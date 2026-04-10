@@ -1,0 +1,18 @@
+CREATE INDEX idx_teachers_school ON teachers(school_id);
+CREATE INDEX idx_teachers_cognito ON teachers(cognito_sub);
+CREATE INDEX idx_classes_teacher ON classes(teacher_id);
+CREATE INDEX idx_classes_school ON classes(school_id);
+CREATE INDEX idx_students_school ON students(school_id);
+CREATE INDEX idx_class_students_class ON class_students(class_id);
+CREATE INDEX idx_class_students_student ON class_students(student_id);
+CREATE INDEX idx_devices_student ON devices(student_id);
+CREATE INDEX idx_devices_device_id ON devices(device_id);
+CREATE INDEX idx_sessions_teacher ON class_sessions(teacher_id);
+CREATE INDEX idx_sessions_class ON class_sessions(class_id);
+CREATE INDEX idx_sessions_active ON class_sessions(teacher_id) WHERE ended_at IS NULL;
+CREATE INDEX idx_checkins_session ON check_ins(session_id);
+CREATE INDEX idx_checkins_device ON check_ins(device_id);
+CREATE INDEX idx_attendance_session ON attendance_records(session_id);
+CREATE INDEX idx_attendance_student ON attendance_records(student_id);
+CREATE INDEX idx_blocking_apps_school ON blocking_apps(school_id);
+CREATE INDEX idx_session_blocklist_session ON session_blocklist(session_id);

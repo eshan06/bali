@@ -1,0 +1,12 @@
+export { pool, query } from './client';
+export * as teacherQueries from './queries/teachers';
+export * as classQueries from './queries/classes';
+export * as studentQueries from './queries/students';
+export * as sessionQueries from './queries/sessions';
+export * as attendanceQueries from './queries/attendance';
+export * as deviceQueries from './queries/devices';
+export * as blockingQueries from './queries/blocking';
+export * as deviceBlockingStatusQueries from './queries/deviceBlockingStatus';
+export * as teacherAppQueries from './queries/teacherApps';
+export * as teacherBlockingDefaultQueries from './queries/teacherBlockingDefaults';
+export * as classBlockingConfigQueries from './queries/classBlockingConfig';
