@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
-import { signInWithRedirect } from 'aws-amplify/auth';
-import { Teacher } from '@bali/shared';
+import { signIn, signOut, getCurrentUser, fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth';
+import { SessionUser } from '@bali/shared';
 import { api, setTokenProvider } from '@/lib/api-client';
 
 interface AuthState {
-  user: Teacher | null;
+  user: SessionUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -35,8 +34,8 @@ export function useAuth() {
   const loadUser = useCallback(async () => {
     try {
       await getCurrentUser();
-      const teacher = await api.get<Teacher>('/auth/me');
-      setState({ user: teacher, isLoading: false, isAuthenticated: true });
+      const me = await api.get<SessionUser>('/auth/me');
+      setState({ user: me, isLoading: false, isAuthenticated: true });
     } catch {
       setState({ user: null, isLoading: false, isAuthenticated: false });
     }
@@ -60,11 +59,18 @@ export function useAuth() {
     setState({ user: null, isLoading: false, isAuthenticated: false });
   };
 
+  const refresh = useCallback(async () => {
+    await fetchAuthSession({ forceRefresh: true });
+    await loadUser();
+  }, [loadUser]);
+
   return {
     ...state,
+    role: state.user?.role ?? null,
     loginWithEmail,
     loginWithGoogle,
     logout,
     getToken,
+    refresh,
   };
 }

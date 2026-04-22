@@ -3,15 +3,17 @@
 import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { configureCognito } from '@/lib/cognito';
-import { Teacher } from '@bali/shared';
+import { SessionUser } from '@bali/shared';
 
 interface AuthContextType {
-  user: Teacher | null;
+  user: SessionUser | null;
+  role: SessionUser['role'] | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

@@ -5,15 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
 export default function AuthCallback() {
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, role } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    // Amplify automatically processes the OAuth callback
-    if (!isLoading) {
-      router.replace(isAuthenticated ? '/dashboard/' : '/login/');
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      router.replace('/login/');
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
+    if (role === 'teacher') router.replace('/dashboard/');
+    else if (role === 'student') router.replace('/student/');
+    else router.replace('/onboarding/');
+  }, [isAuthenticated, isLoading, role, router]);
 
   return (
     <div className="flex h-screen items-center justify-center">

@@ -1,21 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
+function routeForRole(role: string | null | undefined): string {
+  if (role === 'teacher') return '/dashboard/';
+  if (role === 'student') return '/student/';
+  if (role === 'unset') return '/onboarding/';
+  return '/dashboard/';
+}
+
 export default function LoginPage() {
-  const { loginWithEmail, loginWithGoogle, isAuthenticated } = useAuthContext();
+  const { loginWithEmail, loginWithGoogle, isAuthenticated, role } = useAuthContext();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  if (isAuthenticated) {
-    router.replace('/dashboard/');
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated && role) {
+      router.replace(routeForRole(role));
+    }
+  }, [isAuthenticated, role, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +33,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await loginWithEmail(email, password);
-      router.push('/dashboard/');
+      const session = await fetchAuthSession();
+      const claimRole = session.tokens?.idToken?.payload?.['custom:role'] as string | undefined;
+      router.push(routeForRole(claimRole ?? 'unset'));
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
@@ -110,6 +122,13 @@ export default function LoginPage() {
               Sign in with Google
             </button>
           </div>
+
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Don&apos;t have an account?{' '}
+            <Link href="/signup/" className="font-medium text-primary-600 hover:text-primary-700">
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ export interface AuthUser {
   sub: string;
   email: string;
   name: string;
+  role: 'teacher' | 'student' | 'unset';
 }
 
 let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null;
@@ -29,10 +30,14 @@ export async function authenticateJwt(event: APIGatewayProxyEventV2): Promise<Au
 
   try {
     const payload = await getVerifier().verify(token);
+    const rawRole = (payload['custom:role'] as string) || '';
+    const role: AuthUser['role'] =
+      rawRole === 'teacher' || rawRole === 'student' ? rawRole : 'unset';
     return {
       sub: payload.sub,
       email: (payload.email as string) || '',
-      name: (payload.name as string) || (payload.email as string) || 'Teacher',
+      name: (payload.name as string) || (payload.email as string) || 'User',
+      role,
     };
   } catch {
     return null;
