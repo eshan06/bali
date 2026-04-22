@@ -21,6 +21,11 @@ Thumbs.db
 # Build artifacts
 *.zip
 *.tgz
+*.tsbuildinfo
+
+# Next.js
+.vercel/
+next-env.d.ts
 
 # Logs
 *.log
