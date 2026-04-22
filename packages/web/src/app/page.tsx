@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
 const HERO_IMAGES = [
@@ -13,16 +14,17 @@ const HERO_IMAGES = [
 ];
 
 export default function LandingPage() {
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, role } = useAuthContext();
   const router = useRouter();
   const [slide, setSlide] = useState(0);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard/');
-    }
-  }, [isAuthenticated, isLoading, router]);
+    if (isLoading || !isAuthenticated) return;
+    if (role === 'teacher') router.replace('/dashboard/');
+    else if (role === 'student') router.replace('/student/');
+    // role === 'unset' users stay on the landing page
+  }, [isAuthenticated, isLoading, role, router]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -86,13 +88,22 @@ export default function LandingPage() {
           </div>
 
           {/* CTA */}
-          <a
-            href="/request-demo"
-            className="rounded-full px-6 py-2.5 text-sm font-bold transition-opacity duration-300 hover:opacity-85"
-            style={{ backgroundColor: '#2E5BD0', color: '#fff' }}
-          >
-            Request a Demo
-          </a>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/login/"
+              className="text-sm font-semibold transition-colors duration-300 hover:opacity-70"
+              style={{ color: scrolled ? '#374151' : '#fff' }}
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/signup/"
+              className="rounded-full px-6 py-2.5 text-sm font-bold transition-opacity duration-300 hover:opacity-85"
+              style={{ backgroundColor: '#2E5BD0', color: '#fff' }}
+            >
+              Sign Up
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -128,6 +139,21 @@ export default function LandingPage() {
           <p className="mt-5 text-xl font-normal text-white opacity-90">
             Phone-free classrooms. Automatic attendance.
           </p>
+          <div className="mt-10 flex items-center justify-center gap-4">
+            <Link
+              href="/signup/"
+              className="rounded-full px-8 py-3.5 text-base font-bold transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#2E5BD0', color: '#fff' }}
+            >
+              Get Started
+            </Link>
+            <Link
+              href="/login/"
+              className="rounded-full border border-white/40 px-8 py-3.5 text-base font-semibold text-white hover:bg-white/10 transition-colors"
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
 
         {/* scroll cue */}
@@ -429,13 +455,13 @@ export default function LandingPage() {
           <h2 className="text-6xl font-black text-white tracking-tight leading-tight mb-6">
             Ready to take back<br />your classroom?
           </h2>
-          <a
-            href="/request-demo"
+          <Link
+            href="/signup/"
             className="inline-block rounded-lg px-10 py-4 text-base font-bold hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#fff', color: '#2E5BD0' }}
           >
-            Request a Demo
-          </a>
+            Get Started Free
+          </Link>
         </div>
       </section>
 

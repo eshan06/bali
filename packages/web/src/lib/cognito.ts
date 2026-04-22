@@ -9,9 +9,9 @@ export function configureCognito() {
         loginWith: {
           oauth: {
             domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN || '',
-            scopes: ['openid', 'email', 'profile'],
-            redirectSignIn: [process.env.NEXT_PUBLIC_REDIRECT_URI || 'http://localhost:3000/auth/callback/'],
-            redirectSignOut: [process.env.NEXT_PUBLIC_REDIRECT_URI?.replace('/auth/callback/', '/login/') || 'http://localhost:3000/login/'],
+            scopes: ['openid', 'email', 'profile', 'aws.cognito.signin.user.admin'],
+            redirectSignIn: [process.env.NEXT_PUBLIC_REDIRECT_URI || 'http://localhost:3000/auth/callback'],
+            redirectSignOut: [process.env.NEXT_PUBLIC_REDIRECT_URI?.replace(/\/auth\/callback\/?$/, '') || 'http://localhost:3000'],
             responseType: 'code',
           },
         },

@@ -17,6 +17,16 @@ export interface Teacher {
   updatedAt: string;
 }
 
+export type UserRole = 'teacher' | 'student';
+
+export interface SessionUser {
+  role: UserRole | 'unset';
+  sub: string;
+  email: string;
+  displayName: string;
+  teacher?: Teacher;
+}
+
 export type BlockingPreset = 'none' | 'full_focus' | 'no_social_media' | 'no_games' | 'custom';
 
 export interface Class {

@@ -6,14 +6,18 @@ import { useAuthContext } from '@/components/auth/AuthProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, role } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.replace('/login/');
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
+    if (role === 'student') router.replace('/student/');
+    else if (role === 'unset') router.replace('/onboarding/');
+  }, [isAuthenticated, isLoading, role, router]);
 
   if (isLoading) {
     return (
@@ -23,7 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated || role !== 'teacher') return null;
 
   return (
     <div className="flex h-screen">
