@@ -68,10 +68,15 @@ export default function LandingPage() {
 
           {/* center nav links */}
           <div className="hidden md:flex items-center gap-8">
-            {['How It Works', 'About', 'For Districts', 'Press'].map((label) => (
+            {[
+              { label: 'How It Works', href: '#how-it-works' },
+              { label: 'About', href: '#about' },
+              { label: 'Attendance', href: '#for-districts' },
+              { label: 'Press', href: '#press' },
+            ].map(({ label, href }) => (
               <a
                 key={label}
-                href="#"
+                href={href}
                 className="text-sm font-medium transition-colors duration-300 hover:opacity-70"
                 style={{ color: scrolled ? '#374151' : '#fff' }}
               >
@@ -82,25 +87,9 @@ export default function LandingPage() {
 
           {/* CTA */}
           <a
-            href="mailto:jonbani2006@gmail.com?subject=Bali Demo Request"
-            className="rounded-full px-6 py-2.5 text-sm font-bold transition-all duration-300"
-            style={
-              scrolled
-                ? { backgroundColor: '#2E5BD0', color: '#fff', border: '2px solid #2E5BD0' }
-                : { backgroundColor: 'transparent', color: '#fff', border: '2px solid rgba(255,255,255,0.85)' }
-            }
-            onMouseEnter={(e) => {
-              if (!scrolled) {
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = '#fff';
-                (e.currentTarget as HTMLAnchorElement).style.color = '#000';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!scrolled) {
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent';
-                (e.currentTarget as HTMLAnchorElement).style.color = '#fff';
-              }
-            }}
+            href="/request-demo"
+            className="rounded-full px-6 py-2.5 text-sm font-bold transition-opacity duration-300 hover:opacity-85"
+            style={{ backgroundColor: '#2E5BD0', color: '#fff' }}
           >
             Request a Demo
           </a>
@@ -139,15 +128,6 @@ export default function LandingPage() {
           <p className="mt-5 text-xl font-normal text-white opacity-90">
             Phone-free classrooms. Automatic attendance.
           </p>
-          <div className="mt-10">
-            <a
-              href="mailto:jonbani2006@gmail.com?subject=Bali Demo Request"
-              className="inline-block rounded-lg px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black"
-              style={{ border: '1.5px solid rgba(255,255,255,0.85)', backgroundColor: 'transparent' }}
-            >
-              Request a Demo
-            </a>
-          </div>
         </div>
 
         {/* scroll cue */}
@@ -159,7 +139,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── MISSION ────────────────────────────────────────────────────── */}
-      <section style={{ backgroundColor: '#1a1a1a' }}>
+      <section id="about" style={{ backgroundColor: '#1a1a1a' }}>
         <div className="max-w-4xl mx-auto px-8 py-32 text-center">
           <div className="mx-auto mb-8 rounded-full" style={{ width: 64, height: 3, backgroundColor: '#2E5BD0' }} />
           <h2 className="text-5xl md:text-6xl font-black text-white uppercase leading-tight tracking-tight mb-8">
@@ -292,9 +272,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── ATTENDANCE ─────────────────────────────────────────────────── */}
-      <section id="features" className="bg-white border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-8 py-28">
-          <div className="grid md:grid-cols-2 gap-20 items-center">
+      <section id="for-districts" className="bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-8 py-36">
+          <div className="grid md:grid-cols-2 gap-24 items-center">
 
             {/* left — image */}
             <div className="flex justify-center">
@@ -302,7 +282,7 @@ export default function LandingPage() {
                 src="/dbbd3005-86a3-4939-8357-e42a1afcedef%20copy.png"
                 alt="Class dashboard"
                 className="w-full rounded-3xl object-cover"
-                style={{ maxWidth: 550, boxShadow: '0 32px 80px rgba(0,0,0,0.14)' }}
+                style={{ maxWidth: 620, boxShadow: '0 40px 100px rgba(0,0,0,0.14)' }}
               />
             </div>
 
@@ -311,30 +291,33 @@ export default function LandingPage() {
               <p className="text-xs font-bold tracking-widest uppercase mb-5" style={{ color: '#2E5BD0' }}>
                 Attendance Tracking
               </p>
-              <h2 className="text-4xl md:text-5xl font-bold text-black leading-tight tracking-tight mb-10">
+              <h2 className="text-4xl md:text-5xl font-bold text-black leading-tight tracking-tight mb-12">
                 Automatic Attendance.
               </h2>
 
-              <ul className="space-y-5">
+              <ul className="space-y-7">
                 {[
                   'Present, late, and absent — tracked automatically',
-                  'Exact minutes late recorded per student',
-                  'Bathroom breaks logged with timestamp',
-                  'Syncs directly with Canvas, Google Classroom, Blackboard, and more',
+                  'Syncs with Canvas, Google Classroom, and Blackboard',
+                  'Zero extra work for teachers',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
+                  <li key={item} className="flex items-start gap-4">
                     <span
-                      className="mt-0.5 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center"
+                      className="mt-1 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: '#2E5BD0' }}
                     >
                       <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                       </svg>
                     </span>
-                    <span className="text-gray-800 text-base leading-snug">{item}</span>
+                    <span className="text-gray-800 text-lg leading-snug">{item}</span>
                   </li>
                 ))}
               </ul>
+
+              <p className="mt-10 text-sm text-gray-400 italic">
+                U.S. districts lose $13B annually to chronic absenteeism — Source: Attendance Works
+              </p>
             </div>
 
           </div>
@@ -405,9 +388,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ───────────────────────────────────────────────── */}
       {/* ── RESEARCH ───────────────────────────────────────────────────── */}
-      <section className="bg-white border-t border-gray-100">
+      <section id="press" className="bg-white border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-8 py-28 text-center">
           <h2 className="text-4xl md:text-5xl font-black text-black tracking-tight leading-tight mb-4">
             The Research Is Clear
@@ -442,13 +424,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA ────────────────────────────────────────────────────────── */}
-      <section style={{ backgroundColor: '#2E5BD0' }}>
+      <section id="cta" style={{ backgroundColor: '#2E5BD0' }}>
         <div className="max-w-7xl mx-auto px-8 py-32 text-center">
           <h2 className="text-6xl font-black text-white tracking-tight leading-tight mb-6">
             Ready to take back<br />your classroom?
           </h2>
           <a
-            href="mailto:jonbani2006@gmail.com?subject=Bali Demo Request"
+            href="/request-demo"
             className="inline-block rounded-lg px-10 py-4 text-base font-bold hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#fff', color: '#2E5BD0' }}
           >

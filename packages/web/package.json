@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@bali/shared": "*",
     "aws-amplify": "^6.3.0",
     "next": "^14.2.0",
