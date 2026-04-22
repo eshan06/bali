@@ -348,7 +348,7 @@ export default function LandingPage() {
             {[
               { value: '< 30s', label: 'Average check-in time' },
               { value: '100%', label: 'Automated attendance' },
-              { value: '0', label: 'Apps required by students' },
+              { value: '1', label: 'App for students to install' },
             ].map((stat) => (
               <div key={stat.label} className="px-12 first:pl-0 last:pr-0 text-center">
                 <p className="text-5xl font-black text-black tracking-tight">{stat.value}</p>
