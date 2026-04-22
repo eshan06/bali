@@ -134,8 +134,11 @@ export default function LandingPage() {
         {/* content */}
         <div className="relative z-10 text-center text-white px-6 max-w-5xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] text-white drop-shadow-md">
-            The #1 solution to put phones away and bring learning back.
+            The #1 solution to combat in-class phone usage
           </h1>
+          <p className="mt-5 text-xl font-normal text-white opacity-90">
+            Phone-free classrooms. Automatic attendance.
+          </p>
           <div className="mt-10">
             <a
               href="mailto:jonbani2006@gmail.com?subject=Bali Demo Request"
@@ -197,7 +200,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black text-black mb-3">Tap</h3>
               <p className="text-gray-500 text-base leading-loose max-w-xs">
-                Student taps their phone on the Bali device entering class. The device lights up green.
+                A Bali device is mounted outside every classroom. Students tap their phone as they walk in — the device lights up green to confirm.
               </p>
             </div>
 
@@ -206,7 +209,7 @@ export default function LandingPage() {
               <span className="text-5xl font-black mb-6" style={{ color: '#2E5BD0' }}>2</span>
               <div className="w-full flex items-center justify-center mb-8" style={{ height: 450 }}>
                 <img
-                  src={encodeURI('/Screenshot 2026-04-05 at 7.13.38 PM copy.png')}
+                  src="/lock-step.png"
                   alt="Lock"
                   className="rounded-2xl object-contain"
                   style={{ maxHeight: 450, width: '100%' }}
@@ -214,7 +217,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black text-black mb-3">Lock</h3>
               <p className="text-gray-500 text-base leading-loose max-w-xs">
-                The moment class starts, Bali locks distracting apps. Students enter focus mode — camera and notepad still available.
+                Bali instantly enters focus mode — distracting apps blocked, camera and notepad still available.
               </p>
             </div>
 
@@ -231,7 +234,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black text-black mb-3">Track</h3>
               <p className="text-gray-500 text-base leading-loose max-w-xs">
-                See exactly who's present, who's late and by how many minutes, and who's absent — all updating in real time on your dashboard.
+                The teacher dashboard updates in real time: who's present, who's late, and who's absent.
               </p>
             </div>
 
@@ -245,12 +248,12 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 gap-20 items-center">
 
             {/* left — image */}
-            <div>
+            <div className="flex justify-center">
               <img
-                src="/bali-lock-screen.png"
+                src="/lock-step.png"
                 alt="Bali focus mode lock screen"
                 className="w-full rounded-3xl object-cover"
-                style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.14)' }}
+                style={{ maxWidth: 320, boxShadow: '0 32px 80px rgba(0,0,0,0.14)' }}
               />
             </div>
 
@@ -260,16 +263,14 @@ export default function LandingPage() {
                 Focus Mode
               </p>
               <h2 className="text-4xl md:text-5xl font-bold text-black leading-tight tracking-tight mb-10">
-                Students stay focused.<br />Teachers stay in control.
+                Focus Mode.
               </h2>
 
-              <ul className="space-y-5 mb-10">
+              <ul className="space-y-5">
                 {[
-                  'Camera stays on — for photos and scanning',
-                  'Notepad stays on — for notes and studying',
-                  'Social media, games, and distracting apps blocked',
-                  'Teachers can customize exactly which apps are allowed',
-                  'Emergency override button — students can unlock instantly in any emergency, teacher is alerted immediately',
+                  'Social media, games, and iMessage blocked',
+                  'Camera and Notepad stay on',
+                  'Emergency override instantly unlocks and alerts teacher',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <span
@@ -284,10 +285,56 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
+            </div>
 
-              <p className="text-gray-400 text-base leading-relaxed">
-                Every school is different. Bali lets administrators set the exact policy that works for their district.
+          </div>
+        </div>
+      </section>
+
+      {/* ── ATTENDANCE ─────────────────────────────────────────────────── */}
+      <section id="features" className="bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-8 py-28">
+          <div className="grid md:grid-cols-2 gap-20 items-center">
+
+            {/* left — image */}
+            <div className="flex justify-center">
+              <img
+                src="/dbbd3005-86a3-4939-8357-e42a1afcedef%20copy.png"
+                alt="Class dashboard"
+                className="w-full rounded-3xl object-cover"
+                style={{ maxWidth: 550, boxShadow: '0 32px 80px rgba(0,0,0,0.14)' }}
+              />
+            </div>
+
+            {/* right — text */}
+            <div>
+              <p className="text-xs font-bold tracking-widest uppercase mb-5" style={{ color: '#2E5BD0' }}>
+                Attendance Tracking
               </p>
+              <h2 className="text-4xl md:text-5xl font-bold text-black leading-tight tracking-tight mb-10">
+                Automatic Attendance.
+              </h2>
+
+              <ul className="space-y-5">
+                {[
+                  'Present, late, and absent — tracked automatically',
+                  'Exact minutes late recorded per student',
+                  'Bathroom breaks logged with timestamp',
+                  'Syncs directly with Canvas, Google Classroom, Blackboard, and more',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span
+                      className="mt-0.5 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: '#2E5BD0' }}
+                    >
+                      <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    </span>
+                    <span className="text-gray-800 text-base leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
           </div>
@@ -358,97 +405,52 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FEATURES ───────────────────────────────────────────────────── */}
-      <section id="features" className="border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-8 py-32">
-          <div className="max-w-2xl mb-20">
-            <p className="text-sm font-semibold tracking-widest text-gray-400 uppercase mb-4">Features</p>
-            <h2 className="text-5xl font-black text-black tracking-tight leading-tight">
-              Everything you need.<br />Nothing you don't.
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-px bg-gray-100">
-            {[
-              {
-                icon: (
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
-                title: 'Instant Attendance',
-                desc: 'Students tap in with their device and attendance is recorded automatically. No roll calls, no paper.',
-              },
-              {
-                icon: (
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                ),
-                title: 'Phone Lockdown',
-                desc: 'The moment class starts, distracting apps are blocked. One click. No student opt-out.',
-              },
-              {
-                icon: (
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75" />
-                  </svg>
-                ),
-                title: 'Live Dashboard',
-                desc: "See who's in, who's late, and whose device is locked — all in real time from one screen.",
-              },
-            ].map((feature) => (
-              <div key={feature.title} className="bg-white p-12">
-                <div className="h-12 w-12 rounded-2xl bg-gray-50 flex items-center justify-center text-black mb-8">
-                  {feature.icon}
-                </div>
-                <h3 className="text-xl font-bold text-black mb-3">{feature.title}</h3>
-                <p className="text-gray-500 leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── HOW IT WORKS ───────────────────────────────────────────────── */}
-      <section id="how-it-works" className="border-t border-gray-100 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-8 py-32">
-          <div className="max-w-2xl mb-20">
-            <p className="text-sm font-semibold tracking-widest text-gray-400 uppercase mb-4">How it works</p>
-            <h2 className="text-5xl font-black text-black tracking-tight leading-tight">
-              Up and running<br />in minutes.
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8">
+      {/* ── RESEARCH ───────────────────────────────────────────────────── */}
+      <section className="bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-8 py-28 text-center">
+          <h2 className="text-4xl md:text-5xl font-black text-black tracking-tight leading-tight mb-4">
+            The Research Is Clear
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6 text-left mb-12">
             {[
-              { step: '01', title: 'Create a class', desc: 'Add your students manually or import a CSV in seconds.' },
-              { step: '02', title: 'Set your policy', desc: 'Choose what to block — social, games, everything, or a custom list.' },
-              { step: '03', title: 'Start a session', desc: 'Blocking activates instantly. Students tap in from their phone.' },
-              { step: '04', title: 'Just teach', desc: "Monitor attendance and focus from your dashboard. That's it." },
-            ].map((item) => (
-              <div key={item.step}>
-                <p className="text-6xl font-black text-gray-100 leading-none mb-6">{item.step}</p>
-                <h3 className="text-lg font-bold text-black mb-2">{item.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
+              {
+                quote: "Students who didn't use phones wrote down 62% more notes and scored a full letter grade higher on tests.",
+                source: '— London School of Economics',
+              },
+              {
+                quote: 'Even a phone face-down on a desk reduces cognitive capacity and impairs thinking.',
+                source: '— University of Texas at Austin',
+              },
+              {
+                quote: 'Banning phones improved grades most for low-income students and those who struggle most.',
+                source: '— Education Endowment Foundation',
+              },
+            ].map(({ quote, source }) => (
+              <div key={source} className="rounded-xl py-8 px-8 flex flex-col" style={{ backgroundColor: '#F7F7F7' }}>
+                <span className="text-5xl font-black leading-none mb-4" style={{ color: '#2E5BD0' }}>"</span>
+                <p className="text-base text-gray-700 italic leading-relaxed flex-1 mb-6">{quote}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{source}</p>
               </div>
             ))}
           </div>
+
+          <p className="text-sm text-gray-400 italic">
+            Referenced in The Atlantic, The New York Times, and Jonathan Haidt's <em>The Anxious Generation</em>.
+          </p>
         </div>
       </section>
 
       {/* ── CTA ────────────────────────────────────────────────────────── */}
-      <section className="border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-8 py-40 text-center">
-          <h2 className="text-6xl font-black text-black tracking-tight leading-tight mb-6">
+      <section style={{ backgroundColor: '#2E5BD0' }}>
+        <div className="max-w-7xl mx-auto px-8 py-32 text-center">
+          <h2 className="text-6xl font-black text-white tracking-tight leading-tight mb-6">
             Ready to take back<br />your classroom?
           </h2>
-          <p className="text-xl text-gray-400 max-w-lg mx-auto mb-12">
-            No apps. No setup for students. No excuses.
-          </p>
           <a
             href="mailto:jonbani2006@gmail.com?subject=Bali Demo Request"
-            className="inline-block rounded-full bg-brand px-10 py-4 text-base font-bold text-white hover:opacity-90 transition-opacity"
+            className="inline-block rounded-lg px-10 py-4 text-base font-bold hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: '#fff', color: '#2E5BD0' }}
           >
             Request a Demo
           </a>
@@ -456,10 +458,14 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOOTER ─────────────────────────────────────────────────────── */}
-      <footer className="border-t border-gray-100">
+      <footer style={{ backgroundColor: '#0f0f0f' }}>
         <div className="max-w-7xl mx-auto px-8 py-10 flex items-center justify-between">
-          <span className="text-lg font-black text-black tracking-tight">bali</span>
-          <span className="text-sm text-gray-400">Built for teachers, by students.</span>
+          <span className="text-lg font-black text-white tracking-tight">bali</span>
+          <div className="flex items-center gap-6 text-sm text-gray-500">
+            <a href="https://baliedu.com" className="hover:text-gray-300 transition-colors">baliedu.com</a>
+            <a href="mailto:contact@baliedu.com" className="hover:text-gray-300 transition-colors">contact@baliedu.com</a>
+          </div>
+          <span className="text-sm text-gray-500">© 2025 Bali. Built for schools.</span>
         </div>
       </footer>
 
