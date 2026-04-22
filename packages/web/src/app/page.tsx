@@ -198,7 +198,7 @@ export default function LandingPage() {
               <span className="text-5xl font-black mb-6" style={{ color: '#2E5BD0' }}>1</span>
               <div className="w-full flex items-center justify-center mb-8" style={{ height: 450 }}>
                 <img
-                  src="/40abf499-4465-4750-90f9-a72a03d96651%20copy.png"
+                  src="/step-tap.webp"
                   alt="Tap"
                   className="rounded-2xl object-contain"
                   style={{ maxHeight: 450, width: '100%' }}
@@ -215,7 +215,7 @@ export default function LandingPage() {
               <span className="text-5xl font-black mb-6" style={{ color: '#2E5BD0' }}>2</span>
               <div className="w-full flex items-center justify-center mb-8" style={{ height: 450 }}>
                 <img
-                  src="/lock-step.png"
+                  src="/lock-step.webp"
                   alt="Lock"
                   className="rounded-2xl object-contain"
                   style={{ maxHeight: 450, width: '100%' }}
@@ -232,7 +232,7 @@ export default function LandingPage() {
               <span className="text-5xl font-black mb-6" style={{ color: '#2E5BD0' }}>3</span>
               <div className="w-full flex items-center justify-center mb-8" style={{ height: 450 }}>
                 <img
-                  src="/dbbd3005-86a3-4939-8357-e42a1afcedef%20copy.png"
+                  src="/dashboard-preview.webp"
                   alt="Track"
                   className="rounded-2xl object-contain"
                   style={{ maxHeight: 450, width: '100%' }}
@@ -256,7 +256,7 @@ export default function LandingPage() {
             {/* left — image */}
             <div className="flex justify-center">
               <img
-                src="/lock-step.png"
+                src="/lock-step.webp"
                 alt="Bali focus mode lock screen"
                 className="w-full rounded-3xl object-cover"
                 style={{ maxWidth: 320, boxShadow: '0 32px 80px rgba(0,0,0,0.14)' }}
@@ -305,7 +305,7 @@ export default function LandingPage() {
             {/* left — image */}
             <div className="flex justify-center">
               <img
-                src="/dbbd3005-86a3-4939-8357-e42a1afcedef%20copy.png"
+                src="/dashboard-preview.webp"
                 alt="Class dashboard"
                 className="w-full rounded-3xl object-cover"
                 style={{ maxWidth: 620, boxShadow: '0 40px 100px rgba(0,0,0,0.14)' }}
@@ -377,39 +377,19 @@ export default function LandingPage() {
           <p className="mt-4 text-lg text-white/50 max-w-xl mx-auto">
             Watch how one device transforms your school's phone policy.
           </p>
-          <div className="mt-12 mx-auto relative" style={{ maxWidth: 900 }}>
-            {/* play button overlay — clicking it removes the overlay and plays */}
+          <div className="mt-12 mx-auto" style={{ maxWidth: 900 }}>
             <div
-              id="video-overlay"
-              className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl cursor-pointer"
-              style={{ background: 'rgba(0,0,0,0.25)' }}
-              onClick={() => {
-                const overlay = document.getElementById('video-overlay');
-                const vid = document.getElementById('bali-video') as HTMLVideoElement | null;
-                if (overlay) overlay.style.display = 'none';
-                if (vid) vid.play();
-              }}
+              className="relative w-full overflow-hidden rounded-2xl"
+              style={{ paddingBottom: '56.25%' }}
             >
-              <div
-                className="flex items-center justify-center rounded-full"
-                style={{ width: 72, height: 72, backgroundColor: '#fff' }}
-              >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <polygon points="6,3 20,12 6,21" fill="#2E5BD0" />
-                </svg>
-              </div>
+              <iframe
+                className="absolute inset-0 h-full w-full"
+                src="https://www.youtube.com/embed/uxpDa-c-4Mc"
+                title="Bali demo"
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
             </div>
-            <video
-              id="bali-video"
-              controls
-              playsInline
-              poster={"/Screenshot 2026-04-22 at 1.29.27 AM.png"}
-              className="w-full rounded-2xl block"
-              style={{ height: 500, width: '100%', objectFit: 'cover' }}
-            >
-              <source src="/Bali%20video%20copy.mov" type="video/mp4" />
-              <source src="/Bali%20video%20copy.mov" type="video/quicktime" />
-            </video>
           </div>
         </div>
       </section>
