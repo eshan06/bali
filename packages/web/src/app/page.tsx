@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
 const HERO_IMAGES = [
-  'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920',
-  'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1920',
   'https://images.unsplash.com/photo-1588072432836-e10032774350?w=1920',
   'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=1920',
-  'https://images.unsplash.com/photo-1606761568499-6d2451b23c66?w=1920',
+  'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920',
+  'https://images.unsplash.com/photo-1491308056676-205b7c9a7dc1?w=1920',
+  'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1920',
 ];
 
 export default function LandingPage() {
