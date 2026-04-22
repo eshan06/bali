@@ -87,6 +87,10 @@ export const setClassBlockingConfigSchema = z.object({
   appIds: z.array(z.string().uuid()).optional(),
 });
 
+export const updateStudentNotesSchema = z.object({
+  notes: z.string().max(5000),
+});
+
 export type CreateClassInput = z.infer<typeof createClassSchema>;
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 export type AddStudentInput = z.infer<typeof addStudentSchema>;

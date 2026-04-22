@@ -469,8 +469,13 @@ export default function ClassDetailPage() {
             <tbody className="divide-y divide-gray-50">
               {cls.students.map((s: any) => (
                 <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    {s.firstName} {s.lastName}
+                  <td className="px-4 py-3 text-sm font-medium">
+                    <Link
+                      href={`/dashboard/classes/${classId}/students/${s.id}/`}
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {s.firstName} {s.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{s.email || '-'}</td>
                   <td className="px-4 py-3 text-right">

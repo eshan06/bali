@@ -45,8 +45,48 @@ export interface Student {
   lastName: string;
   email?: string;
   externalId?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StudentProfile {
+  student: Student & { enrolledAt: string };
+  classes: Array<{ id: string; name: string; period?: string }>;
+  device: {
+    id: string;
+    deviceId: string;
+    friendlyName?: string;
+  } | null;
+  attendanceHistory: Array<{
+    sessionId: string;
+    startedAt: string;
+    endedAt?: string;
+    status: string;
+    checkInAt?: string;
+    isOverride: boolean;
+    blockingStatus: 'active' | 'inactive' | 'student_override' | 'disabled' | 'no_data';
+  }>;
+  attendanceStats: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+    excused: number;
+    rate: number;
+  };
+  blockingStatus: {
+    isBlocked: boolean;
+    reportedAt: string;
+    reportedBy: string;
+  } | null;
+  auditLog: Array<{
+    sessionId: string;
+    oldStatus: string;
+    newStatus: string;
+    changedAt: string;
+    changedByName?: string;
+  }>;
 }
 
 export interface ClassStudent {
@@ -136,7 +176,7 @@ export interface DeviceBlockingStatus {
   studentId: string;
   isBlocked: boolean;
   reportedAt: string;
-  reportedBy: 'manual' | 'device';
+  reportedBy: 'manual' | 'device' | 'student_override';
 }
 
 export interface BlockingPolicy {

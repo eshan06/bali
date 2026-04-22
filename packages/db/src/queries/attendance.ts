@@ -34,6 +34,13 @@ export async function getBySessionWithEnrolled(sessionId: string, classId: strin
 }
 
 export async function override(sessionId: string, studentId: string, status: string, teacherId: string) {
+  // Log the old status before overwriting
+  const existing = await query(
+    `SELECT status FROM attendance_records WHERE session_id = $1 AND student_id = $2`,
+    [sessionId, studentId]
+  );
+  const oldStatus = existing[0]?.status;
+
   const rows = await query(
     `INSERT INTO attendance_records (session_id, student_id, status, marked_at, override_by)
      VALUES ($1, $2, $3, NOW(), $4)
@@ -42,6 +49,15 @@ export async function override(sessionId: string, studentId: string, status: str
      RETURNING id, student_id as "studentId", status, marked_at as "markedAt"`,
     [sessionId, studentId, status, teacherId]
   );
+
+  if (oldStatus && oldStatus !== status) {
+    await query(
+      `INSERT INTO attendance_audit_log (session_id, student_id, old_status, new_status, changed_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [sessionId, studentId, oldStatus, status, teacherId]
+    );
+  }
+
   return rows[0];
 }
 
@@ -74,6 +90,33 @@ export async function markAbsentForMissing(sessionId: string, classId: string) {
        )
      ON CONFLICT (session_id, student_id) DO NOTHING`,
     [sessionId, classId]
+  );
+}
+
+export async function getAuditLog(sessionId: string, studentId: string) {
+  return query(
+    `SELECT aal.old_status as "oldStatus", aal.new_status as "newStatus",
+            aal.changed_at as "changedAt",
+            t.display_name as "changedByName"
+     FROM attendance_audit_log aal
+     LEFT JOIN teachers t ON t.id = aal.changed_by
+     WHERE aal.session_id = $1 AND aal.student_id = $2
+     ORDER BY aal.changed_at ASC`,
+    [sessionId, studentId]
+  );
+}
+
+export async function getAuditLogForStudentInClass(studentId: string, classId: string) {
+  return query(
+    `SELECT aal.session_id as "sessionId", aal.old_status as "oldStatus",
+            aal.new_status as "newStatus", aal.changed_at as "changedAt",
+            t.display_name as "changedByName"
+     FROM attendance_audit_log aal
+     JOIN class_sessions cs ON cs.id = aal.session_id
+     LEFT JOIN teachers t ON t.id = aal.changed_by
+     WHERE aal.student_id = $1 AND cs.class_id = $2
+     ORDER BY aal.changed_at ASC`,
+    [studentId, classId]
   );
 }
 

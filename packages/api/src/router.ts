@@ -13,6 +13,8 @@ import { handler as studentAdd } from './handlers/students/add';
 import { handler as studentBulkAdd } from './handlers/students/bulkAdd';
 import { handler as studentList } from './handlers/students/list';
 import { handler as studentRemove } from './handlers/students/remove';
+import { handler as studentProfile } from './handlers/students/profile';
+import { handler as studentUpdateNotes } from './handlers/students/updateNotes';
 import { handler as sessionStart } from './handlers/sessions/start';
 import { handler as sessionEnd } from './handlers/sessions/end';
 import { handler as sessionActive } from './handlers/sessions/active';
@@ -60,6 +62,8 @@ const routes: Route[] = [
   { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students$/,                         handler: studentAdd,          auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students\/import$/,                 handler: studentBulkAdd,      auth: 'jwt' },
   { method: 'GET',    pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students$/,                          handler: studentList,         auth: 'jwt' },
+  { method: 'GET',    pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students\/(?<studentId>[^/]+)$/,     handler: studentProfile,      auth: 'jwt' },
+  { method: 'PUT',    pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students\/(?<studentId>[^/]+)\/notes$/, handler: studentUpdateNotes, auth: 'jwt' },
   { method: 'DELETE', pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students\/(?<studentId>[^/]+)$/,     handler: studentRemove,       auth: 'jwt' },
 
   // Sessions
