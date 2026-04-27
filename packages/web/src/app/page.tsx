@@ -384,7 +384,7 @@ export default function LandingPage() {
             >
               <iframe
                 className="absolute inset-0 h-full w-full"
-                src="https://www.youtube.com/embed/uxpDa-c-4Mc"
+                src="https://www.youtube.com/embed/QR-k56YwHVo"
                 title="Bali demo"
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
