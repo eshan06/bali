@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   signUp,
@@ -16,16 +16,22 @@ import type { UserRole } from '@bali/shared';
 type Step = 'form' | 'confirm';
 
 const PENDING_ROLE_KEY = 'bali:pendingSignupRole';
+const PENDING_REDIRECT_KEY = 'bali:pendingRedirect';
 
-function routeForRole(role: string | null | undefined): string {
+function routeForRole(role: string | null | undefined, redirect: string | null): string {
+  if (redirect && (role === 'teacher' || role === 'student')) return redirect;
   if (role === 'teacher') return '/dashboard/';
-  if (role === 'student') return '/student/';
-  return '/onboarding/';
+  if (role === 'student') {
+    return redirect ? `/onboarding/profile/?redirect=${encodeURIComponent(redirect)}` : '/student/';
+  }
+  return redirect ? `/onboarding/?redirect=${encodeURIComponent(redirect)}` : '/onboarding/';
 }
 
 export default function SignupPage() {
   const { loginWithGoogle, isAuthenticated, role: currentRole } = useAuthContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
 
   const [step, setStep] = useState<Step>('form');
   const [role, setRole] = useState<UserRole>('teacher');
@@ -38,9 +44,9 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (isAuthenticated && currentRole) {
-      router.replace(routeForRole(currentRole));
+      router.replace(routeForRole(currentRole, redirect));
     }
-  }, [isAuthenticated, currentRole, router]);
+  }, [isAuthenticated, currentRole, router, redirect]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +81,7 @@ export default function SignupPage() {
       await signIn({ username: email, password });
       const session = await fetchAuthSession();
       const claimRole = session.tokens?.idToken?.payload?.['custom:role'] as string | undefined;
-      router.push(routeForRole(claimRole ?? role));
+      router.push(routeForRole(claimRole ?? role, redirect));
     } catch (err: any) {
       setError(err.message || 'Confirmation failed');
     } finally {
@@ -97,6 +103,9 @@ export default function SignupPage() {
   const handleGoogleSignup = async (chosenRole: UserRole) => {
     try {
       window.sessionStorage.setItem(PENDING_ROLE_KEY, chosenRole);
+      if (redirect) {
+        window.sessionStorage.setItem(PENDING_REDIRECT_KEY, redirect);
+      }
     } catch {}
     await loginWithGoogle();
   };
@@ -215,7 +224,10 @@ export default function SignupPage() {
 
               <p className="mt-6 text-center text-sm text-gray-500">
                 Already have an account?{' '}
-                <Link href="/login/" className="font-medium text-primary-600 hover:text-primary-700">
+                <Link
+                  href={redirect ? `/login/?redirect=${encodeURIComponent(redirect)}` : '/login/'}
+                  className="font-medium text-primary-600 hover:text-primary-700"
+                >
                   Sign in
                 </Link>
               </p>

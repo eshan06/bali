@@ -25,6 +25,8 @@ export interface SessionUser {
   email: string;
   displayName: string;
   teacher?: Teacher;
+  /** Present when role === 'student' and the student has completed their profile. */
+  student?: Student;
 }
 
 export type BlockingPreset = 'none' | 'full_focus' | 'no_social_media' | 'no_games' | 'custom';
@@ -50,14 +52,67 @@ export interface ClassBlockingConfig {
 
 export interface Student {
   id: string;
-  schoolId: string;
+  schoolId: string | null;
+  cognitoSub?: string | null;
   firstName: string;
   lastName: string;
   email?: string;
+  grade?: string;
   externalId?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StudentClassSummary {
+  id: string;
+  name: string;
+  period?: string;
+  teacherName: string;
+  schoolName?: string;
+  activeSession: {
+    id: string;
+    startedAt: string;
+    blockingEnabled: boolean;
+    checkedIn: boolean;
+    attendanceStatus: 'present' | 'late' | 'absent' | 'excused' | null;
+  } | null;
+  attendanceRate: number;
+  totalSessions: number;
+}
+
+export interface StudentSelf {
+  student: Student;
+  classes: StudentClassSummary[];
+  pendingInvites: PendingInvite[];
+}
+
+export interface PendingInvite {
+  inviteId: string;
+  classId: string;
+  className: string;
+  period?: string;
+  teacherName: string;
+  schoolName?: string;
+  invitedAt: string;
+}
+
+export interface TeacherClassInvite {
+  id: string;
+  email: string;
+  invitedAt: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  status: 'pending' | 'accepted' | 'revoked';
+}
+
+export interface ClassJoinPreview {
+  classId: string;
+  className: string;
+  period?: string;
+  teacherName: string;
+  schoolName?: string;
+  alreadyEnrolled: boolean;
 }
 
 export interface StudentProfile {

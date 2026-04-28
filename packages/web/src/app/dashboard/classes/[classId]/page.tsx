@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import {
-  Class, Student, TeacherApp, BlockingPreset,
+  Class, Student, TeacherApp, BlockingPreset, TeacherClassInvite,
   SYSTEM_PROTECTED_BUNDLE_IDS, SUGGESTED_APPS,
 } from '@bali/shared';
 
@@ -32,6 +32,11 @@ export default function ClassDetailPage() {
   const [blockingSaved, setBlockingSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  const [invites, setInvites] = useState<TeacherClassInvite[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   const loadClass = () => {
     api.get<Class & { students: Student[] }>(`/classes/${classId}`)
       .then(setCls)
@@ -40,6 +45,39 @@ export default function ClassDetailPage() {
   };
 
   useEffect(() => { loadClass(); }, [classId]);
+
+  const loadInvites = () => {
+    api.get<{ invites: TeacherClassInvite[] }>(`/classes/${classId}/invites`)
+      .then(res => setInvites(res.invites))
+      .catch(console.error);
+  };
+
+  useEffect(() => { loadInvites(); }, [classId]);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteError('');
+    setInviting(true);
+    try {
+      await api.post(`/classes/${classId}/invites`, { email: inviteEmail.trim() });
+      setInviteEmail('');
+      loadInvites();
+    } catch (err: any) {
+      setInviteError(err.message || 'Could not send invite');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    if (!confirm('Revoke this invite?')) return;
+    try {
+      await api.delete(`/classes/${classId}/invites/${inviteId}`);
+      loadInvites();
+    } catch (err: any) {
+      alert(err.message || 'Could not revoke invite');
+    }
+  };
 
   // Load blocking config + teacher apps
   useEffect(() => {
@@ -402,8 +440,86 @@ export default function ClassDetailPage() {
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Students will need the Bali app installed to use this link. Coming soon.
+            Students who open this link can sign up and join this class instantly.
           </p>
+        </div>
+      </div>
+
+      {/* ── Invite by Email ── */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Invite by Email</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Send an in-app invite. The student will see it on their dashboard the next time they sign in.
+          </p>
+        </div>
+        <div className="p-5 space-y-4">
+          <form onSubmit={handleInvite} className="flex gap-2">
+            <input
+              type="email"
+              required
+              placeholder="student@school.edu"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            <button
+              type="submit"
+              disabled={inviting || !inviteEmail.trim()}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+            >
+              {inviting ? 'Sending...' : 'Send invite'}
+            </button>
+          </form>
+
+          {inviteError && (
+            <p className="text-sm text-red-600">{inviteError}</p>
+          )}
+
+          {invites.length > 0 && (
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="text-xs font-medium text-gray-500 uppercase mb-2">
+                Sent invites
+              </h3>
+              <ul className="divide-y divide-gray-50">
+                {invites.map((inv) => (
+                  <li key={inv.id} className="flex items-center justify-between py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{inv.email}</p>
+                      <p className="text-xs text-gray-500">
+                        {inv.status === 'pending' && `Invited ${new Date(inv.invitedAt).toLocaleDateString()}`}
+                        {inv.status === 'accepted' && inv.acceptedAt &&
+                          `Accepted ${new Date(inv.acceptedAt).toLocaleDateString()}`}
+                        {inv.status === 'revoked' && inv.revokedAt &&
+                          `Revoked ${new Date(inv.revokedAt).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          inv.status === 'pending'
+                            ? 'bg-amber-50 text-amber-700'
+                            : inv.status === 'accepted'
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
+                      {inv.status === 'pending' && (
+                        <button
+                          onClick={() => handleRevokeInvite(inv.id)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 

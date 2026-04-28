@@ -91,6 +91,20 @@ export const updateStudentNotesSchema = z.object({
   notes: z.string().max(5000),
 });
 
+export const studentSelfProfileSchema = z.object({
+  firstName: z.string().min(1).max(255),
+  lastName: z.string().min(1).max(255),
+  grade: z.string().max(50).optional().or(z.literal('')),
+});
+
+export type StudentSelfProfileInput = z.infer<typeof studentSelfProfileSchema>;
+
+export const inviteStudentSchema = z.object({
+  email: z.string().email().max(255),
+});
+
+export type InviteStudentInput = z.infer<typeof inviteStudentSchema>;
+
 export type CreateClassInput = z.infer<typeof createClassSchema>;
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 export type AddStudentInput = z.infer<typeof addStudentSchema>;

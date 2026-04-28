@@ -40,13 +40,163 @@ export async function findByClass(classId: string) {
 
 export async function findById(id: string) {
   const rows = await query(
-    `SELECT id, school_id as "schoolId", first_name as "firstName",
-            last_name as "lastName", email, external_id as "externalId",
-            notes, created_at as "createdAt"
+    `SELECT id, school_id as "schoolId", cognito_sub as "cognitoSub",
+            first_name as "firstName", last_name as "lastName",
+            email, grade, external_id as "externalId",
+            notes, created_at as "createdAt", updated_at as "updatedAt"
      FROM students WHERE id = $1`,
     [id]
   );
   return rows[0] || null;
+}
+
+export async function findByCognitoSub(cognitoSub: string) {
+  const rows = await query(
+    `SELECT id, school_id as "schoolId", cognito_sub as "cognitoSub",
+            first_name as "firstName", last_name as "lastName",
+            email, grade, external_id as "externalId",
+            notes, created_at as "createdAt", updated_at as "updatedAt"
+     FROM students WHERE cognito_sub = $1`,
+    [cognitoSub]
+  );
+  return rows[0] || null;
+}
+
+export async function createForUser(
+  cognitoSub: string,
+  email: string,
+  firstName: string,
+  lastName: string,
+  grade?: string
+) {
+  const rows = await query(
+    `INSERT INTO students (cognito_sub, email, first_name, last_name, grade)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, school_id as "schoolId", cognito_sub as "cognitoSub",
+               first_name as "firstName", last_name as "lastName",
+               email, grade, external_id as "externalId",
+               notes, created_at as "createdAt", updated_at as "updatedAt"`,
+    [cognitoSub, email, firstName, lastName, grade || null]
+  );
+  return rows[0];
+}
+
+export async function updateProfile(
+  id: string,
+  fields: { firstName?: string; lastName?: string; grade?: string }
+) {
+  const sets: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  if (fields.firstName !== undefined) { sets.push(`first_name = $${idx++}`); params.push(fields.firstName); }
+  if (fields.lastName !== undefined) { sets.push(`last_name = $${idx++}`); params.push(fields.lastName); }
+  if (fields.grade !== undefined) { sets.push(`grade = $${idx++}`); params.push(fields.grade || null); }
+
+  if (sets.length === 0) return findById(id);
+
+  sets.push(`updated_at = NOW()`);
+  params.push(id);
+
+  const rows = await query(
+    `UPDATE students SET ${sets.join(', ')} WHERE id = $${idx}
+     RETURNING id, school_id as "schoolId", cognito_sub as "cognitoSub",
+               first_name as "firstName", last_name as "lastName",
+               email, grade, external_id as "externalId",
+               notes, created_at as "createdAt", updated_at as "updatedAt"`,
+    params
+  );
+  return rows[0];
+}
+
+/**
+ * Sets school_id only if currently null. Used when a student joins their first
+ * class — their school comes from that class's teacher.
+ */
+export async function setSchoolIfNull(id: string, schoolId: string) {
+  await query(
+    `UPDATE students SET school_id = $2, updated_at = NOW()
+     WHERE id = $1 AND school_id IS NULL`,
+    [id, schoolId]
+  );
+}
+
+export async function adoptCognitoSub(id: string, cognitoSub: string) {
+  await query(
+    `UPDATE students SET cognito_sub = $2, updated_at = NOW() WHERE id = $1`,
+    [id, cognitoSub]
+  );
+}
+
+export async function deleteById(id: string) {
+  await query(`DELETE FROM students WHERE id = $1`, [id]);
+}
+
+export async function getEnrollment(classId: string, studentId: string) {
+  const rows = await query(
+    `SELECT class_id as "classId", student_id as "studentId",
+            enrolled_at as "enrolledAt"
+     FROM class_students WHERE class_id = $1 AND student_id = $2`,
+    [classId, studentId]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Per-class summary for the student dashboard:
+ * teacher name, current active session (if any), checked-in status, attendance rate.
+ */
+export async function getClassSummariesForStudent(studentId: string) {
+  return query(
+    `SELECT c.id, c.name, c.period, c.school_id as "schoolId",
+            t.display_name as "teacherName",
+            sch.name as "schoolName",
+            (
+              SELECT json_build_object(
+                'id', cs.id,
+                'startedAt', cs.started_at,
+                'blockingEnabled', cs.blocking_enabled,
+                'attendanceStatus', ar.status,
+                'checkedIn', ar.check_in_at IS NOT NULL
+              )
+              FROM class_sessions cs
+              LEFT JOIN attendance_records ar
+                ON ar.session_id = cs.id AND ar.student_id = $1
+              WHERE cs.class_id = c.id AND cs.ended_at IS NULL
+              ORDER BY cs.started_at DESC
+              LIMIT 1
+            ) as "activeSession",
+            (
+              SELECT COUNT(*)::int FROM (
+                SELECT DISTINCT ON ((cs2.started_at AT TIME ZONE 'UTC')::date) ar2.status
+                FROM attendance_records ar2
+                JOIN class_sessions cs2 ON cs2.id = ar2.session_id
+                WHERE ar2.student_id = $1 AND cs2.class_id = c.id
+                  AND cs2.ended_at IS NOT NULL
+                ORDER BY (cs2.started_at AT TIME ZONE 'UTC')::date DESC, cs2.started_at DESC
+              ) d
+            ) as "totalSessions",
+            (
+              SELECT COALESCE(ROUND(
+                100.0 * COUNT(CASE WHEN d.status IN ('present', 'late') THEN 1 END)
+                / NULLIF(COUNT(*), 0)
+              )::int, 0) FROM (
+                SELECT DISTINCT ON ((cs3.started_at AT TIME ZONE 'UTC')::date) ar3.status
+                FROM attendance_records ar3
+                JOIN class_sessions cs3 ON cs3.id = ar3.session_id
+                WHERE ar3.student_id = $1 AND cs3.class_id = c.id
+                  AND cs3.ended_at IS NOT NULL
+                ORDER BY (cs3.started_at AT TIME ZONE 'UTC')::date DESC, cs3.started_at DESC
+              ) d
+            ) as "attendanceRate"
+     FROM class_students enr
+     JOIN classes c ON c.id = enr.class_id
+     JOIN teachers t ON t.id = c.teacher_id
+     LEFT JOIN schools sch ON sch.id = c.school_id
+     WHERE enr.student_id = $1 AND c.is_archived = false
+     ORDER BY c.name`,
+    [studentId]
+  );
 }
 
 export async function findByIdInClass(classId: string, studentId: string) {

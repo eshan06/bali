@@ -10,3 +10,4 @@ export * as deviceBlockingStatusQueries from './queries/deviceBlockingStatus';
 export * as teacherAppQueries from './queries/teacherApps';
 export * as teacherBlockingDefaultQueries from './queries/teacherBlockingDefaults';
 export * as classBlockingConfigQueries from './queries/classBlockingConfig';
+export * as classInviteQueries from './queries/classInvites';

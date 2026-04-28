@@ -1,21 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
-function routeForRole(role: string | null | undefined): string {
+const PENDING_REDIRECT_KEY = 'bali:pendingRedirect';
+
+function routeForRole(role: string | null | undefined, redirect: string | null): string {
+  if (redirect && (role === 'teacher' || role === 'student')) return redirect;
   if (role === 'teacher') return '/dashboard/';
   if (role === 'student') return '/student/';
-  if (role === 'unset') return '/onboarding/';
+  if (role === 'unset') {
+    return redirect ? `/onboarding/?redirect=${encodeURIComponent(redirect)}` : '/onboarding/';
+  }
   return '/dashboard/';
 }
 
 export default function LoginPage() {
   const { loginWithEmail, loginWithGoogle, isAuthenticated, role } = useAuthContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,9 +30,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && role) {
-      router.replace(routeForRole(role));
+      router.replace(routeForRole(role, redirect));
     }
-  }, [isAuthenticated, role, router]);
+  }, [isAuthenticated, role, router, redirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +42,21 @@ export default function LoginPage() {
       await loginWithEmail(email, password);
       const session = await fetchAuthSession();
       const claimRole = session.tokens?.idToken?.payload?.['custom:role'] as string | undefined;
-      router.push(routeForRole(claimRole ?? 'unset'));
+      router.push(routeForRole(claimRole ?? 'unset', redirect));
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogle = async () => {
+    if (redirect) {
+      try {
+        window.sessionStorage.setItem(PENDING_REDIRECT_KEY, redirect);
+      } catch {}
+    }
+    await loginWithGoogle();
   };
 
   return (
@@ -110,7 +126,7 @@ export default function LoginPage() {
             </div>
 
             <button
-              onClick={loginWithGoogle}
+              onClick={handleGoogle}
               className="mt-4 flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -125,7 +141,10 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Don&apos;t have an account?{' '}
-            <Link href="/signup/" className="font-medium text-primary-600 hover:text-primary-700">
+            <Link
+              href={redirect ? `/signup/?redirect=${encodeURIComponent(redirect)}` : '/signup/'}
+              className="font-medium text-primary-600 hover:text-primary-700"
+            >
               Sign up
             </Link>
           </p>

@@ -66,3 +66,21 @@ export async function update(id: string, fields: { name?: string; description?: 
 export async function archive(id: string) {
   await query(`UPDATE classes SET is_archived = true, updated_at = NOW() WHERE id = $1`, [id]);
 }
+
+/**
+ * Public-ish join preview: class name + teacher + school for the invite landing page.
+ */
+export async function findPreviewById(id: string) {
+  const rows = await query(
+    `SELECT c.id, c.name, c.period, c.is_archived as "isArchived",
+            c.school_id as "schoolId",
+            t.display_name as "teacherName",
+            sch.name as "schoolName"
+     FROM classes c
+     JOIN teachers t ON t.id = c.teacher_id
+     LEFT JOIN schools sch ON sch.id = c.school_id
+     WHERE c.id = $1`,
+    [id]
+  );
+  return rows[0] || null;
+}
