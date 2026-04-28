@@ -1,16 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { updateUserAttributes } from 'aws-amplify/auth';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import type { UserRole } from '@bali/shared';
 
 const PENDING_ROLE_KEY = 'bali:pendingSignupRole';
 
+function withRedirect(path: string, redirect: string | null) {
+  return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
+}
+
 export default function OnboardingPage() {
   const { isAuthenticated, isLoading, role, refresh, logout } = useAuthContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
   const [selected, setSelected] = useState<UserRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -18,12 +24,12 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      router.replace('/login/');
+      router.replace(withRedirect('/login/', redirect));
       return;
     }
-    if (role === 'teacher') router.replace('/dashboard/');
-    else if (role === 'student') router.replace('/student/');
-  }, [isAuthenticated, isLoading, role, router]);
+    if (role === 'teacher') router.replace(redirect || '/dashboard/');
+    else if (role === 'student') router.replace(withRedirect('/onboarding/profile/', redirect));
+  }, [isAuthenticated, isLoading, role, router, redirect]);
 
   useEffect(() => {
     try {
@@ -46,7 +52,11 @@ export default function OnboardingPage() {
         window.sessionStorage.removeItem(PENDING_ROLE_KEY);
       } catch {}
       await refresh();
-      router.replace(selected === 'teacher' ? '/dashboard/' : '/student/');
+      if (selected === 'teacher') {
+        router.replace(redirect || '/dashboard/');
+      } else {
+        router.replace(withRedirect('/onboarding/profile/', redirect));
+      }
     } catch (err: any) {
       setError(err.message || 'Could not save your role');
     } finally {

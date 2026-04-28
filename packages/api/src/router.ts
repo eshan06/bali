@@ -9,6 +9,13 @@ import { handler as classList } from './handlers/classes/list';
 import { handler as classGet } from './handlers/classes/get';
 import { handler as classUpdate } from './handlers/classes/update';
 import { handler as classDelete } from './handlers/classes/delete';
+import { handler as classPreview } from './handlers/classes/preview';
+import { handler as classJoin } from './handlers/classes/join';
+import { getHandler as studentMeGet, postHandler as studentMePost } from './handlers/students/me';
+import { handler as inviteCreate } from './handlers/invites/create';
+import { handler as inviteList } from './handlers/invites/list';
+import { handler as inviteRevoke } from './handlers/invites/revoke';
+import { handler as inviteAccept } from './handlers/invites/accept';
 import { handler as studentAdd } from './handlers/students/add';
 import { handler as studentBulkAdd } from './handlers/students/bulkAdd';
 import { handler as studentList } from './handlers/students/list';
@@ -57,6 +64,20 @@ const routes: Route[] = [
   { method: 'GET',    pattern: /^\/api\/classes\/(?<classId>[^/]+)$/,                                   handler: classGet,            auth: 'jwt' },
   { method: 'PUT',    pattern: /^\/api\/classes\/(?<classId>[^/]+)$/,                                   handler: classUpdate,         auth: 'jwt' },
   { method: 'DELETE', pattern: /^\/api\/classes\/(?<classId>[^/]+)$/,                                   handler: classDelete,         auth: 'jwt' },
+
+  // Class invite (student-side join via classId-as-token)
+  { method: 'GET',    pattern: /^\/api\/classes\/(?<classId>[^/]+)\/preview$/,                          handler: classPreview,        auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/join$/,                             handler: classJoin,           auth: 'jwt' },
+
+  // Student self-service
+  { method: 'GET',    pattern: /^\/api\/students\/me$/,                                                 handler: studentMeGet,        auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/students\/me$/,                                                 handler: studentMePost,       auth: 'jwt' },
+
+  // Class invites by email (teacher manages, student accepts)
+  { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/invites$/,                          handler: inviteCreate,        auth: 'jwt' },
+  { method: 'GET',    pattern: /^\/api\/classes\/(?<classId>[^/]+)\/invites$/,                          handler: inviteList,          auth: 'jwt' },
+  { method: 'DELETE', pattern: /^\/api\/classes\/(?<classId>[^/]+)\/invites\/(?<inviteId>[^/]+)$/,      handler: inviteRevoke,        auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/invites\/(?<inviteId>[^/]+)\/accept$/,                          handler: inviteAccept,        auth: 'jwt' },
 
   // Students
   { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/students$/,                         handler: studentAdd,          auth: 'jwt' },

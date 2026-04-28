@@ -1,5 +1,5 @@
 import { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { teacherQueries } from '@bali/db';
+import { teacherQueries, studentQueries } from '@bali/db';
 import { SessionUser } from '@bali/shared';
 import { AuthUser } from '../../middleware/auth';
 import { json } from '../../lib/response';
@@ -16,11 +16,13 @@ export async function handler(_event: APIGatewayProxyEventV2, user: AuthUser) {
   }
 
   if (user.role === 'student') {
+    const student = await studentQueries.findByCognitoSub(user.sub);
     const response: SessionUser = {
       role: 'student',
       sub: user.sub,
       email: user.email,
-      displayName: user.name,
+      displayName: student ? `${student.firstName} ${student.lastName}` : user.name,
+      student: student || undefined,
     };
     return json(response);
   }
