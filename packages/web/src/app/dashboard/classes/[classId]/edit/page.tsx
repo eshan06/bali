@@ -46,7 +46,7 @@ export default function EditClassPage() {
     <div className="max-w-lg">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Class</h1>
       {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
+      <form onSubmit={handleSubmit} className="space-y-4 glass-card rounded-2xl p-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Class Name *</label>
           <input required value={name} onChange={e => setName(e.target.value)}

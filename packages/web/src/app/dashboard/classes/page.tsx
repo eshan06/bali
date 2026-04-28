@@ -40,7 +40,7 @@ export default function ClassesPage() {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="glass-card rounded-2xl divide-y divide-gray-100">
           {classes.map(cls => (
             <Link
               key={cls.id}

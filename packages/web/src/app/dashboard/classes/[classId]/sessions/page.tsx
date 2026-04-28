@@ -37,7 +37,7 @@ export default function SessionHistoryPage() {
           No past sessions yet.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="glass-card rounded-2xl divide-y divide-gray-100">
           {sessions.map(s => (
             <Link
               key={s.sessionId}

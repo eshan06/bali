@@ -21,7 +21,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="bg-aurora flex h-screen items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
       </div>
     );
@@ -30,11 +30,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated || role !== 'teacher') return null;
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
-      </main>
+    <div className="bg-aurora min-h-screen">
+      <div className="flex h-screen">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="p-8 max-w-7xl mx-auto">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

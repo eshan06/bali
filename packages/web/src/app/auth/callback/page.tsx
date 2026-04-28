@@ -51,7 +51,7 @@ export default function AuthCallback() {
   }, [isAuthenticated, isLoading, role, user, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center">
+    <div className="bg-aurora flex h-screen items-center justify-center">
       <div className="text-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full mx-auto" />
         <p className="mt-4 text-gray-600">Completing sign in...</p>

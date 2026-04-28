@@ -103,23 +103,23 @@ export default function StudentProfilePage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="glass-card rounded-2xl p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Attendance Rate</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{attendanceStats.rate}%</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="glass-card rounded-2xl p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
           <p className="text-2xl font-bold text-green-600 mt-1">{attendanceStats.present}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="glass-card rounded-2xl p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
           <p className="text-2xl font-bold text-yellow-600 mt-1">{attendanceStats.late}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="glass-card rounded-2xl p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
           <p className="text-2xl font-bold text-red-600 mt-1">{attendanceStats.absent}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="glass-card rounded-2xl p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Excused</p>
           <p className="text-2xl font-bold text-purple-600 mt-1">{attendanceStats.excused}</p>
         </div>
@@ -128,7 +128,7 @@ export default function StudentProfilePage() {
       {/* Info Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Contact Info */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="glass-card rounded-2xl p-5">
           <h3 className="font-semibold text-gray-900 mb-3">Contact Info</h3>
           <div className="space-y-2">
             <div>
@@ -145,7 +145,7 @@ export default function StudentProfilePage() {
         </div>
 
         {/* Device Info */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="glass-card rounded-2xl p-5">
           <h3 className="font-semibold text-gray-900 mb-3">Device</h3>
           {device ? (
             <div className="space-y-2">
@@ -166,7 +166,7 @@ export default function StudentProfilePage() {
         </div>
 
         {/* Blocking Status */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="glass-card rounded-2xl p-5">
           <h3 className="font-semibold text-gray-900 mb-3">Blocking Status</h3>
           {blockingStatus ? (
             <div className="space-y-2">
@@ -193,7 +193,7 @@ export default function StudentProfilePage() {
 
       {/* Classes Enrolled */}
       {classes.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="glass-card rounded-2xl p-5">
           <h3 className="font-semibold text-gray-900 mb-3">Classes Enrolled ({classes.length})</h3>
           <div className="flex flex-wrap gap-2">
             {classes.map(c => (
@@ -214,7 +214,7 @@ export default function StudentProfilePage() {
       )}
 
       {/* Attendance History */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">Attendance History</h3>
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
@@ -341,7 +341,7 @@ export default function StudentProfilePage() {
       </div>
 
       {/* Notes */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">Notes</h3>
           {!editingNotes && (

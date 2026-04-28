@@ -1,30 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthContext } from '@/components/auth/AuthProvider';
+import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import type { StudentSelf, StudentClassSummary, PendingInvite } from '@bali/shared';
 
-const JOIN_PATH_RE = /\/join\/([0-9a-f-]{36})/i;
-
-function extractClassId(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  const m = trimmed.match(JOIN_PATH_RE);
-  if (m) return m[1];
-  if (/^[0-9a-f-]{36}$/i.test(trimmed)) return trimmed;
-  return null;
-}
-
-export default function StudentHomePage() {
-  const { isAuthenticated, isLoading, role, user, logout } = useAuthContext();
-  const router = useRouter();
-
+export default function StudentClassesPage() {
   const [data, setData] = useState<StudentSelf | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [joinInput, setJoinInput] = useState('');
-  const [joinError, setJoinError] = useState('');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState('');
 
@@ -34,48 +17,11 @@ export default function StudentHomePage() {
       const me = await api.get<StudentSelf>('/students/me');
       setData(me);
     } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.toLowerCase().includes('profile not created')) {
-        router.replace('/onboarding/profile/');
-        return;
-      }
-      setLoadError(msg || 'Could not load your account');
+      setLoadError(err.message || 'Could not load your classes');
     }
-  }, [router]);
+  }, []);
 
-  useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      router.replace('/login/');
-      return;
-    }
-    if (role === 'teacher') {
-      router.replace('/dashboard/');
-      return;
-    }
-    if (role === 'unset') {
-      router.replace('/onboarding/');
-      return;
-    }
-    if (role === 'student' && !user?.student) {
-      router.replace('/onboarding/profile/');
-      return;
-    }
-    if (role === 'student') {
-      load();
-    }
-  }, [isAuthenticated, isLoading, role, user, router, load]);
-
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJoinError('');
-    const classId = extractClassId(joinInput);
-    if (!classId) {
-      setJoinError("That doesn't look like a Bali invite link.");
-      return;
-    }
-    router.push(`/join/${classId}/`);
-  };
+  useEffect(() => { load(); }, [load]);
 
   const handleAcceptInvite = async (inviteId: string) => {
     setInviteError('');
@@ -90,142 +36,125 @@ export default function StudentHomePage() {
     }
   };
 
-  if (isLoading || !isAuthenticated || role !== 'student' || !user?.student) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  const empty = data && data.classes.length === 0 && data.pendingInvites.length === 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto flex items-center justify-between px-6 py-4">
-          <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-bold text-primary-600">Bali</span>
-            <span className="text-sm text-gray-500">
-              {user.student.firstName} {user.student.lastName}
-              {user.student.grade ? ` · ${user.student.grade}` : ''}
-            </span>
-          </div>
-          <button
-            onClick={logout}
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            Sign out
-          </button>
+    <div className="space-y-8">
+      {loadError && (
+        <div className="rounded-2xl bg-red-50/80 backdrop-blur p-4 text-sm text-red-700">
+          {loadError}
         </div>
-      </header>
+      )}
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        {loadError && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{loadError}</div>
-        )}
-
-        {data && data.pendingInvites.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Pending invites</h2>
-            {inviteError && (
-              <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">{inviteError}</div>
-            )}
-            <div className="space-y-3">
-              {data.pendingInvites.map((inv) => (
-                <InviteCard
-                  key={inv.inviteId}
-                  invite={inv}
-                  busy={acceptingId === inv.inviteId}
-                  onAccept={() => handleAcceptInvite(inv.inviteId)}
-                />
-              ))}
+      {data && data.pendingInvites.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Pending invites</h2>
+          {inviteError && (
+            <div className="rounded-2xl bg-red-50/80 backdrop-blur p-3 text-sm text-red-700">
+              {inviteError}
             </div>
-          </section>
-        )}
+          )}
+          <div className="space-y-3">
+            {data.pendingInvites.map((inv) => (
+              <InviteCard
+                key={inv.inviteId}
+                invite={inv}
+                busy={acceptingId === inv.inviteId}
+                onAccept={() => handleAcceptInvite(inv.inviteId)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-        {data && data.classes.length === 0 && data.pendingInvites.length === 0 ? (
-          <EmptyState
-            joinInput={joinInput}
-            setJoinInput={setJoinInput}
-            joinError={joinError}
-            onJoin={handleJoin}
-          />
-        ) : (
-          <>
-            {data && data.classes.length > 0 && (
-              <section>
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Your classes</h2>
-                <div className="space-y-3">
-                  {data.classes.map((cls) => <ClassCard key={cls.id} cls={cls} />)}
-                </div>
-              </section>
-            )}
-
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900">Join another class</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Paste the invite link your teacher shared with you.
-              </p>
-              <form onSubmit={handleJoin} className="mt-3 flex gap-2">
-                <input
-                  type="text"
-                  value={joinInput}
-                  onChange={(e) => setJoinInput(e.target.value)}
-                  placeholder="https://.../join/..."
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
-                >
-                  Join
-                </button>
-              </form>
-              {joinError && (
-                <p className="mt-2 text-sm text-red-600">{joinError}</p>
-              )}
-            </section>
-          </>
-        )}
-      </main>
+      {empty ? (
+        <EmptyState />
+      ) : data && data.classes.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Your classes</h2>
+          <div className="space-y-3">
+            {data.classes.map((cls) => <ClassCard key={cls.id} cls={cls} />)}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
 
-function EmptyState({
-  joinInput,
-  setJoinInput,
-  joinError,
-  onJoin,
+function EmptyState() {
+  return (
+    <div className="glass-card rounded-3xl px-8 py-14 sm:px-16">
+      <div className="max-w-2xl mx-auto text-center space-y-6">
+        <div className="mx-auto h-20 w-20 rounded-full bg-primary-100/60 backdrop-blur flex items-center justify-center">
+          <svg
+            className="h-9 w-9 text-primary-600"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"
+            />
+          </svg>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight">
+            No classes yet
+          </h2>
+          <p className="text-base text-gray-500 max-w-md mx-auto">
+            Join your first class with an invite link, class code, or by scanning a QR code.
+          </p>
+        </div>
+
+        <div className="pt-2">
+          <Link
+            href="/student/join/"
+            className="inline-block rounded-2xl bg-primary-600 px-8 py-4 text-base font-semibold text-white shadow-sm hover:bg-primary-700 transition-colors"
+          >
+            Join a class
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InviteCard({
+  invite,
+  busy,
+  onAccept,
 }: {
-  joinInput: string;
-  setJoinInput: (v: string) => void;
-  joinError: string;
-  onJoin: (e: React.FormEvent) => void;
+  invite: PendingInvite;
+  busy: boolean;
+  onAccept: () => void;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-8 text-center space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">No classes yet</h2>
-      <p className="text-sm text-gray-500">
-        Ask your teacher for an invite link, then paste it below to join your first class.
-      </p>
-      <form onSubmit={onJoin} className="flex gap-2 max-w-md mx-auto pt-2">
-        <input
-          type="text"
-          value={joinInput}
-          onChange={(e) => setJoinInput(e.target.value)}
-          placeholder="https://.../join/..."
-          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
+    <div className="glass-card rounded-2xl p-5 ring-1 ring-primary-200/50">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <span className="inline-block rounded-full bg-primary-100/80 text-primary-700 px-2.5 py-0.5 text-xs font-medium mb-2">
+            New invite
+          </span>
+          <h3 className="font-semibold text-gray-900 truncate">{invite.className}</h3>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {invite.teacherName}
+            {invite.period ? ` · Period ${invite.period}` : ''}
+            {invite.schoolName ? ` · ${invite.schoolName}` : ''}
+          </p>
+        </div>
         <button
-          type="submit"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+          onClick={onAccept}
+          disabled={busy}
+          className="shrink-0 rounded-xl bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
         >
-          Join
+          {busy ? 'Accepting...' : 'Accept'}
         </button>
-      </form>
-      {joinError && (
-        <p className="text-sm text-red-600">{joinError}</p>
-      )}
+      </div>
     </div>
   );
 }
@@ -233,7 +162,7 @@ function EmptyState({
 function ClassCard({ cls }: { cls: StudentClassSummary }) {
   const session = cls.activeSession;
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
+    <div className="glass-card rounded-2xl p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{cls.name}</h3>
@@ -260,54 +189,17 @@ function ClassCard({ cls }: { cls: StudentClassSummary }) {
   );
 }
 
-function InviteCard({
-  invite,
-  busy,
-  onAccept,
-}: {
-  invite: PendingInvite;
-  busy: boolean;
-  onAccept: () => void;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-primary-200 ring-1 ring-primary-100 p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="rounded-full bg-primary-50 text-primary-700 px-2 py-0.5 text-xs font-medium">
-              New invite
-            </span>
-          </div>
-          <h3 className="font-semibold text-gray-900 truncate">{invite.className}</h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {invite.teacherName}
-            {invite.period ? ` · Period ${invite.period}` : ''}
-            {invite.schoolName ? ` · ${invite.schoolName}` : ''}
-          </p>
-        </div>
-        <button
-          onClick={onAccept}
-          disabled={busy}
-          className="shrink-0 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
-        >
-          {busy ? 'Accepting...' : 'Accept'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function SessionBadge({ session }: { session: NonNullable<StudentClassSummary['activeSession']> }) {
   if (session.checkedIn) {
     const label = session.attendanceStatus === 'late' ? 'Checked in (late)' : 'Checked in';
     return (
-      <span className="shrink-0 rounded-full bg-green-50 text-green-700 px-3 py-1 text-xs font-medium">
+      <span className="shrink-0 rounded-full bg-green-100/80 text-green-800 px-3 py-1 text-xs font-medium">
         {label}
       </span>
     );
   }
   return (
-    <span className="shrink-0 rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-medium">
+    <span className="shrink-0 rounded-full bg-amber-100/80 text-amber-800 px-3 py-1 text-xs font-medium">
       Class in session — tap to check in
     </span>
   );
