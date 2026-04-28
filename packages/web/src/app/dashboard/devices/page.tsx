@@ -83,7 +83,7 @@ export default function DevicesPage() {
       </div>
 
       {showRegister && (
-        <form onSubmit={handleRegister} className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+        <form onSubmit={handleRegister} className="glass-card rounded-2xl p-6 space-y-3">
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3">
             <input required placeholder="Device ID (e.g., BALI-DEV-0001)" value={deviceId}
@@ -109,7 +109,7 @@ export default function DevicesPage() {
           No devices registered yet.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200">
+        <div className="glass-card rounded-2xl">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">

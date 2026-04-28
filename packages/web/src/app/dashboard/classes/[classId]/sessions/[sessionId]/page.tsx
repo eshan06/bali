@@ -55,7 +55,7 @@ export default function SessionDetailPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">

@@ -16,10 +16,13 @@ export function Sidebar() {
   const { user, logout } = useAuthContext();
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-white border-r border-gray-200">
-      <div className="flex h-16 items-center px-6 border-b border-gray-200">
-        <Link href="/dashboard/" className="text-xl font-bold text-primary-600">
-          Bali
+    <aside className="flex h-full w-64 flex-col bg-white/55 backdrop-blur-xl border-r border-white/60">
+      <div className="flex h-16 items-center px-6">
+        <Link
+          href="/dashboard/"
+          className="text-2xl font-bold text-primary-600 tracking-tight lowercase"
+        >
+          bali
         </Link>
       </div>
 
@@ -31,10 +34,10 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-white/80 text-primary-700 shadow-sm'
+                  : 'text-gray-700 hover:bg-white/50'
               }`}
             >
               <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -46,9 +49,9 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-white/50 p-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-sm font-medium">
+          <div className="h-9 w-9 rounded-full bg-primary-100/80 backdrop-blur flex items-center justify-center text-primary-700 text-sm font-semibold">
             {user?.displayName?.charAt(0) || 'T'}
           </div>
           <div className="flex-1 min-w-0">
@@ -58,7 +61,7 @@ export function Sidebar() {
         </div>
         <button
           onClick={logout}
-          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="mt-3 w-full chip-outline rounded-xl px-3 py-1.5 text-sm text-gray-700 hover:bg-white/90 transition-colors"
         >
           Sign out
         </button>

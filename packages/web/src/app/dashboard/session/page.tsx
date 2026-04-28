@@ -128,7 +128,7 @@ export default function ActiveSessionPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-gray-900">Start a Session</h1>
-        <div className="max-w-md bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="max-w-md glass-card rounded-2xl p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
             <select

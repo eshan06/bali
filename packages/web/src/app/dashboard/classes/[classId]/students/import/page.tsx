@@ -45,7 +45,7 @@ export default function ImportStudentsPage() {
     <div className="max-w-lg">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Import Students</h1>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="glass-card rounded-2xl p-6 space-y-4">
         <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
           <p className="font-medium mb-1">CSV Format</p>
           <p>Your CSV should have headers: <code className="bg-blue-100 px-1 rounded">first_name</code>, <code className="bg-blue-100 px-1 rounded">last_name</code>, <code className="bg-blue-100 px-1 rounded">email</code></p>

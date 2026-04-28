@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '@/lib/api-client';
 import {
   Class, Student, TeacherApp, BlockingPreset, TeacherClassInvite,
@@ -31,6 +32,7 @@ export default function ClassDetailPage() {
   const [savingBlocking, setSavingBlocking] = useState(false);
   const [blockingSaved, setBlockingSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const [invites, setInvites] = useState<TeacherClassInvite[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -189,8 +191,8 @@ export default function ClassDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{cls.name}</h1>
-          {cls.period && <p className="text-gray-500">{cls.period}</p>}
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{cls.name}</h1>
+          {cls.period && <p className="text-gray-500 mt-1">{cls.period}</p>}
         </div>
         <div className="flex gap-2">
           <Link
@@ -213,7 +215,7 @@ export default function ClassDetailPage() {
       )}
 
       {/* ── App Blocking ── */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <div className="p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">App Blocking</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -412,41 +414,74 @@ export default function ClassDetailPage() {
         </div>
       </div>
 
-      {/* ── Invite Link ── */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-5 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Student Invite Link</h2>
+      {/* ── Invite Link + QR ── */}
+      <div className="glass-card rounded-2xl">
+        <div className="p-5 border-b border-white/40">
+          <h2 className="font-semibold text-gray-900">Student Invite</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Share this link with students so they can join this class from the Bali app.
+            Share the link, the class code, or show students the QR code so they can join.
           </p>
         </div>
-        <div className="p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 rounded-lg bg-gray-50 border border-gray-200 px-4 py-2.5 text-sm text-gray-700 font-mono truncate">
-              {typeof window !== 'undefined'
-                ? `${window.location.origin}/join/${classId}`
-                : `/join/${classId}`}
+        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          <div className="md:col-span-2 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Invite link</label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 rounded-xl bg-white/70 border border-white/70 px-4 py-2.5 text-sm text-gray-700 font-mono truncate">
+                  {typeof window !== 'undefined'
+                    ? `${window.location.origin}/join/${classId}`
+                    : `/join/${classId}`}
+                </div>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/join/${classId}`;
+                    navigator.clipboard.writeText(link);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-black transition-colors"
+                >
+                  {linkCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                const link = `${window.location.origin}/join/${classId}`;
-                navigator.clipboard.writeText(link);
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 2000);
-              }}
-              className="rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-900 transition-colors"
-            >
-              {linkCopied ? 'Copied' : 'Copy Link'}
-            </button>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Class code</label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 rounded-xl bg-white/70 border border-white/70 px-4 py-2.5 text-sm text-gray-700 font-mono truncate">
+                  {classId}
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(String(classId));
+                    setCodeCopied(true);
+                    setTimeout(() => setCodeCopied(false), 2000);
+                  }}
+                  className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-black transition-colors"
+                >
+                  {codeCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">
-            Students who open this link can sign up and join this class instantly.
-          </p>
+
+          <div className="flex flex-col items-center gap-2">
+            <div className="bg-white p-3 rounded-2xl shadow-sm">
+              {typeof window !== 'undefined' && (
+                <QRCodeSVG
+                  value={`${window.location.origin}/join/${classId}`}
+                  size={144}
+                  level="M"
+                />
+              )}
+            </div>
+            <p className="text-xs text-gray-500">Scan with the Bali app</p>
+          </div>
         </div>
       </div>
 
       {/* ── Invite by Email ── */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <div className="p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Invite by Email</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -524,7 +559,7 @@ export default function ClassDetailPage() {
       </div>
 
       {/* ── Students ── */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="glass-card rounded-2xl">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Students ({cls.students.length})</h2>
           <div className="flex gap-2">
