@@ -30,3 +30,9 @@ next-env.d.ts
 # Logs
 *.log
 npm-debug.log*
+
+# Playwright MCP artifacts (browser snapshots / console logs from local dev)
+.playwright-mcp/
+
+# Stray screenshot artifacts at the repo root from local UI iteration
+/*.png

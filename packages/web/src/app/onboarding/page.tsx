@@ -13,13 +13,26 @@ function withRedirect(path: string, redirect: string | null) {
 }
 
 export default function OnboardingPage() {
-  const { isAuthenticated, isLoading, role, refresh, logout } = useAuthContext();
+  const { isAuthenticated, isLoading, role, user, refresh, logout } = useAuthContext();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
   const [selected, setSelected] = useState<UserRole | null>(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill names if Cognito already has them (e.g. Google sign-in supplies
+  // a real name; refreshing this page shouldn't make the user retype).
+  useEffect(() => {
+    const dn = user?.displayName?.trim();
+    if (!dn || dn.includes('@')) return;
+    if (firstName || lastName) return;
+    const parts = dn.split(/\s+/);
+    setFirstName(parts[0] ?? '');
+    setLastName(parts.slice(1).join(' '));
+  }, [user?.displayName, firstName, lastName]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -40,13 +53,18 @@ export default function OnboardingPage() {
     } catch {}
   }, []);
 
+  const trimmedFirst = firstName.trim();
+  const trimmedLast = lastName.trim();
+  const fullName = [trimmedFirst, trimmedLast].filter(Boolean).join(' ');
+  const canContinue = !!selected && !!trimmedFirst && !!trimmedLast;
+
   const handleContinue = async () => {
-    if (!selected) return;
+    if (!canContinue) return;
     setError('');
     setSaving(true);
     try {
       await updateUserAttributes({
-        userAttributes: { 'custom:role': selected },
+        userAttributes: { 'custom:role': selected!, name: fullName },
       });
       try {
         window.sessionStorage.removeItem(PENDING_ROLE_KEY);
@@ -58,7 +76,7 @@ export default function OnboardingPage() {
         router.replace(withRedirect('/onboarding/profile/', redirect));
       }
     } catch (err: any) {
-      setError(err.message || 'Could not save your role');
+      setError(err.message || 'Could not save your details');
     } finally {
       setSaving(false);
     }
@@ -90,6 +108,38 @@ export default function OnboardingPage() {
             <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                First name
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                required
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                Last name
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                required
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          <p className="text-sm font-medium text-gray-700 mb-2">I am a</p>
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setSelected('teacher')}
@@ -121,7 +171,7 @@ export default function OnboardingPage() {
 
           <button
             onClick={handleContinue}
-            disabled={!selected || saving}
+            disabled={!canContinue || saving}
             className="mt-6 w-full rounded-lg bg-primary-600 px-4 py-2.5 text-white font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving...' : 'Continue'}
