@@ -27,12 +27,19 @@ const PRESET_LABEL: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  present: 'bg-green-100 text-green-800 border-green-200',
-  late: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  present: 'bg-green-50 text-green-700 border-green-200',
+  late: 'bg-amber-50 text-amber-700 border-amber-200',
   absent: 'bg-red-50 text-red-700 border-red-200',
-  excused: 'bg-blue-50 text-blue-700 border-blue-200',
+  excused: 'bg-purple-50 text-purple-700 border-purple-200',
   pending: 'bg-gray-50 text-gray-500 border-gray-200',
 };
+
+function periodLabel(period?: string | null): string | null {
+  if (!period) return null;
+  const trimmed = period.trim();
+  if (!trimmed) return null;
+  return /^period\b/i.test(trimmed) ? trimmed : `Period ${trimmed}`;
+}
 
 export default function ActiveSessionPage() {
   const searchParams = useSearchParams();
@@ -193,25 +200,54 @@ export default function ActiveSessionPage() {
             </select>
           </div>
 
-          {selectedClassId && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2.5">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor: selectedPreset === 'none' ? '#d1d5db' : BRAND,
-                  }}
-                />
-                <span className="text-gray-700 font-medium">
-                  {PRESET_LABEL[selectedPreset]}
-                </span>
-              </span>
-              <Link
-                href={`/dashboard/classes/${selectedClassId}/`}
-                className="text-xs font-bold text-brand hover:underline"
-              >
-                Edit policy
-              </Link>
+          {selectedClass && (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    className="text-[11px] font-black uppercase tracking-[0.18em]"
+                    style={{ color: BRAND }}
+                  >
+                    {periodLabel(selectedClass.period) ?? 'Class'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black tracking-tight text-gray-900 truncate">
+                    {selectedClass.name}
+                  </h3>
+                </div>
+                <Link
+                  href={`/dashboard/classes/${selectedClassId}/`}
+                  className="text-xs font-bold text-brand hover:underline whitespace-nowrap"
+                >
+                  Edit on class →
+                </Link>
+              </div>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    Students
+                  </dt>
+                  <dd className="mt-0.5 font-semibold text-gray-900">
+                    {selectedClass.studentCount ?? 0}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    Blocking
+                  </dt>
+                  <dd className="mt-0.5 flex items-center gap-1.5">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          selectedPreset === 'none' ? '#d1d5db' : BRAND,
+                      }}
+                    />
+                    <span className="font-semibold text-gray-900">
+                      {PRESET_LABEL[selectedPreset]}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
             </div>
           )}
 
@@ -236,6 +272,16 @@ export default function ActiveSessionPage() {
   const snapshot: BlockingSnapshot =
     session.blockingConfigSnapshot ?? INACTIVE_BLOCKING_SNAPSHOT;
   const blockingOn = session.blockingEnabled && snapshot.blockingActive;
+  const sessionClass = classes.find((c) => c.id === session.classId);
+  const sessionPeriod = periodLabel(sessionClass?.period);
+  const startedAtLabel = new Date(session.startedAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const elapsedLabel = elapsed >= 1 ? `${elapsed} min in` : 'Just started';
+  const heroMeta = [sessionPeriod, `Started ${startedAtLabel}`, elapsedLabel]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className="space-y-8">
@@ -252,10 +298,7 @@ export default function ActiveSessionPage() {
             <h1 className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 leading-[1.05] truncate">
               {session.className}
             </h1>
-            <p className="text-sm md:text-base text-gray-500">
-              Started {new Date(session.startedAt).toLocaleTimeString()} ·{' '}
-              {elapsed} min in
-            </p>
+            <p className="text-sm md:text-base text-gray-500">{heroMeta}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
@@ -277,7 +320,7 @@ export default function ActiveSessionPage() {
             <button
               onClick={endSession}
               disabled={ending}
-              className="inline-flex items-center rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center rounded-full border border-red-200 bg-white px-5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 disabled:opacity-50 transition-colors"
             >
               {ending ? 'Ending…' : 'End session'}
             </button>
@@ -287,9 +330,9 @@ export default function ActiveSessionPage() {
 
       {/* ── STATS ───────────────────────────────────────────────── */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <CountCard label="Total" value={students.length} />
         <CountCard label="Present" value={presentCount} accent="green" />
         <CountCard label="Late" value={lateCount} accent="amber" />
+        <CountCard label="Absent" value={absentCount} accent="red" />
         <CountCard label="Waiting" value={waitingCount} accent="muted" />
       </section>
 
@@ -369,8 +412,12 @@ export default function ActiveSessionPage() {
         </header>
 
         {students.length === 0 ? (
-          <div className="surface-card rounded-2xl px-8 py-16 text-center">
-            <p className="text-gray-500">No students enrolled in this class yet.</p>
+          <div className="surface-card rounded-2xl px-8 py-16 text-center space-y-2">
+            <p className="text-base font-bold text-gray-900">No students yet</p>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto">
+              Add students to this class so attendance can populate as each
+              device taps in.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -415,13 +462,15 @@ function CountCard({
 }: {
   label: string;
   value: number;
-  accent?: 'green' | 'amber' | 'muted';
+  accent?: 'green' | 'amber' | 'red' | 'muted';
 }) {
   const tint =
     accent === 'green'
       ? 'text-green-700'
       : accent === 'amber'
-      ? 'text-yellow-700'
+      ? 'text-amber-700'
+      : accent === 'red'
+      ? 'text-red-700'
       : accent === 'muted'
       ? 'text-gray-700'
       : 'text-gray-900';
