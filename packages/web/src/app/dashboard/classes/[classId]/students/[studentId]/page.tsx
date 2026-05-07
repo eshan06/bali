@@ -6,25 +6,40 @@ import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { StudentProfile } from '@bali/shared';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
 } from 'recharts';
 
+const BRAND = '#2E5BD0';
+
 const STATUS_COLORS: Record<string, string> = {
-  present: '#22c55e',
-  late: '#f59e0b',
-  absent: '#ef4444',
-  excused: '#8b5cf6',
+  present: '#15803d',
+  late: '#b45309',
+  absent: '#b91c1c',
+  excused: '#7e22ce',
 };
 
-const STATUS_BG: Record<string, string> = {
-  present: 'bg-green-100 text-green-700',
-  late: 'bg-yellow-100 text-yellow-700',
-  absent: 'bg-red-100 text-red-700',
-  excused: 'bg-purple-100 text-purple-700',
+const STATUS_BADGE: Record<string, string> = {
+  present: 'bg-green-50 text-green-700 border-green-200',
+  late: 'bg-amber-50 text-amber-700 border-amber-200',
+  absent: 'bg-red-50 text-red-700 border-red-200',
+  excused: 'bg-purple-50 text-purple-700 border-purple-200',
 };
+
+function initials(firstName: string, lastName: string): string {
+  return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
+}
 
 export default function StudentProfilePage() {
-  const { classId, studentId } = useParams<{ classId: string; studentId: string }>();
+  const { classId, studentId } = useParams<{
+    classId: string;
+    studentId: string;
+  }>();
   const router = useRouter();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,8 +49,9 @@ export default function StudentProfilePage() {
   const [view, setView] = useState<'chart' | 'table'>('chart');
 
   const loadProfile = () => {
-    api.get<StudentProfile>(`/classes/${classId}/students/${studentId}`)
-      .then(data => {
+    api
+      .get<StudentProfile>(`/classes/${classId}/students/${studentId}`)
+      .then((data) => {
         setProfile(data);
         setNotes(data.student.notes || '');
       })
@@ -43,12 +59,16 @@ export default function StudentProfilePage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadProfile(); }, [classId, studentId]);
+  useEffect(() => {
+    loadProfile();
+  }, [classId, studentId]);
 
   const saveNotes = async () => {
     setSavingNotes(true);
     try {
-      await api.put(`/classes/${classId}/students/${studentId}/notes`, { notes });
+      await api.put(`/classes/${classId}/students/${studentId}/notes`, {
+        notes,
+      });
       setEditingNotes(false);
       loadProfile();
     } catch (err: any) {
@@ -60,190 +80,254 @@ export default function StudentProfilePage() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="h-32 bg-gray-200 rounded" />
-        <div className="h-64 bg-gray-200 rounded" />
+      <div className="space-y-8 animate-pulse">
+        <div className="surface-card-hero rounded-3xl h-44" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="surface-card rounded-2xl h-24" />
+          ))}
+        </div>
+        <div className="surface-card rounded-2xl h-72" />
       </div>
     );
   }
 
-  if (!profile) return <p className="text-gray-500">Student not found.</p>;
+  if (!profile) {
+    return (
+      <div className="surface-card rounded-3xl px-8 py-20 text-center space-y-3">
+        <h2 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
+          Student not found
+        </h2>
+        <p className="text-gray-500">
+          The student you're looking for has been removed or is in a different
+          class.
+        </p>
+        <Link
+          href={`/dashboard/classes/${classId}/`}
+          className="inline-flex items-center rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm mt-2"
+          style={{ backgroundColor: BRAND }}
+        >
+          Back to class
+        </Link>
+      </div>
+    );
+  }
 
-  const { student, classes, device, attendanceHistory, attendanceStats, blockingStatus } = profile;
+  const {
+    student,
+    classes,
+    device,
+    attendanceHistory,
+    attendanceStats,
+    blockingStatus,
+  } = profile;
 
-  // Build chart data from recent sessions (last 20, reversed for chronological)
-  const chartData = attendanceHistory.slice(0, 20).reverse().map((r, i) => ({
-    name: new Date(r.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    status: r.status,
-    value: 1,
-  }));
+  const chartData = attendanceHistory
+    .slice(0, 20)
+    .reverse()
+    .map((r) => ({
+      name: new Date(r.startedAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      }),
+      status: r.status,
+      value: 1,
+    }));
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="space-y-8">
+      {/* ── HEADER ─────────────────────────────────────────────── */}
+      <section className="surface-card-hero rounded-3xl p-7 md:p-9">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="flex items-center gap-5 min-w-0">
+            <div
+              className="h-16 w-16 md:h-20 md:w-20 rounded-2xl flex items-center justify-center text-xl md:text-2xl font-black text-white shadow-sm flex-shrink-0"
+              style={{ backgroundColor: BRAND }}
+            >
+              {initials(student.firstName, student.lastName)}
+            </div>
+            <div className="space-y-1.5 min-w-0">
+              <p
+                className="text-[11px] font-black uppercase tracking-[0.22em]"
+                style={{ color: BRAND }}
+              >
+                Student
+              </p>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 leading-[1.05] truncate">
+                {student.firstName} {student.lastName}
+              </h1>
+              <p className="text-sm md:text-base text-gray-500">
+                Enrolled{' '}
+                {new Date(student.enrolledAt).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </p>
+            </div>
+          </div>
           <button
             onClick={() => router.push(`/dashboard/classes/${classId}/`)}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors self-start"
           >
-            Back
+            Back to class
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {student.firstName} {student.lastName}
-            </h1>
-            <p className="text-sm text-gray-500">
-              Enrolled {new Date(student.enrolledAt).toLocaleDateString()}
-            </p>
-          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Attendance Rate</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{attendanceStats.rate}%</p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Present</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{attendanceStats.present}</p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Late</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">{attendanceStats.late}</p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Absent</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{attendanceStats.absent}</p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Excused</p>
-          <p className="text-2xl font-bold text-purple-600 mt-1">{attendanceStats.excused}</p>
-        </div>
-      </div>
+      {/* ── STATS ──────────────────────────────────────────────── */}
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatTile label="Attendance" value={`${attendanceStats.rate}%`} />
+        <StatTile label="Present" value={attendanceStats.present} tint="green" />
+        <StatTile label="Late" value={attendanceStats.late} tint="amber" />
+        <StatTile label="Absent" value={attendanceStats.absent} tint="red" />
+        <StatTile label="Excused" value={attendanceStats.excused} tint="purple" />
+      </section>
 
-      {/* Info Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Contact Info */}
-        <div className="glass-card rounded-2xl p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Contact Info</h3>
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs text-gray-500">Email</p>
-              <p className="text-sm text-gray-900">{student.email || 'Not provided'}</p>
-            </div>
-            {student.externalId && (
-              <div>
-                <p className="text-xs text-gray-500">External ID</p>
-                <p className="text-sm text-gray-900">{student.externalId}</p>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ── INFO CARDS ─────────────────────────────────────────── */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <InfoCard title="Contact">
+          <InfoRow label="Email" value={student.email || 'Not provided'} />
+          {student.externalId && (
+            <InfoRow label="External ID" value={student.externalId} mono />
+          )}
+        </InfoCard>
 
-        {/* Device Info */}
-        <div className="glass-card rounded-2xl p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Device</h3>
+        <InfoCard title="Device">
           {device ? (
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-gray-500">Device ID</p>
-                <p className="text-sm text-gray-900 font-mono">{device.deviceId}</p>
-              </div>
+            <>
+              <InfoRow label="Device ID" value={device.deviceId} mono />
               {device.friendlyName && (
-                <div>
-                  <p className="text-xs text-gray-500">Name</p>
-                  <p className="text-sm text-gray-900">{device.friendlyName}</p>
-                </div>
+                <InfoRow label="Friendly name" value={device.friendlyName} />
               )}
-            </div>
+            </>
           ) : (
             <p className="text-sm text-gray-400">No device assigned</p>
           )}
-        </div>
+        </InfoCard>
 
-        {/* Blocking Status */}
-        <div className="glass-card rounded-2xl p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Blocking Status</h3>
+        <InfoCard title="Blocking">
           {blockingStatus ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                  blockingStatus.isBlocked ? 'bg-green-500' : 'bg-gray-300'
-                }`} />
-                <p className="text-sm text-gray-900">
-                  {blockingStatus.isBlocked ? 'Active — apps blocked' : 'Not blocking'}
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    backgroundColor: blockingStatus.isBlocked
+                      ? '#15803d'
+                      : '#d1d5db',
+                  }}
+                />
+                <p className="text-sm font-bold text-gray-900">
+                  {blockingStatus.isBlocked
+                    ? 'Active — apps blocked'
+                    : 'Not blocking'}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">
-                  Reported by {blockingStatus.reportedBy} at{' '}
-                  {new Date(blockingStatus.reportedAt).toLocaleTimeString()}
-                </p>
-              </div>
+              <p className="text-xs text-gray-500">
+                Reported by {blockingStatus.reportedBy} at{' '}
+                {new Date(blockingStatus.reportedAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
             </div>
           ) : (
             <p className="text-sm text-gray-400">No active session</p>
           )}
-        </div>
-      </div>
+        </InfoCard>
+      </section>
 
-      {/* Classes Enrolled */}
+      {/* ── CLASSES ENROLLED ──────────────────────────────────── */}
       {classes.length > 1 && (
-        <div className="glass-card rounded-2xl p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Classes Enrolled ({classes.length})</h3>
+        <section className="surface-card rounded-2xl p-7 space-y-4">
+          <header>
+            <p
+              className="text-[11px] font-black uppercase tracking-[0.18em]"
+              style={{ color: BRAND }}
+            >
+              Enrolled
+            </p>
+            <h3 className="mt-1 text-xl font-black tracking-tight text-gray-900">
+              Classes ({classes.length})
+            </h3>
+          </header>
           <div className="flex flex-wrap gap-2">
-            {classes.map(c => (
-              <Link
-                key={c.id}
-                href={`/dashboard/classes/${c.id}/`}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium border transition-all ${
-                  c.id === classId
-                    ? 'bg-blue-100 text-blue-700 border-blue-300'
-                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                {c.name}{c.period ? ` (${c.period})` : ''}
-              </Link>
-            ))}
+            {classes.map((c) => {
+              const active = c.id === classId;
+              return (
+                <Link
+                  key={c.id}
+                  href={`/dashboard/classes/${c.id}/`}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm font-bold transition-all ${
+                    active
+                      ? ''
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: 'rgba(46, 91, 208, 0.10)',
+                          color: BRAND,
+                          borderColor: BRAND,
+                        }
+                      : undefined
+                  }
+                >
+                  {c.name}
+                  {c.period ? ` (${c.period})` : ''}
+                </Link>
+              );
+            })}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Attendance History */}
-      <div className="glass-card rounded-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">Attendance History</h3>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── ATTENDANCE HISTORY ────────────────────────────────── */}
+      <section className="surface-card rounded-2xl overflow-hidden">
+        <header className="flex items-end justify-between gap-3 p-7 pb-5">
+          <div className="space-y-1.5 min-w-0">
+            <p
+              className="text-[11px] font-black uppercase tracking-[0.18em]"
+              style={{ color: BRAND }}
+            >
+              History
+            </p>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-gray-900">
+              Attendance history
+            </h3>
+          </div>
+          <div className="inline-flex rounded-full border border-gray-200 overflow-hidden flex-shrink-0">
             <button
               onClick={() => setView('chart')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'chart' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              className={`px-4 py-1.5 text-xs font-bold transition-colors ${
+                view === 'chart'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
               Chart
             </button>
             <button
               onClick={() => setView('table')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'table' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              className={`px-4 py-1.5 text-xs font-bold transition-colors ${
+                view === 'table'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
               Table
             </button>
           </div>
-        </div>
+        </header>
 
         {attendanceHistory.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="px-8 py-12 text-center text-sm text-gray-500">
             No attendance records yet.
           </div>
         ) : view === 'chart' ? (
-          <div className="p-5">
-            <ResponsiveContainer width="100%" height={200}>
+          <div className="px-7 pb-7">
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} barCategoryGap="20%">
                 <XAxis
                   dataKey="name"
@@ -257,135 +341,251 @@ export default function StudentProfilePage() {
                     if (!active || !payload?.[0]) return null;
                     const d = payload[0].payload;
                     return (
-                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm text-xs">
-                        <p className="font-medium">{d.name}</p>
-                        <p className="capitalize" style={{ color: STATUS_COLORS[d.status] }}>{d.status}</p>
+                      <div className="bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-md text-xs">
+                        <p className="font-bold">{d.name}</p>
+                        <p
+                          className="capitalize font-medium"
+                          style={{ color: STATUS_COLORS[d.status] }}
+                        >
+                          {d.status}
+                        </p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                   {chartData.map((entry, i) => (
-                    <Cell key={i} fill={STATUS_COLORS[entry.status] || '#d1d5db'} />
+                    <Cell
+                      key={i}
+                      fill={STATUS_COLORS[entry.status] || '#d1d5db'}
+                    />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-3">
+            <div className="flex flex-wrap justify-center gap-4 mt-4">
               {Object.entries(STATUS_COLORS).map(([status, color]) => (
                 <div key={status} className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-xs text-gray-500 capitalize">{status}</span>
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="text-xs font-medium text-gray-500 capitalize">
+                    {status}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Check-in</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Override</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Blocking</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {attendanceHistory.map(r => (
-                <tr key={r.sessionId} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900">
+          <ul className="divide-y divide-gray-100">
+            {attendanceHistory.map((r) => (
+              <li
+                key={r.sessionId}
+                className="flex items-center gap-4 px-7 py-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900">
                     {new Date(r.startedAt).toLocaleDateString('en-US', {
-                      weekday: 'short', month: 'short', day: 'numeric',
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
                     })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_BG[r.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString() : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {r.isOverride ? 'Yes' : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {r.blockingStatus === 'active' && (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-700">
-                        Active
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {r.checkInAt
+                      ? `Checked in ${new Date(
+                          r.checkInAt
+                        ).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}`
+                      : 'No check-in'}
+                    {r.isOverride && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                        manual
                       </span>
                     )}
-                    {r.blockingStatus === 'inactive' && (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">
-                        Inactive
-                      </span>
-                    )}
-                    {r.blockingStatus === 'student_override' && (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
-                        Student Override
-                      </span>
-                    )}
-                    {r.blockingStatus === 'disabled' && (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                    {r.blockingStatus === 'no_data' && (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                    STATUS_BADGE[r.status] ??
+                    'bg-gray-50 text-gray-500 border-gray-200'
+                  }`}
+                >
+                  {r.status}
+                </span>
+                <BlockingPill state={r.blockingStatus} />
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+      </section>
 
-      {/* Notes */}
-      <div className="glass-card rounded-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">Notes</h3>
+      {/* ── NOTES ────────────────────────────────────────────── */}
+      <section className="surface-card rounded-2xl p-7 space-y-4">
+        <header className="flex items-end justify-between gap-3">
+          <div className="space-y-1.5">
+            <p
+              className="text-[11px] font-black uppercase tracking-[0.18em]"
+              style={{ color: BRAND }}
+            >
+              Notes
+            </p>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-gray-900">
+              Teacher notes
+            </h3>
+          </div>
           {!editingNotes && (
             <button
               onClick={() => setEditingNotes(true)}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Edit
             </button>
           )}
-        </div>
-        <div className="p-5">
-          {editingNotes ? (
-            <div className="space-y-3">
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={4}
-                placeholder="Add notes about this student..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={saveNotes}
-                  disabled={savingNotes}
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {savingNotes ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => { setEditingNotes(false); setNotes(student.notes || ''); }}
-                  className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+        </header>
+
+        {editingNotes ? (
+          <div className="space-y-3">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={5}
+              placeholder="Add notes about this student…"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={saveNotes}
+                disabled={savingNotes}
+                className="rounded-full px-5 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 shadow-sm"
+                style={{ backgroundColor: BRAND }}
+              >
+                {savingNotes ? 'Saving…' : 'Save notes'}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingNotes(false);
+                  setNotes(student.notes || '');
+                }}
+                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
-          ) : (
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">
-              {student.notes || 'No notes yet.'}
-            </p>
-          )}
-        </div>
-      </div>
+          </div>
+        ) : student.notes ? (
+          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+            {student.notes}
+          </p>
+        ) : (
+          <p className="text-sm text-gray-400">
+            No notes yet. Add one to keep context for this student.
+          </p>
+        )}
+      </section>
     </div>
   );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function StatTile({
+  label,
+  value,
+  tint,
+}: {
+  label: string;
+  value: string | number;
+  tint?: 'green' | 'amber' | 'red' | 'purple';
+}) {
+  const cls =
+    tint === 'green'
+      ? 'text-green-700'
+      : tint === 'amber'
+      ? 'text-amber-700'
+      : tint === 'red'
+      ? 'text-red-700'
+      : tint === 'purple'
+      ? 'text-purple-700'
+      : 'text-gray-900';
+  return (
+    <div className="surface-card rounded-2xl p-5">
+      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">
+        {label}
+      </p>
+      <p
+        className={`mt-2 text-2xl md:text-3xl font-black tracking-tight leading-none ${cls}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function InfoCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="surface-card rounded-2xl p-6 space-y-3">
+      <h3 className="text-sm font-black tracking-tight text-gray-900">
+        {title}
+      </h3>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        {label}
+      </p>
+      <p
+        className={`text-sm text-gray-900 truncate ${mono ? 'font-mono' : ''}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function BlockingPill({ state }: { state: string }) {
+  if (state === 'active') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-green-700">
+        Blocking on
+      </span>
+    );
+  }
+  if (state === 'inactive') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+        Off
+      </span>
+    );
+  }
+  if (state === 'student_override') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">
+        Override
+      </span>
+    );
+  }
+  return <span className="text-xs text-gray-300">—</span>;
 }

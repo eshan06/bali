@@ -93,17 +93,27 @@ export default function DevicesPage() {
               Devices
             </h1>
             <p className="text-sm md:text-base text-gray-500 max-w-xl">
-              Register Bali tap devices, assign each one to a student, and
-              monitor when they last checked in.
+              Register Bali blocks, assign each one to a student, and monitor
+              when they last checked in.
             </p>
           </div>
-          <button
-            onClick={() => setShowRegister((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: BRAND }}
-          >
-            {showRegister ? 'Cancel' : 'Register device'}
-          </button>
+          {showRegister ? (
+            <button
+              onClick={() => setShowRegister(false)}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors self-start"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowRegister(true)}
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm self-start"
+              style={{ backgroundColor: BRAND }}
+            >
+              <IconPlus className="h-4 w-4" />
+              Register device
+            </button>
+          )}
         </div>
       </section>
 
@@ -278,15 +288,23 @@ function DeviceCard({
   const blockingState = describeBlocking(d);
 
   return (
-    <li className="surface-card rounded-2xl p-6 flex flex-col gap-4">
+    <li className="surface-card rounded-2xl p-6 flex flex-col gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">
-            {d.friendlyName ?? 'Device'}
+          <p
+            className="text-[11px] font-black uppercase tracking-[0.18em]"
+            style={{ color: BRAND }}
+          >
+            Bali block
           </p>
-          <h3 className="mt-1 font-mono text-base font-bold text-gray-900 truncate">
-            {d.deviceId}
+          <h3 className="mt-1 text-lg md:text-xl font-black tracking-tight text-gray-900 truncate">
+            {d.friendlyName ?? d.deviceId}
           </h3>
+          {d.friendlyName && (
+            <p className="mt-0.5 font-mono text-xs text-gray-400 truncate">
+              {d.deviceId}
+            </p>
+          )}
         </div>
         <span
           className={`flex-shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
@@ -377,6 +395,20 @@ function describeBlocking(d: Device): { label: string; tint: string } {
     label: `Off · ${relativeTime(d.lastBlockingReportedAt)}`,
     tint: 'bg-amber-50 text-amber-700 border-amber-200',
   };
+}
+
+function IconPlus({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.4}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+    </svg>
+  );
 }
 
 function relativeTime(iso: string | null | undefined): string {
