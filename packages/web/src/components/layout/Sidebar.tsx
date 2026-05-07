@@ -43,6 +43,11 @@ const navItems = [
     label: 'Devices',
     icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
   },
+  {
+    href: '/dashboard/dev/simulator/',
+    label: 'Simulator',
+    icon: 'M9 17a4 4 0 11-2-7.464A5 5 0 0117 7.5a4.5 4.5 0 010 9H9z M12 12v6 M9 18l3 3 3-3',
+  },
 ];
 
 export function Sidebar() {
