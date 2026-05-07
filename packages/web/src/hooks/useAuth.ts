@@ -46,12 +46,32 @@ export function useAuth() {
   }, [loadUser]);
 
   const loginWithEmail = async (email: string, password: string) => {
-    await signIn({ username: email, password });
+    try {
+      await signIn({ username: email, password });
+    } catch (err: any) {
+      // Already signed in (stale session): sign out, then retry as the new user.
+      if (err?.name === 'UserAlreadyAuthenticatedException') {
+        await signOut();
+        await signIn({ username: email, password });
+      } else {
+        throw err;
+      }
+    }
     await loadUser();
   };
 
   const loginWithGoogle = async () => {
-    await signInWithRedirect({ provider: 'Google' });
+    try {
+      await signInWithRedirect({ provider: 'Google' });
+    } catch (err: any) {
+      // Already signed in: don't redirect, just refresh local state so the
+      // page's useEffect can route the user to dashboard/student home.
+      if (err?.name === 'UserAlreadyAuthenticatedException') {
+        await loadUser();
+        return;
+      }
+      throw err;
+    }
   };
 
   const logout = async () => {
