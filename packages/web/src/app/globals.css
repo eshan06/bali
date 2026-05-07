@@ -13,7 +13,7 @@
 
 @layer components {
   /* Soft pastel aurora — used as a fixed full-viewport background on
-     student/teacher dashboards and onboarding/auth screens. */
+     student dashboard / onboarding / auth screens. */
   .bg-aurora {
     background-color: #f3f0fa;
     background-image:
@@ -22,6 +22,35 @@
       radial-gradient(60% 60% at 78% 82%, rgba(247, 196, 224, 0.55) 0%, transparent 65%),
       radial-gradient(55% 55% at 18% 88%, rgba(196, 214, 252, 0.45) 0%, transparent 60%);
     background-attachment: fixed;
+  }
+
+  /* Premium dashboard surface — near-white with the faintest brand
+     glow at top-right and bottom-left. Matches the landing page's
+     clean, white aesthetic. */
+  .bg-dash {
+    background-color: #f7f8fc;
+    background-image:
+      radial-gradient(70% 55% at 90% -10%, rgba(46, 91, 208, 0.10) 0%, transparent 60%),
+      radial-gradient(60% 50% at 0% 100%, rgba(46, 91, 208, 0.06) 0%, transparent 65%);
+    background-attachment: fixed;
+  }
+
+  /* Solid white card with refined shadow — premium, non-glassy. */
+  .surface-card {
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 12px 40px -16px rgba(46, 91, 208, 0.10);
+  }
+
+  /* Slightly translucent variant used for the hero. */
+  .surface-card-hero {
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.05);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.03),
+      0 24px 70px -28px rgba(46, 91, 208, 0.18);
   }
 
   /* Frosted glass card — translucent white over the aurora bg. */
