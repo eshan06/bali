@@ -169,6 +169,10 @@ export interface Device {
   studentName?: string;
   registeredAt: string;
   updatedAt: string;
+  lastCheckInAt?: string | null;
+  lastBlockingApplied?: boolean | null;
+  lastBlockingReportedAt?: string | null;
+  lastBlockingReportedBy?: 'manual' | 'device' | 'student_override' | null;
 }
 
 export type BlockingMode = 'block_specific' | 'block_all_except';

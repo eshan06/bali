@@ -29,7 +29,25 @@ export async function findBySchool(schoolId: string) {
     `SELECT d.id, d.device_id as "deviceId", d.friendly_name as "friendlyName",
             d.student_id as "studentId",
             s.first_name || ' ' || s.last_name as "studentName",
-            d.registered_at as "registeredAt"
+            d.registered_at as "registeredAt",
+            (SELECT MAX(ci.received_at)
+               FROM check_ins ci
+              WHERE ci.device_id = d.device_id) as "lastCheckInAt",
+            (SELECT dbs.is_blocked
+               FROM device_blocking_status dbs
+              WHERE dbs.student_id = d.student_id
+              ORDER BY dbs.reported_at DESC
+              LIMIT 1) as "lastBlockingApplied",
+            (SELECT dbs.reported_at
+               FROM device_blocking_status dbs
+              WHERE dbs.student_id = d.student_id
+              ORDER BY dbs.reported_at DESC
+              LIMIT 1) as "lastBlockingReportedAt",
+            (SELECT dbs.reported_by
+               FROM device_blocking_status dbs
+              WHERE dbs.student_id = d.student_id
+              ORDER BY dbs.reported_at DESC
+              LIMIT 1) as "lastBlockingReportedBy"
      FROM devices d
      LEFT JOIN students s ON s.id = d.student_id
      WHERE d.school_id = $1
