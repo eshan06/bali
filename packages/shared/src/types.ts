@@ -183,6 +183,8 @@ export interface ClassSession {
   blockingEnabled: boolean;
   blockingMode: BlockingMode;
   attendanceThresholdMinutes: number;
+  /** Immutable snapshot of the blocking policy resolved at session start. */
+  blockingConfigSnapshot?: import('./blocking-snapshot').BlockingSnapshot | null;
   createdAt: string;
 }
 
