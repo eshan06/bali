@@ -1,6 +1,27 @@
-export const ATTENDANCE_THRESHOLD_MINUTES = 10;
+/**
+ * @deprecated kept for back-compat; use ATTENDANCE_LATE_AFTER_MINUTES instead.
+ */
+export const ATTENDANCE_THRESHOLD_MINUTES = 5;
+
+/** A tap within this many minutes of session start is `present`. */
+export const ATTENDANCE_LATE_AFTER_MINUTES = 5;
+/** Students with no tap after this many minutes should be flagged absent. */
+export const ATTENDANCE_ABSENT_AFTER_MINUTES = 15;
+
 export const POLLING_INTERVAL_MS = 5000;
 export const DEFAULT_PAGE_SIZE = 20;
+
+/** Error codes returned by the hardware check-in endpoint. */
+export const CHECK_IN_ERROR_CODE = {
+  UNKNOWN_DEVICE: 'UNKNOWN_DEVICE',
+  UNASSIGNED_DEVICE: 'UNASSIGNED_DEVICE',
+  NO_ACTIVE_SESSION: 'NO_ACTIVE_SESSION',
+  AMBIGUOUS_SESSION: 'AMBIGUOUS_SESSION',
+  ALREADY_CHECKED_IN: 'ALREADY_CHECKED_IN',
+  MISSING_BLOCKING_CONFIG: 'MISSING_BLOCKING_CONFIG',
+  INVALID_REQUEST: 'INVALID_REQUEST',
+} as const;
+export type CheckInErrorCode = typeof CHECK_IN_ERROR_CODE[keyof typeof CHECK_IN_ERROR_CODE];
 
 export const ATTENDANCE_STATUS = {
   PRESENT: 'present',
@@ -61,6 +82,35 @@ export const GAME_BUNDLE_IDS = [
   'com.roblox.robloxmobile',
   'com.supercell.scroll',
 ] as const;
+
+// App-name lookup used when resolving a snapshot from preset bundle IDs.
+// Anything not in this map falls back to a humanised version of the bundle ID.
+export const APP_NAME_BY_BUNDLE_ID: Readonly<Record<string, string>> = {
+  'com.apple.mobilephone': 'Phone',
+  'com.apple.MobileSMS': 'iMessage',
+  'com.apple.calculator': 'Calculator',
+  'com.apple.camera': 'Camera',
+  'com.apple.clock': 'Clock',
+  'com.apple.mobilesafari': 'Safari',
+  'com.apple.mobilenotes': 'Notes',
+  'com.burbn.instagram': 'Instagram',
+  'com.zhiliaoapp.musically': 'TikTok',
+  'com.toyopagroup.picaboo': 'Snapchat',
+  'com.facebook.Facebook': 'Facebook',
+  'com.atebits.Tweetie2': 'Twitter/X',
+  'com.google.ios.youtube': 'YouTube',
+  'com.netflix.Netflix': 'Netflix',
+  'com.spotify.client': 'Spotify',
+  'com.supercell.laser': 'Brawl Stars',
+  'com.innersloth.amongus': 'Among Us',
+  'com.mojang.minecraftpe': 'Minecraft',
+  'com.roblox.robloxmobile': 'Roblox',
+  'com.supercell.scroll': 'Clash Royale',
+};
+
+export function appNameForBundleId(bundleId: string): string {
+  return APP_NAME_BY_BUNDLE_ID[bundleId] ?? bundleId;
+}
 
 // Common apps shown as suggestions in Custom mode
 export const SUGGESTED_APPS = [

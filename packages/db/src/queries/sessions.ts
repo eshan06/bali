@@ -6,7 +6,8 @@ export async function findActiveByTeacher(teacherId: string) {
             c.name as "className", cs.started_at as "startedAt",
             cs.blocking_enabled as "blockingEnabled",
             cs.blocking_mode as "blockingMode",
-            cs.attendance_threshold_minutes as "attendanceThresholdMinutes"
+            cs.attendance_threshold_minutes as "attendanceThresholdMinutes",
+            cs.blocking_config_snapshot as "blockingConfigSnapshot"
      FROM class_sessions cs
      JOIN classes c ON c.id = cs.class_id
      WHERE cs.teacher_id = $1 AND cs.ended_at IS NULL`,
@@ -22,10 +23,18 @@ export async function start(classId: string, teacherId: string, blockingMode = '
      RETURNING id, class_id as "classId", teacher_id as "teacherId",
                started_at as "startedAt", blocking_enabled as "blockingEnabled",
                blocking_mode as "blockingMode",
-               attendance_threshold_minutes as "attendanceThresholdMinutes"`,
+               attendance_threshold_minutes as "attendanceThresholdMinutes",
+               blocking_config_snapshot as "blockingConfigSnapshot"`,
     [classId, teacherId, blockingMode]
   );
   return rows[0];
+}
+
+export async function setSnapshot(sessionId: string, snapshot: unknown) {
+  await query(
+    `UPDATE class_sessions SET blocking_config_snapshot = $2 WHERE id = $1`,
+    [sessionId, JSON.stringify(snapshot)]
+  );
 }
 
 export async function end(sessionId: string) {
@@ -44,7 +53,8 @@ export async function findById(id: string) {
             c.name as "className", cs.started_at as "startedAt",
             cs.ended_at as "endedAt", cs.blocking_enabled as "blockingEnabled",
             cs.blocking_mode as "blockingMode",
-            cs.attendance_threshold_minutes as "attendanceThresholdMinutes"
+            cs.attendance_threshold_minutes as "attendanceThresholdMinutes",
+            cs.blocking_config_snapshot as "blockingConfigSnapshot"
      FROM class_sessions cs
      JOIN classes c ON c.id = cs.class_id
      WHERE cs.id = $1`,
