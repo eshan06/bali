@@ -138,6 +138,12 @@ const routes: Route[] = [
   { method: 'GET',    pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status$/,                                         handler: deviceStatusGet,     auth: 'jwt' },
   { method: 'PUT',    pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status\/(?<studentId>[^/]+)$/,                    handler: deviceStatusSet,     auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status\/(?<studentId>[^/]+)\/report$/,            handler: deviceStatusReport,  auth: 'apikey' },
+
+  // Teacher-facing simulator: same logic as the hardware/iOS endpoints, but
+  // authed with the teacher's JWT so the API key never reaches the browser.
+  { method: 'POST',   pattern: /^\/api\/dev\/simulator\/check-in$/,                                                              handler: checkinTap,          auth: 'jwt' },
+  { method: 'GET',    pattern: /^\/api\/dev\/simulator\/policy\/(?<studentId>[^/]+)$/,                                            handler: blockingPolicy,      auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/dev\/simulator\/blocking-status\/(?<sessionId>[^/]+)\/(?<studentId>[^/]+)$/,              handler: deviceStatusReport,  auth: 'jwt' },
 ];
 
 export async function handler(event: APIGatewayProxyEventV2, _context: Context): Promise<APIGatewayProxyResultV2> {

@@ -2,94 +2,112 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { usePolling } from '@/hooks/usePolling';
 import {
-  Class, ClassSession, AttendanceRecord, DeviceBlockingStatus, TeacherApp,
-  BlockingPreset, ClassBlockingConfig, POLLING_INTERVAL_MS,
-  SOCIAL_MEDIA_BUNDLE_IDS, GAME_BUNDLE_IDS, FULL_FOCUS_ALLOWED_BUNDLE_IDS,
+  Class,
+  ClassSession,
+  AttendanceRecord,
+  DeviceBlockingStatus,
+  Device,
+  POLLING_INTERVAL_MS,
+  INACTIVE_BLOCKING_SNAPSHOT,
+  type BlockingSnapshot,
 } from '@bali/shared';
 
-const statusColors: Record<string, string> = {
-  present: 'bg-green-100 text-green-800 border-green-200',
-  late: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  absent: 'bg-red-100 text-red-800 border-red-200',
-  excused: 'bg-blue-100 text-blue-800 border-blue-200',
-  pending: 'bg-gray-50 text-gray-500 border-gray-200',
-};
+const BRAND = '#2E5BD0';
 
-const presetLabels: Record<string, string> = {
+const PRESET_LABEL: Record<string, string> = {
   full_focus: 'Full Focus',
   no_social_media: 'No Social Media',
   no_games: 'No Games',
   custom: 'Custom',
-  none: 'Off',
+  none: 'No blocking',
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  present: 'bg-green-100 text-green-800 border-green-200',
+  late: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  absent: 'bg-red-50 text-red-700 border-red-200',
+  excused: 'bg-blue-50 text-blue-700 border-blue-200',
+  pending: 'bg-gray-50 text-gray-500 border-gray-200',
 };
 
 export default function ActiveSessionPage() {
   const searchParams = useSearchParams();
   const preselectClassId = searchParams.get('classId');
   const [classes, setClasses] = useState<Class[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [session, setSession] = useState<ClassSession | null>(null);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
-  const [blockingConfig, setBlockingConfig] = useState<ClassBlockingConfig | null>(null);
 
-  // Load initial state
   useEffect(() => {
     Promise.all([
       api.get<{ classes: Class[] }>('/classes'),
       api.get<{ session: ClassSession | null }>('/sessions/active'),
-    ]).then(([classRes, sessionRes]) => {
-      setClasses(classRes.classes);
-      setSession(sessionRes.session);
-      // Pre-select a class if it was passed via ?classId= and is in the list
-      if (preselectClassId && !sessionRes.session) {
-        const match = classRes.classes.find(c => c.id === preselectClassId);
-        if (match) setSelectedClassId(match.id);
-      }
-    }).catch(console.error)
+      api.get<{ devices: Device[] }>('/devices').catch(() => ({ devices: [] })),
+    ])
+      .then(([classRes, sessionRes, deviceRes]) => {
+        setClasses(classRes.classes);
+        setSession(sessionRes.session);
+        setDevices(deviceRes.devices);
+        if (preselectClassId && !sessionRes.session) {
+          const match = classRes.classes.find((c) => c.id === preselectClassId);
+          if (match) setSelectedClassId(match.id);
+        }
+      })
+      .catch(console.error)
       .finally(() => setLoading(false));
   }, [preselectClassId]);
 
-  // Load blocking config for the session's class
-  useEffect(() => {
-    if (!session) { setBlockingConfig(null); return; }
-    api.get<{ config: ClassBlockingConfig }>(`/classes/${session.classId}/blocking-config`)
-      .then(res => setBlockingConfig(res.config))
-      .catch(console.error);
-  }, [session?.classId]);
-
-  // Poll attendance and device blocking status while session is active
   const fetchAttendance = useCallback(async () => {
     if (!session) return null;
-    const attendance = await api.get<{ students: AttendanceRecord[] }>(`/sessions/${session.id}/attendance`);
+    const attendance = await api.get<{ students: AttendanceRecord[] }>(
+      `/sessions/${session.id}/attendance`
+    );
     let deviceStatuses: DeviceBlockingStatus[] = [];
     try {
-      const res = await api.get<{ statuses: DeviceBlockingStatus[] }>(`/sessions/${session.id}/device-status`);
+      const res = await api.get<{ statuses: DeviceBlockingStatus[] }>(
+        `/sessions/${session.id}/device-status`
+      );
       deviceStatuses = res.statuses;
     } catch {
-      // table may not exist yet
+      /* table missing in older deployments */
     }
     return { students: attendance.students, deviceStatuses };
   }, [session]);
 
-  const { data: attendanceData } = usePolling(fetchAttendance, POLLING_INTERVAL_MS, !!session);
+  const { data: attendanceData } = usePolling(
+    fetchAttendance,
+    POLLING_INTERVAL_MS,
+    !!session
+  );
 
-  const students = attendanceData?.students || [];
-  const deviceStatuses = attendanceData?.deviceStatuses || [];
-  const deviceStatusMap = new Map(deviceStatuses.map(d => [d.studentId, d]));
-  const presentCount = students.filter(s => s.status === 'present').length;
-  const lateCount = students.filter(s => s.status === 'late').length;
+  const students = attendanceData?.students ?? [];
+  const deviceStatuses = attendanceData?.deviceStatuses ?? [];
+  const deviceStatusMap = new Map(
+    deviceStatuses.map((d) => [d.studentId, d])
+  );
+  const deviceByStudent = new Map(
+    devices.filter((d) => d.studentId).map((d) => [d.studentId!, d])
+  );
+  const presentCount = students.filter((s) => s.status === 'present').length;
+  const lateCount = students.filter((s) => s.status === 'late').length;
+  const absentCount = students.filter((s) => s.status === 'absent').length;
   const checkedInCount = presentCount + lateCount;
+  const waitingCount = students.length - checkedInCount - absentCount;
 
   const startSession = async () => {
     if (!selectedClassId) return;
     setStarting(true);
     try {
-      const s = await api.post<ClassSession>('/sessions/start', { classId: selectedClassId });
+      const s = await api.post<ClassSession>('/sessions/start', {
+        classId: selectedClassId,
+      });
       setSession(s);
     } catch (err: any) {
       alert(err.message);
@@ -99,7 +117,9 @@ export default function ActiveSessionPage() {
   };
 
   const endSession = async () => {
-    if (!session || !confirm('End this session? Students without check-ins will be marked absent.')) return;
+    if (!session) return;
+    if (!confirm('End this session? Students without check-ins stay marked as waiting.'))
+      return;
     setEnding(true);
     try {
       await api.post(`/sessions/${session.id}/end`);
@@ -116,241 +136,389 @@ export default function ActiveSessionPage() {
     await api.put(`/sessions/${session.id}/attendance/${studentId}`, { status });
   };
 
-  const toggleStudentBlocking = async (studentId: string, currentlyBlocked: boolean) => {
-    if (!session) return;
-    await api.put(`/sessions/${session.id}/device-status/${studentId}`, { isBlocked: !currentlyBlocked });
-  };
-
   if (loading) {
-    return <div className="animate-pulse space-y-4">
-      <div className="h-8 bg-gray-200 rounded w-48" />
-      <div className="h-64 bg-gray-200 rounded" />
-    </div>;
+    return (
+      <div className="space-y-8 animate-pulse">
+        <div className="surface-card-hero rounded-3xl h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="surface-card rounded-2xl h-24" />
+          ))}
+        </div>
+        <div className="surface-card rounded-2xl h-64" />
+      </div>
+    );
   }
 
-  // No active session — show start form
+  /* ── No active session — show start form ─────────────────────────── */
   if (!session) {
-    const selectedClass = classes.find(c => c.id === selectedClassId);
-    const selectedPreset = selectedClass?.blockingPreset || 'none';
+    const selectedClass = classes.find((c) => c.id === selectedClassId);
+    const selectedPreset = selectedClass?.blockingPreset ?? 'none';
 
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Start a Session</h1>
-        <div className="max-w-md glass-card rounded-2xl p-6 space-y-4">
+      <div className="space-y-8">
+        <section className="surface-card-hero rounded-3xl p-7 md:p-9">
+          <p
+            className="text-[11px] font-black uppercase tracking-[0.22em]"
+            style={{ color: BRAND }}
+          >
+            Live Session
+          </p>
+          <h1 className="mt-2 text-3xl md:text-4xl font-black tracking-tight text-gray-900 leading-tight">
+            Start a session
+          </h1>
+          <p className="mt-2 text-sm md:text-base text-gray-500 max-w-xl">
+            Choose a class. Bali snapshots its blocking policy at start so it
+            won't change underneath you mid-session.
+          </p>
+        </section>
+
+        <div className="surface-card rounded-2xl p-7 max-w-xl space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+              Class
+            </label>
             <select
               value={selectedClassId}
-              onChange={e => setSelectedClassId(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none"
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/30"
             >
-              <option value="">Choose a class...</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name}{c.period ? ` (${c.period})` : ''}</option>
+              <option value="">Choose a class…</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.period ? ` · ${c.period}` : ''}
+                </option>
               ))}
             </select>
           </div>
-          {selectedClassId && selectedPreset !== 'none' && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-              <span className="h-2 w-2 rounded-full bg-red-500" />
-              Blocking: {presetLabels[selectedPreset] || selectedPreset}
+
+          {selectedClassId && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{
+                    backgroundColor: selectedPreset === 'none' ? '#d1d5db' : BRAND,
+                  }}
+                />
+                <span className="text-gray-700 font-medium">
+                  {PRESET_LABEL[selectedPreset]}
+                </span>
+              </span>
+              <Link
+                href={`/dashboard/classes/${selectedClassId}/`}
+                className="text-xs font-bold text-brand hover:underline"
+              >
+                Edit policy
+              </Link>
             </div>
           )}
-          {selectedClassId && selectedPreset === 'none' && (
-            <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-              <span className="h-2 w-2 rounded-full bg-gray-300" />
-              No blocking configured —
-              <a href={`/dashboard/classes/${selectedClassId}`} className="text-blue-600 hover:underline">set up</a>
-            </div>
-          )}
+
           <button
             onClick={startSession}
             disabled={!selectedClassId || starting}
-            className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-white font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="w-full rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm disabled:opacity-50"
+            style={{ backgroundColor: BRAND }}
           >
-            {starting ? 'Starting...' : 'Start Session'}
+            {starting ? 'Starting…' : 'Start session'}
           </button>
         </div>
       </div>
     );
   }
 
-  // Active session view
-  const elapsed = Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 60000);
+  /* ── Active session view ─────────────────────────────────────────── */
+  const elapsed = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 60000)
+  );
+  const snapshot: BlockingSnapshot =
+    session.blockingConfigSnapshot ?? INACTIVE_BLOCKING_SNAPSHOT;
+  const blockingOn = session.blockingEnabled && snapshot.blockingActive;
 
   return (
-    <div className="space-y-6">
-      {/* Session header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{session.className}</h1>
-          <p className="text-gray-500">
-            Started {new Date(session.startedAt).toLocaleTimeString()} ({elapsed} min ago)
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {session.blockingEnabled && (
-            <span className="flex items-center gap-2 rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-700">
-              <span className="h-2 w-2 rounded-full bg-red-500" />
-              Blocking Active
-            </span>
-          )}
-          <button
-            onClick={endSession}
-            disabled={ending}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
-          >
-            {ending ? 'Ending...' : 'End Session'}
-          </button>
-        </div>
-      </div>
+    <div className="space-y-8">
+      {/* ── HERO ────────────────────────────────────────────────── */}
+      <section className="surface-card-hero rounded-3xl p-7 md:p-9">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="space-y-2.5 min-w-0">
+            <p
+              className="text-[11px] font-black uppercase tracking-[0.22em]"
+              style={{ color: BRAND }}
+            >
+              Live Session
+            </p>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 leading-[1.05] truncate">
+              {session.className}
+            </h1>
+            <p className="text-sm md:text-base text-gray-500">
+              Started {new Date(session.startedAt).toLocaleTimeString()} ·{' '}
+              {elapsed} min in
+            </p>
+          </div>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-xl bg-white border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{students.length}</p>
-          <p className="text-xs text-gray-500">Total</p>
+          <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+            {blockingOn && (
+              <span
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold"
+                style={{
+                  backgroundColor: 'rgba(46, 91, 208, 0.10)',
+                  color: BRAND,
+                }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: BRAND }}
+                />
+                Blocking active · {PRESET_LABEL[snapshot.preset]}
+              </span>
+            )}
+            <button
+              onClick={endSession}
+              disabled={ending}
+              className="inline-flex items-center rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {ending ? 'Ending…' : 'End session'}
+            </button>
+          </div>
         </div>
-        <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{presentCount}</p>
-          <p className="text-xs text-green-600">Present</p>
-        </div>
-        <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-4 text-center">
-          <p className="text-2xl font-bold text-yellow-700">{lateCount}</p>
-          <p className="text-xs text-yellow-600">Late</p>
-        </div>
-        <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-700">{students.length - checkedInCount}</p>
-          <p className="text-xs text-gray-500">Waiting</p>
-        </div>
-      </div>
+      </section>
 
-      {/* Blocking summary */}
-      {session.blockingEnabled && blockingConfig && blockingConfig.preset !== 'none' && (() => {
-        const preset = blockingConfig.preset;
-        if (preset === 'full_focus') {
-          const allowed = ['Phone', 'Messages', 'Calculator', 'Camera', 'Clock', 'Safari', 'Notes'];
-          return (
-            <div className="bg-red-50 rounded-xl border border-red-200 px-5 py-3">
-              <p className="text-sm font-medium text-red-800">Full Focus — all apps blocked except:</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {allowed.map(name => (
-                  <span key={name} className="rounded-full bg-green-100 text-green-700 border border-green-200 px-2.5 py-0.5 text-xs font-medium">
-                    {name}
-                  </span>
-                ))}
-              </div>
+      {/* ── STATS ───────────────────────────────────────────────── */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <CountCard label="Total" value={students.length} />
+        <CountCard label="Present" value={presentCount} accent="green" />
+        <CountCard label="Late" value={lateCount} accent="amber" />
+        <CountCard label="Waiting" value={waitingCount} accent="muted" />
+      </section>
+
+      {/* ── BLOCKING SUMMARY (read-only snapshot) ──────────────── */}
+      {blockingOn && (
+        <section className="surface-card rounded-2xl p-6">
+          <header className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">
+                Blocking policy · snapshot
+              </p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-gray-900">
+                {PRESET_LABEL[snapshot.preset]}
+              </h2>
             </div>
-          );
-        }
-        if (preset === 'no_social_media') {
-          const apps = ['Instagram', 'TikTok', 'Snapchat', 'Facebook', 'Twitter/X', 'YouTube'];
-          return (
-            <div className="bg-orange-50 rounded-xl border border-orange-200 px-5 py-3">
-              <p className="text-sm font-medium text-orange-800">No Social Media — blocking:</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {apps.map(name => (
-                  <span key={name} className="rounded-full bg-red-100 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-medium">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        }
-        if (preset === 'no_games') {
-          const apps = ['Brawl Stars', 'Among Us', 'Minecraft', 'Roblox'];
-          return (
-            <div className="bg-purple-50 rounded-xl border border-purple-200 px-5 py-3">
-              <p className="text-sm font-medium text-purple-800">No Games — blocking:</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {apps.map(name => (
-                  <span key={name} className="rounded-full bg-red-100 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-medium">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        }
-        if (preset === 'custom' && blockingConfig.customApps.length > 0) {
-          return (
-            <div className="bg-blue-50 rounded-xl border border-blue-200 px-5 py-3">
-              <p className="text-sm font-medium text-blue-800">Custom — blocking:</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {blockingConfig.customApps.map(app => (
-                  <span key={app.id} className="rounded-full bg-red-100 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-medium">
+            <Link
+              href={`/dashboard/classes/${session.classId}/`}
+              className="text-xs font-bold text-brand hover:underline whitespace-nowrap"
+            >
+              Edit on class →
+            </Link>
+          </header>
+
+          {snapshot.blockedApps.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                Blocked
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {snapshot.blockedApps.map((app) => (
+                  <span
+                    key={app.bundleId}
+                    className="rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-medium"
+                  >
                     {app.appName}
                   </span>
                 ))}
               </div>
             </div>
-          );
-        }
-        return null;
-      })()}
+          )}
 
-      {/* Attendance grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {students.map((s: any) => {
-          const blockStatus = deviceStatusMap.get(s.studentId);
-          const isBlocked = blockStatus?.isBlocked ?? false;
-          const reportedBy = blockStatus?.reportedBy;
-
-          return (
-            <div
-              key={s.studentId}
-              className={`rounded-xl border p-4 transition-all ${statusColors[s.status] || statusColors.pending}`}
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-sm">{s.firstName} {s.lastName}</p>
-                {session.blockingEnabled && (
-                  <button
-                    onClick={() => toggleStudentBlocking(s.studentId, isBlocked)}
-                    title={isBlocked ? `Blocked (${reportedBy || 'manual'})` : 'Not blocked'}
-                    className={`flex-shrink-0 ml-2 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
-                      isBlocked
-                        ? 'bg-red-500 text-white'
-                        : 'bg-gray-200 text-gray-400 hover:bg-gray-300'
-                    }`}
+          {snapshot.allowedApps.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                Allowed (full focus)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {snapshot.allowedApps.map((app) => (
+                  <span
+                    key={app.bundleId}
+                    className="rounded-full bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 text-xs font-medium"
                   >
-                    {isBlocked ? 'B' : 'U'}
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs capitalize">{s.status}</span>
-                {s.checkInAt && (
-                  <span className="text-xs opacity-75">
-                    {new Date(s.checkInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {app.appName}
                   </span>
-                )}
+                ))}
               </div>
-              {session.blockingEnabled && blockStatus && (
-                <p className="text-[10px] mt-1 opacity-60">
-                  {isBlocked ? 'Blocked' : 'Unblocked'} via {reportedBy || 'manual'}
-                </p>
-              )}
-              <select
-                value={s.status}
-                onChange={e => handleOverride(s.studentId, e.target.value)}
-                className="mt-2 w-full text-xs rounded border border-current/20 bg-transparent px-1 py-0.5"
-              >
-                <option value="present">Present</option>
-                <option value="late">Late</option>
-                <option value="absent">Absent</option>
-                <option value="excused">Excused</option>
-              </select>
             </div>
-          );
-        })}
+          )}
+
+          <p className="mt-4 text-xs text-gray-400">
+            Snapshot is locked for the duration of this session. Edits to the
+            class policy take effect on the next session.
+          </p>
+        </section>
+      )}
+
+      {/* ── STUDENT CARDS ──────────────────────────────────────── */}
+      <section>
+        <header className="mb-4">
+          <h2 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
+            Students
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Tracking attendance + per-device blocking status. Status updates as
+            each device taps in.
+          </p>
+        </header>
+
+        {students.length === 0 ? (
+          <div className="surface-card rounded-2xl px-8 py-16 text-center">
+            <p className="text-gray-500">No students enrolled in this class yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {students.map((s: any) => {
+              const dev = deviceByStudent.get(s.studentId);
+              const blockStatus = deviceStatusMap.get(s.studentId);
+              return (
+                <StudentCard
+                  key={s.studentId}
+                  name={`${s.firstName} ${s.lastName}`}
+                  status={s.status}
+                  checkInAt={s.checkInAt}
+                  deviceLabel={dev ? dev.deviceId : null}
+                  blocking={
+                    blockingOn
+                      ? blockStatus
+                        ? blockStatus.isBlocked
+                          ? 'applied'
+                          : blockStatus.reportedBy === 'device'
+                          ? 'failed'
+                          : 'unknown'
+                        : 'unknown'
+                      : 'inactive'
+                  }
+                  onOverride={(next) => handleOverride(s.studentId, next)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function CountCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: 'green' | 'amber' | 'muted';
+}) {
+  const tint =
+    accent === 'green'
+      ? 'text-green-700'
+      : accent === 'amber'
+      ? 'text-yellow-700'
+      : accent === 'muted'
+      ? 'text-gray-700'
+      : 'text-gray-900';
+  return (
+    <div className="surface-card rounded-2xl p-5">
+      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">
+        {label}
+      </p>
+      <p className={`mt-2 text-3xl md:text-4xl font-black tracking-tight leading-none ${tint}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function StudentCard({
+  name,
+  status,
+  checkInAt,
+  deviceLabel,
+  blocking,
+  onOverride,
+}: {
+  name: string;
+  status: 'present' | 'late' | 'absent' | 'excused' | 'pending' | string;
+  checkInAt?: string | null;
+  deviceLabel: string | null;
+  blocking: 'applied' | 'failed' | 'unknown' | 'inactive';
+  onOverride: (next: string) => void;
+}) {
+  const blockingLabel: Record<typeof blocking, string> = {
+    applied: 'Blocking applied',
+    failed: 'Blocking failed',
+    unknown: 'Awaiting device',
+    inactive: 'Blocking off',
+  };
+  const blockingTint: Record<typeof blocking, string> = {
+    applied: 'bg-green-50 text-green-700 border-green-200',
+    failed: 'bg-red-50 text-red-700 border-red-200',
+    unknown: 'bg-gray-50 text-gray-500 border-gray-200',
+    inactive: 'bg-gray-50 text-gray-500 border-gray-200',
+  };
+
+  return (
+    <div className="surface-card rounded-2xl p-5 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-base font-bold text-gray-900 leading-tight truncate">{name}</h3>
+        <span
+          className={`flex-shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+            STATUS_BADGE[status] ?? STATUS_BADGE.pending
+          }`}
+        >
+          {status}
+        </span>
       </div>
 
-      {students.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-500">
-          No students enrolled in this class yet.
-        </div>
-      )}
+      <ul className="text-xs text-gray-500 space-y-1">
+        {checkInAt ? (
+          <li>
+            Checked in{' '}
+            {new Date(checkInAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </li>
+        ) : (
+          <li className="text-gray-400">Not yet checked in</li>
+        )}
+        <li className="truncate">
+          {deviceLabel ? (
+            <>
+              <span className="text-gray-400">Device · </span>
+              <span className="font-mono text-gray-600">{deviceLabel}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">No device assigned</span>
+          )}
+        </li>
+      </ul>
+
+      <span
+        className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${blockingTint[blocking]}`}
+      >
+        {blockingLabel[blocking]}
+      </span>
+
+      <select
+        value={status}
+        onChange={(e) => onOverride(e.target.value)}
+        aria-label={`Override attendance for ${name}`}
+        className="mt-1 w-full text-xs rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
+      >
+        <option value="present">Present</option>
+        <option value="late">Late</option>
+        <option value="absent">Absent</option>
+        <option value="excused">Excused</option>
+      </select>
     </div>
   );
 }
