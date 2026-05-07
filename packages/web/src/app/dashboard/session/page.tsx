@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api-client';
 import { usePolling } from '@/hooks/usePolling';
 import {
@@ -26,6 +27,8 @@ const presetLabels: Record<string, string> = {
 };
 
 export default function ActiveSessionPage() {
+  const searchParams = useSearchParams();
+  const preselectClassId = searchParams.get('classId');
   const [classes, setClasses] = useState<Class[]>([]);
   const [session, setSession] = useState<ClassSession | null>(null);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -42,9 +45,14 @@ export default function ActiveSessionPage() {
     ]).then(([classRes, sessionRes]) => {
       setClasses(classRes.classes);
       setSession(sessionRes.session);
+      // Pre-select a class if it was passed via ?classId= and is in the list
+      if (preselectClassId && !sessionRes.session) {
+        const match = classRes.classes.find(c => c.id === preselectClassId);
+        if (match) setSelectedClassId(match.id);
+      }
     }).catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [preselectClassId]);
 
   // Load blocking config for the session's class
   useEffect(() => {
