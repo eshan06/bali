@@ -24,8 +24,18 @@ function extractClassId(input: string): string | null {
   return null;
 }
 
+type Tab = 'link' | 'code' | 'qr';
+
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'link', label: 'Link', icon: <IconLink /> },
+  { id: 'code', label: 'Code', icon: <IconCode /> },
+  { id: 'qr', label: 'QR', icon: <IconQr /> },
+];
+
 export default function StudentJoinPage() {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>('link');
+  const [joining, setJoining] = useState(false);
 
   const [linkInput, setLinkInput] = useState('');
   const [linkError, setLinkError] = useState('');
@@ -37,6 +47,7 @@ export default function StudentJoinPage() {
   const [scanError, setScanError] = useState('');
 
   const goToClass = (classId: string) => {
+    setJoining(true);
     router.push(`/join/${classId}/`);
   };
 
@@ -45,7 +56,9 @@ export default function StudentJoinPage() {
     setLinkError('');
     const id = extractClassId(linkInput);
     if (!id) {
-      setLinkError("That doesn't look like a Bali invite link.");
+      setLinkError(
+        "We couldn't find that class. Check the link and try again."
+      );
       return;
     }
     goToClass(id);
@@ -56,7 +69,9 @@ export default function StudentJoinPage() {
     setCodeError('');
     const id = extractClassId(codeInput);
     if (!id) {
-      setCodeError('Class codes look like a UUID, e.g. 1a2b3c4d-...');
+      setCodeError(
+        "We couldn't find that class. Check the code and try again."
+      );
       return;
     }
     goToClass(id);
@@ -75,8 +90,8 @@ export default function StudentJoinPage() {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-8 max-w-2xl">
+      {/* ── HEADER ─────────────────────────────────────────────── */}
       <header className="space-y-2">
         <p
           className="text-[11px] font-black uppercase tracking-[0.22em]"
@@ -88,142 +103,215 @@ export default function StudentJoinPage() {
           Join a class
         </h1>
         <p className="text-sm md:text-base text-gray-500 max-w-xl">
-          Use any of the three options below to join your teacher's class.
+          Use a link, class code, or QR code from your teacher.
         </p>
       </header>
 
-      {/* Paste invite link */}
-      <JoinSection
-        title="Paste invite link"
-        description="Use the link your teacher shared with you."
-        icon={<IconLink />}
-      >
-        <form onSubmit={handleLinkSubmit} className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            value={linkInput}
-            onChange={(e) => setLinkInput(e.target.value)}
-            placeholder="https://.../join/..."
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: BRAND }}
-          >
-            Join
-          </button>
-        </form>
-        {linkError && <p className="text-sm text-red-600">{linkError}</p>}
-      </JoinSection>
-
-      {/* Enter class code */}
-      <JoinSection
-        title="Enter class code"
-        description="The code is the unique class identifier — your teacher can copy it from the class page."
-        icon={<IconCode />}
-      >
-        <form onSubmit={handleCodeSubmit} className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            placeholder="1a2b3c4d-...."
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand/30"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: BRAND }}
-          >
-            Join
-          </button>
-        </form>
-        {codeError && <p className="text-sm text-red-600">{codeError}</p>}
-      </JoinSection>
-
-      {/* Scan QR code */}
-      <JoinSection
-        title="Scan QR code"
-        description="Point your camera at the QR code your teacher is showing."
-        icon={<IconQr />}
-      >
-        {!scannerOpen ? (
-          <button
-            onClick={() => {
-              setScanError('');
-              setScannerOpen(true);
-            }}
-            className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: BRAND }}
-          >
-            Open camera
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <div className="rounded-2xl overflow-hidden bg-black/80 max-w-sm aspect-square">
-              <Scanner
-                onScan={handleScan}
-                onError={(err) => {
-                  setScanError(
-                    (err as any)?.message ||
-                      'Could not access the camera. Check permissions and try again.'
-                  );
+      {/* ── MAIN CARD ─────────────────────────────────────────── */}
+      <section className="surface-card rounded-2xl p-2 sm:p-3">
+        {/* Segmented control */}
+        <div
+          role="tablist"
+          aria-label="Join method"
+          className="grid grid-cols-3 gap-1 rounded-xl bg-gray-50/80 border border-gray-100 p-1"
+        >
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setTab(t.id);
+                  if (t.id !== 'qr') setScannerOpen(false);
                 }}
-                constraints={{ facingMode: 'environment' }}
-                styles={{ container: { width: '100%', height: '100%' } }}
-              />
-            </div>
-            <button
-              onClick={() => {
-                setScannerOpen(false);
-                setScanError('');
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold transition-all"
+                style={
+                  active
+                    ? {
+                        backgroundColor: '#fff',
+                        color: BRAND,
+                        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)',
+                      }
+                    : { color: '#6b7280' }
+                }
+              >
+                <span className={active ? '' : 'opacity-70'}>{t.icon}</span>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Joining overlay state */}
+        {joining ? (
+          <div className="px-4 py-12 text-center space-y-3">
+            <div
+              className="mx-auto h-8 w-8 rounded-full border-4 animate-spin"
+              style={{
+                borderColor: BRAND,
+                borderTopColor: 'transparent',
               }}
-              className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
+            />
+            <p className="text-sm font-bold text-gray-900">
+              Joining class…
+            </p>
+          </div>
+        ) : (
+          <div className="px-4 sm:px-5 py-5 space-y-4">
+            {tab === 'link' && (
+              <TabPanel
+                title="Paste invite link"
+                description="Use the full URL your teacher shared with you."
+              >
+                <form
+                  onSubmit={handleLinkSubmit}
+                  className="flex flex-col sm:flex-row gap-2"
+                >
+                  <input
+                    type="text"
+                    value={linkInput}
+                    onChange={(e) => setLinkInput(e.target.value)}
+                    placeholder="https://.../join/..."
+                    autoFocus
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!linkInput.trim()}
+                    className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm disabled:opacity-50"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Join Class
+                  </button>
+                </form>
+                {linkError && <ErrorLine message={linkError} />}
+              </TabPanel>
+            )}
+
+            {tab === 'code' && (
+              <TabPanel
+                title="Enter class code"
+                description="Your teacher can copy this from the class page."
+              >
+                <form
+                  onSubmit={handleCodeSubmit}
+                  className="flex flex-col sm:flex-row gap-2"
+                >
+                  <input
+                    type="text"
+                    value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value)}
+                    placeholder="1a2b3c4d-...."
+                    autoFocus
+                    autoComplete="off"
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!codeInput.trim()}
+                    className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm disabled:opacity-50"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Join Class
+                  </button>
+                </form>
+                {codeError && <ErrorLine message={codeError} />}
+              </TabPanel>
+            )}
+
+            {tab === 'qr' && (
+              <TabPanel
+                title="Scan QR code"
+                description="Point your camera at the QR code your teacher is showing."
+              >
+                {!scannerOpen ? (
+                  <button
+                    onClick={() => {
+                      setScanError('');
+                      setScannerOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    <IconCamera className="h-4 w-4" />
+                    Open Camera
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-2xl overflow-hidden bg-black/85 max-w-sm aspect-square">
+                      <Scanner
+                        onScan={handleScan}
+                        onError={(err) => {
+                          const msg = (err as any)?.message || '';
+                          setScanError(
+                            msg.toLowerCase().includes('permission') ||
+                              msg.toLowerCase().includes('notallowed')
+                              ? 'Camera access is unavailable. Try joining with a link or code.'
+                              : msg ||
+                                  'Camera access is unavailable. Try joining with a link or code.'
+                          );
+                        }}
+                        constraints={{ facingMode: 'environment' }}
+                        styles={{ container: { width: '100%', height: '100%' } }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setScannerOpen(false);
+                        setScanError('');
+                      }}
+                      className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {scanError && <ErrorLine message={scanError} />}
+              </TabPanel>
+            )}
           </div>
         )}
-        {scanError && <p className="text-sm text-red-600">{scanError}</p>}
-      </JoinSection>
+      </section>
+
+      <p className="text-xs text-gray-400 text-center max-w-xl mx-auto">
+        Don't have a code? Ask your teacher to share an invite link or show
+        you their class QR.
+      </p>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
 
-function JoinSection({
+function TabPanel({
   title,
   description,
-  icon,
   children,
 }: {
   title: string;
   description: string;
-  icon: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="surface-card rounded-2xl p-6">
-      <div className="flex items-start gap-4">
-        <div
-          className="shrink-0 h-11 w-11 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(46, 91, 208, 0.10)', color: BRAND }}
-        >
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0 space-y-4">
-          <div>
-            <h3 className="text-base md:text-lg font-black tracking-tight text-gray-900">
-              {title}
-            </h3>
-            <p className="mt-0.5 text-sm text-gray-500">{description}</p>
-          </div>
-          {children}
-        </div>
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-base md:text-lg font-black tracking-tight text-gray-900">
+          {title}
+        </h2>
+        <p className="mt-0.5 text-sm text-gray-500">{description}</p>
       </div>
-    </section>
+      {children}
+    </div>
+  );
+}
+
+function ErrorLine({ message }: { message: string }) {
+  return (
+    <p className="rounded-xl bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-700">
+      {message}
+    </p>
   );
 }
 
@@ -234,7 +322,7 @@ function IconLink() {
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
-      className="h-5 w-5"
+      className="h-4 w-4"
     >
       <path
         strokeLinecap="round"
@@ -252,7 +340,7 @@ function IconCode() {
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
-      className="h-5 w-5"
+      className="h-4 w-4"
     >
       <path
         strokeLinecap="round"
@@ -270,12 +358,35 @@ function IconQr() {
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}
-      className="h-5 w-5"
+      className="h-4 w-4"
     >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 4h2m4 0h-2m-4-4h2m2 4v2"
+      />
+    </svg>
+  );
+}
+
+function IconCamera({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
       />
     </svg>
   );
