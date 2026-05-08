@@ -15,6 +15,7 @@ export async function create(schoolId: string, teacherId: string, name: string, 
 export async function findByTeacher(teacherId: string, includeArchived = false) {
   const rows = await query(
     `SELECT c.id, c.name, c.period, c.is_archived as "isArchived",
+            c.blocking_preset as "blockingPreset",
             c.created_at as "createdAt",
             COUNT(cs.id)::int as "studentCount"
      FROM classes c
