@@ -87,6 +87,57 @@ export interface StudentSelf {
   pendingInvites: PendingInvite[];
 }
 
+export interface StudentClassDetail {
+  class: {
+    id: string;
+    name: string;
+    period?: string;
+    teacherName: string;
+    schoolName?: string;
+  };
+  attendance: {
+    rate: number;
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+    excused: number;
+  };
+  activeSession: StudentActiveSessionInfo | null;
+  recentSessions: StudentSessionHistoryEntry[];
+  device: { deviceId: string; friendlyName?: string } | null;
+}
+
+export interface StudentActiveSessionInfo {
+  id: string;
+  startedAt: string;
+  blockingEnabled: boolean;
+  checkedIn: boolean;
+  attendanceStatus: 'present' | 'late' | null;
+  checkInAt: string | null;
+  blockingSnapshot: import('./blocking-snapshot').BlockingSnapshot;
+  deviceBlockingStatus: {
+    isBlocked: boolean;
+    reportedAt: string;
+    reportedBy: 'manual' | 'device' | 'student_override';
+  } | null;
+}
+
+export interface StudentSessionHistoryEntry {
+  sessionId: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: 'present' | 'late' | 'absent' | 'excused';
+  checkInAt: string | null;
+  isOverride: boolean;
+  blockingStatus:
+    | 'active'
+    | 'inactive'
+    | 'student_override'
+    | 'disabled'
+    | 'no_data';
+}
+
 export interface PendingInvite {
   inviteId: string;
   classId: string;
