@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import type { StudentSelf, StudentClassSummary, PendingInvite } from '@bali/shared';
+import type {
+  StudentSelf,
+  StudentClassSummary,
+  PendingInvite,
+} from '@bali/shared';
 
 const BRAND = '#2E5BD0';
 
@@ -13,6 +17,21 @@ function periodLabel(period?: string | null): string | null {
   const trimmed = period.trim();
   if (!trimmed) return null;
   return /^period\b/i.test(trimmed) ? trimmed : `Period ${trimmed}`;
+}
+
+function formatStartedAt(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+type CardState = 'idle' | 'in_session' | 'checked_in' | 'checked_in_late';
+
+function classState(cls: StudentClassSummary): CardState {
+  const s = cls.activeSession;
+  if (!s) return 'idle';
+  if (!s.checkedIn) return 'in_session';
+  if (s.attendanceStatus === 'late') return 'checked_in_late';
+  return 'checked_in';
 }
 
 export default function StudentClassesPage() {
@@ -52,10 +71,6 @@ export default function StudentClassesPage() {
     }
   };
 
-  const firstName = user?.student?.firstName ?? 'there';
-  const empty =
-    data && data.classes.length === 0 && data.pendingInvites.length === 0;
-
   if (loading) return <ClassesSkeleton />;
 
   if (loadError) {
@@ -76,6 +91,15 @@ export default function StudentClassesPage() {
     );
   }
 
+  const firstName = user?.student?.firstName ?? 'there';
+  const empty =
+    data && data.classes.length === 0 && data.pendingInvites.length === 0;
+
+  const needsCheckIn =
+    data?.classes.some((c) => classState(c) === 'in_session') ?? false;
+  const anyActive =
+    data?.classes.some((c) => !!c.activeSession) ?? false;
+
   return (
     <div className="space-y-8">
       {/* ── HEADER ─────────────────────────────────────────────── */}
@@ -90,10 +114,25 @@ export default function StudentClassesPage() {
           Hi, {firstName}.
         </h1>
         <p className="text-sm md:text-base text-gray-500 max-w-xl">
-          Tap a class to see attendance and live session details. Pending
-          invites from your teachers show up here too.
+          View your classes, check your attendance, and see when focus mode is
+          active.
         </p>
       </header>
+
+      {/* ── ACTION BANNER (only when something needs attention) ── */}
+      {needsCheckIn ? (
+        <ActionBanner
+          tone="amber"
+          title="You have a class in session."
+          body="Tap your Bali block to check in."
+        />
+      ) : anyActive ? (
+        <ActionBanner
+          tone="brand"
+          title="A class is in session."
+          body="You're already checked in. Focus mode applies until the session ends."
+        />
+      ) : null}
 
       {/* ── PENDING INVITES ───────────────────────────────────── */}
       {data && data.pendingInvites.length > 0 && (
@@ -144,17 +183,32 @@ export default function StudentClassesPage() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
+/*  Class card                                                               */
+/* ────────────────────────────────────────────────────────────────────────── */
 
 function ClassCard({ cls }: { cls: StudentClassSummary }) {
   const session = cls.activeSession;
+  const state = classState(cls);
   const period = periodLabel(cls.period);
-  const meta = [cls.teacherName, period, cls.schoolName]
-    .filter(Boolean)
-    .join(' · ');
+  const meta = [cls.teacherName, cls.schoolName].filter(Boolean).join(' · ');
+  const focusModeActive = !!session?.blockingEnabled;
+
+  // Subtle accent ring on cards that need student attention.
+  const accentStyle =
+    state === 'in_session'
+      ? { boxShadow: '0 0 0 1px rgba(180, 83, 9, 0.20)' }
+      : state === 'checked_in'
+      ? { boxShadow: '0 0 0 1px rgba(21, 128, 61, 0.18)' }
+      : state === 'checked_in_late'
+      ? { boxShadow: '0 0 0 1px rgba(180, 83, 9, 0.20)' }
+      : undefined;
 
   return (
-    <article className="surface-card rounded-2xl p-6 transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start justify-between gap-4">
+    <article
+      className="surface-card rounded-2xl p-6 space-y-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+      style={accentStyle}
+    >
+      <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p
             className="text-[11px] font-black uppercase tracking-[0.18em]"
@@ -169,53 +223,170 @@ function ClassCard({ cls }: { cls: StudentClassSummary }) {
             <p className="text-sm text-gray-500 mt-0.5 truncate">{meta}</p>
           )}
         </div>
-        {session && <SessionBadge session={session} />}
-      </div>
+        <StatusPill state={state} />
+      </header>
 
-      <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
-          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-            Attendance
-          </dt>
-          <dd className="mt-1 text-xl font-black tracking-tight text-gray-900 leading-none">
-            {cls.attendanceRate}%
-          </dd>
+      {state === 'in_session' && session && (
+        <div
+          className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+        >
+          <div className="flex items-center gap-2.5">
+            <PulseDot color="#b45309" />
+            <p className="text-sm font-bold text-amber-800">
+              Tap your Bali block to check in.
+            </p>
+          </div>
+          <p className="text-xs text-amber-700">
+            Started {formatStartedAt(session.startedAt)}
+          </p>
         </div>
-        <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
-          <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-            Sessions
-          </dt>
-          <dd className="mt-1 text-xl font-black tracking-tight text-gray-900 leading-none">
-            {cls.totalSessions}
-          </dd>
+      )}
+
+      {(state === 'checked_in' || state === 'checked_in_late') && session && (
+        <div className="rounded-2xl border border-green-100 bg-green-50/70 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-green-600" />
+            <p className="text-sm font-bold text-green-800">
+              {state === 'checked_in_late'
+                ? "You're checked in (late)."
+                : "You're checked in."}
+            </p>
+          </div>
+          <p className="text-xs text-green-700">
+            Started {formatStartedAt(session.startedAt)}
+          </p>
         </div>
+      )}
+
+      {focusModeActive && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider"
+            style={{
+              backgroundColor: 'rgba(46, 91, 208, 0.10)',
+              color: BRAND,
+            }}
+          >
+            <IconLock className="h-3 w-3" />
+            Focus mode active
+          </span>
+          <span className="text-xs text-gray-500">
+            Some apps are blocked until the session ends.
+          </span>
+        </div>
+      )}
+
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <Stat label="Attendance" value={`${cls.attendanceRate}%`} />
+        <Stat label="Sessions" value={cls.totalSessions} />
       </dl>
     </article>
   );
 }
 
-function SessionBadge({
-  session,
-}: {
-  session: NonNullable<StudentClassSummary['activeSession']>;
-}) {
-  if (session.checkedIn) {
-    const label =
-      session.attendanceStatus === 'late' ? 'Checked in (late)' : 'Checked in';
+function StatusPill({ state }: { state: CardState }) {
+  if (state === 'in_session') {
     return (
-      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-bold text-green-700 whitespace-nowrap">
+      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap">
+        <PulseDot color="#b45309" />
+        Class in session
+      </span>
+    );
+  }
+  if (state === 'checked_in') {
+    return (
+      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-green-700 whitespace-nowrap">
         <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
-        {label}
+        Checked in
+      </span>
+    );
+  }
+  if (state === 'checked_in_late') {
+    return (
+      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
+        Checked in late
       </span>
     );
   }
   return (
-    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700 whitespace-nowrap">
-      <PulseDot color="#b45309" />
-      Tap to check in
+    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-gray-50 border border-gray-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
+      <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+      No active session
     </span>
   );
 }
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        {label}
+      </dt>
+      <dd className="mt-1 text-xl font-black tracking-tight text-gray-900 leading-none">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Action banner                                                            */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function ActionBanner({
+  tone,
+  title,
+  body,
+}: {
+  tone: 'amber' | 'brand';
+  title: string;
+  body: string;
+}) {
+  if (tone === 'amber') {
+    return (
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
+        <span className="mt-0.5">
+          <PulseDot color="#b45309" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-black tracking-tight text-amber-900">
+            {title}
+          </p>
+          <p className="text-sm text-amber-800 mt-0.5">{body}</p>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section
+      className="rounded-2xl border px-5 py-4 flex items-start gap-3"
+      style={{
+        backgroundColor: 'rgba(46, 91, 208, 0.06)',
+        borderColor: 'rgba(46, 91, 208, 0.20)',
+      }}
+    >
+      <span className="mt-0.5">
+        <PulseDot color={BRAND} />
+      </span>
+      <div className="min-w-0">
+        <p
+          className="text-sm font-black tracking-tight"
+          style={{ color: '#1e3a8a' }}
+        >
+          {title}
+        </p>
+        <p className="text-sm mt-0.5" style={{ color: '#3a4d7a' }}>
+          {body}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Invites + empty                                                          */
+/* ────────────────────────────────────────────────────────────────────────── */
 
 function InviteCard({
   invite,
@@ -302,8 +473,8 @@ function EmptyState() {
             No classes yet
           </h2>
           <p className="text-gray-500 max-w-sm mx-auto leading-relaxed">
-            Join your first class with an invite link, class code, or QR code
-            from your teacher.
+            Join your first class using a link, class code, or QR code from
+            your teacher.
           </p>
         </div>
         <Link
@@ -335,17 +506,39 @@ function ClassesSkeleton() {
   );
 }
 
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Tiny atoms                                                               */
+/* ────────────────────────────────────────────────────────────────────────── */
+
 function PulseDot({ color }: { color: string }) {
   return (
-    <span className="relative flex h-1.5 w-1.5">
+    <span className="relative flex h-2 w-2">
       <span
         className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping"
         style={{ backgroundColor: color }}
       />
       <span
-        className="relative inline-flex h-1.5 w-1.5 rounded-full"
+        className="relative inline-flex h-2 w-2 rounded-full"
         style={{ backgroundColor: color }}
       />
     </span>
+  );
+}
+
+function IconLock({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+      />
+    </svg>
   );
 }
