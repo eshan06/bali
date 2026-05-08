@@ -308,6 +308,31 @@ export async function getDevice(studentId: string) {
   return rows[0] || null;
 }
 
+export async function getActiveSessionForClass(studentId: string, classId: string) {
+  const rows = await query(
+    `SELECT cs.id, cs.started_at as "startedAt",
+            cs.blocking_enabled as "blockingEnabled",
+            cs.attendance_threshold_minutes as "thresholdMinutes",
+            cs.blocking_config_snapshot as "blockingSnapshot",
+            ar.status as "attendanceStatus",
+            ar.check_in_at as "checkInAt",
+            CASE WHEN ar.check_in_at IS NOT NULL THEN true ELSE false END as "checkedIn",
+            dbs.is_blocked as "deviceIsBlocked",
+            dbs.reported_at as "deviceReportedAt",
+            dbs.reported_by as "deviceReportedBy"
+     FROM class_sessions cs
+     LEFT JOIN attendance_records ar
+       ON ar.session_id = cs.id AND ar.student_id = $1
+     LEFT JOIN device_blocking_status dbs
+       ON dbs.session_id = cs.id AND dbs.student_id = $1
+     WHERE cs.class_id = $2 AND cs.ended_at IS NULL
+     ORDER BY cs.started_at DESC
+     LIMIT 1`,
+    [studentId, classId]
+  );
+  return rows[0] || null;
+}
+
 export async function update(id: string, fields: { firstName?: string; lastName?: string; email?: string }) {
   const sets: string[] = [];
   const params: any[] = [];

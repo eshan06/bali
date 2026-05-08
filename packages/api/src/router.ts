@@ -12,6 +12,8 @@ import { handler as classDelete } from './handlers/classes/delete';
 import { handler as classPreview } from './handlers/classes/preview';
 import { handler as classJoin } from './handlers/classes/join';
 import { getHandler as studentMeGet, postHandler as studentMePost } from './handlers/students/me';
+import { handler as studentClassDetail } from './handlers/students/classDetail';
+import { handler as studentSimulateCheckIn } from './handlers/students/simulateCheckIn';
 import { handler as inviteCreate } from './handlers/invites/create';
 import { handler as inviteList } from './handlers/invites/list';
 import { handler as inviteRevoke } from './handlers/invites/revoke';
@@ -72,6 +74,8 @@ const routes: Route[] = [
   // Student self-service
   { method: 'GET',    pattern: /^\/api\/students\/me$/,                                                 handler: studentMeGet,        auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/students\/me$/,                                                 handler: studentMePost,       auth: 'jwt' },
+  { method: 'GET',    pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)$/,                     handler: studentClassDetail,  auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)\/simulate-check-in$/,  handler: studentSimulateCheckIn, auth: 'jwt' },
 
   // Class invites by email (teacher manages, student accepts)
   { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/invites$/,                          handler: inviteCreate,        auth: 'jwt' },

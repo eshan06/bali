@@ -204,8 +204,9 @@ function ClassCard({ cls }: { cls: StudentClassSummary }) {
       : undefined;
 
   return (
-    <article
-      className="surface-card rounded-2xl p-6 space-y-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+    <Link
+      href={`/student/classes/${cls.id}/`}
+      className="block surface-card rounded-2xl p-6 space-y-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
       style={accentStyle}
     >
       <header className="flex items-start justify-between gap-4">
@@ -280,7 +281,7 @@ function ClassCard({ cls }: { cls: StudentClassSummary }) {
         <Stat label="Attendance" value={`${cls.attendanceRate}%`} />
         <Stat label="Sessions" value={cls.totalSessions} />
       </dl>
-    </article>
+    </Link>
   );
 }
 
