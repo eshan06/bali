@@ -65,7 +65,7 @@ export async function findById(id: string) {
 
 export async function findByClass(classId: string, limit = 20, offset = 0) {
   return query(
-    `SELECT cs.id, cs.started_at as "startedAt", cs.ended_at as "endedAt",
+    `SELECT cs.id as "sessionId", cs.started_at as "startedAt", cs.ended_at as "endedAt",
             COUNT(CASE WHEN ar.status = 'present' THEN 1 END)::int as "presentCount",
             COUNT(CASE WHEN ar.status = 'late' THEN 1 END)::int as "lateCount",
             COUNT(CASE WHEN ar.status = 'absent' THEN 1 END)::int as "absentCount",
