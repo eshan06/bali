@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 
+const BRAND = '#2E5BD0';
+
 const navItems = [
   { href: '/student/', label: 'Classes' },
   { href: '/student/join/', label: 'Join' },
@@ -38,40 +40,48 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   if (isLoading || !isAuthenticated || role !== 'student' || !user?.student) {
     return (
-      <div className="bg-aurora flex min-h-screen items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+      <div className="bg-dash flex min-h-screen items-center justify-center">
+        <div
+          className="animate-spin h-8 w-8 border-4 border-t-transparent rounded-full"
+          style={{ borderColor: BRAND, borderTopColor: 'transparent' }}
+        />
       </div>
     );
   }
 
   const student = user.student;
+  const isActiveLink = (href: string) =>
+    href === '/student/'
+      ? pathname === '/student/' || pathname === '/student'
+      : pathname?.startsWith(href);
 
   return (
-    <div className="bg-aurora min-h-screen">
-      <header className="px-8 pt-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-6">
+    <div className="bg-dash min-h-screen">
+      <header className="px-6 sm:px-8 pt-5 pb-1">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-6">
           <div className="flex items-center gap-8">
             <Link
               href="/student/"
-              className="text-3xl font-bold text-primary-600 tracking-tight lowercase"
+              className="text-2xl font-black tracking-tight text-gray-900 lowercase"
             >
               bali
             </Link>
             <nav className="hidden sm:flex items-center gap-1">
               {navItems.map((item) => {
-                const isActive =
-                  item.href === '/student/'
-                    ? pathname === '/student/' || pathname === '/student'
-                    : pathname?.startsWith(item.href);
+                const active = isActiveLink(item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`rounded-xl px-4 py-1.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-white/80 text-primary-700 shadow-sm'
-                        : 'text-gray-700 hover:bg-white/40'
-                    }`}
+                    className="rounded-full px-4 py-1.5 text-sm font-bold transition-colors"
+                    style={
+                      active
+                        ? {
+                            backgroundColor: 'rgba(46, 91, 208, 0.10)',
+                            color: BRAND,
+                          }
+                        : { color: '#374151' }
+                    }
                   >
                     {item.label}
                   </Link>
@@ -79,16 +89,18 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               })}
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-sm text-gray-700">
-              <span className="font-medium text-gray-900">
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-sm">
+              <span className="font-bold text-gray-900">
                 {student.firstName} {student.lastName}
               </span>
-              {student.grade ? <span className="text-gray-500"> · {student.grade}</span> : null}
+              {student.grade ? (
+                <span className="text-gray-400"> · {student.grade}</span>
+              ) : null}
             </span>
             <button
               onClick={logout}
-              className="chip-outline rounded-xl px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-white/90 transition-colors"
+              className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Sign out
             </button>
@@ -96,21 +108,22 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         </div>
 
         {/* Mobile nav row */}
-        <div className="max-w-7xl mx-auto mt-4 sm:hidden flex items-center gap-1">
+        <div className="max-w-5xl mx-auto mt-4 sm:hidden flex items-center gap-1">
           {navItems.map((item) => {
-            const isActive =
-              item.href === '/student/'
-                ? pathname === '/student/' || pathname === '/student'
-                : pathname?.startsWith(item.href);
+            const active = isActiveLink(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-white/80 text-primary-700 shadow-sm'
-                    : 'text-gray-700 hover:bg-white/40'
-                }`}
+                className="rounded-full px-3 py-1.5 text-sm font-bold transition-colors"
+                style={
+                  active
+                    ? {
+                        backgroundColor: 'rgba(46, 91, 208, 0.10)',
+                        color: BRAND,
+                      }
+                    : { color: '#374151' }
+                }
               >
                 {item.label}
               </Link>
@@ -119,7 +132,9 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 pt-10 pb-16">{children}</main>
+      <main className="max-w-5xl mx-auto px-6 sm:px-8 pt-10 pb-16">
+        {children}
+      </main>
     </div>
   );
 }
