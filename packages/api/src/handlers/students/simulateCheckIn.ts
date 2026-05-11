@@ -1,5 +1,5 @@
 import { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { studentQueries, attendanceQueries, query } from '@bali/db';
+import { studentQueries, attendanceQueries, deviceBlockingStatusQueries, query } from '@bali/db';
 import {
   ATTENDANCE_LATE_AFTER_MINUTES,
   INACTIVE_BLOCKING_SNAPSHOT,
@@ -75,6 +75,17 @@ export async function handler(
     status,
     tapTimestamp
   );
+
+  // Mimic the iOS app reporting that the policy was applied. Without this the
+  // student page sits at "Blocking pending" forever in the no-hardware flow.
+  if (session.blockingConfigSnapshot?.blockingActive) {
+    await deviceBlockingStatusQueries.setStatus(
+      session.id,
+      student.id,
+      true,
+      'device'
+    );
+  }
 
   return json({
     success: true,
