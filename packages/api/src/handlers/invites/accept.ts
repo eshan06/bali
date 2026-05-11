@@ -26,11 +26,15 @@ export async function handler(
 
   // Same adoption logic as direct join: prefer the teacher-pre-created row
   // (so any prior enrollments / attendance history attach to this student).
+  // Delete the self-created row FIRST to free up cognito_sub before transferring
+  // it onto the existing row — otherwise the UNIQUE constraint trips.
   if (student.email && cls.schoolId) {
     const existing = await studentQueries.findBySchoolAndEmail(cls.schoolId, student.email);
     if (existing && existing.id !== student.id && !existing.cognitoSub) {
-      await studentQueries.adoptCognitoSub(existing.id, user.sub);
+      const profile = { firstName: student.firstName, lastName: student.lastName, grade: student.grade };
       await studentQueries.deleteById(student.id);
+      await studentQueries.adoptCognitoSub(existing.id, user.sub);
+      await studentQueries.updateProfile(existing.id, profile);
       student = await studentQueries.findById(existing.id);
     }
   }

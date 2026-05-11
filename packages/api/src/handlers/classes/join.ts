@@ -18,12 +18,15 @@ export async function handler(
 
   // If a teacher pre-created a student row in this school with the same email,
   // adopt that row so any prior enrollments / attendance history attach to the
-  // signed-in student. Then drop the now-empty self-created row.
+  // signed-in student. Delete the self-created row FIRST so its cognito_sub
+  // is freed before we transfer the value — otherwise the UNIQUE constraint trips.
   if (student.email && cls.schoolId) {
     const existing = await studentQueries.findBySchoolAndEmail(cls.schoolId, student.email);
     if (existing && existing.id !== student.id && !existing.cognitoSub) {
-      await studentQueries.adoptCognitoSub(existing.id, user.sub);
+      const profile = { firstName: student.firstName, lastName: student.lastName, grade: student.grade };
       await studentQueries.deleteById(student.id);
+      await studentQueries.adoptCognitoSub(existing.id, user.sub);
+      await studentQueries.updateProfile(existing.id, profile);
       student = await studentQueries.findById(existing.id);
     }
   }
