@@ -35,6 +35,7 @@ import com.bali.student.data.prefs.StudentPrefs
 import com.bali.student.ui.screens.ClassDetailScreen
 import com.bali.student.ui.screens.ClassesScreen
 import com.bali.student.ui.screens.FocusModeScreen
+import com.bali.student.ui.screens.JoinConfirmScreen
 import com.bali.student.ui.screens.JoinScreen
 import com.bali.student.ui.screens.LoginScreen
 import com.bali.student.ui.screens.ProfileScreen
@@ -55,7 +56,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val CLASS_DETAIL = "class/{classId}"
     const val FOCUS_MODE = "focus"
+    const val JOIN_CONFIRM = "join/confirm/{classId}"
     fun classDetail(classId: String) = "class/$classId"
+    fun joinConfirm(classId: String) = "join/confirm/$classId"
 }
 
 private data class BottomTab(val route: String, val label: String, val icon: ImageVector)
@@ -145,17 +148,24 @@ private fun NavGraphBuilder.tabGraph(navController: NavHostController) {
             popUpTo(0) { inclusive = true }
         }
     }
-    composable(Routes.CLASSES) {
+    composable(Routes.CLASSES) { entry ->
+        val refreshSignal by entry.savedStateHandle
+            .getStateFlow("refresh", false)
+            .collectAsState()
         ClassesScreen(
             onOpenClass = { id -> navController.navigate(Routes.classDetail(id)) },
             onOpenJoin = { navigateToTab(navController, Routes.JOIN) },
+            refreshSignal = refreshSignal,
+            onRefreshSignalHandled = { entry.savedStateHandle["refresh"] = false },
         )
     }
     composable(Routes.JOIN) {
-        JoinScreen()
+        JoinScreen(
+            onConfirm = { id -> navController.navigate(Routes.joinConfirm(id)) },
+        )
     }
     composable(Routes.PROFILE) {
-        ProfileScreen(onSignedOut = toLogin)
+        ProfileScreen()
     }
     composable(Routes.SETTINGS) {
         SettingsScreen(onSignedOut = toLogin)
@@ -175,6 +185,26 @@ private fun NavGraphBuilder.detailGraph(navController: NavHostController) {
     }
     composable(Routes.FOCUS_MODE) {
         FocusModeScreen(onBack = { navController.popBackStack() })
+    }
+    composable(
+        route = Routes.JOIN_CONFIRM,
+        arguments = listOf(navArgument("classId") { type = NavType.StringType }),
+    ) {
+        JoinConfirmScreen(
+            onCancel = { navController.popBackStack() },
+            onJoined = {
+                runCatching {
+                    navController.getBackStackEntry(Routes.CLASSES)
+                        .savedStateHandle["refresh"] = true
+                }
+                navController.popBackStack(Routes.CLASSES, false)
+            },
+            onViewClass = { id ->
+                navController.navigate(Routes.classDetail(id)) {
+                    popUpTo(Routes.JOIN_CONFIRM) { inclusive = true }
+                }
+            },
+        )
     }
 }
 

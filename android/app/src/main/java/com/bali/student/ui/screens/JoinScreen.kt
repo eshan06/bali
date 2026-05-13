@@ -26,17 +26,43 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
 import com.bali.student.ui.theme.BaliBackground
+
+private const val ERR_LINK = "We couldn't read that invite link. Check the link and try again."
+private const val ERR_CODE = "We couldn't find a class with that code."
+
+private val UUID_REGEX = Regex(
+    "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    RegexOption.IGNORE_CASE,
+)
+private val JOIN_PATH_REGEX = Regex(
+    "/join/([0-9a-f-]{36})",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun extractClassId(input: String): String? {
+    val trimmed = input.trim()
+    if (trimmed.isEmpty()) return null
+    JOIN_PATH_REGEX.find(trimmed)?.let { return it.groupValues[1].lowercase() }
+    UUID_REGEX.find(trimmed)?.let { return it.value.lowercase() }
+    return null
+}
 
 private enum class JoinTab(val label: String) {
     Link("Link"), Code("Code"), QR("QR")
 }
 
 @Composable
-fun JoinScreen() {
+fun JoinScreen(onConfirm: (classId: String) -> Unit) {
     var tab by remember { mutableStateOf(JoinTab.Link) }
-    var input by remember { mutableStateOf("") }
+    var linkInput by remember { mutableStateOf("") }
+    var linkError by remember { mutableStateOf<String?>(null) }
+    var codeInput by remember { mutableStateOf("") }
+    var codeError by remember { mutableStateOf<String?>(null) }
 
     BaliBackground {
         Column(
@@ -88,17 +114,29 @@ fun JoinScreen() {
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     when (tab) {
-                        JoinTab.Link -> JoinFormContent(
-                            label = "Invite link",
-                            hint = "https://bali.app/i/...",
-                            value = input,
-                            onChange = { input = it },
+                        JoinTab.Link -> LinkForm(
+                            value = linkInput,
+                            onChange = {
+                                linkInput = it
+                                linkError = null
+                            },
+                            error = linkError,
+                            onJoin = {
+                                val id = extractClassId(linkInput)
+                                if (id == null) linkError = ERR_LINK else onConfirm(id)
+                            },
                         )
-                        JoinTab.Code -> JoinFormContent(
-                            label = "Class code",
-                            hint = "e.g. AB12-CD34",
-                            value = input,
-                            onChange = { input = it },
+                        JoinTab.Code -> CodeForm(
+                            value = codeInput,
+                            onChange = {
+                                codeInput = it
+                                codeError = null
+                            },
+                            error = codeError,
+                            onJoin = {
+                                val id = extractClassId(codeInput)
+                                if (id == null) codeError = ERR_CODE else onConfirm(id)
+                            },
                         )
                         JoinTab.QR -> QrPlaceholder()
                     }
@@ -109,26 +147,61 @@ fun JoinScreen() {
 }
 
 @Composable
-private fun JoinFormContent(
-    label: String,
-    hint: String,
+private fun LinkForm(
     value: String,
     onChange: (String) -> Unit,
+    error: String?,
+    onJoin: () -> Unit,
 ) {
-    Text(label, style = MaterialTheme.typography.titleLarge)
+    Text("Paste invite link", style = MaterialTheme.typography.titleLarge)
     Spacer(Modifier.height(12.dp))
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        placeholder = { Text(hint) },
+        placeholder = { Text("https://.../join/...") },
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     )
+    if (error != null) {
+        Spacer(Modifier.height(8.dp))
+        ErrorRow(error)
+    }
     Spacer(Modifier.height(16.dp))
+    JoinButton(enabled = value.isNotBlank(), onClick = onJoin)
+}
+
+@Composable
+private fun CodeForm(
+    value: String,
+    onChange: (String) -> Unit,
+    error: String?,
+    onJoin: () -> Unit,
+) {
+    Text("Enter class code", style = MaterialTheme.typography.titleLarge)
+    Spacer(Modifier.height(12.dp))
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        placeholder = { Text("ABC123") },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (error != null) {
+        Spacer(Modifier.height(8.dp))
+        ErrorRow(error)
+    }
+    Spacer(Modifier.height(16.dp))
+    JoinButton(enabled = value.isNotBlank(), onClick = onJoin)
+}
+
+@Composable
+private fun JoinButton(enabled: Boolean, onClick: () -> Unit) {
     Button(
-        onClick = { /* TODO: wire join flow in a later task */ },
-        enabled = false,
+        onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
@@ -138,19 +211,35 @@ private fun JoinFormContent(
             .fillMaxWidth()
             .height(48.dp),
     ) {
-        Text("Join class")
+        Text("Join Class")
     }
-    Spacer(Modifier.height(8.dp))
-    Text(
-        "Joining will be enabled in a later update.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+}
+
+@Composable
+private fun ErrorRow(message: String) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEECEC)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(12.dp),
+        )
+    }
 }
 
 @Composable
 private fun QrPlaceholder() {
-    Text("Scan a class QR code", style = MaterialTheme.typography.titleLarge)
+    Text("Scan QR code", style = MaterialTheme.typography.titleLarge)
+    Spacer(Modifier.height(6.dp))
+    Text(
+        "Point your camera at the QR code your teacher is showing.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Spacer(Modifier.height(12.dp))
     Box(
         modifier = Modifier
@@ -163,19 +252,19 @@ private fun QrPlaceholder() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             modifier = Modifier.fillMaxSize(),
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     Text(
-                        "QR scanner",
+                        "QR scanning coming soon",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Coming soon",
+                        "Use Link or Code in the meantime.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )

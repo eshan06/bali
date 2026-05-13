@@ -46,6 +46,29 @@ data class AcceptInviteResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class ClassJoinPreview(
+    val classId: String,
+    val className: String,
+    val period: String? = null,
+    val teacherName: String,
+    val schoolName: String? = null,
+    val alreadyEnrolled: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class JoinClassResponse(
+    val studentId: String,
+    val classId: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class StudentProfileUpdate(
+    val firstName: String,
+    val lastName: String,
+    val grade: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
 data class PendingInvite(
     val inviteId: String,
     val classId: String,

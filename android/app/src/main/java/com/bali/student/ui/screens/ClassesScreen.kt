@@ -36,6 +36,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -174,9 +175,18 @@ class ClassesViewModel @Inject constructor(
 fun ClassesScreen(
     onOpenClass: (String) -> Unit,
     onOpenJoin: () -> Unit,
+    refreshSignal: Boolean = false,
+    onRefreshSignalHandled: () -> Unit = {},
     vm: ClassesViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
+
+    LaunchedEffect(refreshSignal) {
+        if (refreshSignal) {
+            vm.refresh()
+            onRefreshSignalHandled()
+        }
+    }
 
     BaliBackground {
         when {
