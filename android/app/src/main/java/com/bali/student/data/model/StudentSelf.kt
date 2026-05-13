@@ -40,6 +40,12 @@ data class ActiveSessionLite(
 )
 
 @JsonClass(generateAdapter = true)
+data class AcceptInviteResponse(
+    val studentId: String,
+    val classId: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class PendingInvite(
     val inviteId: String,
     val classId: String,
