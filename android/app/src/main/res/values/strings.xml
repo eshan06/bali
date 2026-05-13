@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Bali</string>
+    <string name="accessibility_service_description">Bali uses this access to detect when you open a blocked app during class so it can show the Focus Mode screen.</string>
 </resources>
