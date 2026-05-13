@@ -181,6 +181,7 @@ private fun NavGraphBuilder.detailGraph(navController: NavHostController) {
         ClassDetailScreen(
             classId = id,
             onBack = { navController.popBackStack() },
+            onOpenFocusMode = { navController.navigate(Routes.FOCUS_MODE) },
         )
     }
     composable(Routes.FOCUS_MODE) {

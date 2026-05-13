@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -46,9 +47,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bali.student.data.api.BaliApi
+import com.bali.student.data.focus.AppPackageMap
+import com.bali.student.data.focus.FocusModePolicy
+import com.bali.student.data.focus.FocusModeStore
 import com.bali.student.data.model.BlockingAppEntry
 import com.bali.student.data.model.BlockingSnapshot
 import com.bali.student.data.model.RecentSession
+import com.bali.student.data.model.SimulateCheckInResponse
 import com.bali.student.data.model.StudentActiveSessionInfo
 import com.bali.student.data.model.StudentClassDetail
 import com.bali.student.nfc.NfcReader
@@ -92,6 +97,7 @@ data class ClassDetailUiState(
     val detail: StudentClassDetail? = null,
     val error: String? = null,
     val checkInError: String? = null,
+    val pendingFocusModeNav: Boolean = false,
 ) {
     val hasLoaded: Boolean get() = detail != null || error != null
 }
@@ -100,6 +106,7 @@ data class ClassDetailUiState(
 class ClassDetailViewModel @Inject constructor(
     private val api: BaliApi,
     private val nfcReader: NfcReader,
+    private val focusModeStore: FocusModeStore,
     savedState: SavedStateHandle,
 ) : ViewModel() {
     private val classId: String = savedState.get<String>("classId").orEmpty()
@@ -149,14 +156,17 @@ class ClassDetailViewModel @Inject constructor(
         )
         viewModelScope.launch {
             runCatching { api.simulateCheckIn(classId) }
-                .onSuccess {
+                .onSuccess { resp ->
                     runCatching { api.getClassDetail(classId) }
                         .onSuccess { d ->
+                            persistPolicy(resp, d)
+                            val hasBlocking = resp.blockingPolicy?.blockingActive == true
                             _state.value = _state.value.copy(
                                 checkingIn = false,
                                 nfcReading = false,
                                 detail = d,
                                 checkInError = null,
+                                pendingFocusModeNav = hasBlocking,
                             )
                         }
                         .onFailure {
@@ -198,15 +208,46 @@ class ClassDetailViewModel @Inject constructor(
     fun dismissCheckInError() {
         _state.value = _state.value.copy(checkInError = null)
     }
+
+    fun consumePendingFocusModeNav() {
+        _state.value = _state.value.copy(pendingFocusModeNav = false)
+    }
+
+    private suspend fun persistPolicy(resp: SimulateCheckInResponse, detail: StudentClassDetail) {
+        val snap = resp.blockingPolicy ?: return
+        val policy = FocusModePolicy(
+            sessionId = resp.sessionId,
+            classId = resp.classId,
+            className = detail.`class`.name,
+            checkInTime = resp.checkInTime,
+            attendanceStatus = resp.attendanceStatus,
+            blockingActive = snap.blockingActive,
+            preset = snap.preset,
+            mode = snap.mode,
+            blockedPackages = snap.blockedApps.mapNotNull { AppPackageMap.androidPackage(it.bundleId) },
+            allowedPackages = snap.allowedApps.mapNotNull { AppPackageMap.androidPackage(it.bundleId) },
+            blockedAppNames = snap.blockedApps.map { it.appName },
+            allowedAppNames = snap.allowedApps.map { it.appName },
+        )
+        focusModeStore.save(policy)
+    }
 }
 
 @Composable
 fun ClassDetailScreen(
     classId: String,
     onBack: () -> Unit,
+    onOpenFocusMode: () -> Unit,
     vm: ClassDetailViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
+
+    LaunchedEffect(state.pendingFocusModeNav) {
+        if (state.pendingFocusModeNav) {
+            onOpenFocusMode()
+            vm.consumePendingFocusModeNav()
+        }
+    }
 
     BaliBackground {
         Column(modifier = Modifier.fillMaxSize()) {
