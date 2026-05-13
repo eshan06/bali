@@ -28,6 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bali.student.data.api.BaliApi
 import com.bali.student.data.model.StudentClassDetail
+import com.bali.student.ui.theme.BaliBackground
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +75,7 @@ fun ClassDetailScreen(
 ) {
     val state by vm.state.collectAsState()
 
+    BaliBackground {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(24.dp))
         TextButton(onClick = onBack) { Text("← Back to classes") }
@@ -140,6 +142,7 @@ fun ClassDetailScreen(
                 }
             }
         }
+    }
     }
 }
 

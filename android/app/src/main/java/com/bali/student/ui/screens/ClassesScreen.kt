@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,8 +32,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bali.student.data.api.BaliApi
-import com.bali.student.data.auth.AmplifyAuth
 import com.bali.student.data.model.StudentClassSummary
+import com.bali.student.ui.theme.BaliBackground
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,14 +43,12 @@ import javax.inject.Inject
 data class ClassesUiState(
     val loading: Boolean = true,
     val classes: List<StudentClassSummary> = emptyList(),
-    val firstName: String? = null,
     val error: String? = null,
 )
 
 @HiltViewModel
 class ClassesViewModel @Inject constructor(
     private val api: BaliApi,
-    private val auth: AmplifyAuth,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ClassesUiState())
     val state: StateFlow<ClassesUiState> = _state
@@ -61,25 +60,14 @@ class ClassesViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { api.getStudentSelf() }
                 .onSuccess { self ->
-                    _state.value = ClassesUiState(
-                        loading = false,
-                        classes = self.classes,
-                        firstName = self.student.firstName,
-                    )
+                    _state.value = ClassesUiState(loading = false, classes = self.classes)
                 }
-                .onFailure { t ->
+                .onFailure {
                     _state.value = _state.value.copy(
                         loading = false,
-                        error = t.message ?: "Failed to load classes",
+                        error = "We couldn't load your classes. Try again.",
                     )
                 }
-        }
-    }
-
-    fun signOut(onDone: () -> Unit) {
-        viewModelScope.launch {
-            auth.signOut()
-            onDone()
         }
     }
 }
@@ -87,70 +75,89 @@ class ClassesViewModel @Inject constructor(
 @Composable
 fun ClassesScreen(
     onOpenClass: (String) -> Unit,
-    onSignedOut: () -> Unit,
+    onOpenJoin: () -> Unit,
     vm: ClassesViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(24.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text(
-                    "YOUR CLASSES",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Hi, ${state.firstName ?: "there"}.",
-                    style = MaterialTheme.typography.headlineLarge,
-                )
-            }
-            TextButton(onClick = { vm.signOut(onSignedOut) }) {
-                Text("Sign out")
+    BaliBackground {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "CLASSES",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Your classes",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "View your classes, check your attendance, and see when Focus Mode is active.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(20.dp))
+
+            when {
+                state.loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                state.error != null -> {
+                    ErrorCard(message = state.error!!, onRetry = vm::refresh)
+                }
+                state.classes.isEmpty() -> {
+                    EmptyClassesCard(onOpenJoin = onOpenJoin)
+                }
+                else -> {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                    ) {
+                        items(state.classes, key = { it.id }) { c ->
+                            ClassRow(c, onClick = { onOpenClass(c.id) })
+                        }
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(16.dp))
+    }
+}
 
-        when {
-            state.loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            state.error != null -> {
-                ErrorCard(message = state.error!!, onRetry = vm::refresh)
-            }
-            state.classes.isEmpty() -> {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text("No classes yet.", style = MaterialTheme.typography.titleLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Ask your teacher for an invite link or class code.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            else -> {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                ) {
-                    items(state.classes, key = { it.id }) { c ->
-                        ClassRow(c, onClick = { onOpenClass(c.id) })
-                    }
-                }
+@Composable
+private fun EmptyClassesCard(onOpenJoin: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("No classes yet", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Join your first class using a link, class code, or QR code from your teacher.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onOpenJoin,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+            ) {
+                Text("Join a Class")
             }
         }
     }
@@ -159,7 +166,7 @@ fun ClassesScreen(
 @Composable
 private fun ClassRow(c: StudentClassSummary, onClick: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         onClick = onClick,
@@ -206,8 +213,9 @@ private fun ClassRow(c: StudentClassSummary, onClick: () -> Unit) {
 @Composable
 private fun ErrorCard(message: String, onRetry: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("We couldn't load your classes.", style = MaterialTheme.typography.titleLarge)
