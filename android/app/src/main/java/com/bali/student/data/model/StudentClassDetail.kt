@@ -6,7 +6,7 @@ import com.squareup.moshi.JsonClass
 data class StudentClassDetail(
     val `class`: ClassInfo,
     val attendance: AttendanceStats,
-    val activeSession: ActiveSessionLite? = null,
+    val activeSession: StudentActiveSessionInfo? = null,
     val recentSessions: List<RecentSession> = emptyList(),
     val device: Device? = null,
 )
@@ -31,6 +31,40 @@ data class AttendanceStats(
 )
 
 @JsonClass(generateAdapter = true)
+data class StudentActiveSessionInfo(
+    val id: String,
+    val startedAt: String,
+    val blockingEnabled: Boolean,
+    val checkedIn: Boolean,
+    val attendanceStatus: String? = null,
+    val checkInAt: String? = null,
+    val blockingSnapshot: BlockingSnapshot? = null,
+    val deviceBlockingStatus: DeviceBlockingStatus? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class BlockingSnapshot(
+    val preset: String,
+    val mode: String,
+    val blockingActive: Boolean,
+    val blockedApps: List<BlockingAppEntry> = emptyList(),
+    val allowedApps: List<BlockingAppEntry> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class BlockingAppEntry(
+    val bundleId: String,
+    val appName: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class DeviceBlockingStatus(
+    val isBlocked: Boolean,
+    val reportedAt: String,
+    val reportedBy: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class RecentSession(
     val sessionId: String,
     val startedAt: String,
@@ -45,4 +79,14 @@ data class RecentSession(
 data class Device(
     val deviceId: String,
     val friendlyName: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class SimulateCheckInResponse(
+    val success: Boolean,
+    val sessionId: String,
+    val classId: String,
+    val attendanceStatus: String,
+    val checkInTime: String,
+    val blockingPolicy: BlockingSnapshot? = null,
 )

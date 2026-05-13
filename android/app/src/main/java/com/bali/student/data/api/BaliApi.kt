@@ -1,6 +1,7 @@
 package com.bali.student.data.api
 
 import com.bali.student.data.model.AcceptInviteResponse
+import com.bali.student.data.model.SimulateCheckInResponse
 import com.bali.student.data.model.StudentClassDetail
 import com.bali.student.data.model.StudentSelf
 import retrofit2.http.GET
@@ -16,4 +17,7 @@ interface BaliApi {
 
     @POST("invites/{inviteId}/accept")
     suspend fun acceptInvite(@Path("inviteId") inviteId: String): AcceptInviteResponse
+
+    @POST("students/me/classes/{classId}/simulate-check-in")
+    suspend fun simulateCheckIn(@Path("classId") classId: String): SimulateCheckInResponse
 }
