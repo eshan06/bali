@@ -46,6 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import com.bali.student.data.api.BaliApi
 import com.bali.student.data.focus.AppPackageMap
 import com.bali.student.data.focus.FocusModePolicy
@@ -57,6 +58,10 @@ import com.bali.student.data.model.SimulateCheckInResponse
 import com.bali.student.data.model.StudentActiveSessionInfo
 import com.bali.student.data.model.StudentClassDetail
 import com.bali.student.nfc.NfcReader
+import com.bali.student.permissions.PermissionChecks
+import com.bali.student.service.FocusAccessibilityService
+import com.bali.student.service.FocusModeService
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.bali.student.ui.theme.AccentAmber
 import com.bali.student.ui.theme.AccentGreen
 import com.bali.student.ui.theme.AccentOrange
@@ -107,6 +112,7 @@ class ClassDetailViewModel @Inject constructor(
     private val api: BaliApi,
     private val nfcReader: NfcReader,
     private val focusModeStore: FocusModeStore,
+    @ApplicationContext private val appContext: Context,
     savedState: SavedStateHandle,
 ) : ViewModel() {
     private val classId: String = savedState.get<String>("classId").orEmpty()
@@ -230,6 +236,19 @@ class ClassDetailViewModel @Inject constructor(
             allowedAppNames = snap.allowedApps.map { it.appName },
         )
         focusModeStore.save(policy)
+
+        if (!policy.blockingActive) return
+
+        val accessibilityOn = PermissionChecks.isAccessibilityServiceEnabled(
+            appContext,
+            FocusAccessibilityService::class.java,
+        )
+        if (accessibilityOn) {
+            focusModeStore.updateStatus(FocusModePolicy.STATUS_APPLIED)
+            FocusModeService.start(appContext)
+        } else {
+            focusModeStore.updateStatus(FocusModePolicy.STATUS_FAILED)
+        }
     }
 }
 
