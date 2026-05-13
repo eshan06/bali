@@ -36,3 +36,14 @@ npm-debug.log*
 
 # Stray screenshot artifacts at the repo root from local UI iteration
 /*.png
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.cxx/
+android/local.properties
+android/*.iml
+android/app/*.iml
+android/.kotlin/
