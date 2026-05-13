@@ -10,18 +10,33 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.amplifyframework.core.Amplify
+import com.bali.student.nfc.NfcReader
 import com.bali.student.ui.nav.BaliNavHost
 import com.bali.student.ui.theme.BaliTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var nfcReader: NfcReader
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             BaliApp()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        nfcReader.enableReader(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        nfcReader.disableReader(this)
     }
 
     override fun onNewIntent(intent: Intent) {

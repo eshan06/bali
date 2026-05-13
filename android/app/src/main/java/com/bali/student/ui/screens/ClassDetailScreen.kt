@@ -51,6 +51,7 @@ import com.bali.student.data.model.BlockingSnapshot
 import com.bali.student.data.model.RecentSession
 import com.bali.student.data.model.StudentActiveSessionInfo
 import com.bali.student.data.model.StudentClassDetail
+import com.bali.student.nfc.NfcReader
 import com.bali.student.ui.theme.AccentAmber
 import com.bali.student.ui.theme.AccentGreen
 import com.bali.student.ui.theme.AccentOrange
@@ -78,6 +79,8 @@ private const val ERR_LOAD_DETAIL = "Check your connection and try again."
 private const val ERR_NO_SESSION = "No active session found for this class."
 private const val ERR_NOT_FOUND = "We couldn't find this class."
 private const val ERR_CHECKIN_GENERIC = "We couldn't check you in. Try again."
+private const val ERR_NFC_NO_SESSION = "No active session found. Ask your teacher to start class."
+private const val ERR_NFC_UNASSIGNED = "This phone has not been assigned by your teacher yet."
 
 private val AppChipRedBg = Color(0xFFFEE2E2)
 
@@ -85,6 +88,7 @@ data class ClassDetailUiState(
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val checkingIn: Boolean = false,
+    val nfcReading: Boolean = false,
     val detail: StudentClassDetail? = null,
     val error: String? = null,
     val checkInError: String? = null,
@@ -95,13 +99,19 @@ data class ClassDetailUiState(
 @HiltViewModel
 class ClassDetailViewModel @Inject constructor(
     private val api: BaliApi,
+    private val nfcReader: NfcReader,
     savedState: SavedStateHandle,
 ) : ViewModel() {
     private val classId: String = savedState.get<String>("classId").orEmpty()
     private val _state = MutableStateFlow(ClassDetailUiState())
     val state: StateFlow<ClassDetailUiState> = _state
 
-    init { refresh() }
+    init {
+        refresh()
+        viewModelScope.launch {
+            nfcReader.taps.collect { onNfcTap() }
+        }
+    }
 
     fun refresh() {
         val firstLoad = !_state.value.hasLoaded
@@ -130,9 +140,13 @@ class ClassDetailViewModel @Inject constructor(
         }
     }
 
-    fun simulateCheckIn() {
+    fun simulateCheckIn(viaNfc: Boolean = false) {
         if (_state.value.checkingIn) return
-        _state.value = _state.value.copy(checkingIn = true, checkInError = null)
+        _state.value = _state.value.copy(
+            checkingIn = true,
+            nfcReading = viaNfc,
+            checkInError = null,
+        )
         viewModelScope.launch {
             runCatching { api.simulateCheckIn(classId) }
                 .onSuccess {
@@ -140,12 +154,16 @@ class ClassDetailViewModel @Inject constructor(
                         .onSuccess { d ->
                             _state.value = _state.value.copy(
                                 checkingIn = false,
+                                nfcReading = false,
                                 detail = d,
                                 checkInError = null,
                             )
                         }
                         .onFailure {
-                            _state.value = _state.value.copy(checkingIn = false)
+                            _state.value = _state.value.copy(
+                                checkingIn = false,
+                                nfcReading = false,
+                            )
                         }
                 }
                 .onFailure { t ->
@@ -154,8 +172,26 @@ class ClassDetailViewModel @Inject constructor(
                         t is HttpException && t.code() == 404 -> ERR_NOT_FOUND
                         else -> ERR_CHECKIN_GENERIC
                     }
-                    _state.value = _state.value.copy(checkingIn = false, checkInError = msg)
+                    _state.value = _state.value.copy(
+                        checkingIn = false,
+                        nfcReading = false,
+                        checkInError = msg,
+                    )
                 }
+        }
+    }
+
+    private fun onNfcTap() {
+        val current = _state.value
+        if (current.checkingIn) return
+        val detail = current.detail
+        val active = detail?.activeSession
+        when {
+            detail == null -> _state.value = current.copy(checkInError = ERR_NFC_NO_SESSION)
+            active == null -> _state.value = current.copy(checkInError = ERR_NFC_NO_SESSION)
+            active.checkedIn -> Unit // already checked in — ignore
+            detail.device == null -> _state.value = current.copy(checkInError = ERR_NFC_UNASSIGNED)
+            else -> simulateCheckIn(viaNfc = true)
         }
     }
 
@@ -182,9 +218,10 @@ fun ClassDetailScreen(
                     detail = state.detail!!,
                     refreshing = state.refreshing,
                     checkingIn = state.checkingIn,
+                    nfcReading = state.nfcReading,
                     checkInError = state.checkInError,
                     onRefresh = vm::refresh,
-                    onSimulateCheckIn = vm::simulateCheckIn,
+                    onSimulateCheckIn = { vm.simulateCheckIn(viaNfc = false) },
                     onDismissCheckInError = vm::dismissCheckInError,
                 )
                 else -> Unit
@@ -215,6 +252,7 @@ private fun LoadedBody(
     detail: StudentClassDetail,
     refreshing: Boolean,
     checkingIn: Boolean,
+    nfcReading: Boolean,
     checkInError: String?,
     onRefresh: () -> Unit,
     onSimulateCheckIn: () -> Unit,
@@ -236,6 +274,7 @@ private fun LoadedBody(
                 CurrentSessionSection(
                     session = detail.activeSession,
                     checkingIn = checkingIn,
+                    nfcReading = nfcReading,
                     onSimulateCheckIn = onSimulateCheckIn,
                 )
             }
@@ -453,6 +492,7 @@ private fun StatTile(label: String, value: String, bg: Color, fg: Color, modifie
 private fun CurrentSessionSection(
     session: StudentActiveSessionInfo?,
     checkingIn: Boolean,
+    nfcReading: Boolean,
     onSimulateCheckIn: () -> Unit,
 ) {
     SectionCard {
@@ -464,6 +504,7 @@ private fun CurrentSessionSection(
             DetailState.InSessionNotCheckedIn -> InSessionPanel(
                 session = session!!,
                 checkingIn = checkingIn,
+                nfcReading = nfcReading,
                 onSimulateCheckIn = onSimulateCheckIn,
             )
             DetailState.CheckedIn -> CheckedInPanel(session!!, late = false)
@@ -491,11 +532,18 @@ private fun NoSessionPanel() {
 private fun InSessionPanel(
     session: StudentActiveSessionInfo,
     checkingIn: Boolean,
+    nfcReading: Boolean,
     onSimulateCheckIn: () -> Unit,
 ) {
+    val panelTitle = if (nfcReading) "Reading Bali block…" else "Class in session"
+    val panelBody = if (nfcReading) {
+        "Hold your phone steady while we check you in."
+    } else {
+        "Tap your Bali block to check in."
+    }
     StatePanelText(
-        title = "Class in session",
-        body = "Tap your Bali block to check in.",
+        title = panelTitle,
+        body = panelBody,
         fg = AccentAmber,
         bg = AmberTint,
     )
