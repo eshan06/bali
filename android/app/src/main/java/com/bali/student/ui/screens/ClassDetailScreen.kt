@@ -219,6 +219,15 @@ class ClassDetailViewModel @Inject constructor(
         _state.value = _state.value.copy(pendingFocusModeNav = false)
     }
 
+    /**
+     * Prototype affordance — emits a synthetic NFC tap so the test path is
+     * identical to a real Bali block tap (same NfcReader flow, same
+     * onNfcTap handler, same check-in call, same blocking activation).
+     */
+    fun triggerSimulatedNfcTap() {
+        nfcReader.simulateTap()
+    }
+
     private suspend fun persistPolicy(resp: SimulateCheckInResponse, detail: StudentClassDetail) {
         val snap = resp.blockingPolicy ?: return
         val policy = FocusModePolicy(
@@ -281,7 +290,7 @@ fun ClassDetailScreen(
                     nfcReading = state.nfcReading,
                     checkInError = state.checkInError,
                     onRefresh = vm::refresh,
-                    onSimulateCheckIn = { vm.simulateCheckIn(viaNfc = false) },
+                    onSimulateNfcTap = vm::triggerSimulatedNfcTap,
                     onDismissCheckInError = vm::dismissCheckInError,
                 )
                 else -> Unit
@@ -315,7 +324,7 @@ private fun LoadedBody(
     nfcReading: Boolean,
     checkInError: String?,
     onRefresh: () -> Unit,
-    onSimulateCheckIn: () -> Unit,
+    onSimulateNfcTap: () -> Unit,
     onDismissCheckInError: () -> Unit,
 ) {
     PullToRefreshBox(
@@ -335,7 +344,7 @@ private fun LoadedBody(
                     session = detail.activeSession,
                     checkingIn = checkingIn,
                     nfcReading = nfcReading,
-                    onSimulateCheckIn = onSimulateCheckIn,
+                    onSimulateNfcTap = onSimulateNfcTap,
                 )
             }
             if (checkInError != null) {
@@ -553,7 +562,7 @@ private fun CurrentSessionSection(
     session: StudentActiveSessionInfo?,
     checkingIn: Boolean,
     nfcReading: Boolean,
-    onSimulateCheckIn: () -> Unit,
+    onSimulateNfcTap: () -> Unit,
 ) {
     SectionCard {
         Text("Current session", style = MaterialTheme.typography.titleLarge)
@@ -565,7 +574,7 @@ private fun CurrentSessionSection(
                 session = session!!,
                 checkingIn = checkingIn,
                 nfcReading = nfcReading,
-                onSimulateCheckIn = onSimulateCheckIn,
+                onSimulateNfcTap = onSimulateNfcTap,
             )
             DetailState.CheckedIn -> CheckedInPanel(session!!, late = false)
             DetailState.CheckedInLate -> CheckedInPanel(session!!, late = true)
@@ -593,7 +602,7 @@ private fun InSessionPanel(
     session: StudentActiveSessionInfo,
     checkingIn: Boolean,
     nfcReading: Boolean,
-    onSimulateCheckIn: () -> Unit,
+    onSimulateNfcTap: () -> Unit,
 ) {
     val panelTitle = if (nfcReading) "Reading Bali block…" else "Class in session"
     val panelBody = if (nfcReading) {
@@ -616,27 +625,49 @@ private fun InSessionPanel(
     if (presetLabel != null && session.blockingSnapshot.blockingActive) {
         InfoLine(label = "Focus Mode", value = "$presetLabel — will activate after check-in")
     }
-    Spacer(Modifier.height(12.dp))
-    Button(
-        onClick = onSimulateCheckIn,
-        enabled = !checkingIn,
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-    ) {
-        Text(if (checkingIn) "Checking in…" else "Simulate Check In")
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(
-        "Temporary for development — NFC check-in will replace this.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Spacer(Modifier.height(14.dp))
+    PrototypeSimulator(
+        checkingIn = checkingIn,
+        onSimulateNfcTap = onSimulateNfcTap,
     )
+}
+
+@Composable
+private fun PrototypeSimulator(checkingIn: Boolean, onSimulateNfcTap: () -> Unit) {
+    androidx.compose.material3.Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = NeutralTint,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                "PROTOTYPE TESTING ONLY",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Simulates an NFC tap on your Bali block — runs the same check-in flow as the real hardware.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onSimulateNfcTap,
+                enabled = !checkingIn,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+            ) {
+                Text(if (checkingIn) "Checking in…" else "Simulate NFC Tap")
+            }
+        }
+    }
 }
 
 @Composable
