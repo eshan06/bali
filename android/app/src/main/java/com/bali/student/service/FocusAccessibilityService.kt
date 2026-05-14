@@ -1,7 +1,9 @@
 package com.bali.student.service
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.bali.student.data.focus.AppPackageMap
 import com.bali.student.data.focus.FocusModePolicy
@@ -13,6 +15,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val TAG = "FocusAccessibility"
 
 /**
  * Brick-style focus enforcer. We get notified by the system whenever a window
@@ -35,17 +39,42 @@ class FocusAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        // Configure programmatically so the service works even if the
+        // accessibility XML meta-data fails to load (we hit this on AVD).
+        serviceInfo = AccessibilityServiceInfo().apply {
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            notificationTimeout = 50
+            flags = 0
+        }
+        Log.i(TAG, "service connected, eventTypes=${serviceInfo?.eventTypes}")
         scope.launch {
-            focusModeStore.policy.collect { currentPolicy = it }
+            focusModeStore.policy.collect { policy ->
+                currentPolicy = policy
+                Log.i(
+                    TAG,
+                    "policy update: active=${policy?.blockingActive} mode=${policy?.mode} " +
+                        "blocked=${policy?.blockedPackages} allowed=${policy?.allowedPackages}",
+                )
+            }
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        val policy = currentPolicy ?: return
-        if (!policy.blockingActive) return
-        if (!shouldBlock(pkg, policy)) return
+        val policy = currentPolicy
+        if (policy == null) {
+            Log.d(TAG, "window=$pkg policy=null")
+            return
+        }
+        if (!policy.blockingActive) {
+            Log.d(TAG, "window=$pkg policy.blockingActive=false")
+            return
+        }
+        val blocked = shouldBlock(pkg, policy)
+        Log.d(TAG, "window=$pkg blocked=$blocked mode=${policy.mode}")
+        if (!blocked) return
 
         // Debounce: AccessibilityService can fire multiple window-state events
         // in quick succession for the same package; we don't want to relaunch
@@ -55,6 +84,7 @@ class FocusAccessibilityService : AccessibilityService() {
         lastBlockedPackage = pkg
         lastBlockedAt = now
 
+        Log.i(TAG, "launching block screen for $pkg")
         launchBlockScreen(pkg)
     }
 
