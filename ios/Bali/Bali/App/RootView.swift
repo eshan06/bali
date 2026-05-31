@@ -2,12 +2,11 @@
 //  RootView.swift
 //  Bali
 //
-//  The top-level phase gate. Builds the app environment once and switches the
-//  whole UI on AuthStore.phase: loading → unauthenticated → onboarding → app.
+//  The top-level phase gate. Builds the app environment once, bootstraps the
+//  auth session on launch, and switches the whole UI on AuthStore.phase:
+//  loading → unauthenticated (Login) → onboarding → app (tabs).
 //
-//  Phase 2: AuthStore stubs straight to `.app`, so this lands in the tabbed
-//  shell. Phase 3 wires real Cognito (login screen for `.unauthenticated`) and
-//  Phase 5 wires the onboarding flow.
+//  Phase 5 replaces the onboarding placeholder with the real flow.
 //
 
 import SwiftUI
@@ -18,6 +17,7 @@ struct RootView: View {
     var body: some View {
         content
             .injectBaliEnvironment(env)
+            .task { await env.auth.bootstrap() }
     }
 
     @ViewBuilder
@@ -26,8 +26,7 @@ struct RootView: View {
         case .loading:
             LaunchView()
         case .unauthenticated:
-            // Phase 3 replaces this with LoginView.
-            LaunchView(message: "Sign in arrives in Phase 3")
+            LoginView()
         case .onboarding:
             // Phase 5 replaces this with the onboarding flow.
             LaunchView(message: "Onboarding arrives in Phase 5")
@@ -37,7 +36,7 @@ struct RootView: View {
     }
 }
 
-/// Branded launch / placeholder surface for non-app phases.
+/// Branded launch / placeholder surface for the loading & onboarding phases.
 struct LaunchView: View {
     var message: String? = nil
 
@@ -52,6 +51,6 @@ struct LaunchView: View {
     }
 }
 
-#Preview {
+#Preview("Login") {
     RootView()
 }

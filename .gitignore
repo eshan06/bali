@@ -60,3 +60,6 @@ ios/**/.swiftpm/
 ios/**/Packages/
 # CocoaPods (if ever used)
 ios/**/Pods/
+# Real Amplify config holds Cognito IDs — keep untracked (commit the .example).
+ios/**/amplifyconfiguration.json
+ios/**/awsconfiguration.json
