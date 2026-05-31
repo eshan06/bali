@@ -404,3 +404,123 @@ entitlements for Family Controls + NFC, needed for Phases 6–7 on device) and
 §9.13 (Cognito app-client config for raw auth, needed for Phase 3).
 
 On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase.
+
+---
+
+## 11. Resume here — session handoff (last updated 2026-05-31)
+
+### Where we are
+
+| Phase | Status | Commit |
+|---|---|---|
+| 0 scaffold + repo hygiene | ✅ done | `d18dcd5` |
+| 1 design system | ✅ done | `faf0674` |
+| 2 app shell + tab nav | ✅ done | `21a0cb3` (amended) |
+| 3 auth (Cognito) + API client | ✅ done | `4ff80f9` |
+| 4 dashboard / classes / profile | ⏳ **NEXT — not started on disk** | — |
+| 5–8 | ⬜ pending | — |
+
+`main` is **5 commits ahead of origin, not pushed.** Working tree clean. Builds
+succeed (0 errors) for the iOS 17 Simulator and were launch-verified on the
+**iPhone 17** simulator (UDID `63712FAE-41B3-4818-87EA-83AAB85E2F4E`). Login
+screen matches design screenshot 01.
+
+⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
+*clean* build emits **2 real warnings** (they didn't appear in the incremental
+builds I checked at commit time — my mistake). Both in
+`Networking/APIClient.swift` (~lines 43 & 49): *"non-Sendable parameter type
+'T.Type' cannot be sent … into main actor-isolated implementation; this is an
+error in the Swift 6 language mode."* Harmless in the current Swift 5 mode, but
+**fix them first thing in Phase 4** (e.g. drop the unnecessary `@MainActor`
+isolation on the `APIClient` protocol, or take `T.Type` differently). Don't
+trust incremental-build warning counts — always confirm on a `clean build`.
+
+### How to build / run (Xcode is installed; xcode-select points at CLT)
+
+```
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+"$DEVELOPER_DIR/usr/bin/xcodebuild" -project ios/Bali/Bali.xcodeproj -scheme Bali \
+  -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug build
+# then: simctl uninstall com.bali.Bali ; install <app> ; launch ; io <udid> screenshot
+```
+**Discipline:** gate on `grep -q "BUILD SUCCEEDED"` before install/screenshot;
+always `simctl uninstall` first so you never screenshot a stale build; never
+claim "0 warnings" without reading an actual BUILD SUCCEEDED. PNG screenshots
+downscaled with `sips -Z 760` read reliably here; wide crops / JPEGs often don't.
+
+### What's built (architecture is in place — Phases 4–8 mostly add files)
+
+- **Design system** (`DesignSystem/`): all `bali.css` tokens + component library
+  (BaliButton, Card, Badge/PulseDot, IconTile, AttendanceRing, BaliTextField,
+  BaliSegmentedControl, Eyebrow, Wordmark, NfcMark, ShieldTile, AppTile,
+  RadarView, IconButton, BaliScreen/ScreenHeader, DetailScaffold/StubPlaceholder,
+  GoogleGGlyph). DEBUG-only `DesignGallery` preview.
+- **Shell** (`Features/Shell/`): custom `MainTabView` (4 NavigationStacks in a
+  ZStack, opacity-switched — **do not add `.zIndex` to the stacks or the tab bar
+  gets covered**, learned the hard way) + `BaliTabBar` with the raised center NFC
+  FAB. `AppRouter` (per-tab paths, sheets, overlay) + `Navigation.swift` enums.
+- **Auth** (`Auth/`, `Networking/`): `AuthService` protocol (StubAuthService
+  active; AmplifyAuthService behind `#if canImport(Amplify)`), `RoleGate`,
+  `AuthStore` (phase gate), `APIClient`/`APIConfig`/`APIError`. `AppEnvironment`
+  picks stub vs Amplify at compile time. `RootView` bootstraps + routes.
+- **Stub screens** for every tab root + pushed detail + the two sheets — real
+  navigation, placeholder bodies (replaced in Phases 4–8).
+
+### Phase 4 — first step: fix the 2 APIClient Sendable warnings (above), then:
+
+### ⚠️ Phase 4 was attempted and ROLLED BACK — re-do from scratch
+
+A Phase-4 batch was interrupted; most files never reached disk and the rest was
+reverted so Phase 3 could commit clean. **None of the Phase 4 code is on disk.**
+I had written (and they are NOT saved — rewrite them) :
+- `Models/BlockingSnapshot.swift` — mirror packages/shared (preset/mode/
+  blockingActive/blockedApps/allowedApps; presets decode unknown→custom).
+- `Models/StudentModels.swift` — StudentSelf, StudentClassSummary,
+  ActiveSessionSummary, PendingInvite, StudentClassDetail + nested, ClassJoinPreview,
+  CheckInResponse, StudentProfileUpdate, AttendanceStatus helper.
+- `Models/AppCatalog.swift` — bundleId → AppVisual (SF Symbol + color), real
+  data only, no brand logos. `Models/Formatting.swift` — ISO date/time + percent.
+- `DesignSystem/Tokens/ClassColor.swift` — deterministic per-classId accent.
+- `Data/StudentRepository.swift` (protocol + LiveStudentRepository) +
+  `Data/SampleStudentRepository.swift` (Maya Chen / Lincoln High fixtures:
+  AP Biology live+FullFocus, World History noSocial, Algebra II noGames; a
+  Chemistry pending invite). Sidecar `ClassPresentation` (preset/seat/nextLabel)
+  + `streakHint` carry fields the DTOs lack (flagged §9: no preset on summary,
+  no seat, no next-time, no streak).
+- `State/AppModel.swift` (@Observable: student/classes/invites, detail cache,
+  checkedIn map, derived liveClass/focusActiveClass/averageAttendance).
+- `Features/Classes/ClassCard.swift` (4pt color bar, period+LIVE, ring, policy +
+  status row with the spec's status logic).
+- Real `HomeView` (3 hero states), `ClassesView` (+ dashed join tile),
+  `ClassDetailView` (header/session/stats/device+policy/recent),
+  `FocusPolicyPreviewView`, `ProfileView` (editable), `SettingsView`,
+  `DeviceInfoView`. Wire `AppModel` into `AppEnvironment` (add `let model` +
+  `.environment(env.model)` + Live/Sample split + preview()).
+
+Pitfalls hit during the attempt (avoid next time):
+- `@MainActor @Observable` types: **don't** use `= SomeType()` default args in an
+  initializer (nonisolated-default-arg error). Use `param: T? = nil` then
+  `self.x = param ?? T()` inside the init.
+- `ScreenHeader` needs an explicit `init` so an accessory closure can omit the
+  eyebrow (already fixed in committed code).
+- Don't put `.environment(\.colorScheme, .dark)` on a non-View expression; for a
+  light eyebrow on the class-color header just pass a white color.
+- Work in **small batches** and build between them — a too-large parallel batch
+  got cancelled by one failed build and left files half-written.
+
+### Backend/shared changes still to confirm (see §9; all have local fallbacks)
+Real student check-in endpoint (using `simulate-check-in` behind a
+`CheckInService` seam, no "simulate" UI), semantic `blockedAppKeys`, JWT status
+report, student device registration, emergency unlock, push notifications,
+seat/block name, streak/unread. Decisions locked: iOS 17, **Amplify Swift**
+(parity), MVP-local-now.
+
+### Your open action items (don't block Phases 4–5; needed for 3 real-auth & 6–7)
+- Add the **Amplify SPM package** in Xcode + a real (untracked)
+  `amplifyconfiguration.json` to activate real Cognito (template at
+  `ios/Bali/Bali/Resources/amplifyconfiguration.example.json`; steps in
+  `Auth/AmplifyAuthService.swift`). Register the iOS OAuth redirect URI on the
+  Cognito app client. Until then the **stub auth + sample data** run everything
+  on the Simulator.
+- Apple entitlements for **Family Controls** + **NFC Tag Reading** (Phases 6–7,
+  device-only).
