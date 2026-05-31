@@ -47,3 +47,16 @@ android/local.properties
 android/*.iml
 android/app/*.iml
 android/.kotlin/
+
+# iOS / Xcode build artifacts
+ios/**/build/
+ios/**/DerivedData/
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+ios/**/*.xcscmblueprint
+ios/**/*.xccheckout
+# Swift Package Manager
+ios/**/.swiftpm/
+ios/**/Packages/
+# CocoaPods (if ever used)
+ios/**/Pods/
