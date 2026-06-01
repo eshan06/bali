@@ -423,11 +423,11 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 7 Focus Mode / Screen Time | ✅ done | `bcfb5e5` |
 | 8 notifications + polish | ✅ done | `9b02ae6` |
 
-**All 8 phases complete.** `main` is **15 commits ahead of origin, not pushed.**
-Working tree clean. A clean build succeeds with **0 errors / 0 warnings** for the
-iOS 17 Simulator; every design screen (01–18) is built and launch-verified on the
-**iPhone 17** simulator (UDID `63712FAE-41B3-4818-87EA-83AAB85E2F4E`) on stub auth
-+ sample data. (The 2 APIClient warnings below are fixed.)
+**All 8 phases complete + live Cognito auth wired (`3a08b6b`).** `main` is **16
+commits ahead of origin, NOT pushed.** Working tree clean. Clean build = **0 errors
+/ 0 warnings** (iPhone 17 sim). Every design screen (01–18) built + verified. The
+app now runs on **real Cognito + the live dev API** (not just sample data) — sign-in
++ real DB data verified on the Simulator. (The 2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
 *clean* build emits **2 real warnings** (they didn't appear in the incremental
@@ -581,20 +581,37 @@ feed seeds on app load. DEBUG aid: `-baliPush notifications`.
 Every design screen (01–18) is built + Sim-verified on stub auth + sample data.
 What's left is device-only or backend, all behind clean seams (§9):
 
-- **Device (user, Apple account):** NFC Tag Reading entitlement +
-  `NFCReaderUsageDescription` (Phase 6); Family Controls entitlement (Phase 7,
-  Apple approval) + a one-time FamilyActivityPicker selection. `CoreNFCReader` +
-  `RealScreenTimeService` are Sim-excluded → unverified; the first device build
-  may need tweaks. The project uses no Info.plist file — add the usage string via
-  `INFOPLIST_KEY_*` build settings + a `Bali.entitlements`.
-- **Auth / live data:** add the Amplify SPM package + a real (untracked)
-  `amplifyconfiguration.json` to flip from stub auth + sample data to live Cognito
-  + the API (the live repository/auth seams are already in place).
-- **Backend / shared (§9):** the tag-aware student check-in endpoint, semantic
-  `blockedAppKeys`, a JWT status-report route, student device registration,
-  emergency-unlock review, push notifications, seat / next-class / streak fields.
-- **Polish follow-ups:** a fuller accessibility pass (Dynamic Type, VoiceOver
-  labels on icon-only controls) and motion beyond the existing radar/pulse/countdown.
+- **Auth / live data: ✅ DONE (`3a08b6b`).** Amplify SPM (Amplify +
+  AWSCognitoAuthPlugin) added; `BaliApp` configures Amplify; `AmplifyAuthService`
+  imports `AWSPluginsCore`; login prefill removed. `amplifyconfiguration.json`
+  (gitignored, mirrors android) is bundled. Runs on real Cognito + the dev API
+  (`npm run dev:api` → localhost:3001, reads root `.env`). Sign-in needs a Cognito
+  user with `custom:role = student` (the API verifies the **id** token, `tokenUse:'id'`).
+  Remaining for *prod* auth: the `balistudent://` URL scheme for Google sign-in
+  (email/pw already works) + a deployed HTTPS API URL (today the API is localhost-only).
+- **Device (waiting on Apple Developer enrollment — paid, "pending" end of session 2,
+  activates in ~24–48h):** once active, on-device testing of BOTH NFC and Focus Mode
+  works with **no extra Apple approval** (the Family Controls *distribution* approval
+  is only needed to ship, not to dev-test). Steps: switch the team (current
+  `DEVELOPMENT_TEAM H535678UF8` is the personal team) to the paid one → add the
+  **Near Field Communication Tag Reading** + **Family Controls** capabilities →
+  connect the iPhone → run. `CoreNFCReader` + `RealScreenTimeService` are Sim-excluded
+  → unverified; first device build may need tweaks. The device can't reach localhost →
+  use `-BALI_DEV_API_HOST <mac-LAN-ip>` + an ATS exception (the Simulator allows
+  http://localhost without one). No Info.plist file → add usage strings via
+  `INFOPLIST_KEY_*` + a `Bali.entitlements`.
+- **⚠️ Emergency stop / unlock — BUILD OUT (priority).** `EmergencyUnlockSheet` is
+  local/optimistic only today: pick reason + note → "Request sent", nothing actually
+  happens (§9.6). Build the real flow — a backend endpoint for the teacher to
+  review/approve, and the actual stop/unlock behavior on approval (clear shields).
+- **Backend / shared (§9; server-side, decoupled from NFC — buildable NOW via the dev
+  API):** student device registration, JWT status-report route, the real tag-aware
+  check-in endpoint (simulate-check-in is the MVP), semantic `blockedAppKeys`,
+  push/APNs, seat / next-class / streak. Recommended first: device registration +
+  status-report. (These touch the shared backend — web + android consume it too.)
+- **Polish / ship:** accessibility pass (Dynamic Type, VoiceOver labels), deploy the
+  API, App Store assets + privacy strings + Family Controls *distribution* approval +
+  App Review.
 
 DEBUG launch-arg aids (all `#if DEBUG`, no effect on normal runs):
 `-baliAutologin`, `-baliTab`, `-baliPush`, `-baliSheet`, `-baliNfcState`,
