@@ -417,23 +417,25 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 1 design system | ✅ done | `faf0674` |
 | 2 app shell + tab nav | ✅ done | `21a0cb3` (amended) |
 | 3 auth (Cognito) + API client | ✅ done | `4ff80f9` |
-| 4 dashboard / classes / profile | ⏳ **NEXT — not started on disk** | — |
-| 5–8 | ⬜ pending | — |
+| 4 dashboard / classes / profile | ✅ done | `40281d0` |
+| 5 join + onboarding | ⏳ **NEXT** | — |
+| 6 real NFC · 7 Focus/Screen Time (both device) · 8 notifications + polish | ⬜ pending | — |
 
-`main` is **5 commits ahead of origin, not pushed.** Working tree clean. Builds
-succeed (0 errors) for the iOS 17 Simulator and were launch-verified on the
-**iPhone 17** simulator (UDID `63712FAE-41B3-4818-87EA-83AAB85E2F4E`). Login
-screen matches design screenshot 01.
+`main` is **7 commits ahead of origin, not pushed.** Working tree clean. A clean
+build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator, and all
+Phase 4 screens were launch-verified on the **iPhone 17** simulator (UDID
+`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (04–06, 14–17).
+Login still matches screenshot 01. (The 2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
 *clean* build emits **2 real warnings** (they didn't appear in the incremental
 builds I checked at commit time — my mistake). Both in
 `Networking/APIClient.swift` (~lines 43 & 49): *"non-Sendable parameter type
 'T.Type' cannot be sent … into main actor-isolated implementation; this is an
-error in the Swift 6 language mode."* Harmless in the current Swift 5 mode, but
-**fix them first thing in Phase 4** (e.g. drop the unnecessary `@MainActor`
-isolation on the `APIClient` protocol, or take `T.Type` differently). Don't
-trust incremental-build warning counts — always confirm on a `clean build`.
+error in the Swift 6 language mode."* Harmless in the current Swift 5 mode, and
+**FIXED in Phase 4** by making the data layer `nonisolated` (the target's default
+isolation is MainActor — see the Phase 4 findings below). Don't trust
+incremental-build warning counts — always confirm on a `clean build`.
 
 ### How to build / run (Xcode is installed; xcode-select points at CLT)
 
@@ -466,47 +468,66 @@ downscaled with `sips -Z 760` read reliably here; wide crops / JPEGs often don't
 - **Stub screens** for every tab root + pushed detail + the two sheets — real
   navigation, placeholder bodies (replaced in Phases 4–8).
 
-### Phase 4 — first step: fix the 2 APIClient Sendable warnings (above), then:
+### Phase 4 — DONE (commit `40281d0`)
 
-### ⚠️ Phase 4 was attempted and ROLLED BACK — re-do from scratch
+All Phase 4 code is on disk, builds clean (0/0), and every screen was launch-
+verified on the iPhone 17 sim against the handoff. What landed:
+- **Models** (`Models/`): `BlockingSnapshot` (+ preset/mode display, unknown
+  enums → safe fallbacks), `StudentModels` (StudentSelf, summary/detail,
+  sessions, invites, `CheckInResponse`, `StudentProfileUpdate`, `AttendanceStatus`),
+  `AppCatalog` (bundleId → `AppVisual`, real category glyphs), `Formatting`
+  (ISO / relative / dayLabel / percent). `DesignSystem/Tokens/ClassColor`.
+- **Data** (`Data/`): `StudentRepository` (+ `LiveStudentRepository`),
+  `SampleStudentRepository` (Maya Chen / Lincoln High: AP Biology live+Full Focus,
+  World History No Social Media, Algebra II No Games, Chemistry invite). Sidecar
+  `ClassPresentation` (policy/seat/nextLabel) + `StudentExtras` (streak) carry the
+  fields the DTOs lack (§9). `State/AppModel` (@Observable) wired into
+  `AppEnvironment` (stub→Sample, Amplify→Live) + `.environment(env.model)`.
+- **Screens**: Home (live / checked-in / resting hero, attendance+streak, list),
+  Classes (cards + pending invites + dashed join tile), ClassDetail (gradient
+  header / live session+check-in CTA / stats / device+policy / recent),
+  FocusPolicyPreview (real allowed/paused grids — NOT placeholder apps), Profile
+  (editable + Save), Settings (grouped + sign out), DeviceInfo. Plus `ClassCard`.
 
-A Phase-4 batch was interrupted; most files never reached disk and the rest was
-reverted so Phase 3 could commit clean. **None of the Phase 4 code is on disk.**
-I had written (and they are NOT saved — rewrite them) :
-- `Models/BlockingSnapshot.swift` — mirror packages/shared (preset/mode/
-  blockingActive/blockedApps/allowedApps; presets decode unknown→custom).
-- `Models/StudentModels.swift` — StudentSelf, StudentClassSummary,
-  ActiveSessionSummary, PendingInvite, StudentClassDetail + nested, ClassJoinPreview,
-  CheckInResponse, StudentProfileUpdate, AttendanceStatus helper.
-- `Models/AppCatalog.swift` — bundleId → AppVisual (SF Symbol + color), real
-  data only, no brand logos. `Models/Formatting.swift` — ISO date/time + percent.
-- `DesignSystem/Tokens/ClassColor.swift` — deterministic per-classId accent.
-- `Data/StudentRepository.swift` (protocol + LiveStudentRepository) +
-  `Data/SampleStudentRepository.swift` (Maya Chen / Lincoln High fixtures:
-  AP Biology live+FullFocus, World History noSocial, Algebra II noGames; a
-  Chemistry pending invite). Sidecar `ClassPresentation` (preset/seat/nextLabel)
-  + `streakHint` carry fields the DTOs lack (flagged §9: no preset on summary,
-  no seat, no next-time, no streak).
-- `State/AppModel.swift` (@Observable: student/classes/invites, detail cache,
-  checkedIn map, derived liveClass/focusActiveClass/averageAttendance).
-- `Features/Classes/ClassCard.swift` (4pt color bar, period+LIVE, ring, policy +
-  status row with the spec's status logic).
-- Real `HomeView` (3 hero states), `ClassesView` (+ dashed join tile),
-  `ClassDetailView` (header/session/stats/device+policy/recent),
-  `FocusPolicyPreviewView`, `ProfileView` (editable), `SettingsView`,
-  `DeviceInfoView`. Wire `AppModel` into `AppEnvironment` (add `let model` +
-  `.environment(env.model)` + Live/Sample split + preview()).
+KEY DECISIONS / FINDINGS — carry forward into Phases 5–8:
+- **Target sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`** (Swift-5 mode). So
+  the whole **data layer is explicitly `nonisolated`** (Codable models, APIClient,
+  repository, Formatting) — else models are inferred @MainActor and `JSONDecoder`
+  (nonisolated) can't build them off-main. **Stores/views stay @MainActor;
+  presentation helpers that read BaliColor/AppVisual (AppCatalog, ClassColor)
+  stay default (@MainActor).** New model/DTO/service types → mark `nonisolated`.
+- **API envelope:** student endpoints return the object directly (`json(x)` =
+  `JSON.stringify(x)`); errors are `{error}`. No `{data}` wrapper.
+- **attendanceRate / attendance.rate are integer percents 0–100** (ring takes /100).
+- **POST /students/me** body = `{firstName,lastName,grade?}`; returns `StudentSelf`.
+- Xcode uses **filesystem-synchronized groups** — new files/folders under
+  `ios/Bali/Bali/` are auto-built; **no pbxproj edits needed**.
+- `ClassColor.palette` is a 6-color order chosen so the sample roster hashes to
+  blue/violet/green (design fidelity); arbitrary real ids still get stable colors.
+- **DEBUG launch-arg verification aids** (in `AuthService`/`AppRouter`/`Navigation`,
+  `#if DEBUG`, no effect on normal runs; there's no `idb` on this host):
+  `simctl launch <udid> com.bali.Bali -baliAutologin YES -baliTab <home|classes|
+  focus|profile> -baliPush <classDetail|focusPolicy|settings|deviceInfo|
+  notifications|join>` boots into / deep-links any authed screen for screenshots.
+- SwiftUI gotcha hit: a helper that wraps content in `Card { content() }` must take
+  the closure `@escaping` (Card stores it). Small batches + build between them.
 
-Pitfalls hit during the attempt (avoid next time):
-- `@MainActor @Observable` types: **don't** use `= SomeType()` default args in an
-  initializer (nonisolated-default-arg error). Use `param: T? = nil` then
-  `self.x = param ?? T()` inside the init.
-- `ScreenHeader` needs an explicit `init` so an accessory closure can omit the
-  eyebrow (already fixed in committed code).
-- Don't put `.environment(\.colorScheme, .dark)` on a non-View expression; for a
-  light eyebrow on the class-color header just pass a white color.
-- Work in **small batches** and build between them — a too-large parallel batch
-  got cancelled by one failed build and left files half-written.
+### Phase 5 — NEXT (join + onboarding) · Simulator
+
+1. **Join** — real `JoinClassView`: Code / Link / QR via `BaliSegmentedControl`
+   → `GET /classes/{id}/preview` (ClassJoinPreview) → confirm → `POST
+   /classes/{id}/join`. Add `preview` / `join` / `acceptInvite` to
+   `StudentRepository` (+ Sample), AppModel actions, then refresh. The Classes
+   invite cards + Home/Classes empty states already route to `.join`. Screens 07.
+2. **Invite accept** — `POST /invites/{id}/accept`; surface from the pending-invite
+   cards (currently they just push `.join`).
+3. **Onboarding** — RootView `.onboarding` phase: RegisterDevice (keychain device
+   id + status, §9.5 local) and Permissions (Family Controls request — stubbed on
+   Sim). Screens 02 / 03.
+
+Then 6 (real NFC check-in, device), 7 (Focus Mode / Screen Time, device), 8
+(notifications + polish). One `ios:` commit per phase, no co-author trailer;
+push only when asked. Check in after each phase.
 
 ### Backend/shared changes still to confirm (see §9; all have local fallbacks)
 Real student check-in endpoint (using `simulate-check-in` behind a
