@@ -18,6 +18,8 @@ final class AppEnvironment {
     let auth: AuthStore
     let router: AppRouter
     let model: AppModel
+    let nfcReader: any NFCReader
+    let checkInService: CheckInService
 
     init() {
         let authService: AuthService
@@ -39,6 +41,13 @@ final class AppEnvironment {
         repo = SampleStudentRepository()
         #endif
 
+        #if !targetEnvironment(simulator) && canImport(CoreNFC)
+        nfcReader = CoreNFCReader()
+        #else
+        nfcReader = UnavailableNFCReader()
+        #endif
+        checkInService = CheckInService(api: apiClient)
+
         self.auth = AuthStore(auth: authService, gate: gate)
         self.router = AppRouter()
         self.model = AppModel(repo: repo)
@@ -50,6 +59,8 @@ final class AppEnvironment {
         self.auth = auth
         self.model = model
         self.router = router ?? AppRouter()
+        self.nfcReader = UnavailableNFCReader()
+        self.checkInService = CheckInService(api: apiClient)
     }
 }
 

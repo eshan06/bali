@@ -27,6 +27,9 @@ final class AppRouter {
         if let pushName = defaults.string(forKey: "baliPush"), let route = Route(debugName: pushName) {
             push(route)
         }
+        if defaults.string(forKey: "baliSheet") == "nfc" {
+            sheet = .nfcCheckIn(classId: nil)
+        }
         #endif
     }
 
