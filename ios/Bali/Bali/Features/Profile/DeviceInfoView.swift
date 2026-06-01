@@ -3,9 +3,9 @@
 //  Bali — Device Info (pushed)
 //
 //  The student's registered device: a hero card, then model / stable device ID /
-//  registration status / assigned seat. The device + seat come from a loaded
-//  class detail (GET /students/me omits them); a real keychain device identity +
-//  student-side registration land in Phase 6 (PLAN.md §9.5).
+//  registration / assigned seat. The device id + registration are LOCAL
+//  (DeviceIdentity, keychain — §9.5); the friendly name + seat come from the
+//  server when a class detail is loaded ("linked" = the teacher side sees it).
 //
 
 import SwiftUI
@@ -13,9 +13,16 @@ import SwiftUI
 struct DeviceInfoView: View {
     @Environment(AppModel.self) private var model
 
-    private var registered: Bool { model.registeredDevice != nil }
-    private var deviceName: String { model.registeredDevice?.friendlyName ?? "This iPhone" }
-    private var deviceId: String { model.registeredDevice?.deviceId ?? "—" }
+    private var registered: Bool { DeviceIdentity.isRegistered }
+    private var serverLinked: Bool { model.registeredDevice != nil }
+    private var deviceName: String { model.registeredDevice?.friendlyName ?? DeviceIdentity.modelName }
+    private var deviceId: String { DeviceIdentity.current }
+
+    private var heroBadge: (text: String, tone: BaliTone) {
+        if registered && serverLinked { return ("Registered & linked", .green) }
+        if registered { return ("Registered", .green) }
+        return ("Not registered", .gray)
+    }
 
     var body: some View {
         DetailScaffold {
@@ -51,8 +58,7 @@ struct DeviceInfoView: View {
                             .foregroundStyle(BaliColor.blue)
                     }
                 BaliText(deviceName, .h3)
-                Badge(text: registered ? "Registered & linked" : "Not registered",
-                      tone: registered ? .green : .gray, showsDot: true)
+                Badge(text: heroBadge.text, tone: heroBadge.tone, showsDot: true)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, BaliSpacing.s)
@@ -67,7 +73,7 @@ struct DeviceInfoView: View {
                 infoRow(icon: "sparkle", tone: .blue, label: "Device ID", value: deviceId, mono: true)
                 divider
                 infoRow(icon: "checkmark.seal.fill", tone: .green, label: "Registration",
-                        value: registered ? "Active" : "Inactive")
+                        value: registered ? "Active" : "Not registered")
                 divider
                 infoRow(icon: "graduationcap.fill", tone: .ink, label: "Assigned seat",
                         value: model.assignedSeat ?? "—")

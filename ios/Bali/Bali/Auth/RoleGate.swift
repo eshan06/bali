@@ -46,5 +46,13 @@ struct LiveRoleGate: RoleGate {
 /// student so the post-login app shell is reachable.
 struct StubRoleGate: RoleGate {
     var result: RoleGateResult = .student(hasProfile: true)
-    func resolve() async -> RoleGateResult { result }
+    func resolve() async -> RoleGateResult {
+        #if DEBUG
+        // Verification aid: `-baliOnboarding YES` routes to the onboarding flow.
+        if UserDefaults.standard.bool(forKey: "baliOnboarding") {
+            return .student(hasProfile: false)
+        }
+        #endif
+        return result
+    }
 }

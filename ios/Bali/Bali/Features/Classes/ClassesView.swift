@@ -12,6 +12,7 @@ import SwiftUI
 struct ClassesView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppRouter.self) private var router
+    @State private var acceptingInviteId: String?
 
     var body: some View {
         BaliScreen(onRefresh: { await model.refresh() }) {
@@ -65,8 +66,8 @@ struct ClassesView: View {
         VStack(alignment: .leading, spacing: BaliSpacing.m) {
             BaliText("Pending invites", .h3)
             ForEach(model.invites) { invite in
-                Button { router.push(.join, on: .classes) } label: {
-                    Card {
+                Card {
+                    VStack(alignment: .leading, spacing: BaliSpacing.m) {
                         HStack(spacing: BaliSpacing.m14) {
                             IconTile(systemImage: "envelope.fill", tone: .blue)
                             VStack(alignment: .leading, spacing: 3) {
@@ -76,10 +77,20 @@ struct ClassesView: View {
                             Spacer(minLength: 0)
                             Badge(text: "Invited", tone: .blue)
                         }
+                        BaliButton(title: acceptingInviteId == invite.inviteId ? "Accepting…" : "Accept invite",
+                                   icon: "checkmark", size: .sm) { accept(invite) }
+                            .disabled(acceptingInviteId != nil)
                     }
                 }
-                .buttonStyle(CardPressStyle())
             }
+        }
+    }
+
+    private func accept(_ invite: PendingInvite) {
+        acceptingInviteId = invite.inviteId
+        Task {
+            _ = await model.acceptInvite(invite)
+            acceptingInviteId = nil
         }
     }
 

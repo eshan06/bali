@@ -30,6 +30,28 @@ nonisolated struct SampleStudentRepository: StudentRepository {
 
     func fetchExtras() async -> StudentExtras { Self.sampleExtras() }
 
+    func joinPreview(_ token: String) async throws -> ClassJoinPreview {
+        let key = token.uppercased().trimmingCharacters(in: .whitespaces)
+        // The pending Chemistry invite, joinable by its sample code / link id.
+        if ["7K2-Q9F", "7K2Q9F", "CHEM01", "CHEMISTRY", "CLS-CHEM"].contains(key) {
+            return ClassJoinPreview(
+                classId: "cls-chem", className: "Chemistry", period: "Period 6",
+                teacherName: "Dr. Park", schoolName: "Lincoln High", alreadyEnrolled: false)
+        }
+        // An already-enrolled class (by id or name) — shows the "already joined" state.
+        if let existing = Self.sampleSelf().classes
+            .first(where: { $0.id.uppercased() == key || $0.name.uppercased() == key }) {
+            return ClassJoinPreview(
+                classId: existing.id, className: existing.name, period: existing.period,
+                teacherName: existing.teacherName, schoolName: existing.schoolName,
+                alreadyEnrolled: true)
+        }
+        throw APIError.http(status: 404, message: "We couldn't find a class for that code.")
+    }
+
+    func joinClass(classId: String) async throws { /* sample: AppModel adds optimistically */ }
+    func acceptInvite(inviteId: String) async throws { /* sample: AppModel updates locally */ }
+
     // MARK: - Sync fixture builders (also used by AppModel.preview)
 
     static let student = Student(

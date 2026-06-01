@@ -28,8 +28,7 @@ struct RootView: View {
         case .unauthenticated:
             LoginView()
         case .onboarding:
-            // Phase 5 replaces this with the onboarding flow.
-            LaunchView(message: "Onboarding arrives in Phase 5")
+            OnboardingFlow()
         case .app:
             MainTabView()
         }

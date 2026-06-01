@@ -62,6 +62,9 @@ final class AuthStore {
         await auth.currentJWT()
     }
 
+    /// Advance from onboarding (device + permissions) into the tabbed app.
+    func finishOnboarding() { phase = .app }
+
     // MARK: - Private
 
     /// Run a credential action, then the role gate, with shared loading/error.

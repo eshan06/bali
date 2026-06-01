@@ -161,6 +161,62 @@ final class AppModel {
         }
     }
 
+    // MARK: - Join / invites
+
+    /// Look up a class to join from a code or link-extracted classId.
+    func joinPreview(token: String) async -> ClassJoinPreview? {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            return try await repo.joinPreview(trimmed)
+        } catch let error as APIError {
+            errorMessage = error.userMessage; return nil
+        } catch {
+            errorMessage = "We couldn't find that class."; return nil
+        }
+    }
+
+    @discardableResult
+    func joinClass(_ preview: ClassJoinPreview) async -> Bool {
+        do {
+            try await repo.joinClass(classId: preview.classId)
+            addToRoster(id: preview.classId, name: preview.className, period: preview.period,
+                        teacher: preview.teacherName, school: preview.schoolName)
+            return true
+        } catch let error as APIError {
+            errorMessage = error.userMessage; return false
+        } catch {
+            errorMessage = "Couldn't join this class."; return false
+        }
+    }
+
+    @discardableResult
+    func acceptInvite(_ invite: PendingInvite) async -> Bool {
+        do {
+            try await repo.acceptInvite(inviteId: invite.inviteId)
+            invites.removeAll { $0.inviteId == invite.inviteId }
+            addToRoster(id: invite.classId, name: invite.className, period: invite.period,
+                        teacher: invite.teacherName, school: invite.schoolName)
+            return true
+        } catch let error as APIError {
+            errorMessage = error.userMessage; return false
+        } catch {
+            errorMessage = "Couldn't accept this invite."; return false
+        }
+    }
+
+    /// Optimistically add a freshly joined/accepted class so it appears at once;
+    /// a later refresh reconciles with the server. Drops any matching invite.
+    private func addToRoster(id: String, name: String, period: String?,
+                             teacher: String, school: String?) {
+        invites.removeAll { $0.classId == id }
+        guard !classes.contains(where: { $0.id == id }) else { return }
+        classes.append(StudentClassSummary(
+            id: id, name: name, period: period, teacherName: teacher, schoolName: school,
+            activeSession: nil, attendanceRate: 0, totalSessions: 0))
+        classes.sort { $0.name < $1.name }
+    }
+
     /// Record a successful (real NFC) check-in so the UI updates immediately.
     func markCheckedIn(sessionId: String) { locallyCheckedIn.insert(sessionId) }
 

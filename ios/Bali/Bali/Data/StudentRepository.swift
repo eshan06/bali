@@ -46,6 +46,11 @@ protocol StudentRepository: Sendable {
     func fetchSelf() async throws -> StudentSelf
     func fetchClassDetail(classId: String) async throws -> StudentClassDetail
     func updateProfile(_ update: StudentProfileUpdate) async throws -> StudentSelf
+    /// Preview a class to join. `token` is a classId (links carry it; the design's
+    /// short "code" has no resolver yet — §9, so today it's treated as a classId).
+    func joinPreview(_ token: String) async throws -> ClassJoinPreview
+    func joinClass(classId: String) async throws
+    func acceptInvite(inviteId: String) async throws
     /// Best-effort sidecar metadata the DTOs lack. Empty by default (live API).
     func fetchExtras() async -> StudentExtras
 }
@@ -68,6 +73,18 @@ nonisolated struct LiveStudentRepository: StudentRepository {
 
     func updateProfile(_ update: StudentProfileUpdate) async throws -> StudentSelf {
         try await api.post("students/me", body: update, as: StudentSelf.self)
+    }
+
+    func joinPreview(_ token: String) async throws -> ClassJoinPreview {
+        try await api.get("classes/\(token)/preview", as: ClassJoinPreview.self)
+    }
+
+    func joinClass(classId: String) async throws {
+        try await api.postVoid("classes/\(classId)/join", body: nil)
+    }
+
+    func acceptInvite(inviteId: String) async throws {
+        try await api.postVoid("invites/\(inviteId)/accept", body: nil)
     }
     // fetchExtras() uses the default (empty) — the live API carries no sidecar yet.
 }
