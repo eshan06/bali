@@ -11,6 +11,14 @@ import SwiftUI
 
 @main
 struct BaliApp: App {
+    init() {
+        #if canImport(Amplify)
+        // Configures Amplify once at launch (real Cognito). Compiled in only once
+        // the Amplify SPM package is added; until then this is a no-op.
+        AmplifyAuthService.configure()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

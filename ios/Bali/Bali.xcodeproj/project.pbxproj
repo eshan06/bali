@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6859FA522FCD57B3004B4694 /* AWSCognitoAuthPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 6859FA512FCD57B3004B4694 /* AWSCognitoAuthPlugin */; };
+		6859FA542FCD57B3004B4694 /* Amplify in Frameworks */ = {isa = PBXBuildFile; productRef = 6859FA532FCD57B3004B4694 /* Amplify */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		688BBDD92FCC0DC40002B18B /* Bali.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bali.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6859FA522FCD57B3004B4694 /* AWSCognitoAuthPlugin in Frameworks */,
+				6859FA542FCD57B3004B4694 /* Amplify in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = Bali;
 			packageProductDependencies = (
+				6859FA512FCD57B3004B4694 /* AWSCognitoAuthPlugin */,
+				6859FA532FCD57B3004B4694 /* Amplify */,
 			);
 			productName = Bali;
 			productReference = 688BBDD92FCC0DC40002B18B /* Bali.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = 688BBDD02FCC0DC40002B18B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6859FA502FCD57B3004B4694 /* XCRemoteSwiftPackageReference "amplify-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 688BBDDA2FCC0DC40002B18B /* Products */;
 			projectDirPath = "";
@@ -246,6 +258,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -284,6 +297,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -337,6 +351,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6859FA502FCD57B3004B4694 /* XCRemoteSwiftPackageReference "amplify-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/aws-amplify/amplify-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.58.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6859FA512FCD57B3004B4694 /* AWSCognitoAuthPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6859FA502FCD57B3004B4694 /* XCRemoteSwiftPackageReference "amplify-swift" */;
+			productName = AWSCognitoAuthPlugin;
+		};
+		6859FA532FCD57B3004B4694 /* Amplify */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6859FA502FCD57B3004B4694 /* XCRemoteSwiftPackageReference "amplify-swift" */;
+			productName = Amplify;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 688BBDD12FCC0DC40002B18B /* Project object */;
 }

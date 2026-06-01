@@ -13,8 +13,8 @@ import SwiftUI
 struct LoginView: View {
     @Environment(AuthStore.self) private var auth
 
-    @State private var email = "maya.chen@lincoln.edu"
-    @State private var password = "password"
+    @State private var email = ""
+    @State private var password = ""
     @State private var keepSignedIn = true
 
     private let heroHeight: CGFloat = 312

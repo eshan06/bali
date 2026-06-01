@@ -21,6 +21,7 @@
 import Foundation
 import Amplify
 import AWSCognitoAuthPlugin
+import AWSPluginsCore
 import AuthenticationServices
 
 actor AmplifyAuthService: AuthService {
