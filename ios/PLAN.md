@@ -418,13 +418,14 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 2 app shell + tab nav | ✅ done | `21a0cb3` (amended) |
 | 3 auth (Cognito) + API client | ✅ done | `4ff80f9` |
 | 4 dashboard / classes / profile | ✅ done | `40281d0` |
-| 5 join + onboarding | ⏳ **NEXT** | — |
-| 6 real NFC · 7 Focus/Screen Time (both device) · 8 notifications + polish | ⬜ pending | — |
+| 5 join + onboarding | ✅ done | `4e76e12` |
+| 6 real NFC check-in | ⏳ **NEXT** (📱 device) | — |
+| 7 Focus/Screen Time (device) · 8 notifications + polish | ⬜ pending | — |
 
-`main` is **7 commits ahead of origin, not pushed.** Working tree clean. A clean
-build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator, and all
-Phase 4 screens were launch-verified on the **iPhone 17** simulator (UDID
-`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (04–06, 14–17).
+`main` is **9 commits ahead of origin, not pushed.** Working tree clean. A clean
+build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator; Phases
+4–5 were launch-verified on the **iPhone 17** simulator (UDID
+`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (02–07, 14–17).
 Login still matches screenshot 01. (The 2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
@@ -512,22 +513,43 @@ KEY DECISIONS / FINDINGS — carry forward into Phases 5–8:
 - SwiftUI gotcha hit: a helper that wraps content in `Card { content() }` must take
   the closure `@escaping` (Card stores it). Small batches + build between them.
 
-### Phase 5 — NEXT (join + onboarding) · Simulator
+### Phase 5 — DONE (commit `4e76e12`)
 
-1. **Join** — real `JoinClassView`: Code / Link / QR via `BaliSegmentedControl`
-   → `GET /classes/{id}/preview` (ClassJoinPreview) → confirm → `POST
-   /classes/{id}/join`. Add `preview` / `join` / `acceptInvite` to
-   `StudentRepository` (+ Sample), AppModel actions, then refresh. The Classes
-   invite cards + Home/Classes empty states already route to `.join`. Screens 07.
-2. **Invite accept** — `POST /invites/{id}/accept`; surface from the pending-invite
-   cards (currently they just push `.join`).
-3. **Onboarding** — RootView `.onboarding` phase: RegisterDevice (keychain device
-   id + status, §9.5 local) and Permissions (Family Controls request — stubbed on
-   Sim). Screens 02 / 03.
+- **Join** (`JoinClassView`): Code / Link / QR → `joinPreview` → confirm card →
+  `joinClass`. Links carry the classId; the short "code" has no resolver (§9) so
+  it's passed through the seam (sample resolves it, live treats it as a classId);
+  QR is an honest device-only state on Sim. Join optimistically adds to the roster.
+- **Invites**: Classes invite cards Accept for real (`acceptInvite`), then the
+  class moves into the roster.
+- **Onboarding** (`Features/Onboarding/OnboardingFlow`): two full-screen steps
+  (register device → Focus-blocking permissions) shown for `.onboarding`, then
+  `auth.finishOnboarding()` → `.app`. Real FamilyControls auth deferred to Phase 7.
+- **DeviceIdentity** (`Services/Device/`): keychain-persisted stable "BALI-…" id +
+  registration flag (local, §9.5), nonisolated (ProcessInfo, not @MainActor
+  UIDevice). Device Info shows the local id + registration; name/seat from server.
+- Repo: `joinPreview`/`joinClass`/`acceptInvite` (Live + Sample). AppModel join/
+  invite actions are optimistic. DEBUG aids: `-baliOnboarding[Step]`, `-baliJoinToken`.
 
-Then 6 (real NFC check-in, device), 7 (Focus Mode / Screen Time, device), 8
-(notifications + polish). One `ios:` commit per phase, no co-author trailer;
-push only when asked. Check in after each phase.
+### Phase 6 — NEXT (real NFC check-in) · 📱 DEVICE-ONLY
+
+Core NFC needs a **physical iPhone** + the Near Field Communication Tag Reading
+entitlement + `NFCReaderUsageDescription` (§9.12 — confirm the account has it).
+Build: `NFCReader` protocol (`CoreNFCReader` device impl; `UnavailableNFCReader`
+Sim stub → honest "needs a physical iPhone" state; `NfcCheckInSheet` already has
+the radar/phase scaffold), a `CheckInService.checkIn(classId:tag:)` seam calling
+the existing `POST /students/me/classes/{id}/simulate-check-in` (real NFC-driven,
+**no "simulate" UI**) → `CheckInResponse`, result mapping (present / late /
+failed / notAssigned / noSession) → on success `model.markCheckedIn(sessionId:)`
++ auto-advance to Focus Mode. The NFC FAB and Home / ClassDetail "Tap to check in"
+already call `router.startCheckIn(classId:)`.
+
+> ⚠️ Phase 6 CANNOT be verified on the Simulator (no NFC radio). The Sim path is
+> the honest "needs a physical iPhone" state; real check-in needs a device + the
+> NFC entitlement. **Flag this to the user before starting Phase 6.**
+
+Then 7 (Focus Mode / Screen Time, device) and 8 (notifications + polish). One
+`ios:` commit per phase, no co-author trailer; push only when asked. Check in
+after each phase.
 
 ### Backend/shared changes still to confirm (see §9; all have local fallbacks)
 Real student check-in endpoint (using `simulate-check-in` behind a
