@@ -22,6 +22,7 @@ final class AppEnvironment {
     let checkInService: CheckInService
     let screenTimeService: any ScreenTimeService
     let focusController: FocusModeController
+    let notifications: NotificationManager
 
     init() {
         let authService: AuthService
@@ -61,6 +62,7 @@ final class AppEnvironment {
         let model = AppModel(repo: repo)
         self.model = model
         self.focusController = FocusModeController(service: screenTimeService, model: model)
+        self.notifications = NotificationManager()
     }
 
     /// Test/preview seam: inject specific collaborators.
@@ -74,6 +76,7 @@ final class AppEnvironment {
         let sts = StubScreenTimeService()
         self.screenTimeService = sts
         self.focusController = FocusModeController(service: sts, model: model)
+        self.notifications = NotificationManager()
     }
 }
 
@@ -88,6 +91,7 @@ extension View {
             .environment(env.router)
             .environment(env.model)
             .environment(env.focusController)
+            .environment(env.notifications)
     }
 }
 

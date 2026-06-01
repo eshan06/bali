@@ -14,6 +14,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppRouter.self) private var router
+    @Environment(NotificationManager.self) private var notifications
 
     var body: some View {
         BaliScreen(onRefresh: { await model.refresh() }) {
@@ -45,7 +46,7 @@ struct HomeView: View {
                 BaliText("\(model.student?.firstName ?? "there").", .display)
             }
             Spacer(minLength: BaliSpacing.m)
-            IconButton(systemImage: "bell", showsBadge: !model.invites.isEmpty) {
+            IconButton(systemImage: "bell", showsBadge: notifications.unreadCount > 0) {
                 router.push(.notifications, on: .home)
             }
         }

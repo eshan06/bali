@@ -18,6 +18,7 @@ struct NfcCheckInSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppModel.self) private var model
     @Environment(AppRouter.self) private var router
+    @Environment(NotificationManager.self) private var notifications
     @Environment(\.dismiss) private var dismiss
     @State private var controller: NFCCheckInController?
 
@@ -43,6 +44,18 @@ struct NfcCheckInSheet: View {
         .onChange(of: isCancelled) { _, cancelled in
             if cancelled { dismiss() }
         }
+        .onChange(of: successResponse) { _, response in
+            if let response {
+                notifications.notify(.checkedIn,
+                    title: response.attendanceStatus == .late ? "Checked in late" : "Checked in on time",
+                    message: "\(targetClass?.name ?? "Class") · just now")
+            }
+        }
+    }
+
+    private var successResponse: CheckInResponse? {
+        if case .result(.success(let response)) = controller?.phase { return response }
+        return nil
     }
 
     // MARK: - Header + class context

@@ -15,6 +15,7 @@ struct MainTabView: View {
     @Environment(AppRouter.self) private var router
     @Environment(AppModel.self) private var model
     @Environment(FocusModeController.self) private var focus
+    @Environment(NotificationManager.self) private var notifications
 
     var body: some View {
         @Bindable var router = router
@@ -53,6 +54,7 @@ struct MainTabView: View {
         }
         .task {
             await model.load()
+            notifications.refresh(from: model)
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "baliSessionEnded") { focus.debugShowEnded() }
             #endif
@@ -62,6 +64,12 @@ struct MainTabView: View {
                 await focus.start(for: active)
             } else {
                 focus.syncInactive()
+            }
+        }
+        .onChange(of: focus.endedInfo) { _, info in
+            if let info {
+                notifications.notify(.sessionEnded, title: "Apps are available again",
+                                     message: "\(info.className) session ended.")
             }
         }
     }

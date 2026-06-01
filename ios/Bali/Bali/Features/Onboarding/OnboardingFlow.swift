@@ -13,6 +13,7 @@ import SwiftUI
 
 struct OnboardingFlow: View {
     @Environment(AuthStore.self) private var auth
+    @Environment(NotificationManager.self) private var notifications
 
     @State private var step: Int = {
         #if DEBUG
@@ -79,8 +80,10 @@ struct OnboardingFlow: View {
                      subtitle: "Bali needs Screen Time access to pause apps during class. Here's exactly what that does:")
             permissionsCard
             VStack(spacing: BaliSpacing.m) {
-                BaliButton(title: "Allow access", icon: "checkmark.shield.fill") { finish() }
-                Button { finish() } label: {
+                BaliButton(title: "Allow access", icon: "checkmark.shield.fill") {
+                    Task { await notifications.requestAuthorization(); auth.finishOnboarding() }
+                }
+                Button { auth.finishOnboarding() } label: {
                     BaliText("Maybe later", .bodyStrong, color: BaliColor.ink3)
                 }
                 .buttonStyle(.plain)
@@ -140,11 +143,6 @@ struct OnboardingFlow: View {
 
     private var rowDivider: some View {
         Rectangle().fill(BaliColor.line).frame(height: 1).padding(.leading, 68)
-    }
-
-    private func finish() {
-        // Phase 7 wires the real FamilyControls authorization request here.
-        auth.finishOnboarding()
     }
 }
 
