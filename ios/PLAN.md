@@ -420,14 +420,14 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 4 dashboard / classes / profile | ✅ done | `40281d0` |
 | 5 join + onboarding | ✅ done | `4e76e12` |
 | 6 real NFC check-in | ✅ done | `ce007eb` |
-| 7 Focus Mode / Screen Time | ⏳ **NEXT** (UI on Sim; shielding 📱 device) | — |
-| 8 notifications + polish | ⬜ pending | — |
+| 7 Focus Mode / Screen Time | ✅ done | `bcfb5e5` |
+| 8 notifications + polish | ⏳ **NEXT** (Sim) | — |
 
-`main` is **11 commits ahead of origin, not pushed.** Working tree clean. A clean
+`main` is **13 commits ahead of origin, not pushed.** Working tree clean. A clean
 build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator; Phases
-4–6 were launch-verified on the **iPhone 17** simulator (UDID
-`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (02–09, 14–17).
-Login still matches screenshot 01. (The 2 APIClient warnings below are fixed.)
+4–7 were launch-verified on the **iPhone 17** simulator (UDID
+`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (01–17). (The
+2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
 *clean* build emits **2 real warnings** (they didn't appear in the incremental
@@ -549,24 +549,37 @@ Reading capability + `com.apple.developer.nfc.readersession.formats` entitlement
 an `NFCReaderUsageDescription` Info.plist string. `CoreNFCReader` is unverified
 (Sim-excluded) — the first device build may need concurrency/entitlement tweaks.
 
-### Phase 7 — NEXT (Focus Mode / Screen Time)
+### Phase 7 — DONE (commit `bcfb5e5`)
 
-UI is Simulator-verifiable; real shielding is device-only + needs the **Family
-Controls entitlement** (`com.apple.developer.family-controls` — Apple approval +
-paid account, §9.12). Build:
-- `ScreenTimeService` seam: real FamilyControls / ManagedSettings / DeviceActivity
-  on device; a Sim stub mocking "granted" + no-op shields so the UI/countdown demo.
-- `FocusModeController` (@Observable): authorization → FamilyActivityPicker
-  selection → shields → DeviceActivity window → local status (applied/failed). Poll
-  `GET /students/me/classes/{id}` (~30s) while active; clear + Session Ended overlay
-  when `activeSession` goes null. Status is local-only (no JWT report route — §9.4).
-- Screens: `FocusModeView` dark takeover (active) + resting (10/11),
-  `EmergencyUnlockSheet` (local/optimistic — §9.6) (12), `SessionEndedOverlay` (13).
-  `FocusPolicyPreviewView` already done (14). The checked-in hero / "View Focus
-  Mode" already route to the Focus tab.
+Focus Mode UI (Sim-verified) + the Screen Time seam (real shielding device-only).
+`Services/Focus/`: `ScreenTimeService` (`StubScreenTimeService` Sim;
+`RealScreenTimeService` device — FamilyControls / ManagedSettings, EXCLUDED from
+the Sim slice → unverified). `FocusModeController` (@Observable): apply/clear
+shields, local status (§9.4), an assumed 50-min countdown (no session end in the
+DTO — §9), ~30s polling → Session Ended when the class session vanishes.
+`FocusModeActiveView` (dark takeover via fullScreenCover from MainTabView; real
+still-available / paused apps, no placeholders), `FocusModeView` resting +
+collapsed-active, `EmergencyUnlockSheet` (local/optimistic §9.6),
+`SessionEndedOverlay`. Verified active / resting / emergency / ended on the Sim
+(10–13). DEBUG aids: `-baliCheckedIn`, `-baliSessionEnded`, `-baliSheet emergency`.
 
-Then 8 (notifications + polish; Simulator). One `ios:` commit per phase, no
-co-author trailer; push only when asked. Check in after each phase.
+⚠️ DEVICE TODO (user, Apple account): Family Controls capability +
+`com.apple.developer.family-controls` entitlement (Apple approval) + a one-time
+FamilyActivityPicker selection. `RealScreenTimeService` is unverified (Sim-excluded).
+
+### Phase 8 — NEXT (notifications + polish) · Simulator
+
+Fully Simulator-verifiable — the last phase. Build:
+- `NotificationManager`: local notifications for the 4 event types (class started /
+  checked in / blocking applied / session ended), APNs-ready behind a seam; request
+  permission (Settings "Class & focus alerts" already shows a status). Real push is
+  backend + APNs (§9.7). Wire the real `NotificationsView` (currently a stub) → 18.
+- Polish: countdown/transition animation niceties (radar/pulse already exist), an
+  empty/error/loading-state audit, accessibility (Dynamic Type, labels, contrast),
+  and a final fidelity pass against all 18 screenshots.
+
+That closes the 8-phase plan. One `ios:` commit, no co-author trailer; push only
+when asked. Check in after.
 
 ### Backend/shared changes still to confirm (see §9; all have local fallbacks)
 Real student check-in endpoint (using `simulate-check-in` behind a
