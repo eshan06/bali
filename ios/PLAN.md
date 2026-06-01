@@ -419,13 +419,14 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 3 auth (Cognito) + API client | ✅ done | `4ff80f9` |
 | 4 dashboard / classes / profile | ✅ done | `40281d0` |
 | 5 join + onboarding | ✅ done | `4e76e12` |
-| 6 real NFC check-in | ⏳ **NEXT** (📱 device) | — |
-| 7 Focus/Screen Time (device) · 8 notifications + polish | ⬜ pending | — |
+| 6 real NFC check-in | ✅ done | `ce007eb` |
+| 7 Focus Mode / Screen Time | ⏳ **NEXT** (UI on Sim; shielding 📱 device) | — |
+| 8 notifications + polish | ⬜ pending | — |
 
-`main` is **9 commits ahead of origin, not pushed.** Working tree clean. A clean
+`main` is **11 commits ahead of origin, not pushed.** Working tree clean. A clean
 build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator; Phases
-4–5 were launch-verified on the **iPhone 17** simulator (UDID
-`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (02–07, 14–17).
+4–6 were launch-verified on the **iPhone 17** simulator (UDID
+`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (02–09, 14–17).
 Login still matches screenshot 01. (The 2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
@@ -530,26 +531,42 @@ KEY DECISIONS / FINDINGS — carry forward into Phases 5–8:
 - Repo: `joinPreview`/`joinClass`/`acceptInvite` (Live + Sample). AppModel join/
   invite actions are optimistic. DEBUG aids: `-baliOnboarding[Step]`, `-baliJoinToken`.
 
-### Phase 6 — NEXT (real NFC check-in) · 📱 DEVICE-ONLY
+### Phase 6 — DONE (commit `ce007eb`)
 
-Core NFC needs a **physical iPhone** + the Near Field Communication Tag Reading
-entitlement + `NFCReaderUsageDescription` (§9.12 — confirm the account has it).
-Build: `NFCReader` protocol (`CoreNFCReader` device impl; `UnavailableNFCReader`
-Sim stub → honest "needs a physical iPhone" state; `NfcCheckInSheet` already has
-the radar/phase scaffold), a `CheckInService.checkIn(classId:tag:)` seam calling
-the existing `POST /students/me/classes/{id}/simulate-check-in` (real NFC-driven,
-**no "simulate" UI**) → `CheckInResponse`, result mapping (present / late /
-failed / notAssigned / noSession) → on success `model.markCheckedIn(sessionId:)`
-+ auto-advance to Focus Mode. The NFC FAB and Home / ClassDetail "Tap to check in"
-already call `router.startCheckIn(classId:)`.
+Real Core NFC behind a seam, no "simulate" UI. `Services/NFC/`: `NFCReader`
+(`CoreNFCReader` device — built but EXCLUDED from the Sim slice via `#if`, so
+NOT compile-verified here; `UnavailableNFCReader` Sim), `CheckInService` over the
+existing simulate-check-in endpoint (§9.2 tag-aware endpoint still backend-side),
+`NFCCheckInController` (@Observable: unavailable / waiting / reading / result). The
+`NfcCheckInSheet` is state-driven; on success → `model.markCheckedIn` + Focus
+Mode. `notAssigned` is driven by `DeviceIdentity.isRegistered` locally. DEBUG aids:
+`-baliSheet nfc`, `-baliNfcState <waiting|reading|notAssigned|noSession|failed|
+success|unavailable>`. Verified every sheet state on the Sim (the unavailable
+state is the real Sim path; the rest via the DEBUG forcer).
 
-> ⚠️ Phase 6 CANNOT be verified on the Simulator (no NFC radio). The Sim path is
-> the honest "needs a physical iPhone" state; real check-in needs a device + the
-> NFC entitlement. **Flag this to the user before starting Phase 6.**
+⚠️ DEVICE TODO before a real scan works (user, with their Apple account): NFC Tag
+Reading capability + `com.apple.developer.nfc.readersession.formats` entitlement +
+an `NFCReaderUsageDescription` Info.plist string. `CoreNFCReader` is unverified
+(Sim-excluded) — the first device build may need concurrency/entitlement tweaks.
 
-Then 7 (Focus Mode / Screen Time, device) and 8 (notifications + polish). One
-`ios:` commit per phase, no co-author trailer; push only when asked. Check in
-after each phase.
+### Phase 7 — NEXT (Focus Mode / Screen Time)
+
+UI is Simulator-verifiable; real shielding is device-only + needs the **Family
+Controls entitlement** (`com.apple.developer.family-controls` — Apple approval +
+paid account, §9.12). Build:
+- `ScreenTimeService` seam: real FamilyControls / ManagedSettings / DeviceActivity
+  on device; a Sim stub mocking "granted" + no-op shields so the UI/countdown demo.
+- `FocusModeController` (@Observable): authorization → FamilyActivityPicker
+  selection → shields → DeviceActivity window → local status (applied/failed). Poll
+  `GET /students/me/classes/{id}` (~30s) while active; clear + Session Ended overlay
+  when `activeSession` goes null. Status is local-only (no JWT report route — §9.4).
+- Screens: `FocusModeView` dark takeover (active) + resting (10/11),
+  `EmergencyUnlockSheet` (local/optimistic — §9.6) (12), `SessionEndedOverlay` (13).
+  `FocusPolicyPreviewView` already done (14). The checked-in hero / "View Focus
+  Mode" already route to the Focus tab.
+
+Then 8 (notifications + polish; Simulator). One `ios:` commit per phase, no
+co-author trailer; push only when asked. Check in after each phase.
 
 ### Backend/shared changes still to confirm (see §9; all have local fallbacks)
 Real student check-in endpoint (using `simulate-check-in` behind a
