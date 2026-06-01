@@ -14,6 +14,7 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppRouter.self) private var router
     @Environment(AppModel.self) private var model
+    @Environment(FocusModeController.self) private var focus
 
     var body: some View {
         @Bindable var router = router
@@ -37,12 +38,39 @@ struct MainTabView: View {
                 BaliTabBar(router: router)
                     .transition(.move(edge: .bottom))
             }
+
+            if let ended = focus.endedInfo {
+                SessionEndedOverlay(info: ended) { focus.dismissEnded() }
+            }
         }
         .animation(.easeOut(duration: 0.2), value: router.isShowingDetail)
+        .animation(.easeInOut(duration: 0.25), value: focus.endedInfo)
         .sheet(item: $router.sheet) { sheet in
             sheetContent(sheet)
         }
-        .task { await model.load() }
+        .fullScreenCover(isPresented: focusCoverBinding) {
+            FocusModeActiveView()
+        }
+        .task {
+            await model.load()
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "baliSessionEnded") { focus.debugShowEnded() }
+            #endif
+        }
+        .task(id: model.focusActiveClass?.id) {
+            if let active = model.focusActiveClass {
+                await focus.start(for: active)
+            } else {
+                focus.syncInactive()
+            }
+        }
+    }
+
+    private var focusCoverBinding: Binding<Bool> {
+        Binding(
+            get: { focus.isActive && focus.isExpanded },
+            set: { if !$0 { focus.collapse() } }
+        )
     }
 
     // MARK: Per-tab navigation stack

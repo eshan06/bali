@@ -105,6 +105,13 @@ final class AppModel {
             if let target = liveClass ?? classes.first, detailCache[target.id] == nil {
                 _ = try? await fetchAndCacheDetail(target.id)
             }
+            #if DEBUG
+            // Verification aid: `-baliCheckedIn YES` marks the live session checked
+            // in so Focus Mode is active (for screenshotting the takeover).
+            if UserDefaults.standard.bool(forKey: "baliCheckedIn"), let session = liveClass?.activeSession {
+                locallyCheckedIn.insert(session.id)
+            }
+            #endif
         } catch let error as APIError {
             errorMessage = error.userMessage
             if phase != .loaded { phase = .failed }

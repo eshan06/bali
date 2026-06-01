@@ -20,6 +20,8 @@ final class AppEnvironment {
     let model: AppModel
     let nfcReader: any NFCReader
     let checkInService: CheckInService
+    let screenTimeService: any ScreenTimeService
+    let focusController: FocusModeController
 
     init() {
         let authService: AuthService
@@ -48,9 +50,17 @@ final class AppEnvironment {
         #endif
         checkInService = CheckInService(api: apiClient)
 
+        #if !targetEnvironment(simulator) && canImport(FamilyControls)
+        screenTimeService = RealScreenTimeService()
+        #else
+        screenTimeService = StubScreenTimeService()
+        #endif
+
         self.auth = AuthStore(auth: authService, gate: gate)
         self.router = AppRouter()
-        self.model = AppModel(repo: repo)
+        let model = AppModel(repo: repo)
+        self.model = model
+        self.focusController = FocusModeController(service: screenTimeService, model: model)
     }
 
     /// Test/preview seam: inject specific collaborators.
@@ -61,6 +71,9 @@ final class AppEnvironment {
         self.router = router ?? AppRouter()
         self.nfcReader = UnavailableNFCReader()
         self.checkInService = CheckInService(api: apiClient)
+        let sts = StubScreenTimeService()
+        self.screenTimeService = sts
+        self.focusController = FocusModeController(service: sts, model: model)
     }
 }
 
@@ -74,6 +87,7 @@ extension View {
             .environment(env.auth)
             .environment(env.router)
             .environment(env.model)
+            .environment(env.focusController)
     }
 }
 
