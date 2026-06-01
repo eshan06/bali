@@ -421,13 +421,13 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 | 5 join + onboarding | ✅ done | `4e76e12` |
 | 6 real NFC check-in | ✅ done | `ce007eb` |
 | 7 Focus Mode / Screen Time | ✅ done | `bcfb5e5` |
-| 8 notifications + polish | ⏳ **NEXT** (Sim) | — |
+| 8 notifications + polish | ✅ done | `9b02ae6` |
 
-`main` is **13 commits ahead of origin, not pushed.** Working tree clean. A clean
-build succeeds with **0 errors / 0 warnings** for the iOS 17 Simulator; Phases
-4–7 were launch-verified on the **iPhone 17** simulator (UDID
-`63712FAE-41B3-4818-87EA-83AAB85E2F4E`) against the design handoff (01–17). (The
-2 APIClient warnings below are fixed.)
+**All 8 phases complete.** `main` is **15 commits ahead of origin, not pushed.**
+Working tree clean. A clean build succeeds with **0 errors / 0 warnings** for the
+iOS 17 Simulator; every design screen (01–18) is built and launch-verified on the
+**iPhone 17** simulator (UDID `63712FAE-41B3-4818-87EA-83AAB85E2F4E`) on stub auth
++ sample data. (The 2 APIClient warnings below are fixed.)
 
 ⚠️ **Correction to the Phase-3 commit message:** it says "0 warnings", but a
 *clean* build emits **2 real warnings** (they didn't appear in the incremental
@@ -567,19 +567,38 @@ collapsed-active, `EmergencyUnlockSheet` (local/optimistic §9.6),
 `com.apple.developer.family-controls` entitlement (Apple approval) + a one-time
 FamilyActivityPicker selection. `RealScreenTimeService` is unverified (Sim-excluded).
 
-### Phase 8 — NEXT (notifications + polish) · Simulator
+### Phase 8 — DONE (commit `9b02ae6`)
 
-Fully Simulator-verifiable — the last phase. Build:
-- `NotificationManager`: local notifications for the 4 event types (class started /
-  checked in / blocking applied / session ended), APNs-ready behind a seam; request
-  permission (Settings "Class & focus alerts" already shows a status). Real push is
-  backend + APNs (§9.7). Wire the real `NotificationsView` (currently a stub) → 18.
-- Polish: countdown/transition animation niceties (radar/pulse already exist), an
-  empty/error/loading-state audit, accessibility (Dynamic Type, labels, contrast),
-  and a final fidelity pass against all 18 screenshots.
+`NotificationManager` (@Observable): local notifications feed for the 4 event
+types, derived locally (§9.7); `requestAuthorization`/`notify` over
+UNUserNotificationCenter (APNs-ready); `unreadCount`/`markAllRead`. Real
+`NotificationsView` (18). Wired: Home bell badge → unread; check-in success +
+session end post notifications; onboarding "Allow access" requests permission;
+feed seeds on app load. DEBUG aid: `-baliPush notifications`.
 
-That closes the 8-phase plan. One `ios:` commit, no co-author trailer; push only
-when asked. Check in after.
+### ✅ All 8 phases complete — remaining work (device + backend)
+
+Every design screen (01–18) is built + Sim-verified on stub auth + sample data.
+What's left is device-only or backend, all behind clean seams (§9):
+
+- **Device (user, Apple account):** NFC Tag Reading entitlement +
+  `NFCReaderUsageDescription` (Phase 6); Family Controls entitlement (Phase 7,
+  Apple approval) + a one-time FamilyActivityPicker selection. `CoreNFCReader` +
+  `RealScreenTimeService` are Sim-excluded → unverified; the first device build
+  may need tweaks. The project uses no Info.plist file — add the usage string via
+  `INFOPLIST_KEY_*` build settings + a `Bali.entitlements`.
+- **Auth / live data:** add the Amplify SPM package + a real (untracked)
+  `amplifyconfiguration.json` to flip from stub auth + sample data to live Cognito
+  + the API (the live repository/auth seams are already in place).
+- **Backend / shared (§9):** the tag-aware student check-in endpoint, semantic
+  `blockedAppKeys`, a JWT status-report route, student device registration,
+  emergency-unlock review, push notifications, seat / next-class / streak fields.
+- **Polish follow-ups:** a fuller accessibility pass (Dynamic Type, VoiceOver
+  labels on icon-only controls) and motion beyond the existing radar/pulse/countdown.
+
+DEBUG launch-arg aids (all `#if DEBUG`, no effect on normal runs):
+`-baliAutologin`, `-baliTab`, `-baliPush`, `-baliSheet`, `-baliNfcState`,
+`-baliCheckedIn`, `-baliSessionEnded`, `-baliOnboarding[Step]`, `-baliJoinToken`.
 
 ### Backend/shared changes still to confirm (see §9; all have local fallbacks)
 Real student check-in endpoint (using `simulate-check-in` behind a
