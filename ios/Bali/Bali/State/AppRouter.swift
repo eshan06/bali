@@ -15,6 +15,21 @@ import SwiftUI
 final class AppRouter {
     var selectedTab: AppTab = .home
 
+    init() {
+        #if DEBUG
+        // Verification aid: `simctl launch … -baliTab classes -baliPush settings`
+        // opens a chosen tab and optionally pushes a detail route on launch
+        // (paired with -baliAutologin). No effect on normal runs.
+        let defaults = UserDefaults.standard
+        if let raw = defaults.string(forKey: "baliTab"), let tab = AppTab(name: raw) {
+            selectedTab = tab
+        }
+        if let pushName = defaults.string(forKey: "baliPush"), let route = Route(debugName: pushName) {
+            push(route)
+        }
+        #endif
+    }
+
     // One push stack per tab so back history is preserved per tab.
     var homePath: [Route] = []
     var classesPath: [Route] = []

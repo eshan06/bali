@@ -46,8 +46,14 @@ actor StubAuthService: AuthService {
     private var signedIn = false
 
     func restoreSession() async -> Bool {
+        #if DEBUG
+        // Verification aid: `simctl launch … -baliAutologin YES` boots straight
+        // into the tabbed app (sample data) so authed screens are screenshottable
+        // without a manual sign-in. No effect on normal runs.
+        if UserDefaults.standard.bool(forKey: "baliAutologin") { return true }
+        #endif
         // Start signed out so the Login screen is always reachable in dev.
-        signedIn
+        return signedIn
     }
 
     func signIn(email: String, password: String) async throws {

@@ -7,6 +7,13 @@
 //  JSON, and maps non-2xx responses to typed APIError. This is the single seam
 //  every feature store calls — no view touches URLSession directly.
 //
+//  Isolation: the whole data layer is `nonisolated`. The target builds with
+//  SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor, so without this the client (and the
+//  Codable models it decodes) would be inferred @MainActor — forcing JSON work
+//  onto the main actor and tripping Swift-6 Sendable diagnostics when the
+//  nonisolated `Decodable.init(from:)` requirement meets a main-actor witness.
+//  Stores (@Observable) and views stay on the main actor and `await` across.
+//
 //  Student JWT routes only. Never teacher routes, never x-api-key/hardware
 //  endpoints (`/api/checkin`, `/blocking/policy/:id`, `.../report`).
 //
@@ -26,7 +33,7 @@ protocol APIClient: Sendable {
 /// Vends the current bearer token (nil when signed out / stub).
 typealias TokenProvider = @Sendable () async -> String?
 
-struct LiveAPIClient: APIClient {
+nonisolated struct LiveAPIClient: APIClient {
     let config: APIConfig
     let tokenProvider: TokenProvider
     private let session: URLSession
@@ -36,9 +43,6 @@ struct LiveAPIClient: APIClient {
         self.tokenProvider = tokenProvider
         self.session = session
     }
-
-    private static let decoder = JSONDecoder()
-    private static let encoder = JSONEncoder()
 
     func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
         let data = try await requestData("GET", path, body: nil)
@@ -67,7 +71,7 @@ struct LiveAPIClient: APIClient {
             return EmptyResponse() as! T
         }
         do {
-            return try Self.decoder.decode(T.self, from: data)
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
             throw APIError.decoding(String(describing: error))
         }
@@ -92,7 +96,7 @@ struct LiveAPIClient: APIClient {
 
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try Self.encoder.encode(AnyEncodable(body))
+            request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
         }
         if let token = await tokenProvider() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -115,10 +119,10 @@ struct LiveAPIClient: APIClient {
 }
 
 /// Marker for endpoints whose body we don't care about.
-struct EmptyResponse: Decodable {}
+nonisolated struct EmptyResponse: Decodable {}
 
 /// Type-erasing wrapper so `(any Encodable)` can be JSON-encoded.
-private struct AnyEncodable: Encodable {
+nonisolated private struct AnyEncodable: Encodable {
     private let encodeFn: (Encoder) throws -> Void
     init(_ wrapped: any Encodable) { encodeFn = wrapped.encode }
     func encode(to encoder: Encoder) throws { try encodeFn(encoder) }

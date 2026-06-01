@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum UserRole: String, Codable {
+nonisolated enum UserRole: String, Codable {
     case teacher
     case student
     case unset
@@ -21,7 +21,7 @@ enum UserRole: String, Codable {
     }
 }
 
-struct Student: Codable, Identifiable, Equatable {
+nonisolated struct Student: Codable, Identifiable, Equatable {
     let id: String
     var firstName: String
     var lastName: String
@@ -43,7 +43,7 @@ struct Student: Codable, Identifiable, Equatable {
     }
 }
 
-struct SessionUser: Codable, Equatable {
+nonisolated struct SessionUser: Codable, Equatable {
     let role: UserRole
     let sub: String
     let email: String

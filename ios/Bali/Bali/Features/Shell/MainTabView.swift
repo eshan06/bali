@@ -13,6 +13,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         @Bindable var router = router
@@ -41,6 +42,7 @@ struct MainTabView: View {
         .sheet(item: $router.sheet) { sheet in
             sheetContent(sheet)
         }
+        .task { await model.load() }
     }
 
     // MARK: Per-tab navigation stack
