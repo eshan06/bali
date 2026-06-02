@@ -409,6 +409,83 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 
 ## 11. Resume here — session handoff (last updated 2026-06-01)
 
+### ⭐ Session 3 (2026-06-01) — ON-DEVICE bring-up + the blocking-model rethink
+
+**The app now runs on a REAL iPhone (Eshan's iPhone 15 Pro, iOS 18.6.2, UDID
+`00008130-000A1D29260B803A`).** The paid Apple Developer enrollment **upgraded the
+existing team `H535678UF8` in place** (free Personal → paid Individual) — so NO team
+switch was needed; the project already points at it. Signed device build + install +
+launch all succeed; entitlements (`com.apple.developer.family-controls`,
+`nfc.readersession.formats [NDEF,TAG]`) are embedded in the signed app.
+
+**Verified ON DEVICE this session:**
+- Live Cognito sign-in + live data over the LAN (`http://<mac-LAN-ip>:3001/api`, ATS
+  exception working).
+- Family Controls **authorization dialog** (real Screen Time grant).
+- **FamilyActivityPicker** selection + persistence + count badge.
+- **Actual ManagedSettings shielding** — selected apps genuinely block on device. (The
+  hardest device-only feature: CONFIRMED.)
+- Device registration (Settings → Device Info → "Register this iPhone").
+- Class-detail refresh-on-open fix.
+
+**NFC chip read — VERY LIKELY working but NOT yet confirmed in a log I controlled.**
+Mid-session my dev API died and the **user's own `npm run dev:api` took over port 3001**,
+so the phone's traffic (incl. NFC check-ins) logged to the *user's* terminal, not mine —
+which is why I kept seeing "0 POSTs". User reports the NFC prompt appeared and check-in
+worked on a fresh session. **TOMORROW: take over the API (user agreed) and do one clean
+check-in to see `POST …/simulate-check-in -> 200` directly.**
+
+**⚠️ NEW BLOCKING-MODEL REQUIREMENT (supersedes the §9.3 picker approach — build this):**
+The user wants: *the student authorizes a broad set of blockable apps once, and then the
+**teacher's session policy decides which subset is actually shielded** each session*
+(e.g. student allows everything blockable → a "No Social Media" session shields only the
+social apps; a "Full Focus" session shields all).
+- **iOS constraint (critical):** FamilyControls tokens are **opaque** — the app CANNOT
+  introspect a student's "all apps" token blob to extract the social subset at runtime.
+  So the *literal* "allow all, filter by policy" is **impossible** as stated.
+- **Achievable design = labeled category buckets.** A one-time student setup picks
+  apps/category **per bucket** the teacher uses (social, games, …) — each stored as its
+  own `FamilyActivitySelection` under a known key. At session start
+  `applyShields(for: snapshot)` maps `snapshot.preset` → the matching bucket(s):
+  `noSocialMedia`→social bucket, `noGames`→games bucket, `fullFocus`/allow-list→`.all()`
+  (already done), `custom`→best-effort (union/`.all()`, document the limit). This delivers
+  the desired behavior within iOS limits; the student labels at pick-time because iOS
+  won't reveal token identities.
+- **VERIFY:** whether iOS 17/18 exposes any way to reference a *standard* ActivityCategory
+  token WITHOUT the picker. If yes, per-bucket setup could shrink/disappear. (Best current
+  knowledge: no — but confirm before building.)
+- **Refactor needed:** `FocusSelectionStore` → multiple keyed selections; a setup UI
+  (replace/extend `BlockedAppsView`); `applyShields` preset→bucket mapping; Settings count.
+
+**🐞 BUG found on device (fix early — it's the Emergency-Stop mechanism):** marking the
+student **absent** from the teacher web does NOT unblock the phone, because
+`isCheckedIn = serverCheckedIn || locallyCheckedIn.contains(id)` — the local optimistic
+flag overrides the server's "absent", so Focus Mode stays on. (Ending the session works,
+because that removes `activeSession` entirely.) Fix: let the server's not-checked-in state
+clear/override the local flag (carefully, to not race a just-happened optimistic check-in).
+
+**Session-3 commits (all build 0/0 sim + device-SDK):** `5800ca3` (device-slice compile +
+CoreNFC warnings), `499a9b2` (entitlements + NFC usage string), `78108a1`
+(FamilyActivityPicker), `4864163` (ATS Info.plist), `d152101` (FC auth + device-reg entry
+points), `c0c9caf` (class-detail refresh), `69d229f` (web-domain shielding), `09c2ae0`
+(preset→category bridge). `main` is **26 ahead of origin, unpushed**. Working tree: only
+`packages/api/src/local-server.ts` modified (dev-only request logging — uncommitted; decide
+whether to keep).
+
+**Operational notes for the device loop (tomorrow):**
+- Re-check the Mac LAN IP each day: `ipconfig getifaddr en0` (was `10.0.0.115`).
+- Device build: `xcodebuild -project ios/Bali/Bali.xcodeproj -scheme Bali -destination
+  'id=00008130-000A1D29260B803A' -configuration Debug -allowProvisioningUpdates build`.
+- Install/launch: `xcrun devicectl device install app --device <UDID> <Bali.app>` then
+  `xcrun devicectl device process launch --terminate-existing --environment-variables
+  '{"BALI_DEV_API_HOST":"<LAN-IP>"}' --device <UDID> com.bali.Bali`.
+- Compile-only device check (no signing): add `-sdk iphoneos -destination
+  'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`.
+- The phone reaches the API only over the LAN IP (not localhost) — needs `npm run dev:api`
+  running + the ATS exception (shipped). User runs their own `dev:api`+`dev:web` for the
+  teacher portal → **coordinate who owns :3001** (only one binds it).
+- `-baliAutologin`/other DEBUG deep-links are **stub-mode only** → don't work with live auth.
+
 ### Where we are
 
 | Phase | Status | Commit |
