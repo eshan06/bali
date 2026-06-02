@@ -14,7 +14,7 @@
 //
 
 #if !targetEnvironment(simulator) && canImport(CoreNFC)
-import CoreNFC
+@preconcurrency import CoreNFC
 import Foundation
 
 nonisolated final class CoreNFCReader: NSObject, NFCReader, NFCTagReaderSessionDelegate, @unchecked Sendable {
@@ -53,15 +53,20 @@ nonisolated final class CoreNFCReader: NSObject, NFCReader, NFCTagReaderSessionD
             session.invalidate(errorMessage: "No tag found.")
             return
         }
+        // CoreNFC serializes its delegate/completion callbacks on its own queue, so
+        // these non-Sendable values never actually cross isolation boundaries
+        // concurrently. `connect`'s completion handler is `@Sendable`, so assert that.
+        nonisolated(unsafe) let nfcSession = session
+        nonisolated(unsafe) let nfcTag = tag
         session.connect(to: tag) { [weak self] error in
             if let error {
-                session.invalidate(errorMessage: error.localizedDescription)
+                nfcSession.invalidate(errorMessage: error.localizedDescription)
                 self?.resume(throwing: NFCReadError.readFailed(error.localizedDescription))
                 return
             }
-            session.alertMessage = "Checked the block."
-            session.invalidate()
-            self?.resume(returning: NFCTagPayload(identifier: Self.identifier(of: tag), message: nil))
+            nfcSession.alertMessage = "Checked the block."
+            nfcSession.invalidate()
+            self?.resume(returning: NFCTagPayload(identifier: Self.identifier(of: nfcTag), message: nil))
         }
     }
 
