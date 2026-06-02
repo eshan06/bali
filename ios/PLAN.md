@@ -407,7 +407,7 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 
 ---
 
-## 11. Resume here — session handoff (last updated 2026-05-31)
+## 11. Resume here — session handoff (last updated 2026-06-01)
 
 ### Where we are
 
@@ -589,17 +589,38 @@ What's left is device-only or backend, all behind clean seams (§9):
   user with `custom:role = student` (the API verifies the **id** token, `tokenUse:'id'`).
   Remaining for *prod* auth: the `balistudent://` URL scheme for Google sign-in
   (email/pw already works) + a deployed HTTPS API URL (today the API is localhost-only).
-- **Device (waiting on Apple Developer enrollment — paid, "pending" end of session 2,
-  activates in ~24–48h):** once active, on-device testing of BOTH NFC and Focus Mode
-  works with **no extra Apple approval** (the Family Controls *distribution* approval
-  is only needed to ship, not to dev-test). Steps: switch the team (current
-  `DEVELOPMENT_TEAM H535678UF8` is the personal team) to the paid one → add the
-  **Near Field Communication Tag Reading** + **Family Controls** capabilities →
-  connect the iPhone → run. `CoreNFCReader` + `RealScreenTimeService` are Sim-excluded
-  → unverified; first device build may need tweaks. The device can't reach localhost →
-  use `-BALI_DEV_API_HOST <mac-LAN-ip>` + an ATS exception (the Simulator allows
-  http://localhost without one). No Info.plist file → add usage strings via
-  `INFOPLIST_KEY_*` + a `Bali.entitlements`.
+- **Device (NFC + Focus Mode) — prep DONE in session 3; awaiting paid team + phone.**
+  The user now has the paid Apple Developer account AND the physical NFC chips.
+  Session-3 prep landed (commits `5800ca3`, `499a9b2`, `78108a1`):
+  - ✅ The Sim-excluded device slice now **compile-verifies** against the iphoneos SDK
+    (`xcodebuild -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`).
+    Fixed `CoreNFCReader`'s 3 concurrency warnings (`@preconcurrency import CoreNFC` +
+    `nonisolated(unsafe)` bindings for CoreNFC's non-Sendable session/tag).
+  - ✅ `Bali/Bali.entitlements` (NFC `readersession.formats` = [NDEF, TAG] +
+    `family-controls`), wired as `CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]` so the Sim
+    build (free team, test env) is untouched. Added `INFOPLIST_KEY_NFCReaderUsageDescription`.
+  - ✅ **FamilyActivityPicker** (`Features/Focus/BlockedAppsView.swift`) — was a latent
+    bug: `FocusSelectionStore` was only ever read, so `applyShields` always no-op'd.
+    Now the student picks apps once (Settings → "Apps to block"), tokens persist,
+    `RealScreenTimeService` enforces them. `ScreenTimeService.blockedSelectionCount`
+    added; "Focus permissions" badge now reflects real auth status.
+
+  STILL NEEDED (user actions, then device run):
+  1. Add the **paid Apple ID to Xcode** (Settings → Accounts) so automatic signing can
+     provision `family-controls` + NFC for *development* (the free `H535678UF8` team
+     can't). Then switch `DEVELOPMENT_TEAM` to the paid team id (detect from Xcode prefs
+     `IDEProvisioningTeamByIdentifier` or read off the account).
+  2. **Connect + trust the iPhone.**
+  3. Device build/run → real chip tap → check-in → real shielding. `CoreNFCReader` /
+     `RealScreenTimeService` are now compile-verified but never *runtime*-verified.
+  4. Device can't reach localhost → run with `-BALI_DEV_API_HOST <mac-LAN-ip>` + an **ATS
+     exception**. ATS is a nested dict, NOT expressible via flat `INFOPLIST_KEY_*` — needs
+     either `NSAllowsLocalNetworking` (may not cover raw private-IP literals) or a real
+     `Info.plist`. Decide at device-run time once the LAN IP is known. (Sim allows
+     http://localhost without any of this.)
+  Note: `-baliAutologin` and the other DEBUG deep-link aids are **stub-mode only**; with
+  live Amplify auth wired they no longer apply, so authed screens can't be screenshot on
+  the Sim without a real Cognito student sign-in (needs `npm run dev:api` + credentials).
 - **⚠️ Emergency stop / unlock — BUILD OUT (priority).** `EmergencyUnlockSheet` is
   local/optimistic only today: pick reason + note → "Request sent", nothing actually
   happens (§9.6). Build the real flow — a backend endpoint for the teacher to
