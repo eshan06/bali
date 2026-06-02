@@ -29,10 +29,12 @@ enum FocusSelectionStore {
         }
     }
 
-    /// Apps + categories the student has picked to shield.
+    /// Apps + categories + web domains the student has picked to shield.
     static var count: Int {
         let selection = load()
-        return selection.applicationTokens.count + selection.categoryTokens.count
+        return selection.applicationTokens.count
+            + selection.categoryTokens.count
+            + selection.webDomainTokens.count
     }
 }
 #endif

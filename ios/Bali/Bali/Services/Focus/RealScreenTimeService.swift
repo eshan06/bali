@@ -45,15 +45,19 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
         let selection = FocusSelectionStore.load()
         let apps = selection.applicationTokens
         let categories = selection.categoryTokens
-        guard !apps.isEmpty || !categories.isEmpty else { return false }   // nothing picked yet
+        let domains = selection.webDomainTokens
+        // nothing picked yet
+        guard !apps.isEmpty || !categories.isEmpty || !domains.isEmpty else { return false }
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
+        store.shield.webDomains = domains.isEmpty ? nil : domains
         return true
     }
 
     func clearShields() async {
         store.shield.applications = nil
         store.shield.applicationCategories = nil
+        store.shield.webDomains = nil
     }
 }
 #endif
