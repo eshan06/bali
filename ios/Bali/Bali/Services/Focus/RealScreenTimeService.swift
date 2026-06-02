@@ -42,6 +42,18 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
     }
 
     func applyShields(for snapshot: BlockingSnapshot) async -> Bool {
+        // Full Focus / allow-list: shield ALL app categories straight from the
+        // policy — no picker selection needed. iOS never shields system essentials
+        // (Phone, Messages, Settings), so "everything but essentials" falls out.
+        if snapshot.preset == .fullFocus || snapshot.isAllowList {
+            store.shield.applicationCategories = .all()
+            store.shield.applications = nil
+            store.shield.webDomains = nil
+            return true
+        }
+        // Specific policies (No Social Media, No Games, Custom): iOS can only shield
+        // opaque tokens the student picked, so enforce the student's selection —
+        // guided to the policy's category in BlockedAppsView (presets → categories).
         let selection = FocusSelectionStore.load()
         let apps = selection.applicationTokens
         let categories = selection.categoryTokens

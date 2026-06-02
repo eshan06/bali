@@ -31,10 +31,13 @@ struct BlockedAppsView: View {
             Group {
                 #if canImport(FamilyControls)
                 if isLive {
-                    FamilyActivityPicker(selection: $selection)
-                        .onChange(of: selection) { _, newValue in
-                            FocusSelectionStore.save(newValue)
-                        }
+                    VStack(spacing: 0) {
+                        guidance
+                        FamilyActivityPicker(selection: $selection)
+                            .onChange(of: selection) { _, newValue in
+                                FocusSelectionStore.save(newValue)
+                            }
+                    }
                 } else {
                     unavailable
                 }
@@ -50,6 +53,27 @@ struct BlockedAppsView: View {
                 }
             }
         }
+    }
+
+    private var guidance: some View {
+        VStack(alignment: .leading, spacing: BaliSpacing.s) {
+            BaliText("Match your class policy", .bodyStrong)
+            BaliText("Pick the category that matches what your teacher blocks:", .foot)
+            VStack(alignment: .leading, spacing: 4) {
+                guidanceRow("No Social Media", "Social Networking")
+                guidanceRow("No Games", "Games")
+                guidanceRow("Custom", "the specific apps listed")
+            }
+            BaliText("Full Focus blocks everything automatically — no need to pick.", .foot)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(BaliSpacing.m)
+        .background(BaliColor.blueTint)
+    }
+
+    private func guidanceRow(_ policy: String, _ category: String) -> some View {
+        (Text(policy).font(BaliFont.at(13, 600)).foregroundStyle(BaliColor.ink)
+         + Text("  →  \(category)").font(BaliFont.at(13, 500)).foregroundStyle(BaliColor.ink3))
     }
 
     private var unavailable: some View {
