@@ -99,10 +99,11 @@ final class AppModel {
             extras = extrasData
             errorMessage = nil
             phase = .loaded
-            // Warm the primary class detail so device info + the live policy are
-            // available app-wide (Profile "Device linked", Settings, device screen)
-            // without first opening a class. Silent — a prefetch miss isn't shown.
-            if let target = liveClass ?? classes.first, detailCache[target.id] == nil {
+            // Warm + keep-fresh the primary class detail so device info + the live
+            // policy stay current app-wide (Profile "Device linked", Settings, device
+            // screen, Focus Mode policy) without first opening a class. Re-fetched on
+            // every reload so a new check-in/session shows up. Silent — a miss isn't shown.
+            if let target = liveClass ?? classes.first {
                 _ = try? await fetchAndCacheDetail(target.id)
             }
             #if DEBUG

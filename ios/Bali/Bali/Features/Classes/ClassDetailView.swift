@@ -29,7 +29,9 @@ struct ClassDetailView: View {
             devicePolicyCard
             recentSessions
         }
-        .task { await model.loadDetail(classId: classId) }
+        // Force a refetch on open so attendance + recent sessions reflect the
+        // latest check-in (the cached copy renders instantly meanwhile).
+        .task { await model.loadDetail(classId: classId, force: true) }
     }
 
     // MARK: - Header
