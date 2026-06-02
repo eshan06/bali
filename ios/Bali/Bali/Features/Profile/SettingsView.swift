@@ -59,7 +59,7 @@ struct SettingsView: View {
                 }
                 rowDivider
                 SettingsRow(icon: "app.badge.fill", tone: .coral, title: "Apps to block",
-                            action: { showBlockedApps = true }) {
+                            action: { Task { await pickBlockedApps() } }) {
                     HStack(spacing: BaliSpacing.s) {
                         BaliText(blockedCount > 0 ? "\(blockedCount) selected" : "None", .foot)
                         chevron
@@ -102,6 +102,15 @@ struct SettingsView: View {
     private func loadFocus() async {
         focusAuth = await env.screenTimeService.authorizationStatus()
         blockedCount = env.screenTimeService.blockedSelectionCount
+    }
+
+    /// Tapping "Apps to block": grant Screen Time access if it hasn't been
+    /// granted yet (existing accounts skip onboarding), then open the picker.
+    private func pickBlockedApps() async {
+        if focusAuth != .approved {
+            focusAuth = await env.screenTimeService.requestAuthorization()
+        }
+        showBlockedApps = true
     }
 
     private func refreshFocus() {

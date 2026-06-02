@@ -4,14 +4,15 @@
 //
 //  The two-step first run shown (full-screen, no tab bar) when AuthStore.phase
 //  is .onboarding: (1) register this device as the student's Bali phone (keychain
-//  device id, local — §9.5) and (2) explain + request Focus blocking. Finishing
-//  advances into the tabbed app. The real Family Controls authorization is wired
-//  in Phase 7; here "Allow access" / "Maybe later" both proceed.
+//  device id, local — §9.5) and (2) explain + request Focus blocking. "Allow
+//  access" requests the real Family Controls (Screen Time) + notification
+//  authorizations; "Maybe later" skips. Finishing advances into the tabbed app.
 //
 
 import SwiftUI
 
 struct OnboardingFlow: View {
+    @Environment(AppEnvironment.self) private var env
     @Environment(AuthStore.self) private var auth
     @Environment(NotificationManager.self) private var notifications
 
@@ -81,7 +82,12 @@ struct OnboardingFlow: View {
             permissionsCard
             VStack(spacing: BaliSpacing.m) {
                 BaliButton(title: "Allow access", icon: "checkmark.shield.fill") {
-                    Task { await notifications.requestAuthorization(); auth.finishOnboarding() }
+                    Task {
+                        // Screen Time first (the focus-blocking grant), then notifications.
+                        _ = await env.screenTimeService.requestAuthorization()
+                        await notifications.requestAuthorization()
+                        auth.finishOnboarding()
+                    }
                 }
                 Button { auth.finishOnboarding() } label: {
                     BaliText("Maybe later", .bodyStrong, color: BaliColor.ink3)

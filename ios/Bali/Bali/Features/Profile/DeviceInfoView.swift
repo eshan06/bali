@@ -13,7 +13,7 @@ import SwiftUI
 struct DeviceInfoView: View {
     @Environment(AppModel.self) private var model
 
-    private var registered: Bool { DeviceIdentity.isRegistered }
+    @State private var registered = DeviceIdentity.isRegistered
     private var serverLinked: Bool { model.registeredDevice != nil }
     private var deviceName: String { model.registeredDevice?.friendlyName ?? DeviceIdentity.modelName }
     private var deviceId: String { DeviceIdentity.current }
@@ -33,6 +33,13 @@ struct DeviceInfoView: View {
 
             heroCard
             detailsCard
+
+            if !registered {
+                BaliButton(title: "Register this iPhone", icon: "checkmark.seal.fill") {
+                    DeviceIdentity.isRegistered = true
+                    registered = true
+                }
+            }
 
             BaliText("Your device ID stays stable across sign-ins so teachers can keep your seat linked.", .foot)
                 .multilineTextAlignment(.center)
