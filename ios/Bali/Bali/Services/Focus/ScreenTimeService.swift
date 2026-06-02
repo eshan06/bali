@@ -17,6 +17,9 @@ nonisolated enum FocusAuthorization: Equatable {
 protocol ScreenTimeService: Sendable {
     /// False on the Simulator / without the entitlement — real shielding can't run.
     var isAvailable: Bool { get }
+    /// How many apps/categories the student has chosen to shield (0 if none /
+    /// unsupported). Drives the Settings badge; `applyShields` no-ops at 0.
+    var blockedSelectionCount: Int { get }
     func authorizationStatus() async -> FocusAuthorization
     func requestAuthorization() async -> FocusAuthorization
     /// Apply shields for the session policy. Returns whether shielding took effect.
@@ -29,6 +32,7 @@ protocol ScreenTimeService: Sendable {
 /// to actually shield anything.
 nonisolated struct StubScreenTimeService: ScreenTimeService {
     var isAvailable: Bool { false }
+    var blockedSelectionCount: Int { 0 }
     func authorizationStatus() async -> FocusAuthorization { .approved }
     func requestAuthorization() async -> FocusAuthorization { .approved }
     func applyShields(for snapshot: BlockingSnapshot) async -> Bool { true }

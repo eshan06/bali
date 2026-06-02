@@ -22,6 +22,7 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
     private let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("bali.focus"))
 
     var isAvailable: Bool { true }
+    var blockedSelectionCount: Int { FocusSelectionStore.count }
 
     func authorizationStatus() async -> FocusAuthorization {
         switch AuthorizationCenter.shared.authorizationStatus {
@@ -53,24 +54,6 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
     func clearShields() async {
         store.shield.applications = nil
         store.shield.applicationCategories = nil
-    }
-}
-
-/// Persists the student's one-time FamilyActivityPicker selection.
-enum FocusSelectionStore {
-    private static let key = "bali.focus.selection"
-
-    static func load() -> FamilyActivitySelection {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
-        else { return FamilyActivitySelection() }
-        return selection
-    }
-
-    static func save(_ selection: FamilyActivitySelection) {
-        if let data = try? JSONEncoder().encode(selection) {
-            UserDefaults.standard.set(data, forKey: key)
-        }
     }
 }
 #endif

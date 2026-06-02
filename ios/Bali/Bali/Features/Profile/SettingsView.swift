@@ -11,13 +11,26 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
     @Environment(AppModel.self) private var model
     @Environment(AuthStore.self) private var auth
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showBlockedApps = false
+    @State private var focusAuth: FocusAuthorization = .approved
+    @State private var blockedCount = 0
+
     private var deviceLinked: Bool { model.registeredDevice != nil }
+
+    private var focusBadge: (text: String, tone: BaliTone) {
+        switch focusAuth {
+        case .approved:      return ("Granted", .green)
+        case .denied:        return ("Denied", .coral)
+        case .notDetermined: return ("Not set", .gray)
+        }
+    }
 
     var body: some View {
         DetailScaffold {
@@ -42,7 +55,15 @@ struct SettingsView: View {
                 }
                 rowDivider
                 SettingsRow(icon: "lock.fill", tone: .amber, title: "Focus permissions") {
-                    Badge(text: "Granted", tone: .green, showsDot: true)
+                    Badge(text: focusBadge.text, tone: focusBadge.tone, showsDot: true)
+                }
+                rowDivider
+                SettingsRow(icon: "app.badge.fill", tone: .coral, title: "Apps to block",
+                            action: { showBlockedApps = true }) {
+                    HStack(spacing: BaliSpacing.s) {
+                        BaliText(blockedCount > 0 ? "\(blockedCount) selected" : "None", .foot)
+                        chevron
+                    }
                 }
                 rowDivider
                 SettingsRow(icon: "graduationcap.fill", tone: .green, title: "Class assignment") {
@@ -72,6 +93,19 @@ struct SettingsView: View {
             }
             .padding(.top, BaliSpacing.s)
         }
+        .sheet(isPresented: $showBlockedApps, onDismiss: refreshFocus) {
+            BlockedAppsView(isLive: env.screenTimeService.isAvailable)
+        }
+        .task { await loadFocus() }
+    }
+
+    private func loadFocus() async {
+        focusAuth = await env.screenTimeService.authorizationStatus()
+        blockedCount = env.screenTimeService.blockedSelectionCount
+    }
+
+    private func refreshFocus() {
+        blockedCount = env.screenTimeService.blockedSelectionCount
     }
 
     // MARK: - Building blocks
