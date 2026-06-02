@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Base Info.plist: holds only the keys that can't be expressed as flat
+	     INFOPLIST_KEY_* build settings. All the template keys (scene manifest,
+	     launch screen, orientation, NFC usage string, etc.) are still generated
+	     and merged on top via GENERATE_INFOPLIST_FILE = YES. -->
+	<!-- App Transport Security: allow plaintext HTTP to the local network only
+	     (RFC-1918 private ranges + .local), so a physical device can reach the
+	     dev API at http://<mac-LAN-ip>:3001 over Wi-Fi. Production uses HTTPS and
+	     is unaffected. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
