@@ -407,7 +407,65 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 
 ---
 
-## 11. Resume here — session handoff (last updated 2026-06-01)
+## 11. Resume here — session handoff (last updated 2026-06-02)
+
+### ⭐ Session 4 (2026-06-02) — NFC confirmed + two on-device blocking fixes
+
+Same iPhone 15 Pro. Took over the dev API (`:3001` + the request logging) and drove
+three things to **on-device confirmation**.
+
+**1. NFC check-in — CONFIRMED end-to-end** (the last unverified device feature). With the
+dev-API log under my control, one real chip tap produced the whole loop: teacher
+`POST /sessions/start -> 201` → phone sees the session → **`POST /students/me/classes/{id}/simulate-check-in -> 200`**
+→ teacher portal attendance reflects it. Core NFC + the student-JWT check-in are proven.
+
+**2. 🐞 Mark-absent / Emergency-Stop — FIXED (`894b29c`), verified on device.** The
+Session-3 hypothesis (local optimistic flag overrides server "absent") was **wrong**. The
+backend keeps `check_in_at` set when a teacher marks absent (`attendance.override` only
+updates `status`/`marked_at`/`override_by`), so `checkedIn` (= `check_in_at IS NOT NULL`)
+stays **true** — only `attendanceStatus` flips to `absent`. The real unblock signal is
+**`attendanceStatus`**, not `checkedIn`. Fix: `AppModel.isCheckedIn` returns false when
+`attendanceStatus ∈ {absent, excused}` (gates Focus Mode AND the "checked in" UI) →
+`focusActiveClass` nil → `MainTabView .task` + the focus poll tear down → shields clear +
+Session Ended card. On device: marked absent → phone unblocked within the ~30s poll, and
+the log shows the focus poll loop STOP. Also generalized the Session Ended copy (was "Your
+teacher ended the session" — wrong for mark-absent → now "All your apps are available
+again"). This is the Emergency-Stop **device** plumbing; the teacher review/approve
+**endpoint** is still a backend change (§9.6).
+
+**3. 🐞 Full Focus shielded only the student's picks — FIXED (`82e278d`), verified.** User
+hit: teacher = Full Focus, student had picked only social apps, phone blocked only social.
+DB ground truth (queried via `node` + root `node_modules/pg`, no psql on host) confirmed the
+session's frozen snapshot IS `full_focus`/`block_all_except` — so the app SHOULD have hit
+`.all()`. Root cause = a **race in `FocusModeController.start`**: it read the policy from the
+dashboard cache, but Focus activates (optimistic check-in / already-checked-in on launch)
+BEFORE the warm-detail fetch lands, and `start()` runs once (guarded by `activeClassId !=
+summary.id`), so a nil policy locked in the `.inactive` fallback → else-branch → shield the
+student's single `FocusSelectionStore` selection. Fix: `start()` now
+`await model.loadDetail(classId:force:true)` and applies that frozen snapshot before
+shielding. On device: Full Focus → every app blocked except system-protected (Messages/
+Phone/Settings) iOS never shields.
+
+**STILL OPEN — the bucketed blocking model (the original "BIG BUILD").** Full Focus now
+works, but **No Social Media / No Games still shield the student's single global
+`FocusSelectionStore` selection** (the else-branch in `RealScreenTimeService.applyShields`).
+So if the student picked social apps once, a "No Games" class wrongly blocks social. The
+labeled-category-buckets design (per-preset `FamilyActivitySelection` keyed by bucket;
+`applyShields` maps preset→bucket) is still the fix — see the Session-3 note below and
+memory `ios-blocking-model`. VERIFIED this session: iOS 17/18 exposes **no** picker-free way
+to reference a *specific* standard category token (only `.all(except:)` for everything), so
+the bucketed approach stands.
+
+**Commits (all build 0/0 device-SDK; verified on device):** `894b29c` (mark-absent gate),
+`577dcb7` (api: local dev-server request logging — the Session-3 uncommitted change, now
+committed/kept), `82e278d` (Full Focus policy race). `main` is **30 ahead of origin,
+unpushed.** Working tree clean.
+
+**Operational (carry forward):** coordinate `:3001` — this session I owned `npm run dev:api`
+and the **teacher web portal also pointed at it**, so one log showed BOTH sides (ideal for
+the mark-absent / Full-Focus round trips). DB ground-truth without psql: `node` + root
+`node_modules/pg`, `DATABASE_URL` from `.env`, `ssl:{rejectUnauthorized:false}` (RDS). LAN IP
+still `10.0.0.115`. Build/install/launch incantations unchanged (memory `ios-device-bring-up`).
 
 ### ⭐ Session 3 (2026-06-01) — ON-DEVICE bring-up + the blocking-model rethink
 
