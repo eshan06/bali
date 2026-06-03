@@ -14,7 +14,7 @@ export async function setStatus(
   sessionId: string,
   studentId: string,
   isBlocked: boolean,
-  reportedBy: 'manual' | 'device' = 'manual'
+  reportedBy: 'manual' | 'device' | 'student_override' = 'manual'
 ) {
   const rows = await query(
     `INSERT INTO device_blocking_status (session_id, student_id, is_blocked, reported_at, reported_by)

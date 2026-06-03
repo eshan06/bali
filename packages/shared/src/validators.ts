@@ -64,6 +64,13 @@ export const setDeviceBlockingStatusSchema = z.object({
   isBlocked: z.boolean(),
 });
 
+// Student-initiated Emergency Stop (Focus turns off on-device immediately; this
+// records it). Reason/note are optional context for the teacher's log.
+export const emergencyStopSchema = z.object({
+  reason: z.string().max(60).optional().default(''),
+  note: z.string().max(1000).optional().default(''),
+});
+
 export const addTeacherAppSchema = z.object({
   bundleId: z.string().min(1).max(500),
   appName: z.string().min(1).max(255),

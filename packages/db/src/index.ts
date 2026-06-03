@@ -7,6 +7,7 @@ export * as attendanceQueries from './queries/attendance';
 export * as deviceQueries from './queries/devices';
 export * as blockingQueries from './queries/blocking';
 export * as deviceBlockingStatusQueries from './queries/deviceBlockingStatus';
+export * as emergencyStopQueries from './queries/emergencyStop';
 export * as teacherAppQueries from './queries/teacherApps';
 export * as teacherBlockingDefaultQueries from './queries/teacherBlockingDefaults';
 export * as classBlockingConfigQueries from './queries/classBlockingConfig';
