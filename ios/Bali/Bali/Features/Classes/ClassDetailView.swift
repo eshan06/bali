@@ -147,6 +147,14 @@ struct ClassDetailView: View {
 
     // MARK: - Device + policy
 
+    /// "Assigned device" value: the device's friendly name, falling back to the
+    /// local model name when a device is present (the server name can be nil — that
+    /// showed a misleading "Not linked"), and "Not linked" only when none is assigned.
+    private var assignedDeviceLabel: String {
+        guard let device = detail?.device else { return "Not linked" }
+        return device.friendlyName ?? DeviceIdentity.modelName
+    }
+
     private var devicePolicyCard: some View {
         let policyTitle = (model.presentation(for: classId).policy
                             ?? detail?.activeSession?.blockingSnapshot)?.preset.title ?? "Not set"
@@ -156,7 +164,7 @@ struct ClassDetailView: View {
                     IconTile(systemImage: "iphone", tone: .blue)
                     VStack(alignment: .leading, spacing: 2) {
                         BaliText("Assigned device", .foot)
-                        BaliText(detail?.device?.friendlyName ?? "Not linked", .bodyStrong)
+                        BaliText(assignedDeviceLabel, .bodyStrong)
                     }
                     Spacer(minLength: 0)
                     if detail?.device != nil { Badge(text: "Linked", tone: .green, showsDot: true) }

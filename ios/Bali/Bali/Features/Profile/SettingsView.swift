@@ -24,6 +24,15 @@ struct SettingsView: View {
 
     private var deviceLinked: Bool { model.registeredDevice != nil }
 
+    /// Registered-device row value: the device's friendly name, falling back to the
+    /// local model name when it's linked (the server name can be nil — that was
+    /// showing a misleading "Not linked"), and only "Not linked" when there's
+    /// genuinely no linked device.
+    private var registeredDeviceLabel: String {
+        guard let device = model.registeredDevice else { return "Not linked" }
+        return device.friendlyName ?? DeviceIdentity.modelName
+    }
+
     private var focusBadge: (text: String, tone: BaliTone) {
         switch focusAuth {
         case .approved:      return ("Granted", .green)
@@ -49,7 +58,7 @@ struct SettingsView: View {
                 SettingsRow(icon: "iphone", tone: .ink, title: "Registered device",
                             action: { router.push(.deviceInfo, on: .profile) }) {
                     HStack(spacing: BaliSpacing.s) {
-                        BaliText(model.registeredDevice?.friendlyName ?? "Not linked", .foot)
+                        BaliText(registeredDeviceLabel, .foot)
                         chevron
                     }
                 }
@@ -96,7 +105,17 @@ struct SettingsView: View {
         .sheet(isPresented: $showBlockedApps, onDismiss: refreshFocus) {
             BlockedAppsView(isLive: env.screenTimeService.isAvailable)
         }
-        .task { await loadFocus() }
+        .task {
+            await loadFocus()
+            // Ensure the registered device is loaded so the "Registered device" and
+            // "Class assignment" rows reflect the linked device on first render — not
+            // only after opening Device Info. `registeredDevice` is derived from a
+            // cached class detail; if none carries it yet, fetch one (force, so a
+            // detail cached before the device linked is refreshed). §9.5
+            if model.registeredDevice == nil, let target = model.liveClass ?? model.classes.first {
+                await model.loadDetail(classId: target.id, force: true)
+            }
+        }
     }
 
     private func loadFocus() async {
