@@ -446,20 +446,29 @@ student's single `FocusSelectionStore` selection. Fix: `start()` now
 shielding. On device: Full Focus → every app blocked except system-protected (Messages/
 Phone/Settings) iOS never shields.
 
-**STILL OPEN — the bucketed blocking model (the original "BIG BUILD").** Full Focus now
-works, but **No Social Media / No Games still shield the student's single global
-`FocusSelectionStore` selection** (the else-branch in `RealScreenTimeService.applyShields`).
-So if the student picked social apps once, a "No Games" class wrongly blocks social. The
-labeled-category-buckets design (per-preset `FamilyActivitySelection` keyed by bucket;
-`applyShields` maps preset→bucket) is still the fix — see the Session-3 note below and
-memory `ios-blocking-model`. VERIFIED this session: iOS 17/18 exposes **no** picker-free way
-to reference a *specific* standard category token (only `.all(except:)` for everything), so
-the bucketed approach stands.
+**DONE — the bucketed blocking model (`a7037b9`), verified on device.** Per-preset labeled
+buckets: `FocusBucket` (social, games), `FocusSelectionStore` keyed per bucket,
+`RealScreenTimeService.applyShields` maps preset→bucket(s) (noSocialMedia→social, noGames→
+games, custom→union best-effort, fullFocus/allowList→`.all()`). The student confirms each
+**category** once via the picker (category-first: one tap covers every app Apple classifies
+there, now + future) — iOS hides app identities, so the teacher's intent can't be mapped to
+tokens without this one-time student pick. (User asked "why any student setup?" — that's the
+iOS floor: only `.all()` needs no identification; a specific category needs a user-granted
+token, and there's no picker-free path on iOS 17/18.) Cross-checked on device: No Games blocks
+ONLY games, No Social Media ONLY social, Full Focus all. See memory `ios-blocking-model`.
+
+**ALSO FIXED — device showed "Not linked" when linked (`b613bf1`), user-spotted.** Two causes:
+(1) SettingsView never loaded a class detail on appear (only DeviceInfoView did), so
+`registeredDevice` (derived from the detail cache) was nil until Device Info was opened;
+(2) the row fell back to "Not linked" when the server `friendlyName` is nil (it is),
+contradicting the "Linked" badge beside it. Fix: SettingsView force-loads the device on
+appear; Settings + ClassDetail rows fall back to the local model name (e.g. "iPhone 15 Pro"),
+reserving "Not linked" for a genuinely unassigned device.
 
 **Commits (all build 0/0 device-SDK; verified on device):** `894b29c` (mark-absent gate),
-`577dcb7` (api: local dev-server request logging — the Session-3 uncommitted change, now
-committed/kept), `82e278d` (Full Focus policy race). `main` is **30 ahead of origin,
-unpushed.** Working tree clean.
+`577dcb7` (api dev-server request logging — kept), `82e278d` (Full Focus policy race),
+`a7037b9` (bucketed blocking model), `b613bf1` (device-linked display). `main` is **34 ahead
+of origin, unpushed.** Working tree clean.
 
 **Operational (carry forward):** coordinate `:3001` — this session I owned `npm run dev:api`
 and the **teacher web portal also pointed at it**, so one log showed BOTH sides (ideal for
