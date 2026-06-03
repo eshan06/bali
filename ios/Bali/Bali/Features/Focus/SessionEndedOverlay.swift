@@ -30,7 +30,7 @@ struct SessionEndedOverlay: View {
 
                 VStack(spacing: BaliSpacing.s) {
                     BaliText("Focus Mode ended", .h2)
-                    BaliText("Your teacher ended the session. All your apps are available again.", .body)
+                    BaliText("All your apps are available again.", .body)
                         .multilineTextAlignment(.center)
                 }
 

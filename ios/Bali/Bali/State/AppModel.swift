@@ -55,6 +55,11 @@ final class AppModel {
 
     func isCheckedIn(_ summary: StudentClassSummary) -> Bool {
         guard let s = summary.activeSession else { return false }
+        // A teacher override to absent/excused ends the student's active
+        // attendance even though the server keeps `check_in_at` set (so the raw
+        // `checkedIn` stays true). Honor it over the local optimistic flag too:
+        // this is the mark-absent / Emergency-Stop signal that releases Focus Mode.
+        if s.attendanceStatus == .absent || s.attendanceStatus == .excused { return false }
         return s.checkedIn || locallyCheckedIn.contains(s.id)
     }
 
