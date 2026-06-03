@@ -56,13 +56,17 @@ const server = http.createServer(async (req, res) => {
     const headers = typeof result === 'object' && 'headers' in result ? result.headers || {} : {};
     const responseBody = typeof result === 'object' && 'body' in result ? result.body : JSON.stringify(result);
 
+    // Dev-only request log (local harness; helps debug on-device requests).
+    console.log(`${req.method} ${url.pathname} -> ${statusCode}` +
+      (statusCode >= 400 ? ` ${String(responseBody).slice(0, 200)}` : ''));
+
     Object.entries(headers).forEach(([k, v]) => {
       res.setHeader(k, String(v));
     });
     res.writeHead(statusCode);
     res.end(responseBody);
   } catch (err: any) {
-    console.error('Handler error:', err);
+    console.error(`${req.method} ${url.pathname} -> 500`, err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: err.message }));
   }
