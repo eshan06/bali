@@ -22,7 +22,7 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
     private let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("bali.focus"))
 
     var isAvailable: Bool { true }
-    var blockedSelectionCount: Int { FocusSelectionStore.count }
+    var blockedSelectionCount: Int { FocusSelectionStore.totalCount }
 
     func authorizationStatus() async -> FocusAuthorization {
         switch AuthorizationCenter.shared.authorizationStatus {
@@ -51,14 +51,21 @@ nonisolated final class RealScreenTimeService: ScreenTimeService, @unchecked Sen
             store.shield.webDomains = nil
             return true
         }
-        // Specific policies (No Social Media, No Games, Custom): iOS can only shield
-        // opaque tokens the student picked, so enforce the student's selection —
-        // guided to the policy's category in BlockedAppsView (presets → categories).
-        let selection = FocusSelectionStore.load()
-        let apps = selection.applicationTokens
-        let categories = selection.categoryTokens
-        let domains = selection.webDomainTokens
-        // nothing picked yet
+        // Specific presets shield the matching student-labeled bucket(s): the
+        // teacher's preset picks the subset (No Social Media -> social bucket,
+        // No Games -> games), the student's per-bucket selection supplies the
+        // opaque tokens. `custom` unions every bucket as a best effort — an
+        // arbitrary teacher app list can't be mapped to tokens (PLAN.md §9.3).
+        var apps: Set<ApplicationToken> = []
+        var categories: Set<ActivityCategoryToken> = []
+        var domains: Set<WebDomainToken> = []
+        for bucket in FocusBucket.buckets(for: snapshot.preset) {
+            let selection = FocusSelectionStore.load(bucket)
+            apps.formUnion(selection.applicationTokens)
+            categories.formUnion(selection.categoryTokens)
+            domains.formUnion(selection.webDomainTokens)
+        }
+        // nothing picked for this preset's bucket(s) yet
         guard !apps.isEmpty || !categories.isEmpty || !domains.isEmpty else { return false }
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
