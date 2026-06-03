@@ -1,28 +1,30 @@
 //
 //  EmergencyUnlockSheet.swift
-//  Bali — Emergency unlock sheet
+//  Bali — Emergency Stop sheet
 //
-//  Local/optimistic emergency unlock: pick a reason + optional note → "Request
-//  sent". It never silently bypasses blocking — the copy is explicit that the
-//  teacher reviews and decides. A real teacher-review endpoint is a backend
-//  change (PLAN.md §9.6); for now nothing is unlocked client-side.
+//  Student-initiated Emergency Stop: turns off Focus immediately — no teacher
+//  approval. The device clears shields right away (setting the stop flag makes
+//  `focusActiveClass` go nil, which tears Focus down via the shell wiring); the
+//  stop is reported best-effort so the teacher console logs it. Focus stays off
+//  for the session until the student taps back in (a new NFC check-in). Reason +
+//  note are captured for the record.
 //
 
 import SwiftUI
 
 struct EmergencyUnlockSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
 
     private let reasons = ["Family / urgent call", "Medical", "Need a specific app for class", "Other"]
     @State private var selectedReason: String?
     @State private var note = ""
-    @State private var sent = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BaliSpacing.l) {
                 header
-                if sent { sentState } else { form }
+                form
             }
             .padding(.horizontal, BaliSpacing.xl)
             .padding(.top, BaliSpacing.m)
@@ -36,8 +38,8 @@ struct EmergencyUnlockSheet: View {
         HStack(spacing: BaliSpacing.m) {
             IconTile(systemImage: "hand.raised.fill", tone: .coral)
             VStack(alignment: .leading, spacing: 2) {
-                BaliText("Emergency unlock", .h3)
-                BaliText("Sends a request to your teacher to review.", .foot)
+                BaliText("Emergency Stop", .h3)
+                BaliText("Turns off Focus right now.", .foot)
             }
             Spacer(minLength: 0)
         }
@@ -47,10 +49,10 @@ struct EmergencyUnlockSheet: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: BaliSpacing.l) {
-            warning
+            notice
 
             VStack(alignment: .leading, spacing: BaliSpacing.s) {
-                FieldLabel("Reason")
+                FieldLabel("Reason (optional)")
                 VStack(spacing: BaliSpacing.s) {
                     ForEach(reasons, id: \.self) { reasonRow($0) }
                 }
@@ -58,7 +60,7 @@ struct EmergencyUnlockSheet: View {
 
             VStack(alignment: .leading, spacing: BaliSpacing.s) {
                 FieldLabel("Add a note (optional)")
-                TextField("Tell your teacher what you need…", text: $note, axis: .vertical)
+                TextField("Tell your teacher what happened…", text: $note, axis: .vertical)
                     .font(BaliFont.at(16, 400))
                     .foregroundStyle(BaliColor.ink)
                     .tint(BaliColor.blue)
@@ -70,10 +72,7 @@ struct EmergencyUnlockSheet: View {
             }
 
             VStack(spacing: BaliSpacing.s) {
-                BaliButton(title: "Send request to teacher", variant: .danger) {
-                    withAnimation { sent = true }
-                }
-                .disabled(selectedReason == nil)
+                BaliButton(title: "Turn off Focus now", variant: .danger) { stop() }
                 Button { dismiss() } label: {
                     BaliText("Cancel", .bodyStrong, color: BaliColor.ink3)
                 }
@@ -82,12 +81,12 @@ struct EmergencyUnlockSheet: View {
         }
     }
 
-    private var warning: some View {
+    private var notice: some View {
         HStack(alignment: .top, spacing: BaliSpacing.s10) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(BaliColor.amber)
-            BaliText("This won't silently bypass blocking. Your teacher sees the request and decides.",
+            BaliText("Your apps unlock immediately and your teacher is notified that you used Emergency Stop. Focus stays off until you tap back in.",
                      .foot, color: BaliColor.badgeAmberText)
             Spacer(minLength: 0)
         }
@@ -99,7 +98,7 @@ struct EmergencyUnlockSheet: View {
 
     private func reasonRow(_ reason: String) -> some View {
         let selected = selectedReason == reason
-        return Button { selectedReason = reason } label: {
+        return Button { selectedReason = selected ? nil : reason } label: {
             HStack {
                 BaliText(reason, .bodyStrong)
                 Spacer(minLength: 0)
@@ -124,31 +123,24 @@ struct EmergencyUnlockSheet: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Sent
+    // MARK: - Action
 
-    private var sentState: some View {
-        VStack(spacing: BaliSpacing.l) {
-            ZStack {
-                Circle().fill(BaliColor.greenTint).frame(width: 96, height: 96)
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(BaliColor.green)
-            }
-            VStack(spacing: BaliSpacing.s) {
-                BaliText("Request sent", .h2)
-                BaliText("Your teacher will review it. Nothing is unlocked yet — they decide.", .body)
-                    .multilineTextAlignment(.center)
-            }
-            BaliButton(title: "Done") { dismiss() }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, BaliSpacing.xl)
+    /// Stop immediately: flag the active session (sticky), let the shell tear Focus
+    /// down, and report best-effort. Capture the active class first — `emergencyStop`
+    /// makes `focusActiveClass` go nil.
+    private func stop() {
+        guard let active = model.focusActiveClass else { dismiss(); return }
+        let reason = selectedReason ?? "Unspecified"
+        let noteText = note
+        Task { await model.emergencyStop(for: active, reason: reason, note: noteText) }
+        dismiss()
     }
 }
 
 #Preview {
     Color.black.sheet(isPresented: .constant(true)) {
         EmergencyUnlockSheet()
+            .environment(AppModel.preview)
             .presentationDetents([.large])
     }
 }

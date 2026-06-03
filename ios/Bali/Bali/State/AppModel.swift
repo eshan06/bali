@@ -28,9 +28,29 @@ final class AppModel {
     /// Phase 6 so the UI reflects a check-in immediately, before the next poll.
     private(set) var locallyCheckedIn: Set<String> = []
 
+    /// Sessions the student has Emergency-Stopped on this device. Persisted so a
+    /// relaunch / poll won't silently re-block; cleared when the student taps back
+    /// in (`markCheckedIn`). Honored by `focusActiveClass`.
+    private(set) var stoppedSessions: Set<String> = []
+    private static let stoppedSessionsKey = "bali.focus.stoppedSessions"
+
     private let repo: StudentRepository
 
-    init(repo: StudentRepository) { self.repo = repo }
+    init(repo: StudentRepository) {
+        self.repo = repo
+        stoppedSessions = Set(UserDefaults.standard.stringArray(forKey: Self.stoppedSessionsKey) ?? [])
+    }
+
+    private func persistStoppedSessions() {
+        UserDefaults.standard.set(Array(stoppedSessions), forKey: Self.stoppedSessionsKey)
+    }
+
+    /// Drop Emergency-Stop flags for sessions no longer active (ended/replaced).
+    private func pruneStoppedSessions() {
+        let activeIds = Set(classes.compactMap { $0.activeSession?.id })
+        let kept = stoppedSessions.intersection(activeIds)
+        if kept != stoppedSessions { stoppedSessions = kept; persistStoppedSessions() }
+    }
 
     // MARK: - Derived
 
@@ -41,6 +61,7 @@ final class AppModel {
     var focusActiveClass: StudentClassSummary? {
         classes.first { summary in
             guard let s = summary.activeSession, s.blockingEnabled else { return false }
+            guard !stoppedSessions.contains(s.id) else { return false }  // student Emergency-Stopped
             return isCheckedIn(summary)
         }
     }
@@ -104,6 +125,7 @@ final class AppModel {
             extras = extrasData
             errorMessage = nil
             phase = .loaded
+            pruneStoppedSessions()
             // Warm + keep-fresh the primary class detail so device info + the live
             // policy stay current app-wide (Profile "Device linked", Settings, device
             // screen, Focus Mode policy) without first opening a class. Re-fetched on
@@ -231,7 +253,22 @@ final class AppModel {
     }
 
     /// Record a successful (real NFC) check-in so the UI updates immediately.
-    func markCheckedIn(sessionId: String) { locallyCheckedIn.insert(sessionId) }
+    /// Tapping back in also clears a prior Emergency Stop for the session (re-engages Focus).
+    func markCheckedIn(sessionId: String) {
+        locallyCheckedIn.insert(sessionId)
+        if stoppedSessions.remove(sessionId) != nil { persistStoppedSessions() }
+    }
+
+    /// Student-initiated Emergency Stop: immediately end Focus for this live session
+    /// (no teacher approval). Sticky until the student taps back in. Reports to the
+    /// server best-effort so the teacher console logs it; the device unlock (shields
+    /// clear via `focusActiveClass` -> nil -> teardown) happens regardless.
+    func emergencyStop(for summary: StudentClassSummary, reason: String, note: String) async {
+        guard let session = summary.activeSession else { return }
+        stoppedSessions.insert(session.id)
+        persistStoppedSessions()
+        try? await repo.reportEmergencyStop(classId: summary.id, reason: reason, note: note)
+    }
 
     /// Clear all state on sign-out.
     func reset() {
@@ -242,6 +279,8 @@ final class AppModel {
         extras = StudentExtras()
         detailCache = [:]
         locallyCheckedIn = []
+        stoppedSessions = []
+        persistStoppedSessions()
         errorMessage = nil
     }
 }

@@ -201,7 +201,7 @@ struct FocusModeActiveView: View {
 
     private var emergencyButton: some View {
         Button { showEmergency = true } label: {
-            Text("Request emergency unlock")
+            Text("Emergency Stop")
                 .font(BaliFont.at(15, 650))
                 .foregroundStyle(BaliColor.focusText2)
                 .frame(maxWidth: .infinity)

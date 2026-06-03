@@ -53,10 +53,14 @@ protocol StudentRepository: Sendable {
     func acceptInvite(inviteId: String) async throws
     /// Best-effort sidecar metadata the DTOs lack. Empty by default (live API).
     func fetchExtras() async -> StudentExtras
+    /// Report a student-initiated Emergency Stop so the teacher console can log it.
+    /// Best-effort — the device unlock happens regardless of this call.
+    func reportEmergencyStop(classId: String, reason: String, note: String) async throws
 }
 
 extension StudentRepository {
     nonisolated func fetchExtras() async -> StudentExtras { StudentExtras() }
+    nonisolated func reportEmergencyStop(classId: String, reason: String, note: String) async throws {}
 }
 
 /// Real repository — talks to the student JWT endpoints via APIClient.
@@ -86,5 +90,16 @@ nonisolated struct LiveStudentRepository: StudentRepository {
     func acceptInvite(inviteId: String) async throws {
         try await api.postVoid("invites/\(inviteId)/accept", body: nil)
     }
+
+    func reportEmergencyStop(classId: String, reason: String, note: String) async throws {
+        try await api.postVoid("students/me/classes/\(classId)/emergency-stop",
+                               body: EmergencyStopBody(reason: reason, note: note))
+    }
     // fetchExtras() uses the default (empty) — the live API carries no sidecar yet.
+}
+
+/// Body for POST students/me/classes/{id}/emergency-stop.
+nonisolated struct EmergencyStopBody: Encodable {
+    let reason: String
+    let note: String
 }
