@@ -60,10 +60,18 @@ final class FocusModeController {
         activeClassId = summary.id
         endedInfo = nil
         isExpanded = true
-        policy = model.presentation(for: summary.id).policy
-            ?? model.detail(for: summary.id)?.activeSession?.blockingSnapshot
         startedAt = BaliFormat.date(summary.activeSession?.startedAt) ?? Date()
         status = .applying
+        // Resolve the session's frozen policy from a fresh class-detail fetch before
+        // shielding. Focus can activate from an optimistic check-in — or an already
+        // checked-in session on launch — before the dashboard's warm-detail lands,
+        // and start() runs once (guarded above). Reading a not-yet-cached policy here
+        // would lock in the `.inactive` fallback, which shields only the student's
+        // picked apps instead of the teacher's policy (e.g. Full Focus -> .all()).
+        // The explicit fetch guarantees we apply the real session policy.
+        let detail = await model.loadDetail(classId: summary.id, force: true)
+        policy = detail?.activeSession?.blockingSnapshot
+            ?? model.presentation(for: summary.id).policy
         let applied = await service.applyShields(for: policy ?? .inactive)
         status = applied ? .applied : .failed
         startPolling()
