@@ -465,10 +465,37 @@ contradicting the "Linked" badge beside it. Fix: SettingsView force-loads the de
 appear; Settings + ClassDetail rows fall back to the local model name (e.g. "iPhone 15 Pro"),
 reserving "Not linked" for a genuinely unassigned device.
 
-**Commits (all build 0/0 device-SDK; verified on device):** `894b29c` (mark-absent gate),
-`577dcb7` (api dev-server request logging — kept), `82e278d` (Full Focus policy race),
-`a7037b9` (bucketed blocking model), `b613bf1` (device-linked display). `main` is **34 ahead
-of origin, unpushed.** Working tree clean.
+**⭐ Student Emergency Stop (session 4 continued) — iOS DONE + verified; backend NOT YET LIVE.**
+User's model: student taps Emergency Stop → Focus turns off IMMEDIATELY (no teacher approval);
+stays off for the session UNLESS the student taps back in (NFC re-check-in re-engages);
+attendance is NOT affected; a durable NOTE is recorded for the teacher console.
+- **iOS (`53ba289`, verified on device):** `AppModel.stoppedSessions` (persisted UserDefaults);
+  `focusActiveClass` skips stopped sessions → the shell tears Focus down (shields clear + ended
+  card) and stays off across polls/relaunch; `markCheckedIn` clears the flag (tap-back-in
+  re-engages); `emergencyStop(for:reason:note:)` sets the flag + best-effort
+  `repo.reportEmergencyStop` (POST `students/me/classes/{id}/emergency-stop`).
+  `EmergencyUnlockSheet` reframed "request→teacher decides" → "Turn off Focus now" (reason/note
+  optional). On-device: instant unlock, sticky, re-engage all CONFIRMED.
+- **Backend (`b69f352`, typechecks, NOT applied/tested):** student-JWT route records
+  `device_blocking_status` as `student_override` (shows in the teacher's EXISTING device-status
+  view) + appends to a new `emergency_stop_log` (reason, note, time). Adds migration **`012`**,
+  query, zod schema, widened `reported_by`. **All additive.** `@bali/shared`+`@bali/db` rebuilt.
+- **⚠️ TO GO LIVE (held per user):** apply migration `012` — do NOT `npm run migrate` (it re-runs
+  `003_seed.sql`); apply JUST `012` via node+pg (`CREATE TABLE IF NOT EXISTS`, idempotent). Then
+  RESTART the dev API (ts-node, no hot-reload), then test the POST → expect `-> 200` (it 404'd
+  this session, route didn't exist), a `student_override` row, and an `emergency_stop_log` entry.
+  Teacher-console DISPLAY of the log is the "eventually" web piece (the override already shows in
+  device-status; `emergencyStopQueries.getBySession` is ready).
+
+**Auth note (corrected):** **Google sign-in WORKS** (the user signs in with Google) — the
+`balistudent://` scheme is registered. Email/pw also works. (Supersedes earlier "Google needs the
+URL scheme" notes.)
+
+**Commits (all build 0/0 device-SDK; iOS all verified on device):** `894b29c` (mark-absent),
+`577dcb7` (api dev logging), `82e278d` (Full Focus race), `fd66ea3`+`066c4bc` (PLAN §11),
+`a7037b9` (bucketed blocking), `b613bf1` (device-linked display), `53ba289` (Emergency Stop iOS),
+`b69f352` (Emergency Stop backend — NOT yet live). `main` is **36 ahead of origin, unpushed.**
+Working tree clean.
 
 **Operational (carry forward):** coordinate `:3001` — this session I owned `npm run dev:api`
 and the **teacher web portal also pointed at it**, so one log showed BOTH sides (ideal for
