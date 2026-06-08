@@ -84,6 +84,14 @@ final class AppModel {
         return s.checkedIn || locallyCheckedIn.contains(s.id)
     }
 
+    /// The student is still checked in but Focus is off because they hit
+    /// Emergency Stop this session (sticky until they tap back in). Drives the
+    /// Home hero copy so it doesn't claim "Focus Mode is keeping you on task".
+    func isEmergencyStopped(_ summary: StudentClassSummary) -> Bool {
+        guard let s = summary.activeSession else { return false }
+        return stoppedSessions.contains(s.id) && isCheckedIn(summary)
+    }
+
     func presentation(for classId: String) -> ClassPresentation {
         extras.presentations[classId] ?? ClassPresentation()
     }

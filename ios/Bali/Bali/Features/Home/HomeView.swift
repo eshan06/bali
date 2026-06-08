@@ -64,7 +64,12 @@ struct HomeView: View {
 
     @ViewBuilder private var hero: some View {
         if let live = model.liveClass {
-            if model.isCheckedIn(live) { checkedInHero(live) } else { liveHero(live) }
+            if model.isCheckedIn(live) {
+                if model.isEmergencyStopped(live) { emergencyStoppedHero(live) }
+                else { checkedInHero(live) }
+            } else {
+                liveHero(live)
+            }
         } else {
             restingHero
         }
@@ -106,6 +111,25 @@ struct HomeView: View {
             }
             BaliButton(title: "View Focus Mode", icon: "shield.fill",
                        variant: .glass, fullWidth: false) { router.selectTab(.focus) }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(BaliGradient.darkCard)
+        .clipShape(RoundedRectangle(cornerRadius: BaliRadius.lg, style: .continuous))
+        .baliShadow(.elevated)
+    }
+
+    /// Checked in, but the student used Emergency Stop — Focus is off until they
+    /// tap their Bali block again. Don't claim Focus is "keeping you on task".
+    private func emergencyStoppedHero(_ live: StudentClassSummary) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            heroBadge("FOCUS OFF", dot: BaliColor.amber)
+            VStack(alignment: .leading, spacing: 6) {
+                BaliText("Focus is off", .h1, color: .white)
+                Text("You stopped Focus for \(live.name). Tap your Bali block to turn it back on.")
+                    .baliText(.body, color: BaliColor.focusText2)
+            }
+            checkInPill("Turn Focus back on") { router.startCheckIn(classId: live.id) }
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -184,11 +208,12 @@ struct HomeView: View {
         .clipShape(Capsule())
     }
 
-    private func checkInPill(_ action: @escaping () -> Void) -> some View {
+    private func checkInPill(_ title: String = "Tap to check in",
+                             _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: "dot.radiowaves.left.and.right")
-                Text("Tap to check in")
+                Text(title)
             }
             .font(BaliFont.at(16, 650))
             .foregroundStyle(BaliColor.blue)
