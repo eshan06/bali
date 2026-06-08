@@ -472,7 +472,10 @@ submission, accessibility, APNs, **Android** parity, real tag-aware check-in
 **Commits this session:** `dfcf0e8` (ios home card), `c19b6fd` (web label),
 `2d9a406` (api emergency-stops route), `e2ee063` (web timeline), `7e8ac61` (api
 blocking-status route), `87c7f4d` (ios blocking-status report), + this PLAN
-update. `main` is **44 ahead of origin, unpushed.** LAN IP `10.0.0.115`.
+update. **All PUSHED to `origin/main` (in sync)** — authored+committed as `eshan06
+<eshan.nirav@gmail.com>`, no co-author trailers. Going forward: commit to main,
+**push when the user asks**, as the user (this session was the first push; the prior
+"keep it unpushed" default no longer applies). LAN IP `10.0.0.115`.
 
 ### ⭐ Session 4 (2026-06-02) — NFC confirmed + two on-device blocking fixes
 
