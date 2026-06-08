@@ -47,7 +47,13 @@ interface SessionAttendance {
   students: AttendanceRecord[];
 }
 
-type BlockingState = 'applied' | 'failed' | 'unknown' | 'inactive' | 'no_device';
+type BlockingState =
+  | 'applied'
+  | 'failed'
+  | 'unknown'
+  | 'inactive'
+  | 'no_device'
+  | 'student_override';
 
 function periodLabel(period?: string | null): string | null {
   if (!period) return null;
@@ -123,6 +129,14 @@ function blockingStateFor(opts: {
       state: 'applied',
       label: 'Blocking applied',
       tint: 'bg-green-50 text-green-700 border-green-200',
+    };
+  }
+  // Student-initiated Emergency Stop — an intentional unlock, not a failure.
+  if (opts.status.reportedBy === 'student_override') {
+    return {
+      state: 'student_override',
+      label: 'Emergency Stop',
+      tint: 'bg-amber-50 text-amber-700 border-amber-200',
     };
   }
   return {

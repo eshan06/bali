@@ -520,6 +520,8 @@ export default function ActiveSessionPage() {
                       ? blockStatus
                         ? blockStatus.isBlocked
                           ? 'applied'
+                          : blockStatus.reportedBy === 'student_override'
+                          ? 'student_override'
                           : blockStatus.reportedBy === 'device'
                           ? 'failed'
                           : 'unknown'
@@ -582,7 +584,7 @@ function StudentCard({
   status: 'present' | 'late' | 'absent' | 'excused' | 'pending' | string;
   checkInAt?: string | null;
   deviceLabel: string | null;
-  blocking: 'applied' | 'failed' | 'unknown' | 'inactive';
+  blocking: 'applied' | 'failed' | 'unknown' | 'inactive' | 'student_override';
   onOverride: (next: string) => void;
 }) {
   const blockingLabel: Record<typeof blocking, string> = {
@@ -590,12 +592,14 @@ function StudentCard({
     failed: 'Blocking failed',
     unknown: 'Awaiting device',
     inactive: 'Blocking off',
+    student_override: 'Emergency Stop',
   };
   const blockingTint: Record<typeof blocking, string> = {
     applied: 'bg-green-50 text-green-700 border-green-200',
     failed: 'bg-red-50 text-red-700 border-red-200',
     unknown: 'bg-gray-50 text-gray-500 border-gray-200',
     inactive: 'bg-gray-50 text-gray-500 border-gray-200',
+    student_override: 'bg-amber-50 text-amber-700 border-amber-200',
   };
 
   return (
