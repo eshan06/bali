@@ -47,6 +47,16 @@ interface SessionAttendance {
   students: AttendanceRecord[];
 }
 
+interface EmergencyStop {
+  id: string;
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  reason: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 type BlockingState =
   | 'applied'
   | 'failed'
@@ -153,6 +163,111 @@ function csvEscape(value: string | null | undefined): string {
   return s;
 }
 
+function fmtTime(t: string): string {
+  return new Date(t).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Horizontal timeline of student-initiated Emergency Stops across the session's
+ * duration — a marker per stop positioned by time, plus a per-event detail list.
+ * Fed by the durable emergency_stop_log via /sessions/:id/emergency-stops.
+ */
+function EmergencyStopTimeline({
+  startedAt,
+  endedAt,
+  stops,
+}: {
+  startedAt: string;
+  endedAt?: string | null;
+  stops: EmergencyStop[];
+}) {
+  const start = new Date(startedAt).getTime();
+  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+  const span = Math.max(end - start, 60_000);
+  const ordered = [...stops].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  return (
+    <section className="surface-card rounded-2xl p-7 space-y-6">
+      <div className="space-y-1.5">
+        <p
+          className="text-[11px] font-black uppercase tracking-[0.18em]"
+          style={{ color: BRAND }}
+        >
+          Focus
+        </p>
+        <h2 className="text-xl md:text-2xl font-black tracking-tight text-gray-900">
+          Emergency Stops
+        </h2>
+        <p className="text-sm text-gray-500">
+          {stops.length} student-initiated{' '}
+          {stops.length === 1 ? 'stop' : 'stops'} during this session. Focus
+          unlocked immediately; attendance was unaffected.
+        </p>
+      </div>
+
+      <div className="px-1 pt-2">
+        <div className="relative h-2 rounded-full bg-gray-100">
+          {ordered.map((s) => {
+            const pct = Math.min(
+              98,
+              Math.max(
+                2,
+                ((new Date(s.createdAt).getTime() - start) / span) * 100
+              )
+            );
+            return (
+              <div
+                key={s.id}
+                className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500 ring-4 ring-amber-100"
+                style={{ left: `${pct}%` }}
+                title={`Emergency Stop · ${fmtTime(s.createdAt)}`}
+              />
+            );
+          })}
+        </div>
+        <div className="mt-3 flex justify-between text-[11px] font-semibold text-gray-400">
+          <span>{fmtTime(startedAt)} · started</span>
+          <span>
+            {endedAt ? `${fmtTime(endedAt)} · ended` : 'in progress'}
+          </span>
+        </div>
+      </div>
+
+      <ul className="divide-y divide-gray-100 border-t border-gray-100">
+        {ordered.map((s) => (
+          <li
+            key={s.id}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2.5 text-sm"
+          >
+            <span className="h-2 w-2 flex-shrink-0 rounded-full bg-amber-500" />
+            <span className="font-bold text-gray-900">
+              {s.firstName} {s.lastName}
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="text-gray-600">{fmtTime(s.createdAt)}</span>
+            {s.reason && s.reason.toLowerCase() !== 'unspecified' && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-600">{s.reason}</span>
+              </>
+            )}
+            {s.note && (
+              <span className="w-full truncate italic text-gray-500 sm:w-auto">
+                “{s.note}”
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function SessionDetailPage() {
   const { classId, sessionId } = useParams<{
     classId: string;
@@ -165,6 +280,7 @@ export default function SessionDetailPage() {
   const [deviceStatuses, setDeviceStatuses] = useState<DeviceBlockingStatus[]>(
     []
   );
+  const [emergencyStops, setEmergencyStops] = useState<EmergencyStop[]>([]);
   const [loading, setLoading] = useState(true);
   const [errored, setErrored] = useState(false);
 
@@ -181,13 +297,19 @@ export default function SessionDetailPage() {
           `/sessions/${sessionId}/device-status`
         )
         .catch(() => ({ statuses: [] })),
+      api
+        .get<{ stops: EmergencyStop[] }>(
+          `/sessions/${sessionId}/emergency-stops`
+        )
+        .catch(() => ({ stops: [] })),
     ])
-      .then(([att, sess, c, dev, ds]) => {
+      .then(([att, sess, c, dev, ds, es]) => {
         setAttendance(att);
         setSession(sess);
         setCls(c);
         setDevices(dev.devices);
         setDeviceStatuses(ds.statuses);
+        setEmergencyStops(es.stops);
       })
       .catch(() => setErrored(true))
       .finally(() => setLoading(false));
@@ -418,6 +540,15 @@ export default function SessionDetailPage() {
         snapshot={snapshot}
         blockingActive={blockingActive}
       />
+
+      {/* ── EMERGENCY STOPS ───────────────────────────────────── */}
+      {emergencyStops.length > 0 && (
+        <EmergencyStopTimeline
+          startedAt={attendance.startedAt}
+          endedAt={attendance.endedAt}
+          stops={emergencyStops}
+        />
+      )}
 
       {/* ── STUDENTS ──────────────────────────────────────────── */}
       <section className="surface-card rounded-2xl overflow-hidden">
