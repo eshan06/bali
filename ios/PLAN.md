@@ -407,7 +407,72 @@ On your go-ahead I start at **Phase 0 → Phase 1**, one `ios:` commit per phase
 
 ---
 
-## 11. Resume here — session handoff (last updated 2026-06-02)
+## 11. Resume here — session handoff (last updated 2026-06-07)
+
+### ⭐ Session 5 (2026-06-07) — Emergency Stop LIVE + teacher visibility + live blocking status
+
+Same iPhone 15 Pro. Owned `:3001` (the user's teacher web portal hit the same
+server). Took the Emergency Stop backend **live**, built out teacher-side
+visibility, and added live blocking-status reporting. **Scope locked this session
+(user decision): a stronger LOCAL demo, iOS-only — NOT real users / not prod.**
+
+**1. Emergency Stop backend — NOW LIVE + verified e2e** (was written/committed in
+session 4 as `b69f532` but held). Applied migration **`012_emergency_stop_log`**
+to the shared RDS via `node` + root `pg` (NOT `npm run migrate` — that re-runs
+`003_seed`); idempotent `CREATE TABLE IF NOT EXISTS`. Confirmed
+`device_blocking_status.reported_by` is `VARCHAR(20)` with **no CHECK** → holds
+`'student_override'` (16 chars), so 012 was the only DB change. Restarted the dev
+API. On device: **`POST .../emergency-stop -> 200`** (was 404), **2
+`emergency_stop_log` rows** for the session + a `device_blocking_status` row
+`reported_by=student_override`. **Closes §9.6** (last open backend seam).
+
+**2. Three user-driven UI fixes (all committed + verified).**
+- **iOS Home hero (`dfcf0e8`):** the checked-in hero claimed "Focus Mode is
+  keeping you on task" even after Emergency Stop. Added `AppModel.isEmergencyStopped`
+  + an amber **"Focus off"** hero ("You stopped Focus for {class}. Tap your Bali
+  block to turn it back on.") with a **Turn Focus back on** CTA (generalized
+  `checkInPill` to take a title).
+- **Web label (`c19b6fd`):** teacher console showed red **"Blocking failed"** for
+  `reported_by='student_override'`. Mapped to amber **"Emergency Stop"** in BOTH
+  the session-detail (`blockingStateFor`) and live Active Session (`StudentCard`)
+  views.
+- **Web timeline (`2d9a406` api + `e2ee063` web):** new **"Emergency Stops"**
+  section on the session-detail page — a horizontal timeline (marker per stop by
+  time across the session span) + a per-event list (student · time · reason ·
+  note), between the blocking-policy card and roster. Fed by a new teacher route
+  **GET `/sessions/:id/emergency-stops`** (JWT + ownership, over
+  `emergencyStopQueries.getBySession`). Verified live: the user's portal fetched
+  it `-> 200` with the real 2-stop data.
+
+**3. Live blocking status on the teacher dashboard (`7e8ac61` api + `87c7f4d`
+ios).** iOS previously reported ONLY Emergency Stop, so a normally-blocked student
+showed "Blocking status not reported". New student-JWT route **POST
+`/students/me/classes/:id/blocking-status`** (`{isBlocked}`, writes
+`reported_by='device'`, mirrors emergencyStop). `FocusModeController.start` now
+reports the real `applyShields` result. **Reports on apply/re-engage ONLY — never
+on teardown**, so an Emergency-Stop teardown can't clobber its own
+`student_override` badge (re-engage re-applies → re-reports true). Teacher now
+sees green **"Blocking applied"** live. Route `-> 401` smoke; typechecks clean;
+iOS builds 0/0; on device.
+
+**4. Stale-session cleanup.** Closed 1 orphaned never-ended session ("Math", Jun
+5) → **0 open remain**. `sessions/start` already blocks two-active-per-teacher
+(`findActiveByTeacher` → conflict), so orphans only come from a session never
+ended; no code change needed.
+
+**Scope decision (2026-06-07) — deferred (NOT this demo):** API/web
+**deployment** (no infra exists — API is `ts-node` localhost/LAN-only;
+`docs/aws-setup.md` is the un-executed Lambda+API-Gateway+Amplify runbook;
+RDS+Cognito already live), Family Controls **distribution** entitlement, App Store
+submission, accessibility, APNs, **Android** parity, real tag-aware check-in
+(still `simulate-check-in`), real student device registration (local keychain).
+**Remaining "stronger demo" menu:** an on-device **polish sweep**
+(copy/empty-states/demo-data realism — streak, seat name, notifications).
+
+**Commits this session:** `dfcf0e8` (ios home card), `c19b6fd` (web label),
+`2d9a406` (api emergency-stops route), `e2ee063` (web timeline), `7e8ac61` (api
+blocking-status route), `87c7f4d` (ios blocking-status report), + this PLAN
+update. `main` is **44 ahead of origin, unpushed.** LAN IP `10.0.0.115`.
 
 ### ⭐ Session 4 (2026-06-02) — NFC confirmed + two on-device blocking fixes
 
