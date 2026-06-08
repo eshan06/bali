@@ -30,6 +30,7 @@ import { handler as sessionEnd } from './handlers/sessions/end';
 import { handler as sessionActive } from './handlers/sessions/active';
 import { handler as sessionList } from './handlers/sessions/list';
 import { handler as sessionGet } from './handlers/sessions/get';
+import { getHandler as emergencyStopsGet } from './handlers/sessions/emergencyStops';
 import { handler as checkinTap } from './handlers/checkin/tap';
 import { handler as attendanceStatus } from './handlers/attendance/status';
 import { handler as attendanceOverride } from './handlers/attendance/override';
@@ -142,6 +143,7 @@ const routes: Route[] = [
 
   // Device blocking status (per-student)
   { method: 'GET',    pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status$/,                                         handler: deviceStatusGet,     auth: 'jwt' },
+  { method: 'GET',    pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/emergency-stops$/,                                       handler: emergencyStopsGet,   auth: 'jwt' },
   { method: 'PUT',    pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status\/(?<studentId>[^/]+)$/,                    handler: deviceStatusSet,     auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/sessions\/(?<sessionId>[^/]+)\/device-status\/(?<studentId>[^/]+)\/report$/,            handler: deviceStatusReport,  auth: 'apikey' },
 
