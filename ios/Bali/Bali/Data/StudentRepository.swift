@@ -56,11 +56,15 @@ protocol StudentRepository: Sendable {
     /// Report a student-initiated Emergency Stop so the teacher console can log it.
     /// Best-effort — the device unlock happens regardless of this call.
     func reportEmergencyStop(classId: String, reason: String, note: String) async throws
+    /// Report whether Focus shields are currently applied, so the teacher console
+    /// shows live per-student blocking status. Best-effort.
+    func reportBlockingStatus(classId: String, isBlocked: Bool) async throws
 }
 
 extension StudentRepository {
     nonisolated func fetchExtras() async -> StudentExtras { StudentExtras() }
     nonisolated func reportEmergencyStop(classId: String, reason: String, note: String) async throws {}
+    nonisolated func reportBlockingStatus(classId: String, isBlocked: Bool) async throws {}
 }
 
 /// Real repository — talks to the student JWT endpoints via APIClient.
@@ -95,6 +99,11 @@ nonisolated struct LiveStudentRepository: StudentRepository {
         try await api.postVoid("students/me/classes/\(classId)/emergency-stop",
                                body: EmergencyStopBody(reason: reason, note: note))
     }
+
+    func reportBlockingStatus(classId: String, isBlocked: Bool) async throws {
+        try await api.postVoid("students/me/classes/\(classId)/blocking-status",
+                               body: BlockingStatusBody(isBlocked: isBlocked))
+    }
     // fetchExtras() uses the default (empty) — the live API carries no sidecar yet.
 }
 
@@ -102,4 +111,9 @@ nonisolated struct LiveStudentRepository: StudentRepository {
 nonisolated struct EmergencyStopBody: Encodable {
     let reason: String
     let note: String
+}
+
+/// Body for POST students/me/classes/{id}/blocking-status.
+nonisolated struct BlockingStatusBody: Encodable {
+    let isBlocked: Bool
 }

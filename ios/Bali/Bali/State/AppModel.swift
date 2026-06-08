@@ -278,6 +278,14 @@ final class AppModel {
         try? await repo.reportEmergencyStop(classId: summary.id, reason: reason, note: note)
     }
 
+    /// Report whether Focus shields are currently applied for this class's active
+    /// session, so the teacher console shows live blocking status. Best-effort —
+    /// only sent on apply/re-engage (never on an Emergency-Stop teardown, which
+    /// records the more specific `student_override`).
+    func reportBlockingStatus(classId: String, isBlocked: Bool) async {
+        try? await repo.reportBlockingStatus(classId: classId, isBlocked: isBlocked)
+    }
+
     /// Clear all state on sign-out.
     func reset() {
         phase = .idle

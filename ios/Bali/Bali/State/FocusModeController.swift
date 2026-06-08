@@ -74,6 +74,10 @@ final class FocusModeController {
             ?? model.presentation(for: summary.id).policy
         let applied = await service.applyShields(for: policy ?? .inactive)
         status = applied ? .applied : .failed
+        // Tell the teacher console this device's real blocking status. Best-effort,
+        // fire-and-forget. We report on apply/re-engage only — teardown stays silent
+        // so an Emergency Stop's `student_override` badge isn't clobbered.
+        Task { await model.reportBlockingStatus(classId: summary.id, isBlocked: applied) }
         startPolling()
     }
 
