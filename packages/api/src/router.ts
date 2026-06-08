@@ -15,6 +15,7 @@ import { getHandler as studentMeGet, postHandler as studentMePost } from './hand
 import { handler as studentClassDetail } from './handlers/students/classDetail';
 import { handler as studentSimulateCheckIn } from './handlers/students/simulateCheckIn';
 import { handler as studentEmergencyStop } from './handlers/students/emergencyStop';
+import { handler as studentBlockingStatus } from './handlers/students/blockingStatus';
 import { handler as inviteCreate } from './handlers/invites/create';
 import { handler as inviteList } from './handlers/invites/list';
 import { handler as inviteRevoke } from './handlers/invites/revoke';
@@ -79,6 +80,7 @@ const routes: Route[] = [
   { method: 'GET',    pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)$/,                     handler: studentClassDetail,  auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)\/simulate-check-in$/,  handler: studentSimulateCheckIn, auth: 'jwt' },
   { method: 'POST',   pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)\/emergency-stop$/,     handler: studentEmergencyStop,   auth: 'jwt' },
+  { method: 'POST',   pattern: /^\/api\/students\/me\/classes\/(?<classId>[^/]+)\/blocking-status$/,    handler: studentBlockingStatus,  auth: 'jwt' },
 
   // Class invites by email (teacher manages, student accepts)
   { method: 'POST',   pattern: /^\/api\/classes\/(?<classId>[^/]+)\/invites$/,                          handler: inviteCreate,        auth: 'jwt' },
