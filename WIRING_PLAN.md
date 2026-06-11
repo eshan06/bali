@@ -109,7 +109,8 @@ GET  /v1/sessions/:id          header + participations (derived states) + active
 GET  /v1/sessions/:id/stream   SSE: init snapshot · participant · session · event · ping(15s)
 POST /v1/sessions/:id/end | /v1/sessions/:id/extend {minutes}
 POST /v1/sessions/:id/passes   {studentId, minutes, reason?}
-POST /v1/participations/:id/no-device   {on: bool}
+POST /v1/sessions/:id/no-device {studentId, on}   ← keyed by session+student (creates the
+                               participation row when a never-tapped student is flagged)
 GET  /v1/portal/home           greeting block, live-now card, today rows, approvals, recent events
 GET  /v1/reports/unlocks?range=&classId=        rows + 6-week sparkline buckets (+CSV via Accept)
 GET  /v1/reports/focus-minutes?range=&classId=  per-class averages only
@@ -256,7 +257,7 @@ AWS resources, so values transfer verbatim unless noted).
 
 | New file (untracked) | Vars | Source |
 |---|---|---|
-| `apps/api/.env` | `DATABASE_URL` → same RDS host/user/pass, **db `bali_v2`** · `COGNITO_USER_POOL_ID` · `COGNITO_CLIENT_ID` · `CORS_ORIGIN=http://localhost:3000` · `DEFAULT_SCHOOL_ID` · `PORT=3001` | legacy `.env` (modified db name) |
+| **`.env` (repo root)** — shared by apps/api + packages/db scripts (deviation from the original `apps/api/.env` idea: db migrate/seed need the same values, and root-.env mirrors the legacy convention) | `DATABASE_URL` → same RDS host/user/pass, **db `bali_v2`** · `COGNITO_USER_POOL_ID` · `COGNITO_CLIENT_ID` · `CORS_ORIGIN=http://localhost:3000` · `DEFAULT_SCHOOL_ID` · `PORT=3001` · `SEED_TEACHER_EMAIL` · dev-only `ALLOW_DEV_TOKENS=1` | legacy `.env` (modified db name) |
 | `apps/web/.env.local` | `NEXT_PUBLIC_API_URL=http://localhost:3001/v1` · `NEXT_PUBLIC_COGNITO_USER_POOL_ID` · `NEXT_PUBLIC_COGNITO_CLIENT_ID` · `NEXT_PUBLIC_COGNITO_DOMAIN` · `NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/auth/callback` | legacy web `.env.local` (new API path) |
 | `ios/**/amplifyconfiguration.json` | same shape as legacy (pool, client, `balistudent://callback/`) | legacy ios config (untracked; `.example` committed) |
 
