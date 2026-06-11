@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — S3 · Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="sheet.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="scaffold.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+function Banner({ variant }) {
+  if (variant === "focused") {
+    return (
+      <div className="fc-banner" style={{ borderRadius: 20 }}>
+        <div className="b-lead" style={{ background: "transparent" }}>
+          <Arc size={40} stroke={4.5} pct={0.466} />
+        </div>
+        <div>
+          <div className="b-title">Focused until 10:45</div>
+          <div className="b-sub">Period 3 — Algebra II · Ms. Rivera</div>
+        </div>
+        <div className="b-action"><Icon name="chevron-right" size={18} color="var(--text-tertiary)" /></div>
+      </div>
+    );
+  }
+  if (variant === "unlocked") {
+    return (
+      <div className="fc-banner is-unlocked" style={{ borderRadius: 20 }}>
+        <div className="b-lead"><Icon name="lock-open" size={18} /></div>
+        <div>
+          <div className="b-title">Unlocked — focus when ready</div>
+          <div className="b-sub">Ms. Rivera was notified</div>
+        </div>
+        <div className="b-action"><div className="fc-btn fc-btn--secondary" style={{ padding: "8px 14px", fontSize: 15 }}>Re-focus</div></div>
+      </div>
+    );
+  }
+  return (
+    <div className="fc-banner is-free" style={{ borderRadius: 20 }}>
+      <div className="b-lead"><Icon name="circle" size={18} /></div>
+      <div>
+        <div className="b-title">Free</div>
+        <div className="b-sub">Next: Period 3 — Algebra II · 10:00</div>
+      </div>
+    </div>
+  );
+}
+
+function ClassRow({ name, when, hint, live }) {
+  return (
+    <div className="fc-banner" style={{ borderRadius: 16, padding: "13px 16px" }}>
+      <div>
+        <div className="t-headline">{name}</div>
+        <div className="t-footnote sec" style={{ marginTop: 1 }}>{when}</div>
+      </div>
+      <div className="spacer" />
+      {live
+        ? <Chip state="focused" label="Live" />
+        : <span className="t-footnote ter">{hint}</span>}
+      <Icon name="chevron-right" size={16} color="var(--text-tertiary)" />
+    </div>
+  );
+}
+
+function Home({ variant = "free", permOff = false, empty = false }) {
+  return (
+    <React.Fragment>
+      <div className="safe vstack" style={{ paddingTop: 84, gap: 16 }}>
+        <div className="hstack">
+          <div className="t-lgtitle">Today</div>
+          <div className="spacer" />
+          <Icon name="settings-2" size={22} color="var(--text-secondary)" />
+        </div>
+        {!empty && <Banner variant={variant} />}
+        {permOff && (
+          <div className="fc-permrow is-off" style={{ borderRadius: 16 }}>
+            <Icon name="shield-off" size={20} />
+            <div style={{ flex: 1 }}>
+              <div className="p-title" style={{ fontWeight: 600, fontSize: 15 }}>Screen Time permission is off</div>
+              <div className="p-sub" style={{ fontSize: 13 }}>Focus can't start until it's back on.</div>
+            </div>
+            <div className="fc-btn fc-btn--secondary" style={{ padding: "7px 12px", fontSize: 14, flex: "none" }}>Open Settings</div>
+          </div>
+        )}
+        {empty ? (
+          <div className="vstack" style={{ alignItems: "center", gap: 20, textAlign: "center", paddingTop: 110 }}>
+            <Arc size={120} stroke={8} pct={0} >
+              <Icon name="plus" size={30} color="var(--text-tertiary)" />
+            </Arc>
+            <div className="t-title2" style={{ maxWidth: 280 }}>No classes yet</div>
+            <div className="t-subhead sec" style={{ maxWidth: 280 }}>Join with the code your teacher put on the board.</div>
+            <div className="fc-btn fc-btn--primary" style={{ padding: "13px 26px", fontSize: 17, borderRadius: 14 }}>Join a class</div>
+          </div>
+        ) : (
+          <React.Fragment>
+            <div className="t-footnote ter" style={{ textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, marginTop: 8 }}>Classes</div>
+            <div className="vstack" style={{ gap: 10 }}>
+              <ClassRow name="Period 3 — Algebra II" when="10:00–10:45 · Ms. Rivera" hint={variant === "free" ? "starts in 12m" : ""} live={variant !== "free"} />
+              <ClassRow name="Period 5 — Chemistry" when="1:15–2:00 · Mr. Okafor" hint="1:15 PM" />
+              <ClassRow name="Period 7 — English 11" when="2:50–3:35 · Mrs. Liang" hint="2:50 PM" />
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+      <div className="spacer" />
+    </React.Fragment>
+  );
+}
+
+function App() {
+  return (
+    <Sheet num="S3" title="Home" here="S3"
+      intro="The StatusBanner answers 'what is my phone doing right now' in one glance — Free, Focused with a live mini arc, or Unlocked with a gentle Re-focus invitation. The PermissionHealthRow appears only when something needs fixing, in amber posture, never red.">
+      <div className="frames">
+        <Frame label="S3.1 · Free" note={<span>Quiet default. The next session is a hint on the banner, and each class row carries its own next-time.</span>}>
+          <Home variant="free" />
+        </Frame>
+        <Frame label="S3.2 · Focused" note={<span>The banner's mini arc is the same live countdown as S6 — tapping the banner returns to Focus Active. The live class row echoes with a Focused chip.</span>}>
+          <Home variant="focused" />
+        </Frame>
+        <Frame label="S3.3 · Unlocked" note={<span><b>Post-emergency posture:</b> "focus when ready" — re-focusing is invited with a small secondary button, never demanded. The notified line is stated once, factually.</span>}>
+          <Home variant="unlocked" />
+        </Frame>
+        <Frame label="S3.4 · Permission off" note={<span>Health row slots between banner and classes only while Screen Time is off. Amber family (it's fixable), action takes the student straight to Settings.</span>}>
+          <Home variant="free" permOff />
+        </Frame>
+        <Frame label="S3.5 · Light variant" light note={<span>Same structure on warm paper — cards go white, hairlines carry the separation.</span>}>
+          <Home variant="free" />
+        </Frame>
+        <Frame label="S3.6 · Empty state" note={<span>Empty state gives the next action, not a mood: join the class on the board. The empty arc quietly seeds the motif.</span>}>
+          <Home empty />
+        </Frame>
+      </div>
+    </Sheet>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>

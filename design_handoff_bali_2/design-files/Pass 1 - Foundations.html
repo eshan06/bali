@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — Pass 1 · Foundations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--surface-page); }
+  body {
+    font: var(--type-body);
+    font-family: var(--font-ui);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    padding: 56px 0 120px;
+  }
+  .sheet { width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+
+  /* ---- sheet chrome ---- */
+  .masthead { display: flex; flex-direction: column; gap: 16px; }
+  .masthead .kicker { font: var(--type-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-brand); display: flex; align-items: center; gap: 10px; }
+  .masthead h1 { font: var(--type-display); letter-spacing: -0.02em; }
+  .arc-mark { width: 20px; height: 20px; flex: none; }
+  .rationale { max-width: 880px; font: var(--type-body-lg); color: var(--text-secondary); text-wrap: pretty; }
+
+  section.block { display: flex; flex-direction: column; gap: 20px; }
+  .block > header { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border-default); padding-bottom: 12px; }
+  .block > header h2 { font: var(--type-h2); flex: none; white-space: nowrap; }
+  .block > header .sub { font: var(--type-caption); color: var(--text-tertiary); }
+  .note { font: var(--type-caption); color: var(--text-tertiary); max-width: 760px; text-wrap: pretty; }
+  .card { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 24px; }
+
+  /* ---- color ramps ---- */
+  .ramps { display: flex; flex-direction: column; gap: 18px; }
+  .ramp { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; }
+  .ramp .name { font: var(--type-h3); }
+  .ramp .name small { display: block; font: var(--type-caption); font-weight: 400; color: var(--text-tertiary); margin-top: 2px; }
+  .ramp .steps { display: flex; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-default); }
+  .step { flex: 1; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; gap: 1px; }
+  .step b { font: var(--type-label); letter-spacing: 0.04em; }
+  .step span { font: 500 10px/14px var(--font-mono); opacity: 0.85; }
+
+  /* ---- surfaces / text panels ---- */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { border-radius: var(--radius-md); border: 1px solid var(--border-default); padding: 24px; background: var(--surface-page); display: flex; flex-direction: column; gap: 14px; }
+  .panel h3 { font: var(--type-h3); }
+  .swatch-row { display: flex; align-items: center; gap: 12px; }
+  .swatch { width: 44px; height: 32px; border-radius: var(--radius-xs); border: 1px solid var(--border-default); flex: none; }
+  .swatch-row .lbl { font: var(--type-data); font-variant-numeric: tabular-nums; }
+  .swatch-row .lbl small { display: block; font: var(--type-caption); font-weight: 400; color: var(--text-tertiary); }
+  .swatch-row .hex { margin-left: auto; font: var(--type-code); color: var(--text-tertiary); }
+  .text-demo { display: flex; flex-direction: column; gap: 4px; }
+  .text-demo div { font: var(--type-body); display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .text-demo .hex { font: var(--type-code); font-size: 12px; opacity: 0.7; }
+
+  /* ---- state chips ---- */
+  .state-grid { display: grid; grid-template-columns: 150px 1fr 1fr 220px; gap: 0; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; background: var(--surface-card); }
+  .state-grid .gh { font: var(--type-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); padding: 12px 16px; background: var(--surface-sunken); border-bottom: 1px solid var(--border-default); }
+  .state-grid > div { padding: 14px 16px; border-bottom: 1px solid var(--border-default); display: flex; align-items: center; }
+  .state-grid > div:nth-last-child(-n+4) { border-bottom: none; }
+  .state-name { font: var(--type-data); font-weight: 600; }
+  .state-name small { display: block; font: var(--type-caption); font-weight: 400; color: var(--text-tertiary); }
+  .chip-cell { gap: 10px; }
+  .chip-cell.dark { background: #141312; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font: 600 14px/20px var(--font-ui);
+    padding: 6px 12px; border-radius: var(--radius-full);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .chip svg { width: 15px; height: 15px; }
+  .chip.dashed { border: 1.5px dashed currentColor; }
+  .ratio { font: var(--type-code); font-size: 11.5px; color: var(--text-secondary); margin-left: auto; padding-left: 10px; white-space: nowrap; }
+  .ratio.on-dark { color: #B0AAA1; }
+  .meaning { font: var(--type-caption); color: var(--text-secondary); }
+  .toolbar { display: flex; gap: 10px; align-items: center; }
+  button.ghost {
+    font: var(--type-data); font-family: var(--font-ui); cursor: pointer;
+    background: var(--surface-card); color: var(--text-primary);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    padding: 7px 14px; transition: background var(--motion-fast) var(--ease-standard);
+  }
+  button.ghost:hover { background: var(--surface-sunken); }
+  button.ghost:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .grayscale-on .state-grid { filter: grayscale(1); }
+
+  /* ---- typography ---- */
+  .type-table { width: 100%; border-collapse: collapse; }
+  .type-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-default); vertical-align: baseline; }
+  .type-table tr:last-child td { border-bottom: none; }
+  .type-table .meta { font: var(--type-code); font-size: 12px; color: var(--text-tertiary); white-space: nowrap; width: 280px; }
+  .ios-sample { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  .numerals { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .num-hero { background: #141312; border-radius: var(--radius-md); padding: 32px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .num-hero .big { font-family: var(--font-num); font-weight: 600; font-size: 76px; line-height: 80px; color: #F1EFEB; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  .num-hero .until { font: var(--type-body); color: #B0AAA1; }
+  .code-spec { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; }
+  .join-code { font-family: var(--font-mono); font-weight: 600; font-size: 56px; line-height: 64px; letter-spacing: 0.18em; color: var(--text-primary); }
+  .tag-code { font: var(--type-code); color: var(--text-secondary); letter-spacing: 0.12em; background: var(--surface-sunken); padding: 6px 12px; border-radius: var(--radius-xs); white-space: nowrap; }
+
+  /* ---- spacing / radius / elevation ---- */
+  .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .space-row { display: flex; align-items: center; gap: 12px; }
+  .space-row .bar { height: 18px; background: var(--green-200); border-radius: 3px; flex: none; }
+  .space-row code { font: var(--type-code); font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
+  .radius-demos { display: flex; gap: 14px; flex-wrap: wrap; }
+  .radius-demo { width: 86px; height: 64px; background: var(--surface-sunken); border: 1.5px solid var(--border-strong); display: flex; align-items: flex-end; padding: 6px 8px; font: var(--type-code); font-size: 11px; color: var(--text-tertiary); }
+  .elev-demos { display: flex; flex-direction: column; gap: 14px; }
+  .elev { background: var(--surface-card); border-radius: var(--radius-sm); padding: 12px 16px; font: var(--type-data); border: 1px solid var(--border-default); }
+  .elev small { color: var(--text-tertiary); font-weight: 400; margin-left: 8px; }
+  .dark-elevs { background: #141312; border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .dark-elevs .elev { border: 1px solid #2E2B27; color: #F1EFEB; }
+
+  /* ---- motion / icons ---- */
+  .mini-table { width: 100%; border-collapse: collapse; font: var(--type-data); }
+  .mini-table td { padding: 9px 12px; border-bottom: 1px solid var(--border-default); }
+  .mini-table tr:last-child td { border-bottom: none; }
+  .mini-table td:first-child { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-brand); white-space: nowrap; }
+  .mini-table td:last-child { color: var(--text-secondary); font-weight: 400; }
+  .icon-row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .icon-cell { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 92px; }
+  .icon-cell .ic { width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface-sunken); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+  .icon-cell .ic svg { width: 20px; height: 20px; }
+  .icon-cell span { font: var(--type-caption); color: var(--text-tertiary); text-align: center; }
+
+  /* ---- code blocks ---- */
+  .codeblock { position: relative; background: #161513; border-radius: var(--radius-md); overflow: hidden; }
+  .codeblock .cb-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid #2E2B27; }
+  .codeblock .cb-head span { font: var(--type-code); font-size: 12px; color: #837D74; }
+  .codeblock button.copy { font: var(--type-data); font-family: var(--font-ui); cursor: pointer; background: #262421; color: #F1EFEB; border: 1px solid #3C3934; border-radius: var(--radius-xs); padding: 5px 12px; }
+  .codeblock button.copy:hover { background: #2E2B27; }
+  .codeblock button.copy:focus-visible { outline: none; box-shadow: 0 0 0 2px #161513, 0 0 0 4px var(--green-300); }
+  .codeblock pre { font: var(--type-code); font-size: 12px; line-height: 18px; color: #B0AAA1; padding: 18px; max-height: 420px; overflow: auto; }
+
+  .checklist { display: flex; flex-direction: column; gap: 12px; }
+  .checklist .item { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font: var(--type-body); color: var(--text-secondary); max-width: 880px; text-wrap: pretty; }
+  .checklist .item b { color: var(--text-primary); font-weight: 600; }
+  .checklist .tick { color: var(--green-600); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ============ MASTHEAD ============ -->
+  <header class="masthead" data-screen-label="Pass 1 — Foundations">
+    <div class="kicker">
+      <svg class="arc-mark" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>
+      Bali · Pass 1 of 4
+    </div>
+    <h1>Foundations</h1>
+    <p class="rationale">
+      <b style="color: var(--text-primary);">Rationale.</b> Everything is built to feel like a shared agreement, not enforcement: warm stone neutrals give both platforms paper-like calm instead of clinical blue-gray; a desaturated evergreen carries both the brand and the <i>focused</i> state, so "the product's color" literally means "things are fine." Students get a dark-first world of true warm darks where elevation comes from surface steps and hairlines, not shadows — native, not inverted. The semantic system is rigid on purpose: orange is reserved for emergency and reads earthy and supportive, red exists only for <i>revoked</i> and destructive actions, and every state ships as an icon + label + color triple so the grid survives grayscale and a 6-foot squint. Type does the personality work — Instrument Sans (kept: humanist warmth plus true tabular numerals) for web UI, the system stack on iOS, SF&nbsp;Pro&nbsp;Rounded only at large numeral sizes as the single note of softness, and a mono face strictly for codes.
+    </p>
+  </header>
+
+  <!-- ============ 01 PRIMITIVES ============ -->
+  <section class="block">
+    <header><h2>01 · Color primitives</h2><span class="sub">Raw scales — screens only ever reference the semantic aliases in 02–03</span></header>
+    <div class="card ramps" id="ramps"></div>
+    <p class="note">Evergreen chroma peaks mid-scale and stays muted at both ends — at no step does it read acid or neon. The orange ramp is deliberately earthy (toward amber-brown, away from safety-vest) so an emergency chip feels warm, not alarming.</p>
+  </section>
+
+  <!-- ============ 02 SURFACES & TEXT ============ -->
+  <section class="block">
+    <header><h2>02 · Surfaces &amp; text</h2><span class="sub">Light = warm paper · Dark = true warm darks, elevation by surface step</span></header>
+    <div class="duo" id="surfaces"></div>
+    <p class="note">Light tertiary text (#8A847A) is 3.4:1 against surface-page — used only at ≥18px or for non-essential metadata (staleness badges, timestamps); body copy never drops below secondary. All other text steps clear 4.5:1, verified live below.</p>
+  </section>
+
+  <!-- ============ 03 SEMANTIC STATES ============ -->
+  <section class="block" id="states-block">
+    <header style="justify-content: space-between;">
+      <div style="display: flex; align-items: baseline; gap: 14px;"><h2>03 · Canonical state system</h2><span class="sub">§2 — icon + label + color, never color alone</span></div>
+      <div class="toolbar"><button class="ghost" id="grayToggle" type="button">View in grayscale</button></div>
+    </header>
+    <div class="state-grid" id="stateGrid">
+      <div class="gh">State</div><div class="gh">Light</div><div class="gh" style="background: #141312; color: #837D74; border-bottom-color: #2E2B27;">Dark</div><div class="gh">Meaning</div>
+    </div>
+    <p class="note">Contrast ratios are computed live from the rendered pixels (WCAG 2.2 relative luminance) — not hand-claimed. <i>No device</i> uses a dashed outline instead of a fill so a marked-absent student never reads as a colored status. Staleness ("4m") will be a small neutral badge layered on any state — it is not a state. Red appears in this system exactly once.</p>
+  </section>
+
+  <!-- ============ 04 TYPOGRAPHY ============ -->
+  <section class="block">
+    <header><h2>04 · Typography</h2><span class="sub">iOS: SF Pro via Dynamic Type · Web: Instrument Sans · Codes: JetBrains Mono</span></header>
+
+    <div class="duo">
+      <div class="card" style="padding: 0;">
+        <table class="type-table" id="iosType"></table>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="num-hero">
+          <div class="big">23:14</div>
+          <div class="until">until 10:45</div>
+          <div style="font: var(--type-caption); color: #5C574F; margin-top: 10px;">SF Pro Rounded · 76pt · semibold · tabular — the hero countdown voice (rendered via ui-rounded; exact on device)</div>
+        </div>
+        <div class="card code-spec">
+          <div class="join-code">KM3W7Q2A</div>
+          <div class="tag-code">tag T7XK2M9QPF</div>
+          <div style="font: var(--type-caption); color: var(--text-tertiary);">JetBrains Mono — chosen for unmistakable 0/O · 1/l/I at projector distance. Mono never appears outside codes.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 0;">
+      <table class="type-table" id="webType"></table>
+    </div>
+    <p class="note">Web scale tops out at display/56 for the projector join code header and W4 countdown; <code style="font-family: var(--font-mono); font-size: 12px;">data</code> styles always set <code style="font-family: var(--font-mono); font-size: 12px;">font-variant-numeric: tabular-nums</code> so ticking timers never jitter. iOS uses Dynamic Type text styles verbatim (sizes shown at the default Large setting) — layouts will be proven at XL in Pass 3.</p>
+  </section>
+
+  <!-- ============ 05 SPACE / RADIUS / ELEVATION ============ -->
+  <section class="block">
+    <header><h2>05 · Spacing · Radius · Elevation</h2><span class="sub">4pt grid · soft warm shadows in light, surface steps in dark</span></header>
+    <div class="trio">
+      <div class="card" style="display: flex; flex-direction: column; gap: 10px;" id="spacing"></div>
+      <div class="card">
+        <div class="radius-demos" id="radii"></div>
+        <p class="note" style="margin-top: 14px;">xs badges · sm buttons/inputs · md cards &amp; chips · lg sheets/hero · full pills + the EmergencyUnlockControl.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="elev-demos">
+          <div class="elev" style="box-shadow: var(--shadow-1);">shadow-1 <small>resting cards</small></div>
+          <div class="elev" style="box-shadow: var(--shadow-2);">shadow-2 <small>popovers, toasts</small></div>
+          <div class="elev" style="box-shadow: var(--shadow-3);">shadow-3 <small>slide-overs, modals</small></div>
+        </div>
+        <div class="dark-elevs">
+          <div class="elev" style="background: #1D1B19;">card #1D1B19</div>
+          <div class="elev" style="background: #262421;">raised #262421 <small style="color: #837D74;">+ hairline, no glow</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 ICONS & MOTION ============ -->
+  <section class="block">
+    <header><h2>06 · Iconography &amp; motion tokens</h2><span class="sub">SF Symbols on iOS · Lucide on web · motion budget per §11</span></header>
+    <div class="duo">
+      <div class="card">
+        <div class="icon-row" id="iconRow"></div>
+        <p class="note" style="margin-top: 16px;">One concept, two renderers: SF Symbols on iOS (listed name per state), Lucide on web at 1.5px stroke. Shown here in Lucide. The arc mark itself is product-drawn, not an icon-set glyph.</p>
+      </div>
+      <div class="card" style="padding: 12px 8px;">
+        <table class="mini-table">
+          <tr><td>--motion-fast · 150ms</td><td>chip state crossfades</td></tr>
+          <tr><td>--motion-base · 200ms</td><td>toast slide-in, sheet present</td></tr>
+          <tr><td>--motion-slow · 300ms</td><td>ceiling for everything else</td></tr>
+          <tr><td>--motion-arc · 600ms</td><td>the one theatrical moment: arc draw-in on tap-in</td></tr>
+          <tr><td>--ease-standard</td><td>cubic-bezier(0.2, 0, 0, 1)</td></tr>
+          <tr><td>--ease-spring</td><td>hold-to-unlock release spring-back</td></tr>
+          <tr><td>reduced-motion</td><td>every animation falls back to crossfade or none</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 07 COPY-PASTEABLE ============ -->
+  <section class="block">
+    <header><h2>07 · Copy-pasteable tokens</h2><span class="sub">Single source of truth — the sheet you're reading is styled by this exact file</span></header>
+    <div class="codeblock">
+      <div class="cb-head"><span>tokens/tokens.css</span><button class="copy" type="button" data-src="tokens/tokens.css">Copy</button></div>
+      <pre id="cssOut">loading…</pre>
+    </div>
+    <div class="codeblock">
+      <div class="cb-head"><span>tokens/tailwind.tokens.js — theme.extend block</span><button class="copy" type="button" data-src="tokens/tailwind.tokens.js">Copy</button></div>
+      <pre id="twOut">loading…</pre>
+    </div>
+  </section>
+
+  <!-- ============ 08 SELF-CHECK ============ -->
+  <section class="block">
+    <header><h2>08 · §3 anti-default self-check</h2><span class="sub">What drifted generic in drafting, and the correction</span></header>
+    <div class="card checklist">
+      <div class="item"><span class="tick">✓</span><span><b>Cream + serif + terracotta:</b> first draft of the neutrals warmed toward cream. Pulled chroma down to near-imperceptible warmth (stone ramp), kept all display type sans, and there is no terracotta — the warm hue in the system is the emergency orange, which is semantic, not decorative.</span></div>
+      <div class="item"><span class="tick">✓</span><span><b>Near-black + acid green:</b> dark mode pairs warm darks (#141312, not #000/#111 blue-black) with a <i>desaturated</i> evergreen that jumps to the soft 300/400 steps — never neon-on-void.</span></div>
+      <div class="item"><span class="tick">✓</span><span><b>Emergency drifted alarm-ward:</b> an early orange-500 read like a hazard vest next to red. Re-anchored the ramp toward amber-brown and specced emergency chips at orange-800-on-orange-100 (light) / 300-on-deep-tint (dark) — warm and calm, clearly distinct from revoked red even in grayscale via the open-lock icon.</span></div>
+      <div class="item"><span class="tick">✓</span><span><b>Gradient meshes / glassmorphism:</b> none. Elevation is two flat systems — warm soft shadows in light, surface-lightness steps + hairlines in dark.</span></div>
+      <div class="item"><span class="tick">✓</span><span><b>Overused faces:</b> no Inter/Roboto. Kept the brief's Instrument Sans suggestion (one-line justification: true tabular numerals plus humanist warmth that matches the paper neutrals). Mono confined to codes; SF Rounded confined to large numerals.</span></div>
+      <div class="item"><span class="tick">✓</span><span><b>Emoji-as-iconography:</b> zero. SF Symbols (iOS) / Lucide (web), one stroke weight.</span></div>
+    </div>
+    <p class="note" style="margin-top: 4px;">Paused here per §13 — Pass 2 (component sheet) starts on your approval. Open questions I'd flag: none blocking; exact dark-tint hexes for state chips were hand-mixed (not alpha) and may shift ±1 step once real chips are built in Pass 2.</p>
+  </section>
+
+</div>
+
+<script>
+/* ---------- data ---------- */
+const RAMPS = [
+  ["green", "Evergreen", "brand · focused · primary actions", ["50","#F0F7F3"],["100","#DCEDE3"],["200","#BCDCCA"],["300","#92C3A9"],["400","#62A483"],["500","#3F8765"],["600","#2C6F51"],["700","#245A43"],["800","#1E4936"],["900","#18392B"],["950","#0E251C"]],
+  ["stone", "Stone", "warm neutrals · surfaces · text", ["50","#F7F5F2"],["100","#EFECE7"],["200","#E3DFD8"],["300","#D2CCC2"],["400","#ABA59A"],["500","#8A847A"],["600","#6B665D"],["700","#524E47"],["800","#3A3733"],["900","#26241F"],["950","#161513"]],
+  ["orange", "Orange", "emergency_unlocked — warm, never alarm", ["50","#FBF4EC"],["100","#F7E6D2"],["200","#EFCEA4"],["300","#E5AF6F"],["400","#DB9347"],["500","#C97A2D"],["600","#AE6322"],["700","#8C4F1E"],["800","#6F3F1B"],["900","#5A3418"]],
+  ["blue", "Blue", "pass state only", ["50","#EFF4FC"],["100","#E0EBFA"],["200","#BDD4F2"],["300","#8FB4E8"],["400","#5E90D9"],["500","#3D77C9"],["600","#2F62AC"],["700","#28528E"],["800","#224371"],["900","#1C3659"]],
+  ["red", "Red", "RESERVED: revoked + destructive only", ["50","#FCF0EE"],["100","#FAE3E0"],["200","#F2C3BD"],["300","#E89B92"],["400","#D96E61"],["500","#C44A3C"],["600","#A93D31"],["700","#8C342B"],["800","#702B24"],["900","#59241F"]],
+];
+
+const STATES = [
+  { key: "not_joined", label: "Not in", name: "Maya R.", icon: "circle", meaning: "Session running, hasn’t tapped in", lf: "var(--state-notjoined-fg)", lb: "var(--state-notjoined-bg)", df: "#B0AAA1", db: "#242220" },
+  { key: "focused", label: "Focused", name: "Jordan P.", icon: "circle-check", meaning: "Tapped in, shields on", lf: "var(--state-focused-fg)", lb: "var(--state-focused-bg)", df: "#92C3A9", db: "#1E2F27" },
+  { key: "pass", label: "Pass · 4:32", name: "Aisha K.", icon: "ticket", meaning: "Teacher-granted temporary unlock", lf: "var(--state-pass-fg)", lb: "var(--state-pass-bg)", df: "#8FB4E8", db: "#1D2938" },
+  { key: "emergency_unlocked", label: "Unlocked", name: "Sam T.", icon: "lock-open", meaning: "Used Emergency Unlock — calm, zero shame", lf: "var(--state-emergency-fg)", lb: "var(--state-emergency-bg)", df: "#E5AF6F", db: "#38291A" },
+  { key: "revoked", label: "Permission off", name: "Diego M.", icon: "shield-off", meaning: "Screen Time permission turned off — red’s only home", lf: "var(--state-revoked-fg)", lb: "var(--state-revoked-bg)", df: "#E89B92", db: "#341F1C" },
+  { key: "no_device", label: "No device", name: "Priya S.", icon: "smartphone", meaning: "Teacher marked: no phone today — dashed, unfilled", lf: "var(--state-nodevice-fg)", lb: "transparent", df: "#A39D94", db: "transparent", dashed: true },
+  { key: "ended", label: "Ended", name: "—", icon: "flag", meaning: "Session over", lf: "var(--state-ended-fg)", lb: "var(--state-ended-bg)", df: "#A39D94", db: "#242220" },
+];
+
+const IOS_TYPE = [
+  ["Large Title", 34, 41, "400 (700 in nav)", "screen titles"],
+  ["Title 1", 28, 34, "400", "S6 class name"],
+  ["Title 2", 22, 28, "600", "card titles"],
+  ["Headline", 17, 22, "600", "row titles, buttons"],
+  ["Body", 17, 22, "400", "default copy"],
+  ["Subheadline", 15, 20, "400", "secondary rows"],
+  ["Footnote", 13, 18, "400", "hints, HoldHintLabel"],
+  ["Caption 1", 12, 16, "400", "staleness badges"],
+];
+
+const WEB_TYPE = [
+  ["display", "Period 3 — Algebra II", "56/60 · 600 · -0.02em"],
+  ["h1", "Live — ends 10:45 AM", "32/38 · 600 · -0.01em"],
+  ["h2", "Roster · 28 students", "24/30 · 600"],
+  ["h3", "Lecture — Notes, Camera, Calculator allowed", "18/24 · 600"],
+  ["body-lg", "Patterns are conversation starters, not verdicts.", "17/26 · 400"],
+  ["body", "Ms. Rivera was notified. Sessions end automatically at the bell.", "15/22 · 400"],
+  ["caption", "Last seen 4m ago · via tag T7XK…", "13/18 · 400"],
+  ["label", "EMERGENCY LOG", "12/16 · 600 · +0.06em"],
+  ["data", "22 focused · 2 not in · 4:32", "14/20 · 500 · tabular"],
+  ["data-lg", "23:14", "28/32 · 600 · tabular · rounded"],
+];
+
+const ICONS = [
+  ["circle", "not_joined", "circle"],
+  ["circle-check", "focused", "checkmark.circle.fill"],
+  ["ticket", "pass", "ticket"],
+  ["lock-open", "emergency", "lock.open"],
+  ["shield-off", "revoked", "shield.slash"],
+  ["smartphone", "no_device", "iphone.slash"],
+  ["timer", "countdown", "timer"],
+  ["wifi-off", "reconnecting", "wifi.slash"],
+];
+
+/* ---------- builders ---------- */
+const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+
+// 01 ramps
+const rampsHost = document.getElementById("ramps");
+RAMPS.forEach(([key, name, use, ...steps]) => {
+  const row = el("div", "ramp");
+  row.appendChild(el("div", "name", `${name}<small>${use}</small>`));
+  const strip = el("div", "steps");
+  steps.forEach(([s, hex]) => {
+    const cell = el("div", "step", `<b>${s}</b><span>${hex}</span>`);
+    cell.style.background = hex;
+    const light = parseInt(s, 10) <= 400;
+    cell.style.color = light ? "rgba(22,21,19,0.75)" : "rgba(255,255,255,0.85)";
+    strip.appendChild(cell);
+  });
+  row.appendChild(strip);
+  rampsHost.appendChild(row);
+});
+
+// 02 surfaces
+const SURF = {
+  light: { title: "Light — warm paper", bg: "#F7F5F2", rows: [
+    ["surface/page", "#F7F5F2", "app background"], ["surface/card", "#FFFFFF", "cards, sheets"],
+    ["surface/sunken", "#EFECE7", "wells, inputs"], ["border/default", "#E3DFD8", "hairlines"]],
+    text: [["text/primary", "#211F1B"], ["text/secondary", "#5B564E"], ["text/tertiary · ≥18px or meta only", "#8A847A"]] },
+  dark: { title: "Dark — true warm darks (student default)", bg: "#141312", rows: [
+    ["surface/page", "#141312", "app background"], ["surface/card", "#1D1B19", "cards"],
+    ["surface/raised", "#262421", "sheets, popovers"], ["border/default", "#2E2B27", "hairlines"]],
+    text: [["text/primary", "#F1EFEB"], ["text/secondary", "#B0AAA1"], ["text/tertiary", "#837D74"]] },
+};
+const surfHost = document.getElementById("surfaces");
+Object.values(SURF).forEach((side) => {
+  const p = el("div", "panel");
+  p.style.background = side.bg;
+  const darkSide = side.bg === "#141312";
+  const tp = darkSide ? "#F1EFEB" : "#211F1B";
+  p.appendChild(el("h3", null, side.title)).style.color = tp;
+  side.rows.forEach(([name, hex, use]) => {
+    const r = el("div", "swatch-row");
+    const sw = el("div", "swatch"); sw.style.background = hex;
+    if (darkSide) sw.style.borderColor = "#3C3934";
+    r.appendChild(sw);
+    const lbl = el("div", "lbl", `${name}<small style="color:${darkSide ? "#837D74" : "var(--text-tertiary)"}">${use}</small>`);
+    lbl.style.color = tp;
+    r.appendChild(lbl);
+    r.appendChild(el("div", "hex", hex)).style.color = darkSide ? "#837D74" : "";
+    p.appendChild(r);
+  });
+  const td = el("div", "text-demo");
+  side.text.forEach(([name, hex]) => {
+    const row = el("div", null, `<span style="color:${hex}">${name}</span><span class="hex" style="color:${darkSide ? "#5C574F" : "var(--text-tertiary)"}">${hex} · <b class="rt" data-fg="${hex}" data-bg="${side.bg}"></b></span>`);
+    td.appendChild(row);
+  });
+  p.appendChild(td);
+  surfHost.appendChild(p);
+});
+
+// 03 state grid
+const grid = document.getElementById("stateGrid");
+STATES.forEach((s) => {
+  grid.appendChild(el("div", null, `<span class="state-name"><code style="font-family: var(--font-mono); font-size: 12px;">${s.key}</code><small>${s.label === "—" ? "" : ""}</small></span>`));
+
+  const lightCell = el("div", "chip-cell");
+  const lchip = el("span", "chip" + (s.dashed ? " dashed" : ""), `<i data-lucide="${s.icon}"></i>${s.name !== "—" ? s.name + " · " : ""}${s.label}`);
+  lchip.style.color = s.lf; lchip.style.background = s.lb;
+  lightCell.appendChild(lchip);
+  lightCell.appendChild(el("span", "ratio", `<b class="rt" data-el="chip"></b>`));
+  grid.appendChild(lightCell);
+
+  const darkCell = el("div", "chip-cell dark");
+  const dchip = el("span", "chip" + (s.dashed ? " dashed" : ""), `<i data-lucide="${s.icon}"></i>${s.name !== "—" ? s.name + " · " : ""}${s.label}`);
+  dchip.style.color = s.df; dchip.style.background = s.db;
+  darkCell.appendChild(dchip);
+  darkCell.appendChild(el("span", "ratio on-dark", `<b class="rt" data-el="chip"></b>`));
+  grid.appendChild(darkCell);
+
+  grid.appendChild(el("div", "meaning", s.meaning));
+});
+
+// grayscale toggle
+const grayBtn = document.getElementById("grayToggle");
+grayBtn.addEventListener("click", () => {
+  const blk = document.getElementById("states-block");
+  const on = blk.classList.toggle("grayscale-on");
+  grayBtn.textContent = on ? "View in color" : "View in grayscale";
+});
+
+// 04 type tables
+const iosT = document.getElementById("iosType");
+iosT.innerHTML = IOS_TYPE.map(([name, size, lh, w, use]) =>
+  `<tr><td class="ios-sample" style="font-size:${size}px; line-height:${lh}px; font-weight:${w.startsWith("600") ? 600 : 400};">${name}</td><td class="meta">${size}/${lh} · ${w}<br>${use}</td></tr>`).join("");
+const webT = document.getElementById("webType");
+webT.innerHTML = WEB_TYPE.map(([token, sample, meta]) => {
+  const tabular = token.startsWith("data") ? "font-variant-numeric: tabular-nums;" : "";
+  const fam = token === "data-lg" ? "font-family: var(--font-num);" : "";
+  const xform = token === "label" ? "text-transform: uppercase; letter-spacing: 0.06em;" : "";
+  return `<tr><td style="font: var(--type-${token}); ${tabular}${fam}${xform}">${sample}</td><td class="meta">${token} · ${meta}</td></tr>`;
+}).join("");
+
+// 05 spacing + radii
+document.getElementById("spacing").innerHTML =
+  [4, 8, 12, 16, 20, 24, 32, 40, 48, 64].map((s) =>
+    `<div class="space-row"><div class="bar" style="width:${s * 2.4}px"></div><code>space-${s / 4 <= 6 ? s / 4 : s / 4} · ${s}px</code></div>`).join("");
+document.getElementById("radii").innerHTML =
+  [["xs", 6], ["sm", 10], ["md", 14], ["lg", 20], ["full", 999]].map(([n, r]) =>
+    `<div class="radius-demo" style="border-radius:${Math.min(r, 32)}px">${n} · ${r === 999 ? "pill" : r + "px"}</div>`).join("");
+
+// 06 icons
+document.getElementById("iconRow").innerHTML = ICONS.map(([lucide, label, sf]) =>
+  `<div class="icon-cell"><div class="ic"><i data-lucide="${lucide}"></i></div><span>${label}<br><span style="font-family: var(--font-mono); font-size: 10px;">${sf}</span></span></div>`).join("");
+
+// lucide render
+if (window.lucide) lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+
+// 07 fetch code files
+[["tokens/tokens.css", "cssOut"], ["tokens/tailwind.tokens.js", "twOut"]].forEach(([src, id]) => {
+  fetch(src).then((r) => r.text()).then((t) => { document.getElementById(id).textContent = t; })
+    .catch(() => { document.getElementById(id).textContent = "Open " + src + " in the project files."; });
+});
+document.querySelectorAll("button.copy").forEach((b) => {
+  b.addEventListener("click", async () => {
+    const t = await fetch(b.dataset.src).then((r) => r.text());
+    await navigator.clipboard.writeText(t);
+    b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy"), 1400);
+  });
+});
+
+/* ---------- live WCAG contrast ---------- */
+function lum(rgb) {
+  const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+}
+function parseColor(str) {
+  const m = str.match(/rgba?\(([^)]+)\)/);
+  if (m) { const p = m[1].split(",").map(parseFloat); return p[3] === 0 ? null : p.slice(0, 3); }
+  const h = str.replace("#", "");
+  if (h.length >= 6) return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return null;
+}
+function ratio(fg, bg) {
+  const a = lum(fg), b = lum(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+function effectiveBg(node) {
+  let n = node;
+  while (n && n !== document.documentElement) {
+    const c = parseColor(getComputedStyle(n).backgroundColor || "");
+    if (c) return c;
+    n = n.parentElement;
+  }
+  return [247, 245, 242];
+}
+requestAnimationFrame(() => {
+  document.querySelectorAll(".rt").forEach((b) => {
+    let fg, bg;
+    if (b.dataset.el === "chip") {
+      const chip = b.closest(".chip-cell").querySelector(".chip");
+      fg = parseColor(getComputedStyle(chip).color);
+      bg = parseColor(getComputedStyle(chip).backgroundColor) || effectiveBg(chip.parentElement);
+    } else {
+      fg = parseColor(b.dataset.fg); bg = parseColor(b.dataset.bg);
+    }
+    if (!fg || !bg) return;
+    const r = ratio(fg, bg);
+    const pass = r >= 4.5 ? "AA" : r >= 3 ? "AA-large" : "✕";
+    b.textContent = r.toFixed(1) + ":1 " + pass;
+    if (r < 3) b.style.color = "var(--red-600)";
+  });
+});
+</script>
+</body>
+</html>

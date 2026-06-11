@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — W4 · Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<link rel="stylesheet" href="pass2/components.css">
+<link rel="stylesheet" href="pass3/sheet.css">
+<link rel="stylesheet" href="pass4/web.css">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  .sheet { max-width: 1500px; }
+  @keyframes softpulse { 0% { box-shadow: 0 0 0 0 rgba(219, 147, 71, 0.45); } 100% { box-shadow: 0 0 0 14px rgba(219, 147, 71, 0); } }
+  .pulse-once { animation: softpulse 1.2s var(--ease-standard) 2; }
+  @media (prefers-reduced-motion: reduce) { .pulse-once { animation: none; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="masthead" data-screen-label="Pass 4 — W4 Live Dashboard">
+    <div class="kicker">
+      <svg class="arc-mark" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>
+      Bali · Pass 4 of 4 · Web
+    </div>
+    <h1>W4 · /app/classes/[id]/live</h1>
+    <p>The page. Ambient peripheral vision for a teacher mid-lesson: the summary strip answers "is anything wrong?" from six feet, the grid fits all 28 without scroll at 1440, and the only motion is a 150ms crossfade plus one soft pulse when an emergency lands. All six required states below.</p>
+    <nav class="crumbs">
+      <a class="here" href="W4 Live Dashboard.html">W4</a>
+      <a href="W1-W3 Login Fallback Classes.html">W1–W3</a>
+      <a href="W5-W7 Roster Policies Tags.html">W5–W7</a>
+      <a href="W8-W10 Reports Logs Settings.html">W8–W10</a>
+      <a href="pass3/S6 Focus Active.html">iOS ↗</a>
+      <a href="Bali - Landing.html">Landing ↗</a>
+    </nav>
+  </header>
+  <div id="frames" style="display: flex; flex-direction: column; gap: 48px;"></div>
+</div>
+
+<script>
+const I = { notjoined: "circle", focused: "circle-check", pass: "ticket", emergency: "lock-open", revoked: "shield-off", nodevice: "smartphone", ended: "flag" };
+const ROSTER = [
+  ["focused","Jordan P."],["focused","Lena W."],["pass","Aisha K.","Pass · 4:32"],["focused","Marcus J."],
+  ["emergency","Sam T.","Unlocked"],["focused","Noor H."],["notjoined","Maya R.","Not in"],["focused","Tavi O."],
+  ["revoked","Diego M.","Permission off"],["focused","Ethan C."],["nodevice","Priya S.","No device"],["focused","Zoe B."],
+  ["focused","Amara D."],["focused","Felix G."],["focused","Hana S."],["focused","Ivan K."],
+  ["focused","Jade L."],["focused","Kai N."],["notjoined","Luca F.","Not in"],["focused","Mei T."],
+  ["focused","Nia W."],["focused","Omar A."],["focused","Rosa V."],["focused","Theo B."],
+  ["focused","Uma P."],["focused","Vik R."],["focused","Wren H."],["focused","Yusuf E."],
+];
+const DEFAULT_LABELS = { focused: "Focused", notjoined: "Not in", pass: "Pass", emergency: "Unlocked", revoked: "Permission off", nodevice: "No device" };
+
+function arc(size, stroke, pct, fill = "var(--arc-fill)", track = "var(--arc-track)") {
+  const r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  return `<div class="fc-arc" style="width:${size}px;height:${size}px;"><svg width="${size}" height="${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${track}" stroke-width="${stroke}"></circle>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${fill}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c*pct} ${c*(1-pct)}"></circle></svg></div>`;
+}
+function chip(state, name, label, opts = {}) {
+  const size = opts.proj ? "proj" : "grid";
+  const stale = opts.stale ? `<span class="stale">${opts.stale}</span>` : "";
+  return `<span class="fc-chip fc-chip--${size} is-${state} ${opts.extra || ""}" data-interactive tabindex="0">
+    <i data-lucide="${I[state]}"></i>${name} <span class="lbl">${label || DEFAULT_LABELS[state]}</span>${stale}</span>`;
+}
+function summary(counts, proj) {
+  const items = [["focused", counts[0] + " Focused"], ["notjoined", counts[1] + " Not in"], ["pass", counts[2] + " Pass"], ["emergency", counts[3] + " Unlocked"], ["revoked", counts[4] + " Permission off"], ["nodevice", counts[5] + " No device"]];
+  return `<div class="fc-summary">` + items.map(([s, l]) =>
+    `<span class="fc-chip ${proj ? "fc-chip--grid" : "fc-chip--mini"} is-${s}"><i data-lucide="${I[s]}"></i><span class="lbl">${l}</span></span>`).join("") + `</div>`;
+}
+function sidenav(active = "Classes") {
+  const items = [["layout-grid", "Classes"], ["list-checks", "Policies"], ["nfc", "Tags"], ["chart-bar", "Reports"], ["scroll-text", "Logs"], ["settings", "Settings"]];
+  return `<aside class="sidenav">
+    <div class="brand"><svg class="arc-mark" viewBox="0 0 20 20" fill="none" style="width:18px;height:18px;"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>Bali</div>
+    ${items.map(([ic, l]) => `<a class="${l === active ? "on" : ""}" href="#"><i data-lucide="${ic}"></i>${l}</a>`).join("")}
+    <div class="foot"><div class="ava">MR</div><div class="who">Ms. Rivera<small>Jefferson High</small></div></div>
+  </aside>`;
+}
+function header({ live = true, projector = false } = {}) {
+  if (projector) {
+    return `<div class="main-head" style="gap: 22px;">
+      ${arc(56, 6, 0.466)}
+      <div><h1 style="font-size: 36px; line-height: 42px;">Period 3 — Algebra II</h1><div class="meta" style="font-size: 16px; margin-top: 2px;">Lecture — Notes, Camera, Calculator allowed</div></div>
+      <div class="countdown-block" style="margin-left: auto;"><div><div class="t" style="font-size: 44px; line-height: 48px;">23:14</div><div class="sub" style="font-size: 15px;">ends 10:45 AM</div></div></div>
+    </div>`;
+  }
+  return `<div class="main-head">
+    ${live ? arc(44, 5, 0.466) : ""}
+    <div><h1>Period 3 — Algebra II</h1><div class="meta">${live ? "Lecture — Notes, Camera, Calculator allowed" : "28 students · no session running"}</div></div>
+    ${live ? `<div class="countdown-block" style="margin-left: 12px;"><div><div class="t">23:14</div><div class="sub">ends 10:45 AM</div></div></div>` : ""}
+    <div style="margin-left: auto; display: flex; gap: 10px;">
+      ${live ? `<button class="fc-btn fc-btn--secondary">Extend</button><button class="fc-btn fc-btn--secondary" style="color: var(--red-600);">End session…</button>`
+             : `<button class="fc-btn fc-btn--secondary">Roster</button>`}
+    </div>
+  </div>`;
+}
+function grid(roster, opts = {}) {
+  return `<div class="lg-grid ${opts.proj ? "lg-grid--proj" : ""}">` +
+    roster.map(([s, n, l]) => chip(s, n, l, { ...opts, extra: opts.pulseName === n ? "pulse-once" : "" })).join("") + `</div>`;
+}
+const HEALTHY_COUNTS = [22, 2, 1, 1, 1, 1];
+
+function frame(label, sub, note, inner, opts = {}) {
+  return `<div class="wframe-cell">
+    <div class="wf-label">${label}${sub ? `<small>${sub}</small>` : ""}</div>
+    <div class="wframe" style="${opts.style || ""}">${inner}</div>
+    ${note ? `<div class="wf-note">${note}</div>` : ""}
+  </div>`;
+}
+function shell(mainHTML, overlays = "", active = "Classes") {
+  return `<div class="shell">${sidenav(active)}<main class="main">${mainHTML}</main></div>${overlays}`;
+}
+
+/* ---------- state (a) healthy ---------- */
+const stateA = shell(
+  header() + summary(HEALTHY_COUNTS) + grid(ROSTER)
+);
+
+/* ---------- state (b) emergency toast + panel ---------- */
+const panel = `
+<div class="fc-panel" style="position: absolute; top: 0; right: 0; bottom: 0; width: 372px; border-radius: 0; border: none; border-left: 1px solid var(--border-default); z-index: 35;">
+  <div class="pn-head">
+    <div><div style="font: 600 18px/24px 'Instrument Sans', sans-serif;">Sam Torres</div>
+    <div style="font: 400 13px/18px 'Instrument Sans', sans-serif; color: var(--text-secondary); margin-top: 2px;">tapped in 10:02 · iPhone</div></div>
+    <span class="fc-chip fc-chip--mini is-emergency" style="margin-left: auto;"><i data-lucide="lock-open"></i><span class="lbl">Unlocked</span></span>
+    <button class="t-close" style="background: none; border: none; color: var(--text-tertiary); cursor: pointer;"><i data-lucide="x"></i></button>
+  </div>
+  <div class="pn-body">
+    <div><h4>This session</h4>
+      <div class="fc-timeline">
+        <div class="ev is-focused"><div class="dot"><i data-lucide="circle-check"></i></div><div class="what">Tapped in</div><div class="when">10:02</div></div>
+        <div class="ev is-emergency"><div class="dot"><i data-lucide="lock-open"></i></div><div class="what">Emergency Unlock<small>reason pending</small></div><div class="when">10:31</div></div>
+      </div>
+    </div>
+    <div><h4>Grant a pass</h4>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="fc-seg" style="display: flex;"><button style="flex:1;">5</button><button class="is-active" style="flex:1;">10</button><button style="flex:1;">15</button><button style="flex:1;">Custom</button></div>
+        <input class="fc-input" placeholder="Reason (optional) — e.g. nurse">
+        <button class="fc-btn fc-btn--primary">Grant 10-minute pass</button>
+        <span style="font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Shields return automatically.</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border-default); padding-top: 16px;">
+      <div style="flex: 1;"><div style="font: 500 14px/19px 'Instrument Sans', sans-serif;">No device today</div>
+      <div style="font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Today's grid only</div></div>
+      <button class="fc-toggle" aria-label="No device today, off"></button>
+    </div>
+  </div>
+</div>`;
+const toastB = `
+<div class="toasts" style="right: 390px; top: 150px;">
+  <div class="fc-toast is-emergency">
+    <div class="t-icon"><i data-lucide="lock-open"></i></div>
+    <div><div class="t-title">Sam T. used Emergency Unlock</div><div class="t-sub">Reason pending · 10:31 AM</div>
+    <div class="t-actions"><a>Open student</a></div></div>
+    <button class="t-close" aria-label="Dismiss"><i data-lucide="x"></i></button>
+  </div>
+</div>`;
+const stateB = shell(
+  header() + summary(HEALTHY_COUNTS) + grid(ROSTER, { pulseName: "Sam T." }),
+  toastB + panel
+);
+
+/* ---------- state (c) no active session ---------- */
+const stateC = shell(
+  header({ live: false }) +
+  `<div class="wcard" style="max-width: 560px; display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
+    <div style="font: 600 18px/24px 'Instrument Sans', sans-serif;">Start a session</div>
+    <div style="display: flex; gap: 12px;">
+      <div style="flex: 1;"><div class="wlabel" style="margin-bottom: 6px;">Ends at</div>
+        <div class="fc-input" style="display: flex; align-items: center; gap: 8px;"><i data-lucide="bell" style="width:15px;height:15px;color:var(--text-tertiary);"></i><b style="font-variant-numeric: tabular-nums;">10:45</b><span style="color: var(--text-tertiary); font-size: 13px;">next bell</span><i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text-tertiary);margin-left:auto;"></i></div></div>
+      <div style="flex: 1;"><div class="wlabel" style="margin-bottom: 6px;">Policy</div>
+        <div class="fc-input" style="display: flex; align-items: center; gap: 8px;"><b>Lecture</b><i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text-tertiary);margin-left:auto;"></i></div></div>
+    </div>
+    <div style="font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Lecture — Notes, Camera, Calculator allowed · students map these on their own devices</div>
+    <button class="fc-btn fc-btn--primary" style="align-self: flex-start; padding: 11px 28px;">Start session</button>
+  </div>
+  <div style="font: 400 13px/18px 'Instrument Sans', sans-serif; color: var(--text-tertiary); margin-top: 6px;">When it starts, 28 students can tap the desk tag to focus. Sessions end automatically at the bell.</div>`
+);
+
+/* ---------- state (d) live, 0 tapped in ---------- */
+const stateD = shell(
+  header() + summary([0, 28, 0, 0, 0, 0]) +
+  `<div style="display: flex; align-items: center; gap: 10px; padding: 10px 0 2px; color: var(--text-secondary); font: 400 14px/19px 'Instrument Sans', sans-serif;">
+    <i data-lucide="nfc" style="width: 16px; height: 16px; color: var(--text-tertiary);"></i>Students tap the desk tag to start — names light up here as they join.
+  </div>` +
+  grid(ROSTER.map(([s, n]) => ["notjoined", n, "Not in"]))
+);
+
+/* ---------- state (e) reconnecting ---------- */
+const stale = ROSTER.map((r, i) => r);
+const stateE = shell(
+  `<div style="position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 36;"><span class="fc-reconnect"><span class="pulse"></span>Reconnecting — data may be 20s stale</span></div>` +
+  header() + summary(HEALTHY_COUNTS) +
+  `<div class="lg-grid">` + ROSTER.map(([s, n, l], i) => chip(s, n, l, { stale: i < 6 ? "20s" : "" })).join("") + `</div>`
+);
+
+/* ---------- state (f) projector ---------- */
+const stateF = `
+<main class="main" style="padding: 36px 48px;">
+  ${header({ projector: true })}
+  ${summary([22, 2, 1, 1, 1, 1], true)}
+  ${grid(ROSTER, { proj: true })}
+</main>`;
+
+document.getElementById("frames").innerHTML = [
+  frame("W4 · a — Healthy mid-session", "the §6 distribution", "<b>The 6-foot read:</b> summary strip first, grid second. 28 chips, 4-up so every state label renders unabbreviated, no scroll at 1440. Non-neutral states are sparse by design — a healthy class is mostly quiet green. Every chip is keyboard-focusable; Tab order follows roster order.", stateA),
+  frame("W4 · b — Emergency toast lands", "+ StudentPanel via 'Open student'", "Toast is sticky until dismissed; with the panel open it docks left of it, below the header so the countdown and summary stay readable. Sam's chip pulses <b>twice, softly,</b> then rests — no infinite blinking. The panel carries the same pass form as iOS T3; reason will replace 'pending' in place when it arrives.", stateB),
+  frame("W4 · c — No active session", "inline start controls", "Header drops the countdown; starting is the same two prefilled decisions as iOS (next bell + last policy). The page never shows a fake empty grid for a session that doesn't exist.", stateC),
+  frame("W4 · d — Live, 0 tapped in", "'Students tap the desk tag to start'", "The empty state names the next physical action. All-gray grid + '0 Focused' summary makes 'nobody is in yet' unmistakable from distance — and not an error.", stateD),
+  frame("W4 · e — Reconnecting", "ReconnectingPill + staleness badges", "Non-blocking: pill pinned top-center, grid stays interactive, recently-unsynced chips carry a small '20s' badge. Staleness is an overlay, never a state color.", stateE),
+  frame("W4 · f — Projector / full-screen", "everything one size up", "Sidebar gone, chips at 52px with 20px names, summary at grid-chip size, countdown 44px — tuned for a washed-out classroom projector. The state system reads in grayscale by icon + label alone.", stateF),
+].join("");
+
+if (window.lucide) lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+</script>
+</body>
+</html>

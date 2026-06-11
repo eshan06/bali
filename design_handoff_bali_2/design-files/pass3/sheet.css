@@ -1,0 +1,85 @@
+/* Bali — Pass 3/4 mockup sheet chrome (annotations OUTSIDE device frames) */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--surface-page); }
+body {
+  font: 400 15px/22px "Instrument Sans", system-ui, sans-serif;
+  color: var(--text-primary); -webkit-font-smoothing: antialiased;
+  padding: 56px 40px 120px;
+}
+.sheet { max-width: 1840px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+.masthead { display: flex; flex-direction: column; gap: 12px; }
+.masthead .kicker { font: 600 12px/16px "Instrument Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-brand); display: flex; align-items: center; gap: 10px; }
+.masthead h1 { font: 600 44px/50px "Instrument Sans", sans-serif; letter-spacing: -0.02em; }
+.masthead p { max-width: 820px; font: 400 16px/25px "Instrument Sans", sans-serif; color: var(--text-secondary); text-wrap: pretty; }
+.arc-mark { width: 20px; height: 20px; flex: none; }
+.crumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.crumbs a {
+  font: 600 13px/18px "Instrument Sans", sans-serif; color: var(--text-secondary);
+  text-decoration: none; background: var(--surface-card); border: 1px solid var(--border-default);
+  border-radius: 999px; padding: 6px 14px; white-space: nowrap;
+}
+.crumbs a:hover { background: var(--surface-sunken); }
+.crumbs a.here { color: var(--text-on-brand); background: var(--surface-brand); border-color: var(--surface-brand); }
+
+.frames { display: flex; flex-wrap: wrap; gap: 44px 36px; align-items: flex-start; }
+.frame-cell { display: flex; flex-direction: column; gap: 12px; }
+.frame-label { font: 600 14px/19px "Instrument Sans", sans-serif; color: var(--text-primary); }
+.frame-label small { font-weight: 400; color: var(--text-tertiary); margin-left: 6px; }
+.frame-note { font: 400 12.5px/18px "Instrument Sans", sans-serif; color: var(--text-tertiary); max-width: 393px; text-wrap: pretty; }
+.frame-note b { color: var(--text-secondary); font-weight: 600; }
+
+/* screen root inside the device — flips token scope; iOS system stack inside frames */
+.scr {
+  min-height: 100%; display: flex; flex-direction: column;
+  background: var(--surface-page); color: var(--text-primary);
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-ui: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  position: relative;
+}
+.scr .safe { padding: 0 20px; }
+
+/* iOS-ish text styles (Dynamic Type Large defaults) */
+.t-lgtitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.2px; }
+.t-title1 { font-size: 28px; line-height: 34px; font-weight: 700; }
+.t-title2 { font-size: 22px; line-height: 28px; font-weight: 600; }
+.t-title3 { font-size: 20px; line-height: 25px; font-weight: 600; }
+.t-headline { font-size: 17px; line-height: 22px; font-weight: 600; }
+.t-body { font-size: 17px; line-height: 22px; font-weight: 400; }
+.t-callout { font-size: 16px; line-height: 21px; font-weight: 400; }
+.t-subhead { font-size: 15px; line-height: 20px; font-weight: 400; }
+.t-footnote { font-size: 13px; line-height: 18px; font-weight: 400; }
+.t-caption { font-size: 12px; line-height: 16px; font-weight: 400; }
+.sec { color: var(--text-secondary); }
+.ter { color: var(--text-tertiary); }
+
+/* native-style sheet overlay inside a frame */
+.dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.44); z-index: 30; }
+.native-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 31;
+  background: var(--surface-raised); border-radius: 20px 20px 0 0;
+  padding: 10px 20px 40px; display: flex; flex-direction: column;
+}
+.grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--border-strong); margin: 2px auto 14px; flex: none; }
+
+/* native alert (system dialog — styled around, never redesigned) */
+.ios-alert {
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); z-index: 32;
+  width: 270px; border-radius: 14px; overflow: hidden; text-align: center;
+  background: rgba(37, 37, 40, 0.97); color: #fff;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.ios-alert.light { background: rgba(247, 247, 247, 0.97); color: #000; }
+.ios-alert .a-body { padding: 19px 16px 15px; display: flex; flex-direction: column; gap: 4px; }
+.ios-alert .a-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.ios-alert .a-msg { font-size: 13px; line-height: 18px; }
+.ios-alert .a-btns { display: flex; border-top: 0.5px solid rgba(128, 128, 128, 0.45); }
+.ios-alert .a-btns > div { flex: 1; padding: 11px 0; font-size: 17px; color: #0A84FF; }
+.ios-alert .a-btns > div + div { border-left: 0.5px solid rgba(128, 128, 128, 0.45); font-weight: 600; }
+
+/* misc */
+.vstack { display: flex; flex-direction: column; }
+.hstack { display: flex; align-items: center; }
+.spacer { flex: 1; }
+.pagedots { display: flex; gap: 7px; justify-content: center; }
+.pagedots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
+.pagedots span.on { background: var(--text-primary); }

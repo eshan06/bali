@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — Focus sessions for your classroom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<link rel="stylesheet" href="pass2/components.css">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--surface-page);
+    color: var(--text-primary);
+    font: 400 16px/25px "Instrument Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+
+  /* ---------- nav ---------- */
+  .topnav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: color-mix(in oklab, var(--surface-page) 78%, transparent);
+    border-bottom: 1px solid var(--border-default);
+  }
+  .topnav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .wordmark { display: flex; align-items: center; gap: 9px; font: 600 19px/24px "Instrument Sans", sans-serif; letter-spacing: -0.01em; }
+  .topnav a.navlink { font: 500 14px/19px "Instrument Sans", sans-serif; color: var(--text-secondary); text-decoration: none; }
+  .topnav a.navlink:hover { color: var(--text-primary); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    font: 600 15px/20px "Instrument Sans", sans-serif;
+    border-radius: 12px; border: 1px solid transparent;
+    padding: 12px 24px; cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: transform 200ms var(--ease-standard), background 150ms var(--ease-standard), box-shadow 200ms var(--ease-standard);
+  }
+  .btn--primary { background: var(--green-700); color: #fff; box-shadow: 0 1px 2px rgba(24, 36, 28, 0.2); }
+  .btn--primary:hover { background: var(--green-800); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(24, 36, 28, 0.18); }
+  .btn--ghost { color: var(--text-primary); border-color: var(--border-strong); background: var(--surface-card); }
+  .btn--ghost:hover { background: var(--surface-sunken); }
+  .btn--big { font-size: 16px; padding: 15px 30px; border-radius: 14px; }
+  .btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 92px 0 110px; position: relative; overflow: hidden; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; position: relative; z-index: 1; }
+  .ambient { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  .ambient .ring { position: absolute; top: 50%; left: 72%; translate: -50% -50%; }
+  .ring-a { animation: spinring 80s linear infinite; }
+  .ring-b { animation: spinring 150s linear infinite reverse; }
+  @keyframes spinring { to { transform: rotate(360deg); } }
+  .kicker { font: 600 12.5px/17px "Instrument Sans", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green-700); display: flex; align-items: center; gap: 9px; }
+  h1.display {
+    font: 600 64px/68px "Instrument Sans", sans-serif; letter-spacing: -0.025em;
+    margin: 18px 0 22px; text-wrap: balance;
+  }
+  h1.display em { font-style: normal; color: var(--green-700); position: relative; white-space: nowrap; }
+  h1.display em::after {
+    content: ""; position: absolute; left: 0; right: 8px; bottom: 4px; height: 11px;
+    background: var(--green-200); border-radius: 7px; z-index: -1;
+    transform: scaleX(0); transform-origin: left;
+    animation: sweep 550ms cubic-bezier(0.2, 0, 0, 1) 1050ms forwards;
+  }
+  @keyframes sweep { to { transform: scaleX(1); } }
+  .lede { font: 400 19px/30px "Instrument Sans", sans-serif; color: var(--text-secondary); max-width: 480px; text-wrap: pretty; }
+  .hero-ctas { display: flex; gap: 14px; margin-top: 34px; align-items: center; }
+  .trustline { margin-top: 26px; font: 400 13.5px/19px "Instrument Sans", sans-serif; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px; }
+
+  /* entrance animation */
+  .rise { opacity: 0; transform: translateY(18px); transition: opacity 600ms cubic-bezier(0.2, 0, 0, 1), transform 600ms cubic-bezier(0.2, 0, 0, 1); }
+  .rise.in { opacity: 1; transform: none; }
+
+  /* ---------- phone visual ---------- */
+  .stagebox { position: relative; display: flex; justify-content: center; }
+  .phone {
+    width: 330px; border-radius: 36px; padding: 26px 24px 24px;
+    background: #141312; color: #F1EFEB;
+    box-shadow: 0 30px 70px rgba(28, 24, 18, 0.28), 0 0 0 1px rgba(28, 24, 18, 0.1);
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+    position: relative; z-index: 2; will-change: transform;
+  }
+  .phone .cls { text-align: center; }
+  .phone .cls b { font: 600 17px/23px "Instrument Sans", sans-serif; display: block; }
+  .phone .cls span { font: 400 12.5px/17px "Instrument Sans", sans-serif; color: #B0AAA1; white-space: nowrap; }
+  .phone .fc-arc .time { color: #F1EFEB; font-size: 44px; line-height: 48px; }
+  .phone .fc-arc .until { color: #B0AAA1; font-size: 12.5px; }
+  #heroArcFill { transition: stroke-dashoffset 1100ms cubic-bezier(0.3, 0, 0.2, 1); }
+  .phone .apps { display: flex; gap: 12px; }
+  .phone .apps .a { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 400 9.5px/12px "Instrument Sans", sans-serif; color: #837D74; }
+  .phone .apps .a i, .phone .apps .a svg { width: 38px; height: 38px; border-radius: 10px; background: #1D1B19; border: 1px solid #2E2B27; padding: 9px; color: #B0AAA1; }
+  .phone .fc-unlock { height: 56px; font-size: 13px; }
+  .phone .fc-unlock .base-label { font-size: 13px; line-height: 17px; white-space: normal; text-align: center; max-width: 230px; gap: 7px; }
+  .phone .fc-holdhint { font-size: 11px; }
+
+  .floatchip {
+    position: absolute; z-index: 3;
+    box-shadow: var(--shadow-2);
+    animation: floaty 5.5s ease-in-out infinite alternate;
+  }
+  @keyframes floaty { from { transform: translateY(-7px); } to { transform: translateY(7px); } }
+
+  /* pop-in for children of revealed sections (springy) */
+  .pop { opacity: 0; transform: translateY(12px) scale(0.9); transition: opacity 500ms cubic-bezier(0.2, 0, 0, 1), transform 550ms cubic-bezier(0.34, 1.3, 0.64, 1); }
+  .in .pop { opacity: 1; transform: none; }
+
+  /* ---------- sections ---------- */
+  section.band { padding: 96px 0; }
+  .sec-head { max-width: 620px; margin-bottom: 52px; }
+  h2.sec { font: 600 38px/46px "Instrument Sans", sans-serif; letter-spacing: -0.02em; margin: 14px 0 14px; text-wrap: balance; }
+  .sec-sub { font: 400 17px/27px "Instrument Sans", sans-serif; color: var(--text-secondary); text-wrap: pretty; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .step {
+    background: var(--surface-card); border: 1px solid var(--border-default);
+    border-radius: 18px; padding: 28px 26px;
+  }
+  .step .num { font: 600 12px/16px var(--font-mono); color: var(--green-700); letter-spacing: 0.1em; }
+  .step .ic { width: 46px; height: 46px; border-radius: 13px; background: var(--green-100); color: var(--green-700); display: flex; align-items: center; justify-content: center; margin: 18px 0 16px; }
+  .step .ic svg { width: 21px; height: 21px; }
+  .step h3 { font: 600 19px/25px "Instrument Sans", sans-serif; margin-bottom: 8px; }
+  .step p { font: 400 14.5px/22px "Instrument Sans", sans-serif; color: var(--text-secondary); text-wrap: pretty; }
+
+  /* dark trust band */
+  .darkband { background: #141312; color: #F1EFEB; border-radius: 28px; padding: 72px 64px; display: grid; grid-template-columns: 1fr 380px; gap: 64px; align-items: center; }
+  .darkband h2.sec { color: #F1EFEB; }
+  .darkband .sec-sub { color: #B0AAA1; }
+  .darkband ul { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-top: 26px; }
+  .darkband li { display: flex; gap: 12px; font: 400 15px/23px "Instrument Sans", sans-serif; color: #D9D4CC; }
+  .darkband li svg { width: 18px; height: 18px; flex: none; color: var(--orange-300); margin-top: 2px; }
+  .holdwrap { display: flex; flex-direction: column; gap: 12px; }
+
+  /* teacher glance */
+  .glance { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 20px; padding: 28px; box-shadow: var(--shadow-2); }
+  .glance .gsum { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .glance .ggrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .glance .ggrid .fc-chip { justify-content: flex-start; font-size: 14px; padding: 8px 13px; }
+  .glance .ggrid .fc-chip svg { width: 15px; height: 15px; }
+
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+
+  /* privacy */
+  .contract { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 20px; overflow: hidden; max-width: 880px; }
+  .contract > div { padding: 34px 36px; }
+  .contract > div + div { border-left: 1px solid var(--border-default); }
+  .contract .clabel { font: 600 12px/16px "Instrument Sans", sans-serif; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 18px; }
+  .contract ul { list-style: none; display: flex; flex-direction: column; gap: 13px; }
+  .contract li { display: flex; gap: 11px; font: 400 15.5px/23px "Instrument Sans", sans-serif; }
+  .contract li svg { width: 17px; height: 17px; flex: none; margin-top: 3px; }
+
+  /* CTA band */
+  .ctaband { background: var(--green-800); border-radius: 28px; color: #fff; padding: 78px 64px; text-align: center; position: relative; overflow: hidden; }
+  .ctaband::before {
+    content: ""; position: absolute; right: -120px; top: -120px; width: 420px; height: 420px;
+    border: 3px dashed rgba(255, 255, 255, 0.18); border-radius: 50%;
+    animation: spinring 70s linear infinite;
+  }
+  .ctaband::after {
+    content: ""; position: absolute; left: -150px; bottom: -190px; width: 390px; height: 390px;
+    border: 38px solid rgba(255, 255, 255, 0.05); border-radius: 50%;
+  }
+  .ctaband h2 { font: 600 42px/50px "Instrument Sans", sans-serif; letter-spacing: -0.02em; margin-bottom: 14px; }
+  .ctaband p { font: 400 17px/26px "Instrument Sans", sans-serif; color: rgba(255, 255, 255, 0.75); max-width: 480px; margin: 0 auto 34px; }
+  .demoform { display: flex; gap: 10px; justify-content: center; max-width: 520px; margin: 0 auto; }
+  .demoform input {
+    flex: 1; font: 400 15px/20px "Instrument Sans", sans-serif;
+    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px; padding: 13px 16px; color: #fff;
+  }
+  .demoform input::placeholder { color: rgba(255, 255, 255, 0.55); }
+  .demoform input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--green-800), 0 0 0 4px #fff3; }
+  .ctaband .btn--primary { background: #fff; color: var(--green-800); }
+  .ctaband .btn--primary:hover { background: var(--stone-100); }
+  .ctaband .fine { margin-top: 18px; font: 400 12.5px/17px "Instrument Sans", sans-serif; color: rgba(255, 255, 255, 0.55); }
+
+  footer { padding: 44px 0 60px; }
+  footer .wrap { display: flex; align-items: center; gap: 24px; }
+  footer .links { margin-left: auto; display: flex; gap: 22px; }
+  footer a { font: 400 13.5px/18px "Instrument Sans", sans-serif; color: var(--text-tertiary); text-decoration: none; }
+  footer a:hover { color: var(--text-secondary); }
+
+  /* frozen-timeline fallback: timers add this class and force final states */
+  .anim-settled h1.display em::after { animation: none; transform: scaleX(1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .rise { opacity: 1; transform: none; transition: none; }
+    .floatchip { animation: none; }
+    #heroArcFill { transition: none; }
+    .btn { transition: none; }
+    .ring-a, .ring-b, .ctaband::before { animation: none; }
+    h1.display em::after { animation: none; transform: scaleX(1); }
+    .pop { opacity: 1; transform: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav" data-screen-label="Landing — nav">
+  <div class="wrap">
+    <span class="wordmark">
+      <svg viewBox="0 0 20 20" fill="none" style="width: 24px; height: 24px;" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>
+      Bali
+    </span>
+    <span style="flex: 1;"></span>
+    <a class="navlink" href="#how">How it works</a>
+    <a class="navlink" href="#trust">The exit</a>
+    <a class="navlink" href="#privacy">Privacy</a>
+    <a class="navlink" href="Bali - Teacher Portal.html">Sign in</a>
+    <a class="btn btn--primary" href="#demo" style="padding: 9px 18px; font-size: 14px;">Book a demo</a>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero" data-screen-label="Landing — hero">
+  <div class="ambient" aria-hidden="true">
+    <svg class="ring ring-a" width="960" height="960" viewBox="0 0 960 960"><circle cx="480" cy="480" r="462" fill="none" stroke="var(--green-200)" stroke-width="2" stroke-dasharray="5 16"></circle></svg>
+    <svg class="ring ring-b" width="1340" height="1340" viewBox="0 0 1340 1340"><circle cx="670" cy="670" r="652" fill="none" stroke="var(--stone-200)" stroke-width="2" stroke-dasharray="2 12"></circle></svg>
+  </div>
+  <div class="wrap">
+    <div>
+      <div class="kicker rise">
+        <svg viewBox="0 0 20 20" fill="none" style="width: 15px; height: 15px;" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--green-200)" stroke-width="3.4"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3.4" stroke-linecap="round"></path></svg>
+        Bali for schools
+      </div>
+      <h1 class="display rise" style="transition-delay: 80ms;">Fifty focused minutes. <em>One tap.</em></h1>
+      <p class="lede rise" style="transition-delay: 160ms;">Students tap a desk tag and their distractions rest until the bell. Teachers see one calm grid. And the emergency exit is always one hold away — no questions asked.</p>
+      <div class="hero-ctas rise" style="transition-delay: 240ms;">
+        <a class="btn btn--primary btn--big" href="#demo">Book a demo</a>
+        <a class="btn btn--ghost btn--big" href="#how">See how it works</a>
+      </div>
+      <div class="trustline rise" style="transition-delay: 320ms;">
+        <i data-lucide="shield-check" style="width: 15px; height: 15px;"></i>
+        Built on Apple Screen Time · Students always hold the exit
+      </div>
+    </div>
+
+    <div class="stagebox rise" style="transition-delay: 200ms;">
+      <div class="phone">
+        <div class="cls">
+          <b>Period 3 — Algebra II</b>
+          <span>with Ms. Rivera · ends 10:45 AM</span>
+        </div>
+        <div class="fc-arc" style="width: 198px; height: 198px;">
+          <svg width="198" height="198">
+            <circle cx="99" cy="99" r="94" fill="none" stroke="#2E2B27" stroke-width="9"></circle>
+            <circle id="heroArcFill" cx="99" cy="99" r="94" fill="none" stroke="#62A483" stroke-width="9" stroke-linecap="round"></circle>
+          </svg>
+          <div class="stack">
+            <span class="time" id="heroTime">23:14</span>
+            <span class="until">until 10:45</span>
+          </div>
+        </div>
+        <div class="apps">
+          <span class="a"><i data-lucide="phone"></i>Phone</span>
+          <span class="a"><i data-lucide="message-circle"></i>Messages</span>
+          <span class="a"><i data-lucide="notebook-pen"></i>Notes</span>
+          <span class="a"><i data-lucide="calculator"></i>Calc</span>
+        </div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 7px;">
+          <div class="fc-unlock" id="heroUnlock" tabindex="0" role="button" aria-label="Emergency unlock demo. Hold for one second. Your teacher will be notified.">
+            <span class="base-label"><i data-lucide="lock-open" style="width: 15px; height: 15px;"></i>Hold to unlock — your teacher will be notified</span>
+            <span class="fill"><span class="fill-label"><i data-lucide="lock-open" style="width: 15px; height: 15px;"></i></span></span>
+          </div>
+          <span class="fc-holdhint">Try it — hold for one second</span>
+        </div>
+      </div>
+      <span class="fc-chip fc-chip--mini is-focused floatchip" data-depth="0.9" style="top: 56px; left: -42px;"><i data-lucide="circle-check"></i><span class="lbl">Jordan P. · Focused</span></span>
+      <span class="fc-chip fc-chip--mini is-pass floatchip" data-depth="1.5" style="top: 168px; right: -54px; animation-delay: -2.2s;"><i data-lucide="ticket"></i><span class="lbl">Pass · 4:32</span></span>
+      <span class="fc-chip fc-chip--mini is-focused floatchip" data-depth="1.2" style="bottom: 120px; left: -64px; animation-delay: -3.8s;"><i data-lucide="circle-check"></i><span class="lbl">22 Focused</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="band" id="how" data-screen-label="Landing — how it works">
+  <div class="wrap">
+    <div class="sec-head rise">
+      <div class="kicker">How it works</div>
+      <h2 class="sec">A focus session is a shared agreement — made visible</h2>
+      <p class="sec-sub">No surveillance, no lockdown theater. Bali shows everyone the same honest picture: who's in, until when, and which apps the class agreed to keep.</p>
+    </div>
+    <div class="steps">
+      <div class="step rise">
+        <div class="num">01</div>
+        <div class="ic pop"><i data-lucide="nfc"></i></div>
+        <h3>Tap the desk tag</h3>
+        <p>Students tap an NFC tag (or scan its QR) as they sit down. Apple Screen Time quiets every app except the ones the class policy allows — Phone always stays.</p>
+      </div>
+      <div class="step rise" style="transition-delay: 100ms;">
+        <div class="num">02</div>
+        <div class="ic pop" style="transition-delay: 80ms;"><i data-lucide="circle-check"></i></div>
+        <h3>Focus together</h3>
+        <p>Each phone shows one calm screen: the countdown, the allowed apps, and the emergency exit. It sits face-up on the desk — nothing to hide, nothing to check.</p>
+      </div>
+      <div class="step rise" style="transition-delay: 200ms;">
+        <div class="num">03</div>
+        <div class="ic pop" style="transition-delay: 160ms;"><i data-lucide="bell"></i></div>
+        <h3>The bell ends it</h3>
+        <p>Sessions end automatically at the bell — every time, no teacher action needed. Passes for the nurse or office return shields on their own, too.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TRUST / EMERGENCY ============ -->
+<section class="band" id="trust" style="padding-top: 24px;" data-screen-label="Landing — emergency trust">
+  <div class="wrap">
+    <div class="darkband rise">
+      <div>
+        <div class="kicker" style="color: var(--orange-300);">The part we designed first</div>
+        <h2 class="sec">The exit is always unlocked</h2>
+        <p class="sec-sub">A student having a hard moment shouldn't negotiate with software. One hold unlocks everything — instantly, even offline, with zero confirmation steps. Their teacher is notified, never "reported."</p>
+        <ul>
+          <li><i data-lucide="zap"></i>Works without Wi-Fi or signal — the unlock is on the device</li>
+          <li><i data-lucide="message-circle-question"></i>Sharing a reason afterwards is optional; Skip is a first-class answer</li>
+          <li><i data-lucide="eye"></i>Honest by design: shielding is consent-based Screen Time, and we say so</li>
+        </ul>
+      </div>
+      <div class="holdwrap">
+        <div class="fc-unlock" id="bandUnlock" tabindex="0" role="button" aria-label="Emergency unlock demo. Hold for one second. Your teacher will be notified." style="height: 64px;">
+          <span class="base-label" style="white-space: normal; text-align: center; font-size: 15px; line-height: 20px; max-width: 280px;"><i data-lucide="lock-open" style="width: 17px; height: 17px;"></i>Hold to unlock — your teacher will be notified</span>
+          <span class="fill"><span class="fill-label"></span></span>
+        </div>
+        <span class="fc-holdhint" style="color: #837D74;">Live demo — hold for one second, or let go early (nothing happens)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TEACHER GLANCE ============ -->
+<section class="band" data-screen-label="Landing — teacher view">
+  <div class="wrap twocol">
+    <div class="rise">
+      <div class="kicker">For teachers</div>
+      <h2 class="sec">"Is anything wrong?" — answered from six feet</h2>
+      <p class="sec-sub">The live grid is ambient peripheral vision, not another dashboard to manage. A summary strip carries the one-second read; every state is an icon plus a label, legible across the room and on a washed-out projector.</p>
+      <div style="margin-top: 28px;"><a class="btn btn--ghost" href="#demo">See the dashboard in a demo</a></div>
+    </div>
+    <div class="glance rise" style="transition-delay: 120ms;">
+      <div class="gsum">
+        <span class="fc-chip fc-chip--mini is-focused"><i data-lucide="circle-check"></i><span class="lbl">22 Focused</span></span>
+        <span class="fc-chip fc-chip--mini is-notjoined"><i data-lucide="circle"></i><span class="lbl">2 Not in</span></span>
+        <span class="fc-chip fc-chip--mini is-pass"><i data-lucide="ticket"></i><span class="lbl">1 Pass</span></span>
+        <span class="fc-chip fc-chip--mini is-emergency"><i data-lucide="lock-open"></i><span class="lbl">1 Unlocked</span></span>
+      </div>
+      <div class="ggrid">
+        <span class="fc-chip is-focused pop"><i data-lucide="circle-check"></i>Jordan P.</span>
+        <span class="fc-chip is-focused pop" style="transition-delay: 50ms;"><i data-lucide="circle-check"></i>Lena W.</span>
+        <span class="fc-chip is-pass pop" style="transition-delay: 100ms;"><i data-lucide="ticket"></i>Aisha K.</span>
+        <span class="fc-chip is-emergency pop" style="transition-delay: 150ms;"><i data-lucide="lock-open"></i>Sam T.</span>
+        <span class="fc-chip is-focused pop" style="transition-delay: 200ms;"><i data-lucide="circle-check"></i>Noor H.</span>
+        <span class="fc-chip is-notjoined pop" style="transition-delay: 250ms;"><i data-lucide="circle"></i>Maya R.</span>
+        <span class="fc-chip is-focused pop" style="transition-delay: 300ms;"><i data-lucide="circle-check"></i>Tavi O.</span>
+        <span class="fc-chip is-focused pop" style="transition-delay: 350ms;"><i data-lucide="circle-check"></i>Ethan C.</span>
+        <span class="fc-chip is-focused pop" style="transition-delay: 400ms;"><i data-lucide="circle-check"></i>Zoe B.</span>
+      </div>
+      <div style="font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary); margin-top: 14px;">Live view · Period 3 — Algebra II · ends 10:45</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRIVACY ============ -->
+<section class="band" id="privacy" style="padding-top: 30px;" data-screen-label="Landing — privacy contract">
+  <div class="wrap">
+    <div class="sec-head rise">
+      <div class="kicker">The privacy contract</div>
+      <h2 class="sec">Students read the whole list on day one</h2>
+      <p class="sec-sub">This exact card appears in onboarding and again in Settings. It never grows without asking again.</p>
+    </div>
+    <div class="contract rise" style="transition-delay: 100ms;">
+      <div>
+        <div class="clabel" style="color: var(--green-700);">A teacher sees</div>
+        <ul>
+          <li><i data-lucide="circle-check" style="color: var(--green-600);"></i>Focus status — focused, on a pass, or unlocked</li>
+          <li><i data-lucide="circle-check" style="color: var(--green-600);"></i>When a student taps in and out</li>
+          <li><i data-lucide="circle-check" style="color: var(--green-600);"></i>Unlock times, and a reason if the student shares one</li>
+        </ul>
+      </div>
+      <div>
+        <div class="clabel" style="color: var(--text-tertiary);">Never sees</div>
+        <ul style="color: var(--text-secondary);">
+          <li><i data-lucide="eye-off" style="color: var(--text-tertiary);"></i>Screens, or anything on them</li>
+          <li><i data-lucide="eye-off" style="color: var(--text-tertiary);"></i>App lists, messages, or browsing</li>
+          <li><i data-lucide="eye-off" style="color: var(--text-tertiary);"></i>Location — Bali never asks for it</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="band" id="demo" style="padding-top: 20px;" data-screen-label="Landing — book a demo">
+  <div class="wrap">
+    <div class="ctaband rise">
+      <h2>Bring Bali to your classroom</h2>
+      <p>A 20-minute walkthrough with a real session — tags, the live grid, and the emergency exit included.</p>
+      <div class="demoform">
+        <input type="email" placeholder="you@school.edu" aria-label="School email">
+        <a class="btn btn--primary btn--big" href="#demo">Book a demo</a>
+      </div>
+      <div class="fine">Free for your first class. No student accounts, no credit card.</div>
+    </div>
+  </div>
+</section>
+
+<footer data-screen-label="Landing — footer">
+  <div class="wrap">
+    <span class="wordmark" style="font-size: 16px;">
+      <svg viewBox="0 0 20 20" fill="none" style="width: 19px; height: 19px;" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>
+      Bali
+    </span>
+    <span style="font: 400 13px/18px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Focus sessions for classrooms</span>
+    <div class="links">
+      <a href="#privacy">Privacy</a>
+      <a href="#how">How it works</a>
+      <a href="#demo">Book a demo</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ---------- hero arc draw-in + live ticking ---------- */
+const R = 94, C = 2 * Math.PI * R;
+const fillEl = document.getElementById("heroArcFill");
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let remain = 23 * 60 + 14;
+const total = 50 * 60;
+fillEl.setAttribute("transform", "rotate(-90 99 99)");
+fillEl.style.strokeDasharray = C;
+fillEl.style.strokeDashoffset = reduced ? C * (1 - remain / total) : C;
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  fillEl.style.strokeDashoffset = C * (1 - remain / total);
+}));
+const timeEl = document.getElementById("heroTime");
+setInterval(() => {
+  remain = Math.max(0, remain - 1);
+  const m = Math.floor(remain / 60), s = String(remain % 60).padStart(2, "0");
+  timeEl.textContent = m + ":" + s;
+  fillEl.style.transition = "none";
+  fillEl.style.strokeDashoffset = C * (1 - remain / total);
+}, 1000);
+
+/* ---------- scroll reveal (rect-based; IO unreliable in embedded iframes) ---------- */
+const risers = Array.from(document.querySelectorAll(".rise"));
+function reveal() {
+  const vh = window.innerHeight || document.documentElement.clientHeight || 800; /* fallback for pre-layout embeds */
+  let matched = 0;
+  risers.forEach((el) => {
+    if (el.classList.contains("in")) { matched++; return; }
+    const r = el.getBoundingClientRect();
+    if (r.top < vh * 0.92 && r.bottom > 0) {
+      matched++;
+      el.classList.add("in");
+      el.style.opacity = "1";
+      el.style.transform = "none";
+      /* some embedded webviews freeze the CSS transition timeline while timers
+         keep running — snap element AND its staggered .pop children when done */
+      setTimeout(() => {
+        el.style.transition = "none";
+        el.querySelectorAll(".pop").forEach((p) => {
+          p.style.transition = "none"; p.style.opacity = "1"; p.style.transform = "none";
+        });
+      }, 1050);
+    }
+  });
+  return matched;
+}
+window.addEventListener("scroll", reveal, { passive: true });
+window.addEventListener("resize", reveal);
+/* poll until the viewport has laid out and at least one element reveals
+   (some embeds report innerHeight=0 well past the load event) */
+reveal();
+const revealPoll = setInterval(() => {
+  if (reveal() > 0) clearInterval(revealPoll);
+}, 250);
+setTimeout(() => clearInterval(revealPoll), 8000);
+
+/* frozen-timeline fallback for the headline word animation */
+setTimeout(() => document.body.classList.add("anim-settled"), 1900);
+
+/* ---------- hero tilt + chip parallax (fine pointers only) ---------- */
+(function () {
+  if (reduced || !window.matchMedia("(pointer: fine)").matches) return;
+  const hero = document.querySelector(".hero");
+  const stage = document.querySelector(".stagebox");
+  const phoneEl = document.querySelector(".phone");
+  const chips = Array.from(document.querySelectorAll(".floatchip"));
+  let tx = 0, ty = 0, cx = 0, cy = 0, raf = null;
+  function loop() {
+    raf = requestAnimationFrame(() => {
+      cx += (tx - cx) * 0.085; cy += (ty - cy) * 0.085;
+      phoneEl.style.transform = `perspective(1100px) rotateY(${(cx * 8).toFixed(2)}deg) rotateX(${(-cy * 6).toFixed(2)}deg)`;
+      chips.forEach((ch) => {
+        const d = parseFloat(ch.dataset.depth || "1");
+        ch.style.translate = `${(cx * 24 * d).toFixed(1)}px ${(cy * 18 * d).toFixed(1)}px`;
+      });
+      if (Math.abs(tx - cx) > 0.002 || Math.abs(ty - cy) > 0.002) loop(); else raf = null;
+    });
+  }
+  hero.addEventListener("mousemove", (e) => {
+    const r = stage.getBoundingClientRect();
+    tx = Math.max(-0.65, Math.min(0.65, (e.clientX - (r.left + r.width / 2)) / r.width));
+    ty = Math.max(-0.65, Math.min(0.65, (e.clientY - (r.top + r.height / 2)) / r.height));
+    if (!raf) loop();
+  });
+  hero.addEventListener("mouseleave", () => { tx = 0; ty = 0; if (!raf) loop(); });
+})();
+
+/* ---------- hold-to-unlock demos ---------- */
+function wireUnlock(el, doneLabel) {
+  const fill = el.querySelector(".fill");
+  const fl = el.querySelector(".fill-label");
+  let t = null, completed = false;
+  const size = () => { fl.style.width = el.offsetWidth + "px"; };
+  size(); window.addEventListener("resize", size);
+  const start = (e) => {
+    if (completed) return;
+    e.preventDefault();
+    el.classList.remove("is-springback"); el.classList.add("is-filling");
+    fill.style.width = "100%";
+    t = setTimeout(complete, 1000);
+  };
+  const cancel = () => {
+    if (completed || t === null) return;
+    clearTimeout(t); t = null;
+    el.classList.remove("is-filling"); el.classList.add("is-springback");
+    fill.style.width = "0%";
+  };
+  function complete() {
+    completed = true; t = null;
+    el.classList.remove("is-filling"); el.classList.add("is-complete");
+    fill.style.width = "0%";
+    el.querySelector(".base-label").innerHTML = `<i data-lucide="check" style="width:16px;height:16px;"></i>${doneLabel}`;
+    lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+    setTimeout(() => {
+      completed = false;
+      el.classList.remove("is-complete");
+      el.querySelector(".base-label").innerHTML = `<i data-lucide="lock-open" style="width:15px;height:15px;"></i>Hold to unlock — your teacher will be notified`;
+      lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+      size();
+    }, 2400);
+  }
+  el.addEventListener("pointerdown", start);
+  el.addEventListener("pointerup", cancel);
+  el.addEventListener("pointerleave", cancel);
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); complete(); } });
+}
+wireUnlock(document.getElementById("heroUnlock"), "Unlocked — Ms. Rivera was notified");
+wireUnlock(document.getElementById("bandUnlock"), "Unlocked — that's the whole flow");
+
+if (window.lucide) lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+</script>
+</body>
+</html>

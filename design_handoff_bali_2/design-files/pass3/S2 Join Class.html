@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — S2 · Join Class</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="sheet.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="scaffold.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+function CodeCells({ value = "", error = false, active }) {
+  const chars = Array.from({ length: 8 }, (_, i) => value[i] || "");
+  return (
+    <div className="hstack" style={{ gap: 7, justifyContent: "center" }}>
+      {chars.map((ch, i) => (
+        <div key={i} style={{
+          width: 38, height: 48, borderRadius: 10,
+          background: "var(--surface-card)",
+          border: error ? "1.5px solid var(--red-500)" : i === active ? "1.5px solid var(--focus-ring-color)" : "1px solid var(--border-strong)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 600,
+          color: "var(--text-primary)",
+        }}>{ch}</div>
+      ))}
+    </div>
+  );
+}
+
+function JoinShell({ children }) {
+  return (
+    <React.Fragment>
+      <div className="safe vstack" style={{ paddingTop: 84, gap: 8 }}>
+        <div className="t-lgtitle">Join a class</div>
+        <div className="t-subhead sec">Enter the code from the board, or scan its QR.</div>
+      </div>
+      {children}
+    </React.Fragment>
+  );
+}
+
+function App() {
+  return (
+    <Sheet num="S2" title="Join Class" here="S2"
+      intro="A big 8-cell mono field that auto-uppercases, with a QR fallback. The success state is the informed-consent posture: the student sees the class, the teacher, the schedule, and exactly which apps the policy allows — before the Join button.">
+      <div className="frames">
+
+        <Frame label="S2.1 · Code entry" sub="keyboard up" keyboard note={<span>Auto-uppercase, mono, ambiguity-proof glyphs (0/O, 1/l distinct in JetBrains Mono). Paste fills all eight cells. "Scan QR instead" sits above the keyboard at all times.</span>}>
+          <JoinShell>
+            <div className="vstack" style={{ gap: 18, paddingTop: 40 }}>
+              <CodeCells value="KM3W7" active={5} />
+              <div className="hstack" style={{ justifyContent: "center", gap: 7 }}>
+                <Icon name="qr-code" size={16} color="var(--text-brand)" />
+                <span className="t-subhead" style={{ color: "var(--text-brand)", fontWeight: 600 }}>Scan QR instead</span>
+              </div>
+            </div>
+            <div className="spacer" />
+          </JoinShell>
+        </Frame>
+
+        <Frame label="S2.2 · Class found" sub="informed consent" note={<span><b>Everything before the button:</b> who runs it, when it meets, and the policy's allowed apps. Joining is an agreement, so the terms come first.</span>}>
+          <JoinShell>
+            <div className="safe vstack" style={{ gap: 16, paddingTop: 28 }}>
+              <CodeCells value="KM3W7Q2A" />
+              <div style={{ background: "var(--surface-card)", borderRadius: 20, padding: 20 }} className="vstack">
+                <div className="t-title2">Period 3 — Algebra II</div>
+                <div className="t-subhead sec" style={{ marginTop: 2 }}>Ms. Rivera · Mon–Fri, 10:00–10:45</div>
+                <div className="t-footnote ter" style={{ marginTop: 14, marginBottom: 10 }}>During focus, this class allows</div>
+                <AppsRow size={44} />
+              </div>
+            </div>
+            <div className="spacer" />
+            <div className="safe vstack" style={{ paddingBottom: 48, gap: 10 }}>
+              <BigButton>Join class</BigButton>
+              <div className="t-footnote ter" style={{ textAlign: "center" }}>You can leave any time in Settings.</div>
+            </div>
+          </JoinShell>
+        </Frame>
+
+        <Frame label="S2.3 · Invalid code" note={<span>Error names the fix, not the failure. Cells outline red (the error/destructive family) and clear on next keystroke; no shake animation.</span>}>
+          <JoinShell>
+            <div className="vstack" style={{ gap: 12, paddingTop: 40, alignItems: "center" }}>
+              <CodeCells value="KM3W7Q2J" error />
+              <div className="t-footnote" style={{ color: "var(--red-300)" }}>That code doesn't match a class — check the board.</div>
+              <div className="hstack" style={{ justifyContent: "center", gap: 7, marginTop: 8 }}>
+                <Icon name="qr-code" size={16} color="var(--text-brand)" />
+                <span className="t-subhead" style={{ color: "var(--text-brand)", fontWeight: 600 }}>Scan QR instead</span>
+              </div>
+            </div>
+            <div className="spacer" />
+          </JoinShell>
+        </Frame>
+
+        <Frame label="S2.4 · Pending approval" note={<span>Some classes require teacher approval (W5 queue). Confirmation gives the next thing that happens — a notification — not a mood.</span>}>
+          <div className="spacer" style={{ minHeight: 120 }} />
+          <div className="safe vstack" style={{ gap: 22, alignItems: "center", textAlign: "center" }}>
+            <Arc size={120} stroke={8} pct={1} fill="var(--green-500)">
+              <Icon name="hourglass" size={34} color="var(--green-300)" />
+            </Arc>
+            <div className="t-title1" style={{ maxWidth: 300 }}>Request sent</div>
+            <div className="t-body sec" style={{ maxWidth: 300 }}>Ms. Rivera approves new members for Period 3 — Algebra II. You'll get a notification when you're in.</div>
+          </div>
+          <div className="spacer" />
+          <div className="safe" style={{ paddingBottom: 48 }}>
+            <BigButton kind="secondary">Done</BigButton>
+          </div>
+        </Frame>
+
+      </div>
+    </Sheet>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>

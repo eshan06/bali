@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — S1 · Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="sheet.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="scaffold.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+function OnbShell({ dots, cta, ctaKind = "primary", secondary, children }) {
+  return (
+    <React.Fragment>
+      <div className="spacer" style={{ minHeight: 90 }} />
+      <div className="safe vstack" style={{ gap: 26, alignItems: "center", textAlign: "center" }}>{children}</div>
+      <div className="spacer" />
+      <div className="safe vstack" style={{ paddingBottom: 48, gap: 16 }}>
+        {dots && (
+          <div className="pagedots" style={{ marginBottom: 6 }}>
+            {[0, 1, 2].map((i) => <span key={i} className={i === dots - 1 ? "on" : ""}></span>)}
+          </div>
+        )}
+        {cta && <BigButton kind={ctaKind}>{cta}</BigButton>}
+        {secondary}
+      </div>
+    </React.Fragment>
+  );
+}
+
+const seeRow = (icon, text, no) => (
+  <div className="hstack" style={{ gap: 10, alignItems: "flex-start" }}>
+    <Icon name={icon} size={17} color={no ? "var(--text-tertiary)" : "var(--green-300)"} style={{ marginTop: 2 }} />
+    <span className="t-subhead" style={{ textAlign: "left", color: no ? "var(--text-secondary)" : "var(--text-primary)" }}>{text}</span>
+  </div>
+);
+
+function App() {
+  return (
+    <Sheet num="S1" title="Onboarding" here="S1"
+      intro="Three cards and the permission moment. Card 2 — the privacy contract — is the trust moment and gets the most visual weight. The native Screen Time dialog is shown as the system surface it is; the denied state stays calm and offers an honest status-only path.">
+      <div className="frames">
+
+        <Frame label="S1.1 · What it does" note={<span>One sentence, one image. The arc appears here first — the same mark the student will live with on S6.</span>}>
+          <OnbShell dots={1} cta="Continue">
+            <Arc size={150} stroke={9} pct={0.72}>
+              <Icon name="circle-check" size={40} color="var(--green-300)" />
+            </Arc>
+            <div className="t-title1" style={{ maxWidth: 300 }}>Your class, focused together</div>
+            <div className="t-body sec" style={{ maxWidth: 300 }}>Bali quiets every app except the ones your class allows — until the bell.</div>
+          </OnbShell>
+        </Frame>
+
+        <Frame label="S1.2 · The privacy contract" sub="the trust moment" note={<span><b>Verbatim contract,</b> restated word-for-word on the Settings → Privacy page (S9). "Sees" uses the brand green, "never sees" stays deliberately plain — no scary red anywhere in onboarding.</span>}>
+          <OnbShell dots={2} cta="Continue">
+            <div className="t-title1" style={{ maxWidth: 320 }}>What your teacher sees</div>
+            <div style={{ background: "var(--surface-card)", borderRadius: 20, padding: "22px 20px", width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, textAlign: "left" }}>
+              <div className="vstack" style={{ gap: 12 }}>
+                <div className="t-footnote" style={{ fontWeight: 600, color: "var(--green-300)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sees</div>
+                {seeRow("circle-check", "Your focus status")}
+                {seeRow("circle-check", "When you tap in and out")}
+                {seeRow("circle-check", "When you unlock, and the reason if you share one")}
+              </div>
+              <div className="vstack" style={{ gap: 12, borderLeft: "1px solid var(--border-default)", paddingLeft: 18 }}>
+                <div className="t-footnote" style={{ fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Never sees</div>
+                {seeRow("eye-off", "Your screen", true)}
+                {seeRow("eye-off", "Your apps or what's in them", true)}
+                {seeRow("eye-off", "Your messages or location", true)}
+              </div>
+            </div>
+            <div className="t-footnote ter" style={{ maxWidth: 300 }}>This is the whole list. It never grows without asking you again.</div>
+          </OnbShell>
+        </Frame>
+
+        <Frame label="S1.3 · How tap-in works" note={<span>NFC gesture drawn with simple shapes — the tag is the circle, the phone reaches it. Camera-shy students can always use the QR path (S2).</span>}>
+          <OnbShell dots={3} cta="Continue">
+            <div style={{ position: "relative", width: 170, height: 170 }}>
+              <div style={{ position: "absolute", left: 0, bottom: 0, width: 96, height: 96, borderRadius: "50%", border: "2px solid var(--border-strong)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)", letterSpacing: "0.1em" }}>TAG</span>
+              </div>
+              <div style={{ position: "absolute", right: 6, top: 0, width: 64, height: 118, borderRadius: 14, background: "var(--surface-card)", border: "1px solid var(--border-strong)", transform: "rotate(18deg)" }}></div>
+              <Icon name="waves" size={26} color="var(--green-300)" style={{ position: "absolute", left: 88, top: 86, transform: "rotate(45deg)" }} />
+            </div>
+            <div className="t-title1" style={{ maxWidth: 300 }}>Tap the desk tag to start</div>
+            <div className="t-body sec" style={{ maxWidth: 310 }}>Everything comes back at the bell — or instantly, any time, with Emergency Unlock. No questions asked.</div>
+          </OnbShell>
+        </Frame>
+
+        <Frame label="S1.4 · Permission framing → native dialog" note={<span><b>System surface, untouched:</b> we frame the ask in our own words first, then iOS speaks. The dialog is Apple's — styled around, never redesigned.</span>}>
+          <OnbShell cta="Ask me" secondary={<div className="t-footnote ter" style={{ textAlign: "center" }}>You can change this any time in Settings.</div>}>
+            <Icon name="shield-check" size={44} color="var(--green-300)" />
+            <div className="t-title1" style={{ maxWidth: 320 }}>iOS will ask for Screen Time permission</div>
+            <div className="t-body sec" style={{ maxWidth: 312 }}>That's the switch that lets Bali shield apps during a session. It stays on your phone, under your control — turning it off later is always possible, and your teacher simply sees "permission off."</div>
+          </OnbShell>
+          <div className="dim"></div>
+          <div className="ios-alert">
+            <div className="a-body">
+              <div className="a-title">"Bali" Would Like to Set Up Screen Time</div>
+              <div className="a-msg">Bali will be able to limit app use during focus sessions you join.</div>
+            </div>
+            <div className="a-btns"><div>Don't Allow</div><div>Continue</div></div>
+          </div>
+        </Frame>
+
+        <Frame label="S1.5 · Permission denied" note={<span><b>Calm, two honest paths:</b> fix it in Settings, or join status-only with the consequence stated in one line. No nagging modal loops, no guilt.</span>}>
+          <OnbShell cta="Open Settings"
+            secondary={
+              <div className="vstack" style={{ gap: 6, alignItems: "center" }}>
+                <div className="fc-btn fc-btn--ghost" style={{ color: "var(--text-secondary)" }}>Join without focus (status-only)</div>
+                <div className="t-footnote ter" style={{ textAlign: "center", maxWidth: 300 }}>You'll show as "not in" during sessions, and apps stay unshielded.</div>
+              </div>
+            }>
+            <Icon name="shield-off" size={44} color="var(--text-tertiary)" />
+            <div className="t-title1" style={{ maxWidth: 320 }}>Screen Time stayed off</div>
+            <div className="t-body sec" style={{ maxWidth: 312 }}>No problem — Bali just can't shield apps without it. Turn it on whenever you're ready.</div>
+          </OnbShell>
+        </Frame>
+
+      </div>
+    </Sheet>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>

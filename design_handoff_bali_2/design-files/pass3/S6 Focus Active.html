@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — S6 · Focus Active</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="sheet.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="scaffold.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+function FocusScreen({ variant = "normal", xl = false }) {
+  const f = (n) => (xl ? Math.round(n * 1.24) : n); // ~XXL Dynamic Type factor
+  const isFinal = variant === "final";
+  const isPass = variant === "pass";
+  const arcPct = isFinal ? 0.038 : isPass ? 0.45 : 0.466;
+  const arcFill = isPass ? "var(--blue-400)" : isFinal ? "var(--arc-final2)" : "var(--arc-fill)";
+  const time = isFinal ? "1:54" : isPass ? "4:32" : "23:14";
+  const untilLine = isPass ? "pass ends 10:39" : "until 10:45";
+
+  return (
+    <React.Fragment>
+      {/* header */}
+      <div className="vstack" style={{ alignItems: "center", gap: 3, paddingTop: 74 }}>
+        <div style={{ fontSize: f(22), lineHeight: f(28) + "px", fontWeight: 600 }}>Period 3 — Algebra II</div>
+        <div className="sec" style={{ fontSize: f(15), lineHeight: f(20) + "px" }}>with Ms. Rivera · ends 10:45 AM</div>
+        {variant === "reconnect" && (
+          <span className="fc-reconnect" style={{ marginTop: 12, boxShadow: "none" }}>
+            <span className="pulse"></span>Reconnecting — focus continues offline
+          </span>
+        )}
+        {isPass && (
+          <span style={{ marginTop: 12 }}><Chip state="pass" label="Pass — shields return automatically" /></span>
+        )}
+      </div>
+
+      <div className="spacer" />
+
+      {/* hero arc */}
+      <div className="vstack" style={{ alignItems: "center", gap: f(34) }}>
+        <Arc size={xl ? 218 : 244} stroke={isFinal ? 12 : 10} pct={arcPct} fill={arcFill}>
+          <span className="time" style={{ fontSize: f(56), lineHeight: f(60) + "px", color: isFinal ? "var(--green-200)" : undefined }}>{time}</span>
+          <span className="until" style={{ fontSize: f(15) }}>{untilLine}</span>
+        </Arc>
+        <AppsRow size={xl ? 52 : 48} />
+      </div>
+
+      <div className="spacer" />
+
+      {/* bottom-anchored emergency control */}
+      <div className="safe vstack" style={{ paddingBottom: 48, gap: 10 }}>
+        <div className="fc-unlock" style={{ height: xl ? 76 : 64 }}>
+          <span className="base-label" style={{ fontSize: f(15), lineHeight: f(20) + "px", whiteSpace: "normal", textAlign: "center", maxWidth: 300 }}>
+            <Icon name="lock-open" size={f(18)} />Hold to unlock — your teacher will be notified
+          </span>
+          <span className="fill" style={{ width: "0%" }}></span>
+        </div>
+        <span className="fc-holdhint" style={{ fontSize: f(13), lineHeight: f(18) + "px" }}>Works without Wi-Fi. Releasing early does nothing.</span>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function App() {
+  return (
+    <Sheet
+      num="S6"
+      title="Focus Active"
+      here="S6"
+      intro={
+        "The flagship student screen — it sits face-up on a desk for 50 minutes, so it is calm, almost empty, and beautiful in the dark. Hero arc 244pt; allowed apps as honest generic glyphs; the Emergency Unlock is bottom-anchored, always visible, never styled as danger. Dark is the design target; light is the variant."
+      }
+    >
+      <div className="frames">
+        <Frame label="S6 · Normal" sub="dark — the design target" note={<span><b>Motion:</b> on tap-in the apps settle first, then the arc draws in once (600ms) — the product's only theatrical moment. Reduced motion: crossfade. Nothing on this screen animates after that; the time ticks with tabular digits so nothing shifts.</span>}>
+        <FocusScreen />
+        </Frame>
+        <Frame label="S6 · Final 2 minutes" note={<span><b>Emphasis, not alarm:</b> arc thickens 10→12pt and lifts to a lighter green; numerals lift one step brighter. No red, no pulsing — the bell is a release, not a deadline.</span>}>
+          <FocusScreen variant="final" />
+        </Frame>
+        <Frame label="S6 · Reconnecting" note={<span><b>Subtle + non-blocking:</b> a quiet pill under the header. Copy is honest about what still works — focus and the emergency unlock are fully offline-capable.</span>}>
+          <FocusScreen variant="reconnect" />
+        </Frame>
+        <Frame label="S6 · Pass active" note={<span><b>Pass variant:</b> the arc adopts the pass blue and counts the pass, not the session ("pass ends 10:39"). The chip states the contract: shields return automatically. The unlock control never leaves.</span>}>
+          <FocusScreen variant="pass" />
+        </Frame>
+        <Frame label="S6 · Light variant" light note={<span>Same hierarchy on warm paper. Students who use light mode get a real light design — surfaces from the token sheet, not an inversion.</span>}>
+          <FocusScreen />
+        </Frame>
+        <Frame label="S6 · XL Dynamic Type" sub="≈ XXL setting" note={<span><b>Layout survives:</b> type scales ~124%, arc steps down 244→218pt, the control grows to 76pt and its label wraps to two centered lines. Nothing truncates; the unlock affordance is still one uninterrupted hold.</span>}>
+          <FocusScreen xl />
+        </Frame>
+      </div>
+    </Sheet>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>

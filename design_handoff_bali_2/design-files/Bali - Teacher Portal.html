@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — Teacher Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<link rel="stylesheet" href="pass2/components.css">
+<link rel="stylesheet" href="pass4/web.css">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--surface-page); color: var(--text-primary);
+    font: 400 15px/22px "Instrument Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell { min-height: 100vh; }
+  .sidenav { position: sticky; top: 0; height: 100vh; padding-top: 32px; } /* brand baseline aligns with the greeting h1 */
+  .main { max-width: 1190px; padding: 30px 36px 48px; gap: 22px; }
+
+  .greet h1 { font: 600 28px/34px "Instrument Sans", sans-serif; letter-spacing: -0.015em; }
+  .greet .meta { font: 400 13.5px/19px "Instrument Sans", sans-serif; color: var(--text-secondary); margin-top: 3px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+  /* live card */
+  .livecard {
+    background: var(--surface-card); border: 1px solid var(--green-200);
+    border-radius: 16px; padding: 22px; box-shadow: var(--shadow-1);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .livecard .lc-head { display: flex; align-items: center; gap: 14px; }
+  .livecard h2 { font: 600 18px/24px "Instrument Sans", sans-serif; }
+  .livecard .lc-meta { font: 400 12.5px/17px "Instrument Sans", sans-serif; color: var(--text-secondary); margin-top: 1px; }
+  .lc-count { margin-left: 12px; text-align: right; flex: none; }
+  .lc-count .t { font: 600 30px/34px var(--font-num); font-variant-numeric: tabular-nums; }
+  .lc-count .sub { font: 400 12px/16px "Instrument Sans", sans-serif; color: var(--text-secondary); }
+
+  /* schedule rows */
+  .schedrow {
+    background: var(--surface-card); border: 1px solid var(--border-default);
+    border-radius: 14px; padding: 15px 18px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .schedrow .when { font: 600 13px/17px var(--font-num); font-variant-numeric: tabular-nums; color: var(--text-secondary); width: 78px; flex: none; }
+  .schedrow .what { flex: 1; min-width: 0; padding-right: 8px; }
+  .schedrow .what b { font: 600 15px/20px "Instrument Sans", sans-serif; display: block; color: var(--text-primary); }
+  .schedrow .what span { font: 400 12.5px/17px "Instrument Sans", sans-serif; color: var(--text-tertiary); }
+  .schedrow .act { margin-left: auto; }
+  .schedrow.is-past { opacity: 0.55; }
+
+  .rail-card { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 14px; padding: 18px; }
+  .rail-card h3 { font: 600 11.5px/15px "Instrument Sans", sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .approve-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .approve-row + .approve-row { border-top: 1px solid var(--border-default); }
+  .approve-row b { font: 600 13.5px/18px "Instrument Sans", sans-serif; }
+  .approve-row small { display: block; font: 400 11.5px/15px "Instrument Sans", sans-serif; color: var(--text-tertiary); }
+
+  a.quiet { font: 600 13px/18px "Instrument Sans", sans-serif; color: var(--text-brand); text-decoration: none; }
+  a.quiet:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+  /* gentle entrance (snap-safe) */
+  .fade { opacity: 0; transform: translateY(10px); transition: opacity 450ms cubic-bezier(0.2, 0, 0, 1), transform 450ms cubic-bezier(0.2, 0, 0, 1); }
+  .fade.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .fade { opacity: 1; transform: none; transition: none; } }
+</style>
+</head>
+<body data-screen-label="Teacher Portal — Home">
+
+<div class="shell">
+  <aside class="sidenav">
+    <div class="brand">
+      <svg viewBox="0 0 20 20" fill="none" style="width: 18px; height: 18px;" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="var(--stone-200)" stroke-width="3"></circle><path d="M 10 2.5 A 7.5 7.5 0 1 1 3.5 13.75" stroke="var(--green-600)" stroke-width="3" stroke-linecap="round"></path></svg>
+      Bali
+    </div>
+    <a class="on" href="#"><i data-lucide="house"></i>Home</a>
+    <a href="W4 Live Dashboard.html"><i data-lucide="layout-grid"></i>Classes</a>
+    <a href="W5-W7 Roster Policies Tags.html"><i data-lucide="list-checks"></i>Policies</a>
+    <a href="W5-W7 Roster Policies Tags.html"><i data-lucide="nfc"></i>Tags</a>
+    <a href="W8-W10 Reports Logs Settings.html"><i data-lucide="chart-bar"></i>Reports</a>
+    <a href="W8-W10 Reports Logs Settings.html"><i data-lucide="scroll-text"></i>Logs</a>
+    <a href="W8-W10 Reports Logs Settings.html"><i data-lucide="settings"></i>Settings</a>
+    <div class="foot">
+      <div class="ava">MR</div>
+      <div class="who">Ms. Rivera<small>Jefferson High</small></div>
+      <a href="Bali - Landing.html" aria-label="Sign out" style="margin-left: auto; color: var(--text-tertiary); display: flex;"><i data-lucide="log-out" style="width: 15px; height: 15px;"></i></a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="greet fade">
+      <h1>Good morning, Ms. Rivera</h1>
+      <div class="meta">Wednesday, June 10 · Jefferson High · next bell 10:45</div>
+    </div>
+
+    <div class="cols">
+      <div class="col">
+        <!-- live now -->
+        <div class="livecard fade" style="transition-delay: 60ms;">
+          <div class="lc-head">
+            <div id="liveArc"></div>
+            <div style="flex: 1; min-width: 0;">
+              <h2>Period 3 — Algebra II</h2>
+              <div class="lc-meta">Live · Lecture — Notes, Camera, Calculator allowed</div>
+            </div>
+            <div class="lc-count">
+              <div class="t" id="portalTime">23:14</div>
+              <div class="sub">ends 10:45 AM</div>
+            </div>
+          </div>
+          <div class="fc-summary">
+            <span class="fc-chip fc-chip--mini is-focused"><i data-lucide="circle-check"></i><span class="lbl">22 Focused</span></span>
+            <span class="fc-chip fc-chip--mini is-notjoined"><i data-lucide="circle"></i><span class="lbl">2 Not in</span></span>
+            <span class="fc-chip fc-chip--mini is-pass"><i data-lucide="ticket"></i><span class="lbl">1 Pass · 4:32</span></span>
+            <span class="fc-chip fc-chip--mini is-emergency"><i data-lucide="lock-open"></i><span class="lbl">1 Unlocked</span></span>
+            <span class="fc-chip fc-chip--mini is-revoked"><i data-lucide="shield-off"></i><span class="lbl">1 Permission off</span></span>
+            <span class="fc-chip fc-chip--mini is-nodevice"><i data-lucide="smartphone"></i><span class="lbl">1 No device</span></span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <a class="fc-btn fc-btn--primary" href="W4 Live Dashboard.html">Open live grid</a>
+            <a class="fc-btn fc-btn--secondary" href="W5-W7 Roster Policies Tags.html">Roster</a>
+            <span style="margin-left: auto; align-self: center; font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Sam T.'s unlock is waiting in the grid</span>
+          </div>
+        </div>
+
+        <!-- today -->
+        <div class="fade" style="transition-delay: 120ms;">
+          <h3 style="font: 600 11.5px/15px 'Instrument Sans', sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 12px;">Today</h3>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="schedrow is-past">
+              <span class="when">8:05</span>
+              <div class="what"><b>Period 1 — Algebra I</b><span>ended · 44 min average focus</span></div>
+              <span class="act" style="font: 400 12.5px/17px 'Instrument Sans', sans-serif; color: var(--text-tertiary);">Done</span>
+            </div>
+            <div class="schedrow" style="border-color: var(--green-200);">
+              <span class="when" style="color: var(--green-700);">Now</span>
+              <div class="what"><b>Period 3 — Algebra II</b><span>live until 10:45 · 28 students</span></div>
+              <a class="act quiet" href="W4 Live Dashboard.html">Open</a>
+            </div>
+            <div class="schedrow">
+              <span class="when">12:05</span>
+              <div class="what"><b>Period 4 — Precalculus</b><span>Lecture policy · ends at the 12:50 bell</span></div>
+              <button class="fc-btn fc-btn--secondary act" type="button" style="padding: 7px 14px; font-size: 13px;">Start at 12:05</button>
+            </div>
+            <div class="schedrow">
+              <span class="when">2:50</span>
+              <div class="what"><b>Period 6 — Geometry</b><span>Quiz policy · ends at the 3:35 bell</span></div>
+              <button class="fc-btn fc-btn--secondary act" type="button" style="padding: 7px 14px; font-size: 13px;">Start at 2:50</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <!-- approvals -->
+        <div class="rail-card fade" style="transition-delay: 180ms;">
+          <h3><i data-lucide="user-plus" style="width: 14px; height: 14px;"></i>Waiting to join</h3>
+          <div class="approve-row">
+            <div style="flex: 1;"><b>Casey Nguyen</b><small>Period 3 — Algebra II · entered code today</small></div>
+            <button class="fc-btn fc-btn--primary" type="button" style="padding: 5px 12px; font-size: 12.5px;">Approve</button>
+            <button class="fc-btn fc-btn--secondary" type="button" style="padding: 5px 12px; font-size: 12.5px;">Decline</button>
+          </div>
+          <div class="approve-row">
+            <div style="flex: 1;"><b>Robbie Fox</b><small>Period 3 — Algebra II · entered code today</small></div>
+            <button class="fc-btn fc-btn--primary" type="button" style="padding: 5px 12px; font-size: 12.5px;">Approve</button>
+            <button class="fc-btn fc-btn--secondary" type="button" style="padding: 5px 12px; font-size: 12.5px;">Decline</button>
+          </div>
+        </div>
+
+        <!-- recent activity -->
+        <div class="rail-card fade" style="transition-delay: 240ms;">
+          <h3><i data-lucide="scroll-text" style="width: 14px; height: 14px;"></i>Recent activity</h3>
+          <div class="fc-timeline">
+            <div class="ev is-emergency"><div class="dot"><i data-lucide="lock-open"></i></div><div class="what">Sam Torres — Emergency Unlock<small>reason pending · Period 3</small></div><div class="when">10:31</div></div>
+            <div class="ev is-pass"><div class="dot"><i data-lucide="ticket"></i></div><div class="what">Pass granted to Aisha Khan · 10 min<small>"nurse" · Period 3</small></div><div class="when">10:14</div></div>
+            <div class="ev is-focused"><div class="dot"><i data-lucide="circle-check"></i></div><div class="what">Session started · 26 tapped in<small>Period 3 — Algebra II</small></div><div class="when">10:00</div></div>
+          </div>
+          <div style="margin-top: 14px;"><a class="quiet" href="W8-W10 Reports Logs Settings.html">Open the full log</a></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* medium arc */
+(function () {
+  const size = 46, stroke = 5, r = (size - stroke) / 2, c = 2 * Math.PI * r, pct = 0.466;
+  document.getElementById("liveArc").innerHTML =
+    `<div class="fc-arc" style="width:${size}px;height:${size}px;"><svg width="${size}" height="${size}">
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--arc-track)" stroke-width="${stroke}"></circle>
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--arc-fill)" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c * pct} ${c * (1 - pct)}"></circle></svg></div>`;
+})();
+
+/* live ticking countdown */
+let remain = 23 * 60 + 14;
+setInterval(() => {
+  remain = Math.max(0, remain - 1);
+  document.getElementById("portalTime").textContent =
+    Math.floor(remain / 60) + ":" + String(remain % 60).padStart(2, "0");
+}, 1000);
+
+/* entrance (snap-safe for frozen-timeline embeds) */
+document.querySelectorAll(".fade").forEach((el) => {
+  el.classList.add("in");
+  setTimeout(() => { el.style.transition = "none"; el.style.opacity = "1"; el.style.transform = "none"; }, 800);
+});
+
+if (window.lucide) lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+</script>
+</body>
+</html>
