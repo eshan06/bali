@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, isNull, lte } from 'drizzle-orm';
 import { getDb, schema as s, type Db } from '@bali/db';
-import type { SessionDetailDTO, UnlockReason } from '@bali/shared';
+import { deriveParticipantState, type SessionDetailDTO, type UnlockReason } from '@bali/shared';
 import { bus } from './bus';
 import {
   countStates,
@@ -555,13 +555,25 @@ export async function heartbeat(opts: {
     where: eq(s.participations.id, participation.id),
   });
 
+  // Return the DERIVED state — the same truth every chip renders (e.g. an active
+  // pass reads `pass` even though the stored state is `focused`).
+  const now = new Date();
+  const derived = deriveParticipantState({
+    storedState: fresh?.state ?? participation.state,
+    noDevice: fresh?.noDevice ?? false,
+    passEndsAt: activePass && !activePass.endedAt ? activePass.endsAt : null,
+    lastSeenAt: now,
+    session: { endsAt: session.endsAt, endedAt: session.endedAt },
+    now,
+  });
+
   return {
     session: {
       endsAt: session.endsAt.toISOString(),
       endedAt: session.endedAt ? session.endedAt.toISOString() : null,
     },
-    state: fresh?.state ?? participation.state,
-    passEndsAt: activePass && activePass.endsAt > new Date() ? activePass.endsAt.toISOString() : null,
+    state: derived.state,
+    passEndsAt: derived.state === 'pass' && activePass ? activePass.endsAt.toISOString() : null,
     allowedAppLabels: session.policySnapshot.allowedAppLabels,
     messagesAllowed: session.policySnapshot.messagesAllowed,
   };

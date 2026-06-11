@@ -22,6 +22,17 @@ export async function buildApp(): Promise<FastifyInstance> {
     allowedHeaders: ['authorization', 'content-type'],
   });
 
+  // Action endpoints (refocus, end, approve…) are legitimately body-less; treat an
+  // empty JSON body as undefined instead of erroring like Fastify's default parser.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (body === '' || body === undefined) return done(null, undefined);
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      done(Object.assign(err as Error, { statusCode: 400 }), undefined);
+    }
+  });
+
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof HttpError) {
       return reply.code(err.statusCode).send({ error: err.code, message: err.message });
@@ -31,8 +42,12 @@ export async function buildApp(): Promise<FastifyInstance> {
         .code(400)
         .send({ error: 'invalid_body', message: err.issues[0]?.message ?? 'Invalid request' });
     }
-    app.log.error(err);
-    return reply.code(500).send({ error: 'internal', message: 'Something went wrong' });
+    const statusCode = typeof err.statusCode === 'number' && err.statusCode >= 400 ? err.statusCode : 500;
+    if (statusCode >= 500) app.log.error(err);
+    return reply.code(statusCode).send({
+      error: statusCode >= 500 ? 'internal' : 'bad_request',
+      message: statusCode >= 500 ? 'Something went wrong' : err.message,
+    });
   });
 
   // Encapsulated registration: hooks (auth preHandlers) stay scoped per module.

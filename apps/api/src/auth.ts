@@ -37,14 +37,35 @@ declare module 'fastify' {
   }
 }
 
+/**
+ * Dev-only test identities: `Bearer dev:<sub>:<email>:<name>` — accepted only when
+ * ALLOW_DEV_TOKENS=1 AND not in production. Lets local integration tests drive the
+ * full flow without real Cognito sign-ins; the web/iOS clients always use real SRP.
+ */
+function devIdentity(token: string): Identity | null {
+  if (process.env.ALLOW_DEV_TOKENS !== '1' || process.env.NODE_ENV === 'production') return null;
+  if (!token.startsWith('dev:')) return null;
+  const [, sub, email = '', name = ''] = token.split(':');
+  if (!sub) return null;
+  return { sub: `dev-${sub}`, email, name: name || email };
+}
+
 export async function authenticate(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     reply.code(401).send({ error: 'unauthorized', message: 'Missing bearer token' });
     return;
   }
+  const token = header.slice(7);
+
+  const dev = devIdentity(token);
+  if (dev) {
+    req.identity = dev;
+    return;
+  }
+
   try {
-    const payload = await verifier.verify(header.slice(7));
+    const payload = await verifier.verify(token);
     req.identity = {
       sub: payload.sub,
       email: typeof payload.email === 'string' ? payload.email : '',
