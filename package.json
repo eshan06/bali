@@ -1,0 +1,23 @@
+{
+  "name": "bali",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "db:create": "npm run create -w packages/db",
+    "db:generate": "npm run generate -w packages/db",
+    "db:migrate": "npm run migrate -w packages/db",
+    "db:seed": "npm run seed -w packages/db",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm test -ws --if-present",
+    "build": "npm run build -ws --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

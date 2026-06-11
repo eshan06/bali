@@ -1,0 +1,45 @@
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { config } from 'dotenv';
+import pg from 'pg';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as schema from './schema';
+
+/** Backend env lives at the repo root (legacy convention carried over). */
+export function loadRootEnv(): void {
+  const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
+  config({ path: resolve(root, '.env') });
+}
+
+export type Db = NodePgDatabase<typeof schema>;
+
+let pool: pg.Pool | null = null;
+let db: Db | null = null;
+
+export function getPool(): pg.Pool {
+  if (!pool) {
+    loadRootEnv();
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL missing — copy .env.example to .env at the repo root');
+    pool = new pg.Pool({
+      connectionString: url,
+      max: 10,
+      // RDS requires TLS; the instance uses an AWS-managed cert not in the local trust store.
+      ssl: url.includes('sslmode=disable') ? undefined : { rejectUnauthorized: false },
+    });
+  }
+  return pool;
+}
+
+export function getDb(): Db {
+  if (!db) db = drizzle(getPool(), { schema });
+  return db;
+}
+
+export async function closeDb(): Promise<void> {
+  await pool?.end();
+  pool = null;
+  db = null;
+}
+
+export { schema };
