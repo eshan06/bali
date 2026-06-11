@@ -42,11 +42,12 @@ export async function buildApp(): Promise<FastifyInstance> {
         .code(400)
         .send({ error: 'invalid_body', message: err.issues[0]?.message ?? 'Invalid request' });
     }
-    const statusCode = typeof err.statusCode === 'number' && err.statusCode >= 400 ? err.statusCode : 500;
+    const fe = err as { statusCode?: unknown; message?: unknown };
+    const statusCode = typeof fe.statusCode === 'number' && fe.statusCode >= 400 ? fe.statusCode : 500;
     if (statusCode >= 500) app.log.error(err);
     return reply.code(statusCode).send({
       error: statusCode >= 500 ? 'internal' : 'bad_request',
-      message: statusCode >= 500 ? 'Something went wrong' : err.message,
+      message: statusCode >= 500 ? 'Something went wrong' : String(fe.message ?? 'Bad request'),
     });
   });
 

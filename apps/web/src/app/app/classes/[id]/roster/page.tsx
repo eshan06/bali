@@ -27,9 +27,7 @@ export default function RosterPage() {
 
   const remove = async (membershipId: string, name: string) => {
     if (!window.confirm(`Remove ${name} from this class? They can rejoin with the code.`)) return;
-    await api.del(`/memberships/${membershipId}`).catch(async () => {
-      // remove endpoint lands with W5 polish; decline works for pending only
-    });
+    await api.del(`/memberships/${membershipId}`);
     load();
   };
 

@@ -17,6 +17,7 @@ import {
   findOpenSessionForClass,
   getSessionDetail,
   grantPass,
+  removeMembership,
   setNoDevice,
   startSession,
 } from '../domain';
@@ -186,6 +187,13 @@ export function teacherRoutes(app: FastifyInstance): void {
       membershipId: req.params.id,
       approve: false,
     });
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { id: string } }>('/v1/memberships/:id', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    await removeMembership({ teacherId: teacher.id, schoolId: teacher.schoolId, membershipId: req.params.id });
     return { ok: true };
   });
 

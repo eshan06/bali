@@ -846,6 +846,44 @@ export async function joinByCode(opts: {
   };
 }
 
+export async function removeMembership(opts: {
+  teacherId: string;
+  schoolId: string;
+  membershipId: string;
+}): Promise<void> {
+  const db = getDb();
+  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, opts.membershipId) });
+  if (!membership) throw new HttpError(404, 'not_found', 'Membership not found');
+  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
+  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Membership not found');
+
+  const student = await db.query.students.findFirst({ where: eq(s.students.id, membership.studentId) });
+  const events: EventRow[] = [];
+  await db.transaction(async (tx) => {
+    await tx.delete(s.memberships).where(eq(s.memberships.id, opts.membershipId));
+    events.push(
+      await appendEvent(tx, {
+        schoolId: opts.schoolId,
+        classId: cls.id,
+        studentId: membership.studentId,
+        teacherId: opts.teacherId,
+        type: 'member_removed',
+        payload: {
+          studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+          className: cls.name,
+        },
+      }),
+    );
+  });
+  const open = await findOpenSessionForClass(cls.id);
+  publishEvents(open?.id ?? null, events);
+  // Roster shrank — push a fresh snapshot so a live grid drops the chip immediately.
+  if (open) {
+    const detail = await getSessionDetail(open.id);
+    bus.publish(open.id, { kind: 'snapshot', detail });
+  }
+}
+
 export async function decideMembership(opts: {
   teacherId: string;
   schoolId: string;

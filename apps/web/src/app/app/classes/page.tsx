@@ -142,7 +142,7 @@ export default function ClassesPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-30 bg-[rgba(22,19,16,0.42)]" />
           <Dialog.Content
-            className="fixed left-1/2 top-1/2 z-31 w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-md bg-surface-card p-6 shadow-3 focus:outline-none"
+            className="fixed left-1/2 top-1/2 z-[31] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-md bg-surface-card p-6 shadow-3 focus:outline-none"
             aria-describedby={undefined}
           >
             {created ? (
