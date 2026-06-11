@@ -1,0 +1,43 @@
+{
+  "UserAgent": "aws-amplify-cli/2.0",
+  "Version": "1.0",
+  "auth": {
+    "plugins": {
+      "awsCognitoAuthPlugin": {
+        "UserAgent": "aws-amplify-cli/0.1.0",
+        "Version": "0.1.0",
+        "IdentityManager": {
+          "Default": {}
+        },
+        "CognitoUserPool": {
+          "Default": {
+            "PoolId": "us-east-1_MwuzsGGtT",
+            "AppClientId": "3hsgud7pr2k0emhsodctqg4okd",
+            "Region": "us-east-1"
+          }
+        },
+        "Auth": {
+          "Default": {
+            "OAuth": {
+              "WebDomain": "bali-auth.auth.us-east-1.amazoncognito.com",
+              "AppClientId": "3hsgud7pr2k0emhsodctqg4okd",
+              "Scopes": ["openid", "email", "profile"],
+              "SignInRedirectURI": "balistudent://callback/",
+              "SignOutRedirectURI": "balistudent://signout/"
+            },
+            "authenticationFlowType": "USER_SRP_AUTH",
+            "usernameAttributes": ["EMAIL"],
+            "signupAttributes": ["EMAIL"],
+            "passwordProtectionSettings": {
+              "passwordPolicyMinLength": 8,
+              "passwordPolicyCharacters": []
+            },
+            "mfaConfiguration": "OFF",
+            "mfaTypes": ["SMS"],
+            "verificationMechanisms": ["EMAIL"]
+          }
+        }
+      }
+    }
+  }
+}
