@@ -27,11 +27,16 @@ async function studentGate(req: FastifyRequest, reply: FastifyReply): Promise<St
   return requireStudent(req, reply);
 }
 
+/** Per-route opt-in for the app-level rate limiter (keyed per bearer token). Limits sit
+ *  far above any honest cadence (heartbeat ≈ 2/min) — they exist to stop runaway
+ *  clients and code guessing, never a real student. */
+const limited = (max: number) => ({ config: { rateLimit: { max, timeWindow: '1 minute' } } });
+
 export function studentRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', authenticate);
 
   // ---------- join ----------
-  app.post('/v1/join', async (req, reply) => {
+  app.post('/v1/join', limited(10), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = joinBodySchema.parse(req.body);
@@ -121,7 +126,7 @@ export function studentRoutes(app: FastifyInstance): void {
   });
 
   // ---------- tag resolution (S4's four variants) ----------
-  app.post('/v1/tags/resolve', async (req, reply) => {
+  app.post('/v1/tags/resolve', limited(30), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = resolveTagBodySchema.parse(req.body);
@@ -172,7 +177,7 @@ export function studentRoutes(app: FastifyInstance): void {
   });
 
   // ---------- focus lifecycle ----------
-  app.post<{ Params: { id: string } }>('/v1/sessions/:id/tap-in', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/sessions/:id/tap-in', limited(30), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = tapInBodySchema.parse(req.body);
@@ -185,7 +190,7 @@ export function studentRoutes(app: FastifyInstance): void {
     });
   });
 
-  app.post<{ Params: { id: string } }>('/v1/sessions/:id/heartbeat', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/sessions/:id/heartbeat', limited(12), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = heartbeatBodySchema.parse(req.body);
@@ -198,7 +203,8 @@ export function studentRoutes(app: FastifyInstance): void {
     });
   });
 
-  app.post<{ Params: { id: string } }>('/v1/sessions/:id/unlock', async (req, reply) => {
+  // Generous ceiling: the emergency path must never be the thing a limiter blocks.
+  app.post<{ Params: { id: string } }>('/v1/sessions/:id/unlock', limited(30), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = unlockBodySchema.parse(req.body);
@@ -211,7 +217,7 @@ export function studentRoutes(app: FastifyInstance): void {
     });
   });
 
-  app.post<{ Params: { id: string } }>('/v1/unlocks/:id/reason', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/unlocks/:id/reason', limited(20), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const body = unlockReasonBodySchema.parse(req.body);
@@ -224,7 +230,7 @@ export function studentRoutes(app: FastifyInstance): void {
     return { ok: true };
   });
 
-  app.post<{ Params: { id: string } }>('/v1/sessions/:id/refocus', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/sessions/:id/refocus', limited(20), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     await refocus({ studentId: student.id, studentName: fullName(student), sessionId: req.params.id });
@@ -311,7 +317,7 @@ export function studentRoutes(app: FastifyInstance): void {
   });
 
   // ---------- leave class ----------
-  app.post<{ Params: { id: string } }>('/v1/memberships/:id/leave', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/memberships/:id/leave', limited(10), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
     const db = getDb();

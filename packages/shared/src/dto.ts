@@ -59,6 +59,8 @@ export const createClassBodySchema = z.object({
 });
 
 export const updateClassBodySchema = createClassBodySchema.partial().extend({
+  /** null detaches the policy (W6's "detach from N classes first" path). */
+  policyId: z.string().uuid().nullable().optional(),
   archived: z.boolean().optional(),
 });
 
