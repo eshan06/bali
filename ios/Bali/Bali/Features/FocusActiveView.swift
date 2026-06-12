@@ -10,6 +10,7 @@ struct FocusActiveView: View {
     var onExit: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var drawnIn = false
     @State private var now = Date()
     @State private var showReasonSheet = false
@@ -115,8 +116,12 @@ struct FocusActiveView: View {
         !isPass && remainingSeconds <= 120
     }
 
+    /// XL Dynamic Type (doc 04 S6.6): arc drops to 218pt, control grows to 76pt —
+    /// the layout adapts, nothing truncates.
+    private var isXLType: Bool { typeSize >= .xxLarge }
+
     private var heroArc: some View {
-        let arcSize: CGFloat = 244
+        let arcSize: CGFloat = isXLType ? 218 : 244
         let stroke: CGFloat = final2 ? 12 : 10
         let fill: Color = isPass ? Tokens.blue400 : (final2 ? Tokens.Dark.arcFinal2 : Tokens.Dark.arcFill)
         let timeColor: Color = final2 ? Tokens.green200 : Tokens.Dark.textPrimary
@@ -129,11 +134,11 @@ struct FocusActiveView: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text(countdownText)
-                    .font(.heroTime(56))
+                    .font(.heroTime(isXLType ? 50 : 56))
                     .monospacedDigit()
                     .foregroundColor(timeColor)
                 Text(isPass ? "pass ends \(passEndsLabel)" : "until \(endsLabel)")
-                    .font(.system(size: 15))
+                    .font(.system(size: isXLType ? 18 : 15))
                     .foregroundColor(Tokens.Dark.textSecondary)
             }
         }
@@ -152,7 +157,8 @@ struct FocusActiveView: View {
         VStack(spacing: 12) {
             EmergencyUnlockControl(
                 teacher: engine.teacherDisplayName,
-                isUnlocked: isUnlocked
+                isUnlocked: isUnlocked,
+                height: isXLType ? 76 : 64
             ) {
                 engine.emergencyUnlock()
             }
@@ -227,14 +233,13 @@ struct FocusActiveView: View {
 struct EmergencyUnlockControl: View {
     var teacher: String
     var isUnlocked: Bool
+    var height: CGFloat = 64
     var onUnlock: () -> Void
 
     @State private var holding = false
     @State private var fillFraction: CGFloat = 0
     @State private var holdTask: Task<Void, Never>?
     @State private var hapticTask: Task<Void, Never>?
-
-    private let height: CGFloat = 64
 
     var body: some View {
         GeometryReader { geo in
