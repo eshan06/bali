@@ -95,7 +95,7 @@ export default function LoginPage() {
             type="button"
             className="text-center text-[12px] text-ink-tertiary underline decoration-dotted hover:text-ink-secondary"
             onClick={() => {
-              void devSignIn('dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah').then(() => router.replace('/app'));
+              void devSignIn('dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher').then(() => router.replace('/app'));
             }}
           >
             Dev sign-in (local only)

@@ -117,7 +117,7 @@ final class TeacherStore: ObservableObject {
 
     func devSignIn() async {
         #if DEBUG
-        UserDefaults.standard.set("dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah", forKey: tokenKey)
+        UserDefaults.standard.set("dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher", forKey: tokenKey)
         await loadProfile()
         #endif
     }
