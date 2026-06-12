@@ -67,3 +67,30 @@ export function ReconnectingPill({ className }: { className?: string }) {
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={clsx('rounded-md border border-line bg-surface-card p-5', className)}>{children}</div>;
 }
+
+/** Flat filter pill (W8/W9): active = green-700 bg, white text. */
+export function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={clsx(
+        'rounded-full border px-3.5 py-1.5 text-[13px] font-medium leading-[18px] transition-colors duration-fast',
+        active
+          ? 'border-transparent bg-green-700 text-white'
+          : 'border-line bg-surface-card text-ink-secondary hover:bg-surface-sunken',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
