@@ -117,3 +117,19 @@ enum ScreenTime {
         #endif
     }
 }
+
+/// What the S10 shield screen reads (separate process — shared via the app group).
+/// Written when focus starts, cleared when shields drop.
+enum ShieldContext {
+    private static var suite: UserDefaults? { UserDefaults(suiteName: "group.com.bali.shared") }
+
+    static func set(teacher: String, endsAt: Date) {
+        suite?.set(teacher, forKey: "shield.teacher")
+        suite?.set(endsAt.timeIntervalSince1970, forKey: "shield.endsAt")
+    }
+
+    static func clear() {
+        suite?.removeObject(forKey: "shield.teacher")
+        suite?.removeObject(forKey: "shield.endsAt")
+    }
+}

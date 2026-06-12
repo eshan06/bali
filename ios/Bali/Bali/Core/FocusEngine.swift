@@ -40,6 +40,7 @@ final class FocusEngine: ObservableObject {
         self.session = session
         self.className = className
         self.teacherDisplayName = teacher
+        ShieldContext.set(teacher: teacher, endsAt: session.endsAt)
         screenTime.applyShields(allowedLabels: session.allowedAppLabels)
         state = .focused
         startHeartbeats()
@@ -53,6 +54,7 @@ final class FocusEngine: ObservableObject {
         self.teacherDisplayName = teacher
         switch mine?.state {
         case "focused":
+            ShieldContext.set(teacher: teacher, endsAt: session.endsAt)
             screenTime.applyShields(allowedLabels: session.allowedAppLabels)
             state = .focused
             startHeartbeats()
@@ -101,12 +103,14 @@ final class FocusEngine: ObservableObject {
     }
 
     func sessionEnded() {
+        ShieldContext.clear()
         screenTime.clearShields()
         heartbeatTask?.cancel()
         state = .ended
     }
 
     func reset() {
+        ShieldContext.clear()
         screenTime.clearShields()
         heartbeatTask?.cancel()
         state = .idle

@@ -10,20 +10,46 @@ struct HomeView: View {
     @State private var showJoin = false
     @State private var showTagEntry = false
     @State private var tapTarget: TagResolution?
+    @State private var navPath = NavigationPath()
+
+    init(student: StudentSelf) {
+        self.student = student
+        var path = NavigationPath()
+        #if DEBUG
+        // Screenshot/test seam: `simctl launch ... -bali.route settings|history`
+        switch UserDefaults.standard.string(forKey: "bali.route") {
+        case "settings": path.append("settings")
+        case "history":
+            path.append("settings")
+            path.append(SettingsRoute.history)
+        case "privacy":
+            path.append("settings")
+            path.append(SettingsRoute.privacy)
+        default: break
+        }
+        #endif
+        _navPath = State(initialValue: path)
+    }
 
     var body: some View {
-        ZStack {
-            Tokens.Dark.page.ignoresSafeArea()
+        NavigationStack(path: $navPath) {
+            ZStack {
+                Tokens.Dark.page.ignoresSafeArea()
 
-            if let engine = model.engine, model.focusPresented {
-                FocusActiveView(engine: engine) {
-                    model.focusPresented = false
-                    model.engine?.reset()
-                    Task { await model.load(api: auth.api) }
+                if let engine = model.engine, model.focusPresented {
+                    FocusActiveView(engine: engine) {
+                        model.focusPresented = false
+                        model.engine?.reset()
+                        Task { await model.load(api: auth.api) }
+                    }
+                } else {
+                    content
                 }
-            } else {
-                content
             }
+            .navigationDestination(for: String.self) { route in
+                if route == "settings" { SettingsView(student: student) }
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .task { await model.load(api: auth.api) }
@@ -52,9 +78,7 @@ struct HomeView: View {
                         .font(.system(size: 34, weight: .bold))
                         .foregroundColor(Tokens.Dark.textPrimary)
                     Spacer()
-                    Button {
-                        auth.signOut()
-                    } label: {
+                    NavigationLink(value: "settings") {
                         Image(systemName: "gearshape")
                             .font(.system(size: 20))
                             .foregroundColor(Tokens.Dark.textSecondary)
