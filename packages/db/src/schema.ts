@@ -80,6 +80,8 @@ export const teachers = pgTable(
     notifyEmergency: boolean('notify_emergency').notNull().default(true),
     notifyRevoked: boolean('notify_revoked').notNull().default(true),
     notifyWeekly: boolean('notify_weekly').notNull().default(false),
+    /** T5's third toggle — stored intent like the others (delivery is stubbed). */
+    notifyPassEndings: boolean('notify_pass_endings').notNull().default(false),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },

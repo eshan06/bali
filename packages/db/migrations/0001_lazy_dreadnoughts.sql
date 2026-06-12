@@ -1,0 +1,1 @@
+ALTER TABLE "teachers" ADD COLUMN "notify_pass_endings" boolean DEFAULT false NOT NULL;

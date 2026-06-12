@@ -147,6 +147,7 @@ export const updateSettingsBodySchema = z.object({
   notifyEmergency: z.boolean().optional(),
   notifyRevoked: z.boolean().optional(),
   notifyWeekly: z.boolean().optional(),
+  notifyPassEndings: z.boolean().optional(),
 });
 
 // ---------- response shapes (types only; server constructs, clients consume) ----------

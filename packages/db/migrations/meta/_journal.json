@@ -8,6 +8,13 @@
       "when": 1781165627920,
       "tag": "0000_far_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781231726986,
+      "tag": "0001_lazy_dreadnoughts",
+      "breakpoints": true
     }
   ]
 }

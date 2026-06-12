@@ -278,6 +278,7 @@ export function manageRoutes(app: FastifyInstance): void {
       notifyEmergency: row.notifyEmergency,
       notifyRevoked: row.notifyRevoked,
       notifyWeekly: row.notifyWeekly,
+      notifyPassEndings: row.notifyPassEndings,
     };
   });
 
@@ -296,6 +297,7 @@ export function manageRoutes(app: FastifyInstance): void {
           ...(body.notifyEmergency !== undefined ? { notifyEmergency: body.notifyEmergency } : {}),
           ...(body.notifyRevoked !== undefined ? { notifyRevoked: body.notifyRevoked } : {}),
           ...(body.notifyWeekly !== undefined ? { notifyWeekly: body.notifyWeekly } : {}),
+          ...(body.notifyPassEndings !== undefined ? { notifyPassEndings: body.notifyPassEndings } : {}),
           updatedAt: new Date(),
         })
         .where(eq(s.teachers.id, teacher.id));
@@ -314,6 +316,7 @@ export function manageRoutes(app: FastifyInstance): void {
       notifyEmergency: row!.notifyEmergency,
       notifyRevoked: row!.notifyRevoked,
       notifyWeekly: row!.notifyWeekly,
+      notifyPassEndings: row!.notifyPassEndings,
     };
   });
 }
