@@ -40,7 +40,7 @@ final class FocusEngine: ObservableObject {
         self.session = session
         self.className = className
         self.teacherDisplayName = teacher
-        screenTime.applyShields()
+        screenTime.applyShields(allowedLabels: session.allowedAppLabels)
         state = .focused
         startHeartbeats()
         await flushUnlockQueue()
@@ -53,7 +53,7 @@ final class FocusEngine: ObservableObject {
         self.teacherDisplayName = teacher
         switch mine?.state {
         case "focused":
-            screenTime.applyShields()
+            screenTime.applyShields(allowedLabels: session.allowedAppLabels)
             state = .focused
             startHeartbeats()
         case "pass":
@@ -93,7 +93,7 @@ final class FocusEngine: ObservableObject {
         guard let session else { return }
         do {
             try await api.postVoid("sessions/\(session.sessionId)/refocus", body: nil as EmptyBody?)
-            screenTime.applyShields()
+            screenTime.applyShields(allowedLabels: session.allowedAppLabels)
             state = .focused
         } catch {
             // stay unlocked; next heartbeat reconciles
@@ -147,7 +147,7 @@ final class FocusEngine: ObservableObject {
             if case .focused = state {} else if case .unlocked = state {
                 // teacher can't force re-focus; ignore
             } else {
-                screenTime.applyShields()
+                screenTime.applyShields(allowedLabels: session.allowedAppLabels)
                 state = .focused
             }
         default:

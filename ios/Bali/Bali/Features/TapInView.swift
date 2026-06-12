@@ -91,13 +91,33 @@ struct TapInView: View {
     var onStartFocus: (ResolvedSession, String, String) async -> Void
 
     @State private var busy = false
+    /// S5 gate: a ready tap with no stored bucket for this label set routes to
+    /// policy setup BEFORE the S4 confirmation (design doc 04 §S4).
+    @State private var needsPolicySetup: Bool
+
+    init(resolution: TagResolution, onStartFocus: @escaping (ResolvedSession, String, String) async -> Void) {
+        self.resolution = resolution
+        self.onStartFocus = onStartFocus
+        let labels = resolution.session?.allowedAppLabels ?? []
+        let needsSetup = resolution.variant == "ready" && !ScreenTime.make().hasSelection(forLabels: labels)
+        _needsPolicySetup = State(initialValue: needsSetup)
+    }
 
     var body: some View {
         ZStack {
             Tokens.Dark.page.ignoresSafeArea()
             switch resolution.variant {
             case "ready":
-                ready
+                if needsPolicySetup, let session = resolution.session {
+                    PolicySetupView(
+                        labels: session.allowedAppLabels,
+                        teacherDisplayName: resolution.teacherDisplayName
+                    ) {
+                        needsPolicySetup = false
+                    }
+                } else {
+                    ready
+                }
             case "session_not_started":
                 notStarted
             default:
