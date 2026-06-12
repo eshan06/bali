@@ -50,7 +50,11 @@ if (click) {
   await new Promise((r) => setTimeout(r, 700));
 }
 if (js) {
-  await Runtime.evaluate({ expression: js, awaitPromise: true });
+  const { exceptionDetails } = await Runtime.evaluate({
+    expression: `(async () => { ${js} })()`,
+    awaitPromise: true,
+  });
+  if (exceptionDetails) console.error('js error:', exceptionDetails.text, exceptionDetails.exception?.description ?? '');
   await new Promise((r) => setTimeout(r, 700));
 }
 
