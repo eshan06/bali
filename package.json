@@ -19,5 +19,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "chrome-remote-interface": "^0.34.0"
   }
 }
