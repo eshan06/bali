@@ -285,8 +285,10 @@ Dropped vars: `API_KEY` (auth model change), `DATABASE_SSL` (encoded in the URL'
    Revocation while app alive is caught by heartbeat; while dead, by next launch.
 6. **W10 email toggles.** Stored as prefs; actual email delivery is out of scope (no
    templates in the design). Stub notifier logs intent. UI ships per spec.
-7. **Teacher iOS Google sign-in** would need a new redirect URI on the pool client →
-   teacher iOS uses email/password SRP only; zero Cognito changes. Web keeps Google.
+7. **Teacher iOS Google sign-in** — initially skipped to avoid pool changes; added in
+   session 2 via Cognito Hosted UI (`signInWithWebUI`, ASWebAuthenticationSession)
+   reusing the already-registered `balistudent://callback/` redirect — still zero
+   Cognito changes. Web keeps Google; student iOS stays SRP-only.
 8. **QR codes** render as real SVG (design: "render real ones") encoding the W2 URL.
 9. **Demo data** (`Ms. Rivera / Period 3 / 28 students / KM3W7Q2A / T7XK2M9QPF`) ships
    as `npm run db:seed` for dev/demo only — never auto-applied.
