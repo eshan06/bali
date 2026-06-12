@@ -24,8 +24,17 @@ export function getPool(): pg.Pool {
     pool = new pg.Pool({
       connectionString: url,
       max: 10,
+      // Retire idle clients before RDS does — its idle timeout sends ECONNRESETs.
+      idleTimeoutMillis: 30_000,
+      keepAlive: true,
       // RDS requires TLS; the instance uses an AWS-managed cert not in the local trust store.
       ssl: url.includes('sslmode=disable') ? undefined : { rejectUnauthorized: false },
+    });
+    // An idle pooled client dropping (RDS timeout, network blip) emits 'error' on the
+    // pool; without a listener Node kills the whole process. Log and let the pool
+    // replace the client — in-flight queries get their own errors via their callers.
+    pool.on('error', (err) => {
+      console.error('pg pool: idle client error (recovering):', err.message);
     });
   }
   return pool;
