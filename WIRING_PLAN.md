@@ -321,6 +321,12 @@ Dropped vars: `API_KEY` (auth model change), `DATABASE_SSL` (encoded in the URL'
 20. **S5 count check** counts apps+categories+sites in the student's picker selection
     against the policy's label count, per the mock's copy ("The policy lists 3 — …");
     Messages, when allowed, rides the student's selection like any other pick.
+21. **Demo-teacher ownership** (2026-06-11): the seeded "Ms. Rivera" row was
+    transferred to the user's real Cognito account (toeshanshah@gmail.com) — found by
+    sub, no adoption step. Dev-token teacher flows moved to a sandbox identity, and
+    both integration suites became fully self-contained (own class/tag/joins) so they
+    never touch the real teacher's data. Idle-pool `error` handling + keepalive added
+    to packages/db client after an RDS idle reset crashed the API process.
 
 ## 9. Phase 2 build order (each step leaves the repo runnable)
 

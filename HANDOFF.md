@@ -184,7 +184,19 @@ bali/
 ## 5. How to run everything
 
 Env files unchanged from session 1 (root `.env` + `apps/web/.env.local`, real values
-untracked; recreate from `legacy/` per WIRING_PLAN §7 if lost).
+untracked; recreate from `legacy/` per WIRING_PLAN §7 if lost). `SEED_TEACHER_EMAIL`
+is now `toeshanshah@gmail.com`.
+
+**Who owns what (since 2026-06-11):** the demo teacher row ("Ms. Rivera", all Period
+classes, code KM3W7Q2A, tag T7XK2M9QPF) is owned by the user's REAL Cognito account
+(`toeshanshah@gmail.com`) — sign in with email+password on web or either iOS app and
+the demo world is there. Dev-token flows (`dev:t-sandbox:…`) own a separate "Slice
+Sandbox" world that the integration tests create for themselves; the suites never
+touch the real teacher's classes and can run during live demos. Two cautions:
+(1) don't create a STUDENT account with the teacher's email — same Cognito sub, and
+`/v1/me` resolves teacher-first, so the student app would loop; use any other email
+(a `+alias` works). (2) avoid the web "Continue with Google" button for that email —
+Google federation mints a different sub and would create a second, empty teacher.
 
 ```bash
 cd ~/Downloads/github/bali
@@ -196,7 +208,7 @@ python3 scripts/manage-test.py   # e2e management/report surface
 # screenshots: launch Chrome headless once →
 #   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
 #     --remote-debugging-port=9222 --user-data-dir=/tmp/bali-chrome about:blank &
-#   node scripts/shot.mjs http://localhost:3000/app/reports /tmp/x.png --token 'dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah'
+#   node scripts/shot.mjs http://localhost:3000/app/reports /tmp/x.png --token 'dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher'
 ```
 
 **iOS Simulator** (iPhone 17 Pro `34AD32D3-B30E-450C-831F-9E70312574F7` has both apps):
@@ -207,7 +219,7 @@ cd ios/Bali
 xcodebuild -project Bali.xcodeproj -scheme Bali        -destination "id=$SIM" build
 xcodebuild -project Bali.xcodeproj -scheme BaliTeacher -destination "id=$SIM" build
 # student dev auth:  defaults write com.bali.Bali bali.devToken "dev:s-jordan::Jordan Park"
-# teacher dev auth:  defaults write com.bali.teacher bali.teacher.devToken "dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah"
+# teacher dev auth:  defaults write com.bali.teacher bali.teacher.devToken "dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher"
 # DEBUG screenshot seams: -bali.onboardingStep N · -bali.route settings|history|privacy ·
 #                         -bali.teacher.route live
 ```
