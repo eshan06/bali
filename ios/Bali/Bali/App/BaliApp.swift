@@ -19,6 +19,7 @@ struct BaliApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var auth: AuthStore
+    @AppStorage(OnboardingView.doneKey) private var onboarded = false
 
     var body: some View {
         switch auth.phase {
@@ -34,7 +35,11 @@ struct RootView: View {
         case let .needsConfirmation(email, password):
             ConfirmCodeView(email: email, password: password)
         case let .ready(student):
-            HomeView(student: student)
+            if onboarded {
+                HomeView(student: student)
+            } else {
+                OnboardingView { onboarded = true }
+            }
         }
     }
 }
