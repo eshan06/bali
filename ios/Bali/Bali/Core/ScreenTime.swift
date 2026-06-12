@@ -118,6 +118,41 @@ enum ScreenTime {
     }
 }
 
+#if canImport(DeviceActivity) && !targetEnvironment(simulator)
+import DeviceActivity
+
+/// Dead-app safety net: a DeviceActivity window whose `intervalDidEnd` (in the
+/// BaliMonitor extension) clears shields even if Bali was killed mid-session.
+/// The live engine still clears at the real bell; this is the backstop.
+enum SessionWatchdog {
+    private static let activity = DeviceActivityName("bali.session")
+
+    static func arm(endsAt: Date) {
+        let now = Date()
+        // DeviceActivity rejects windows under 15 minutes — pad short (demo)
+        // sessions; real periods exceed it and end exactly at the bell.
+        let end = max(endsAt, now.addingTimeInterval(15 * 60 + 30))
+        let cal = Calendar.current
+        let comps: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: cal.dateComponents(comps, from: now),
+            intervalEnd: cal.dateComponents(comps, from: end),
+            repeats: false
+        )
+        try? DeviceActivityCenter().startMonitoring(activity, during: schedule)
+    }
+
+    static func disarm() {
+        DeviceActivityCenter().stopMonitoring([activity])
+    }
+}
+#else
+enum SessionWatchdog {
+    static func arm(endsAt _: Date) {}
+    static func disarm() {}
+}
+#endif
+
 /// What the S10 shield screen reads (separate process — shared via the app group).
 /// Written when focus starts, cleared when shields drop.
 enum ShieldContext {

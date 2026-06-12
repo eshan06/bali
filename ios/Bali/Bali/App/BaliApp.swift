@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct BaliApp: App {
     @StateObject private var auth = AuthStore()
+    @StateObject private var deepLinks = DeepLinks()
 
     init() {
         AmplifyAuth.configure()
@@ -12,7 +13,9 @@ struct BaliApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(auth)
+                .environmentObject(deepLinks)
                 .task { await auth.start() }
+                .onOpenURL { deepLinks.handle($0) }
         }
     }
 }

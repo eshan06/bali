@@ -10,6 +10,7 @@
 		BA100051 /* Amplify in Frameworks */ = {isa = PBXBuildFile; productRef = BA100050 /* Amplify */; };
 		BA100053 /* AWSCognitoAuthPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = BA100052 /* AWSCognitoAuthPlugin */; };
 		BA100065 /* BaliShield.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA100060 /* BaliShield.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BA100085 /* BaliMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA100080 /* BaliMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,6 +20,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = BA100061;
 			remoteInfo = BaliShield;
+		};
+		BA100086 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BA100000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA100081;
+			remoteInfo = BaliMonitor;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -30,6 +38,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				BA100065 /* BaliShield.appex in Embed Foundation Extensions */,
+				BA100085 /* BaliMonitor.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -39,6 +48,7 @@
 /* Begin PBXFileReference section */
 		BA10000A /* Bali.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bali.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA100060 /* BaliShield.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaliShield.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA100080 /* BaliMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaliMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -60,6 +70,15 @@
 			path = BaliShield;
 			sourceTree = "<group>";
 		};
+		BA100082 /* BaliMonitor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = BaliMonitor;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +98,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BA100084 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -87,6 +113,7 @@
 			children = (
 				BA100001 /* Bali */,
 				BA100062 /* BaliShield */,
+				BA100082 /* BaliMonitor */,
 				BA100003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -96,6 +123,7 @@
 			children = (
 				BA10000A /* Bali.app */,
 				BA100060 /* BaliShield.appex */,
+				BA100080 /* BaliMonitor.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -116,6 +144,7 @@
 			);
 			dependencies = (
 				BA100067 /* PBXTargetDependency */,
+				BA100087 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BA100001 /* Bali */,
@@ -150,6 +179,27 @@
 			productReference = BA100060 /* BaliShield.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BA100081 /* BaliMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA100089 /* Build configuration list for PBXNativeTarget "BaliMonitor" */;
+			buildPhases = (
+				BA100083 /* Sources */,
+				BA100084 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BA100082 /* BaliMonitor */,
+			);
+			name = BaliMonitor;
+			packageProductDependencies = (
+			);
+			productName = BaliMonitor;
+			productReference = BA100080 /* BaliMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXTargetDependency section */
@@ -157,6 +207,11 @@
 			isa = PBXTargetDependency;
 			target = BA100061 /* BaliShield */;
 			targetProxy = BA100066 /* PBXContainerItemProxy */;
+		};
+		BA100087 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA100081 /* BaliMonitor */;
+			targetProxy = BA100086 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -193,6 +248,7 @@
 			targets = (
 				BA100010 /* Bali */,
 				BA100061 /* BaliShield */,
+				BA100081 /* BaliMonitor */,
 			);
 		};
 /* End PBXProject section */
@@ -216,6 +272,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		BA100063 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA100083 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -372,6 +435,52 @@
 			};
 			name = Release;
 		};
+		BA100090 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaliMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "BaliMonitor-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bali.Bali.BaliMonitor;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BA100091 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaliMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "BaliMonitor-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bali.Bali.BaliMonitor;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -398,6 +507,15 @@
 			buildConfigurations = (
 				BA100070 /* Debug */,
 				BA100071 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BA100089 /* Build configuration list for PBXNativeTarget "BaliMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA100090 /* Debug */,
+				BA100091 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -42,5 +42,19 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- W2's "Open in Bali" deep link: bali://t/<code> resolves the tag in-app. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.bali.Bali</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bali</string>
+			</array>
+		</dict>
+	</array>
+	<key>NFCReaderUsageDescription</key>
+	<string>Bali reads your class's desk tag to start focus.</string>
 </dict>
 </plist>

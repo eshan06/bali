@@ -42,6 +42,7 @@ final class FocusEngine: ObservableObject {
         self.teacherDisplayName = teacher
         ShieldContext.set(teacher: teacher, endsAt: session.endsAt)
         screenTime.applyShields(allowedLabels: session.allowedAppLabels)
+        SessionWatchdog.arm(endsAt: session.endsAt)
         state = .focused
         startHeartbeats()
         await flushUnlockQueue()
@@ -56,6 +57,7 @@ final class FocusEngine: ObservableObject {
         case "focused":
             ShieldContext.set(teacher: teacher, endsAt: session.endsAt)
             screenTime.applyShields(allowedLabels: session.allowedAppLabels)
+            SessionWatchdog.arm(endsAt: session.endsAt)
             state = .focused
             startHeartbeats()
         case "pass":
@@ -105,6 +107,7 @@ final class FocusEngine: ObservableObject {
     func sessionEnded() {
         ShieldContext.clear()
         screenTime.clearShields()
+        SessionWatchdog.disarm()
         heartbeatTask?.cancel()
         state = .ended
     }
@@ -112,6 +115,7 @@ final class FocusEngine: ObservableObject {
     func reset() {
         ShieldContext.clear()
         screenTime.clearShields()
+        SessionWatchdog.disarm()
         heartbeatTask?.cancel()
         state = .idle
         session = nil
@@ -139,6 +143,12 @@ final class FocusEngine: ObservableObject {
         if result.session.endedAt != nil || result.session.endsAt <= Date() {
             sessionEnded()
             return
+        }
+        // Teacher extended the session: move the watchdog and the shield subtitle.
+        if result.session.endsAt != session.endsAt {
+            self.session?.endsAt = result.session.endsAt
+            ShieldContext.set(teacher: teacherDisplayName, endsAt: result.session.endsAt)
+            SessionWatchdog.arm(endsAt: result.session.endsAt)
         }
         // Server is the truth for cross-device transitions (passes granted, etc.)
         switch result.state {

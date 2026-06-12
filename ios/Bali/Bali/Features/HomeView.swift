@@ -6,10 +6,12 @@ struct HomeView: View {
     let student: StudentSelf
 
     @EnvironmentObject private var auth: AuthStore
+    @EnvironmentObject private var deepLinks: DeepLinks
     @StateObject private var model = HomeModel()
     @State private var showJoin = false
     @State private var showTagEntry = false
     @State private var tapTarget: TagResolution?
+    @State private var nfcHint: String?
     @State private var navPath = NavigationPath()
 
     init(student: StudentSelf) {
@@ -68,6 +70,39 @@ struct HomeView: View {
                 await model.startFocus(api: auth.api, session: session, className: className, teacher: teacher)
             }
         }
+        .onReceive(deepLinks.$pendingTagCode) { code in
+            guard let code else { return }
+            deepLinks.pendingTagCode = nil
+            Task { await resolveTag(code: code) }
+        }
+    }
+
+    /// One resolve path for NFC taps, deep links, and the Simulator's entry sheet.
+    private func resolveTag(code: String) async {
+        do {
+            let resolution = try await auth.api.post("tags/resolve", body: ResolveBody(code: code), as: TagResolution.self)
+            tapTarget = resolution
+        } catch {
+            nfcHint = "This tag isn't active — check with your teacher."
+        }
+    }
+
+    /// Device: real NFC scan. Simulator / NFC-less device: the tag-entry sheet.
+    private func tapDeskTag() {
+        #if !targetEnvironment(simulator) && canImport(CoreNFC)
+        if TagCodeReader.isAvailable {
+            Task {
+                do {
+                    let code = try await TagCodeReader().scan()
+                    await resolveTag(code: code)
+                } catch {
+                    if let message = (error as? LocalizedError)?.errorDescription { nfcHint = message }
+                }
+            }
+            return
+        }
+        #endif
+        showTagEntry = true
     }
 
     private var content: some View {
@@ -245,8 +280,14 @@ struct HomeView: View {
 
     private var actions: some View {
         VStack(spacing: 10) {
+            if let nfcHint {
+                Text(nfcHint)
+                    .font(.system(size: 13))
+                    .foregroundColor(Tokens.Dark.textSecondary)
+                    .frame(maxWidth: .infinity)
+            }
             Button {
-                showTagEntry = true
+                tapDeskTag()
             } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "wave.3.right.circle")
