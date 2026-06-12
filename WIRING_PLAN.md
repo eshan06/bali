@@ -291,7 +291,36 @@ Dropped vars: `API_KEY` (auth model change), `DATABASE_SSL` (encoded in the URL'
 9. **Demo data** (`Ms. Rivera / Period 3 / 28 students / KM3W7Q2A / T7XK2M9QPF`) ships
    as `npm run db:seed` for dev/demo only — never auto-applied.
 10. **Rate limiting / abuse**: light `@fastify/rate-limit` defaults on student write
-    routes; full hardening is post-MVP.
+    routes; full hardening is post-MVP. *(Done in 2b: per-route opt-in, keyed by bearer
+    token — never by IP, a classroom shares one school IP.)*
+
+### Session-2 (2b/2c) deviations — each: what → why
+
+11. **W8 focus-minutes denominator** is the school's real longest scheduled period
+    (45 min with the demo seed), not the mock's literal 50 — the caption renders
+    "Out of a {N}-minute period" with the true N. Honesty beats mock fidelity.
+12. **Pending unlock reasons in W8** render "pending" in tertiary (same quiet weight
+    as "skipped") — the design mocked no pending row; "reason pending" is the
+    established W4 vocabulary.
+13. **Tag reactivation** emits a `tag_created` event (renders "Tag … is live" — literally
+    true) instead of adding a `tag_reactivated` enum value + migration.
+14. **Policy delete** also nulls `sessions.policyId` / archived classes' `policyId`
+    inside the tx — FK provenance pointers only; `policy_snapshot` stays the truth.
+15. **S8 entry point** (design gap: no History link drawn anywhere): a History row in
+    S9 Settings; the S3 gear navigates to S9.
+16. **`notify_pass_endings` column added** (migration 0001) so T5's third toggle stores
+    real intent instead of mislabeling an existing field. W10 still shows the
+    designed three (emergency/permission/weekly).
+17. **Teacher iOS navigation** is a 3-tab TabView (Classes/Tags/Passes) — the mocks'
+    pill nav is a reviewer aid, not product chrome; tabs are the honest iOS idiom.
+18. **DeviceActivity watchdog** (shields clear at the bell even if the app is killed)
+    pads sub-15-minute sessions to iOS's 15-minute schedule minimum — the live engine
+    still ends exactly at the bell; the watchdog is only the dead-app backstop.
+19. **`bali://` URL scheme** registered on the student app only; the teacher app needs
+    no deep links (and no new Cognito callback URIs).
+20. **S5 count check** counts apps+categories+sites in the student's picker selection
+    against the policy's label count, per the mock's copy ("The policy lists 3 — …");
+    Messages, when allowed, rides the student's selection like any other pick.
 
 ## 9. Phase 2 build order (each step leaves the repo runnable)
 
