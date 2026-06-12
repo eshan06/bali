@@ -11,6 +11,8 @@
 		BA100053 /* AWSCognitoAuthPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = BA100052 /* AWSCognitoAuthPlugin */; };
 		BA100065 /* BaliShield.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA100060 /* BaliShield.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BA100085 /* BaliMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA100080 /* BaliMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BA1000B6 /* Amplify in Frameworks */ = {isa = PBXBuildFile; productRef = BA1000B8 /* Amplify */; };
+		BA1000B7 /* AWSCognitoAuthPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = BA1000B9 /* AWSCognitoAuthPlugin */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +51,7 @@
 		BA10000A /* Bali.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Bali.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA100060 /* BaliShield.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaliShield.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA100080 /* BaliMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaliMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA1000B0 /* BaliTeacher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BaliTeacher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +82,24 @@
 			path = BaliMonitor;
 			sourceTree = "<group>";
 		};
+		BA1000A0 /* BaliCore */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = BaliCore;
+			sourceTree = "<group>";
+		};
+		BA1000B2 /* BaliTeacher */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = BaliTeacher;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +126,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BA1000B4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA1000B6 /* Amplify in Frameworks */,
+				BA1000B7 /* AWSCognitoAuthPlugin in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -112,6 +142,8 @@
 			isa = PBXGroup;
 			children = (
 				BA100001 /* Bali */,
+				BA1000A0 /* BaliCore */,
+				BA1000B2 /* BaliTeacher */,
 				BA100062 /* BaliShield */,
 				BA100082 /* BaliMonitor */,
 				BA100003 /* Products */,
@@ -122,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				BA10000A /* Bali.app */,
+				BA1000B0 /* BaliTeacher.app */,
 				BA100060 /* BaliShield.appex */,
 				BA100080 /* BaliMonitor.appex */,
 			);
@@ -148,6 +181,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				BA100001 /* Bali */,
+				BA1000A0 /* BaliCore */,
 			);
 			name = Bali;
 			packageProductDependencies = (
@@ -200,6 +234,31 @@
 			productReference = BA100080 /* BaliMonitor.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BA1000B1 /* BaliTeacher */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA1000BA /* Build configuration list for PBXNativeTarget "BaliTeacher" */;
+			buildPhases = (
+				BA1000B3 /* Sources */,
+				BA1000B4 /* Frameworks */,
+				BA1000B5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BA1000B2 /* BaliTeacher */,
+				BA1000A0 /* BaliCore */,
+			);
+			name = BaliTeacher;
+			packageProductDependencies = (
+				BA1000B8 /* Amplify */,
+				BA1000B9 /* AWSCognitoAuthPlugin */,
+			);
+			productName = BaliTeacher;
+			productReference = BA1000B0 /* BaliTeacher.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXTargetDependency section */
@@ -247,6 +306,7 @@
 			projectRoot = "";
 			targets = (
 				BA100010 /* Bali */,
+				BA1000B1 /* BaliTeacher */,
 				BA100061 /* BaliShield */,
 				BA100081 /* BaliMonitor */,
 			);
@@ -255,6 +315,13 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		BA100022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA1000B5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -279,6 +346,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		BA100083 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BA1000B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -383,6 +457,48 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bali.Bali;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		BA1000BB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaliTeacher.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "BaliTeacher-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bali.teacher;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BA1000BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaliTeacher.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H535678UF8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "BaliTeacher-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bali.teacher;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -520,6 +636,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		BA1000BA /* Build configuration list for PBXNativeTarget "BaliTeacher" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA1000BB /* Debug */,
+				BA1000BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -540,6 +665,16 @@
 			productName = Amplify;
 		};
 		BA100052 /* AWSCognitoAuthPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA100049 /* XCRemoteSwiftPackageReference "amplify-swift" */;
+			productName = AWSCognitoAuthPlugin;
+		};
+		BA1000B8 /* Amplify */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA100049 /* XCRemoteSwiftPackageReference "amplify-swift" */;
+			productName = Amplify;
+		};
+		BA1000B9 /* AWSCognitoAuthPlugin */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BA100049 /* XCRemoteSwiftPackageReference "amplify-swift" */;
 			productName = AWSCognitoAuthPlugin;

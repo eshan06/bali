@@ -53,6 +53,10 @@ final class APIClient {
         try await request("POST", path, body: body, as: type)
     }
 
+    func patch<T: Decodable, B: Encodable>(_ path: String, body: B?, as type: T.Type) async throws -> T {
+        try await request("PATCH", path, body: body, as: type)
+    }
+
     @discardableResult
     func postVoid<B: Encodable>(_ path: String, body: B?) async throws -> Bool {
         _ = try await request("POST", path, body: body, as: OkResponse.self)

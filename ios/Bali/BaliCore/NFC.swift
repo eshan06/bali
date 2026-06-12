@@ -103,6 +103,95 @@ final class TagCodeReader: NSObject, NFCNDEFReaderSessionDelegate, @unchecked Se
         continuation = nil
     }
 }
+/// T4's write flow: puts the server-issued code onto a physical NDEF tag as a
+/// well-known text record (the student reader and QR both resolve the same code).
+final class TagCodeWriter: NSObject, NFCNDEFReaderSessionDelegate, @unchecked Sendable {
+    static var isAvailable: Bool { NFCNDEFReaderSession.readingAvailable }
+
+    private var session: NFCNDEFReaderSession?
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var code = ""
+
+    enum WriteError: LocalizedError {
+        case cancelled
+        case notWritable
+        case failed(String)
+        var errorDescription: String? {
+            switch self {
+            case .cancelled: return nil
+            case .notWritable: return "This tag can't be written — try a blank NDEF sticker."
+            case .failed(let message): return message
+            }
+        }
+    }
+
+    func write(code: String) async throws {
+        self.code = code
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            let session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: false)
+            session.alertMessage = "Hold your iPhone near the tag to write it."
+            self.session = session
+            session.begin()
+        }
+    }
+
+    func readerSession(_ session: NFCNDEFReaderSession, didDetectNDEFs messages: [NFCNDEFMessage]) {
+        // unused — tag delegate below handles writing
+    }
+
+    func readerSession(_ session: NFCNDEFReaderSession, didDetect tags: [NFCNDEFTag]) {
+        guard let tag = tags.first else { return }
+        session.connect(to: tag) { [weak self] error in
+            guard let self else { return }
+            if let error {
+                session.invalidate(errorMessage: error.localizedDescription)
+                self.resume(throwing: WriteError.failed(error.localizedDescription))
+                return
+            }
+            tag.queryNDEFStatus { status, _, _ in
+                guard status == .readWrite else {
+                    session.invalidate(errorMessage: "This tag isn't writable.")
+                    self.resume(throwing: WriteError.notWritable)
+                    return
+                }
+                guard let payload = NFCNDEFPayload.wellKnownTypeTextPayload(string: self.code, locale: Locale(identifier: "en")) else {
+                    session.invalidate(errorMessage: "Couldn't build the tag payload.")
+                    self.resume(throwing: WriteError.failed("Couldn't build the tag payload."))
+                    return
+                }
+                tag.writeNDEF(NFCNDEFMessage(records: [payload])) { writeError in
+                    if let writeError {
+                        session.invalidate(errorMessage: writeError.localizedDescription)
+                        self.resume(throwing: WriteError.failed(writeError.localizedDescription))
+                    } else {
+                        session.alertMessage = "Tag written."
+                        session.invalidate()
+                        self.resume()
+                    }
+                }
+            }
+        }
+    }
+
+    func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {
+        if (error as? NFCReaderError)?.code == .readerSessionInvalidationErrorUserCanceled {
+            resume(throwing: WriteError.cancelled)
+        } else {
+            resume(throwing: WriteError.failed(error.localizedDescription))
+        }
+        self.session = nil
+    }
+
+    private func resume(throwing error: Error? = nil) {
+        if let error {
+            continuation?.resume(throwing: error)
+        } else {
+            continuation?.resume(returning: ())
+        }
+        continuation = nil
+    }
+}
 #endif
 
 /// `bali://t/<code>` — W2's "Open in Bali" lands here.

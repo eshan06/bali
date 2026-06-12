@@ -60,6 +60,26 @@ enum Tokens {
         static let textPrimary = Color(hex: 0x211F1B)
         static let textSecondary = Color(hex: 0x5B564E)
         static let textTertiary = Color(hex: 0x8A847A)
+        static let arcTrack = Color(hex: 0xE3DFD8)
+        static let arcFill = Tokens.green600
+        static let actionPrimaryBg = Tokens.green700
+        static let actionPrimaryFg = Color.white
+        /// Destructive text (End session…) — red only for revoked/destructive.
+        static let red600 = Color(hex: 0xA93D31)
+        // State chip pairs (light) — each >=4.5:1 per the token sheet.
+        static let stateFocusedFg = Tokens.green700
+        static let stateFocusedBg = Tokens.green100
+        static let stateNotjoinedFg = Color(hex: 0x524E47)
+        static let stateNotjoinedBg = Color(hex: 0xEFECE7)
+        static let statePassFg = Color(hex: 0x28528E)
+        static let statePassBg = Color(hex: 0xE0EBFA)
+        static let stateEmergencyFg = Color(hex: 0x6F3F1B)
+        static let stateEmergencyBg = Color(hex: 0xF7E6D2)
+        static let stateRevokedFg = Color(hex: 0x8C342B)
+        static let stateRevokedBg = Color(hex: 0xFAE3E0)
+        static let stateNodeviceFg = Color(hex: 0x6B665D)
+        static let stateEndedFg = Color(hex: 0x6B665D)
+        static let stateEndedBg = Color(hex: 0xEFECE7)
     }
 }
 
