@@ -105,3 +105,21 @@
     transition: none;
   }
 }
+
+/* W7 print sheet: when printing, only the sheet exists. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible;
+  }
+  .print-sheet {
+    position: fixed;
+    inset: 0;
+    display: flex !important;
+    justify-content: center;
+    background: #fff;
+  }
+}
