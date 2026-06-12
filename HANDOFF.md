@@ -1,4 +1,72 @@
-# Bali v2 — Session Handoff (updated 2026-06-11, end of build session 2)
+# Bali v2 — Session Handoff
+
+## ⚡ SESSION 3 — START HERE (written 2026-06-12, mid device-test)
+
+Everything below the session-2 header further down is still accurate background.
+This block is what changed since, and exactly where we stopped.
+
+### What changed after the session-2 handoff was written (all committed AND pushed — origin/main == main @ ccbfce8)
+
+1. **Demo-teacher ownership transferred to the real account.** The "Ms. Rivera" row
+   (all Period classes, join code KM3W7Q2A, tag T7XK2M9QPF) now belongs to the user's
+   real Cognito identity **toeshanshah@gmail.com — which is a GOOGLE-FEDERATED user
+   (no password exists; never offer it email/password sign-in)**. Found by sub, no
+   adoption step. `SEED_TEACHER_EMAIL` in `.env` updated to match.
+   ⚠️ Never create a STUDENT account with that email (same sub; /v1/me resolves
+   teacher-first → student app would loop). For the student device test use
+   `toeshanshah+student@gmail.com` (same inbox, distinct Cognito user).
+2. **Dev-token flows moved to a sandbox**: `dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher`
+   owns only the tests' "Slice Sandbox" class. Both python suites are now fully
+   self-contained (create own class/tag, students join by code) and safe to run during
+   live demos. Web dev sign-in button + teacher iOS DEBUG dev sign-in use the sandbox.
+3. **Google sign-in shipped on the teacher iOS app** (Cognito Hosted UI via
+   ASWebAuthenticationSession, reusing the already-registered `balistudent://callback/`
+   redirect — zero Cognito changes). Web Google sign-in already worked.
+4. **DB pool resilience**: an RDS idle reset emitted an unhandled pool 'error' and
+   killed the API process mid-session. Fixed in packages/db/src/client.ts (error
+   handler + keepalive + 30s idle timeout). If the API ever seems dead, check
+   /tmp/bali-api.log — and note `tsx watch` does NOT restart on crash.
+5. **BALI_DEV_API_HOST persists** from the devicectl launch env into UserDefaults, so
+   icon-tap relaunches on the phone keep talking to the Mac (10.0.0.115:3001).
+
+### Exact device-test position (iPhone 15 Pro, UDID 00008130-000A1D29260B803A / devicectl id CB970F97-E09E-5D3F-99E2-83B775E5C520)
+
+- Both apps installed and launched with `BALI_DEV_API_HOST=10.0.0.115`; user has a
+  blank NFC sticker ready. API + web dev servers were running on the Mac.
+- **Next user action (where we stopped): teacher app → "Continue with Google" →
+  pick toeshanshah@gmail.com → should land on all four Period classes.** If classes
+  come back EMPTY, the Google-federated sub differs from the row's sub
+  (54a84478-d021-7062-e9fa-19c6bf75c340) — repoint the teachers row to whatever sub
+  the sign-in minted (check API log or query teachers for the new orphan row).
+- Then the scripted flow: write NFC sticker (Tags tab → Period 3) → start session
+  (≥15 min for the watchdog test) → student app: create account with the +student
+  alias → S1 permission → join KM3W7Q2A → approve on web (localhost:3000, Google
+  sign-in) → tap sticker → S5 picker (ALSO select "Bali Teacher" — shields are
+  device-wide and both apps share the phone) → Start Focus → shield screen check →
+  airplane-mode emergency unlock → pass → kill-app watchdog at the bell.
+- Task #18 (device pass + VoiceOver listening pass) is the only open build task.
+
+### The new backlog: ROADMAP.md (root)
+
+36 adversarially-verified improvement ideas across student/teacher/admin/design-gap
+lenses, each with file:line evidence and build corrections. Recommended order is at
+the top: P0 honesty-bug cluster first (arc math, reason queue, S2 preview, S6
+reconnect pill, email notifier), then Live Activity / phone approvals / teacher
+invite code. Read it before starting any new feature work.
+
+### Session-3 cadence reminders
+
+- Commits as eshan06, multiple focused commits, NO Claude attribution. Pushing is
+  allowed when the user asks (he had us push session 2).
+- Verify the world first: dev servers up → `npm test -w packages/shared` →
+  `python3 scripts/slice-test.py` → `python3 scripts/manage-test.py`.
+- iOS builds: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- Headless Chrome screenshot harness: scripts/shot.mjs (Chrome with
+  --remote-debugging-port=9222 must be running).
+
+---
+
+# Session 2 handoff (still-accurate background) — originally titled: Bali v2 — Session Handoff (updated 2026-06-11, end of build session 2)
 
 > **Who this is for:** the next working session (Claude Code acting as principal engineer
 > on Bali, or any engineer picking this up). Read this file, then the documents it chains
