@@ -7,7 +7,7 @@ import urllib.request
 import urllib.error
 
 BASE = "http://localhost:3001/v1"
-TEACHER = "dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah"
+TEACHER = "dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher"
 
 
 def call(method, path, token=None, body=None, expect=None, raw=False, headers=None):

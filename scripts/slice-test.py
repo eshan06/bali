@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end server-side slice test against the live local API + RDS bali_v2."""
+"""End-to-end server-side slice test against the live local API + RDS bali_v2.
+
+Self-contained: builds (and reuses) its own sandbox — a dev teacher, one class,
+one tag — and enrolls the two dev students by join code. It never touches the
+real demo teacher's classes, so it can run alongside live demo/device sessions.
+"""
 import json
-import subprocess
 import threading
 import time
 import urllib.request
@@ -9,9 +13,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 BASE = "http://localhost:3001/v1"
-TEACHER = "dev:t-rivera:aayan.nirav@gmail.com:Eshan Shah"
+TEACHER = "dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher"
 STUDENT = "dev:s-jordan::Jordan Park"
 STUDENT2 = "dev:s-lena::Lena Walsh"
+SANDBOX_CLASS = "Slice Sandbox"
 
 def call(method, path, token=None, body=None, expect=None):
     req = urllib.request.Request(BASE + path, method=method)
@@ -47,27 +52,50 @@ def sse_listen(session_id, token, stop):
                 if msg["kind"] != "ping":
                     sse_lines.append(msg)
 
-print("== teacher bootstrap (adopts Ms. Rivera) ==")
+print("== sandbox teacher bootstrap ==")
 call("POST", "/auth/bootstrap", TEACHER, {"role": "teacher"})
 me = call("GET", "/me", TEACHER)
-assert me["role"] == "teacher" and me["teacher"]["displayName"] == "Ms. Rivera", me
-print("    adopted:", me["teacher"]["displayName"], "/", me["teacher"]["schoolName"])
+assert me["role"] == "teacher", me
 
+print("== ensure sandbox class + tag ==")
 classes = call("GET", "/classes", TEACHER)["classes"]
-p3 = next(c for c in classes if c["name"].startswith("Period 3"))
-assert p3["memberCount"] == 28, p3["memberCount"]
-print(f"    Period 3: {p3['memberCount']} members, policy {p3['policyName']}, code {p3['joinCode']}")
+sandbox = next((c for c in classes if c["name"] == SANDBOX_CLASS), None)
+if sandbox is None:
+    sandbox = call("POST", "/classes", TEACHER, {
+        "name": SANDBOX_CLASS,
+        "daysLabel": "Mon–Fri",
+        "startTime": "08:00",
+        "endTime": "15:59",
+        "requireApproval": False,
+    }, expect=201)
+    print(f"    created {SANDBOX_CLASS} ({sandbox['joinCode']})")
+cid = sandbox["id"]
+
+tags = call("GET", f"/classes/{cid}/tags", TEACHER)["tags"]
+tag = next((t for t in tags if t["active"]), None)
+if tag is None:
+    tag = call("POST", f"/classes/{cid}/tags", TEACHER, {"label": "Sandbox desk"}, expect=201)
+tag_code = tag["code"]
+print(f"    class {cid[:8]}… join {sandbox['joinCode']} tag {tag_code}")
 
 # cleanup: end any session left over from an earlier run
-if p3["live"]:
-    call("POST", f"/sessions/{p3['live']['sessionId']}/end", TEACHER)
+if sandbox.get("live"):
+    call("POST", f"/sessions/{sandbox['live']['sessionId']}/end", TEACHER)
     print("    (ended leftover session)")
+
+print("== students bootstrap + join by code ==")
+call("POST", "/auth/bootstrap", STUDENT, {"role": "student", "firstName": "Jordan", "lastName": "Park"})
+call("POST", "/auth/bootstrap", STUDENT2, {"role": "student", "firstName": "Lena", "lastName": "Walsh"})
+j1 = call("POST", "/join", STUDENT, {"code": sandbox["joinCode"]})
+j2 = call("POST", "/join", STUDENT2, {"code": sandbox["joinCode"]})
+assert j1["membershipStatus"] == "active" and j2["membershipStatus"] == "active", (j1, j2)
 
 print("== start session (ends +6 min) ==")
 ends = (datetime.now(timezone.utc) + timedelta(minutes=6)).isoformat()
-detail = call("POST", f"/classes/{p3['id']}/sessions", TEACHER, {"endsAt": ends}, expect=201)
+detail = call("POST", f"/classes/{cid}/sessions", TEACHER, {"endsAt": ends}, expect=201)
 sid = detail["session"]["id"]
-assert detail["counts"]["not_joined"] == 28, detail["counts"]
+members = sum(detail["counts"].values())
+assert members == 2 and detail["counts"]["not_joined"] == 2, detail["counts"]
 print(f"    session {sid[:8]}… counts: {detail['counts']}")
 
 stop = threading.Event()
@@ -75,16 +103,13 @@ t = threading.Thread(target=sse_listen, args=(sid, TEACHER, stop), daemon=True)
 t.start()
 time.sleep(1.0)
 
-print("== students bootstrap (adopt Jordan Park + Lena Walsh by name) ==")
-call("POST", "/auth/bootstrap", STUDENT, {"role": "student", "firstName": "Jordan", "lastName": "Park"})
-call("POST", "/auth/bootstrap", STUDENT2, {"role": "student", "firstName": "Lena", "lastName": "Walsh"})
+print("== student home sees the live session ==")
 home = call("GET", "/student/home", STUDENT)
-livecls = next(c for c in home["classes"] if c["live"])
-assert livecls["live"]["sessionId"] == sid
+livecls = next(c for c in home["classes"] if c["live"] and c["live"]["sessionId"] == sid)
 print("    Jordan sees live session in", livecls["className"])
 
-print("== resolve tag (front desk) ==")
-res = call("POST", "/tags/resolve", STUDENT, {"code": "T7XK2M9QPF"})
+print("== resolve tag (sandbox desk) ==")
+res = call("POST", "/tags/resolve", STUDENT, {"code": tag_code})
 assert res["variant"] == "ready" and res["session"]["sessionId"] == sid, res
 print("    variant:", res["variant"], "| allowed:", res["session"]["allowedAppLabels"])
 
@@ -126,7 +151,7 @@ print("== final detail ==")
 final = call("GET", f"/sessions/{sid}", TEACHER)
 counts = final["counts"]
 print("    counts:", counts)
-assert counts["focused"] == 1 and counts["pass"] == 1 and counts["not_joined"] == 26, counts
+assert counts["focused"] == 1 and counts["pass"] == 1 and counts["not_joined"] == 0, counts
 jordan = next(p for p in final["participants"] if p["shortName"] == "Jordan P.")
 assert jordan["state"] == "focused" and jordan["pendingUnlockId"] is None
 
@@ -137,7 +162,6 @@ print("    ", " | ".join(e["title"] for e in tl["events"]))
 print("== portal home ==")
 portal = call("GET", "/portal/home", TEACHER)
 assert portal["live"]["session"]["id"] == sid
-assert len(portal["approvals"]) == 2, portal["approvals"]
 print("    live card ✓ · approvals:", [a["name"] for a in portal["approvals"]])
 print("    recent:", [e["title"] for e in portal["recent"]][:3])
 
@@ -148,7 +172,7 @@ print("    sessions:", len(hist["sessions"]), "| streak:", hist["streakDays"], "
 print("== end session ==")
 call("POST", f"/sessions/{sid}/end", TEACHER)
 ended = call("GET", f"/sessions/{sid}", TEACHER)
-assert ended["counts"]["ended"] == 28, ended["counts"]
+assert ended["counts"]["ended"] == 2, ended["counts"]
 
 time.sleep(1.0)
 stop.set()
