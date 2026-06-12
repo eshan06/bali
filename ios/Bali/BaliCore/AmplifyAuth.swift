@@ -8,8 +8,10 @@ import Foundation
 
 #if canImport(Amplify) && canImport(AWSCognitoAuthPlugin)
 import Amplify
+import AuthenticationServices
 import AWSCognitoAuthPlugin
 import AWSPluginsCore
+import UIKit
 
 enum AmplifyAuth {
     static let isAvailable = true
@@ -44,6 +46,21 @@ enum AmplifyAuth {
         let result = try await Amplify.Auth.signIn(username: email, password: password)
         if case .confirmSignUp = result.nextStep { return false }
         return result.isSignedIn
+    }
+
+    /// Google via Cognito Hosted UI (ASWebAuthenticationSession). Reuses the
+    /// `balistudent://callback/` redirect already registered on the app client —
+    /// zero Cognito changes; federated users carry the same pool JWTs.
+    @MainActor
+    static func signInWithGoogle() async throws -> Bool {
+        let result = try await Amplify.Auth.signInWithWebUI(for: .google, presentationAnchor: keyAnchor())
+        return result.isSignedIn
+    }
+
+    @MainActor
+    private static func keyAnchor() -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.flatMap(\.windows).first { $0.isKeyWindow } ?? ASPresentationAnchor()
     }
 
     /// Returns true when the account is immediately usable; false when a
@@ -100,6 +117,7 @@ enum AmplifyAuth {
     static func isSignedIn() async -> Bool { false }
     static func idToken() async -> String? { nil }
     static func signIn(email _: String, password _: String) async throws -> Bool { throw unavailable }
+    static func signInWithGoogle() async throws -> Bool { throw unavailable }
     static func signUp(email _: String, password _: String, fullName _: String) async throws -> Bool { throw unavailable }
     static func confirmSignUp(email _: String, code _: String) async throws { throw unavailable }
     static func resendCode(email _: String) async throws { throw unavailable }

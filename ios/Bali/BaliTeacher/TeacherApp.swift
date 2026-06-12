@@ -115,6 +115,17 @@ final class TeacherStore: ObservableObject {
         }
     }
 
+    func signInWithGoogle() async {
+        authError = nil
+        do {
+            if try await AmplifyAuth.signInWithGoogle() {
+                await loadProfile()
+            }
+        } catch {
+            authError = AmplifyAuth.describe(error)
+        }
+    }
+
     func devSignIn() async {
         #if DEBUG
         UserDefaults.standard.set("dev:t-sandbox:sandbox-teacher@bali.dev:Sandbox Teacher", forKey: tokenKey)
@@ -203,6 +214,27 @@ struct TeacherSignInView: View {
                     }
                     .disabled(!canSubmit)
                     .opacity(canSubmit ? 1 : 0.45)
+
+                    Button {
+                        busy = true
+                        Task {
+                            await store.signInWithGoogle()
+                            busy = false
+                        }
+                    } label: {
+                        Text("Continue with Google")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Tokens.Light.card)
+                            .foregroundColor(Tokens.Light.textPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Tokens.Light.borderStrong, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .disabled(busy)
 
                     Text("Students don't sign in here — they use the Bali app.")
                         .font(.system(size: 13))
