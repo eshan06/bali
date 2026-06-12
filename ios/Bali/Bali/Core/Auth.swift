@@ -1,38 +1,121 @@
 import Foundation
 import SwiftUI
 
-/// Student auth. Production path is Cognito SRP via Amplify Swift (lands with the
-/// device pass — same pool/flows the legacy app proved; config stays untracked).
-/// DEBUG builds can also use the API's dev-token mode so the Simulator slice runs
-/// end-to-end without real credentials.
+/// Student auth. Production path is Cognito SRP via Amplify Swift (same pool/flows
+/// the legacy app proved; config stays untracked). DEBUG builds can also use the
+/// API's dev-token mode so the Simulator slice runs without real credentials.
 @MainActor
 final class AuthStore: ObservableObject {
     enum Phase {
         case loading
         case signedOut
+        /// Signed in to Cognito but no student row yet — collect first/last name.
         case needsName
+        /// Cognito emailed a confirmation code at sign-up.
+        case needsConfirmation(email: String, password: String)
         case ready(StudentSelf)
     }
 
     @Published var phase: Phase = .loading
+    @Published var authError: String?
 
     private let tokenKey = "bali.devToken"
-    private(set) lazy var api = APIClient { [weak self] in self?.currentToken() }
+    private(set) lazy var api = APIClient { [weak self] in await self?.currentToken() }
 
-    nonisolated private func currentToken() -> String? {
+    private nonisolated func devToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
     }
 
-    func start() async {
-        guard currentToken() != nil else {
-            phase = .signedOut
-            return
-        }
-        await loadProfile()
+    /// Dev token wins in DEBUG (Simulator slice); otherwise the live Cognito ID token.
+    nonisolated func currentToken() async -> String? {
+        #if DEBUG
+        if let dev = devToken() { return dev }
+        #endif
+        return await AmplifyAuth.idToken()
     }
 
-    /// DEBUG dev sign-in: identity is `dev:<sub>` + the chosen name; the API adopts
-    /// the seed student with that name (e.g. "Jordan Park" becomes the persona).
+    func start() async {
+        #if DEBUG
+        if devToken() != nil {
+            await loadProfile()
+            return
+        }
+        #endif
+        if AmplifyAuth.isAvailable, await AmplifyAuth.isSignedIn() {
+            await loadProfile()
+        } else {
+            phase = .signedOut
+        }
+    }
+
+    // ---------- real Cognito (S0) ----------
+
+    func signIn(email: String, password: String) async {
+        authError = nil
+        do {
+            let complete = try await AmplifyAuth.signIn(email: email, password: password)
+            if complete {
+                await loadProfile()
+            } else {
+                try await AmplifyAuth.resendCode(email: email)
+                phase = .needsConfirmation(email: email, password: password)
+            }
+        } catch {
+            authError = AmplifyAuth.describe(error)
+        }
+    }
+
+    func signUp(email: String, password: String, firstName: String, lastName: String) async {
+        authError = nil
+        // Names travel with bootstrap (DB-authoritative), not just the Cognito attribute.
+        stashName(first: firstName, last: lastName)
+        do {
+            let complete = try await AmplifyAuth.signUp(
+                email: email, password: password, fullName: "\(firstName) \(lastName)"
+            )
+            if complete {
+                _ = try? await AmplifyAuth.signIn(email: email, password: password)
+                await loadProfile()
+            } else {
+                phase = .needsConfirmation(email: email, password: password)
+            }
+        } catch {
+            authError = AmplifyAuth.describe(error)
+        }
+    }
+
+    func confirmSignUp(email: String, password: String, code: String) async {
+        authError = nil
+        do {
+            try await AmplifyAuth.confirmSignUp(email: email, code: code)
+            _ = try await AmplifyAuth.signIn(email: email, password: password)
+            await loadProfile()
+        } catch {
+            authError = AmplifyAuth.describe(error)
+        }
+    }
+
+    /// `needsName` exit: provision the student row (adopts a seeded roster student
+    /// when the name matches — WIRING_PLAN seed-adoption rule).
+    func submitName(firstName: String, lastName: String) async {
+        authError = nil
+        stashName(first: firstName, last: lastName)
+        do {
+            _ = try await api.post(
+                "auth/bootstrap",
+                body: BootstrapBody(role: "student", firstName: firstName, lastName: lastName),
+                as: BootstrapResult.self
+            )
+            await loadProfile()
+        } catch {
+            authError = (error as? APIError)?.message ?? "Couldn't finish setting up — try again."
+        }
+    }
+
+    // ---------- DEBUG dev sign-in ----------
+
+    /// Identity is `dev:<sub>` + the chosen name; the API adopts the seed student
+    /// with that name (e.g. "Jordan Park" becomes the persona).
     func devSignIn(firstName: String, lastName: String) async {
         #if DEBUG
         let slug = "\(firstName)-\(lastName)".lowercased()
@@ -54,7 +137,18 @@ final class AuthStore: ObservableObject {
 
     func signOut() {
         UserDefaults.standard.removeObject(forKey: tokenKey)
+        Task { await AmplifyAuth.signOut() }
         phase = .signedOut
+    }
+
+    // ---------- profile ----------
+
+    private let firstNameKey = "bali.pendingFirstName"
+    private let lastNameKey = "bali.pendingLastName"
+
+    private func stashName(first: String, last: String) {
+        UserDefaults.standard.set(first, forKey: firstNameKey)
+        UserDefaults.standard.set(last, forKey: lastNameKey)
     }
 
     private func loadProfile() async {
@@ -63,14 +157,32 @@ final class AuthStore: ObservableObject {
             var student: StudentSelf?
         }
         do {
+            // Bootstrap first when we have a stashed name (idempotent; provisions or adopts).
+            if let first = UserDefaults.standard.string(forKey: firstNameKey),
+               let last = UserDefaults.standard.string(forKey: lastNameKey),
+               !first.isEmpty, !last.isEmpty {
+                _ = try? await api.post(
+                    "auth/bootstrap",
+                    body: BootstrapBody(role: "student", firstName: first, lastName: last),
+                    as: BootstrapResult.self
+                )
+            }
             let me = try await api.get("me", as: Me.self)
             if let student = me.student {
+                UserDefaults.standard.removeObject(forKey: firstNameKey)
+                UserDefaults.standard.removeObject(forKey: lastNameKey)
                 phase = .ready(student)
             } else {
                 phase = .needsName
             }
         } catch {
-            phase = .signedOut
+            // Signed in to Cognito but the API is unreachable or refused: the name
+            // screen retries bootstrap; signed-out is wrong here only if a session exists.
+            if await AmplifyAuth.isSignedIn() || devToken() != nil {
+                phase = .needsName
+            } else {
+                phase = .signedOut
+            }
         }
     }
 }

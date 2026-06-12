@@ -4,6 +4,10 @@ import SwiftUI
 struct BaliApp: App {
     @StateObject private var auth = AuthStore()
 
+    init() {
+        AmplifyAuth.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -23,8 +27,12 @@ struct RootView: View {
                 Tokens.Dark.page.ignoresSafeArea()
                 ProgressView().tint(Tokens.Dark.textSecondary)
             }
-        case .signedOut, .needsName:
+        case .signedOut:
             SignInView()
+        case .needsName:
+            NameView()
+        case let .needsConfirmation(email, password):
+            ConfirmCodeView(email: email, password: password)
         case let .ready(student):
             HomeView(student: student)
         }
