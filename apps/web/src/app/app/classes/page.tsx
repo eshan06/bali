@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, Monitor, Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { Button, Input, Label, Toggle } from '@/components/bali/Button';
 import { JoinCodeBadge, CopyButton } from '@/components/bali/bits';
+import { ProjectCodeOverlay, ProjectThisButton } from '@/components/bali/ProjectCode';
 import { StatusChip } from '@/components/bali/StatusChip';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
@@ -24,6 +25,7 @@ export default function ClassesPage() {
   const [policies, setPolicies] = useState<PolicyDTO[]>([]);
   const [open, setOpen] = useState(false);
   const [created, setCreated] = useState<ClassCardDTO | null>(null);
+  const [projecting, setProjecting] = useState(false);
 
   // create form
   const [name, setName] = useState('');
@@ -159,13 +161,7 @@ export default function ClassesPage() {
                 <JoinCodeBadge code={created.joinCode} size="card" />
                 <div className="flex gap-2">
                   <CopyButton text={created.joinCode} />
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-sm border border-line-strong bg-surface-card px-3.5 py-[7px] text-[13px] font-semibold leading-[18px] hover:bg-surface-sunken"
-                  >
-                    <Monitor size={14} strokeWidth={ICON_STROKE} />
-                    Project this
-                  </button>
+                  <ProjectThisButton onClick={() => setProjecting(true)} />
                 </div>
                 <Button className="mt-1.5 w-full py-[11px]" onClick={() => { setOpen(false); setCreated(null); }}>
                   Done
@@ -235,6 +231,14 @@ export default function ClassesPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {projecting && created ? (
+        <ProjectCodeOverlay
+          code={created.joinCode}
+          className={created.name}
+          onClose={() => setProjecting(false)}
+        />
+      ) : null}
     </div>
   );
 }

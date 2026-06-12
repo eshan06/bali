@@ -2,9 +2,10 @@
 
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Monitor, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/bali/Button';
 import { JoinCodeBadge, CopyButton, Card } from '@/components/bali/bits';
+import { ProjectCodeOverlay, ProjectThisButton } from '@/components/bali/ProjectCode';
 import { StatusChip, chipLabel } from '@/components/bali/StatusChip';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
@@ -14,6 +15,7 @@ import type { RosterDTO } from '@/lib/types';
 export default function RosterPage() {
   const { id: classId } = useParams<{ id: string }>();
   const [roster, setRoster] = useState<RosterDTO | null>(null);
+  const [projecting, setProjecting] = useState(false);
 
   const load = useCallback(() => {
     void api.get<RosterDTO>(`/classes/${classId}/roster`).then(setRoster);
@@ -40,7 +42,11 @@ export default function RosterPage() {
           <h1 className="text-[26px] font-semibold leading-8 tracking-[-0.01em]">{roster.class.name}</h1>
           <div className="text-[13px] leading-[18px] text-ink-secondary">
             Roster · {roster.members.length} students
+            {roster.pending.length > 0 ? ` · ${roster.pending.length} pending` : ''}
           </div>
+        </div>
+        <div className="ml-auto">
+          <ProjectThisButton onClick={() => setProjecting(true)} />
         </div>
       </div>
 
@@ -118,19 +124,21 @@ export default function RosterPage() {
           <JoinCodeBadge code={roster.class.joinCode} size="card" />
           <div className="flex gap-2">
             <CopyButton text={roster.class.joinCode} />
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-line-strong bg-surface-card px-3.5 py-[7px] text-[13px] font-semibold leading-[18px] hover:bg-surface-sunken"
-            >
-              <Monitor size={14} strokeWidth={ICON_STROKE} />
-              Project this
-            </button>
+            <ProjectThisButton onClick={() => setProjecting(true)} />
           </div>
           <p className="text-[12.5px] leading-[17px] text-ink-tertiary">
             Students join from the Bali iOS app with this code.
           </p>
         </Card>
       </div>
+
+      {projecting ? (
+        <ProjectCodeOverlay
+          code={roster.class.joinCode}
+          className={roster.class.name}
+          onClose={() => setProjecting(false)}
+        />
+      ) : null}
     </div>
   );
 }
