@@ -148,7 +148,7 @@ export default function PortalHomePage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-[1fr_340px] items-start gap-5">
+      <div className="grid grid-cols-[1fr_340px] items-start gap-5 max-[1024px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-5">
           {home.live ? (
             <div className={clsx('fade-up', entered && 'in')} style={{ transitionDelay: '60ms' }}>

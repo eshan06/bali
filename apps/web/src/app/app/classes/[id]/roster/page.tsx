@@ -50,7 +50,7 @@ export default function RosterPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_360px] items-start gap-5">
+      <div className="grid grid-cols-[1fr_360px] items-start gap-5 max-[1024px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-4">
           {roster.pending.length > 0 ? (
             <div className="overflow-hidden rounded-md border border-line bg-surface-card">
