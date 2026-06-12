@@ -6,6 +6,11 @@ import Foundation
 enum APIConfig {
     static var baseURL: URL {
         #if DEBUG
+        // devicectl launches pass the host as env; persist it so plain icon-tap
+        // launches keep talking to the same Mac afterwards.
+        if let env = ProcessInfo.processInfo.environment["BALI_DEV_API_HOST"], !env.isEmpty {
+            UserDefaults.standard.set(env, forKey: "BALI_DEV_API_HOST")
+        }
         let host = ProcessInfo.processInfo.environment["BALI_DEV_API_HOST"]
             ?? UserDefaults.standard.string(forKey: "BALI_DEV_API_HOST")
             ?? "localhost"
