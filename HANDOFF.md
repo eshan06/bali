@@ -1,6 +1,82 @@
 # Bali v2 — Session Handoff
 
-## ⚡ SESSION 4 — START HERE (written 2026-06-14) — Teacher iOS = full-control app
+## ⚡ SESSION 5 — START HERE (written 2026-06-14) — Teacher iOS compiles + runs under Xcode 26.5
+
+The session-4 teacher app (T1 rev · T6–T12 · T3 rev) was authored in a Linux sandbox and
+**never compiled**. This session did the real Swift build. Result: **all four targets BUILD
+SUCCEEDED under Xcode 26.5** (Bali, BaliTeacher, BaliShield, BaliMonitor) — the authored
+Swift was correct (zero source errors). The one real fight was the **toolchain**, documented
+below so nobody loses an hour to it again.
+
+### ⚠️ THE BUILD GOTCHA — Xcode 26.5 + Amplify (read before any iOS build)
+
+Xcode 26.5 turns on **explicitly-built modules by default**. Building the way the session-4
+handoff suggested — `-target BaliTeacher -sdk iphonesimulator` with **no `-destination`** —
+forces a **multi-arch** build (arm64 **and** x86_64), and the explicit-module dependency
+*scanner* then chokes on a transitive Amplify dep (`smithy-swift`'s `Smithy` importing
+`swift-log`'s `Logging`):
+
+```
+error: unable to resolve module dependency: 'Logging'   (in target 'Smithy')
+```
+
+This is **not** a code bug and **not** flaky — it reproduces every clean build. Two dead ends:
+- `SWIFT_ENABLE_EXPLICIT_MODULES=NO` *does* drop `-explicit-module-build`, but Xcode 26's SPM
+  integration wires cross-package modules **through** explicit modules, so you then get
+  `no such module 'Logging'` (Smithy's `-I` paths no longer include swift-log). Worse, not better.
+- Plain rebuilds — deterministic failure, not a race.
+
+**✅ THE FIX: build against a concrete single-arch destination.** A single active arch sidesteps
+the multi-arch scanner bug entirely. No dependency bumps, no project edits, no source changes.
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer        # xcode-select → CLT
+SIM=34AD32D3-B30E-450C-831F-9E70312574F7                               # iPhone 17 Pro (iOS 26)
+cd ios/Bali
+xcodebuild -project Bali.xcodeproj -scheme BaliTeacher -destination "id=$SIM" -configuration Debug build
+xcodebuild -project Bali.xcodeproj -scheme Bali        -destination "id=$SIM" -configuration Debug build  # student + both .appex
+```
+
+Device builds use `-destination 'generic/platform=iOS'` (or `id=<UDID>`) — that's arm64-only =
+single-arch, so the device pass is **unaffected** by this bug. The trap is *only* the
+destination-less simulator invocation. (First build resolves the Amplify SPM graph — slow once.)
+
+### What this session changed (all on `main`, NOT pushed)
+
+- **iOS:** 5 trivial `_ = try? await store.api.postVoid(...)` warning fixes (T2Live ×2, T3Student,
+  T7Roster ×2) so the teacher target builds **warning-clean**, matching the `_ = try?` discard
+  pattern already used in T6/T8. **No other source changes** — the compile fix was the *invocation*,
+  not the code.
+- **Docs:** this block.
+
+### What this session verified
+
+- **Compile:** BaliTeacher + Bali + BaliShield + BaliMonitor all BUILD SUCCEEDED (single-arch sim).
+  0 errors, 0 warnings in our code. Bundles produced incl. both `.appex` embedded in `Bali.app/PlugIns`.
+- **Runtime (sim):** BaliTeacher installs + launches + stays running on the iPhone 17 Pro sim (iOS 26),
+  renders `TeacherSignInView` correctly (ArcMark, tokens, fields, disabled Sign-in state, Google
+  button, DEBUG dev sign-in). AmplifyAuth.configure() succeeds. No launch crash.
+- **Swift↔API contract (static, comprehensive):** every teacher Codable struct checked field-for-field
+  against the live serializers — `portal/home`→THome, `classCard`→TClassCard, roster→TRoster,
+  `sessions/:id/recap`→TRecap, `classes/:id/overview`→TClassOverview, `.../history`→TStudentHistory,
+  `/events`→{events,nextCursor}, `/policies` (incl. `usedByClasses` on create/patch), tags, settings,
+  `/me`, session detail. Optionals, the `class`→`cls` CodingKey, and ISO-8601 dates all line up. **No
+  decode bugs** — the blank-screen risk compile can't catch is retired across all endpoints.
+
+### What still remains (the user's device pass — unchanged from §6/session-4 checklist)
+
+A real Swift compile + sim launch is now done; the **data-driven §6 visual walk** is still best on
+the phone, because (a) it needs Google sign-in as `toeshanshah@gmail.com` against RDS (only the user
+can), and (b) the new screens have **no DEBUG launch-arg nav seams**, so a sim can only reach T1
+without UI-tap automation. Walk per the session-4 checklist: T1 hub → T6 (5 segments + XL Dynamic
+Type reflow) → T9 → T2 → T10 recap → T7 → T8 → T12 → T3 Recent, and confirm the §6 gate visually.
+Run with `npm run dev:api` + `npm run dev:web` on the Mac and `BALI_DEV_API_HOST=<mac-ip>` (sim can
+use `localhost`). Student-only device bits (NFC, FamilyControls shields, watchdog) are unrelated to
+the teacher app — the teacher target uses no ScreenTime APIs, so the simulator is a faithful render of it.
+
+---
+
+## SESSION 4 (written 2026-06-14) — Teacher iOS = full-control app
 
 Scope of this session: upgraded the **teacher iOS app** from a thin companion into a
 full-control app per `design_handoff_teacher_ios/` (T1 rev · T6–T12 · T3 rev). The
