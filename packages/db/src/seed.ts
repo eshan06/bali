@@ -322,14 +322,16 @@ async function main() {
       return out;
     };
 
-    const days = lastWeekdays(5); // [most-recent … oldest]
+    const days = lastWeekdays(5); // [most-recent … oldest]; k is the recency index.
     const snapshot = {
       name: lecture.name,
       messagesAllowed: lecture.messagesAllowed,
       allowedAppLabels: lecture.allowedAppLabels,
     };
 
-    for (let k = 0; k < days.length; k++) {
+    // Insert oldest day first so event ids run monotonically with time — the W9/T6
+    // activity feed orders by id, so insertion order must match chronology.
+    for (let k = days.length - 1; k >= 0; k--) {
       const day = days[k]!;
       const start = atOn(day, 10, 0);
       const end = atOn(day, 10, 45);
