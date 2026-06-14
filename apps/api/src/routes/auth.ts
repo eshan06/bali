@@ -5,7 +5,12 @@ import { bootstrapBodySchema } from '@bali/shared';
 import { authenticate, bootstrapIdentity } from '../auth';
 
 export function authRoutes(app: FastifyInstance): void {
-  app.post('/v1/auth/bootstrap', { preHandler: authenticate }, async (req, reply) => {
+  // Provisioning is idempotent and per-user; cap it so a leaked token can't spray the
+  // adoption logic. Keyed by token (the global keyGenerator), never by shared classroom IP.
+  app.post(
+    '/v1/auth/bootstrap',
+    { preHandler: authenticate, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req, reply) => {
     const body = bootstrapBodySchema.parse(req.body ?? {});
     try {
       const result = await bootstrapIdentity(req.identity!, body);

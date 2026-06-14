@@ -31,6 +31,18 @@ export async function buildApp(): Promise<FastifyInstance> {
     allowedHeaders: ['authorization', 'content-type'],
   });
 
+  // Baseline security headers on every JSON response (SSE hijacks the reply and is
+  // unaffected). Kept minimal — this is a JSON API behind a TLS-terminating proxy; HSTS
+  // is only emitted in production. CORS (above) governs cross-origin access, not these.
+  app.addHook('onSend', async (_req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'no-referrer');
+    if (process.env.NODE_ENV === 'production') {
+      reply.header('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+    }
+  });
+
   // Opt-in rate limiting (student write routes carry `config.rateLimit`). Keyed by
   // bearer token, NOT IP — a classroom of 28 phones shares one school IP and must
   // never be throttled as a single client.

@@ -5,7 +5,12 @@ import { getDb, schema as s } from '@bali/db';
 export function publicRoutes(app: FastifyInstance): void {
   /** W2 phone fallback: the ONLY unauthenticated data — a class display name.
    *  (Privacy: reveals nothing about people; tag codes are printed on desks anyway.) */
-  app.get<{ Params: { code: string } }>('/v1/public/tags/:code', async (req, reply) => {
+  // Unauthenticated → keyed by client IP. Generous enough for a classroom tapping in,
+  // tight enough to stop someone enumerating tag codes.
+  app.get<{ Params: { code: string } }>(
+    '/v1/public/tags/:code',
+    { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    async (req, reply) => {
     const db = getDb();
     const code = req.params.code.toUpperCase();
     const tag = await db.query.tags.findFirst({

@@ -60,8 +60,11 @@ describe.skipIf(!HAS_DB)('teacher API integration', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('liveness + readiness', async () => {
-    expect((await app.inject({ method: 'GET', url: '/v1/health' })).statusCode).toBe(200);
+  it('liveness + readiness + security headers', async () => {
+    const health = await app.inject({ method: 'GET', url: '/v1/health' });
+    expect(health.statusCode).toBe(200);
+    expect(health.headers['x-content-type-options']).toBe('nosniff');
+    expect(health.headers['x-frame-options']).toBe('DENY');
     const ready = await app.inject({ method: 'GET', url: '/v1/ready' });
     expect(ready.statusCode).toBe(200);
     expect(ready.json().ready).toBe(true);
