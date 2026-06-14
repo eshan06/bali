@@ -1,6 +1,70 @@
 # Bali v2 — Session Handoff
 
-## ⚡ SESSION 3 — START HERE (written 2026-06-12, mid device-test)
+## ⚡ SESSION 4 — START HERE (written 2026-06-14) — Teacher iOS = full-control app
+
+Scope of this session: upgraded the **teacher iOS app** from a thin companion into a
+full-control app per `design_handoff_teacher_ios/` (T1 rev · T6–T12 · T3 rev). The
+student app and web app were untouched except one additive shared change (below).
+Backend was extended and **verified end-to-end against a local Postgres (41/41
+integration checks green)**. The iOS could not be compiled in the Linux sandbox — it
+was authored carefully and reviewed by a multi-agent compile/gate pass; **a real Xcode
+build + device pass is the one remaining verification** (deferred — phone not connected).
+
+### What shipped (all committed to main, NOT pushed)
+
+**Backend (`apps/api`, `packages/db`, `packages/shared`)**
+- Migration **`0002_previous_revanche`**: `memberships.default_no_device` (bool) +
+  `memberships.source` (enum code|tag|manual). Additive, defaults backfill existing rows.
+- New endpoints (all teacher-gated): `GET /classes/:id/overview` (T6 stats + last-session
+  recap pointer), `GET /sessions/:id/recap` (T10), `GET /classes/:id/students/:sid/history`
+  (T3 Recent), `PATCH /memberships/:id` (default-no-device).
+- `reports.ts`: `sessionRecap`, `studentSessionHistory`, `classOverview` — reuse the W8
+  focus-minute event algorithm; neutral counts, zero ranking. Recap partitions the roster
+  by precedence (no_device > emergency > permission-off > pass > focused > never-joined).
+- `domain.startSession` seeds default-no-device participations; `joinByCode` records source;
+  `setMembershipDefaults` mirrors a live session immediately. `classCard` gains
+  `autoApprove`, `archived`, `lastMetLabel`. Portal approvals now carry `classId` + newest-first.
+- `seed.ts`: canonical addendum demo — Dana/Leo/Sofia pending in Period 1 (approval on,
+  Sofia by tag), Priya (P3) + Hana (P1) default-no-device, and **5 ended Period 3 sessions**
+  crafted so Sam Torres's Recent reads the spec rows and the last session is "26 of 28 focused".
+
+**iOS (`ios/Bali/BaliTeacher` + one shared `BaliCore` change)**
+- New: `TComponents.swift` (shared: ClassPrimaryAction, LiveBanner, projectable JoinCode,
+  StatGrid, SegPicker, SummaryChips, StateIconDot, EventTimelineCard, FramingLine, FlowLayout),
+  `T6ClassDetail.swift`, `T7Roster.swift`, `T8Policies.swift`, `T9StartSession.swift`,
+  `T10Recap.swift`, `T12CreateClass.swift`. Revised: `T1Home.swift` (hub), `T3Student.swift`
+  (Recent), `T2Live.swift` (End → T10), `TeacherModels.swift`, `TeacherApp.swift` (TeacherField).
+- Shared `BaliCore/API.swift`: query strings no longer go through `appendingPathComponent`
+  (was breaking `events?classId=`); added `delete()`. **Additive — student app unaffected.**
+- Xcode project uses synchronized folder groups (PBXFileSystemSynchronizedRootGroup), so the
+  new files auto-join the BaliTeacher target — **no .pbxproj edits needed**.
+
+### ⚠️ To deploy / run on the device (DB is the shared RDS — do this deliberately)
+
+1. **Apply the migration to RDS FIRST, before deploying the new API code** — the new code
+   SELECTs `default_no_device`/`source`, so the API will 500 on every roster/class query if
+   the columns are missing. `npm run db:migrate`.
+2. The new endpoints work on EXISTING data after the migration (columns default sensibly).
+   **Reseeding is optional** — only needed to get the new canonical demo content. If you
+   reseed, note `npm run db:seed -- --reset` may NOT forward `--reset` through the nested npm
+   script; run it directly: **`npx tsx packages/db/src/seed.ts --reset`**. A `--reset` WIPES
+   the RDS demo world (incl. the real `toeshanshah@gmail.com` adoption — it re-adopts on the
+   next Google sign-in + bootstrap since the email still matches a seed-% row).
+3. Local verification harness used this session (safe, never touches RDS): docker postgres on
+   :5433 + `ALLOW_DEV_TOKENS=1` + dev token `dev:rivera:teacher@example.com:Ms. Rivera`
+   (bootstrap adopts seed Rivera by email). Tests in `/tmp/test-endpoints.mjs` (ephemeral).
+
+### Device-test checklist for the new teacher screens (do after an Xcode build)
+
+T1 hub (live + idle + empty) · tap class → T6 (all 5 segments; XL Dynamic Type reflow) ·
+Start session from T6/T1 → live grid → End → **T10 recap auto-presents** · T7 approve/decline ·
+T8 editor + in-use delete guard · T12 create → join-code reveal · T3 → Recent tab. The §6
+gate (icon+label states, red only on revoked/destructive, framing line on T6/T10/T3, verbatim
+T8 explainer + T3 boundary, 44pt) was reviewed in-repo but confirm visually.
+
+---
+
+## ⚡ SESSION 3 (written 2026-06-12, mid device-test)
 
 Everything below the session-2 header further down is still accurate background.
 This block is what changed since, and exactly where we stopped.
