@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — T12 · Create Class</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="../pass3/sheet.css">
+<link rel="stylesheet" href="pass5.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="../pass3/ios-frame.jsx"></script>
+<script type="text/babel" src="../pass3/scaffold.jsx"></script>
+<script type="text/babel" src="scaffold5.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+function HomeBackdrop() {
+  return (
+    <div className="safe vstack" style={{ paddingTop: 80, filter: "blur(1px)", opacity: 0.45 }}>
+      <div className="t-title1">Good morning, Ms.&nbsp;Rivera</div>
+      <div className="t-footnote sec" style={{ marginTop: 3 }}>Wednesday, June 10</div>
+    </div>
+  );
+}
+
+function CreateSheet({ firstEver = false }) {
+  return (
+    <React.Fragment>
+      <HomeBackdrop />
+      <div className="dim"></div>
+      <div className="native-sheet" style={{ paddingBottom: 44 }}>
+        <div className="grabber"></div>
+        <div className="t-title2" style={{ textAlign: "center" }}>New class</div>
+        {firstEver && (
+          <div className="t-subhead sec" style={{ textAlign: "center", marginTop: 4 }}>Students join with a code you put on the board — that's the whole setup.</div>
+        )}
+        <div className="vstack" style={{ gap: 12, marginTop: 20 }}>
+          <SectionLabel>Name</SectionLabel>
+          <input className="fc-input" value="Period 4 — Precalculus" readOnly style={{ fontSize: 17, padding: "12px 14px" }} />
+          <SectionLabel style={{ marginTop: 2 }}>Meets</SectionLabel>
+          <input className="fc-input" value="TTh · 11:10–11:55" readOnly style={{ fontSize: 17, padding: "12px 14px" }} />
+          <div className="hstack" style={{ background: "var(--surface-card)", borderRadius: 14, padding: "13px 16px", gap: 12, minHeight: 48 }}>
+            <Icon name="list-checks" size={18} color="var(--text-secondary)" />
+            <span className="t-body">Policy</span>
+            <div className="spacer"></div>
+            <span className="t-body" style={{ fontWeight: 600 }}>Lecture</span>
+            <span className="t-footnote ter">most used</span>
+            <Icon name="chevron-down" size={15} color="var(--text-tertiary)" />
+          </div>
+          <div className="t-footnote ter" style={{ padding: "0 4px" }}>Lecture — Notes, Camera, Calculator allowed · or create a new policy</div>
+          <div className="hstack" style={{ background: "var(--surface-card)", borderRadius: 14, padding: "11px 16px", gap: 12, minHeight: 48 }}>
+            <Icon name="user-plus" size={18} color="var(--text-secondary)" />
+            <div style={{ flex: 1 }}>
+              <div className="t-body">Auto-approve joins</div>
+              <div className="t-footnote ter">Anyone with the code is in — no waiting on you</div>
+            </div>
+            <button className="fc-toggle is-on" aria-label="Auto-approve joins, on"></button>
+          </div>
+          <BigButton>Create class</BigButton>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function Reveal() {
+  return (
+    <React.Fragment>
+      <div className="safe vstack" style={{ paddingTop: 84, gap: 14, alignItems: "center", textAlign: "center" }}>
+        <Arc size={110} stroke={8} pct={1} fill="var(--green-600)">
+          <Icon name="check" size={32} color="var(--text-brand)" />
+        </Arc>
+        <div className="t-title2" style={{ maxWidth: 300 }}>Period 4 — Precalculus is ready</div>
+        <div className="t-subhead sec" style={{ maxWidth: 300 }}>Put the join code on the board — students join from the Bali iOS app.</div>
+        <div className="fc-joincode fc-joincode--card" style={{ marginTop: 8 }}>
+          <span className="code">QV4N8R1C</span>
+        </div>
+        <div className="hstack" style={{ gap: 10, marginTop: 4 }}>
+          <div className="fc-btn fc-btn--secondary" style={{ padding: "11px 18px" }}><Icon name="maximize-2" size={15} />Project this</div>
+          <div className="fc-btn fc-btn--secondary" style={{ padding: "11px 18px" }}><Icon name="share" size={15} />Share</div>
+        </div>
+        <div className="spacer"></div>
+      </div>
+      <div className="safe vstack" style={{ position: "absolute", left: 0, right: 0, bottom: 48 }}>
+        <BigButton>Open the class</BigButton>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function App() {
+  return (
+    <Sheet5 num="T12 · new" title="Create Class — iOS parity with W3b" here="T12"
+      intro="The web's two-prefilled-decisions form, as a sheet: name, schedule, the teacher's most-used policy, and auto-approve (default on — the code should just work). Creation lands on the join-code reveal, because the next physical act is putting the code on the board. Open the class → T6.">
+      <div className="frames">
+        <Frame label="T12.1 · The form" sub="sheet over T1" light note={<span><b>One required field.</b> Name is the only validation (Create disables while empty); policy prefills to most-used with its allowed list restated; auto-approve defaults on with the consequence in plain words. Esc/swipe closes without residue.</span>}>
+          <CreateSheet />
+        </Frame>
+        <Frame label="T12.2 · First class ever" light note={<span>Same form plus one orienting line under the title — how students join — because a first-time teacher hasn't seen a join code yet. No tour, no overlay.</span>}>
+          <CreateSheet firstEver />
+        </Frame>
+        <Frame label="T12.3 · Created — join-code reveal" light note={<span>The arc-check moment from W3b, then the card-size JoinCodeBadge. Project this opens the full-screen projectable version (the same one T6's header chip reaches); Share hands the code to AirDrop/Messages via the system sheet. Open the class → T6 with its empty-roster state.</span>}>
+          <Reveal />
+        </Frame>
+      </div>
+    </Sheet5>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>

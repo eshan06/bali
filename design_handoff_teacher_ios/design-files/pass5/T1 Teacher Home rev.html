@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali — T1 rev · Teacher Home (daily hub)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../pass2/components.css">
+<link rel="stylesheet" href="../pass3/sheet.css">
+<link rel="stylesheet" href="pass5.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script type="text/babel" src="../pass3/ios-frame.jsx"></script>
+<script type="text/babel" src="../pass3/scaffold.jsx"></script>
+<script type="text/babel" src="scaffold5.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+/* ---------- hub pieces ---------- */
+function Greeting({ sub = "Wednesday, June 10 · next bell 10:45" }) {
+  return (
+    <div className="hstack" style={{ alignItems: "flex-start" }}>
+      <div>
+        <div className="t-title1">Good morning, Ms.&nbsp;Rivera</div>
+        <div className="t-footnote sec" style={{ marginTop: 3 }}>{sub}</div>
+      </div>
+      <div className="spacer"></div>
+      <Icon name="settings-2" size={22} color="var(--text-secondary)" style={{ marginTop: 8 }} />
+    </div>
+  );
+}
+
+function LiveNowCard() {
+  return (
+    <div className="vstack" style={{ background: "var(--surface-card)", border: "1.5px solid var(--green-200)", borderRadius: 18, padding: "15px 17px", boxShadow: "var(--shadow-1)", gap: 12 }}>
+      <div className="hstack" style={{ gap: 12 }}>
+        <Arc size={44} stroke={5} pct={0.466} />
+        <div>
+          <div className="t-headline">Period 3 — Algebra II</div>
+          <div className="t-footnote sec" style={{ fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
+            <span className="hstack" style={{ gap: 6, display: "inline-flex" }}><LiveDot />Live · 23:14 · ends 10:45</span>
+          </div>
+        </div>
+      </div>
+      <SummaryChips />
+      <div className="fc-btn fc-btn--primary" style={{ padding: "11px 0" }}>Open live grid</div>
+    </div>
+  );
+}
+
+function ApprovalsRow({ count = 3 }) {
+  return (
+    <Card5>
+      <div className="hstack" style={{ gap: 12, padding: "12px 16px", minHeight: 44 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 999, background: "var(--surface-sunken)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+          <Icon name="user-plus" size={17} color="var(--text-secondary)" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div className="t-subhead" style={{ fontWeight: 600 }}>{count} students want to join</div>
+          <div className="t-footnote ter">Period 1 — Algebra I · newest 2 min ago</div>
+        </div>
+        <Icon name="chevron-right" size={16} color="var(--text-tertiary)" />
+      </div>
+    </Card5>
+  );
+}
+
+function ScheduleRow({ time, name, live = false, started = false, last = false }) {
+  return (
+    <div className="hstack" style={{ gap: 12, padding: "11px 16px", position: "relative", minHeight: 48 }}>
+      <span className="t-subhead" style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", width: 46, flex: "none" }}>{time}</span>
+      <span className="t-subhead" style={{ flex: 1 }}>{name}</span>
+      {live
+        ? <span className="hstack" style={{ gap: 6 }}><LiveDot /><span className="t-footnote" style={{ color: "var(--text-brand)", fontWeight: 600 }}>Live now</span></span>
+        : <div className="fc-btn fc-btn--secondary" style={{ padding: "8px 16px", fontSize: 14 }}><Icon name="play" size={13} />Start</div>}
+      {!last && <div className="sep" style={{ position: "absolute", bottom: 0, left: 16, right: 0 }}></div>}
+    </div>
+  );
+}
+
+function ClassCardRev({ name, sched, count, live = false, startable = false, lastMet }) {
+  return (
+    <div className="vstack" style={{ background: "var(--surface-card)", borderRadius: 18, padding: "14px 17px", boxShadow: "var(--shadow-1)", gap: 3 }}>
+      <div className="hstack" style={{ gap: 10 }}>
+        <div className="t-headline">{name}</div>
+        <div className="spacer"></div>
+        {live
+          ? <span className="hstack" style={{ gap: 6 }}><LiveDot /><span className="t-footnote" style={{ color: "var(--text-brand)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>Live · 23:14</span></span>
+          : <Icon name="chevron-right" size={16} color="var(--text-tertiary)" />}
+      </div>
+      <div className="t-footnote sec">{sched} · {count} students{lastMet ? ` · ${lastMet}` : ""}</div>
+      {(live || startable) && (
+        <div className="hstack" style={{ gap: 10, marginTop: 11 }}>
+          <div className="fc-btn fc-btn--primary" style={{ flex: 1, padding: "10px 0" }}>{live ? "Open live grid" : "Start session"}</div>
+          <div className="fc-btn fc-btn--secondary" style={{ padding: "10px 16px" }}>Roster</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecentActivity({ idle = false }) {
+  return (
+    <React.Fragment>
+      <SectionLabel style={{ marginTop: 6 }}>Recent activity</SectionLabel>
+      <Card5 style={{ padding: 16 }}>
+        <div className="fc-timeline">
+          {idle ? (
+            <React.Fragment>
+              <div className="ev is-focused"><div className="dot"><Icon name="flag" size={13} /></div><div className="what">Session ended at the bell<small>Period 6 — Geometry · yesterday</small></div><div className="when">3:35</div></div>
+              <div className="ev is-pass"><div className="dot"><Icon name="ticket" size={13} /></div><div className="what">Pass ended, shields returned<small>Marcus J. · Period 6 · yesterday</small></div><div className="when">3:12</div></div>
+              <div className="ev"><div className="dot"><Icon name="user-plus" size={13} /></div><div className="what">2 students joined<small>Period 1 — Algebra I · yesterday</small></div><div className="when">12:40</div></div>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <div className="ev is-emergency"><div className="dot"><Icon name="lock-open" size={13} /></div><div className="what">Sam T. used Emergency Unlock<small>Period 3 — Algebra II · reason pending</small></div><div className="when">10:31</div></div>
+              <div className="ev is-pass"><div className="dot"><Icon name="ticket" size={13} /></div><div className="what">Aisha K. — 10-minute pass, “nurse”<small>Period 3 — Algebra II</small></div><div className="when">10:18</div></div>
+              <div className="ev is-focused"><div className="dot"><Icon name="circle-check" size={13} /></div><div className="what">Session started — Lecture policy<small>Period 3 — Algebra II</small></div><div className="when">9:50</div></div>
+            </React.Fragment>
+          )}
+        </div>
+      </Card5>
+    </React.Fragment>
+  );
+}
+
+/* ---------- T1 screens ---------- */
+function TeacherHomeRev({ live = true }) {
+  return (
+    <React.Fragment>
+      <div className="safe vstack" style={{ paddingTop: 80, gap: 12, paddingBottom: 28 }}>
+        <Greeting sub={live ? "Wednesday, June 10 · next bell 10:45" : "Wednesday, June 10 · Period 3 starts 9:50"} />
+        {live && <LiveNowCard />}
+        {live && <ApprovalsRow />}
+        <SectionLabel style={{ marginTop: 4 }}>Today</SectionLabel>
+        <Card5>
+          {live ? (
+            <React.Fragment>
+              <ScheduleRow time="9:50" name="Period 3 — Algebra II" live />
+              <ScheduleRow time="12:05" name="Period 1 — Algebra I" />
+              <ScheduleRow time="2:50" name="Period 6 — Geometry" last />
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <ScheduleRow time="9:50" name="Period 3 — Algebra II" />
+              <ScheduleRow time="12:05" name="Period 1 — Algebra I" />
+              <ScheduleRow time="2:50" name="Period 6 — Geometry" last />
+            </React.Fragment>
+          )}
+        </Card5>
+        <SectionLabel style={{ marginTop: 4 }}>Classes</SectionLabel>
+        {live ? (
+          <React.Fragment>
+            <ClassCardRev name="Period 3 — Algebra II" sched="MWF · 9:50" count={28} live />
+            <ClassCardRev name="Period 1 — Algebra I" sched="MWF · 12:05" count={24} lastMet="last met Mon" />
+            <ClassCardRev name="Period 6 — Geometry" sched="MWF · 2:50" count={26} lastMet="last met Mon" />
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <ClassCardRev name="Period 3 — Algebra II" sched="MWF · 9:50" count={28} startable />
+            <ClassCardRev name="Period 1 — Algebra I" sched="MWF · 12:05" count={24} lastMet="last met Mon" />
+            <ClassCardRev name="Period 6 — Geometry" sched="MWF · 2:50" count={26} lastMet="last met Mon" />
+          </React.Fragment>
+        )}
+        <div className="fc-btn fc-btn--ghost" style={{ alignSelf: "center" }}><Icon name="plus" size={15} />New class</div>
+        <RecentActivity idle={!live} />
+      </div>
+      <div className="spacer"></div>
+    </React.Fragment>
+  );
+}
+
+function TeacherHomeEmpty() {
+  return (
+    <React.Fragment>
+      <div className="safe vstack" style={{ paddingTop: 80, gap: 14 }}>
+        <Greeting sub="Wednesday, June 10" />
+        <div className="vstack" style={{ alignItems: "center", gap: 20, textAlign: "center", paddingTop: 104 }}>
+          <Arc size={120} stroke={8} pct={0}>
+            <Icon name="plus" size={30} color="var(--text-tertiary)" />
+          </Arc>
+          <div className="t-title2" style={{ maxWidth: 290 }}>Set up your first class</div>
+          <div className="t-subhead sec" style={{ maxWidth: 290 }}>A class takes about a minute: name it, pick a policy, and put the join code on the board.</div>
+          <div className="fc-btn fc-btn--primary" style={{ padding: "13px 26px", fontSize: 17, borderRadius: 14 }}>Create a class</div>
+        </div>
+      </div>
+      <div className="spacer"></div>
+    </React.Fragment>
+  );
+}
+
+function App() {
+  return (
+    <Sheet5 num="T1 · revised" title="Teacher Home — the daily hub" here="T1 rev"
+      intro="The class list grows into the W3a portal on a phone: greeting, a live-now card with the §2 summary read, the approvals badge (time-sensitive, so it lives up top), today's schedule with one-tap Start, loaded class cards, and a cross-class activity feed. Tapping a class card opens T6; Start opens T9 prefilled. Same components, same density as the brief's T1.">
+      <div className="frames">
+        <Frame label="T1.1 · Hub — session live" sub="§6 distribution" light note={<span><b>The live class owns the top of the screen:</b> arc, countdown, and the six summary chips (icon + label + count — never color-only). The approvals row sits directly under it because a student waiting to join can't wait for a laptop. Period 3's class card and schedule row both point at the same live session — one truth, three doors.</span>}>
+          <TeacherHomeRev live />
+        </Frame>
+        <Frame label="T1.2 · Hub — idle, scheduled now" light note={<span><b>Context-aware primary action:</b> Period 3 is scheduled now and idle, so its card carries <b>Start session</b> (→ T9 prefilled); the other classes stay one-line quiet with "last met" recency. No approvals row — it only renders when requests exist. The activity feed shows yesterday's tail so the screen never opens blank.</span>}>
+          <TeacherHomeRev live={false} />
+        </Frame>
+        <Frame label="T1.3 · Empty — first run" light note={<span>New-teacher state keeps the greeting (it's still their home) and names the three steps and the time cost. Create a class → T12. No demo-data confetti.</span>}>
+          <TeacherHomeEmpty />
+        </Frame>
+      </div>
+    </Sheet5>
+  );
+}
+mountSheet(App);
+</script>
+</body>
+</html>
