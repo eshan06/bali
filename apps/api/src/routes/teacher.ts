@@ -430,7 +430,8 @@ export function teacherRoutes(app: FastifyInstance): void {
           classId: cls.id,
           sessionId: card.live.sessionId,
           name: cls.name,
-          timeLabel: 'Now',
+          // Bell time like the other rows — the "● Live now" trailing label carries the state.
+          timeLabel: hhmm12(start).replace(' AM', '').replace(' PM', ''),
           subtitle: `live until ${card.live.endsAtLabel} · ${card.memberCount} students`,
         });
         continue;
@@ -471,6 +472,7 @@ export function teacherRoutes(app: FastifyInstance): void {
     const pending = await db
       .select({
         membershipId: s.memberships.id,
+        classId: s.classes.id,
         joinedAt: s.memberships.joinedAt,
         firstName: s.students.firstName,
         lastName: s.students.lastName,
@@ -480,7 +482,7 @@ export function teacherRoutes(app: FastifyInstance): void {
       .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
       .innerJoin(s.classes, eq(s.memberships.classId, s.classes.id))
       .where(and(eq(s.classes.teacherId, teacher.id), eq(s.memberships.status, 'pending')))
-      .orderBy(asc(s.memberships.joinedAt));
+      .orderBy(desc(s.memberships.joinedAt));
 
     const recent = await db.query.events.findMany({
       where: eq(s.events.schoolId, teacher.schoolId),
@@ -504,6 +506,7 @@ export function teacherRoutes(app: FastifyInstance): void {
       today,
       approvals: pending.map((p) => ({
         membershipId: p.membershipId,
+        classId: p.classId,
         name: `${p.firstName} ${p.lastName}`,
         className: p.className,
         requestedAt: p.joinedAt.toISOString(),
