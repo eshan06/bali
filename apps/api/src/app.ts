@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { ZodError } from 'zod';
-import { env } from './env';
+import { corsOrigins } from './env';
 import { HttpError } from './domain';
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from './routes/public';
@@ -17,10 +17,14 @@ export async function buildApp(): Promise<FastifyInstance> {
       process.env.NODE_ENV === 'production'
         ? true
         : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } } },
+    // Behind an ALB/nginx: trust X-Forwarded-* so req.ip (and IP-keyed limits) are correct.
+    trustProxy: true,
+    // Let app.close() drain long-lived SSE streams on deploy instead of hanging.
+    forceCloseConnections: true,
   });
 
   await app.register(cors, {
-    origin: [env.CORS_ORIGIN],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['authorization', 'content-type'],
   });

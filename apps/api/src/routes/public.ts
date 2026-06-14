@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
 
 export function publicRoutes(app: FastifyInstance): void {
@@ -19,5 +19,17 @@ export function publicRoutes(app: FastifyInstance): void {
     return { className: cls.name, tagCode: tag.code };
   });
 
+  /** Liveness: the process is up and serving. Cheap, never touches the DB. */
   app.get('/v1/health', async () => ({ ok: true, at: new Date().toISOString() }));
+
+  /** Readiness: the process can serve real traffic (DB reachable). For load balancers /
+   *  orchestrators — returns 503 when the DB is down so traffic drains off this instance. */
+  app.get('/v1/ready', async (_req, reply) => {
+    try {
+      await getDb().execute(sql`select 1`);
+      return { ready: true, at: new Date().toISOString() };
+    } catch {
+      return reply.code(503).send({ ready: false, error: 'db_unreachable' });
+    }
+  });
 }
