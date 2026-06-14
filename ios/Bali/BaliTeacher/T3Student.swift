@@ -283,7 +283,7 @@ struct T3StudentSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onChange(of: noDevice) { on in
             Task {
-                try? await store.api.postVoid("sessions/\(sessionId)/no-device", body: NoDeviceBody(studentId: participant.studentId, on: on))
+                _ = try? await store.api.postVoid("sessions/\(sessionId)/no-device", body: NoDeviceBody(studentId: participant.studentId, on: on))
                 await onChanged()
             }
         }

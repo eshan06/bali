@@ -62,7 +62,7 @@ struct T2LiveView: View {
         .confirmationDialog("End this session?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End session", role: .destructive) {
                 Task {
-                    try? await store.api.postVoid("sessions/\(sessionId)/end", body: nil as EmptyBody?)
+                    _ = try? await store.api.postVoid("sessions/\(sessionId)/end", body: nil as EmptyBody?)
                     LocalReminders.cancelEnd(sessionId: sessionId)
                     showRecap = true
                 }
@@ -93,7 +93,7 @@ struct T2LiveView: View {
             Spacer()
             Button("Extend") {
                 Task {
-                    try? await store.api.postVoid("sessions/\(sessionId)/extend", body: ExtendBody(minutes: 5))
+                    _ = try? await store.api.postVoid("sessions/\(sessionId)/extend", body: ExtendBody(minutes: 5))
                     // The end time moved — the on-device reminder is now stale.
                     LocalReminders.cancelEnd(sessionId: sessionId)
                     await refresh()

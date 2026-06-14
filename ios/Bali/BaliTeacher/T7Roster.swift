@@ -218,13 +218,13 @@ struct RosterContent: View {
     private func decide(_ req: TJoinRequest, approve: Bool) async {
         busyIds.insert(req.membershipId)
         defer { busyIds.remove(req.membershipId) }
-        try? await store.api.postVoid("memberships/\(req.membershipId)/\(approve ? "approve" : "decline")", body: nil as EmptyBody?)
+        _ = try? await store.api.postVoid("memberships/\(req.membershipId)/\(approve ? "approve" : "decline")", body: nil as EmptyBody?)
         await reload()
     }
 
     private func approveAll() async {
         for req in roster.pending {
-            try? await store.api.postVoid("memberships/\(req.membershipId)/approve", body: nil as EmptyBody?)
+            _ = try? await store.api.postVoid("memberships/\(req.membershipId)/approve", body: nil as EmptyBody?)
         }
         await reload()
     }
