@@ -15,6 +15,7 @@ struct T2LiveView: View {
     @State private var confirmEnd = false
     @State private var toast: ToastInfo?
     @State private var pulseStudentId: String?
+    @State private var showRecap = false
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     struct ToastInfo: Equatable {
@@ -54,7 +55,7 @@ struct T2LiveView: View {
         .task { await poll() }
         .onReceive(tick) { now = $0 }
         .sheet(item: $selected) { participant in
-            T3StudentSheet(sessionId: sessionId, participant: participant) {
+            T3StudentSheet(classId: classId, sessionId: sessionId, participant: participant) {
                 await refresh()
             }
         }
@@ -62,12 +63,17 @@ struct T2LiveView: View {
             Button("End session", role: .destructive) {
                 Task {
                     try? await store.api.postVoid("sessions/\(sessionId)/end", body: nil as EmptyBody?)
-                    onClosed()
+                    LocalReminders.cancelEnd(sessionId: sessionId)
+                    showRecap = true
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Shields lift for everyone. Ending early is fine — the bell would have done it anyway.")
+        }
+        // The closing beat: a recap presents over the grid on end, then dismisses both (T10).
+        .fullScreenCover(isPresented: $showRecap, onDismiss: { onClosed() }) {
+            T10RecapView(sessionId: sessionId)
         }
     }
 
@@ -88,6 +94,8 @@ struct T2LiveView: View {
             Button("Extend") {
                 Task {
                     try? await store.api.postVoid("sessions/\(sessionId)/extend", body: ExtendBody(minutes: 5))
+                    // The end time moved — the on-device reminder is now stale.
+                    LocalReminders.cancelEnd(sessionId: sessionId)
                     await refresh()
                 }
             }
@@ -258,7 +266,11 @@ struct T2LiveView: View {
             }
         }
         detail = fresh
-        if fresh.session.endedAt != nil { onClosed() }
+        // Session closed (bell or elsewhere) → present the recap, which dismisses the grid on Done.
+        if fresh.session.endedAt != nil, !showRecap {
+            LocalReminders.cancelEnd(sessionId: sessionId)
+            showRecap = true
+        }
     }
 }
 

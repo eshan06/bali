@@ -259,11 +259,11 @@ struct TeacherSignInView: View {
 struct TeacherField: View {
     var placeholder: String
     @Binding var text: String
-    var contentType: UITextContentType
+    var contentType: UITextContentType?
     var keyboard: UIKeyboardType = .default
     var secure = false
 
-    init(_ placeholder: String, text: Binding<String>, contentType: UITextContentType,
+    init(_ placeholder: String, text: Binding<String>, contentType: UITextContentType? = nil,
          keyboard: UIKeyboardType = .default, secure: Bool = false) {
         self.placeholder = placeholder
         self._text = text

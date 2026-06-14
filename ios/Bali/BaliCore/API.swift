@@ -68,8 +68,26 @@ final class APIClient {
         return true
     }
 
+    @discardableResult
+    func delete(_ path: String) async throws -> Bool {
+        _ = try await request("DELETE", path, body: nil as String?, as: OkResponse.self)
+        return true
+    }
+
+    /// Build a request URL, keeping any `?query=...` out of the path component (otherwise
+    /// `appendingPathComponent` percent-encodes `?`/`&` and the query is lost).
+    private func url(for path: String) -> URL {
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let base = APIConfig.baseURL.appendingPathComponent(String(parts[0]))
+        guard parts.count > 1, var comps = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            return base
+        }
+        comps.percentEncodedQuery = String(parts[1])
+        return comps.url ?? base
+    }
+
     private func request<T: Decodable, B: Encodable>(_ method: String, _ path: String, body: B?, as _: T.Type) async throws -> T {
-        var req = URLRequest(url: APIConfig.baseURL.appendingPathComponent(path))
+        var req = URLRequest(url: url(for: path))
         req.httpMethod = method
         req.timeoutInterval = 15
         if let token = await tokenProvider() {

@@ -1,55 +1,41 @@
 import SwiftUI
 
-/// T1 · Home — class cards; the live one leads with "Open live grid".
+/// Push destinations off the hub.
+enum TeacherRoute: Hashable {
+    case classDetail(String)
+    case roster(String)
+    case policies
+}
+
+/// T1 · Teacher Home — the daily hub (W3a portal on the phone). Top to bottom: greeting,
+/// live-now card, approvals row, today's schedule with one-tap Start, loaded class cards,
+/// and a cross-class activity feed. Same components and density as the brief's T1.
 struct T1HomeView: View {
     @EnvironmentObject private var store: TeacherStore
+
+    @State private var home: THome?
     @State private var classes: [TClassCard]?
+    @State private var path = NavigationPath()
     @State private var startTarget: TClassCard?
-    @State private var liveTarget: TClassCard?
+    @State private var liveTarget: LiveTarget?
     @State private var showCreate = false
     @State private var confirmSignOut = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Tokens.Light.page.ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 14) {
-                        HStack {
-                            Text("Classes")
-                                .font(.system(size: 34, weight: .bold))
-                                .foregroundColor(Tokens.Light.textPrimary)
-                            Spacer()
-                            Button { confirmSignOut = true } label: {
-                                Image(systemName: "gearshape.2")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(Tokens.Light.textSecondary)
-                            }
-                            .accessibilityLabel("Settings")
-                        }
-                        .padding(.top, 12)
-
+                    VStack(alignment: .leading, spacing: 16) {
+                        greeting
                         if let classes {
                             if classes.isEmpty {
                                 emptyState
                             } else {
-                                ForEach(classes) { cls in
-                                    classCard(cls)
-                                }
-                                Button {
-                                    showCreate = true
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
-                                        Text("New class")
-                                    }
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(Tokens.green700)
-                                }
-                                .padding(.top, 6)
+                                hub(classes)
                             }
                         } else {
-                            ProgressView().tint(Tokens.Light.textSecondary).padding(.top, 80)
+                            ProgressView().tint(Tokens.Light.textSecondary).frame(maxWidth: .infinity).padding(.top, 80)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -58,27 +44,32 @@ struct T1HomeView: View {
                 .refreshable { await load() }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: TeacherRoute.self) { route in
+                switch route {
+                case .classDetail(let id): T6ClassDetailView(classId: id)
+                case .roster(let id): T7RosterView(classId: id)
+                case .policies: T8PoliciesView()
+                }
+            }
             .task { await load() }
             .sheet(item: $startTarget) { cls in
-                StartSessionSheet(cls: cls) { detail in
-                    startTarget = nil
+                T9StartSessionSheet(cls: cls, onStarted: { detail in
                     await load()
-                    liveTarget = classes?.first { $0.id == detail.session.classId }
-                }
-                .presentationDetents([.height(380)])
+                    liveTarget = LiveTarget(classId: detail.session.classId, sessionId: detail.session.id)
+                }, onOpenLive: { sid in
+                    liveTarget = LiveTarget(classId: cls.id, sessionId: sid)
+                })
             }
-            .fullScreenCover(item: $liveTarget) { cls in
-                if let live = cls.live {
-                    T2LiveView(classId: cls.id, sessionId: live.sessionId) {
-                        liveTarget = nil
-                        Task { await load() }
-                    }
+            .fullScreenCover(item: $liveTarget) { target in
+                T2LiveView(classId: target.classId, sessionId: target.sessionId) {
+                    liveTarget = nil
+                    Task { await load() }
                 }
             }
             .sheet(isPresented: $showCreate) {
-                CreateClassSheet {
-                    showCreate = false
-                    await load()
+                T12CreateClassSheet(firstEver: classes?.isEmpty ?? false) { card in
+                    Task { await load() }
+                    path.append(TeacherRoute.classDetail(card.id))
                 }
             }
             .confirmationDialog("Sign out of Bali?", isPresented: $confirmSignOut, titleVisibility: .visible) {
@@ -88,19 +79,189 @@ struct T1HomeView: View {
         }
     }
 
-    private func load() async {
-        struct R: Decodable { var classes: [TClassCard] }
-        if let r = try? await store.api.get("classes", as: R.self) {
-            classes = r.classes
-            // keep an open grid's endsAt fresh after extend
-            if let live = liveTarget { liveTarget = r.classes.first { $0.id == live.id } ?? nil }
-            #if DEBUG
-            // Screenshot/test seam: `simctl launch ... -bali.teacher.route live`
-            if UserDefaults.standard.string(forKey: "bali.teacher.route") == "live", liveTarget == nil {
-                UserDefaults.standard.removeObject(forKey: "bali.teacher.route")
-                liveTarget = r.classes.first { $0.live != nil }
+    // MARK: greeting
+
+    private var greeting: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(greetingTitle)
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(Tokens.Light.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let meta = metaLine {
+                    Text(meta).font(.system(size: 13)).foregroundColor(Tokens.Light.textSecondary)
+                }
             }
-            #endif
+            Spacer()
+            Button { confirmSignOut = true } label: {
+                Image(systemName: "gearshape.2").font(.system(size: 20)).foregroundColor(Tokens.Light.textSecondary)
+            }
+            .accessibilityLabel("Settings")
+        }
+        .padding(.top, 12)
+    }
+
+    private var greetingTitle: String {
+        let name = home?.teacher.displayName ?? "there"
+        let hour = Calendar.current.component(.hour, from: Date())
+        let part = hour < 12 ? "morning" : (hour < 17 ? "afternoon" : "evening")
+        return "Good \(part), \(name)"
+    }
+
+    private var metaLine: String? {
+        guard let home else { return nil }
+        if home.live != nil, let bell = home.nextBell { return "\(home.dateLabel) · next bell \(stripMeridiem(bell))" }
+        if let next = home.today.first(where: { $0.kind == "future" }) {
+            let short = next.name.split(separator: "—").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? next.name
+            return "\(home.dateLabel) · \(short) starts \(next.timeLabel)"
+        }
+        return home.dateLabel
+    }
+
+    private func stripMeridiem(_ s: String) -> String {
+        s.replacingOccurrences(of: " AM", with: "").replacingOccurrences(of: " PM", with: "")
+    }
+
+    // MARK: hub body
+
+    @ViewBuilder
+    private func hub(_ classes: [TClassCard]) -> some View {
+        if let live = home?.live { liveNowCard(live) }
+        if let approvals = home?.approvals, !approvals.isEmpty { approvalsRow(approvals) }
+        if let today = home?.today, !today.isEmpty { todaySchedule(today, classes: classes) }
+
+        VStack(alignment: .leading, spacing: 12) {
+            TSectionLabel("CLASSES")
+            ForEach(classes) { cls in classCard(cls) }
+            Button { showCreate = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
+                    Text("New class")
+                }
+                .font(.system(size: 15, weight: .semibold)).foregroundColor(Tokens.green700)
+            }
+            .padding(.top, 2)
+        }
+
+        if let recent = home?.recent, !recent.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                TSectionLabel("RECENT ACTIVITY")
+                EventTimelineCard(events: Array(recent.prefix(4)))
+            }
+        }
+    }
+
+    private func liveNowCard(_ live: TSessionDetail) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let now = context.date
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    ArcRing(progress: sessionProgress(start: live.session.startedAt, end: live.session.endsAt, now: now), size: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(live.session.className)
+                            .font(.system(size: 17, weight: .semibold)).foregroundColor(Tokens.Light.textPrimary)
+                        HStack(spacing: 6) {
+                            LiveDot()
+                            Text("Live · \(mmss(live.session.endsAt.timeIntervalSince(now))) · ends \(hmm(live.session.endsAt))")
+                                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                                .foregroundColor(Tokens.Light.textSecondary)
+                        }
+                    }
+                    Spacer()
+                }
+                SummaryChips(counts: live.counts)
+                Button {
+                    liveTarget = LiveTarget(classId: live.session.classId, sessionId: live.session.id)
+                } label: {
+                    Text("Open live grid")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .background(Tokens.Light.actionPrimaryBg).foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+            .padding(16)
+            .background(Tokens.Light.card)
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Tokens.green200, lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private func approvalsRow(_ approvals: [THomeApproval]) -> some View {
+        let newest = approvals[0]
+        return Button { path.append(TeacherRoute.roster(newest.classId)) } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(Tokens.Light.sunken)
+                    Image(systemName: "person.badge.plus").font(.system(size: 17)).foregroundColor(Tokens.green600)
+                }
+                .frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(approvals.count) student\(approvals.count == 1 ? "" : "s") want to join")
+                        .font(.system(size: 15, weight: .semibold)).foregroundColor(Tokens.Light.textPrimary)
+                    Text("\(newest.className) · newest \(relativeAgo(newest.requestedAt))")
+                        .font(.system(size: 12.5)).foregroundColor(Tokens.Light.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundColor(Tokens.Light.textTertiary)
+            }
+            .padding(14)
+            .background(Tokens.Light.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func todaySchedule(_ rows: [THomeRow], classes: [TClassCard]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TSectionLabel("TODAY")
+            VStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
+                    HStack(spacing: 14) {
+                        Text(row.timeLabel)
+                            .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                            .foregroundColor(Tokens.Light.textPrimary)
+                            .frame(width: 52, alignment: .leading)
+                        Text(row.name)
+                            .font(.system(size: 15))
+                            .foregroundColor(row.kind == "past" ? Tokens.Light.textTertiary : Tokens.Light.textPrimary)
+                            .lineLimit(1)
+                        Spacer()
+                        scheduleAction(row, classes: classes)
+                    }
+                    .frame(minHeight: 48)
+                    if idx < rows.count - 1 {
+                        Rectangle().fill(Tokens.Light.border).frame(height: 0.5)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .background(Tokens.Light.card)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private func scheduleAction(_ row: THomeRow, classes: [TClassCard]) -> some View {
+        if row.kind == "now" {
+            HStack(spacing: 6) {
+                LiveDot(size: 7)
+                Text("Live now").font(.system(size: 13, weight: .semibold)).foregroundColor(Tokens.green700)
+            }
+        } else if row.kind == "future" {
+            Button {
+                startTarget = classes.first { $0.id == row.classId }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "play.fill").font(.system(size: 11))
+                    Text("Start")
+                }
+                .font(.system(size: 14, weight: .semibold)).foregroundColor(Tokens.Light.textPrimary)
+                .padding(.horizontal, 12).frame(height: 32)
+                .background(Tokens.Light.card)
+                .overlay(Capsule().stroke(Tokens.Light.borderStrong, lineWidth: 1))
+                .clipShape(Capsule())
+            }
         }
     }
 
@@ -108,68 +269,60 @@ struct T1HomeView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 10) {
                 Text(cls.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(Tokens.Light.textPrimary)
+                    .font(.system(size: 17, weight: .semibold)).foregroundColor(Tokens.Light.textPrimary)
                 Spacer()
-                if let live = cls.live {
-                    chip("checkmark.circle", "Live · ends \(live.endsAtLabel)", fg: Tokens.Light.stateFocusedFg, bg: Tokens.Light.stateFocusedBg)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Tokens.Light.textTertiary)
-                }
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundColor(Tokens.Light.textTertiary)
             }
-            Text(subtitle(cls))
-                .font(.system(size: 13))
-                .foregroundColor(Tokens.Light.textSecondary)
+            Text(cardMeta(cls))
+                .font(.system(size: 13)).foregroundColor(Tokens.Light.textSecondary)
 
-            if cls.live != nil {
+            let action = classPrimaryAction(cls)
+            if action != .none {
                 HStack(spacing: 10) {
-                    Button {
-                        liveTarget = cls
-                    } label: {
-                        Text("Open live grid")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(Tokens.Light.actionPrimaryBg)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    switch action {
+                    case .openLive:
+                        cardButton("Open live grid", primary: true) {
+                            if let live = cls.live { liveTarget = LiveTarget(classId: cls.id, sessionId: live.sessionId) }
+                        }
+                    default:
+                        cardButton("Start session", primary: true) { startTarget = cls }
                     }
+                    cardButton("Roster", primary: false) { path.append(TeacherRoute.roster(cls.id)) }
                 }
-                .padding(.top, 14)
+                .padding(.top, 12)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 18).padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Tokens.Light.card)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: Color.black.opacity(0.05), radius: 3, y: 1)
         .contentShape(Rectangle())
-        .onTapGesture {
-            if cls.live != nil { liveTarget = cls } else { startTarget = cls }
-        }
+        .onTapGesture { path.append(TeacherRoute.classDetail(cls.id)) }
     }
 
-    private func subtitle(_ cls: TClassCard) -> String {
-        let base = "\(cls.memberCount) students"
-        if cls.live != nil, let policy = cls.policyName { return "\(base) · \(policy) policy" }
-        if cls.live != nil { return base }
-        return "\(base) · next session \(cls.startTime)"
+    private func cardButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: primary ? .infinity : nil)
+                .frame(height: 40)
+                .padding(.horizontal, primary ? 0 : 18)
+                .background(primary ? Tokens.Light.actionPrimaryBg : Tokens.Light.card)
+                .foregroundColor(primary ? .white : Tokens.Light.textPrimary)
+                .overlay(primary ? nil : RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Tokens.Light.borderStrong, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
-    private func chip(_ icon: String, _ label: String, fg: Color, bg: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 12))
-            Text(label).font(.system(size: 13, weight: .medium).monospacedDigit())
-        }
-        .foregroundColor(fg)
-        .padding(.horizontal, 11)
-        .padding(.vertical, 4)
-        .background(bg)
-        .clipShape(Capsule())
+    private func cardMeta(_ cls: TClassCard) -> String {
+        var parts = ["\(cls.daysLabel) · \(cls.startTime)", cls.studentsLabel]
+        if cls.live == nil, let last = cls.lastMetLabel { parts.append("last met \(last)") }
+        return parts.joined(separator: " · ")
     }
+
+    // MARK: empty
 
     private var emptyState: some View {
         VStack(spacing: 20) {
@@ -179,266 +332,22 @@ struct T1HomeView: View {
             }
             .frame(width: 120, height: 120)
             Text("Set up your first class")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(Tokens.Light.textPrimary)
+                .font(.system(size: 22, weight: .semibold)).foregroundColor(Tokens.Light.textPrimary)
             Text("A class takes about a minute: name it, pick a policy, and put the join code on the board.")
-                .font(.system(size: 15))
-                .foregroundColor(Tokens.Light.textSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 290)
-            Button("Create a class") { showCreate = true }
-                .font(.system(size: 17, weight: .semibold))
-                .padding(.horizontal, 26)
-                .padding(.vertical, 13)
-                .background(Tokens.Light.actionPrimaryBg)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .font(.system(size: 15)).foregroundColor(Tokens.Light.textSecondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 290)
+            TPrimaryButton(title: "Create a class") { showCreate = true }.frame(maxWidth: 240)
         }
-        .padding(.top, 100)
-    }
-}
-
-/// T1 · Start Session sheet — two prefilled decisions (next bell + last policy).
-struct StartSessionSheet: View {
-    let cls: TClassCard
-    var onStarted: (TSessionDetail) async -> Void
-
-    @EnvironmentObject private var store: TeacherStore
-    @State private var endsAt: Date
-    @State private var policies: [TPolicy] = []
-    @State private var policyId: String?
-    @State private var busy = false
-    @State private var errorText: String?
-
-    init(cls: TClassCard, onStarted: @escaping (TSessionDetail) async -> Void) {
-        self.cls = cls
-        self.onStarted = onStarted
-        // Prefill = the class bell today; if it already rang, a 45-minute session.
-        let parts = cls.endTime.split(separator: ":").compactMap { Int($0) }
-        var bell = Calendar.current.date(
-            bySettingHour: parts.first ?? 0, minute: parts.count > 1 ? parts[1] : 0, second: 0, of: Date()
-        ) ?? Date()
-        if bell <= Date() { bell = Date().addingTimeInterval(45 * 60) }
-        _endsAt = State(initialValue: bell)
-        _policyId = State(initialValue: cls.policyId)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
     }
 
-    var body: some View {
-        ZStack {
-            Tokens.Light.page.ignoresSafeArea()
-            VStack(spacing: 12) {
-                Capsule().fill(Tokens.Light.borderStrong).frame(width: 36, height: 5).padding(.top, 10)
-                Text("Start a session")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(Tokens.Light.textPrimary)
-                Text(cls.name)
-                    .font(.system(size: 15))
-                    .foregroundColor(Tokens.Light.textSecondary)
+    // MARK: data
 
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "bell").font(.system(size: 16)).foregroundColor(Tokens.Light.textSecondary)
-                        Text("Ends at").font(.system(size: 16)).foregroundColor(Tokens.Light.textPrimary)
-                        Spacer()
-                        DatePicker("", selection: $endsAt, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                        Text("next bell").font(.system(size: 13)).foregroundColor(Tokens.Light.textTertiary)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 56)
-                    .background(Tokens.Light.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "checklist").font(.system(size: 16)).foregroundColor(Tokens.Light.textSecondary)
-                        Text("Policy").font(.system(size: 16)).foregroundColor(Tokens.Light.textPrimary)
-                        Spacer()
-                        Menu {
-                            ForEach(policies) { p in
-                                Button(p.name) { policyId = p.id }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(policies.first { $0.id == policyId }?.name ?? cls.policyName ?? "Focus")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Tokens.Light.textPrimary)
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Tokens.Light.textTertiary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 56)
-                    .background(Tokens.Light.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    if let labels = policies.first(where: { $0.id == policyId })?.allowedAppLabels, !labels.isEmpty {
-                        Text("\(policies.first { $0.id == policyId }?.name ?? "") — \(labels.joined(separator: ", ")) allowed")
-                            .font(.system(size: 13))
-                            .foregroundColor(Tokens.Light.textTertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 4)
-                    }
-
-                    if let errorText {
-                        Text(errorText).font(.system(size: 13)).foregroundColor(Tokens.Light.textSecondary)
-                    }
-
-                    Button {
-                        busy = true
-                        Task {
-                            do {
-                                let detail = try await store.api.post(
-                                    "classes/\(cls.id)/sessions",
-                                    body: StartSessionBody(endsAt: endsAt, policyId: policyId),
-                                    as: TSessionDetail.self
-                                )
-                                busy = false
-                                await onStarted(detail)
-                            } catch {
-                                busy = false
-                                errorText = (error as? APIError)?.message ?? "Couldn't start — try again."
-                            }
-                        }
-                    } label: {
-                        Group {
-                            if busy { ProgressView().tint(.white) } else { Text("Start session") }
-                        }
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Tokens.Light.actionPrimaryBg)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                    .disabled(busy || endsAt <= Date())
-                }
-                .padding(.top, 10)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-        }
-        .task {
-            struct R: Decodable { var policies: [TPolicy] }
-            if let r = try? await store.api.get("policies", as: R.self) { policies = r.policies }
-        }
+    private func load() async {
+        home = try? await store.api.get("portal/home", as: THome.self)
+        classes = (try? await store.api.get("classes", as: R.self))?.classes
     }
-}
 
-/// Minimal create-class sheet (W3's dialog, phone-sized).
-struct CreateClassSheet: View {
-    var onCreated: () async -> Void
-
-    @EnvironmentObject private var store: TeacherStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var startTime = Calendar.current.date(bySettingHour: 11, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var endTime = Calendar.current.date(bySettingHour: 11, minute: 45, second: 0, of: Date()) ?? Date()
-    @State private var policies: [TPolicy] = []
-    @State private var policyId: String?
-    @State private var requireApproval = false
-    @State private var busy = false
-
-    var body: some View {
-        ZStack {
-            Tokens.Light.page.ignoresSafeArea()
-            VStack(spacing: 14) {
-                Text("New class")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(Tokens.Light.textPrimary)
-                    .padding(.top, 24)
-
-                TeacherField("Class name", text: $name, contentType: .name)
-
-                HStack {
-                    Text("Meets").font(.system(size: 15)).foregroundColor(Tokens.Light.textSecondary)
-                    Spacer()
-                    DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute).labelsHidden()
-                    Text("–").foregroundColor(Tokens.Light.textTertiary)
-                    DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute).labelsHidden()
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 54)
-                .background(Tokens.Light.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                HStack {
-                    Text("Policy").font(.system(size: 15)).foregroundColor(Tokens.Light.textSecondary)
-                    Spacer()
-                    Menu {
-                        ForEach(policies) { p in
-                            Button(p.name) { policyId = p.id }
-                        }
-                    } label: {
-                        Text(policies.first { $0.id == policyId }?.name ?? "Choose")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Tokens.Light.textPrimary)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 54)
-                .background(Tokens.Light.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                Toggle(isOn: $requireApproval) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Require approval to join")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Tokens.Light.textPrimary)
-                        Text("Otherwise the code admits anyone who has it")
-                            .font(.system(size: 12.5))
-                            .foregroundColor(Tokens.Light.textTertiary)
-                    }
-                }
-                .tint(Tokens.green600)
-                .padding(.horizontal, 16)
-                .frame(height: 64)
-                .background(Tokens.Light.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                Button {
-                    busy = true
-                    Task {
-                        let fmt = DateFormatter()
-                        fmt.dateFormat = "HH:mm"
-                        _ = try? await store.api.post("classes", body: CreateClassBody(
-                            name: name.trimmingCharacters(in: .whitespaces),
-                            daysLabel: "Mon–Fri",
-                            startTime: fmt.string(from: startTime),
-                            endTime: fmt.string(from: endTime),
-                            policyId: policyId,
-                            requireApproval: requireApproval
-                        ), as: TClassCard.self)
-                        busy = false
-                        dismiss()
-                        await onCreated()
-                    }
-                } label: {
-                    Group {
-                        if busy { ProgressView().tint(.white) } else { Text("Create class") }
-                    }
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Tokens.Light.actionPrimaryBg)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || busy)
-                .opacity(name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.45 : 1)
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-        }
-        .presentationDetents([.large])
-        .task {
-            struct R: Decodable { var policies: [TPolicy] }
-            if let r = try? await store.api.get("policies", as: R.self) {
-                policies = r.policies
-                policyId = policyId ?? r.policies.max(by: { $0.usedByClasses < $1.usedByClasses })?.id
-            }
-        }
-    }
+    private struct R: Decodable { var classes: [TClassCard] }
 }

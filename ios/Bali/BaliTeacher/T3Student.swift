@@ -1,14 +1,20 @@
 import SwiftUI
 
-/// T3 · Student detail sheet — this-session timeline, GrantPassForm, no-device toggle.
+/// T3 · Student detail sheet — pattern, not just this moment. A "This session · Recent"
+/// segmented control: the live timeline + GrantPassForm + no-device toggle, and the last
+/// ~5 sessions as factual outcome rows. Status only — there is deliberately nothing to
+/// drill into; no device contents exist.
 struct T3StudentSheet: View {
+    let classId: String
     let sessionId: String
     let participant: TParticipant
     var onChanged: () async -> Void
 
     @EnvironmentObject private var store: TeacherStore
     @Environment(\.dismiss) private var dismiss
+    @State private var segment = 0
     @State private var events: [TEvent] = []
+    @State private var history: TStudentHistory?
     @State private var noDevice: Bool
     @State private var passMinutes = 10
     @State private var customMinutes = ""
@@ -16,7 +22,8 @@ struct T3StudentSheet: View {
     @State private var granting = false
     @State private var grantError: String?
 
-    init(sessionId: String, participant: TParticipant, onChanged: @escaping () async -> Void) {
+    init(classId: String, sessionId: String, participant: TParticipant, onChanged: @escaping () async -> Void) {
+        self.classId = classId
         self.sessionId = sessionId
         self.participant = participant
         self.onChanged = onChanged
@@ -31,15 +38,8 @@ struct T3StudentSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
-                    if !events.isEmpty {
-                        sectionLabel("THIS SESSION")
-                        timelineCard
-                    }
-                    if ["focused", "pass"].contains(participant.state) {
-                        sectionLabel("GRANT A PASS")
-                        passCard
-                    }
-                    noDeviceCard
+                    SegPicker(items: ["This session", "Recent"], selection: $segment, fontSize: 15)
+                    if segment == 0 { thisSession } else { recentView }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 26)
@@ -53,6 +53,67 @@ struct T3StudentSheet: View {
                 events = r.events
             }
         }
+        .onChange(of: segment) { seg in
+            if seg == 1, history == nil { Task { await loadHistory() } }
+        }
+    }
+
+    @ViewBuilder
+    private var thisSession: some View {
+        if !events.isEmpty {
+            sectionLabel("THIS SESSION")
+            timelineCard
+        }
+        if ["focused", "pass"].contains(participant.state) {
+            sectionLabel("GRANT A PASS")
+            passCard
+        }
+        noDeviceCard
+    }
+
+    @ViewBuilder
+    private var recentView: some View {
+        if let history {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(spacing: 0) {
+                    ForEach(history.rows) { row in
+                        HStack(spacing: 12) {
+                            Text(row.dayLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Tokens.Light.textSecondary)
+                                .frame(width: 40, alignment: .leading)
+                            StateIconDot(state: row.state, size: 30)
+                            Text(row.label)
+                                .font(.system(size: 14))
+                                .foregroundColor(Tokens.Light.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
+                .padding(16)
+                .background(Tokens.Light.card)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                if history.rows.isEmpty {
+                    Text("No past sessions yet for \(participant.firstName).")
+                        .font(.system(size: 14)).foregroundColor(Tokens.Light.textSecondary)
+                }
+
+                FramingLine(text: history.framing)
+                Text(history.boundary)
+                    .font(.system(size: 12.5))
+                    .foregroundColor(Tokens.Light.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            ProgressView().tint(Tokens.Light.textSecondary).frame(maxWidth: .infinity).padding(.top, 30)
+        }
+    }
+
+    private func loadHistory() async {
+        history = try? await store.api.get("classes/\(classId)/students/\(participant.studentId)/history", as: TStudentHistory.self)
     }
 
     private var header: some View {
