@@ -1,6 +1,87 @@
 # Bali v2 — Session Handoff
 
-## ⚡ SESSION 5 — START HERE (written 2026-06-14) — Teacher iOS compiles + runs under Xcode 26.5
+## ⚡ SESSION 6 — START HERE (written 2026-06-14) — Teacher iOS on-device, perf pass, + the zero-setup pivot
+
+Continued from session 5. The teacher app was compiled, run on the **physical iPhone 15 Pro**, and
+walked by the owner (the §6 device pass — "everything looks great"). Then two things: a **loading-perf
+optimization** (owner-confirmed "feels good"), a **schedule-alignment fix**, and a deep **multi-agent
+analysis of pivoting Bali to a "Doorman-style" zero-setup model** (the big strategic thread to resume).
+
+### What shipped this session (all committed to `main`, NOT pushed)
+
+- `perf(api)` **f873ce2** — parallelized the teacher hot paths. `portal/home` was ~28 *sequential*
+  RDS round-trips (an N+1: `classCard` ran 4 queries/class in a loop + a redundant open-session loop
+  + a 5-query `getSessionDetail`). Now: resolve each class's open session once & reuse; `Promise.all`
+  the independent reads; `getSessionDetail`'s 4 reads run concurrently; and `portal/home` **returns
+  the class cards** so T1 is one round-trip. **Measured: portal/home ~4300ms → ~480ms warm** vs RDS.
+- `perf(ios)+ui` **76dc948** — T1 reads cards from `portal/home` (one request, was portal+classes
+  sequential); T6 + T9 fetch concurrently (`async let`); **Today's schedule times zero-padded to
+  HH:MM + left-aligned** so the column is an exact grid. ⚠️ **Pending owner sign-off on the zero-pad
+  style** (`08:05`/`02:50`) — if the leading zero / "02:50 for a PM class" reads wrong, the fix is a
+  one-line revert in `T1Home.swift` `zeroPadHour`/`.frame(alignment:)` (alternatives: right-align +
+  accept single-digit indent, or restore AM/PM).
+- (session 5, already committed) **915a78e** unused-`try?` warning fixes · **bf517a4** SESSION 5
+  handoff (the Xcode 26.5 build gotcha — see below).
+- **NEW doc `ZERO_SETUP_ANALYSIS.md`** (root) — the synthesis of the zero-setup analysis. **Read it.**
+
+### 🔭 THE BIG THREAD TO RESUME — `ZERO_SETUP_ANALYSIS.md`
+
+A 5-agent workflow (Doorman research + iOS feasibility-reading-our-code + teacher/student/admin
+personas) analyzed the owner's ask to make Bali work like Doorman (*zero parent setup, instant at
+school, school full control, parent visibility; full-focus only OK*). Headlines:
+1. **Doorman's lock is a soft VPN a student's own VPN defeats** (it only *detects* bypass). **Bali's
+   FamilyControls shield is already stronger** (OS-enforced). → copy Doorman's *adoption model*, not
+   its tech.
+2. **True "zero setup" is impossible on iOS BYOD** — the FamilyControls authorization is an
+   irreducible one-time student tap. Honest framing: *"zero parent setup, one 10-second student tap,
+   then instant."* Literal zero-setup only exists on **school-managed/supervised (ASM+MDM)** devices.
+3. **Recommendation: a two-tier hybrid** — Tier 1 BYOD one-tap full-focus (now) + read-only parent
+   visibility (backend/web, reuses the event stream, no new iOS permission); Tier 2 ASM+MDM managed
+   devices = literal zero-setup, hard-enforced (upsell), behind the existing `ScreenTimeService` seam.
+4. **Full-focus-only: yes as default**, but all three personas independently demand a **safety
+   carve-out** (calls/911 free anyway; assistive/medical/AAC must survive — ADA/IEP) and the teacher
+   wants a **class-wide opt-in allow-list** on the roadmap.
+5. **`ZERO_SETUP_ANALYSIS.md` §5** has the concrete code changes (drop `PolicySetupView`/`PolicyBuckets`,
+   collapse `applyShields` → `.all()`, nullable-migrate `allowedAppLabels`/`messagesAllowed`, gut W6/T8
+   editors, add managed conformer + parent-visibility surface). **§6 lists the open decisions for the
+   owner — start there next session.**
+
+### To resume tomorrow — running state & restart
+
+The dev servers + on-device app were live at pause; background processes likely **died** when the
+session ended. To get back to a working device loop:
+```bash
+cd ~/Downloads/github/bali
+npm run dev:api  > /tmp/bali-api.log 2>&1 &     # :3001, talks to RDS via root .env (migration 0002 applied)
+npm run dev:web  > /tmp/bali-web.log 2>&1 &     # :3000
+curl -s localhost:3001/v1/ready                 # expect {"ready":true}
+# Teacher app on the iPhone 15 Pro (devicectl id CB970F97-E09E-5D3F-99E2-83B775E5C520), Mac IP 10.0.0.115:
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+cd ios/Bali
+xcodebuild -project Bali.xcodeproj -scheme BaliTeacher -destination 'generic/platform=iOS' -configuration Debug -allowProvisioningUpdates build
+APP=~/Library/Developer/Xcode/DerivedData/Bali-*/Build/Products/Debug-iphoneos/BaliTeacher.app
+xcrun devicectl device install app --device CB970F97-E09E-5D3F-99E2-83B775E5C520 "$APP"
+xcrun devicectl device process launch --device CB970F97-E09E-5D3F-99E2-83B775E5C520 -e '{"BALI_DEV_API_HOST":"10.0.0.115"}' com.bali.teacher
+```
+The app reuses the persisted Google session (signed in as `toeshanshah@gmail.com`) → lands on T1
+with the real RDS demo world. **Build gotcha (from session 5, still applies):** Xcode 26.5 defaults
+to explicit modules; a destination-less `-sdk iphonesimulator` build fails on `smithy-swift`'s
+`Logging` — always build with a **concrete single-arch `-destination`** (`generic/platform=iOS` for
+device, `id=<sim-udid>` for simulator; iPhone 17 Pro sim = `34AD32D3-B30E-450C-831F-9E70312574F7`).
+
+### Suggested next-session order
+
+1. Owner makes the `ZERO_SETUP_ANALYSIS.md` §6 decisions (full-focus-only? carve-out scope? tiers?
+   under-13? marketing language). That gates the iOS/backend simplification work.
+2. Quick win regardless of the pivot: ship the **read-only parent-visibility** web surface (pure
+   backend/web, no iOS permission — cheapest part of the Doorman promise).
+3. Then the web robustness backlog in `PRODUCTION.md` (mutation error-handling) — still open, still
+   sandbox-doable.
+4. Confirm/adjust the zero-pad time style (item above) and commit if changed.
+
+---
+
+## SESSION 5 (written 2026-06-14) — Teacher iOS compiles + runs under Xcode 26.5
 
 The session-4 teacher app (T1 rev · T6–T12 · T3 rev) was authored in a Linux sandbox and
 **never compiled**. This session did the real Swift build. Result: **all four targets BUILD
