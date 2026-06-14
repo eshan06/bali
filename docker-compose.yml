@@ -1,0 +1,89 @@
+# Local full-stack for Bali: Postgres + a one-shot migrate + the API + the web app.
+#   docker compose up --build
+# Seed the demo world once it's up (optional):
+#   docker compose run --rm migrate node --import tsx packages/db/src/seed.ts --reset
+#
+# This is a development/demo convenience and a deployment starting point — it is NOT a
+# hardened production manifest (no secrets manager, single instance, dev CORS).
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: bali
+      POSTGRES_DB: bali_v2
+    ports:
+      - '5433:5432'
+    volumes:
+      - bali-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Applies migrations, then exits. The api waits for it to complete.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ['node', '--import', 'tsx', 'packages/db/src/migrate.ts']
+    environment:
+      DATABASE_URL: postgres://postgres:bali@postgres:5432/bali_v2?sslmode=disable
+      DEFAULT_SCHOOL_ID: '11111111-1111-1111-1111-111111111111'
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-us-east-1_local000}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-localclient000}
+      SEED_TEACHER_EMAIL: ${SEED_TEACHER_EMAIL:-teacher@example.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    init: true
+    environment:
+      DATABASE_URL: postgres://postgres:bali@postgres:5432/bali_v2?sslmode=disable
+      DEFAULT_SCHOOL_ID: '11111111-1111-1111-1111-111111111111'
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-us-east-1_local000}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-localclient000}
+      NODE_ENV: production
+      PORT: '3001'
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      # Demo only — never set to 1 with a real Cognito pool in production.
+      ALLOW_DEV_TOKENS: ${ALLOW_DEV_TOKENS:-0}
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3001/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/v1}
+    environment:
+      PORT: '3000'
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  bali-pg:
