@@ -190,6 +190,33 @@ export async function startSession(opts: {
       })
       .returning();
     if (!session) throw new Error('session insert failed');
+
+    // Carry standing "no device" marks into the session — these students start the grid
+    // as `no_device` (T7's default-no-device → §2 state), without ever tapping in.
+    const defaultNoDevice = await tx
+      .select({ studentId: s.memberships.studentId })
+      .from(s.memberships)
+      .where(
+        and(
+          eq(s.memberships.classId, cls.id),
+          eq(s.memberships.status, 'active'),
+          eq(s.memberships.defaultNoDevice, true),
+        ),
+      );
+    if (defaultNoDevice.length > 0) {
+      await tx
+        .insert(s.participations)
+        .values(
+          defaultNoDevice.map((m) => ({
+            sessionId: session.id,
+            studentId: m.studentId,
+            state: 'not_joined' as const,
+            noDevice: true,
+          })),
+        )
+        .onConflictDoNothing({ target: [s.participations.sessionId, s.participations.studentId] });
+    }
+
     events.push(
       await appendEvent(tx, {
         schoolId: opts.schoolId,
@@ -784,6 +811,7 @@ export async function joinByCode(opts: {
   studentId: string;
   studentName: string;
   code: string;
+  source?: 'code' | 'tag';
 }): Promise<{
   membershipStatus: 'pending' | 'active';
   classId: string;
@@ -819,6 +847,7 @@ export async function joinByCode(opts: {
         classId: cls.id,
         studentId: opts.studentId,
         status,
+        source: opts.source ?? 'code',
         approvedAt: status === 'active' ? new Date() : null,
       });
       events.push(
@@ -882,6 +911,41 @@ export async function removeMembership(opts: {
     const detail = await getSessionDetail(open.id);
     bus.publish(open.id, { kind: 'snapshot', detail });
   }
+}
+
+export async function setMembershipDefaults(opts: {
+  teacherId: string;
+  membershipId: string;
+  defaultNoDevice?: boolean;
+}): Promise<{ membershipId: string; defaultNoDevice: boolean }> {
+  const db = getDb();
+  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, opts.membershipId) });
+  if (!membership) throw new HttpError(404, 'not_found', 'Membership not found');
+  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
+  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Membership not found');
+
+  const [updated] = await db
+    .update(s.memberships)
+    .set({ ...(opts.defaultNoDevice !== undefined ? { defaultNoDevice: opts.defaultNoDevice } : {}) })
+    .where(eq(s.memberships.id, opts.membershipId))
+    .returning();
+  if (!updated) throw new Error('membership update failed');
+
+  // A live session reflects the new default immediately: flip the student's no-device
+  // mark so the grid follows the roster (carries the dashed chip in/out at once).
+  if (opts.defaultNoDevice !== undefined) {
+    const open = await findOpenSessionForClass(membership.classId);
+    if (open) {
+      await setNoDevice({
+        teacherId: opts.teacherId,
+        schoolId: cls.schoolId,
+        sessionId: open.id,
+        studentId: membership.studentId,
+        on: opts.defaultNoDevice,
+      });
+    }
+  }
+  return { membershipId: updated.id, defaultNoDevice: updated.defaultNoDevice };
 }
 
 export async function decideMembership(opts: {

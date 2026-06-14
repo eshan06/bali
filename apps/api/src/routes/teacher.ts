@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { and, asc, count, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
 import {
   createClassBodySchema,
@@ -7,6 +7,7 @@ import {
   grantPassBodySchema,
   newJoinCode,
   startSessionBodySchema,
+  updateMembershipBodySchema,
 } from '@bali/shared';
 import { z } from 'zod';
 import { authenticate, requireTeacher, type TeacherCtx } from '../auth';
@@ -18,9 +19,11 @@ import {
   getSessionDetail,
   grantPass,
   removeMembership,
+  setMembershipDefaults,
   setNoDevice,
   startSession,
 } from '../domain';
+import { classOverview, sessionRecap, studentSessionHistory } from '../reports';
 import { renderEvent } from '../serialize';
 import { streamSession } from '../live';
 
@@ -38,7 +41,19 @@ async function teacherGate(req: FastifyRequest, reply: FastifyReply): Promise<Te
   return requireTeacher(req, reply);
 }
 
-/** Class card payload shared by W3 list and the portal. */
+/** "today" / "yesterday" / weekday — T1's idle "last met" recency. */
+const relativeDay = (d: Date, now = new Date()): string => {
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const ref = new Date(now);
+  ref.setHours(0, 0, 0, 0);
+  const diff = Math.round((ref.getTime() - day.getTime()) / 86_400_000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short' });
+};
+
+/** Class card payload shared by W3 list, the portal, and T1/T6 on iOS. */
 async function classCard(cls: typeof s.classes.$inferSelect) {
   const db = getDb();
   const [{ value: memberCount } = { value: 0 }] = await db
@@ -49,6 +64,12 @@ async function classCard(cls: typeof s.classes.$inferSelect) {
   const policy = cls.policyId
     ? await getDb().query.policies.findFirst({ where: eq(s.policies.id, cls.policyId) })
     : null;
+  const lastEnded = open
+    ? null
+    : await db.query.sessions.findFirst({
+        where: and(eq(s.sessions.classId, cls.id), isNotNull(s.sessions.endedAt)),
+        orderBy: desc(s.sessions.startedAt),
+      });
   return {
     id: cls.id,
     name: cls.name,
@@ -57,10 +78,14 @@ async function classCard(cls: typeof s.classes.$inferSelect) {
     endTime: cls.endTime.slice(0, 5),
     joinCode: cls.joinCode,
     requireApproval: cls.requireApproval,
+    /** Convenience inverse for the iOS copy ("auto-approve off"). */
+    autoApprove: !cls.requireApproval,
     memberCount,
     policyId: cls.policyId,
     policyName: policy?.name ?? null,
     allowedAppLabels: policy?.allowedAppLabels ?? [],
+    archived: cls.archivedAt !== null,
+    lastMetLabel: lastEnded?.endedAt ? relativeDay(lastEnded.endedAt) : null,
     live: open
       ? { sessionId: open.id, endsAt: open.endsAt.toISOString(), endsAtLabel: hhmm12(open.endsAt) }
       : null,
@@ -130,6 +155,8 @@ export function teacherRoutes(app: FastifyInstance): void {
       .select({
         membershipId: s.memberships.id,
         status: s.memberships.status,
+        source: s.memberships.source,
+        defaultNoDevice: s.memberships.defaultNoDevice,
         joinedAt: s.memberships.joinedAt,
         studentId: s.students.id,
         firstName: s.students.firstName,
@@ -153,6 +180,8 @@ export function teacherRoutes(app: FastifyInstance): void {
           studentId: r.studentId,
           name: `${r.firstName} ${r.lastName}`,
           joinedAt: r.joinedAt.toISOString(),
+          source: r.source,
+          defaultNoDevice: r.defaultNoDevice,
           current: stateByStudent.get(r.studentId) ?? null,
         })),
       pending: rows
@@ -162,8 +191,20 @@ export function teacherRoutes(app: FastifyInstance): void {
           studentId: r.studentId,
           name: `${r.firstName} ${r.lastName}`,
           requestedAt: r.joinedAt.toISOString(),
+          source: r.source,
         })),
     };
+  });
+
+  app.patch<{ Params: { id: string } }>('/v1/memberships/:id', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    const body = updateMembershipBodySchema.parse(req.body);
+    return setMembershipDefaults({
+      teacherId: teacher.id,
+      membershipId: req.params.id,
+      defaultNoDevice: body.defaultNoDevice,
+    });
   });
 
   app.post<{ Params: { id: string } }>('/v1/memberships/:id/approve', async (req, reply) => {
@@ -307,6 +348,51 @@ export function teacherRoutes(app: FastifyInstance): void {
         orderBy: asc(s.events.at),
       });
       return { events: rows.map(renderEvent) };
+    },
+  );
+
+  // ---------- T6 · Overview · T10 · Recap · T3 · Recent ----------
+
+  /** T6 Overview quick stats — members, sessions this week, last-session recap pointer. */
+  app.get<{ Params: { id: string } }>('/v1/classes/:id/overview', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    const db = getDb();
+    const cls = await db.query.classes.findFirst({
+      where: and(eq(s.classes.id, req.params.id), eq(s.classes.teacherId, teacher.id)),
+    });
+    if (!cls) return reply.code(404).send({ error: 'not_found', message: 'Class not found' });
+    return classOverview(cls.id);
+  });
+
+  /** T10 Session Recap — neutral aggregates for one (usually ended) session. */
+  app.get<{ Params: { id: string } }>('/v1/sessions/:id/recap', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    const db = getDb();
+    const session = await db.query.sessions.findFirst({
+      where: and(eq(s.sessions.id, req.params.id), eq(s.sessions.teacherId, teacher.id)),
+    });
+    if (!session) return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
+    const recap = await sessionRecap(session.id);
+    if (!recap) return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
+    return recap;
+  });
+
+  /** T3 Recent — last ~5 sessions for one (student, class) as outcome rows. */
+  app.get<{ Params: { id: string; studentId: string } }>(
+    '/v1/classes/:id/students/:studentId/history',
+    async (req, reply) => {
+      const teacher = await teacherGate(req, reply);
+      if (!teacher) return;
+      const db = getDb();
+      const cls = await db.query.classes.findFirst({
+        where: and(eq(s.classes.id, req.params.id), eq(s.classes.teacherId, teacher.id)),
+      });
+      if (!cls) return reply.code(404).send({ error: 'not_found', message: 'Class not found' });
+      const history = await studentSessionHistory({ classId: cls.id, studentId: req.params.studentId });
+      if (!history) return reply.code(404).send({ error: 'not_found', message: 'Student not found' });
+      return history;
     },
   );
 

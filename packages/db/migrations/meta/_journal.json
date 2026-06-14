@@ -15,6 +15,13 @@
       "when": 1781231726986,
       "tag": "0001_lazy_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781402405799,
+      "tag": "0002_previous_revanche",
+      "breakpoints": true
     }
   ]
 }

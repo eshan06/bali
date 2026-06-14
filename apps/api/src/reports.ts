@@ -1,7 +1,10 @@
-import { and, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
+import type { ChipState, SessionRecapDTO, ClassOverviewDTO, StudentHistoryDTO } from '@bali/shared';
+import { shortName } from './serialize';
 
-/** W8's framing line — designed copy; the CSV export embeds it in its header row. */
+/** W8's framing line — designed copy; the CSV export embeds it in its header row.
+ *  The teacher iOS Recent/Recap surfaces reuse the same constant (T6/T10/T3). */
 export const REPORTS_FRAMING_LINE = 'Patterns are conversation starters, not verdicts.';
 
 export type ReportRange = 'week' | 'month';
@@ -253,4 +256,364 @@ export async function focusMinutesReport(opts: {
   // scheduled period, not the mock's 50, so the copy stays honest with live data.
   const longest = Math.max(0, ...rows.map((r) => r.scheduledMinutes));
   return { rows, periodMinutes: longest > 0 ? longest : 50 };
+}
+
+// ---------- teacher iOS addendum aggregations (T6 Overview, T10 Recap, T3 Recent) ----------
+
+const clock24 = (d: Date): string =>
+  d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false });
+const weekdayShort = (d: Date): string => d.toLocaleDateString('en-US', { weekday: 'short' });
+
+/** "today" / "yesterday" / weekday — the recap's relative day word. */
+function dayWord(d: Date, now = new Date()): string {
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const ref = new Date(now);
+  ref.setHours(0, 0, 0, 0);
+  const diff = Math.round((ref.getTime() - day.getTime()) / 86_400_000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function median(nums: number[]): number | null {
+  if (nums.length === 0) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
+}
+
+/**
+ * Focused minutes per student for ONE session, from the same append-only event stream
+ * the W8 report uses: focus accrues from tap-in / re-focus / permission-restore until an
+ * emergency unlock, permission loss, or `endAt`. Passes do NOT stop the clock (sanctioned).
+ * Returns whole minutes; only participation/status data — nothing about device contents.
+ */
+async function focusMinutesByStudent(sessionId: string, endAt: Date): Promise<Map<string, number>> {
+  const db = getDb();
+  const rows = await db
+    .select({ studentId: s.events.studentId, type: s.events.type, at: s.events.at })
+    .from(s.events)
+    .where(
+      and(
+        eq(s.events.sessionId, sessionId),
+        inArray(s.events.type, [...FOCUS_START_EVENTS, ...FOCUS_STOP_EVENTS]),
+        isNotNull(s.events.studentId),
+      ),
+    )
+    .orderBy(asc(s.events.at));
+
+  const acc = new Map<string, { since: Date | null; total: number }>();
+  for (const ev of rows) {
+    if (!ev.studentId) continue;
+    const a = acc.get(ev.studentId) ?? { since: null, total: 0 };
+    acc.set(ev.studentId, a);
+    if ((FOCUS_START_EVENTS as readonly string[]).includes(ev.type)) {
+      a.since ??= ev.at;
+    } else if (a.since) {
+      a.total += ev.at.getTime() - a.since.getTime();
+      a.since = null;
+    }
+  }
+  const out = new Map<string, number>();
+  for (const [studentId, a] of acc) {
+    const total = a.total + (a.since ? endAt.getTime() - a.since.getTime() : 0);
+    out.set(studentId, Math.max(0, Math.round(total / 60_000)));
+  }
+  return out;
+}
+
+/**
+ * T10 · Session Recap — neutral history for one (usually ended) session. Partitions every
+ * active member into exactly one bucket by precedence (no_device > emergency > permission-off
+ * > pass > focused > never-joined) so the counts sum to the roster. No ranking, no red.
+ */
+export async function sessionRecap(sessionId: string, now = new Date()): Promise<SessionRecapDTO | null> {
+  const db = getDb();
+  const session = await db.query.sessions.findFirst({ where: eq(s.sessions.id, sessionId) });
+  if (!session) return null;
+  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
+  const endAt = session.endedAt ?? now;
+
+  const members = await db
+    .select({
+      studentId: s.students.id,
+      firstName: s.students.firstName,
+      lastName: s.students.lastName,
+      defaultNoDevice: s.memberships.defaultNoDevice,
+    })
+    .from(s.memberships)
+    .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
+    .where(and(eq(s.memberships.classId, session.classId), eq(s.memberships.status, 'active')));
+
+  const parts = await db.query.participations.findMany({ where: eq(s.participations.sessionId, sessionId) });
+  const passes = await db.query.passes.findMany({ where: eq(s.passes.sessionId, sessionId) });
+  const unlockRows = await db
+    .select({
+      studentId: s.unlocks.studentId,
+      at: s.unlocks.at,
+      reason: s.unlocks.reason,
+      firstName: s.students.firstName,
+      lastName: s.students.lastName,
+    })
+    .from(s.unlocks)
+    .innerJoin(s.students, eq(s.unlocks.studentId, s.students.id))
+    .where(eq(s.unlocks.sessionId, sessionId))
+    .orderBy(asc(s.unlocks.at));
+  const revokeRows = await db
+    .select({ studentId: s.events.studentId })
+    .from(s.events)
+    .where(and(eq(s.events.sessionId, sessionId), eq(s.events.type, 'permission_revoked'), isNotNull(s.events.studentId)));
+  const refocusRows = await db
+    .select({ studentId: s.events.studentId, at: s.events.at })
+    .from(s.events)
+    .where(
+      and(
+        eq(s.events.sessionId, sessionId),
+        inArray(s.events.type, ['refocused', 'permission_restored']),
+        isNotNull(s.events.studentId),
+      ),
+    )
+    .orderBy(asc(s.events.at));
+
+  const focus = await focusMinutesByStudent(sessionId, endAt);
+  const partByStudent = new Map(parts.map((p) => [p.studentId, p]));
+  const passStudents = new Set(passes.map((p) => p.studentId));
+  const unlockStudents = new Set(unlockRows.map((u) => u.studentId));
+  const revokeStudents = new Set(revokeRows.map((r) => r.studentId));
+
+  let focusedCount = 0;
+  let emergencyCount = 0;
+  let passCount = 0;
+  let permissionOffCount = 0;
+  let neverJoinedCount = 0;
+  let studentsTappedIn = 0;
+  const noDeviceNames: string[] = [];
+  const focusValues: number[] = [];
+
+  for (const m of members) {
+    const p = partByStudent.get(m.studentId);
+    const noDevice = p?.noDevice ?? m.defaultNoDevice;
+    if (noDevice) {
+      noDeviceNames.push(shortName(m.firstName, m.lastName));
+      continue;
+    }
+    const didTap = !!p?.tappedInAt;
+    if (didTap) studentsTappedIn += 1;
+    const fm = focus.get(m.studentId) ?? 0;
+    if (didTap && fm > 0) focusValues.push(fm);
+
+    if (unlockStudents.has(m.studentId)) emergencyCount += 1;
+    else if (revokeStudents.has(m.studentId)) permissionOffCount += 1;
+    else if (passStudents.has(m.studentId)) passCount += 1;
+    else if (didTap) focusedCount += 1;
+    else neverJoinedCount += 1;
+  }
+
+  const emergencies = unlockRows.map((u) => {
+    const reasonLabel =
+      u.reason === null
+        ? 'Reason pending'
+        : u.reason === 'skipped'
+          ? 'Reason: skipped'
+          : `Reason shared: ${u.reason}`;
+    const refocus = refocusRows.find((r) => r.studentId === u.studentId && r.at >= u.at);
+    return {
+      studentId: u.studentId,
+      studentName: `${u.firstName} ${u.lastName}`,
+      shortName: shortName(u.firstName, u.lastName),
+      atLabel: clock24(u.at),
+      reasonLabel,
+      refocusedLabel: refocus ? `re-focused ${clock24(refocus.at)}` : null,
+      nudge: `A quiet check-in with ${u.firstName} later might be welcome.`,
+    };
+  });
+
+  const durationMinutes = Math.max(0, Math.round((endAt.getTime() - session.startedAt.getTime()) / 60_000));
+
+  return {
+    sessionId: session.id,
+    classId: session.classId,
+    className: cls?.name ?? session.policySnapshot.name,
+    scheduleLabel: `${dayWord(session.startedAt, now)} ${clock24(session.startedAt)}–${clock24(session.endsAt)}`,
+    durationMinutes,
+    durationLabel: `${durationMinutes} min`,
+    endReason: session.endReason,
+    endedEarly: session.endReason === 'teacher',
+    isLive: session.endedAt === null,
+    focusedCount,
+    emergencyCount,
+    passCount,
+    permissionOffCount,
+    neverJoinedCount,
+    studentsTappedIn,
+    totalMembers: members.length,
+    medianFocusMinutes: median(focusValues),
+    noDeviceNames,
+    clean: emergencyCount === 0 && permissionOffCount === 0,
+    emergencies,
+    framing: REPORTS_FRAMING_LINE,
+  };
+}
+
+/**
+ * T3 · Recent — the last N ended sessions for one (student, class), each as a factual
+ * outcome row. Status only: durations and events, never device contents. The dot state
+ * follows §2 precedence: no_device > permission-off > pass > (focused, with an unlock note).
+ */
+export async function studentSessionHistory(opts: {
+  classId: string;
+  studentId: string;
+  limit?: number;
+  now?: Date;
+}): Promise<StudentHistoryDTO | null> {
+  const db = getDb();
+  const limit = opts.limit ?? 5;
+  const student = await db.query.students.findFirst({ where: eq(s.students.id, opts.studentId) });
+  if (!student) return null;
+
+  const sessions = await db.query.sessions.findMany({
+    where: and(eq(s.sessions.classId, opts.classId), isNotNull(s.sessions.endedAt)),
+    orderBy: desc(s.sessions.startedAt),
+    limit,
+  });
+
+  const rows: StudentHistoryDTO['rows'] = [];
+  for (const ses of sessions) {
+    const endAt = ses.endedAt!;
+    const participation = await db.query.participations.findFirst({
+      where: and(eq(s.participations.sessionId, ses.id), eq(s.participations.studentId, opts.studentId)),
+    });
+    const dayLabel = weekdayShort(ses.startedAt);
+
+    if (participation?.noDevice) {
+      rows.push({ sessionId: ses.id, dayLabel, state: 'no_device', label: 'No device that day' });
+      continue;
+    }
+
+    const focusMap = await focusMinutesByStudent(ses.id, endAt);
+    const fm = focusMap.get(opts.studentId) ?? 0;
+    const studentUnlocks = await db.query.unlocks.findMany({
+      where: and(eq(s.unlocks.sessionId, ses.id), eq(s.unlocks.studentId, opts.studentId)),
+    });
+    const studentPasses = await db.query.passes.findMany({
+      where: and(eq(s.passes.sessionId, ses.id), eq(s.passes.studentId, opts.studentId)),
+    });
+    const revokes = await db
+      .select({ at: s.events.at })
+      .from(s.events)
+      .where(
+        and(
+          eq(s.events.sessionId, ses.id),
+          eq(s.events.studentId, opts.studentId),
+          eq(s.events.type, 'permission_revoked'),
+        ),
+      )
+      .orderBy(asc(s.events.at));
+    const restores = await db
+      .select({ at: s.events.at })
+      .from(s.events)
+      .where(
+        and(
+          eq(s.events.sessionId, ses.id),
+          eq(s.events.studentId, opts.studentId),
+          eq(s.events.type, 'permission_restored'),
+        ),
+      )
+      .orderBy(asc(s.events.at));
+
+    let state: ChipState;
+    let label: string;
+    if (revokes.length > 0) {
+      state = 'revoked';
+      const firstRevoke = revokes[0]!.at;
+      const restore = restores.find((r) => r.at >= firstRevoke);
+      if (restore) {
+        const mins = Math.max(1, Math.round((restore.at.getTime() - firstRevoke.getTime()) / 60_000));
+        label = `Permission off · rejoined ${mins} min later`;
+      } else {
+        label = 'Permission off · stayed off';
+      }
+    } else if (studentPasses.length > 0) {
+      state = 'pass';
+      label = `Focused ${fm} min · ${studentPasses[0]!.minutes}-min pass`;
+    } else if (studentUnlocks.length > 0) {
+      state = 'focused';
+      const n = studentUnlocks.length;
+      label = `Focused ${fm} min · ${n} unlock${n > 1 ? 's' : ''}, re-focused`;
+    } else if (participation?.tappedInAt) {
+      state = 'focused';
+      label = `Focused ${fm} min, full session`;
+    } else {
+      state = 'not_joined';
+      label = 'Didn’t join that day';
+    }
+    rows.push({ sessionId: ses.id, dayLabel, state, label });
+  }
+
+  return {
+    studentId: student.id,
+    studentName: `${student.firstName} ${student.lastName}`,
+    shortName: shortName(student.firstName, student.lastName),
+    rows,
+    framing: REPORTS_FRAMING_LINE,
+    boundary: `Session status only — Bali never sees ${student.firstName}’s screen, apps, messages, or location.`,
+  };
+}
+
+/** T6 · Overview quick stats — members, sessions this week, last-session recap pointer, median focus. */
+export async function classOverview(classId: string, now = new Date()): Promise<ClassOverviewDTO> {
+  const db = getDb();
+  const [{ value: memberCount } = { value: 0 }] = await db
+    .select({ value: count() })
+    .from(s.memberships)
+    .where(and(eq(s.memberships.classId, classId), eq(s.memberships.status, 'active')));
+
+  const weekStart = weekStartMonday(now);
+  const weekSessions = await db.query.sessions.findMany({
+    where: and(eq(s.sessions.classId, classId), gte(s.sessions.startedAt, weekStart)),
+    columns: { id: true },
+  });
+
+  const lastEnded = await db.query.sessions.findFirst({
+    where: and(eq(s.sessions.classId, classId), isNotNull(s.sessions.endedAt)),
+    orderBy: desc(s.sessions.startedAt),
+  });
+
+  let lastSession: ClassOverviewDTO['lastSession'] = null;
+  if (lastEnded) {
+    const recap = await sessionRecap(lastEnded.id, now);
+    if (recap) {
+      lastSession = {
+        sessionId: lastEnded.id,
+        dayLabel: weekdayShort(lastEnded.startedAt),
+        durationMinutes: recap.durationMinutes,
+        durationLabel: recap.durationLabel,
+        focusedCount: recap.focusedCount,
+        totalMembers: recap.totalMembers,
+      };
+    }
+  }
+
+  // Median focus per session over the last ~4 weeks of ended sessions for this class.
+  const since = weekStartMonday(now);
+  since.setDate(since.getDate() - 21);
+  const recentEnded = await db.query.sessions.findMany({
+    where: and(eq(s.sessions.classId, classId), isNotNull(s.sessions.endedAt), gte(s.sessions.startedAt, since)),
+    columns: { id: true, endedAt: true },
+  });
+  const allFocus: number[] = [];
+  for (const ses of recentEnded) {
+    if (!ses.endedAt) continue;
+    const fmap = await focusMinutesByStudent(ses.id, ses.endedAt);
+    for (const v of fmap.values()) if (v > 0) allFocus.push(v);
+  }
+
+  return {
+    classId,
+    memberCount,
+    sessionsThisWeek: weekSessions.length,
+    medianFocusMinutes: median(allFocus),
+    lastSession,
+  };
 }

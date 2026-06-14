@@ -157,6 +157,8 @@ export const tags = pgTable(
   (t) => [uniqueIndex('tags_code_uq').on(t.code), index('tags_class_idx').on(t.classId)],
 );
 
+export const membershipSourceEnum = pgEnum('membership_source', ['code', 'tag', 'manual']);
+
 export const memberships = pgTable(
   'memberships',
   {
@@ -168,6 +170,10 @@ export const memberships = pgTable(
       .notNull()
       .references(() => students.id),
     status: membershipStatusEnum('status').notNull().default('active'),
+    /** How the student arrived — drives T7's "joined by code / by tag" subtitle. */
+    source: membershipSourceEnum('source').notNull().default('code'),
+    /** Teacher's standing "no device" mark — carried into every session as `no_device` (T7). */
+    defaultNoDevice: boolean('default_no_device').notNull().default(false),
     joinedAt: ts('joined_at').notNull().defaultNow(),
     approvedAt: ts('approved_at'),
   },

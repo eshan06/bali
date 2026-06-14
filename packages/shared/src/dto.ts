@@ -104,6 +104,12 @@ export const grantPassBodySchema = z.object({
 
 export const noDeviceBodySchema = z.object({ on: z.boolean() });
 
+// ---------- membership (T7 default no-device) ----------
+export const updateMembershipBodySchema = z.object({
+  /** Standing "no device" mark — carried into every session as `no_device`. */
+  defaultNoDevice: z.boolean().optional(),
+});
+
 // ---------- student ----------
 export const joinBodySchema = z.object({
   code: z
@@ -199,6 +205,87 @@ export interface EventDTO {
   /** Human line + optional subline, server-rendered so all timelines match. */
   title: string;
   subtitle: string | null;
+}
+
+// ---------- teacher iOS addendum (T6 overview, T10 recap, T3 recent) ----------
+
+/** T6 · Overview quick stats + last-session recap pointer. */
+export interface ClassOverviewDTO {
+  classId: string;
+  memberCount: number;
+  sessionsThisWeek: number;
+  medianFocusMinutes: number | null;
+  lastSession: {
+    sessionId: string;
+    dayLabel: string;
+    durationMinutes: number;
+    durationLabel: string;
+    focusedCount: number;
+    totalMembers: number;
+  } | null;
+}
+
+/** One emergency on the T10 recap — listed plainly, with a check-in nudge (never a hook). */
+export interface RecapEmergencyDTO {
+  studentId: string;
+  studentName: string;
+  shortName: string;
+  atLabel: string;
+  /** "Reason shared: family" | "Reason pending" | "Reason: skipped" */
+  reasonLabel: string;
+  /** "re-focused 10:35" | null */
+  refocusedLabel: string | null;
+  /** "A quiet check-in with Sam later might be welcome." */
+  nudge: string;
+}
+
+/** T10 · Session Recap — neutral history. No ranking, no scoreboard, zero red. */
+export interface SessionRecapDTO {
+  sessionId: string;
+  classId: string;
+  className: string;
+  /** "today 9:50–10:45" — day word + scheduled clock range. */
+  scheduleLabel: string;
+  durationMinutes: number;
+  durationLabel: string;
+  endReason: 'bell' | 'teacher' | null;
+  endedEarly: boolean;
+  isLive: boolean;
+  focusedCount: number;
+  emergencyCount: number;
+  passCount: number;
+  permissionOffCount: number;
+  neverJoinedCount: number;
+  studentsTappedIn: number;
+  totalMembers: number;
+  medianFocusMinutes: number | null;
+  /** Short names of students the teacher marked no-device — plain, never flagged. */
+  noDeviceNames: string[];
+  /** All focused, no emergencies, no permission-off → the "Smooth period." celebration. */
+  clean: boolean;
+  emergencies: RecapEmergencyDTO[];
+  framing: string;
+}
+
+/** One row on T3 · Recent — a past session's outcome, status only. */
+export interface StudentHistoryRowDTO {
+  sessionId: string;
+  /** "Tue" — weekday abbreviation. */
+  dayLabel: string;
+  /** Display state for the grayscale-safe dot (per §2). */
+  state: z.infer<typeof chipStateSchema>;
+  /** "Focused 41 min · 1 unlock, re-focused" — factual, never a verdict. */
+  label: string;
+}
+
+export interface StudentHistoryDTO {
+  studentId: string;
+  studentName: string;
+  shortName: string;
+  rows: StudentHistoryRowDTO[];
+  framing: string;
+  /** "Session status only — Bali never sees Sam's screen, apps, messages, or location." */
+  boundary: string;
 }
 
 export type SSEMessage =

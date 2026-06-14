@@ -53,9 +53,12 @@ const ROSTER: Array<[string, string]> = [
   ['Yusuf', 'Eze'],
 ];
 
-const PENDING: Array<[string, string]> = [
-  ['Casey', 'Nguyen'],
-  ['Robbie', 'Fox'],
+// Pending join requests for Period 1 (the T1 approvals badge + T7 "Want to join · 3").
+// Source drives T7's "joined by code / by tag" subtitle.
+const PENDING: Array<[string, string, 'code' | 'tag']> = [
+  ['Dana', 'Cole', 'code'],
+  ['Leo', 'Marsh', 'code'],
+  ['Sofia', 'Reyes', 'tag'],
 ];
 
 async function reset() {
@@ -135,6 +138,8 @@ async function main() {
           endTime: '08:50',
           policyId: lecture.id,
           joinCode: 'QH8B2N4D',
+          // "auto-approve off" in T7 — the 3 pending requests need a teacher's nod.
+          requireApproval: true,
         },
         {
           schoolId,
@@ -187,38 +192,48 @@ async function main() {
       .values(ROSTER.map(([firstName, lastName]) => ({ schoolId, firstName, lastName })))
       .returning();
 
+    // Priya Shah starts Period 3 marked no-device by default (T7 · default-no-device).
     await tx.insert(s.memberships).values(
       studentRows.map((st) => ({
         classId: p3.id,
         studentId: st.id,
         status: 'active' as const,
+        defaultNoDevice: st.firstName === 'Priya' && st.lastName === 'Shah',
         approvedAt: new Date(),
       })),
     );
     // A few of the same students also sit in Period 1 (history realism).
+    // Hana Sato starts Period 1 marked no-device by default.
     await tx.insert(s.memberships).values(
       studentRows.slice(0, 24).map((st) => ({
         classId: p1.id,
         studentId: st.id,
         status: 'active' as const,
+        defaultNoDevice: st.firstName === 'Hana' && st.lastName === 'Sato',
         approvedAt: new Date(),
       })),
     );
 
+    // Three students waiting to join Period 1 — the T1 approvals badge lands here.
     const pendingRows = await tx
       .insert(s.students)
       .values(PENDING.map(([firstName, lastName]) => ({ schoolId, firstName, lastName })))
       .returning();
     await tx.insert(s.memberships).values(
-      pendingRows.map((st) => ({ classId: p3.id, studentId: st.id, status: 'pending' as const })),
+      pendingRows.map((st, i) => ({
+        classId: p1.id,
+        studentId: st.id,
+        status: 'pending' as const,
+        source: PENDING[i]![2],
+      })),
     );
     await tx.insert(s.events).values(
       pendingRows.map((st) => ({
         schoolId,
-        classId: p3.id,
+        classId: p1.id,
         studentId: st.id,
         type: 'member_requested' as const,
-        payload: { studentName: `${st.firstName} ${st.lastName}`, className: p3.name },
+        payload: { studentName: `${st.firstName} ${st.lastName}`, className: p1.name },
       })),
     );
 
@@ -278,9 +293,143 @@ async function main() {
       ]);
     }
 
+    // ----- Period 3 history (T6 Overview · T10 Recap · T3 Recent) -----
+    // Five ended sessions on the last five weekdays. Most students stay focused; a
+    // crafted thread runs through Sam Torres so his Recent reads exactly the spec rows
+    // (emergency→re-focus, full, pass, permission-off→rejoin, no-device), and the latest
+    // session lands "26 of 28 focused" with Diego's permission-off in the day's activity.
+    type EvIns = typeof s.events.$inferInsert;
+    type PartIns = typeof s.participations.$inferInsert;
+    const findStudent = (first: string, last: string) =>
+      studentRows.find((st) => st.firstName === first && st.lastName === last)!;
+    const sam = findStudent('Sam', 'Torres');
+    const diego = findStudent('Diego', 'Morales');
+
+    const atOn = (base: Date, h: number, m: number): Date => {
+      const x = new Date(base);
+      x.setHours(h, m, 0, 0);
+      return x;
+    };
+    const lastWeekdays = (n: number): Date[] => {
+      const out: Date[] = [];
+      const cursor = new Date(today);
+      cursor.setHours(0, 0, 0, 0);
+      while (out.length < n) {
+        cursor.setDate(cursor.getDate() - 1);
+        const dow = cursor.getDay();
+        if (dow !== 0 && dow !== 6) out.push(new Date(cursor));
+      }
+      return out;
+    };
+
+    const days = lastWeekdays(5); // [most-recent … oldest]
+    const snapshot = {
+      name: lecture.name,
+      messagesAllowed: lecture.messagesAllowed,
+      allowedAppLabels: lecture.allowedAppLabels,
+    };
+
+    for (let k = 0; k < days.length; k++) {
+      const day = days[k]!;
+      const start = atOn(day, 10, 0);
+      const end = atOn(day, 10, 45);
+      const [ses] = await tx
+        .insert(s.sessions)
+        .values({
+          classId: p3.id,
+          teacherId: rivera.id,
+          policyId: lecture.id,
+          policySnapshot: snapshot,
+          startedAt: start,
+          endsAt: end,
+          endedAt: end,
+          endReason: 'bell',
+        })
+        .returning();
+      if (!ses) continue;
+
+      const parts: PartIns[] = [];
+      const evts: EvIns[] = [];
+      const ev = (type: EvIns['type'], at: Date, extra: Partial<EvIns> = {}): EvIns => ({
+        schoolId,
+        classId: p3.id,
+        sessionId: ses.id,
+        teacherId: rivera.id,
+        type,
+        at,
+        ...extra,
+        payload: { className: p3.name, ...(extra.payload ?? {}) },
+      });
+      let tappedIn = 0;
+
+      for (let i = 0; i < studentRows.length; i++) {
+        const st = studentRows[i]!;
+        const fullName = `${st.firstName} ${st.lastName}`;
+
+        if (st.id === sam.id) {
+          if (k === 4) {
+            // No device that day.
+            parts.push({ sessionId: ses.id, studentId: st.id, state: 'ended', noDevice: true, lastSeenAt: end });
+            continue;
+          }
+          const tap = atOn(day, 10, 0);
+          parts.push({ sessionId: ses.id, studentId: st.id, state: 'ended', tappedInAt: tap, lastSeenAt: end });
+          evts.push(ev('tapped_in', tap, { studentId: st.id, payload: { studentName: fullName } }));
+          tappedIn += 1;
+          if (k === 0) {
+            const unlockAt = atOn(day, 10, 31);
+            const sharedAt = atOn(day, 10, 33);
+            const refocusAt = atOn(day, 10, 35);
+            await tx
+              .insert(s.unlocks)
+              .values({ sessionId: ses.id, studentId: st.id, at: unlockAt, reason: 'family', reasonSharedAt: sharedAt });
+            evts.push(ev('emergency_unlock', unlockAt, { studentId: st.id, payload: { studentName: fullName } }));
+            evts.push(
+              ev('reason_shared', sharedAt, { studentId: st.id, payload: { studentName: fullName, sharedReason: 'family' } }),
+            );
+            evts.push(ev('refocused', refocusAt, { studentId: st.id, payload: { studentName: fullName } }));
+          } else if (k === 2) {
+            const grantedAt = atOn(day, 10, 20);
+            const passEnd = atOn(day, 10, 30);
+            await tx
+              .insert(s.passes)
+              .values({ sessionId: ses.id, studentId: st.id, minutes: 10, grantedAt, endsAt: passEnd, endedAt: passEnd });
+            evts.push(ev('pass_granted', grantedAt, { studentId: st.id, payload: { studentName: fullName, minutes: 10 } }));
+            evts.push(ev('pass_ended', passEnd, { studentId: st.id, payload: { studentName: fullName } }));
+          } else if (k === 3) {
+            evts.push(ev('permission_revoked', atOn(day, 10, 18), { studentId: st.id, payload: { studentName: fullName } }));
+            evts.push(ev('permission_restored', atOn(day, 10, 22), { studentId: st.id, payload: { studentName: fullName } }));
+          }
+          continue;
+        }
+
+        if (st.id === diego.id && k === 0) {
+          const tap = atOn(day, 10, 0);
+          parts.push({ sessionId: ses.id, studentId: st.id, state: 'ended', tappedInAt: tap, lastSeenAt: end });
+          evts.push(ev('tapped_in', tap, { studentId: st.id, payload: { studentName: fullName } }));
+          evts.push(ev('permission_revoked', atOn(day, 10, 8), { studentId: st.id, payload: { studentName: fullName } }));
+          evts.push(ev('permission_restored', atOn(day, 10, 12), { studentId: st.id, payload: { studentName: fullName } }));
+          tappedIn += 1;
+          continue;
+        }
+
+        // Everyone else: tapped in and focused to the bell (staggered arrivals).
+        const tap = atOn(day, 10, i % 9);
+        parts.push({ sessionId: ses.id, studentId: st.id, state: 'ended', tappedInAt: tap, lastSeenAt: end });
+        evts.push(ev('tapped_in', tap, { studentId: st.id, payload: { studentName: fullName } }));
+        tappedIn += 1;
+      }
+
+      evts.unshift(ev('session_started', start, { payload: { tappedIn } }));
+      evts.push(ev('session_ended', end, { payload: { reason: 'bell' } }));
+      await tx.insert(s.participations).values(parts);
+      await tx.insert(s.events).values(evts);
+    }
+
     console.log(
       `seeded: Jefferson High · Ms. Rivera (adoptable: ${TEACHER_EMAIL}) · 4 classes · ` +
-        `${studentRows.length} students in Period 3 (+${pendingRows.length} pending) · 3 tags · 1 ended session`,
+        `${studentRows.length} students in Period 3 · ${pendingRows.length} pending in Period 1 · ` +
+        `3 tags · 1 Period 1 + ${days.length} Period 3 ended sessions · Priya/Hana default no-device`,
     );
   });
 
