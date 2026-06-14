@@ -122,6 +122,15 @@ struct T1HomeView: View {
         s.replacingOccurrences(of: " AM", with: "").replacingOccurrences(of: " PM", with: "")
     }
 
+    /// "8:05" → "08:05" so the meridiem-less Today column is an exact HH:MM grid: colons,
+    /// minutes, and left edges all line up, and no single-digit-hour row is indented. Minutes
+    /// already arrive 2-digit from the server.
+    private func zeroPadHour(_ label: String) -> String {
+        let parts = label.split(separator: ":", maxSplits: 1)
+        guard parts.count == 2, let hour = Int(parts[0]) else { return label }
+        return String(format: "%02d:%@", hour, String(parts[1]))
+    }
+
     // MARK: hub body
 
     @ViewBuilder
@@ -218,9 +227,11 @@ struct T1HomeView: View {
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                     HStack(spacing: 14) {
-                        Text(row.timeLabel)
+                        Text(zeroPadHour(row.timeLabel))
                             .font(.system(size: 15, weight: .semibold).monospacedDigit())
                             .foregroundColor(Tokens.Light.textPrimary)
+                            // Exact HH:MM grid (08:05 / 10:00 / 12:05 / 02:50), left-aligned —
+                            // every row the same width, so nothing is ragged or indented.
                             .frame(width: 52, alignment: .leading)
                         Text(row.name)
                             .font(.system(size: 15))
@@ -345,9 +356,8 @@ struct T1HomeView: View {
     // MARK: data
 
     private func load() async {
+        // Single round-trip: portal/home now carries the class cards too.
         home = try? await store.api.get("portal/home", as: THome.self)
-        classes = (try? await store.api.get("classes", as: R.self))?.classes
+        classes = home?.classes
     }
-
-    private struct R: Decodable { var classes: [TClassCard] }
 }

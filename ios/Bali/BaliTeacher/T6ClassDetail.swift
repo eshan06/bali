@@ -372,9 +372,12 @@ struct T6ClassDetailView: View {
     }
 
     private func loadAll() async {
-        await loadCard()
-        await loadOverview()
-        await loadPolicies()
+        // The card (+ live detail), overview, and policy reads are independent — fan them out
+        // instead of three sequential round-trips.
+        async let card: Void = loadCard()
+        async let overview: Void = loadOverview()
+        async let policies: Void = loadPolicies()
+        _ = await (card, overview, policies)
         if segment == 1 { await loadRoster() }
         if segment == 3 { await loadTags() }
         if segment == 4 { await loadEvents(reset: true) }

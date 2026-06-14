@@ -65,8 +65,11 @@ struct T9StartSessionSheet: View {
         }
         .task {
             struct R: Decodable { var policies: [TPolicy] }
-            if let r = try? await store.api.get("policies", as: R.self) { policies = r.policies }
-            if let roster = try? await store.api.get("classes/\(cls.id)/roster", as: TRoster.self) {
+            // Policies and the roster (for the no-device count) load concurrently.
+            async let policiesReq = store.api.get("policies", as: R.self)
+            async let rosterReq = store.api.get("classes/\(cls.id)/roster", as: TRoster.self)
+            if let r = try? await policiesReq { policies = r.policies }
+            if let roster = try? await rosterReq {
                 noDeviceCount = roster.members.filter { $0.defaultNoDevice }.count
             }
         }

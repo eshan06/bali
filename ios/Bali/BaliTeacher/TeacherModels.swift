@@ -166,6 +166,8 @@ struct THome: Codable {
     var dateLabel: String
     var nextBell: String?
     var live: TSessionDetail?
+    /// The class cards — folded into the hub payload so T1 loads in a single round-trip.
+    var classes: [TClassCard]
     var today: [THomeRow]
     var approvals: [THomeApproval]
     var recent: [TEvent]
