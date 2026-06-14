@@ -152,4 +152,14 @@ describe.skipIf(!HAS_DB)('teacher API integration', () => {
     const res = await get(`/v1/classes/${p3}/overview`, OTHER);
     expect(res.statusCode).toBe(404);
   });
+
+  it('enforces session ownership (IDOR): another teacher cannot read/end/inspect a session', async () => {
+    await send('POST', '/v1/auth/bootstrap', { role: 'teacher' }, OTHER);
+    expect((await get(`/v1/sessions/${lastSession}`, OTHER)).statusCode).toBe(404);
+    expect((await get(`/v1/sessions/${lastSession}/recap`, OTHER)).statusCode).toBe(404);
+    expect((await get(`/v1/sessions/${lastSession}/students/${samId}/timeline`, OTHER)).statusCode).toBe(404);
+    expect((await send('POST', `/v1/sessions/${lastSession}/end`, undefined, OTHER)).statusCode).toBe(404);
+    // The owner is unaffected.
+    expect((await get(`/v1/sessions/${lastSession}`)).statusCode).toBe(200);
+  });
 });

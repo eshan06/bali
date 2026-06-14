@@ -92,6 +92,13 @@ async function classCard(cls: typeof s.classes.$inferSelect) {
   };
 }
 
+/** Authorize a teacher for a session by id. Returns null (→ 404) when it isn't theirs,
+ *  so reads/actions on another teacher's session can't succeed and existence never leaks. */
+async function ownedSession(teacherId: string, sessionId: string) {
+  const session = await getDb().query.sessions.findFirst({ where: eq(s.sessions.id, sessionId) });
+  return session && session.teacherId === teacherId ? session : null;
+}
+
 export function teacherRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', authenticate);
 
@@ -282,19 +289,24 @@ export function teacherRoutes(app: FastifyInstance): void {
   app.get<{ Params: { id: string } }>('/v1/sessions/:id', async (req, reply) => {
     const teacher = await teacherGate(req, reply);
     if (!teacher) return;
-    const detail = await getSessionDetail(req.params.id);
-    return detail;
+    if (!(await ownedSession(teacher.id, req.params.id)))
+      return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
+    return getSessionDetail(req.params.id);
   });
 
   app.get<{ Params: { id: string } }>('/v1/sessions/:id/stream', async (req, reply) => {
     const teacher = await teacherGate(req, reply);
     if (!teacher) return;
+    if (!(await ownedSession(teacher.id, req.params.id)))
+      return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
     await streamSession(req, reply, req.params.id);
   });
 
   app.post<{ Params: { id: string } }>('/v1/sessions/:id/end', async (req, reply) => {
     const teacher = await teacherGate(req, reply);
     if (!teacher) return;
+    if (!(await ownedSession(teacher.id, req.params.id)))
+      return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
     await endSession(req.params.id, 'teacher');
     return { ok: true };
   });
@@ -342,6 +354,8 @@ export function teacherRoutes(app: FastifyInstance): void {
     async (req, reply) => {
       const teacher = await teacherGate(req, reply);
       if (!teacher) return;
+      if (!(await ownedSession(teacher.id, req.params.id)))
+        return reply.code(404).send({ error: 'not_found', message: 'Session not found' });
       const db = getDb();
       const rows = await db.query.events.findMany({
         where: and(eq(s.events.sessionId, req.params.id), eq(s.events.studentId, req.params.studentId)),
