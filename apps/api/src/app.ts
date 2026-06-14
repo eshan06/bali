@@ -16,7 +16,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     logger:
       process.env.NODE_ENV === 'production'
         ? true
-        : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } } },
+        : process.env.NODE_ENV === 'test'
+          ? false
+          : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } } },
     // Behind an ALB/nginx: trust X-Forwarded-* so req.ip (and IP-keyed limits) are correct.
     trustProxy: true,
     // Let app.close() drain long-lived SSE streams on deploy instead of hanging.
