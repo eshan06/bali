@@ -53,17 +53,28 @@ const relativeDay = (d: Date, now = new Date()): string => {
   return d.toLocaleDateString('en-US', { weekday: 'short' });
 };
 
-/** Class card payload shared by W3 list, the portal, and T1/T6 on iOS. */
-async function classCard(cls: typeof s.classes.$inferSelect) {
+/** Class card payload shared by W3 list, the portal, and T1/T6 on iOS.
+ *  The three independent reads run concurrently; callers that already resolved the open
+ *  session (the portal does, for every class) pass it in to avoid an N+1 and a redundant
+ *  lazy-bell sweep. `prefetchedOpen === undefined` means "resolve it here" (null is a valid
+ *  "no open session"). */
+async function classCard(
+  cls: typeof s.classes.$inferSelect,
+  prefetchedOpen?: typeof s.sessions.$inferSelect | null,
+) {
   const db = getDb();
-  const [{ value: memberCount } = { value: 0 }] = await db
-    .select({ value: count() })
-    .from(s.memberships)
-    .where(and(eq(s.memberships.classId, cls.id), eq(s.memberships.status, 'active')));
-  const open = await findOpenSessionForClass(cls.id);
-  const policy = cls.policyId
-    ? await getDb().query.policies.findFirst({ where: eq(s.policies.id, cls.policyId) })
-    : null;
+  const [memberRow, policy, open] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(s.memberships)
+      .where(and(eq(s.memberships.classId, cls.id), eq(s.memberships.status, 'active')))
+      .then((rows) => rows[0] ?? { value: 0 }),
+    cls.policyId
+      ? db.query.policies.findFirst({ where: eq(s.policies.id, cls.policyId) })
+      : Promise.resolve(null),
+    prefetchedOpen !== undefined ? Promise.resolve(prefetchedOpen) : findOpenSessionForClass(cls.id),
+  ]);
+  const memberCount = memberRow.value;
   const lastEnded = open
     ? null
     : await db.query.sessions.findFirst({
@@ -111,7 +122,7 @@ export function teacherRoutes(app: FastifyInstance): void {
       where: and(eq(s.classes.teacherId, teacher.id), isNull(s.classes.archivedAt)),
       orderBy: asc(s.classes.startTime),
     });
-    return { classes: await Promise.all(rows.map(classCard)) };
+    return { classes: await Promise.all(rows.map((cls) => classCard(cls))) };
   });
 
   app.post('/v1/classes', async (req, reply) => {
@@ -415,61 +426,84 @@ export function teacherRoutes(app: FastifyInstance): void {
     const teacher = await teacherGate(req, reply);
     if (!teacher) return;
     const db = getDb();
-    const school = await db.query.schools.findFirst({ where: eq(s.schools.id, teacher.schoolId) });
-    const classes = await db.query.classes.findMany({
-      where: and(eq(s.classes.teacherId, teacher.id), isNull(s.classes.archivedAt)),
-      orderBy: asc(s.classes.startTime),
-    });
+    const now = new Date();
+
+    // The four independent top-level reads run together (was four sequential round-trips).
+    const [school, classes, pending, recent] = await Promise.all([
+      db.query.schools.findFirst({ where: eq(s.schools.id, teacher.schoolId) }),
+      db.query.classes.findMany({
+        where: and(eq(s.classes.teacherId, teacher.id), isNull(s.classes.archivedAt)),
+        orderBy: asc(s.classes.startTime),
+      }),
+      // approvals across classes
+      db
+        .select({
+          membershipId: s.memberships.id,
+          classId: s.classes.id,
+          joinedAt: s.memberships.joinedAt,
+          firstName: s.students.firstName,
+          lastName: s.students.lastName,
+          className: s.classes.name,
+        })
+        .from(s.memberships)
+        .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
+        .innerJoin(s.classes, eq(s.memberships.classId, s.classes.id))
+        .where(and(eq(s.classes.teacherId, teacher.id), eq(s.memberships.status, 'pending')))
+        .orderBy(desc(s.memberships.joinedAt)),
+      db.query.events.findMany({
+        where: eq(s.events.schoolId, teacher.schoolId),
+        orderBy: desc(s.events.at),
+        limit: 3,
+      }),
+    ]);
+
+    // Resolve each class's open session once (in parallel), then reuse it for the live-now
+    // card, the class cards, and today's rows — no class is queried for its session twice,
+    // and the per-class card reads fan out instead of running N×4 sequentially.
+    const opens = await Promise.all(classes.map((cls) => findOpenSessionForClass(cls.id)));
+    const cards = await Promise.all(classes.map((cls, i) => classCard(cls, opens[i] ?? null)));
 
     // live-now card
-    let live: Awaited<ReturnType<typeof getSessionDetail>> | null = null;
-    for (const cls of classes) {
-      const open = await findOpenSessionForClass(cls.id);
-      if (open) {
-        live = await getSessionDetail(open.id);
-        break;
-      }
-    }
+    const liveOpen = opens.find((o) => o !== null) ?? null;
+    const live = liveOpen ? await getSessionDetail(liveOpen.id) : null;
 
     // today rows: past (ended session today) · now · future
-    const now = new Date();
-    const today: Array<Record<string, unknown>> = [];
-    for (const cls of classes) {
-      const start = todayAt(cls.startTime.slice(0, 5));
-      const end = todayAt(cls.endTime.slice(0, 5));
-      const card = await classCard(cls);
-      if (card.live) {
-        today.push({
-          kind: 'now',
-          classId: cls.id,
-          sessionId: card.live.sessionId,
-          name: cls.name,
-          // Bell time like the other rows — the "● Live now" trailing label carries the state.
-          timeLabel: hhmm12(start).replace(' AM', '').replace(' PM', ''),
-          subtitle: `live until ${card.live.endsAtLabel} · ${card.memberCount} students`,
-        });
-        continue;
-      }
-      if (end <= now) {
-        // this morning's ended session, if any
-        const ended = await db.query.sessions.findFirst({
-          where: and(eq(s.sessions.classId, cls.id)),
-          orderBy: desc(s.sessions.startedAt),
-        });
-        const sameDay = ended?.endedAt && ended.endedAt.toDateString() === now.toDateString();
-        const avg =
-          sameDay && ended
-            ? Math.round((ended.endedAt!.getTime() - ended.startedAt.getTime()) / 60_000)
-            : null;
-        today.push({
-          kind: 'past',
-          classId: cls.id,
-          name: cls.name,
-          timeLabel: hhmm12(start).replace(' AM', '').replace(' PM', ''),
-          subtitle: sameDay && avg !== null ? `ended · ${avg} min session` : 'no session today',
-        });
-      } else {
-        today.push({
+    const today = await Promise.all(
+      classes.map(async (cls, i) => {
+        const card = cards[i]!;
+        const start = todayAt(cls.startTime.slice(0, 5));
+        const end = todayAt(cls.endTime.slice(0, 5));
+        if (card.live) {
+          return {
+            kind: 'now',
+            classId: cls.id,
+            sessionId: card.live.sessionId,
+            name: cls.name,
+            // Bell time like the other rows — the "● Live now" trailing label carries the state.
+            timeLabel: hhmm12(start).replace(' AM', '').replace(' PM', ''),
+            subtitle: `live until ${card.live.endsAtLabel} · ${card.memberCount} students`,
+          };
+        }
+        if (end <= now) {
+          // this morning's ended session, if any
+          const ended = await db.query.sessions.findFirst({
+            where: eq(s.sessions.classId, cls.id),
+            orderBy: desc(s.sessions.startedAt),
+          });
+          const sameDay = ended?.endedAt && ended.endedAt.toDateString() === now.toDateString();
+          const avg =
+            sameDay && ended
+              ? Math.round((ended.endedAt!.getTime() - ended.startedAt.getTime()) / 60_000)
+              : null;
+          return {
+            kind: 'past',
+            classId: cls.id,
+            name: cls.name,
+            timeLabel: hhmm12(start).replace(' AM', '').replace(' PM', ''),
+            subtitle: sameDay && avg !== null ? `ended · ${avg} min session` : 'no session today',
+          };
+        }
+        return {
           kind: 'future',
           classId: cls.id,
           name: cls.name,
@@ -478,31 +512,9 @@ export function teacherRoutes(app: FastifyInstance): void {
           startLabel: hhmm12(start),
           endsAtIso: end.toISOString(),
           subtitle: `${card.policyName ?? 'Focus'} policy · ends at the ${hhmm12(end)} bell`,
-        });
-      }
-    }
-
-    // approvals across classes
-    const pending = await db
-      .select({
-        membershipId: s.memberships.id,
-        classId: s.classes.id,
-        joinedAt: s.memberships.joinedAt,
-        firstName: s.students.firstName,
-        lastName: s.students.lastName,
-        className: s.classes.name,
-      })
-      .from(s.memberships)
-      .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
-      .innerJoin(s.classes, eq(s.memberships.classId, s.classes.id))
-      .where(and(eq(s.classes.teacherId, teacher.id), eq(s.memberships.status, 'pending')))
-      .orderBy(desc(s.memberships.joinedAt));
-
-    const recent = await db.query.events.findMany({
-      where: eq(s.events.schoolId, teacher.schoolId),
-      orderBy: desc(s.events.at),
-      limit: 3,
-    });
+        };
+      }),
+    );
 
     const nextBell = (() => {
       const upcoming = classes
@@ -517,6 +529,9 @@ export function teacherRoutes(app: FastifyInstance): void {
       dateLabel: now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
       nextBell,
       live,
+      // The hub already computed every class card — return them so the phone's T1 needs a
+      // single round-trip (no separate GET /classes that recomputes the same cards).
+      classes: cards,
       today,
       approvals: pending.map((p) => ({
         membershipId: p.membershipId,

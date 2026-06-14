@@ -77,26 +77,29 @@ export async function getSessionDetail(sessionId: string, now = new Date()): Pro
   const db = getDb();
   const { session, cls } = await loadSessionWithClass(sessionId);
 
-  const members = await db
-    .select({
-      studentId: s.students.id,
-      firstName: s.students.firstName,
-      lastName: s.students.lastName,
-    })
-    .from(s.memberships)
-    .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
-    .where(and(eq(s.memberships.classId, session.classId), eq(s.memberships.status, 'active')))
-    .orderBy(asc(s.memberships.joinedAt));
-
-  const participations = await db.query.participations.findMany({
-    where: eq(s.participations.sessionId, sessionId),
-  });
-  const activePasses = await db.query.passes.findMany({
-    where: and(eq(s.passes.sessionId, sessionId), isNull(s.passes.endedAt)),
-  });
-  const pendingUnlocks = await db.query.unlocks.findMany({
-    where: and(eq(s.unlocks.sessionId, sessionId), isNull(s.unlocks.reason)),
-  });
+  // The roster and the three participation tables are independent given the session —
+  // fan them out (was four sequential round-trips; this path also backs the 5s live poll).
+  const [members, participations, activePasses, pendingUnlocks] = await Promise.all([
+    db
+      .select({
+        studentId: s.students.id,
+        firstName: s.students.firstName,
+        lastName: s.students.lastName,
+      })
+      .from(s.memberships)
+      .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
+      .where(and(eq(s.memberships.classId, session.classId), eq(s.memberships.status, 'active')))
+      .orderBy(asc(s.memberships.joinedAt)),
+    db.query.participations.findMany({
+      where: eq(s.participations.sessionId, sessionId),
+    }),
+    db.query.passes.findMany({
+      where: and(eq(s.passes.sessionId, sessionId), isNull(s.passes.endedAt)),
+    }),
+    db.query.unlocks.findMany({
+      where: and(eq(s.unlocks.sessionId, sessionId), isNull(s.unlocks.reason)),
+    }),
+  ]);
 
   const byStudent = new Map(participations.map((p) => [p.studentId, p]));
   const passByStudent = new Map(activePasses.map((p) => [p.studentId, p]));
