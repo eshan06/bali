@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { UserPlus } from 'lucide-react';
+import type { ParentLinkDTO } from '@bali/shared';
 import { Button } from '@/components/bali/Button';
 import { JoinCodeBadge, CopyButton, Card } from '@/components/bali/bits';
 import { ProjectCodeOverlay, ProjectThisButton } from '@/components/bali/ProjectCode';
@@ -16,6 +17,9 @@ export default function RosterPage() {
   const { id: classId } = useParams<{ id: string }>();
   const [roster, setRoster] = useState<RosterDTO | null>(null);
   const [projecting, setProjecting] = useState(false);
+  const [parentLink, setParentLink] = useState<{ membershipId: string; name: string; url: string } | null>(null);
+  const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     void api.get<RosterDTO>(`/classes/${classId}/roster`).then(setRoster);
@@ -31,6 +35,30 @@ export default function RosterPage() {
     if (!window.confirm(`Remove ${name} from this class? They can rejoin with the code.`)) return;
     await api.del(`/memberships/${membershipId}`);
     load();
+  };
+
+  // Mint a fresh read-only parent link (rotates any prior one) and show the copyable URL.
+  const shareParent = async (membershipId: string, name: string) => {
+    setLinkBusyId(membershipId);
+    setLinkError(null);
+    try {
+      const { token } = await api.post<ParentLinkDTO>(`/memberships/${membershipId}/parent-link`);
+      setParentLink({ membershipId, name, url: `${window.location.origin}/p/${token}` });
+    } catch {
+      setLinkError('Could not create a parent link. Please try again.');
+    } finally {
+      setLinkBusyId(null);
+    }
+  };
+
+  const revokeParent = async () => {
+    if (!parentLink) return;
+    try {
+      await api.del(`/memberships/${parentLink.membershipId}/parent-link`);
+    } catch {
+      /* best-effort; closing the panel is enough for the teacher */
+    }
+    setParentLink(null);
   };
 
   if (!roster) return <div className="p-9 text-ink-tertiary">Loading…</div>;
@@ -103,13 +131,23 @@ export default function RosterPage() {
                     {new Date(m.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="text-[13px] font-semibold text-ink-tertiary hover:text-red-600"
-                      onClick={() => void remove(m.membershipId, m.name)}
-                    >
-                      Remove…
-                    </button>
+                    <div className="flex items-center justify-end gap-4">
+                      <button
+                        type="button"
+                        className="text-[13px] font-semibold text-ink-tertiary hover:text-green-700 disabled:opacity-50"
+                        disabled={linkBusyId === m.membershipId}
+                        onClick={() => void shareParent(m.membershipId, m.name)}
+                      >
+                        {linkBusyId === m.membershipId ? 'Creating…' : 'Parent link'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[13px] font-semibold text-ink-tertiary hover:text-red-600"
+                        onClick={() => void remove(m.membershipId, m.name)}
+                      >
+                        Remove…
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -138,6 +176,59 @@ export default function RosterPage() {
           className={roster.class.name}
           onClose={() => setProjecting(false)}
         />
+      ) : null}
+
+      {parentLink ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setParentLink(null)}
+        >
+          <div
+            className="flex w-full max-w-[440px] flex-col gap-4 rounded-lg bg-surface-card p-6 shadow-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-1">
+              <h2 className="text-[17px] font-semibold leading-[22px]">Parent link · {parentLink.name}</h2>
+              <p className="text-[13px] leading-[18px] text-ink-secondary">
+                A read-only, status-only view of {parentLink.name.split(' ')[0]}’s focus history — no login. Share it
+                with their parent. Creating a new link replaces this one.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border border-line bg-surface-sunken px-3 py-2">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-[17px] text-ink-secondary">
+                {parentLink.url}
+              </span>
+              <CopyButton text={parentLink.url} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="text-[13px] font-semibold text-ink-tertiary hover:text-red-600"
+                onClick={() => void revokeParent()}
+              >
+                Revoke link
+              </button>
+              <div className="flex gap-2">
+                <a href={parentLink.url} target="_blank" rel="noopener noreferrer">
+                  <Button variant="secondary" size="sm">
+                    Open
+                  </Button>
+                </a>
+                <Button size="sm" onClick={() => setParentLink(null)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {linkError ? (
+        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-md bg-red-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-3">
+          {linkError}
+        </div>
       ) : null}
     </div>
   );
