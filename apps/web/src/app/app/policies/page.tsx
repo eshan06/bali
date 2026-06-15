@@ -2,62 +2,29 @@
 
 import clsx from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Button, Input, Toggle } from '@/components/bali/Button';
+import { Button, Input } from '@/components/bali/Button';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
 import type { PolicyDTO } from '@/lib/types';
 
-const MAX_LABELS = 12;
-
-/** Editor form state; `id === null` is the "+ New policy" draft. */
+/** Editor form state; `id === null` is the "+ New policy" draft. Full-focus only —
+ *  every session shields all but the apps each student allows once on their own phone,
+ *  so a policy is just a name you pick when starting a session. */
 interface Draft {
   id: string | null;
   name: string;
-  messagesAllowed: boolean;
-  allowedAppLabels: string[];
 }
 
-const draftFrom = (p: PolicyDTO | null): Draft =>
-  p
-    ? { id: p.id, name: p.name, messagesAllowed: p.messagesAllowed, allowedAppLabels: [...p.allowedAppLabels] }
-    : { id: null, name: '', messagesAllowed: true, allowedAppLabels: [] };
+const draftFrom = (p: PolicyDTO | null): Draft => (p ? { id: p.id, name: p.name } : { id: null, name: '' });
 
-const listSub = (p: PolicyDTO): string => {
-  const extras = p.allowedAppLabels.length > 0 ? p.allowedAppLabels.join(', ') : 'no extras';
-  const used = `used by ${p.usedByClasses} ${p.usedByClasses === 1 ? 'class' : 'classes'}`;
-  return `${extras} · ${used}`;
-};
-
-function ToggleRow({
-  title,
-  sub,
-  on,
-  lockedOn = false,
-  onChange,
-}: {
-  title: string;
-  sub: string;
-  on: boolean;
-  lockedOn?: boolean;
-  onChange?: (next: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center gap-3 border-t border-line py-[13px]">
-      <div className="flex-1">
-        <div className="text-[14.5px] font-medium leading-[19px]">{title}</div>
-        <div className="text-[12.5px] leading-[17px] text-ink-tertiary">{sub}</div>
-      </div>
-      <Toggle on={on} lockedOn={lockedOn} onChange={onChange} ariaLabel={title} />
-    </div>
-  );
-}
+const listSub = (p: PolicyDTO): string =>
+  `Full focus · used by ${p.usedByClasses} ${p.usedByClasses === 1 ? 'class' : 'classes'}`;
 
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState<PolicyDTO[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [labelInput, setLabelInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -79,31 +46,14 @@ export default function PoliciesPage() {
 
   const select = (p: PolicyDTO | null) => {
     setDraft(draftFrom(p));
-    setLabelInput('');
     if (!p) setTimeout(() => nameRef.current?.focus(), 0);
-  };
-
-  const addLabel = () => {
-    const label = labelInput.trim();
-    if (!draft || !label) return;
-    if (draft.allowedAppLabels.some((l) => l.toLowerCase() === label.toLowerCase())) {
-      setLabelInput('');
-      return;
-    }
-    if (draft.allowedAppLabels.length >= MAX_LABELS) return;
-    setDraft({ ...draft, allowedAppLabels: [...draft.allowedAppLabels, label] });
-    setLabelInput('');
   };
 
   const save = async () => {
     if (!draft || !draft.name.trim()) return;
     setBusy(true);
     try {
-      const body = {
-        name: draft.name.trim(),
-        messagesAllowed: draft.messagesAllowed,
-        allowedAppLabels: draft.allowedAppLabels,
-      };
+      const body = { name: draft.name.trim() };
       const saved = draft.id
         ? await api.patch<PolicyDTO>(`/policies/${draft.id}`, body)
         : await api.post<PolicyDTO>('/policies', body);
@@ -169,12 +119,12 @@ export default function PoliciesPage() {
             ) : null}
             {policies.length === 0 && draft?.id !== null ? (
               <div className="text-[13px] leading-[18px] text-ink-tertiary">
-                No policies yet — create one to choose what stays available during focus.
+                No policies yet — create one to pick when you start a session.
               </div>
             ) : null}
           </div>
 
-          {/* editor */}
+          {/* editor — full-focus only, so a policy is just a name */}
           {draft ? (
             <div className="max-w-[620px] rounded-md border border-line bg-surface-card p-5">
               <div className="mb-3.5 flex items-center gap-3">
@@ -189,66 +139,18 @@ export default function PoliciesPage() {
                   />
                 </div>
                 <span className="ml-auto whitespace-nowrap text-[12.5px] leading-[17px] text-ink-tertiary">
-                  {draft.id
-                    ? `Used by ${usedBy} ${usedBy === 1 ? 'class' : 'classes'}`
-                    : 'New policy'}
+                  {draft.id ? `Used by ${usedBy} ${usedBy === 1 ? 'class' : 'classes'}` : 'New policy'}
                 </span>
               </div>
 
-              <ToggleRow title="Phone" sub="Always available — calls can't be shielded" on lockedOn />
-              <ToggleRow
-                title="Messages"
-                sub="Recommended on for family reachability"
-                on={draft.messagesAllowed}
-                onChange={(next) => setDraft({ ...draft, messagesAllowed: next })}
-              />
-
-              <div className="border-t border-line py-3.5">
-                <div className="mb-2.5 text-[14.5px] font-medium leading-[19px]">Also allowed</div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {draft.allowedAppLabels.map((label) => (
-                    <span
-                      key={label}
-                      className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-sunken py-1 pl-3 pr-1.5 text-[13px] font-medium leading-[18px]"
-                    >
-                      {label}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${label}`}
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            allowedAppLabels: draft.allowedAppLabels.filter((l) => l !== label),
-                          })
-                        }
-                        className="flex rounded-full p-0.5 text-ink-tertiary hover:text-ink-primary"
-                      >
-                        <X size={13} strokeWidth={ICON_STROKE} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    value={labelInput}
-                    onChange={(e) => setLabelInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addLabel();
-                      }
-                    }}
-                    onBlur={addLabel}
-                    placeholder="Add an app…"
-                    aria-label="Add an allowed app"
-                    className="w-[130px] rounded-sm border border-line-strong bg-surface-card px-2.5 py-[5px] text-[13px] leading-[18px] placeholder:text-ink-tertiary"
-                  />
-                </div>
-                <div className="mt-2.5 text-[12.5px] leading-[18px] text-ink-tertiary">
-                  Students pick the matching apps on their own phones — Bali never sees anyone's app
-                  list.
-                </div>
+              <div className="rounded-sm border border-line bg-surface-sunken p-3.5 text-[13px] leading-[19px] text-ink-secondary">
+                Every session is <span className="font-medium text-ink-primary">full focus</span>. Each
+                phone pauses every app except the few that student chose once during setup — Bali never
+                sees the list. Phone &amp; Messages always work. A policy is just a name you pick when
+                starting a session.
               </div>
 
-              <div className="flex items-center justify-between border-t border-line pt-3.5">
+              <div className="flex items-center justify-between border-t border-line pt-3.5 mt-3.5">
                 <Button className="px-[22px]" disabled={!draft.name.trim()} loading={busy} onClick={() => void save()}>
                   {draft.id ? 'Save changes' : 'Create policy'}
                 </Button>

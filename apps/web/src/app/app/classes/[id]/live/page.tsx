@@ -171,7 +171,7 @@ export default function LivePage() {
                 {detail.session.className}
               </h1>
               <div className="mt-0.5 text-[16px] text-ink-secondary">
-                {detail.session.policyName} — {detail.session.allowedAppLabels.join(', ')} allowed
+                {detail.session.policyName} · Full focus
               </div>
             </div>
             <div className="ml-auto flex items-center gap-5">
@@ -222,7 +222,7 @@ export default function LivePage() {
           <div>
             <h1 className="text-[26px] font-semibold leading-8 tracking-[-0.01em]">{detail.session.className}</h1>
             <div className="text-[13px] leading-[18px] text-ink-secondary">
-              {detail.session.policyName} — {detail.session.allowedAppLabels.join(', ')} allowed
+              {detail.session.policyName} · Full focus
             </div>
           </div>
           <div className="ml-3 flex items-center gap-3">
@@ -380,9 +380,7 @@ function NoSessionState({ cls, onStarted }: { cls: ClassCardDTO; onStarted: (ses
           </div>
         </div>
         <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
-          {cls.policyName ?? 'Focus'}
-          {cls.allowedAppLabels.length ? ` — ${cls.allowedAppLabels.join(', ')} allowed` : ''} · students map these
-          on their own devices
+          {cls.policyName ?? 'Focus'} · Full focus — students keep the apps they chose during setup
         </div>
         <Button className="self-start px-7 py-[11px]" loading={busy} onClick={() => void start()}>
           Start session

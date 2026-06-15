@@ -204,7 +204,7 @@ export default function ClassesPage() {
                 </div>
                 {selectedPolicy ? (
                   <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
-                    {selectedPolicy.name} — {selectedPolicy.allowedAppLabels.join(', ')} allowed
+                    {selectedPolicy.name} · Full focus
                   </div>
                 ) : null}
                 <div className="flex items-center gap-3 border-t border-line pt-3.5">

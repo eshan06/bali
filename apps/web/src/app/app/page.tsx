@@ -55,7 +55,7 @@ function LiveCard({ live }: { live: SessionDetailDTO }) {
         <div className="min-w-0 flex-1">
           <h2 className="text-[18px] font-semibold leading-6">{live.session.className}</h2>
           <div className="mt-px text-[12.5px] leading-[17px] text-ink-secondary">
-            Live · {live.session.policyName} — {live.session.allowedAppLabels.join(', ')} allowed
+            Live · {live.session.policyName} · Full focus
           </div>
         </div>
         <div className="ml-3 flex-none text-right">
