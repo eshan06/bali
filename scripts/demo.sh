@@ -11,7 +11,6 @@
 set -euo pipefail
 
 DEV=CB970F97-E09E-5D3F-99E2-83B775E5C520            # Eshan's iPhone 15 Pro
-BUNDLE=com.bali.teacher
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # xcode-select points at CLT
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -48,20 +47,32 @@ if ! curl -s --max-time 5 "http://$IP:3001/v1/ready" | grep -q '"ready":true'; t
 fi
 echo "▸ API reachable at http://$IP:3001 ✓"
 
-# 5. Optional rebuild + reinstall (only needed after iOS source changes).
-if [ "${1:-}" = "--build" ]; then
-  echo "▸ building BaliTeacher (single-arch device destination — the Xcode 26.5 workaround)…"
-  xcodebuild -project ios/Bali/Bali.xcodeproj -scheme BaliTeacher \
+# 5. Optional rebuild + reinstall of BOTH apps (only needed after iOS source changes).
+#    Always build against a concrete single-arch device destination (the Xcode 26.5
+#    explicit-modules workaround) — scheme BaliTeacher = teacher; scheme Bali = student + appex.
+build_install() {  # $1=scheme $2=.app name
+  echo "▸ building $1 (single-arch device destination)…"
+  xcodebuild -project ios/Bali/Bali.xcodeproj -scheme "$1" \
     -destination 'generic/platform=iOS' -configuration Debug -allowProvisioningUpdates build \
-    >/tmp/bali-ios-build.log 2>&1 || { echo "❌ build failed; see /tmp/bali-ios-build.log"; exit 1; }
-  APP="$(ls -d "$HOME"/Library/Developer/Xcode/DerivedData/Bali-*/Build/Products/Debug-iphoneos/BaliTeacher.app | head -1)"
-  echo "▸ installing $APP"
-  xcrun devicectl device install app --device "$DEV" "$APP" >/dev/null
+    >"/tmp/bali-build-$1.log" 2>&1 || { echo "❌ $1 build failed; see /tmp/bali-build-$1.log"; exit 1; }
+  local app; app="$(ls -d "$HOME"/Library/Developer/Xcode/DerivedData/Bali-*/Build/Products/Debug-iphoneos/"$2" | head -1)"
+  echo "▸ installing $app"
+  xcrun devicectl device install app --device "$DEV" "$app" >/dev/null
+}
+if [ "${1:-}" = "--build" ]; then
+  build_install BaliTeacher BaliTeacher.app
+  build_install Bali        Bali.app
 fi
 
-# 6. Relaunch the app with the freshly-detected IP (re-persists BALI_DEV_API_HOST).
-echo "▸ launching app on the iPhone with BALI_DEV_API_HOST=$IP …"
+# 6. Relaunch BOTH apps with the freshly-detected IP so each re-persists BALI_DEV_API_HOST
+#    (a plain icon-tap afterwards keeps working — until the Mac's IP changes again).
+#    The student app is launched last so it ends up foregrounded (web is the teacher side).
+echo "▸ pinning BALI_DEV_API_HOST=$IP into both apps…"
 xcrun devicectl device process launch --device "$DEV" \
-  -e "{\"BALI_DEV_API_HOST\":\"$IP\"}" "$BUNDLE" >/dev/null
-echo "✅ Demo ready. Teacher app is live on the phone, talking to http://$IP:3001."
-echo "   Parent-visibility web surface: http://localhost:3000  (sign in on /app, open a roster → 'Parent link')."
+  -e "{\"BALI_DEV_API_HOST\":\"$IP\"}" com.bali.teacher >/dev/null && echo "  · teacher app launched"
+xcrun devicectl device process launch --device "$DEV" \
+  -e "{\"BALI_DEV_API_HOST\":\"$IP\"}" com.bali.Bali >/dev/null && echo "  · student app launched (foreground)"
+echo "✅ Demo ready — both apps talk to http://$IP:3001."
+echo "   • Teacher (web):    http://localhost:3000  → /app, start a session on a class's Live page."
+echo "   • Student (phone):  Bali app → Dev sign-in as 'Jordan Park' (in Period 3 — Algebra II)."
+echo "   • NFC tag codes (Period 3): T7XK2M9QPF · W3RD8K2QAN · D9QM4T6XKE  (write one via the teacher app's Tags screen)."
