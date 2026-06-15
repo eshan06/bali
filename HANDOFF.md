@@ -1,6 +1,80 @@
 # Bali v2 — Session Handoff
 
-## ⚡ SESSION 7 — START HERE (written 2026-06-15) — Parent-visibility surface shipped + full-focus plan
+## ⚡ SESSION 8 — START HERE (written 2026-06-15) — Full-focus-only SHIPPED + demo verified on device
+
+The owner ran the full end-to-end demo on the physical iPhone and confirmed **"it worked."** This
+session: (1) brought the device demo loop back up, (2) fixed a Jordan Park data-drift bug on RDS,
+(3) **implemented the full-focus-only pivot** (`FULL_FOCUS_PLAN.md` Phases 1–3) — every policy is now
+just full focus, with a single **one-time student setup at app download**.
+
+### State now (all on `main`, NOT pushed, tree clean) — HEAD @ `7667e87`
+New commits this session: `b244047` + `53bc4e5` (scripts/demo.sh) · `6108dfa` (api full-focus) ·
+`37a5b18` (ios student full-focus) · `2309a85` (web) · `7667e87` (ios teacher).
+- **Mac LAN IP is now `10.0.0.68`** (was `.115` — DHCP moved it; it can move again — `demo.sh` auto-detects).
+- Dev servers (dev:api `:3001`→RDS, dev:web `:3000`) ran at pause — **they die when the Mac sleeps / the
+  session ends.** Restart with `./scripts/demo.sh`.
+- Phone (iPhone 15 Pro, devicectl `CB970F97-5E9F-...` = `CB970F97-E09E-5D3F-99E2-83B775E5C520`):
+  **both apps installed with the full-focus build** — teacher `com.bali.teacher` (install-over, Google
+  session intact) + student `com.bali.Bali` (fresh install → onboarding re-shows). **Student app's
+  FamilyControls provisioning works on device** (3 App IDs auto-created: `com.bali.Bali` /
+  `.BaliShield` / `.BaliMonitor`) — this was the big unknown and it's cleared.
+
+### Fastest restart tomorrow
+```bash
+./scripts/demo.sh            # detects LAN IP, starts servers, re-pins BALI_DEV_API_HOST into both apps.
+./scripts/demo.sh --build    # after iOS code changes (rebuilds + reinstalls both, single-arch device).
+```
+Then phone: student app → **Dev sign-in as Jordan Park** (in Period 3 — Algebra II) → the one-time
+setup → Home. Teacher side = web `localhost:3000` (`/app` → Period 3 → start a session) OR teacher app.
+NFC: seeded Period 3 tag codes `T7XK2M9QPF` / `W3RD8K2QAN` / `D9QM4T6XKE`; owner wrote a sticker via the
+teacher app's Tags screen.
+
+### What shipped — full-focus-only (Phases 1–3 of `FULL_FOCUS_PLAN.md`, all build-clean)
+- `6108dfa` **api** — `domain.ts` session snapshot is ALWAYS `{ name, messagesAllowed: true,
+  allowedAppLabels: [] }` regardless of policy → full focus enforced server-side (even un-updated
+  clients). `manage.ts` create/patch stop persisting picker values; `seed.ts` policies → empty labels.
+  Columns/`policy_snapshot` KEPT (deprecated) for history + a future class-wide allow-list.
+- `37a5b18` **ios(student)** — the heart. `ScreenTime.applyFullFocus()` shields
+  `.all(except: FocusAllowList)`; `FocusAllowList` = a SINGLE once-ever `FamilyActivitySelection`
+  (replaces per-label `PolicyBuckets`). Picker moved to **OnboardingView** (new `.allowList` step after
+  the Screen Time grant). `TapInView` degated (ready tap → straight to focus). `AllowedAppsRow` →
+  honest `FocusScopeRow`. **`PolicySetupView.swift` DELETED.** 4 `FocusEngine` sites → `applyFullFocus()`.
+- `2309a85` **web** — `policies/page.tsx` editor is name-only; "— X allowed" → "Full focus" on
+  classes/live/app pages. `lib/types.ts` fields kept for decode.
+- `7667e87` **ios(teacher)** — T8 editor name-only (no Messages toggle / label chips); T9/T12/T6
+  "X allowed" → "Full focus"; `allowedSummary()` → "Full focus". `TeacherModels` fields kept for decode.
+- **Safety carve-out (§6.1 option b):** the one-time picker IS the carve-out — the student includes
+  Camera/Notes/assistive/medical apps once. Phone & Messages are unblockable on iOS regardless. (This
+  supersedes the labeled-buckets idea in the old `ios-blocking-model` memory.)
+
+### Fix landed (RDS data only — NOT a commit)
+Jordan Park dev sign-in showed no classes: two rows on RDS — the seeded one (Period 3 + Period 1) was
+claimed by an OLD sub `dev-s-jordan`; the app sends `dev-s-jordan-park`, so bootstrap had created an
+empty dup `6689f39c`. Re-pointed the seeded row (`04a51b0d`) `cognito_sub` → `dev-s-jordan-park`,
+parked the dup. Verified via API (`/student/home` returns Period 3). One-off scripts deleted.
+
+### Open / next
+1. **Push?** Nothing pushed this session — owner pushes on request only.
+2. **RDS cleanup (cosmetic):** junk classes "Test Period 9 — Edited" ×8 + "Slice Sandbox", and Jordan's
+   leftover "Slice Sandbox" membership clutter the demo lists. Offered; not done.
+3. **App Store** FamilyControls justification re-check — `.all()` reads as more aggressive (`FULL_FOCUS_PLAN.md` §7).
+4. **Class-wide opt-in allow-list** (§6.3) — roadmap; `snapshot.allowedAppLabels` kept so it's a data no-op to add.
+5. Dead code: orphaned teacher-app `FlowChips` struct (harmless; `FlowLayout` still used by `TComponents`).
+6. Web robustness backlog (`PRODUCTION.md`) — #1 done (S7); rest open, sandbox-doable.
+7. Schedule zero-pad time style ("02:50" PM) — still pending owner's eye (one-line revert in `T1Home.swift`).
+
+### Build gotchas (carry forward)
+- `devicectl`/`xcodebuild`: `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`
+  (xcode-select points at CLT — `devicectl` won't resolve without this).
+- Xcode 26.5: ALWAYS a concrete single-arch `-destination` (`generic/platform=iOS` device,
+  `id=34AD32D3-B30E-450C-831F-9E70312574F7` iPhone 17 Pro sim) — destination-less sim build fails on
+  smithy-swift `Logging`.
+- SourceKit shows macOS / cross-file "Cannot find type" noise for iOS-only frameworks
+  (FamilyControls/UIKit/Tokens/etc.); the device `xcodebuild` is the source of truth, not the diagnostics.
+
+---
+
+## SESSION 7 (written 2026-06-15) — Parent-visibility surface shipped + full-focus plan
 
 Ran in a **Linux sandbox**, not the Mac — so **no Xcode / devicectl / iPhone and no RDS**
 reachable this session (raw Postgres to RDS is firewalled; only HTTP is proxied). All work was
