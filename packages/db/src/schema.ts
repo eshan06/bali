@@ -296,3 +296,33 @@ export const events = pgTable(
     index('events_student_at_idx').on(t.studentId, t.at),
   ],
 );
+
+/**
+ * Read-only parent-visibility links (Tier-1 "Doorman-promise" surface).
+ * A teacher mints a per-membership (student × class) link; the parent opens it with
+ * no login and sees status-only focus history for that one student in that one class.
+ * Only the SHA-256 of the URL secret is stored (never the secret), and `revokedAt`
+ * makes a link individually revocable — the honest FERPA posture: access is scoped to
+ * exactly one student, granted by that student's teacher, and withdrawable.
+ */
+export const parentLinks = pgTable(
+  'parent_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    membershipId: uuid('membership_id')
+      .notNull()
+      .references(() => memberships.id),
+    /** SHA-256 hex of the URL token. The plaintext is shown to the teacher once, never stored. */
+    tokenHash: text('token_hash').notNull(),
+    createdByTeacherId: uuid('created_by_teacher_id')
+      .notNull()
+      .references(() => teachers.id),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    /** Non-null once revoked; the public lookup treats a revoked link as not-found. */
+    revokedAt: ts('revoked_at'),
+  },
+  (t) => [
+    uniqueIndex('parent_links_token_hash_uq').on(t.tokenHash),
+    index('parent_links_membership_idx').on(t.membershipId),
+  ],
+);
