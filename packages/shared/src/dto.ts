@@ -288,6 +288,33 @@ export interface StudentHistoryDTO {
   boundary: string;
 }
 
+/** Returned once when a teacher mints a parent link — `token` is the URL secret, shown
+ *  only at creation (the server stores only its hash). */
+export interface ParentLinkDTO {
+  token: string;
+  createdAt: string;
+  revoked: boolean;
+}
+
+/** The unauthenticated read-only parent surface for one (student × class). Composed
+ *  entirely from the existing event-stream reports — status only, never screen content. */
+export interface ParentViewDTO {
+  studentShortName: string;
+  className: string;
+  /** The teacher's "shown to students as" display name. */
+  teacherName: string;
+  schoolName: string;
+  /** "as of Jun 15, 9:41 AM" — when this view was rendered. */
+  generatedAtLabel: string;
+  /** Present only while a session is live right now; status-only chip. */
+  live: { state: z.infer<typeof chipStateSchema>; label: string } | null;
+  /** Honest at-a-glance counts over the shown history window. `focusedSessions` counts
+   *  sessions the student ended in the `focused` state; `totalUnlocks` is the true count. */
+  summary: { sessionsShown: number; focusedSessions: number; totalUnlocks: number };
+  /** Reuses the T3 Recent payload verbatim (rows + framing + privacy boundary copy). */
+  history: StudentHistoryDTO;
+}
+
 export type SSEMessage =
   | { kind: 'snapshot'; detail: SessionDetailDTO }
   | { kind: 'participant'; participant: ParticipantDTO; counts: SessionDetailDTO['counts'] }

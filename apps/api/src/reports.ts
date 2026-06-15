@@ -1,6 +1,14 @@
-import { and, asc, count, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
-import type { ChipState, SessionRecapDTO, ClassOverviewDTO, StudentHistoryDTO } from '@bali/shared';
+import type {
+  ChipState,
+  SessionRecapDTO,
+  ClassOverviewDTO,
+  StudentHistoryDTO,
+  ParentViewDTO,
+  StoredParticipantState,
+} from '@bali/shared';
+import { deriveParticipantState } from '@bali/shared';
 import { shortName } from './serialize';
 
 /** W8's framing line — designed copy; the CSV export embeds it in its header row.
@@ -615,5 +623,110 @@ export async function classOverview(classId: string, now = new Date()): Promise<
     sessionsThisWeek: weekSessions.length,
     medianFocusMinutes: median(allFocus),
     lastSession,
+  };
+}
+
+/** Parent-friendly label for the live chip state (status only, never a verdict). */
+function parentLiveLabel(state: ChipState): string {
+  switch (state) {
+    case 'focused':
+      return 'Focused right now';
+    case 'pass':
+      return 'On a teacher pass';
+    case 'emergency_unlocked':
+      return 'Unlocked — emergency';
+    case 'revoked':
+      return 'Focus permission off';
+    case 'no_device':
+      return 'No device today';
+    case 'not_joined':
+      return 'In class — focus not started yet';
+    default:
+      return 'Session ending';
+  }
+}
+
+/** "Jun 15, 9:41 AM" — server-local friendly stamp for the parent view header. */
+function friendlyStamp(d: Date): string {
+  const month = d.toLocaleString('en-US', { month: 'short' });
+  const day = d.getDate();
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${month} ${day}, ${h}:${mm} ${ampm}`;
+}
+
+/**
+ * Read-only parent surface for one (student × class), keyed by membership. Composed
+ * entirely from the existing event-stream reports — status only, no screen content.
+ * Returns null when the membership/class/student no longer resolves (→ 404).
+ */
+export async function parentView(membershipId: string, now = new Date()): Promise<ParentViewDTO | null> {
+  const db = getDb();
+  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, membershipId) });
+  if (!membership) return null;
+  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
+  if (!cls) return null;
+  const [teacher, school, history] = await Promise.all([
+    db.query.teachers.findFirst({ where: eq(s.teachers.id, cls.teacherId) }),
+    db.query.schools.findFirst({ where: eq(s.schools.id, cls.schoolId) }),
+    studentSessionHistory({ classId: cls.id, studentId: membership.studentId, now }),
+  ]);
+  if (!history) return null;
+
+  // Live chip — only while a session is open right now for this class.
+  let live: ParentViewDTO['live'] = null;
+  const open = await db.query.sessions.findFirst({
+    where: and(eq(s.sessions.classId, cls.id), isNull(s.sessions.endedAt)),
+    orderBy: desc(s.sessions.startedAt),
+  });
+  if (open) {
+    const [participation, activePass] = await Promise.all([
+      db.query.participations.findFirst({
+        where: and(eq(s.participations.sessionId, open.id), eq(s.participations.studentId, membership.studentId)),
+      }),
+      db.query.passes.findFirst({
+        where: and(
+          eq(s.passes.sessionId, open.id),
+          eq(s.passes.studentId, membership.studentId),
+          isNull(s.passes.endedAt),
+        ),
+        orderBy: desc(s.passes.grantedAt),
+      }),
+    ]);
+    const derived = deriveParticipantState({
+      storedState: (participation?.state as StoredParticipantState | undefined) ?? null,
+      noDevice: participation?.noDevice ?? membership.defaultNoDevice,
+      passEndsAt: activePass?.endsAt ?? null,
+      lastSeenAt: participation?.lastSeenAt ?? null,
+      session: { endsAt: open.endsAt, endedAt: open.endedAt },
+      now,
+    });
+    live = { state: derived.state, label: parentLiveLabel(derived.state) };
+  }
+
+  // Honest summary over the shown window. `totalUnlocks` is the true row count;
+  // `focusedSessions` counts sessions the student ended in the `focused` state.
+  const sessionIds = history.rows.map((r) => r.sessionId);
+  let totalUnlocks = 0;
+  if (sessionIds.length > 0) {
+    const [{ value } = { value: 0 }] = await db
+      .select({ value: count() })
+      .from(s.unlocks)
+      .where(and(inArray(s.unlocks.sessionId, sessionIds), eq(s.unlocks.studentId, membership.studentId)));
+    totalUnlocks = value;
+  }
+  const focusedSessions = history.rows.filter((r) => r.state === 'focused').length;
+
+  return {
+    studentShortName: history.shortName,
+    className: cls.name,
+    teacherName: teacher?.displayName ?? teacher?.name ?? 'Your child’s teacher',
+    schoolName: school?.name ?? '',
+    generatedAtLabel: `as of ${friendlyStamp(now)}`,
+    live,
+    summary: { sessionsShown: history.rows.length, focusedSessions, totalUnlocks },
+    history,
   };
 }

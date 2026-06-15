@@ -26,6 +26,10 @@ import {
 import { classOverview, sessionRecap, studentSessionHistory } from '../reports';
 import { renderEvent } from '../serialize';
 import { streamSession } from '../live';
+import { randomBytes, createHash } from 'node:crypto';
+
+/** SHA-256 hex of a parent-link token — only the hash is ever persisted. */
+const parentLinkHash = (token: string): string => createHash('sha256').update(token).digest('hex');
 
 const todayAt = (hhmm: string): Date => {
   const [h, m] = hhmm.split(':').map(Number);
@@ -253,6 +257,60 @@ export function teacherRoutes(app: FastifyInstance): void {
     const teacher = await teacherGate(req, reply);
     if (!teacher) return;
     await removeMembership({ teacherId: teacher.id, schoolId: teacher.schoolId, membershipId: req.params.id });
+    return { ok: true };
+  });
+
+  // ---------- parent-visibility links (read-only, per membership) ----------
+
+  /** Authorize a teacher for a membership by id — 404 (never leak existence) unless the
+   *  membership's class belongs to this teacher. Mirrors the `ownedSession` IDOR guard. */
+  async function ownedMembership(teacherId: string, membershipId: string) {
+    const db = getDb();
+    const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, membershipId) });
+    if (!membership) return null;
+    const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
+    return cls && cls.teacherId === teacherId ? membership : null;
+  }
+
+  /** Mint a fresh read-only parent link for one student. Rotating: any prior active link
+   *  for this membership is revoked so exactly one secret is live at a time. The plaintext
+   *  token is returned once here and never again (only its hash is stored). */
+  app.post<{ Params: { id: string } }>('/v1/memberships/:id/parent-link', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    if (!(await ownedMembership(teacher.id, req.params.id)))
+      return reply.code(404).send({ error: 'not_found', message: 'Student not found' });
+    const db = getDb();
+    const token = randomBytes(24).toString('base64url');
+    const row = await db.transaction(async (tx) => {
+      await tx
+        .update(s.parentLinks)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(s.parentLinks.membershipId, req.params.id), isNull(s.parentLinks.revokedAt)));
+      const [created] = await tx
+        .insert(s.parentLinks)
+        .values({
+          membershipId: req.params.id,
+          tokenHash: parentLinkHash(token),
+          createdByTeacherId: teacher.id,
+        })
+        .returning();
+      if (!created) throw new Error('parent link insert failed');
+      return created;
+    });
+    return reply.code(201).send({ token, createdAt: row.createdAt.toISOString(), revoked: false });
+  });
+
+  /** Revoke every active parent link for a student — the link goes dead immediately. */
+  app.delete<{ Params: { id: string } }>('/v1/memberships/:id/parent-link', async (req, reply) => {
+    const teacher = await teacherGate(req, reply);
+    if (!teacher) return;
+    if (!(await ownedMembership(teacher.id, req.params.id)))
+      return reply.code(404).send({ error: 'not_found', message: 'Student not found' });
+    await getDb()
+      .update(s.parentLinks)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(s.parentLinks.membershipId, req.params.id), isNull(s.parentLinks.revokedAt)));
     return { ok: true };
   });
 
