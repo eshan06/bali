@@ -1,6 +1,72 @@
 # Bali v2 — Session Handoff
 
-## ⚡ SESSION 6 — START HERE (written 2026-06-14) — Teacher iOS on-device, perf pass, + the zero-setup pivot
+## ⚡ SESSION 7 — START HERE (written 2026-06-15) — Parent-visibility surface shipped + full-focus plan
+
+Ran in a **Linux sandbox**, not the Mac — so **no Xcode / devicectl / iPhone and no RDS**
+reachable this session (raw Postgres to RDS is firewalled; only HTTP is proxied). All work was
+the **sandbox-doable web/backend track**, developed + verified against a **local Postgres**
+(Docker `bali-pg` on `:5433`, migrated + seeded with the same demo world). The owner's real
+`.env`/RDS creds were left untouched (DATABASE_URL is overridden only in the sandbox env).
+**No iOS code was touched** — the on-device teacher app is exactly as SESSION 6 left it (working).
+
+### What shipped this session (committed to `main`, NOT pushed) — 5 commits on top of 81a581f
+
+1. **`db` e38590a** — migration **0003** `parent_links` (per-membership read-only links; stores only
+   the SHA-256 of the URL token; `revoked_at` for individual revocation). Additive.
+2. **`api` 4531fed** — the **read-only parent-visibility surface** (the owner's stated FIRST
+   deliverable — cheapest honest piece of the Doorman promise, no new iOS permission):
+   - `ParentLinkDTO` + `ParentViewDTO` (shared).
+   - `reports.parentView(membershipId)` composes the **existing** event-stream reports
+     (`studentSessionHistory` + a live chip via `deriveParticipantState` + honest summary counts).
+     Status-only — never screen content.
+   - Teacher routes `POST/DELETE /v1/memberships/:id/parent-link` (mint rotates + revokes prior;
+     `ownedMembership` IDOR guard mirroring `ownedSession`). Public `GET /v1/public/parent/:token`
+     (unauthenticated, hash lookup, IP rate-limited; revoked/unknown → 404 alike).
+   - **Verified end-to-end on local pg:** mint → public view with real history; rotation kills the
+     old token; revoke kills it; cross-teacher mint 404s; garbage token 404s.
+3. **`web` 8d62fb0** — **`/p/[token]`** public page (no auth shell — ArcMark, header, live chip,
+   summary stats, recent-sessions list, the privacy-boundary + framing copy; "isn't active" fallback)
+   + a per-student **"Parent link"** action on the roster (mint → copyable URL overlay with
+   Copy/Open/Revoke + error toast). **Renders the real demo world; prod build green.**
+4. **`docs` 8940c33** — **`FULL_FOCUS_PLAN.md`**: the concrete, file-by-file full-focus-only plan
+   the owner asked for *before* touching iOS shield code. Grounded in a full repo grep; phased so
+   the tree stays green (Phase 1 backend = sandbox-doable & flips behavior server-side via the
+   policy snapshot; Phases 2–4 = Mac/device + the safety-carve-out decision). **Read §6** — the
+   assistive/medical carve-out is flagged blocking for K-12, with a recommended minimal-once picker.
+5. **`web` 10caa40** — **PRODUCTION.md #1** done: approve/decline (dashboard+roster), start-session,
+   extend, end, grant-pass, no-device now surface failures via a toast instead of swallowing them.
+
+### Verification (this session, all green)
+- `typecheck -ws` clean · shared tests 12/12 · **API integration 12/12** (against a throwaway
+  `bali_test` db — run with `DATABASE_URL` **and** `TEST_DATABASE_URL` both pointing at it and
+  `SEED_TEACHER_EMAIL` **unset**, else the seed-teacher adoption mismatches and 9 cascade-fail —
+  that was an env artifact, not a bug) · web prod build 13/13 incl. `/p/[token]`.
+
+### To resume / re-run the sandbox web loop
+```bash
+docker start bali-pg 2>/dev/null || docker run -d --name bali-pg -e POSTGRES_PASSWORD=bali \
+  -e POSTGRES_USER=bali -e POSTGRES_DB=bali -p 5433:5432 postgres:16
+# sandbox dev env is persisted in /etc/sandbox-persistent.sh (DATABASE_URL→:5433, ALLOW_DEV_TOKENS=1)
+cd ~/Downloads/github/bali && npm run db:migrate && npm run db:seed
+cd apps/api && npx tsx src/index.ts &           # :3001  (npm run dev:api's watch dies under run_in_background here)
+cd apps/web && npx next dev &                    # :3000
+# demo the parent surface: sign in on /app as the teacher, open a class roster, "Parent link" →
+# copy the /p/<token> URL → open it (no login) → status-only focus history.
+```
+⚠️ Don't run `next build` while `next dev` is up — it clobbers the dev server's `.next` (→ 500s);
+`rm -rf apps/web/.next` and restart dev after a build.
+
+### Next-session order
+1. **Owner: decide `FULL_FOCUS_PLAN.md` §6** (esp. §6.1 safety carve-out). Then **Phase 1 is
+   sandbox-doable** here; Phases 2–4 need the Mac/device.
+2. **Parent access wiring decisions** if going to prod: the link is unguessable + revocable, but
+   consider an expiry and a parent-facing landing/explainer; FERPA scoping is already per-student.
+3. **On the Mac:** the SESSION 6 device loop still applies (build gotcha = concrete single-arch
+   `-destination`); the zero-pad schedule-time yes/no is still pending the owner's eye.
+
+---
+
+## SESSION 6 (written 2026-06-14) — Teacher iOS on-device, perf pass, + the zero-setup pivot
 
 Continued from session 5. The teacher app was compiled, run on the **physical iPhone 15 Pro**, and
 walked by the owner (the §6 device pass — "everything looks great"). Then two things: a **loading-perf
