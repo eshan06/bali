@@ -175,10 +175,12 @@ export async function startSession(opts: {
   const policy = policyId
     ? await db.query.policies.findFirst({ where: eq(s.policies.id, policyId) })
     : null;
+  // Full-focus is the only mode: every session shields everything except the student's
+  // one-time, on-device allow-list (Camera/Notes/etc.) — there is no per-policy app list.
+  // The policy collapses to a name; `allowedAppLabels` stays in the snapshot (always [])
+  // so historical recaps still render and a future class-wide allow-list has a home.
   // Snapshot frozen at start — sessions never re-resolve policy (WIRING_PLAN §1.5).
-  const snapshot = policy
-    ? { name: policy.name, messagesAllowed: policy.messagesAllowed, allowedAppLabels: policy.allowedAppLabels }
-    : { name: 'Focus', messagesAllowed: true, allowedAppLabels: [] };
+  const snapshot = { name: policy?.name ?? 'Focus', messagesAllowed: true, allowedAppLabels: [] as string[] };
 
   const events: EventRow[] = [];
   const sessionId = await db.transaction(async (tx) => {

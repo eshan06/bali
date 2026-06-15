@@ -108,22 +108,19 @@ async function main() {
       .returning();
     if (!rivera) throw new Error('teacher insert failed');
 
+    // Full-focus only: policies are just names now (every session shields everything
+    // except the student's one-time on-device allow-list). Empty allowedAppLabels.
     const [lecture] = await tx
       .insert(s.policies)
-      .values({
-        teacherId: rivera.id,
-        name: 'Lecture',
-        messagesAllowed: true,
-        allowedAppLabels: ['Notes', 'Camera', 'Calculator'],
-      })
+      .values({ teacherId: rivera.id, name: 'Lecture', messagesAllowed: true, allowedAppLabels: [] })
       .returning();
     const [quiz] = await tx
       .insert(s.policies)
-      .values({ teacherId: rivera.id, name: 'Quiz', messagesAllowed: false, allowedAppLabels: ['Calculator'] })
+      .values({ teacherId: rivera.id, name: 'Quiz', messagesAllowed: true, allowedAppLabels: [] })
       .returning();
     await tx
       .insert(s.policies)
-      .values({ teacherId: rivera.id, name: 'Lab', messagesAllowed: true, allowedAppLabels: ['Camera', 'Notes'] });
+      .values({ teacherId: rivera.id, name: 'Lab', messagesAllowed: true, allowedAppLabels: [] });
     if (!lecture || !quiz) throw new Error('policy insert failed');
 
     const classRows = await tx

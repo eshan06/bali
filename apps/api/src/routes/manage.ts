@@ -112,8 +112,10 @@ export function manageRoutes(app: FastifyInstance): void {
       .values({
         teacherId: teacher.id,
         name: body.name,
-        messagesAllowed: body.messagesAllowed,
-        allowedAppLabels: body.allowedAppLabels,
+        // Full-focus only: the per-app allow-list is deprecated. Accept the body for
+        // back-compat but never persist meaningful values — every session is full-focus.
+        messagesAllowed: true,
+        allowedAppLabels: [],
       })
       .returning();
     if (!policy) throw new Error('policy insert failed');
@@ -133,9 +135,8 @@ export function manageRoutes(app: FastifyInstance): void {
     const [updated] = await db
       .update(s.policies)
       .set({
+        // Full-focus only: a policy is now just a name; the allow-list is never updated.
         ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.messagesAllowed !== undefined ? { messagesAllowed: body.messagesAllowed } : {}),
-        ...(body.allowedAppLabels !== undefined ? { allowedAppLabels: body.allowedAppLabels } : {}),
         updatedAt: new Date(),
       })
       .where(eq(s.policies.id, policy.id))
