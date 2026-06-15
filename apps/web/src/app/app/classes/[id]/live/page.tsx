@@ -55,6 +55,12 @@ export default function LivePage() {
   const [panelStudentId, setPanelStudentId] = useState<string | null>(null);
   const [endConfirm, setEndConfirm] = useState(false);
 
+  // Surface a failed teacher action instead of swallowing it (PRODUCTION.md #1).
+  const actionFailed = useCallback(
+    (title: string) => push({ id: 'action-error', variant: 'revoked', title, sub: 'Please try again.' }),
+    [push],
+  );
+
   const loadClass = useCallback(() => {
     void api.get<ClassCardDTO>(`/classes/${classId}`).then((c) => {
       setCls(c);
@@ -230,7 +236,11 @@ export default function LivePage() {
           <div className="ml-auto flex gap-2.5">
             <Button
               variant="secondary"
-              onClick={() => void api.post(`/sessions/${sessionId}/extend`, { minutes: 5 })}
+              onClick={() =>
+                void api
+                  .post(`/sessions/${sessionId}/extend`, { minutes: 5 })
+                  .catch(() => actionFailed('Couldn’t extend the session'))
+              }
               title="Extend 5 minutes"
             >
               Extend
@@ -268,6 +278,7 @@ export default function LivePage() {
           sessionId={sessionId}
           participant={panelStudent}
           onClose={() => setPanelStudentId(null)}
+          onError={actionFailed}
         />
       ) : null}
 
@@ -289,9 +300,13 @@ export default function LivePage() {
               <Button
                 variant="destructive"
                 onClick={() => {
-                  void api.post(`/sessions/${sessionId}/end`).then(() => {
-                    setEndConfirm(false);
-                  });
+                  void api
+                    .post(`/sessions/${sessionId}/end`)
+                    .then(() => setEndConfirm(false))
+                    .catch(() => {
+                      setEndConfirm(false);
+                      actionFailed('Couldn’t end the session');
+                    });
                 }}
               >
                 End session
@@ -386,10 +401,12 @@ function StudentPanel({
   sessionId,
   participant,
   onClose,
+  onError,
 }: {
   sessionId: string;
   participant: ParticipantDTO;
   onClose: () => void;
+  onError: (title: string) => void;
 }) {
   const [events, setEvents] = useState<EventDTO[]>([]);
   const [preset, setPreset] = useState<'5' | '10' | '15' | 'custom'>('10');
@@ -415,6 +432,8 @@ function StudentPanel({
         reason: reason.trim() || undefined,
       });
       setReason('');
+    } catch {
+      onError('Couldn’t grant the pass');
     } finally {
       setBusy(false);
     }
@@ -498,7 +517,9 @@ function StudentPanel({
           <Toggle
             on={participant.state === 'no_device'}
             onChange={(next) =>
-              void api.post(`/sessions/${sessionId}/no-device`, { studentId: participant.studentId, on: next })
+              void api
+                .post(`/sessions/${sessionId}/no-device`, { studentId: participant.studentId, on: next })
+                .catch(() => onError('Couldn’t update “no device”'))
             }
             ariaLabel="No device today"
           />

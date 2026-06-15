@@ -93,6 +93,7 @@ export default function PortalHomePage() {
   const [home, setHome] = useState<PortalHome | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [entered, setEntered] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api
@@ -117,18 +118,26 @@ export default function PortalHomePage() {
   const startSession = async (row: TodayRow) => {
     if (!row.endsAtIso) return;
     setStartingId(row.classId);
+    setActionError(null);
     try {
       const detail = await api.post<SessionDetailDTO>(`/classes/${row.classId}/sessions`, {
         endsAt: row.endsAtIso,
       });
       router.push(`/app/classes/${detail.session.classId}/live`);
+    } catch {
+      setActionError('Couldn’t start the session. Please try again.');
     } finally {
       setStartingId(null);
     }
   };
 
   const decide = async (membershipId: string, approve: boolean) => {
-    await api.post(`/memberships/${membershipId}/${approve ? 'approve' : 'decline'}`);
+    setActionError(null);
+    try {
+      await api.post(`/memberships/${membershipId}/${approve ? 'approve' : 'decline'}`);
+    } catch {
+      setActionError(`Couldn’t ${approve ? 'approve' : 'decline'} that request. Please try again.`);
+    }
     load();
   };
 
@@ -265,6 +274,18 @@ export default function PortalHomePage() {
           </div>
         </div>
       </div>
+
+      {actionError ? (
+        <div
+          role="alert"
+          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-md bg-red-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-3"
+        >
+          {actionError}
+          <button type="button" className="font-semibold opacity-80 hover:opacity-100" onClick={() => setActionError(null)}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

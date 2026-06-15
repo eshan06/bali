@@ -27,13 +27,23 @@ export default function RosterPage() {
   useEffect(load, [load]);
 
   const decide = async (membershipId: string, approve: boolean) => {
-    await api.post(`/memberships/${membershipId}/${approve ? 'approve' : 'decline'}`);
+    setLinkError(null);
+    try {
+      await api.post(`/memberships/${membershipId}/${approve ? 'approve' : 'decline'}`);
+    } catch {
+      setLinkError(`Couldn’t ${approve ? 'approve' : 'decline'} that request. Please try again.`);
+    }
     load();
   };
 
   const remove = async (membershipId: string, name: string) => {
     if (!window.confirm(`Remove ${name} from this class? They can rejoin with the code.`)) return;
-    await api.del(`/memberships/${membershipId}`);
+    setLinkError(null);
+    try {
+      await api.del(`/memberships/${membershipId}`);
+    } catch {
+      setLinkError(`Couldn’t remove ${name}. Please try again.`);
+    }
     load();
   };
 
