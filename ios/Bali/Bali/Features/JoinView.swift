@@ -106,12 +106,7 @@ struct JoinView: View {
                 Text("\(p.teacherDisplayName) · \(p.scheduleLabel)")
                     .font(.system(size: 14))
                     .foregroundColor(Tokens.Dark.textSecondary)
-                if !p.allowedAppLabels.isEmpty {
-                    Text("During focus, this class allows")
-                        .font(.system(size: 12))
-                        .foregroundColor(Tokens.Dark.textTertiary)
-                    AllowedAppsRow(labels: p.allowedAppLabels, messagesAllowed: p.messagesAllowed)
-                }
+                FocusScopeRow()
                 Button {
                     Task { await onJoined(); dismiss() }
                 } label: {
@@ -146,51 +141,23 @@ struct JoinView: View {
     }
 }
 
-/// AllowedAppsRow — generic glyphs + policy labels, never real app icons (honesty rule).
-struct AllowedAppsRow: View {
-    var labels: [String]
-    var messagesAllowed: Bool
-
-    private func glyph(for label: String) -> String {
-        switch label.lowercased() {
-        case "notes": return "square.and.pencil"
-        case "camera": return "camera"
-        case "calculator": return "plus.forwardslash.minus"
-        case "music": return "music.note"
-        case "books", "reading": return "book"
-        default: return "app"
-        }
-    }
-
+/// FocusScopeRow — the full-focus rule, honestly stated. Every session is identical
+/// (full focus), so there's nothing per-class to show: every app pauses except the few
+/// the student chose once at onboarding, plus calls & Messages (unblockable on iOS). We
+/// never show real app icons or the student's private allow-list (honesty rule).
+struct FocusScopeRow: View {
     var body: some View {
-        HStack(spacing: 14) {
-            chip(symbol: "phone", label: "Phone")
-            if messagesAllowed { chip(symbol: "message", label: "Messages") }
-            ForEach(labels, id: \.self) { label in
-                chip(symbol: glyph(for: label), label: label)
-            }
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "moon.zzz")
+                .font(.system(size: 16))
+                .foregroundColor(Tokens.Dark.textSecondary)
+            Text("Full focus — every app pauses except the few you chose. Calls & Messages always work.")
+                .font(.system(size: 13))
+                .foregroundColor(Tokens.Dark.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private func chip(symbol: String, label: String) -> some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Tokens.Dark.raised)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Tokens.Dark.border, lineWidth: 1)
-                    )
-                    .frame(width: 48, height: 48)
-                Image(systemName: symbol)
-                    .font(.system(size: 19))
-                    .foregroundColor(Tokens.Dark.textSecondary)
-            }
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundColor(Tokens.Dark.textTertiary)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) stays available")
+        .accessibilityLabel("Full focus. Every app pauses except the few you chose. Calls and Messages always work.")
     }
 }

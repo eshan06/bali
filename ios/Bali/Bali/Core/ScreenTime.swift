@@ -13,10 +13,8 @@ protocol ScreenTimeService {
     /// Whether shields are actually applied right now.
     var shieldsApplied: Bool { get }
     func requestAuthorization() async -> Bool
-    /// Whether S5 policy setup has been completed for this label set.
-    func hasSelection(forLabels labels: [String]) -> Bool
-    /// Shield everything except the student's locally-chosen apps for these labels.
-    func applyShields(allowedLabels: [String])
+    /// Full focus: shield everything except the student's one-time, on-device allow-list.
+    func applyFullFocus()
     func clearShields()
 }
 
@@ -24,32 +22,31 @@ final class StubScreenTimeService: ScreenTimeService {
     private(set) var shieldsApplied = false
     var permissionOk: Bool { true }
     func requestAuthorization() async -> Bool { true }
-    func hasSelection(forLabels _: [String]) -> Bool { true } // no picker in the Simulator
-    func applyShields(allowedLabels _: [String]) { shieldsApplied = false } // honest: nothing is shielded
+    func applyFullFocus() { shieldsApplied = false } // honest: nothing is shielded
     func clearShields() { shieldsApplied = false }
 }
 
 #if canImport(FamilyControls)
-/// Per-policy "buckets": the student's FamilyActivitySelection stored locally, keyed
-/// by the policy's label set. Labels stay semantic server-side; the actual apps exist
-/// ONLY on this phone — Bali never sees anyone's app list.
-enum PolicyBuckets {
-    private static func key(for labels: [String]) -> String {
-        "bali.bucket." + labels.map { $0.lowercased() }.sorted().joined(separator: "|")
-    }
+/// The student's one-time, on-device "always allowed" set (e.g. Camera, Notes,
+/// Calculator), chosen ONCE at onboarding via the iOS picker. Stored only on this phone
+/// — Bali never sees anyone's app list. Full focus shields everything except this set;
+/// phone & Messages are unblockable on iOS regardless. There is no per-policy/per-class
+/// picker anymore — this single selection applies to every session.
+enum FocusAllowList {
+    private static let key = "bali.focusAllowList.v1"
 
-    static func load(for labels: [String]) -> FamilyActivitySelection? {
-        guard let data = UserDefaults.standard.data(forKey: key(for: labels)) else { return nil }
+    static func load() -> FamilyActivitySelection? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
     }
 
-    static func save(_ selection: FamilyActivitySelection, for labels: [String]) {
-        UserDefaults.standard.set(try? JSONEncoder().encode(selection), forKey: key(for: labels))
+    static func save(_ selection: FamilyActivitySelection) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(selection), forKey: key)
     }
 
-    static func exists(for labels: [String]) -> Bool {
-        UserDefaults.standard.data(forKey: key(for: labels)) != nil
-    }
+    /// Whether the student has been through the one-time allow-list step (even if they
+    /// chose nothing — an empty set is a valid "block everything" choice).
+    static var isConfigured: Bool { UserDefaults.standard.object(forKey: key) != nil }
 
     /// How many things the student picked (apps + categories + sites).
     static func count(of selection: FamilyActivitySelection) -> Int {
@@ -57,9 +54,9 @@ enum PolicyBuckets {
     }
 }
 
-/// Device implementation. Shields all app categories EXCEPT the student's stored
-/// selection for the session's policy labels (S5 setup). Phone can't be shielded by
-/// iOS at all — honesty the policy editor states outright.
+/// Device implementation. Full focus shields ALL app/web categories except the student's
+/// one-time on-device allow-list. Phone can't be shielded by iOS at all — honesty the UI
+/// states outright.
 final class RealScreenTimeService: ScreenTimeService {
     private let store = ManagedSettingsStore()
     private(set) var shieldsApplied = false
@@ -77,18 +74,13 @@ final class RealScreenTimeService: ScreenTimeService {
         }
     }
 
-    func hasSelection(forLabels labels: [String]) -> Bool {
-        // A policy with no extra labels needs no picker trip.
-        labels.isEmpty || PolicyBuckets.exists(for: labels)
-    }
-
-    func applyShields(allowedLabels labels: [String]) {
+    func applyFullFocus() {
         guard permissionOk else { return }
-        if let selection = PolicyBuckets.load(for: labels), PolicyBuckets.count(of: selection) > 0 {
+        if let selection = FocusAllowList.load(), FocusAllowList.count(of: selection) > 0 {
             store.shield.applicationCategories = .all(except: selection.applicationTokens)
             store.shield.webDomainCategories = .all(except: selection.webDomainTokens)
         } else {
-            // No bucket (status-only setup skipped, or zero-label policy): shield everything.
+            // No allow-list (chose nothing, or skipped): shield everything.
             store.shield.applicationCategories = .all()
             store.shield.webDomainCategories = .all()
         }

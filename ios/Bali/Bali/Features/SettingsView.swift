@@ -235,14 +235,9 @@ private struct ClassDetailSheet: View {
                     .font(.system(size: 15))
                     .foregroundColor(Tokens.Dark.textSecondary)
 
-                if let live = cls.live {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("During focus, this class allows")
-                            .font(.system(size: 13))
-                            .foregroundColor(Tokens.Dark.textTertiary)
-                        AllowedAppsRow(labels: live.allowedAppLabels, messagesAllowed: live.messagesAllowed)
-                    }
-                    .padding(.top, 6)
+                if cls.live != nil {
+                    FocusScopeRow()
+                        .padding(.top, 6)
                 }
 
                 Spacer()

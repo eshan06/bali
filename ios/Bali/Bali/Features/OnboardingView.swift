@@ -1,14 +1,23 @@
 import SwiftUI
+#if canImport(FamilyControls)
+import FamilyControls
+#endif
 
-/// S1 — three cards + the permission moment. Card 2 (the privacy contract) is the
-/// trust moment; its copy is verbatim and restated word-for-word on S9 Privacy.
+/// S1 — three cards + the permission moment + the one-time allow-list. Card 2 (the
+/// privacy contract) is the trust moment; its copy is verbatim and restated word-for-word
+/// on S9 Privacy. After granting Screen Time the student picks, ONCE, the few apps that
+/// stay open in every focus session — there is no per-class/per-session setup ever again.
 /// The denied state stays calm and offers an honest status-only path.
 struct OnboardingView: View {
     var onDone: () -> Void
 
-    private enum Step { case what, contract, tapIn, permission, denied }
+    private enum Step { case what, contract, tapIn, permission, allowList, denied }
     @State private var step: Step
     @State private var asking = false
+    @State private var pickerPresented = false
+    #if canImport(FamilyControls)
+    @State private var allowSelection = FamilyActivitySelection()
+    #endif
     private let screenTime = ScreenTime.make()
 
     init(onDone: @escaping () -> Void) {
@@ -59,6 +68,24 @@ struct OnboardingView: View {
                     title("iOS will ask for Screen Time permission", maxWidth: 320)
                     body16("That's the switch that lets Bali shield apps during a session. It stays on your phone, under your control — turning it off later is always possible, and your teacher simply sees \"permission off.\"", maxWidth: 312)
                 }
+            case .allowList:
+                shell(cta: "Start using Bali", action: { saveAllowListAndFinish() }, under: {
+                    footnote("Phone & Messages always work on iPhone. Change these any time in Settings.", maxWidth: 300)
+                }) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.system(size: 44, weight: .regular))
+                        .foregroundColor(Tokens.green300)
+                    title("Pick what stays open in focus", maxWidth: 320)
+                    body16("Every other app pauses during a session. Choose the few you always want — like Camera, Notes, or a calculator. This is the only setup, and it's one time.", maxWidth: 320)
+                    Button { pickerPresented = true } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle")
+                            Text(allowListButtonTitle)
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Tokens.green300)
+                    }
+                }
             case .denied:
                 shell(cta: "Open Settings", action: { openSettings() }, under: {
                     VStack(spacing: 6) {
@@ -77,9 +104,12 @@ struct OnboardingView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if canImport(FamilyControls)
+        .familyActivityPicker(isPresented: $pickerPresented, selection: $allowSelection)
+        #endif
         .onChange(of: step) { _ in
-            // Returning from iOS Settings with permission now on completes onboarding.
-            if step == .denied, screenTime.permissionOk { finish() }
+            // Returning from iOS Settings with permission now on routes to the allow-list.
+            if step == .denied, screenTime.permissionOk { step = .allowList }
         }
     }
 
@@ -88,8 +118,25 @@ struct OnboardingView: View {
         Task {
             let granted = await screenTime.requestAuthorization()
             asking = false
-            if granted { finish() } else { step = .denied }
+            // Granted → the one-time allow-list pick; denied → the calm status-only path.
+            if granted { step = .allowList } else { step = .denied }
         }
+    }
+
+    private var allowListButtonTitle: String {
+        #if canImport(FamilyControls)
+        let n = FocusAllowList.count(of: allowSelection)
+        return n == 0 ? "Select apps to keep open" : "\(n) selected — tap to edit"
+        #else
+        return "Select apps to keep open"
+        #endif
+    }
+
+    private func saveAllowListAndFinish() {
+        #if canImport(FamilyControls)
+        FocusAllowList.save(allowSelection)
+        #endif
+        finish()
     }
 
     private func openSettings() {

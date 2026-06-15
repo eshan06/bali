@@ -32,11 +32,9 @@ struct FocusActiveView: View {
 
                 heroArc
 
-                AllowedAppsRow(
-                    labels: engine.session?.allowedAppLabels ?? [],
-                    messagesAllowed: engine.session?.messagesAllowed ?? true
-                )
-                .padding(.top, 34)
+                FocusScopeRow()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 34)
 
                 Spacer()
 
