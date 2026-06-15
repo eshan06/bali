@@ -143,8 +143,8 @@ struct T9StartSessionSheet: View {
             .background(Tokens.Light.card)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            if let labels = selectedPolicy?.allowedAppLabels, !labels.isEmpty {
-                Text("\(selectedPolicy?.name ?? "") — \(labels.joined(separator: ", ")) allowed")
+            if let p = selectedPolicy {
+                Text("\(p.name) · Full focus")
                     .font(.system(size: 13))
                     .foregroundColor(Tokens.Light.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)

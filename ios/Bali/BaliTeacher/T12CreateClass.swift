@@ -125,8 +125,7 @@ struct T12CreateClassSheet: View {
 
     private var policyCaption: String {
         guard let p = selectedPolicy else { return "…or create a new policy" }
-        let allowed = p.allowedAppLabels.isEmpty ? "" : " — \(p.allowedAppLabels.joined(separator: ", ")) allowed"
-        return "\(p.name)\(allowed) · or create a new policy"
+        return "\(p.name) · Full focus · or create a new policy"
     }
 
     // MARK: reveal

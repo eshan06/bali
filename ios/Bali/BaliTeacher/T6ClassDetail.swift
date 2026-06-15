@@ -245,14 +245,11 @@ struct T6ClassDetailView: View {
                     Text("default for this class")
                         .font(.system(size: 12.5)).foregroundColor(Tokens.Light.textTertiary)
                 }
-                Text("\(allowedSummary(policy ?? fallbackPolicy(card))) allowed")
+                Text(allowedSummary(policy ?? fallbackPolicy(card)))
                     .font(.system(size: 14)).foregroundColor(Tokens.Light.textSecondary)
-                if let labels = policy?.allowedAppLabels, !labels.isEmpty {
-                    FlowChips(labels: labels) { _ in }.disabled(true).allowsHitTesting(false)
-                }
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle").font(.system(size: 13)).foregroundColor(Tokens.Light.textTertiary).padding(.top, 1)
-                    Text("Phone stays available — iOS can’t shield it. \(messagesLine(policy))")
+                    Text("Phone & Messages always work — iOS can’t shield them. Every other app pauses except the few each student chose once during setup.")
                         .font(.system(size: 12.5)).foregroundColor(Tokens.Light.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -277,7 +274,7 @@ struct T6ClassDetailView: View {
                 }
             }
 
-            Text("Students pick these apps on their own phones. Bali can’t choose apps for them, and can’t see which they picked — it only knows how many.")
+            Text("Every session is full focus. Each student picks the few apps that stay open once on their own phone — Bali never sees the list.")
                 .font(.system(size: 12.5))
                 .foregroundColor(Tokens.Light.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -296,9 +293,6 @@ struct T6ClassDetailView: View {
 
     private func fallbackPolicy(_ card: TClassCard) -> TPolicy {
         TPolicy(id: "", name: card.policyName ?? "Focus", messagesAllowed: true, allowedAppLabels: card.allowedAppLabels, usedByClasses: 0)
-    }
-    private func messagesLine(_ policy: TPolicy?) -> String {
-        (policy?.messagesAllowed ?? true) ? "Messages stays available." : "Messages is shielded."
     }
 
     private var tagsSegment: some View {

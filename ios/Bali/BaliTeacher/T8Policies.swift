@@ -27,7 +27,7 @@ struct T8PoliciesView: View {
                         Text("Policies")
                             .font(.system(size: 34, weight: .bold))
                             .foregroundColor(Tokens.Light.textPrimary)
-                        Text("What stays available while a class is focused. A policy can be shared by several classes.")
+                        Text("Every session is full focus. A policy is just a name you pick when starting a session — and it can be shared by several classes.")
                             .font(.system(size: 14))
                             .foregroundColor(Tokens.Light.textSecondary)
                     }
@@ -99,9 +99,7 @@ struct T8PoliciesView: View {
     }
 }
 
-func allowedSummary(_ policy: TPolicy) -> String {
-    policy.allowedAppLabels.isEmpty ? "No extra apps" : policy.allowedAppLabels.joined(separator: ", ")
-}
+func allowedSummary(_ policy: TPolicy) -> String { "Full focus" }
 
 func usageLabel(_ n: Int) -> String {
     switch n {
@@ -124,22 +122,17 @@ struct T8PolicyEditorView: View {
     @EnvironmentObject private var store: TeacherStore
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
-    @State private var messagesAllowed: Bool
-    @State private var labels: [String]
-    @State private var draft = ""
     @State private var busy = false
     @State private var errorText: String?
     @State private var showInUseGuard = false
     @State private var confirmDelete = false
 
-    private let explainer = "Students pick these apps on their own phones. Bali can't choose apps for them, and can't see which they picked — it only knows how many."
+    private let explainer = "Every session is full focus: each phone pauses every app except the few that student chose once during setup. Bali never sees the list. Phone & Messages always work. A policy is just a name you pick when starting a session."
 
     init(policy: TPolicy?, onSaved: @escaping () async -> Void) {
         self.policy = policy
         self.onSaved = onSaved
         _name = State(initialValue: policy?.name ?? "")
-        _messagesAllowed = State(initialValue: policy?.messagesAllowed ?? true)
-        _labels = State(initialValue: policy?.allowedAppLabels ?? [])
     }
 
     private var isNew: Bool { policy == nil }
@@ -152,34 +145,9 @@ struct T8PolicyEditorView: View {
                     TextField("Name", text: $name)
                 }
 
-                Section("System") {
-                    HStack {
-                        Image(systemName: "iphone").foregroundColor(Tokens.Light.textSecondary)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Phone").foregroundColor(Tokens.Light.textPrimary)
-                            Text("Always available — iOS can't shield it")
-                                .font(.system(size: 12.5)).foregroundColor(Tokens.Light.textTertiary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: .constant(true)).labelsHidden().disabled(true).tint(Tokens.green600)
-                    }
-                    Toggle(isOn: Binding(get: { !messagesAllowed }, set: { messagesAllowed = !$0 })) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Messages").foregroundColor(Tokens.Light.textPrimary)
-                            Text("Shielded during focus")
-                                .font(.system(size: 12.5)).foregroundColor(Tokens.Light.textTertiary)
-                        }
-                    }
-                    .tint(Tokens.green600)
-                }
-
-                Section("Allowed during focus") {
-                    FlowChips(labels: labels) { idx in labels.remove(at: idx) }
-                    TextField("Add an app name…", text: $draft)
-                        .autocorrectionDisabled()
-                        .onSubmit(addLabel)
+                Section("Full focus") {
                     Text(explainer)
-                        .font(.system(size: 12.5))
+                        .font(.system(size: 13))
                         .foregroundColor(Tokens.Light.textSecondary)
                 }
 
@@ -231,26 +199,20 @@ struct T8PolicyEditorView: View {
         return n == 1 ? "1 class uses it as its default." : "\(n) classes use it as their default."
     }
 
-    private func addLabel() {
-        let trimmed = draft.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, labels.count < 12, !labels.contains(trimmed) else { draft = ""; return }
-        labels.append(trimmed)
-        draft = ""
-    }
-
     private func deleteTapped() {
         if (policy?.usedByClasses ?? 0) > 0 { showInUseGuard = true } else { confirmDelete = true }
     }
 
     private func save() async {
-        addLabel() // fold any half-typed name in
         busy = true
         defer { busy = false }
+        // Full-focus only: a policy is just a name. Send full-focus values for back-compat;
+        // the API ignores them and enforces full focus on every session regardless.
         do {
             if let policy {
-                _ = try await store.api.patch("policies/\(policy.id)", body: UpdatePolicyBody(name: name, messagesAllowed: messagesAllowed, allowedAppLabels: labels), as: TPolicy.self)
+                _ = try await store.api.patch("policies/\(policy.id)", body: UpdatePolicyBody(name: name, messagesAllowed: true, allowedAppLabels: []), as: TPolicy.self)
             } else {
-                _ = try await store.api.post("policies", body: CreatePolicyBody(name: name, messagesAllowed: messagesAllowed, allowedAppLabels: labels), as: TPolicy.self)
+                _ = try await store.api.post("policies", body: CreatePolicyBody(name: name, messagesAllowed: true, allowedAppLabels: []), as: TPolicy.self)
             }
             dismiss()
             await onSaved()
