@@ -27,8 +27,8 @@ check in by NFC/simulator, and class sessions drive Screen-Time app blocking on 
 - Node.js 20+
 - Network access to the shared AWS resources (all in `us-east-1`):
   - **RDS PostgreSQL 15** `bali-db` (public endpoint; connection string in `.env` → `DATABASE_URL`)
-  - **Cognito** user pool `us-east-1_MwuzsGGtT`, app client `3hsgud7pr2k0emhsodctqg4okd`,
-    hosted-UI domain `bali-auth.auth.us-east-1.amazoncognito.com` (email/password SRP + Google)
+  - **Cognito** user pool + app client (real ids live in the untracked `.env` /
+    `amplifyconfiguration.json`), hosted UI (email/password SRP + Google)
 - For iOS on a real iPhone: macOS + Xcode (built with 26.x; set
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` if `xcode-select` points at CLT),
   a paid Apple developer team (was `H535678UF8`), and the Family Controls + NFC entitlements.

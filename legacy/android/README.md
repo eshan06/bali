@@ -44,7 +44,7 @@ Wired via Cognito Hosted UI with Google as a federated IdP. The Android side nee
 
 Cognito-side (already configured, recorded here for reference):
 
-- App client `3hsgud7pr2k0emhsodctqg4okd` → Hosted UI → Allowed callback URLs include `balistudent://callback/`
+- App client → Hosted UI → Allowed callback URLs include `balistudent://callback/`
 - Allowed sign-out URLs include `balistudent://signout/`
 - Identity providers: Google enabled
 - OAuth grant type: Authorization code

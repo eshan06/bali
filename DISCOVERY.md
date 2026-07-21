@@ -47,8 +47,8 @@ Monorepo (`legacy/packages/{web,api,db,shared}` + `ios/` + `android/`).
 - **API**: hand-rolled regex router (no framework), Node 20; local dev `:3001`,
   deployable as Lambda behind API Gateway (`ANY /api/{proxy+}`). Zod validation,
   parameterized `pg` queries, **no transactions**, no rate limits.
-- **Auth**: Cognito pool `us-east-1_MwuzsGGtT`, client `3hsgud7pr2k0emhsodctqg4okd`,
-  hosted-UI domain `bali-auth.auth.us-east-1.amazoncognito.com`; SRP + refresh flows;
+- **Auth**: Cognito user pool + app client (real ids live in the untracked `.env` /
+  `amplifyconfiguration.json`), hosted-UI domain on `auth.us-east-1.amazoncognito.com`; SRP + refresh flows;
   Google IdP configured. ID-token verified with `aws-jwt-verify`; role from
   `custom:role` claim; teacher auto-provisioned on first `/auth/me` using
   `DEFAULT_SCHOOL_ID`. Device/iOS policy endpoints use a **single shared `x-api-key`**.

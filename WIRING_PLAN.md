@@ -175,7 +175,7 @@ writes the tag code; `POST classes/:id/tags`) → T5 active passes + notify pref
 ## 5. End-to-end flows (the wiring, traced)
 
 **F1 — The slice: portal → start session → student taps in → live status back.**
-1. Teacher: `/login` → Amplify SRP → ID token (Cognito pool `us-east-1_MwuzsGGtT`) →
+1. Teacher: `/login` → Amplify SRP → ID token (the Cognito pool) →
    `POST /v1/auth/bootstrap` (teacher row, school `DEFAULT_SCHOOL_ID`) → `/app`.
 2. `/app` renders `GET portal/home`. Teacher clicks **Start at 12:05** (or W4 state-c
    inline card) → `POST /v1/classes/:id/sessions {endsAt}` → tx: session row +
