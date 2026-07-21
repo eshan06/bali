@@ -31,6 +31,11 @@ jobs:
         run: npm run build --workspace @bali/web
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3001/v1
+          # Placeholders satisfy the prod-build env guard (apps/web/src/lib/env.ts);
+          # CI checks that the bundle builds, it never ships one.
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: us-east-1_test000000
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: testclient00000000
+          NEXT_PUBLIC_COGNITO_DOMAIN: test.auth.us-east-1.amazoncognito.com
 
   api-integration:
     name: API integration (Postgres)
