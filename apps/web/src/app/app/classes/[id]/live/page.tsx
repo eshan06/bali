@@ -11,7 +11,7 @@ import { Arc } from '@/components/bali/Arc';
 import { Button, Input, Label, Segmented, Toggle } from '@/components/bali/Button';
 import { EventTimeline } from '@/components/bali/EventTimeline';
 import { StatusChip, SummaryStrip, chipLabel } from '@/components/bali/StatusChip';
-import { ReconnectingPill } from '@/components/bali/bits';
+import { LoadError, ReconnectingPill } from '@/components/bali/bits';
 import { ToastCard, useToasts } from '@/components/bali/Toaster';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
@@ -49,11 +49,12 @@ export default function LivePage() {
 
   const [cls, setCls] = useState<ClassCardDTO | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const { detail, reconnecting, lastEvent, pulseStudentId } = useLiveSession(sessionId);
+  const { detail, reconnecting, liveLost, lastEvent, pulseStudentId } = useLiveSession(sessionId);
   const participants = useTickedParticipants(detail);
   const { toasts, push, dismiss } = useToasts();
   const [panelStudentId, setPanelStudentId] = useState<string | null>(null);
   const [endConfirm, setEndConfirm] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   // Surface a failed teacher action instead of swallowing it (PRODUCTION.md #1).
   const actionFailed = useCallback(
@@ -62,10 +63,14 @@ export default function LivePage() {
   );
 
   const loadClass = useCallback(() => {
-    void api.get<ClassCardDTO>(`/classes/${classId}`).then((c) => {
-      setCls(c);
-      setSessionId(c.live?.sessionId ?? null);
-    });
+    setLoadError(false);
+    void api
+      .get<ClassCardDTO>(`/classes/${classId}`)
+      .then((c) => {
+        setCls(c);
+        setSessionId(c.live?.sessionId ?? null);
+      })
+      .catch(() => setLoadError(true));
   }, [classId]);
   useEffect(loadClass, [loadClass]);
 
@@ -124,11 +129,18 @@ export default function LivePage() {
   const countdown = useCountdown(detail?.session.endsAt);
   const pct = useSessionProgress(detail?.session.startedAt, detail?.session.endsAt);
 
-  if (!cls) return <div className="p-9 text-ink-tertiary">Loading…</div>;
+  if (!cls)
+    return loadError ? (
+      <div className="p-9">
+        <LoadError what="this class" onRetry={loadClass} />
+      </div>
+    ) : (
+      <div className="p-9 text-ink-tertiary">Loading…</div>
+    );
 
   // ---------- state (c): no active session ----------
   if (!sessionId || !detail) {
-    return <NoSessionState cls={cls} onStarted={(sid) => setSessionId(sid)} />;
+    return <NoSessionState cls={cls} onStarted={(sid) => setSessionId(sid)} onError={actionFailed} />;
   }
 
   const counts = detail.counts;
@@ -140,7 +152,10 @@ export default function LivePage() {
     <div
       role="list"
       aria-label={`Live status, ${participants.length} students`}
-      className={clsx('grid grid-cols-4', projector ? 'gap-3.5' : 'gap-2.5')}
+      className={clsx(
+        'grid',
+        projector ? 'grid-cols-4 gap-3.5' : 'grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4',
+      )}
     >
       {participants.map((p) => (
         <span role="listitem" key={p.studentId} className="min-w-0 [&>*]:w-full [&>*]:justify-start">
@@ -198,8 +213,24 @@ export default function LivePage() {
 
   return (
     <div className="relative min-h-screen">
-      {/* reconnecting pill — pinned top-center, non-blocking */}
-      {reconnecting ? (
+      {/* Transport status — pinned top-center. A brief blip shows the calm pill; a
+          sustained failure escalates to a loud banner, because a silently-frozen grid
+          on a monitoring surface is a safety gap. */}
+      {liveLost ? (
+        <div
+          role="alert"
+          className="absolute left-1/2 top-3.5 z-[36] flex -translate-x-1/2 items-center gap-3 rounded-md bg-red-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-3"
+        >
+          Live updates lost — this grid may be out of date.
+          <button
+            type="button"
+            className="font-semibold underline underline-offset-2"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      ) : reconnecting ? (
         <div className="absolute left-1/2 top-3.5 z-[36] -translate-x-1/2">
           <ReconnectingPill />
         </div>
@@ -320,7 +351,15 @@ export default function LivePage() {
 }
 
 /** State (c): inline start card — never a fake empty grid. */
-function NoSessionState({ cls, onStarted }: { cls: ClassCardDTO; onStarted: (sessionId: string) => void }) {
+function NoSessionState({
+  cls,
+  onStarted,
+  onError,
+}: {
+  cls: ClassCardDTO;
+  onStarted: (sessionId: string) => void;
+  onError: (title: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const bellIso = useMemo(() => {
     const [h = 0, m = 0] = cls.endTime.split(':').map(Number);
@@ -338,6 +377,8 @@ function NoSessionState({ cls, onStarted }: { cls: ClassCardDTO; onStarted: (ses
         policyId: cls.policyId ?? undefined,
       });
       onStarted(detail.session.id);
+    } catch {
+      onError('Couldn’t start the session');
     } finally {
       setBusy(false);
     }

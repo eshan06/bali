@@ -8,11 +8,19 @@ export interface LiveState {
   detail: SessionDetailDTO | null;
   /** Transport truth for the ReconnectingPill — SSE down, polling at 5s. */
   reconnecting: boolean;
+  /** True once reconnect+poll have failed repeatedly: the grid is stale and the teacher
+   *  must be told loudly (not just a calm "Reconnecting" pill) — this is a monitoring
+   *  surface where a silently-frozen grid is a safety gap. */
+  liveLost: boolean;
   /** Recent emergency/revoked/info events for the toast stack. */
   lastEvent: EventDTO | null;
   /** The student whose chip should soft-pulse (set on emergency arrival). */
   pulseStudentId: string | null;
 }
+
+/** Consecutive failed reconnect cycles before we escalate from "Reconnecting" to
+ *  "Live updates lost". ~3 × (3s retry + poll) ≈ 10–15s of sustained failure. */
+const LIVE_LOST_AFTER = 3;
 
 /**
  * SSE via fetch-streaming (EventSource can't carry Authorization), with automatic
@@ -21,9 +29,11 @@ export interface LiveState {
 export function useLiveSession(sessionId: string | null): LiveState & { refresh: () => void } {
   const [detail, setDetail] = useState<SessionDetailDTO | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const [liveLost, setLiveLost] = useState(false);
   const [lastEvent, setLastEvent] = useState<EventDTO | null>(null);
   const [pulseStudentId, setPulseStudentId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const failuresRef = useRef(0);
 
   const applyMessage = useCallback((msg: SSEMessage) => {
     switch (msg.kind) {
@@ -60,16 +70,27 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
     if (!sessionId) return;
     api
       .get<SessionDetailDTO>(`/sessions/${sessionId}`)
-      .then(setDetail)
+      .then((d) => {
+        // A successful poll means we DO have fresh data — clear the escalation and reset
+        // the failure count (a 401 here already triggered re-auth inside api.request).
+        setDetail(d);
+        failuresRef.current = 0;
+        setLiveLost(false);
+      })
       .catch(() => {});
   }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) {
       setDetail(null);
+      setReconnecting(false);
+      setLiveLost(false);
+      failuresRef.current = 0;
       return;
     }
     let stopped = false;
+    failuresRef.current = 0;
+    setLiveLost(false);
     let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     const startPolling = () => {
@@ -97,6 +118,8 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
           });
           if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
           stopPolling();
+          failuresRef.current = 0;
+          setLiveLost(false);
 
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
@@ -123,6 +146,8 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
           throw new Error('stream closed');
         } catch {
           if (stopped) return;
+          failuresRef.current += 1;
+          if (failuresRef.current >= LIVE_LOST_AFTER) setLiveLost(true);
           startPolling();
           refresh();
           await new Promise((r) => setTimeout(r, 3_000));
@@ -140,7 +165,7 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
     };
   }, [sessionId, applyMessage, refresh]);
 
-  return { detail, reconnecting, lastEvent, pulseStudentId, refresh };
+  return { detail, reconnecting, liveLost, lastEvent, pulseStudentId, refresh };
 }
 
 /** 1s ticking "23:14" countdown to an ISO end time (tabular digits upstream). */
