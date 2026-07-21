@@ -9,7 +9,7 @@ import {
   signOut as amplifySignOut,
 } from 'aws-amplify/auth';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, setTokenProvider } from './api';
+import { api, setTokenProvider, setUnauthorizedHandler } from './api';
 
 /** Same Cognito pool/client/flows the legacy web client proved out. */
 const poolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
@@ -18,7 +18,10 @@ const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
 const redirect = process.env.NEXT_PUBLIC_REDIRECT_URI ?? 'http://localhost:3000/auth/callback';
 
 const DEV_TOKEN_KEY = 'bali.devToken';
-const devTokensAllowed = process.env.NEXT_PUBLIC_ALLOW_DEV_TOKENS === '1';
+// Dev-only auth bypass. Co-gated on NODE_ENV so a production build strips the button
+// and the codepath even if NEXT_PUBLIC_ALLOW_DEV_TOKENS leaks in from a stray .env.local.
+const devTokensAllowed =
+  process.env.NEXT_PUBLIC_ALLOW_DEV_TOKENS === '1' && process.env.NODE_ENV !== 'production';
 
 let configured = false;
 function configureAmplify(): void {
@@ -89,6 +92,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     configureAmplify();
     setTokenProvider(cognitoToken);
+    // On a 401 from any authed request, drop the stale session. Only bounce to /login
+    // from inside the portal — a stale token on a public page (landing, /p, /t) must
+    // not yank the visitor away.
+    let handling = false; // dedupe a burst of concurrent 401s into one teardown
+    setUnauthorizedHandler(() => {
+      if (handling) return;
+      handling = true;
+      if (devTokensAllowed) window.localStorage.removeItem(DEV_TOKEN_KEY);
+      // Drop Amplify's cached session so the rejected token isn't re-sent on /login.
+      void amplifySignOut().catch(() => {});
+      setTeacher(null);
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/app')) {
+        window.location.assign('/login');
+      }
+    });
   }, []);
 
   const loadMe = useCallback(async (): Promise<void> => {

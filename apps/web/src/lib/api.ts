@@ -17,6 +17,15 @@ export function setTokenProvider(fn: TokenProvider): void {
   tokenProvider = fn;
 }
 
+/** Invoked on a 401 from an authenticated request so an expired/revoked session is
+ *  handled centrally (clear auth + bounce to /login) instead of every page silently
+ *  hanging on "Loading…". The registered handler dedupes a burst of 401s itself. */
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler = () => {};
+export function setUnauthorizedHandler(fn: UnauthorizedHandler): void {
+  unauthorizedHandler = fn;
+}
+
 export async function getToken(): Promise<string | null> {
   return tokenProvider();
 }
@@ -33,6 +42,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok) {
+    // A 401 means the token expired/was revoked mid-use — let the app re-auth centrally.
+    // (403 bootstrap_required is expected during provisioning and is handled by callers.)
+    if (res.status === 401) unauthorizedHandler();
     throw new ApiError(res.status, data.error ?? 'error', data.message ?? `Request failed (${res.status})`);
   }
   return data as T;
