@@ -5,6 +5,63 @@ what's left. Written 2026-06-14. The architecture is sound — zod validation, p
 Drizzle queries, policy snapshots, SSE-with-poll-fallback, a lazy-bell sweeper. The gaps are
 operational and were closed or triaged below.
 
+## Go-live web hardening (2026-06-16) — driven by a multi-perspective audit
+
+A multi-agent audit (4 principal-engineer lenses + teacher/parent/admin/product personas, each
+finding adversarially verified against the code) produced a prioritized backlog; the web track is
+now go-live ready. Shipped this session (all on `main`, web + a db seed fix):
+
+**P0 blockers (fixed):**
+- **docker-compose web build now passes the Cognito/redirect build args** (was: only
+  `NEXT_PUBLIC_API_URL`, so the documented `docker compose up --build` baked empty Cognito → a
+  portal where no teacher could sign in). Dockerfile declares them + optional site/lead args.
+- **`/t/[code]` no longer dead-ends on a fake striped "app store badge."** Honest env-driven link
+  (`NEXT_PUBLIC_APP_STORE_URL`); until the iOS app is published it says "coming to the App Store
+  soon," not a broken graphic.
+- **`seed.ts --reset` fixed** — it crashed on a FK violation (added `parent_links` delete before
+  `memberships`); the documented reseed path now works. All 12 API + 12 shared tests green.
+
+**P1 (fixed):**
+- **Security headers + CSP on the web tier** (`next.config.ts`): `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy` (global `strict-origin-when-cross-origin`; `no-referrer` on the
+  token-bearing `/p` & `/t`), a prod-only `Content-Security-Policy` (allows the API origin + SSE +
+  Cognito) + HSTS, and `poweredByHeader: false`. Verified served.
+- **Build-time env guard** (`apps/web/src/lib/env.ts`, called from `next.config.ts`): a production
+  build now *fails* when the Cognito pair is empty or `NEXT_PUBLIC_ALLOW_DEV_TOKENS=1` — the
+  dev-token auth-bypass can never be inlined into a prod bundle (also co-gated on `NODE_ENV`).
+- **Central 401 handling** (`api.ts` + `auth.tsx`): an expired/revoked session now clears auth and
+  bounces to `/login` (from the portal only) instead of every page hanging on "Loading…".
+- **Web mutation + first-load error handling** across the whole teacher portal: failures surface a
+  dismissible toast; failed loads show a "Couldn't load — Retry" instead of a permanent spinner
+  (shared `ErrorToast`/`LoadError` in `bits.tsx`). Tag-deactivate failures no longer mislead.
+- **SSE live grid escalates a sustained outage** to a loud "Live updates lost — reload" banner
+  instead of a too-calm "Reconnecting" pill (a monitoring-surface safety gap).
+- **Real `/privacy`, `/terms`, `/contact` routes** (K-12-appropriate, FERPA/COPPA framing, grounded
+  in the actual status-only data practices; offline-unlock claim scoped honestly). Footer + privacy
+  section link them; `/p` & `/t` are `noindex` + `robots.ts` disallows them.
+- **Landing**: full-focus copy (was describing the pre-pivot class-policy model); the "Book a demo"
+  form now captures a lead (composes an email) instead of being a dead `#demo` anchor; a clear
+  "Sign in" path for self-serve teachers (Google auto-provisions).
+- **a11y**: `--text-tertiary` darkened to meet WCAG AA; `Label` renders a real `<label>`;
+  parent-link modal closes on Escape; live grid is responsive (`grid-cols-2 sm:3 md:4`).
+
+**P2 (fixed):** favicon/`icon.svg`, `apple-icon`, OpenGraph image + Twitter/OG metadata +
+`metadataBase`, web manifest, `sitemap.ts`, branded `not-found` + `global-error`, `apps/web/.env.example`,
+CSV-export `res.ok` guard, auth-callback poll-retry (no more fixed 600ms hang).
+
+### Still open / explicitly out of scope (owner decisions)
+- **No App Store URL yet** — `/t/[code]` says "coming soon" until `NEXT_PUBLIC_APP_STORE_URL` is set
+  (the iOS app isn't published; FamilyControls justification pending — see HANDOFF.md).
+- **Lead capture is a `mailto:`** (no CRM/leads backend). Wire a real endpoint/Calendly when ready;
+  set `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_CONTACT_EMAIL` / `NEXT_PUBLIC_PRIVACY_EMAIL`.
+- **Single-tenant + no admin role + no SSO (SAML/Clever/Workspace)** — the product spec lists
+  "Admin portal" as out of scope and uses `DEFAULT_SCHOOL_ID` + open teacher bootstrap. Real
+  multi-school + admin/SSO is a roadmap item (ROADMAP.md "retire DEFAULT_SCHOOL_ID"), not a v1 web
+  gate. For a clean prod tenant, don't ship seed rows / disable seed-adoption.
+- **Notifications** still stored-but-undelivered; **error tracking (Sentry)** not wired (the
+  boundaries `console.error` — add a DSN-gated tracker). **Legal pages need counsel review** before
+  a real signed contract (content is accurate to practice, not legal advice).
+
 ## Done this session (committed to `main`)
 
 | Area | What | Verified |
