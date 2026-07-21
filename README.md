@@ -35,6 +35,35 @@ watches a live status grid; the student always holds a shame-free emergency exit
 exists — status only. Reports show class averages, never per-student rankings or
 leaderboards. The student's personal history is visible only to the student.
 
+## Screens
+
+*From the design handoffs (`design_handoff_bali_2`, `design_handoff_teacher_ios`) — the
+shipped portal and apps are built and verified against these.*
+
+![Landing page](design_handoff_bali_2/screenshots/01-landing.png)
+
+**The student's phone during a session** — normal, the final two minutes, offline
+(focus continues), and on a pass. The hold-to-unlock exit never leaves the screen:
+
+![Student focus states](docs/assets/student-focus-states.png)
+
+**One-time student onboarding** — the privacy contract up front ("what your teacher
+sees" is the whole list), then the native Screen Time grant:
+
+![Student onboarding](docs/assets/student-onboarding.png)
+
+**The teacher's morning** — the portal dashboard, and the teacher app from classes to
+its own live grid:
+
+![Teacher portal dashboard](design_handoff_bali_2/screenshots/teacher-portal.png)
+
+![Teacher iOS app](docs/assets/teacher-ios.png)
+
+**Reports** — class averages and unlock patterns, framed as conversation starters;
+per-student rankings don't exist anywhere:
+
+![Reports](design_handoff_bali_2/screenshots/w8-reports.png)
+
 ## Architecture
 
 ```mermaid
