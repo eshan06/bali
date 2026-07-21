@@ -747,6 +747,28 @@
     0 0 0 2px var(--green-800),
     0 0 0 4px #fff3;
 }
+.landing .demoform-sent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  max-width: 520px;
+  margin: 0 auto;
+  font: 500 15px/22px var(--font-ui);
+  color: rgba(255, 255, 255, 0.92);
+}
+.landing .demoform-sent a {
+  color: #fff;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.landing .cta-signin {
+  color: #fff;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .landing .ctaband .btn--primary {
   background: #fff;
   color: var(--green-800);

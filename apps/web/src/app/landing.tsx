@@ -197,6 +197,55 @@ const KICKER_MARK = (
   </svg>
 );
 
+/** Demo-request capture. No leads backend yet, so this composes a prefilled email to
+ *  the sales inbox (honest + functional) and confirms inline — not a dead anchor. */
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'hello@trybali.com';
+
+function DemoForm() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+    const subject = encodeURIComponent('Bali demo request');
+    const body = encodeURIComponent(
+      `Hi Bali team,\n\nI'd like a demo for my classroom.\n\nSchool email: ${email}\n`,
+    );
+    window.location.href = `mailto:${DEMO_EMAIL}?subject=${subject}&body=${body}`;
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <div className="demoform-sent" role="status">
+        <Check size={18} strokeWidth={ICON_STROKE} />
+        <span>
+          Thanks — your email app should open. If not, write us at{' '}
+          <a href={`mailto:${DEMO_EMAIL}`}>{DEMO_EMAIL}</a>.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <form className="demoform" onSubmit={submit} noValidate>
+      <input
+        type="email"
+        name="email"
+        required
+        placeholder="you@school.edu"
+        aria-label="School email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <button className="btn btn--primary btn--big" type="submit">
+        Book a demo
+      </button>
+    </form>
+  );
+}
+
 export function Landing() {
   const rootRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLElement>(null);
@@ -437,7 +486,7 @@ export function Landing() {
             <h2 className="sec">A focus session is a shared agreement — made visible</h2>
             <p className="sec-sub">
               No surveillance, no lockdown theater. Bali shows everyone the same honest picture:
-              who's in, until when, and which apps the class agreed to keep.
+              who's in, until when, and that everything rests except the few apps each student keeps.
             </p>
           </div>
           <div className="steps">
@@ -449,7 +498,7 @@ export function Landing() {
               <h3>Tap the desk tag</h3>
               <p>
                 Students tap an NFC tag (or scan its QR) as they sit down. Apple Screen Time quiets
-                every app except the ones the class policy allows — Phone always stays.
+                every app except the few each student kept for themselves — and the Phone app always stays.
               </p>
             </div>
             <div className="step rise" style={{ transitionDelay: '100ms' }}>
@@ -459,7 +508,7 @@ export function Landing() {
               </div>
               <h3>Focus together</h3>
               <p>
-                Each phone shows one calm screen: the countdown, the allowed apps, and the emergency
+                Each phone shows one calm screen: the countdown, the apps they kept, and the emergency
                 exit. It sits face-up on the desk — nothing to hide, nothing to check.
               </p>
             </div>
@@ -641,6 +690,11 @@ export function Landing() {
               </ul>
             </div>
           </div>
+          <div className="rise" style={{ marginTop: 24, textAlign: 'center' }}>
+            <Link className="navlink" href="/privacy" style={{ fontWeight: 600 }}>
+              Read the full privacy policy →
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -653,13 +707,13 @@ export function Landing() {
               A 20-minute walkthrough with a real session — tags, the live grid, and the emergency
               exit included.
             </p>
-            <div className="demoform">
-              <input type="email" placeholder="you@school.edu" aria-label="School email" />
-              <a className="btn btn--primary btn--big" href="#demo">
-                Book a demo
-              </a>
+            <DemoForm />
+            <div className="fine">
+              Free for your first class · No student accounts, no credit card ·{' '}
+              <Link href="/login" className="cta-signin">
+                Already approved? Sign in
+              </Link>
             </div>
-            <div className="fine">Free for your first class. No student accounts, no credit card.</div>
           </div>
         </div>
       </section>
@@ -674,9 +728,10 @@ export function Landing() {
             Focus sessions for classrooms
           </span>
           <div className="links">
-            <a href="#privacy">Privacy</a>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/contact">Contact</Link>
             <a href="#how">How it works</a>
-            <a href="#demo">Book a demo</a>
           </div>
         </div>
       </footer>
