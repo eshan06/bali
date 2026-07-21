@@ -1,7 +1,7 @@
 # Bali — legacy app (reference baseline)
 
 This folder is the **original, working Bali app**, relocated unchanged from the repo root
-on 2026-06-11 so the root could host the v2 rebuild (see `../WIRING_PLAN.md`). It is the
+on 2026-06-11 so the root could host the v2 rebuild (see `../docs/WIRING_PLAN.md`). It is the
 known-good baseline and fallback: **do not modify it** — run it from inside `legacy/`.
 
 Classroom productivity platform: teachers manage classes/sessions/attendance, students

@@ -56,7 +56,7 @@ export default function LivePage() {
   const [endConfirm, setEndConfirm] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  // Surface a failed teacher action instead of swallowing it (PRODUCTION.md #1).
+  // Surface a failed teacher action instead of swallowing it (docs/PRODUCTION.md #1).
   const actionFailed = useCallback(
     (title: string) => push({ id: 'action-error', variant: 'revoked', title, sub: 'Please try again.' }),
     [push],
