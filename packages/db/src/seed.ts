@@ -68,6 +68,7 @@ async function reset() {
   await db.delete(s.passes);
   await db.delete(s.participations);
   await db.delete(s.sessions);
+  await db.delete(s.parentLinks);
   await db.delete(s.memberships);
   await db.delete(s.tags);
   await db.delete(s.classes);
