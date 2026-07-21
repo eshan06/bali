@@ -4,7 +4,11 @@ import { ArcMark } from '@/components/bali/ArcMark';
 import { StatusChip } from '@/components/bali/StatusChip';
 import { API_URL } from '@/lib/api';
 
-export const metadata: Metadata = { title: 'Bali — focus summary' };
+// Renders per-student info behind an unguessable token — never index, never follow.
+export const metadata: Metadata = {
+  title: 'Bali — focus summary',
+  robots: { index: false, follow: false },
+};
 
 /** Read-only parent view. The long random token in the URL is the only credential —
  *  no login. Status only: this page never shows screen content, apps, or location.
@@ -15,7 +19,14 @@ export default async function ParentViewPage({ params }: { params: Promise<{ tok
   let view: ParentViewDTO | null = null;
   try {
     const res = await fetch(`${API_URL}/public/parent/${token}`, { cache: 'no-store' });
-    if (res.ok) view = (await res.json()) as ParentViewDTO;
+    if (res.ok) {
+      const data = (await res.json()) as ParentViewDTO;
+      // Guard against version skew / partial responses on this public no-login surface:
+      // a malformed 200 should show the calm inactive frame, never an unstyled crash.
+      if (data?.summary && data?.history && Array.isArray(data.history.rows) && data.studentShortName) {
+        view = data;
+      }
+    }
   } catch {
     /* API down — fall through to the inactive-link frame */
   }
@@ -49,6 +60,14 @@ export default async function ParentViewPage({ params }: { params: Promise<{ tok
         </p>
         <p className="text-[12.5px] leading-[17px] text-ink-tertiary">{view.generatedAtLabel}</p>
       </header>
+
+      {/* Cold-open framing — a parent may open this with no prior context. Say plainly
+          what Bali is, who shared it, and that it's read-only & status-only. */}
+      <p className="rounded-md border border-line bg-surface-card px-4 py-3 text-center text-[13px] leading-[19px] text-ink-secondary">
+        {view.teacherName} shared this read-only focus summary with you — no account needed. Bali is a
+        classroom focus tool; this page shows only focus status, never screens, apps, messages, or
+        location.
+      </p>
 
       {/* Live-right-now banner (only while a session is open) */}
       {view.live ? (
@@ -94,6 +113,13 @@ export default async function ParentViewPage({ params }: { params: Promise<{ tok
       <footer className="flex flex-col gap-2 px-1 pt-1 text-center">
         <p className="text-[12.5px] leading-[18px] text-ink-tertiary">{view.history.boundary}</p>
         <p className="text-[12.5px] leading-[18px] text-ink-tertiary">{view.history.framing}</p>
+        <p className="text-[12.5px] leading-[18px] text-ink-tertiary">
+          Questions? Reach out to {view.teacherName}
+          {view.schoolName ? ` at ${view.schoolName}` : ''}. ·{' '}
+          <a href="/privacy" className="underline underline-offset-2 hover:text-ink-secondary">
+            Privacy
+          </a>
+        </p>
       </footer>
     </main>
   );
