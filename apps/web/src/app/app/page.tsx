@@ -9,6 +9,7 @@ import type { EventDTO, SessionDetailDTO } from '@bali/shared';
 import { Arc } from '@/components/bali/Arc';
 import { Button } from '@/components/bali/Button';
 import { EventTimeline } from '@/components/bali/EventTimeline';
+import { LoadError } from '@/components/bali/bits';
 import { SummaryStrip } from '@/components/bali/StatusChip';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
@@ -94,12 +95,16 @@ export default function PortalHomePage() {
   const [startingId, setStartingId] = useState<string | null>(null);
   const [entered, setEntered] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
     api
       .get<PortalHome>('/portal/home')
-      .then(setHome)
-      .catch(() => {});
+      .then((h) => {
+        setHome(h);
+        setLoadError(false);
+      })
+      .catch(() => setLoadError(true));
   }, []);
 
   useEffect(load, [load]);
@@ -142,7 +147,13 @@ export default function PortalHomePage() {
   };
 
   if (!home) {
-    return <div className="p-9 text-ink-tertiary">Loading…</div>;
+    return loadError ? (
+      <div className="p-9">
+        <LoadError what="your dashboard" onRetry={load} />
+      </div>
+    ) : (
+      <div className="p-9 text-ink-tertiary">Loading…</div>
+    );
   }
 
   return (

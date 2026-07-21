@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import type { ParentLinkDTO } from '@bali/shared';
 import { Button } from '@/components/bali/Button';
-import { JoinCodeBadge, CopyButton, Card } from '@/components/bali/bits';
+import { JoinCodeBadge, CopyButton, Card, ErrorToast, LoadError } from '@/components/bali/bits';
 import { ProjectCodeOverlay, ProjectThisButton } from '@/components/bali/ProjectCode';
 import { StatusChip, chipLabel } from '@/components/bali/StatusChip';
 import { ICON_STROKE } from '@/components/bali/icons';
@@ -20,11 +20,30 @@ export default function RosterPage() {
   const [parentLink, setParentLink] = useState<{ membershipId: string; name: string; url: string } | null>(null);
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
-    void api.get<RosterDTO>(`/classes/${classId}/roster`).then(setRoster);
+    setLoadError(false);
+    void api
+      .get<RosterDTO>(`/classes/${classId}/roster`)
+      .then(setRoster)
+      .catch(() => setLoadError(true));
   }, [classId]);
   useEffect(load, [load]);
+
+  // Parent-link overlay a11y: Escape closes it, and focus returns to the page on close.
+  useEffect(() => {
+    if (!parentLink) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setParentLink(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      trigger?.focus?.();
+    };
+  }, [parentLink]);
 
   const decide = async (membershipId: string, approve: boolean) => {
     setLinkError(null);
@@ -71,7 +90,14 @@ export default function RosterPage() {
     setParentLink(null);
   };
 
-  if (!roster) return <div className="p-9 text-ink-tertiary">Loading…</div>;
+  if (!roster)
+    return loadError ? (
+      <div className="p-9">
+        <LoadError what="this roster" onRetry={load} />
+      </div>
+    ) : (
+      <div className="p-9 text-ink-tertiary">Loading…</div>
+    );
 
   return (
     <div className="mx-auto flex max-w-[1190px] flex-col gap-[18px] px-8 pb-9 pt-6">
@@ -193,6 +219,7 @@ export default function RosterPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="parent-link-title"
           onClick={() => setParentLink(null)}
         >
           <div
@@ -200,7 +227,9 @@ export default function RosterPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-1">
-              <h2 className="text-[17px] font-semibold leading-[22px]">Parent link · {parentLink.name}</h2>
+              <h2 id="parent-link-title" className="text-[17px] font-semibold leading-[22px]">
+                Parent link · {parentLink.name}
+              </h2>
               <p className="text-[13px] leading-[18px] text-ink-secondary">
                 A read-only, status-only view of {parentLink.name.split(' ')[0]}’s focus history — no login. Share it
                 with their parent. Creating a new link replaces this one.
@@ -226,7 +255,7 @@ export default function RosterPage() {
                     Open
                   </Button>
                 </a>
-                <Button size="sm" onClick={() => setParentLink(null)}>
+                <Button size="sm" autoFocus onClick={() => setParentLink(null)}>
                   Done
                 </Button>
               </div>
@@ -235,11 +264,7 @@ export default function RosterPage() {
         </div>
       ) : null}
 
-      {linkError ? (
-        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-md bg-red-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-3">
-          {linkError}
-        </div>
-      ) : null}
+      {linkError ? <ErrorToast message={linkError} onDismiss={() => setLinkError(null)} /> : null}
     </div>
   );
 }

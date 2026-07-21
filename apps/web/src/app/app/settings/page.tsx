@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Input, Toggle } from '@/components/bali/Button';
+import { ErrorToast, LoadError } from '@/components/bali/bits';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -22,14 +23,22 @@ export default function SettingsPage() {
   const [form, setForm] = useState<SettingsDTO | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void api.get<SettingsDTO>('/me/settings').then(setForm);
+  const load = useCallback(() => {
+    setLoadError(false);
+    api
+      .get<SettingsDTO>('/me/settings')
+      .then(setForm)
+      .catch(() => setLoadError(true));
   }, []);
+  useEffect(load, [load]);
 
   const save = async () => {
     if (!form) return;
     setBusy(true);
+    setActionError(null);
     try {
       const updated = await api.patch<SettingsDTO>('/me/settings', {
         name: form.name.trim() || undefined,
@@ -42,13 +51,24 @@ export default function SettingsPage() {
       setForm(updated);
       setSavedAt(Date.now());
       setTimeout(() => setSavedAt(null), 2400);
-      await reload(); // sidenav + every student screen read displayName
+      // Best-effort sidenav refresh — the save already committed, so a failed /me
+      // reload must NOT masquerade as a save failure.
+      void reload().catch(() => {});
+    } catch {
+      setActionError('Couldn’t save your settings. Please try again.');
     } finally {
       setBusy(false);
     }
   };
 
-  if (!form) return <div className="p-9 text-ink-tertiary">Loading…</div>;
+  if (!form)
+    return loadError ? (
+      <div className="p-9">
+        <LoadError what="settings" onRetry={load} />
+      </div>
+    ) : (
+      <div className="p-9 text-ink-tertiary">Loading…</div>
+    );
 
   const toggles: Array<{
     key: 'notifyEmergency' | 'notifyRevoked' | 'notifyWeekly';
@@ -126,6 +146,8 @@ export default function SettingsPage() {
           </span>
         </div>
       </div>
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }

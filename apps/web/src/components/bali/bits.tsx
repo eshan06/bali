@@ -68,6 +68,40 @@ export function Card({ children, className }: { children: React.ReactNode; class
   return <div className={clsx('rounded-md border border-line bg-surface-card p-5', className)}>{children}</div>;
 }
 
+/** Bottom-center dismissible error toast — the standard "that action failed" surface. */
+export function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-md bg-red-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-3"
+    >
+      {message}
+      <button type="button" className="font-semibold opacity-80 hover:opacity-100" onClick={onDismiss}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+/** First-load failure state — replaces a permanent "Loading…" spinner with a retry. */
+export function LoadError({ onRetry, what = 'this page' }: { onRetry: () => void; what?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-14 text-center">
+      <div className="text-[15px] font-semibold text-ink-primary">Couldn’t load {what}</div>
+      <div className="max-w-[320px] text-[13.5px] leading-[19px] text-ink-secondary">
+        Check your connection and try again.
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded-sm border border-line-strong bg-surface-card px-4 py-2 text-[13px] font-semibold text-ink-primary hover:bg-surface-sunken"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
 /** Flat filter pill (W8/W9): active = green-700 bg, white text. */
 export function FilterChip({
   active,

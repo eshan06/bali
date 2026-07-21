@@ -6,7 +6,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { Button, Input, Label, Toggle } from '@/components/bali/Button';
-import { JoinCodeBadge, CopyButton } from '@/components/bali/bits';
+import { JoinCodeBadge, CopyButton, ErrorToast, LoadError } from '@/components/bali/bits';
 import { ProjectCodeOverlay, ProjectThisButton } from '@/components/bali/ProjectCode';
 import { StatusChip } from '@/components/bali/StatusChip';
 import { ICON_STROKE } from '@/components/bali/icons';
@@ -34,18 +34,28 @@ export default function ClassesPage() {
   const [policyId, setPolicyId] = useState<string>('');
   const [requireApproval, setRequireApproval] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    void api.get<{ classes: ClassCardDTO[] }>('/classes').then((r) => setClasses(r.classes));
-    void api.get<{ policies: PolicyDTO[] }>('/policies').then((r) => {
-      setPolicies(r.policies);
-      setPolicyId((prev) => prev || (r.policies.find((p) => p.usedByClasses > 0) ?? r.policies[0])?.id || '');
-    });
+    setLoadError(false);
+    void api
+      .get<{ classes: ClassCardDTO[] }>('/classes')
+      .then((r) => setClasses(r.classes))
+      .catch(() => setLoadError(true));
+    void api
+      .get<{ policies: PolicyDTO[] }>('/policies')
+      .then((r) => {
+        setPolicies(r.policies);
+        setPolicyId((prev) => prev || (r.policies.find((p) => p.usedByClasses > 0) ?? r.policies[0])?.id || '');
+      })
+      .catch(() => {});
   }, []);
   useEffect(load, [load]);
 
   const create = async () => {
     setBusy(true);
+    setActionError(null);
     try {
       const cls = await api.post<ClassCardDTO>('/classes', {
         name,
@@ -58,6 +68,8 @@ export default function ClassesPage() {
       setCreated(cls);
       setName('');
       load();
+    } catch {
+      setActionError('Couldn’t create the class. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -82,7 +94,11 @@ export default function ClassesPage() {
       </div>
 
       {classes === null ? (
-        <div className="text-ink-tertiary">Loading…</div>
+        loadError ? (
+          <LoadError what="your classes" onRetry={load} />
+        ) : (
+          <div className="text-ink-tertiary">Loading…</div>
+        )
       ) : classes.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-[60px] text-center">
           <svg viewBox="0 0 20 20" fill="none" className="h-14 w-14">
@@ -188,21 +204,31 @@ export default function ClassesPage() {
                   </div>
                   <div className="flex-1">
                     <Label className="mb-1.5">Policy</Label>
-                    <select
-                      className="w-full rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5"
-                      value={policyId}
-                      onChange={(e) => setPolicyId(e.target.value)}
-                    >
-                      {policies.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                          {p.id === mostUsedId ? ' · most used' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    {policies.length === 0 ? (
+                      <div className="rounded-sm border border-line bg-surface-sunken px-3 py-[9px] text-[13px] leading-5 text-ink-secondary">
+                        Runs Full Focus by default
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5"
+                        value={policyId}
+                        onChange={(e) => setPolicyId(e.target.value)}
+                      >
+                        {policies.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                            {p.id === mostUsedId ? ' · most used' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
-                {selectedPolicy ? (
+                {policies.length === 0 ? (
+                  <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
+                    Every session is Full Focus. Name a reusable policy any time from Policies.
+                  </div>
+                ) : selectedPolicy ? (
                   <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
                     {selectedPolicy.name} · Full focus
                   </div>
@@ -239,6 +265,8 @@ export default function ClassesPage() {
           onClose={() => setProjecting(false)}
         />
       ) : null}
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }

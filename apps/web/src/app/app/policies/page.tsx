@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Button, Input } from '@/components/bali/Button';
+import { ErrorToast, LoadError } from '@/components/bali/bits';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
 import type { PolicyDTO } from '@/lib/types';
@@ -27,12 +28,20 @@ export default function PoliciesPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (): Promise<PolicyDTO[]> => {
-    const r = await api.get<{ policies: PolicyDTO[] }>('/policies');
-    setPolicies(r.policies);
-    return r.policies;
+    try {
+      const r = await api.get<{ policies: PolicyDTO[] }>('/policies');
+      setPolicies(r.policies);
+      setLoadError(false);
+      return r.policies;
+    } catch {
+      setLoadError(true);
+      return [];
+    }
   }, []);
 
   useEffect(() => {
@@ -52,6 +61,7 @@ export default function PoliciesPage() {
   const save = async () => {
     if (!draft || !draft.name.trim()) return;
     setBusy(true);
+    setActionError(null);
     try {
       const body = { name: draft.name.trim() };
       const saved = draft.id
@@ -59,6 +69,8 @@ export default function PoliciesPage() {
         : await api.post<PolicyDTO>('/policies', body);
       await load();
       setDraft(draftFrom(saved));
+    } catch {
+      setActionError('Couldn’t save the policy. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -67,11 +79,14 @@ export default function PoliciesPage() {
   const remove = async () => {
     if (!draft?.id) return;
     setBusy(true);
+    setActionError(null);
     try {
       await api.del(`/policies/${draft.id}`);
       setConfirmDelete(false);
       const list = await load();
       setDraft(draftFrom(list[0] ?? null));
+    } catch {
+      setActionError('Couldn’t delete the policy. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -90,7 +105,11 @@ export default function PoliciesPage() {
       </div>
 
       {policies === null ? (
-        <div className="text-ink-tertiary">Loading…</div>
+        loadError ? (
+          <LoadError what="policies" onRetry={() => void load()} />
+        ) : (
+          <div className="text-ink-tertiary">Loading…</div>
+        )
       ) : (
         <div className="grid grid-cols-[320px_1fr] items-start gap-5 max-[1024px]:grid-cols-1">
           {/* policy list */}
@@ -146,8 +165,8 @@ export default function PoliciesPage() {
               <div className="rounded-sm border border-line bg-surface-sunken p-3.5 text-[13px] leading-[19px] text-ink-secondary">
                 Every session is <span className="font-medium text-ink-primary">full focus</span>. Each
                 phone pauses every app except the few that student chose once during setup — Bali never
-                sees the list. Phone &amp; Messages always work. A policy is just a name you pick when
-                starting a session.
+                sees the list. The Phone app always works (calls &amp; 911 are never blocked). A policy is
+                just a name you pick when starting a session.
               </div>
 
               <div className="flex items-center justify-between border-t border-line pt-3.5 mt-3.5">
@@ -204,6 +223,8 @@ export default function PoliciesPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }

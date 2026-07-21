@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { EventDTO } from '@bali/shared';
 import { Button } from '@/components/bali/Button';
-import { FilterChip } from '@/components/bali/bits';
+import { ErrorToast, FilterChip, LoadError } from '@/components/bali/bits';
 import { EventTimeline } from '@/components/bali/EventTimeline';
 import { api } from '@/lib/api';
 import type { ClassCardDTO } from '@/lib/types';
@@ -28,32 +28,40 @@ export default function LogsPage() {
   const [events, setEvents] = useState<EventDTO[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    void api.get<{ classes: ClassCardDTO[] }>('/classes').then((r) => setClasses(r.classes));
+    void api.get<{ classes: ClassCardDTO[] }>('/classes').then((r) => setClasses(r.classes)).catch(() => {});
   }, []);
 
   const baseQuery = `type=${type}${classId ? `&classId=${classId}` : ''}`;
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
     setEvents(null);
     setNextCursor(null);
+    setLoadError(false);
     void api
       .get<{ events: EventDTO[]; nextCursor: string | null }>(`/events?${baseQuery}&limit=30`)
       .then((r) => {
         setEvents(r.events);
         setNextCursor(r.nextCursor);
-      });
+      })
+      .catch(() => setLoadError(true));
   }, [baseQuery]);
+  useEffect(loadEvents, [loadEvents]);
 
   const loadOlder = async () => {
     if (!nextCursor) return;
     setLoadingMore(true);
+    setActionError(null);
     try {
       const r = await api.get<{ events: EventDTO[]; nextCursor: string | null }>(
         `/events?${baseQuery}&limit=30&cursor=${nextCursor}`,
       );
       setEvents((prev) => [...(prev ?? []), ...r.events]);
       setNextCursor(r.nextCursor);
+    } catch {
+      setActionError('Couldn’t load older events. Please try again.');
     } finally {
       setLoadingMore(false);
     }
@@ -88,7 +96,11 @@ export default function LogsPage() {
 
       <div className="max-w-[720px] rounded-md border border-line bg-surface-card p-6">
         {events === null ? (
-          <div className="text-ink-tertiary">Loading…</div>
+          loadError ? (
+            <LoadError what="the event log" onRetry={loadEvents} />
+          ) : (
+            <div className="text-ink-tertiary">Loading…</div>
+          )
         ) : events.length === 0 ? (
           <div className="text-[14px] leading-5 text-ink-secondary">
             Nothing here yet — events appear as sessions run.
@@ -102,6 +114,8 @@ export default function LogsPage() {
           </Button>
         ) : null}
       </div>
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }

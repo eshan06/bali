@@ -6,6 +6,7 @@ import { Plus, Printer } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { Button, Input, Label, Toggle } from '@/components/bali/Button';
+import { ErrorToast, LoadError } from '@/components/bali/bits';
 import { QrSvg } from '@/components/bali/QrSvg';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api } from '@/lib/api';
@@ -73,19 +74,26 @@ export default function TagsPage() {
   const [confirmOff, setConfirmOff] = useState<TagDTO | null>(null);
   const [printTag, setPrintTag] = useState<TagDTO | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // create form
   const [label, setLabel] = useState('');
   const [classId, setClassId] = useState('');
 
   const load = useCallback(async () => {
-    const { classes: list } = await api.get<{ classes: ClassCardDTO[] }>('/classes');
-    setClasses(list);
-    setClassId((prev) => prev || list[0]?.id || '');
-    const perClass = await Promise.all(
-      list.map((c) => api.get<{ tags: TagDTO[] }>(`/classes/${c.id}/tags`)),
-    );
-    setTags(perClass.flatMap((r) => r.tags));
+    setLoadError(false);
+    try {
+      const { classes: list } = await api.get<{ classes: ClassCardDTO[] }>('/classes');
+      setClasses(list);
+      setClassId((prev) => prev || list[0]?.id || '');
+      const perClass = await Promise.all(
+        list.map((c) => api.get<{ tags: TagDTO[] }>(`/classes/${c.id}/tags`)),
+      );
+      setTags(perClass.flatMap((r) => r.tags));
+    } catch {
+      setLoadError(true);
+    }
   }, []);
   useEffect(() => {
     void load();
@@ -94,19 +102,29 @@ export default function TagsPage() {
   const create = async () => {
     if (!label.trim() || !classId) return;
     setBusy(true);
+    setActionError(null);
     try {
       await api.post<TagDTO>(`/classes/${classId}/tags`, { label: label.trim() });
       setLabel('');
       setCreateOpen(false);
       await load();
+    } catch {
+      setActionError('Couldn’t create the tag. Please try again.');
     } finally {
       setBusy(false);
     }
   };
 
   const setActive = async (tag: TagDTO, active: boolean) => {
-    const updated = await api.patch<TagDTO>(`/tags/${tag.id}`, { active });
-    setTags((prev) => prev?.map((t) => (t.id === tag.id ? updated : t)) ?? null);
+    setActionError(null);
+    try {
+      // Only update local state from the server response — on failure the toggle stays
+      // at its true (unchanged) value, so a tag never looks deactivated while still live.
+      const updated = await api.patch<TagDTO>(`/tags/${tag.id}`, { active });
+      setTags((prev) => prev?.map((t) => (t.id === tag.id ? updated : t)) ?? null);
+    } catch {
+      setActionError('Couldn’t update the tag. Please try again.');
+    }
   };
 
   const onToggle = (tag: TagDTO, next: boolean) => {
@@ -141,7 +159,11 @@ export default function TagsPage() {
       </div>
 
       {tags === null ? (
-        <div className="text-ink-tertiary">Loading…</div>
+        loadError ? (
+          <LoadError what="desk tags" onRetry={() => void load()} />
+        ) : (
+          <div className="text-ink-tertiary">Loading…</div>
+        )
       ) : tags.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-[60px] text-center">
           <svg viewBox="0 0 20 20" fill="none" className="h-14 w-14">
@@ -283,6 +305,8 @@ export default function TagsPage() {
           </div>
         </div>
       ) : null}
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }

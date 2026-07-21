@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/bali/Button';
-import { FilterChip } from '@/components/bali/bits';
+import { ErrorToast, FilterChip, LoadError } from '@/components/bali/bits';
 import { ICON_STROKE } from '@/components/bali/icons';
 import { api, API_URL, getToken } from '@/lib/api';
 import type { ClassCardDTO } from '@/lib/types';
@@ -67,31 +67,45 @@ export default function ReportsPage() {
   const [range, setRange] = useState<Range>('month');
   const [unlocks, setUnlocks] = useState<UnlocksReport | null>(null);
   const [focus, setFocus] = useState<FocusReport | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    void api.get<{ classes: ClassCardDTO[] }>('/classes').then((r) => setClasses(r.classes));
+    void api.get<{ classes: ClassCardDTO[] }>('/classes').then((r) => setClasses(r.classes)).catch(() => {});
   }, []);
 
   const query = `?range=${range}${classId ? `&classId=${classId}` : ''}`;
-  useEffect(() => {
+  const loadReports = useCallback(() => {
     setUnlocks(null);
     setFocus(null);
-    void api.get<UnlocksReport>(`/reports/unlocks${query}`).then(setUnlocks);
-    void api.get<FocusReport>(`/reports/focus-minutes${query}`).then(setFocus);
+    setLoadError(false);
+    void api.get<UnlocksReport>(`/reports/unlocks${query}`).then(setUnlocks).catch(() => setLoadError(true));
+    void api.get<FocusReport>(`/reports/focus-minutes${query}`).then(setFocus).catch(() => setLoadError(true));
   }, [query]);
+  useEffect(loadReports, [loadReports]);
 
   const exportCsv = useCallback(async () => {
-    const token = await getToken();
-    const res = await fetch(`${API_URL}/reports/unlocks${query}&format=csv`, {
-      headers: token ? { authorization: `Bearer ${token}` } : {},
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bali-unlocks-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setExporting(true);
+    setActionError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/reports/unlocks${query}&format=csv`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bali-unlocks-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setActionError('Couldn’t export the CSV. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   }, [query]);
 
   const rangeLabel = range === 'month' ? 'this month' : 'this week';
@@ -108,7 +122,7 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="ml-auto">
-          <Button variant="secondary" onClick={() => void exportCsv()}>
+          <Button variant="secondary" loading={exporting} disabled={exporting} onClick={() => void exportCsv()}>
             <Download size={16} strokeWidth={ICON_STROKE} />
             Export CSV
           </Button>
@@ -139,7 +153,11 @@ export default function ReportsPage() {
             Emergency unlocks{unlocks ? ` · ${unlocks.count} ${rangeLabel}` : ''}
           </div>
           {unlocks === null ? (
-            <div className="text-ink-tertiary">Loading…</div>
+            loadError ? (
+              <LoadError what="reports" onRetry={loadReports} />
+            ) : (
+              <div className="text-ink-tertiary">Loading…</div>
+            )
           ) : unlocks.rows.length === 0 ? (
             <div className="rounded-md border border-line bg-surface-card p-6 text-[14px] leading-5 text-ink-secondary">
               No emergency unlocks {rangeLabel} — nothing here is a problem to solve.
@@ -188,7 +206,16 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-md border border-line bg-surface-card p-5">
             {focus === null ? (
-              <div className="text-ink-tertiary">Loading…</div>
+              loadError ? (
+                <div className="text-[13.5px] leading-[19px] text-ink-secondary">
+                  Couldn’t load.{' '}
+                  <button type="button" onClick={loadReports} className="font-semibold text-ink-brand hover:underline">
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <div className="text-ink-tertiary">Loading…</div>
+              )
             ) : focus.rows.length === 0 ? (
               <div className="text-[14px] leading-5 text-ink-secondary">
                 No ended sessions {rangeLabel} yet — averages appear after the first bell.
@@ -220,6 +247,8 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {actionError ? <ErrorToast message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </div>
   );
 }
