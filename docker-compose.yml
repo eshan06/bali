@@ -75,8 +75,22 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # NEXT_PUBLIC_* are inlined at BUILD time — every one the client needs must be
+      # passed here, or it bakes in empty and silently breaks (e.g. empty Cognito = a
+      # portal where no teacher can sign in). The build also refuses when the Cognito
+      # pair is empty in production (apps/web/src/lib/env.ts), so this can't ship blind.
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/v1}
+        NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-}
+        NEXT_PUBLIC_COGNITO_CLIENT_ID: ${NEXT_PUBLIC_COGNITO_CLIENT_ID:-}
+        NEXT_PUBLIC_COGNITO_DOMAIN: ${NEXT_PUBLIC_COGNITO_DOMAIN:-}
+        NEXT_PUBLIC_REDIRECT_URI: ${NEXT_PUBLIC_REDIRECT_URI:-}
+        # Optional (code has fallbacks): site canonical/OG, app-store link, lead/contact emails.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_APP_STORE_URL: ${NEXT_PUBLIC_APP_STORE_URL:-}
+        NEXT_PUBLIC_DEMO_EMAIL: ${NEXT_PUBLIC_DEMO_EMAIL:-}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${NEXT_PUBLIC_CONTACT_EMAIL:-}
+        NEXT_PUBLIC_PRIVACY_EMAIL: ${NEXT_PUBLIC_PRIVACY_EMAIL:-}
     environment:
       PORT: '3000'
     ports:
