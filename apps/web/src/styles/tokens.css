@@ -95,7 +95,9 @@
   /* Text */
   --text-primary:    #211F1B;
   --text-secondary:  #5B564E;
-  --text-tertiary:   var(--stone-500);
+  /* stone-600 (≈5.9:1 on white / ≈4.9:1 on sunken) — meets WCAG AA for the small
+     caption/label text that uses ink-tertiary. (stone-500 was 3.71:1, an AA failure.) */
+  --text-tertiary:   var(--stone-600);
   --text-disabled:   var(--stone-400);
   --text-on-brand:   #FFFFFF;
   --text-brand:      var(--green-700);

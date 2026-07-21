@@ -49,11 +49,26 @@ export const Button = forwardRef<
   );
 });
 
-export function Label({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Label({
+  children,
+  className,
+  htmlFor,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** Associate with an input's id for screen readers + click-to-focus. */
+  htmlFor?: string;
+}) {
   return (
-    <div className={clsx('text-[11.5px] font-semibold uppercase leading-[15px] tracking-[0.05em] text-ink-tertiary', className)}>
+    <label
+      htmlFor={htmlFor}
+      className={clsx(
+        'block text-[11.5px] font-semibold uppercase leading-[15px] tracking-[0.05em] text-ink-tertiary',
+        className,
+      )}
+    >
       {children}
-    </div>
+    </label>
   );
 }
 
