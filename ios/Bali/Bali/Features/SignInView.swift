@@ -109,7 +109,9 @@ struct SignInView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if DEBUG
         .sheet(isPresented: $showDev) { DevSignInSheet() }
+        #endif
     }
 }
 
