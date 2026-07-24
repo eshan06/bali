@@ -13,6 +13,10 @@ const REQUIRED_IN_PROD = [
   'NEXT_PUBLIC_COGNITO_USER_POOL_ID',
   'NEXT_PUBLIC_COGNITO_CLIENT_ID',
   'NEXT_PUBLIC_COGNITO_DOMAIN',
+  // Inlined into the Amplify OAuth config; its code fallback is http://localhost:3000/…,
+  // so a prod build that forgets it silently ships a localhost Google redirect that
+  // Cognito rejects — a portal where Google sign-in is quietly broken.
+  'NEXT_PUBLIC_REDIRECT_URI',
 ] as const;
 
 export function assertWebEnv(): void {
@@ -36,6 +40,12 @@ export function assertWebEnv(): void {
     } catch {
       problems.push(`NEXT_PUBLIC_API_URL must be an absolute http(s) URL (got "${apiUrl}").`);
     }
+  }
+  // A localhost redirect in prod means Google sign-in bounces to the developer's laptop
+  // (and Cognito rejects the unregistered callback). Catch it at build.
+  const redirect = process.env.NEXT_PUBLIC_REDIRECT_URI?.trim();
+  if (redirect && /localhost|127\.0\.0\.1/.test(redirect)) {
+    problems.push(`NEXT_PUBLIC_REDIRECT_URI points at localhost ("${redirect}") — set the production callback URL.`);
   }
   // The dev-token auth bypass must never be inlined into a production bundle.
   if (process.env.NEXT_PUBLIC_ALLOW_DEV_TOKENS === '1') {

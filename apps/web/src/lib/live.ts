@@ -22,6 +22,12 @@ export interface LiveState {
  *  "Live updates lost". ~3 × (3s retry + poll) ≈ 10–15s of sustained failure. */
 const LIVE_LOST_AFTER = 3;
 
+/** A half-open connection (laptop sleep, Wi-Fi handoff, proxy/LB idle cutoff) never
+ *  throws or ends the stream — reader.read() just blocks forever, so the grid freezes
+ *  while still looking live. The server pings every 15s; if no frame (ping or data)
+ *  arrives within this window, treat the transport as dead and reconnect/poll. */
+const STREAM_STALE_MS = 30_000;
+
 /**
  * SSE via fetch-streaming (EventSource can't carry Authorization), with automatic
  * 5s polling fallback on transport loss — the grid never goes blind, it goes honest.
@@ -110,6 +116,7 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
       while (!stopped) {
         const controller = new AbortController();
         abortRef.current = controller;
+        let staleTimer: ReturnType<typeof setInterval> | null = null;
         try {
           const token = await getToken();
           const res = await fetch(`${API_URL}/sessions/${sessionId}/stream`, {
@@ -121,12 +128,20 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
           failuresRef.current = 0;
           setLiveLost(false);
 
+          // Half-open detection: abort the reader if no frame arrives within the stale
+          // window (the server's 15s pings keep a healthy connection well inside it).
+          let lastFrameAt = Date.now();
+          staleTimer = setInterval(() => {
+            if (Date.now() - lastFrameAt > STREAM_STALE_MS) controller.abort();
+          }, 5_000);
+
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
           for (;;) {
             const { done, value } = await reader.read();
             if (done) break;
+            lastFrameAt = Date.now();
             buffer += decoder.decode(value, { stream: true });
             let idx: number;
             while ((idx = buffer.indexOf('\n\n')) >= 0) {
@@ -151,6 +166,8 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
           startPolling();
           refresh();
           await new Promise((r) => setTimeout(r, 3_000));
+        } finally {
+          if (staleTimer) clearInterval(staleTimer);
         }
       }
     };

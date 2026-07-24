@@ -36,6 +36,7 @@ jobs:
           NEXT_PUBLIC_COGNITO_USER_POOL_ID: us-east-1_test000000
           NEXT_PUBLIC_COGNITO_CLIENT_ID: testclient00000000
           NEXT_PUBLIC_COGNITO_DOMAIN: test.auth.us-east-1.amazoncognito.com
+          NEXT_PUBLIC_REDIRECT_URI: https://portal.example.com/auth/callback
 
   api-integration:
     name: API integration (Postgres)

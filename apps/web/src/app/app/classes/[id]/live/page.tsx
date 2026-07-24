@@ -89,7 +89,11 @@ export default function LivePage() {
     if (!lastEvent || seenEvents.current.has(lastEvent.id)) return;
     seenEvents.current.add(lastEvent.id);
     const ev = lastEvent;
-    const student = detail?.participants.find((p) => `${p.firstName} ${p.lastName}` === ev.studentName);
+    // Match by stable studentId (duplicate display names otherwise misdirect or silently
+    // drop the toast on a monitoring surface); fall back to name only if id is absent.
+    const student = detail?.participants.find((p) =>
+      ev.studentId ? p.studentId === ev.studentId : `${p.firstName} ${p.lastName}` === ev.studentName,
+    );
     const at = hhmm(ev.at);
     if (ev.type === 'emergency_unlock' && student) {
       push({
@@ -361,11 +365,20 @@ function NoSessionState({
   onError: (title: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  // Today's bell. If it has already passed, fall back to a bounded default (a class
+  // period from now) instead of silently rolling to *tomorrow* — an after-bell start
+  // must not create a ~24h session that shields every phone until the next day.
+  const bellPassed = useMemo(() => {
+    const [h = 0, m = 0] = cls.endTime.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d <= new Date();
+  }, [cls.endTime]);
   const bellIso = useMemo(() => {
     const [h = 0, m = 0] = cls.endTime.split(':').map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    if (d <= new Date()) d.setDate(d.getDate() + 1);
+    if (d <= new Date()) return new Date(Date.now() + 50 * 60_000); // 50-min default period
     return d;
   }, [cls.endTime]);
 
@@ -407,8 +420,10 @@ function NoSessionState({
             <Label className="mb-1.5">Ends at</Label>
             <div className="flex items-center gap-2 rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5">
               <Bell size={15} strokeWidth={ICON_STROKE} className="text-ink-tertiary" />
-              <b className="tnum">{cls.endTime}</b>
-              <span className="text-[13px] text-ink-tertiary">next bell</span>
+              <b className="tnum">{bellPassed ? hhmm(bellIso.toISOString()) : cls.endTime}</b>
+              <span className="text-[13px] text-ink-tertiary">
+                {bellPassed ? 'today’s bell passed · +50 min' : 'next bell'}
+              </span>
               <ChevronDown size={14} strokeWidth={ICON_STROKE} className="ml-auto text-ink-tertiary" />
             </div>
           </div>

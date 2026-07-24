@@ -30,16 +30,33 @@ export async function getToken(): Promise<string | null> {
   return tokenProvider();
 }
 
+/** A hung (not refused) upstream must not spin a teacher action forever or stall an SSR
+ *  render of the public /p and /t pages. Abort after 15s (matches the iOS client). */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = await tokenProvider();
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers: {
-      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(0, 'timeout', 'The server took too long to respond. Please try again.');
+    }
+    throw new ApiError(0, 'network', 'Couldn’t reach the server. Check your connection and try again.');
+  }
+  clearTimeout(timer);
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok) {
     // A 401 means the token expired/was revoked mid-use — let the app re-auth centrally.
