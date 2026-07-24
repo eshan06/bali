@@ -170,6 +170,11 @@ export async function startSession(opts: {
   if (await findOpenSessionForClass(opts.classId))
     throw new HttpError(409, 'session_running', 'A session is already running for this class');
   if (opts.endsAt <= new Date()) throw new HttpError(400, 'ends_in_past', 'Session end must be in the future');
+  // Guard against a runaway shield: a focus session is a class period, never a whole day.
+  // Caps the blast radius of any client miscomputing the bell (e.g. rolling to tomorrow).
+  const MAX_SESSION_MS = 10 * 60 * 60 * 1000; // 10h — comfortably longer than any period
+  if (opts.endsAt.getTime() - Date.now() > MAX_SESSION_MS)
+    throw new HttpError(400, 'ends_too_far', 'A session can run at most 10 hours — pick an end time today.');
 
   const policyId = opts.policyId ?? cls.policyId;
   const policy = policyId
@@ -183,7 +188,9 @@ export async function startSession(opts: {
   const snapshot = { name: policy?.name ?? 'Focus', messagesAllowed: true, allowedAppLabels: [] as string[] };
 
   const events: EventRow[] = [];
-  const sessionId = await db.transaction(async (tx) => {
+  let sessionId: string;
+  try {
+    sessionId = await db.transaction(async (tx) => {
     const [session] = await tx
       .insert(s.sessions)
       .values({
@@ -234,6 +241,13 @@ export async function startSession(opts: {
     );
     return session.id;
   });
+  } catch (err) {
+    // Lost the race with a concurrent start (partial unique index on the open session):
+    // surface the same 409 the check-then-insert path returns, not a raw 500.
+    if ((err as { code?: string })?.code === '23505')
+      throw new HttpError(409, 'session_running', 'A session is already running for this class');
+    throw err;
+  }
 
   publishEvents(sessionId, events);
   return getSessionDetail(sessionId);
