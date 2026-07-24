@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { and, asc, count, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getTableColumns, isNotNull, isNull } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
 import {
   createClassBodySchema,
@@ -508,11 +508,16 @@ export function teacherRoutes(app: FastifyInstance): void {
         .innerJoin(s.classes, eq(s.memberships.classId, s.classes.id))
         .where(and(eq(s.classes.teacherId, teacher.id), eq(s.memberships.status, 'pending')))
         .orderBy(desc(s.memberships.joinedAt)),
-      db.query.events.findMany({
-        where: eq(s.events.schoolId, teacher.schoolId),
-        orderBy: desc(s.events.at),
-        limit: 3,
-      }),
+      // Recent activity is THIS teacher's own classes only — never the whole school.
+      // Self-service teachers all share DEFAULT_SCHOOL_ID, so a school-scoped feed would
+      // leak other teachers' students' names and emergency-unlock events into this feed.
+      db
+        .select(getTableColumns(s.events))
+        .from(s.events)
+        .innerJoin(s.classes, eq(s.events.classId, s.classes.id))
+        .where(eq(s.classes.teacherId, teacher.id))
+        .orderBy(desc(s.events.at))
+        .limit(3),
     ]);
 
     // Resolve each class's open session once (in parallel), then reuse it for the live-now
