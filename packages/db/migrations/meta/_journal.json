@@ -29,6 +29,13 @@
       "when": 1781507297477,
       "tag": "0003_worried_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784874740177,
+      "tag": "0004_prod_readiness_indexes",
+      "breakpoints": true
     }
   ]
 }

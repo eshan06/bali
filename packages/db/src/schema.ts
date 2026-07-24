@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigserial,
   boolean,
@@ -204,7 +205,16 @@ export const sessions = pgTable(
     endedAt: ts('ended_at'),
     endReason: sessionEndReasonEnum('end_reason'),
   },
-  (t) => [index('sessions_class_idx').on(t.classId), index('sessions_open_idx').on(t.classId, t.endedAt)],
+  (t) => [
+    index('sessions_class_idx').on(t.classId),
+    index('sessions_open_idx').on(t.classId, t.endedAt),
+    // At most one open (not-yet-ended) session per class. Enforces the invariant the
+    // whole domain assumes at the DB level so a double-start race can't create two live
+    // sessions; startSession maps the resulting 23505 to the 409 session_running.
+    uniqueIndex('sessions_one_open_per_class_uq')
+      .on(t.classId)
+      .where(sql`${t.endedAt} is null`),
+  ],
 );
 
 export const participations = pgTable(
@@ -227,6 +237,9 @@ export const participations = pgTable(
   (t) => [
     uniqueIndex('participations_session_student_uq').on(t.sessionId, t.studentId),
     index('participations_session_idx').on(t.sessionId),
+    // Student history (GET /v1/student/history) filters by student_id alone; without
+    // this it seq-scans a table that grows every session for every student.
+    index('participations_student_idx').on(t.studentId),
   ],
 );
 
@@ -311,7 +324,10 @@ export const parentLinks = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     membershipId: uuid('membership_id')
       .notNull()
-      .references(() => memberships.id),
+      // Cascade: removing a membership (teacher remove, decline, or student leave) drops
+      // its parent links. Without this the NO-ACTION FK raised 23503 and permanently
+      // blocked ever removing a student once a parent link had been minted.
+      .references(() => memberships.id, { onDelete: 'cascade' }),
     /** SHA-256 hex of the URL token. The plaintext is shown to the teacher once, never stored. */
     tokenHash: text('token_hash').notNull(),
     createdByTeacherId: uuid('created_by_teacher_id')
