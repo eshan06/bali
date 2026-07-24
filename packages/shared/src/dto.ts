@@ -200,6 +200,9 @@ export interface EventDTO {
   at: string;
   classId: string | null;
   sessionId: string | null;
+  /** Stable id for matching an event to a participant — prefer this over name-matching
+   *  (duplicate display names otherwise misdirect or drop a toast). */
+  studentId: string | null;
   studentName: string | null;
   className: string | null;
   /** Human line + optional subline, server-rendered so all timelines match. */

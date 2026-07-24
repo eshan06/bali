@@ -195,6 +195,7 @@ export function renderEvent(row: EventRow): EventDTO {
     at: row.at.toISOString(),
     classId: row.classId,
     sessionId: row.sessionId,
+    studentId: row.studentId,
     studentName,
     className,
     title,
