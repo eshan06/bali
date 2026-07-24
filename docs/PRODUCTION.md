@@ -5,6 +5,42 @@ what's left. Written 2026-06-14. The architecture is sound — zod validation, p
 Drizzle queries, policy snapshots, SSE-with-poll-fallback, a lazy-bell sweeper. The gaps are
 operational and were closed or triaged below.
 
+## Full-stack readiness pass (2026-07-23) — 8-dimension audit + fixes
+
+A follow-up audit swept API auth/correctness, the DB layer, web, both iOS apps, deploy/CI,
+and secrets/privacy, adversarially verifying each finding against the code. Auth (Cognito JWT
+verify, IDOR guards, student self-scoping), the offline-first emergency-unlock engine, the
+dead-app DeviceActivity watchdog, app-group/entitlement wiring, and secrets hygiene all held
+up. The undocumented bugs it surfaced were fixed this pass (typecheck + shared 12/12 + API
+integration 12/12 + web build + both iOS Release builds all green):
+
+- **iOS Release build blocker** — `SignInView` referenced the DEBUG-only `DevSignInSheet`
+  outside `#if DEBUG`; every archive would have failed. Guarded.
+- **`parent_links` FK** now `ON DELETE cascade` (migration 0004). Was NO-ACTION, so once a
+  teacher minted a parent link the student could never be removed *or* leave (FK 23503 → 500).
+- **One open session per class** is now a partial unique index (`sessions_one_open_per_class_uq`,
+  migration 0004); `startSession` maps the 23505 to the existing 409 — a double-start race can
+  no longer create two live sessions.
+- **Runaway-shield cap** — `startSession` rejects an end time >10h out, and the portal no longer
+  rolls an after-bell start to *tomorrow* (was a silent ~24h session shielding every phone).
+- **Cross-teacher privacy leak** — the portal "recent activity" feed was school-scoped; since
+  self-service teachers share `DEFAULT_SCHOOL_ID` it leaked other teachers' students' names and
+  emergency events. Now scoped to the teacher's own classes.
+- **Half-open SSE** — the live grid now aborts a stalled stream after 30s of no ping and falls
+  back to polling; previously a silently-dropped connection froze the grid while it looked live.
+- **Web fetch timeout** (15s, matching iOS) — a hung upstream no longer spins actions forever or
+  stalls `/p` and `/t` SSR renders.
+- **Emergency/revoked toasts** now match the student by id, not display name (duplicate names
+  previously misdirected — or silently dropped — a safety toast).
+- **`NEXT_PUBLIC_REDIRECT_URI`** is now required by the prod build guard and rejected if it
+  points at localhost (its code fallback was `http://localhost:3000/…` → broken Google sign-in).
+- **`participations(student_id)` index** (migration 0004) — student history no longer seq-scans.
+- **`TZ`** documented + wired into compose (see the env table) — fixes server-local bell times.
+
+Still owner-decisions (unchanged, see "Decisions for you"): the prod API host (`api.bali.app`
+TODO in iOS `APIConfig`), RDS TLS CA verification, single-instance vs horizontal scale, and
+disabling seed-adoption for a clean prod tenant.
+
 ## Go-live web hardening (2026-06-16) — driven by a multi-perspective audit
 
 A multi-agent audit (4 principal-engineer lenses + teacher/parent/admin/product personas, each
@@ -112,8 +148,9 @@ These came out of an adversarial audit; all are low-risk and decision-free. Roug
   manager (SSM/Secrets Manager), never a file.
 - **RDS TLS.** `packages/db/src/client.ts` uses `rejectUnauthorized: false` (AWS cert not in the
   local trust store). Bundle the RDS CA and verify for a hardened posture.
-- **CSP on web** (`next.config.ts` has no headers) — add a Content-Security-Policy that allows
-  Amplify + the SSE `connect-src`. Needs a careful allow-list, hence a decision.
+- ~~**CSP on web**~~ — done (2026-06-16): `next.config.ts` ships a prod CSP allowing the API
+  origin + SSE + Cognito, plus HSTS, `frame-ancestors 'none'`, `object-src 'none'`, and
+  `no-referrer` on `/p` & `/t`.
 - **Seed adoption in prod.** Bootstrap adopts a `seed-%` teacher row by email match (one-time, and
   Cognito email uniqueness gates it). Safe for the demo; for a clean prod tenant, don't ship seed
   rows / disable adoption.
@@ -141,6 +178,7 @@ These came out of an adversarial audit; all are low-risk and decision-free. Roug
 | `CORS_ORIGIN` | no | `localhost:3000` | comma-separated list |
 | `NODE_ENV` | no | development | `production` hardens logging/HSTS + blocks dev tokens |
 | `SWEEP_INTERVAL_MS` | no | 15000 | bell/pass sweeper |
+| `TZ` | no | UTC | **Set to the school's IANA zone** (e.g. `America/Los_Angeles`). Class bell/schedule times are wall-clock and rendered server-local; a UTC container shows wrong bells. Single-tenant v1 assumes one zone per deployment. |
 | `ALLOW_DEV_TOKENS` | no | unset | `1` enables `Bearer dev:…`; forbidden in production |
 
 Integration tests additionally read `TEST_DATABASE_URL` (throwaway Postgres only).
