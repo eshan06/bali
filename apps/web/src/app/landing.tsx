@@ -691,7 +691,7 @@ export function Landing() {
               <ul>
                 <li>
                   <Smartphone strokeWidth={ICON_STROKE} style={{ color: 'var(--green-600)' }} />
-                  Apple Screen Time does the shielding, on the phone
+                  Apple Screen Time does the shielding
                 </li>
                 <li>
                   <Smartphone strokeWidth={ICON_STROKE} style={{ color: 'var(--green-600)' }} />
