@@ -539,8 +539,9 @@ export function Demo() {
               </Link>
             </div>
             <div className="demo-outro-fine">
-              Teachers see focus status, tap-in and tap-out times, and unlock times — never screens,
-              app lists, messages, browsing or location.
+              Shielding happens on the phone, through Apple Screen Time. Teachers see focus status,
+              tap-in and tap-out times, and unlock times — never screens, app lists, messages,
+              browsing or location, because iOS never hands those to us.
             </div>
           </div>
         </div>

@@ -876,3 +876,16 @@
     transition: none;
   }
 }
+
+/* On-device note under the privacy contract — the mechanism, not just the promise. */
+.landing .contract-note {
+  margin: 22px auto 0;
+  max-width: 68ch;
+  text-align: center;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+.landing .contract-note strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}

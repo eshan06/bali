@@ -381,9 +381,6 @@ export function Landing() {
           <a className="navlink" href="#privacy">
             Privacy
           </a>
-          <Link className="navlink" href="/login">
-            Sign in
-          </Link>
           <a className="btn btn--primary" href="#demo" style={{ padding: '9px 18px', fontSize: 14 }}>
             Book a demo
           </a>
@@ -693,6 +690,12 @@ export function Landing() {
               </ul>
             </div>
           </div>
+          <p className="contract-note rise">
+            The shielding itself happens <strong>on the phone</strong>, through Apple Screen Time.
+            Bali never receives screens, app lists, messages, browsing or location — iOS never hands
+            them over, so there is nothing on our side to leak. What reaches us is focus status and
+            timestamps, and that is all the live grid is made of.
+          </p>
           <div className="rise" style={{ marginTop: 24, textAlign: 'center' }}>
             <Link className="navlink" href="/privacy" style={{ fontWeight: 600 }}>
               Read the full privacy policy →
@@ -712,10 +715,7 @@ export function Landing() {
             </p>
             <DemoForm />
             <div className="fine">
-              Free for your first class · No student accounts, no credit card ·{' '}
-              <Link href="/login" className="cta-signin">
-                Already approved? Sign in
-              </Link>
+              Free for your first class · No student accounts, no credit card
             </div>
           </div>
         </div>
