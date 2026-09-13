@@ -185,9 +185,14 @@
   position: absolute;
   inset: 0;
   display: flex;
+  /* Device then badge, as a column. padding-top exactly equals the badge plus
+     its gap (30 + 16), which cancels their weight and leaves the PHONE — not
+     the phone-plus-badge group — centred in the stage. */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 26px;
+  gap: 16px;
+  padding-top: 46px;
   opacity: 0;
   visibility: hidden;
   transform: scale(0.975);
@@ -222,20 +227,7 @@
   pointer-events: none;
 }
 
-.demo-stage-caption {
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font: var(--type-caption);
-  color: var(--text-tertiary);
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  padding: 5px 13px;
-  box-shadow: var(--shadow-1);
-}
+
 
 /* ============================================================
    Device frames
@@ -1306,9 +1298,6 @@
     opacity: 1;
     transform: none;
   }
-  .demo-stage-caption {
-    display: none;
-  }
   .demo-outro-card {
     padding: 40px 24px;
   }
@@ -2183,14 +2172,6 @@
 }
 .demo-surface.is-dark b {
   color: #f1efeb;
-}
-
-/* The pinned stage's pill is now just a positioned wrapper. */
-.demo-stage-caption {
-  background: none;
-  border: 0;
-  padding: 0;
-  box-shadow: none;
 }
 
 .demo-legend {

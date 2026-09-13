@@ -42,11 +42,11 @@ function useStageScale() {
       const vh = window.innerHeight || 800;
       const vw = window.innerWidth || 1200;
       setScale({
-        // Budget: 64px nav + 88px of slack. The slack splits evenly above and below
-        // the centred phone, and the bottom half has to clear the caption pill
-        // (.demo-stage-caption, 30px tall at bottom: 2px) — at 40px of slack the
-        // bezel sat 12px on top of it on every viewport under ~854px tall.
-        pinned: Math.max(0.55, Math.min(0.86, (vh - 64 - 88) / 844)),
+        // Budget: 64px nav + 132px. 46 of that is the surface badge and its 16px
+        // gap, which now sit in flow under the phone; the remaining 86 splits
+        // evenly above and below, so the phone stays optically centred and the
+        // badge keeps ~20px clear of the bottom of the viewport.
+        pinned: Math.max(0.45, Math.min(0.86, (vh - 64 - 132) / 844)),
         inline: Math.max(0.5, Math.min(0.74, (vw - 56) / 390)),
       });
     };
@@ -394,11 +394,9 @@ export function Demo() {
               {SCENES.map((sc, i) => (
                 <div key={sc.key} className={clsx('demo-stage-layer', active === i && 'is-on')}>
                   {sc.device(scale.pinned)}
+                  <SurfaceBadge surface={sc.surface} detail={sc.ref} />
                 </div>
               ))}
-              <span className="demo-stage-caption">
-                <SurfaceBadge surface={SCENES[active]?.surface ?? 'student'} detail={SCENES[active]?.ref} />
-              </span>
             </div>
           </div>
 
