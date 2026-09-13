@@ -55,24 +55,6 @@
   font: var(--type-body-lg);
   color: var(--text-secondary);
 }
-.demo-intro-meta {
-  margin-top: 26px;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  font: var(--type-caption);
-  color: var(--text-tertiary);
-}
-.demo-intro-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  padding: 6px 13px;
-}
 
 /* ---------- the pinned track ---------- */
 
@@ -2215,7 +2197,7 @@
 }
 
 .demo-legend {
-  margin-top: 18px;
+  margin-top: 30px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CircleCheck, EyeOff, Maximize2, Monitor, Nfc, ShieldCheck, Smartphone, Zap } from 'lucide-react';
+import { Bell, CircleCheck, EyeOff, Maximize2, Monitor, Nfc, ShieldCheck, Smartphone } from 'lucide-react';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { ToastCard } from '@/components/bali/Toaster';
 import { ICON_STROKE } from '@/components/bali/icons';
@@ -375,21 +375,6 @@ export function Demo() {
             dashboard, rebuilt here from the same design tokens and the same copy that ships. Scroll
             to move through a single 50-minute period.
           </p>
-          <div className="demo-intro-meta">
-            <span>
-              <ShieldCheck size={14} strokeWidth={ICON_STROKE} />
-              Built on Apple Screen Time
-            </span>
-            <span>
-              <Zap size={14} strokeWidth={ICON_STROKE} />
-              The emergency exit below actually works
-            </span>
-            <span>
-              <EyeOff size={14} strokeWidth={ICON_STROKE} />
-              No real students, rosters or schools
-            </span>
-          </div>
-
           {/* Three surfaces, named once up front — every screen below is badged. */}
           <div className="demo-legend">
             <span className="demo-legend-lead">Three surfaces:</span>
