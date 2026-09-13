@@ -348,6 +348,11 @@ export function Demo() {
             Bali
           </Link>
           <span style={{ flex: 1 }} />
+          {/* Not `demo-nav-hideable` — the way back out is the one link that has
+              to survive the narrow bar. */}
+          <Link className="demo-navlink" href="/">
+            Home
+          </Link>
           <Link className="demo-navlink demo-nav-hideable" href="/privacy">
             Privacy
           </Link>
