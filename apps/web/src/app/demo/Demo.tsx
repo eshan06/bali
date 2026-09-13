@@ -356,6 +356,9 @@ export function Demo() {
           <Link className="demo-navlink demo-nav-hideable" href="/privacy">
             Privacy
           </Link>
+          <Link className="demo-navlink" href="/contact">
+            Contact
+          </Link>
           <Link className="demo-nav-cta" href="/#demo">
             Book a demo
           </Link>

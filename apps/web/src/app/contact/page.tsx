@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
 import { LegalLayout } from '@/components/legal/LegalLayout';
+import { FORM_EMAIL } from '@/lib/forms';
 import { ContactForm } from './ContactForm';
 
 export const metadata: Metadata = {
   title: 'Contact',
   description: 'Reach the Bali team — demos, support, and privacy requests.',
 };
-
-const CONTACT = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'hello@trybali.com';
-const PRIVACY = process.env.NEXT_PUBLIC_PRIVACY_EMAIL ?? 'privacy@trybali.com';
 
 export default function ContactPage() {
   return (
@@ -18,7 +16,7 @@ export default function ContactPage() {
         to you.
       </p>
 
-      <ContactForm contactEmail={CONTACT} privacyEmail={PRIVACY} />
+      <ContactForm contactEmail={FORM_EMAIL} privacyEmail={FORM_EMAIL} />
     </LegalLayout>
   );
 }

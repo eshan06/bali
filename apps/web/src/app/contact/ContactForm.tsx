@@ -2,9 +2,10 @@
 
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, FieldError, Input, Label, Segmented } from '@/components/bali/Button';
 import { ICON_STROKE } from '@/components/bali/icons';
+import { MAX_SUBMISSIONS, recordSubmission, submissionCount } from '@/lib/forms';
 
 /** Contact form.
  *
@@ -46,6 +47,11 @@ export function ContactForm({ contactEmail, privacyEmail }: { contactEmail: stri
   const [f, setF] = useState<Fields>({ name: '', email: '', school: '', message: '' });
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
   const [sent, setSent] = useState(false);
+  // localStorage is not available while rendering on the server, so the count
+  // is read after mount; the form renders normally until then.
+  const [used, setUsed] = useState(0);
+  useEffect(() => setUsed(submissionCount('contact')), []);
+  const capped = used >= MAX_SUBMISSIONS;
 
   const to = topic === 'privacy' ? privacyEmail : contactEmail;
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -77,8 +83,25 @@ export function ContactForm({ contactEmail, privacyEmail }: { contactEmail: stri
     setErrors(next);
     if (Object.keys(next).length) return;
     deliver();
+    setUsed(recordSubmission('contact'));
     setSent(true);
   };
+
+  if (capped && !sent) {
+    return (
+      <div
+        role="status"
+        className="rounded-md border border-line bg-surface-card p-4 text-[15px] leading-[22px] text-ink-secondary"
+      >
+        You&apos;ve sent {MAX_SUBMISSIONS} messages from this browser. If we haven&apos;t replied
+        yet, write to{' '}
+        <a className="font-semibold text-ink-brand underline underline-offset-2" href={`mailto:${to}`}>
+          {to}
+        </a>{' '}
+        directly and we&apos;ll pick it up there.
+      </div>
+    );
+  }
 
   if (sent) {
     return (

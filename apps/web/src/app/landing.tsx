@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { ArcMark } from '@/components/bali/ArcMark';
+import { FORM_EMAIL, MAX_SUBMISSIONS, recordSubmission, submissionCount } from '@/lib/forms';
 import { ICON_STROKE } from '@/components/bali/icons';
 import '@/styles/landing.css';
 
@@ -200,11 +201,14 @@ const KICKER_MARK = (
 
 /** Demo-request capture. No leads backend yet, so this composes a prefilled email to
  *  the sales inbox (honest + functional) and confirms inline — not a dead anchor. */
-const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'hello@trybali.com';
+const DEMO_EMAIL = FORM_EMAIL;
 
 function DemoForm() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  // Read after mount — localStorage does not exist while rendering on the server.
+  const [used, setUsed] = useState(0);
+  useEffect(() => setUsed(submissionCount('demo')), []);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,8 +218,21 @@ function DemoForm() {
       `Hi Bali team,\n\nI'd like a demo for my classroom.\n\nSchool email: ${email}\n`,
     );
     window.location.href = `mailto:${DEMO_EMAIL}?subject=${subject}&body=${body}`;
+    setUsed(recordSubmission('demo'));
     setSent(true);
   };
+
+  if (used >= MAX_SUBMISSIONS && !sent) {
+    return (
+      <div className="demoform-sent" role="status">
+        <Check size={18} strokeWidth={ICON_STROKE} />
+        <span>
+          You&rsquo;ve requested a demo {MAX_SUBMISSIONS} times from this browser. If we
+          haven&rsquo;t replied, write to <a href={`mailto:${DEMO_EMAIL}`}>{DEMO_EMAIL}</a>.
+        </span>
+      </div>
+    );
+  }
 
   if (sent) {
     return (
@@ -372,6 +389,9 @@ export function Landing() {
           <span style={{ flex: 1 }} />
           <Link className="navlink" href="/demo">
             Walkthrough
+          </Link>
+          <Link className="navlink" href="/contact">
+            Contact
           </Link>
           <a className="navlink" href="#privacy">
             Privacy
