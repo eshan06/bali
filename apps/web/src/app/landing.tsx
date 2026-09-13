@@ -372,6 +372,9 @@ export function Landing() {
           <a className="navlink" href="#how">
             How it works
           </a>
+          <Link className="navlink" href="/demo">
+            Walkthrough
+          </Link>
           <a className="navlink" href="#trust">
             The exit
           </a>
@@ -414,9 +417,9 @@ export function Landing() {
               <a className="btn btn--primary btn--big" href="#demo">
                 Book a demo
               </a>
-              <a className="btn btn--ghost btn--big" href="#how">
-                See how it works
-              </a>
+              <Link className="btn btn--ghost btn--big" href="/demo">
+                See the walkthrough
+              </Link>
             </div>
             <div className="trustline rise" style={{ transitionDelay: '320ms' }}>
               <ShieldCheck size={15} strokeWidth={ICON_STROKE} />
@@ -578,9 +581,9 @@ export function Landing() {
               the room and on a washed-out projector.
             </p>
             <div style={{ marginTop: 28 }}>
-              <a className="btn btn--ghost" href="#demo">
-                See the dashboard in a demo
-              </a>
+              <Link className="btn btn--ghost" href="/demo">
+                See the live grid in the walkthrough
+              </Link>
             </div>
           </div>
           <div className="glance rise" style={{ transitionDelay: '120ms' }}>
@@ -731,6 +734,7 @@ export function Landing() {
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/contact">Contact</Link>
+            <Link href="/demo">Walkthrough</Link>
             <a href="#how">How it works</a>
           </div>
         </div>
