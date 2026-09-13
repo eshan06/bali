@@ -464,7 +464,7 @@ export function Demo() {
       </section>
 
       {/* ---------------- the recap ---------------- */}
-      <section className="demo-closing">
+      <section className="demo-closing demo-closing--pair">
         <div className="wrap">
           <div className="demo-closing-grid">
             <div className="demo-closing-copy">

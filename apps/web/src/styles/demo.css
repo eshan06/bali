@@ -2128,9 +2128,6 @@
   .demo-closing--flip .demo-closing-copy {
     grid-row: 1;
   }
-  .demo-closing-stage--pair {
-    flex-wrap: wrap;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2221,19 +2218,37 @@
   align-items: center;
   gap: 16px;
 }
+/* Two phones on one row with the badge spanning underneath. Explicitly a grid:
+   as a wrapping flexbox the phones (2 x 218 + gap = 456) broke onto separate
+   lines the moment the column was narrower than that. */
+.demo-closing--pair .demo-closing-grid {
+  grid-template-columns: 1fr 520px;
+}
 .demo-closing-stage--pair {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: start;
+  gap: 20px;
 }
 .demo-closing-stage--pair .demo-surface {
-  flex-basis: 100%;
-  justify-content: center;
+  grid-column: 1 / -1;
+  justify-self: center;
   margin-top: 4px;
 }
 
 @media (max-width: 900px) {
   .demo-legend {
     justify-content: flex-start;
+  }
+  /* Must live after the 520px base rule above, or it never wins — two 218px
+     phones in a 390px viewport put the second one 278px off-screen, invisible
+     only because .demo clips overflow-x. */
+  .demo-closing--pair .demo-closing-grid {
+    grid-template-columns: 1fr;
+  }
+  .demo-closing-stage--pair {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 }
