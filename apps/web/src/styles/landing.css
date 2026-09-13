@@ -639,16 +639,16 @@
 /* privacy */
 .landing .contract {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: 20px;
   overflow: hidden;
-  max-width: 880px;
+  max-width: 1080px;
 }
 .landing .contract > div {
-  padding: 34px 36px;
+  padding: 32px 30px;
 }
 .landing .contract > div + div {
   border-left: 1px solid var(--border-default);
@@ -875,17 +875,4 @@
   .landing .fc-unlock.is-springback .fill {
     transition: none;
   }
-}
-
-/* On-device note under the privacy contract — the mechanism, not just the promise. */
-.landing .contract-note {
-  margin: 22px auto 0;
-  max-width: 68ch;
-  text-align: center;
-  font: var(--type-body);
-  color: var(--text-secondary);
-}
-.landing .contract-note strong {
-  color: var(--text-primary);
-  font-weight: 600;
 }

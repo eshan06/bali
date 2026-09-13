@@ -18,6 +18,7 @@ import {
   NotebookPen,
   Phone,
   ShieldCheck,
+  Smartphone,
   Ticket,
   Zap,
 } from 'lucide-react';
@@ -683,13 +684,26 @@ export function Landing() {
                 </li>
               </ul>
             </div>
+            <div>
+              <div className="clabel" style={{ color: 'var(--green-700)' }}>
+                Because it&rsquo;s on-device
+              </div>
+              <ul>
+                <li>
+                  <Smartphone strokeWidth={ICON_STROKE} style={{ color: 'var(--green-600)' }} />
+                  Apple Screen Time does the shielding, on the phone
+                </li>
+                <li>
+                  <Smartphone strokeWidth={ICON_STROKE} style={{ color: 'var(--green-600)' }} />
+                  iOS never hands that data to us
+                </li>
+                <li>
+                  <Smartphone strokeWidth={ICON_STROKE} style={{ color: 'var(--green-600)' }} />
+                  Only focus status and times leave the phone
+                </li>
+              </ul>
+            </div>
           </div>
-          <p className="contract-note rise">
-            The shielding itself happens <strong>on the phone</strong>, through Apple Screen Time.
-            Bali never receives screens, app lists, messages, browsing or location — iOS never hands
-            them over, so there is nothing on our side to leak. What reaches us is focus status and
-            timestamps, and that is all the live grid is made of.
-          </p>
           <div className="rise" style={{ marginTop: 24, textAlign: 'center' }}>
             <Link className="navlink" href="/privacy" style={{ fontWeight: 600 }}>
               Read the full privacy policy →
