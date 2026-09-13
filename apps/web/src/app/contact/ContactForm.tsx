@@ -165,7 +165,7 @@ export function ContactForm({ contactEmail, privacyEmail }: { contactEmail: stri
         {errors.message ? <FieldError>{errors.message}</FieldError> : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-col items-start gap-3">
         <Button type="submit">Send message</Button>
         <span className="text-[13px] leading-[18px] text-ink-tertiary">
           Goes to {to}. We read everything.
