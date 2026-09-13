@@ -1,6 +1,7 @@
 'use client';
 
-import { Maximize2 } from 'lucide-react';
+import clsx from 'clsx';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { Arc } from '@/components/bali/Arc';
 import { StatusChip, SummaryStrip } from '@/components/bali/StatusChip';
 import { ToastCard } from '@/components/bali/Toaster';
@@ -15,38 +16,49 @@ export function DashboardLive({
   roster,
   seconds,
   toast = false,
+  projector = false,
 }: {
   roster: DemoStudent[];
   seconds: number;
   /** Show the emergency toast the teacher actually receives. */
   toast?: boolean;
+  /** `?projector=1` — bigger chips, four columns, and nothing is clickable. */
+  projector?: boolean;
 }) {
   const counts = countsFor(roster);
   const pct = Math.min(1, Math.max(0, seconds / DEMO.sessionTotalSeconds));
 
   return (
-    <div className="demo-dash">
+    <div className={clsx('demo-dash', projector && 'is-projector')}>
       <div className="demo-dash-inner">
         <div className="demo-dash-head">
-          <Arc size={44} stroke={5} pct={pct} />
+          <Arc size={projector ? 56 : 44} stroke={projector ? 6 : 5} pct={pct} />
           <div>
             <h3 className="demo-dash-title">{DEMO.className}</h3>
             <div className="demo-dash-sub">{DEMO.policyName} · Full focus</div>
           </div>
           <div className="demo-dash-clock">
             <div className="demo-dash-count tnum">{mmss(seconds)}</div>
-            <div className="demo-dash-ends">ends {DEMO.bellShort}</div>
+            <div className="demo-dash-ends">ends {DEMO.bell}</div>
           </div>
           <div className="demo-dash-actions">
-            <span className="demo-dash-btn">Extend</span>
-            <span className="demo-dash-btn demo-dash-btn--destructive">End session…</span>
-            <span className="demo-dash-btn demo-dash-btn--icon" aria-hidden="true">
-              <Maximize2 size={16} strokeWidth={ICON_STROKE} />
-            </span>
+            {projector ? (
+              <span className="demo-dash-btn demo-dash-btn--icon" aria-hidden="true">
+                <Minimize2 size={22} strokeWidth={ICON_STROKE} />
+              </span>
+            ) : (
+              <>
+                <span className="demo-dash-btn">Extend</span>
+                <span className="demo-dash-btn demo-dash-btn--destructive">End session…</span>
+                <span className="demo-dash-btn demo-dash-btn--icon" aria-hidden="true">
+                  <Maximize2 size={16} strokeWidth={ICON_STROKE} />
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <SummaryStrip counts={counts} />
+        <SummaryStrip counts={counts} size={projector ? 'grid' : 'mini'} />
 
         <div className="demo-dash-grid" role="list" aria-label={`Live status, ${roster.length} students`}>
           {roster.map((s) => (
@@ -54,7 +66,7 @@ export function DashboardLive({
               <StatusChip
                 state={s.state}
                 name={s.name}
-                size="grid"
+                size={projector ? 'proj' : 'grid'}
                 pulse={s.state === 'emergency_unlocked'}
               />
             </span>
@@ -62,7 +74,7 @@ export function DashboardLive({
         </div>
       </div>
 
-      {toast ? (
+      {toast && !projector ? (
         <div className="demo-dash-toast">
           <ToastCard
             toast={{

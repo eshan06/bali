@@ -12,11 +12,30 @@ export const DEMO = {
   policyName: 'Focus',
   bell: '10:45 AM',
   bellShort: '10:45',
-  joinCode: 'RIV-4K2',
+  /** Shipped join codes are [A-Z0-9]{8} — no hyphen (joinBodySchema). */
+  joinCode: 'R4K2QP7M',
   tagCode: 'T7XK2M9QPF',
+  date: 'Friday, September 13',
+  sessionStart: '9:55',
   /** Seconds remaining when the walkthrough opens — the arc reads 49:07. */
   sessionSeconds: 49 * 60 + 7,
   sessionTotalSeconds: 50 * 60,
+  /** The one student whose period doesn't go to plan. The grid uses shortName;
+   *  server-rendered events and the T3 header use the full name. */
+  student: { short: 'Jordan P.', full: 'Jordan Pierce', first: 'Jordan' },
+} as const;
+
+/** Counts derived from ROSTER below, stated once so no screen can disagree:
+ *  28 members → 2 never joined → 26 tapped in → 24 focused + 1 pass + 1 unlocked. */
+export const TALLY = {
+  members: 28,
+  tappedIn: 26,
+  neverJoined: 2,
+  stayedFocused: 24,
+  passes: 1,
+  emergencies: 1,
+  permissionOff: 0,
+  medianFocusMinutes: 47,
 } as const;
 
 export interface DemoStudent {

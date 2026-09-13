@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CircleCheck, EyeOff, Nfc, ShieldCheck, Zap } from 'lucide-react';
+import { Bell, CircleCheck, EyeOff, Maximize2, Nfc, ShieldCheck, Zap } from 'lucide-react';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { ToastCard } from '@/components/bali/Toaster';
 import { ICON_STROKE } from '@/components/bali/icons';
@@ -11,6 +11,9 @@ import { BrowserFrame } from '@/components/demo/BrowserFrame';
 import { IOSFrame } from '@/components/demo/IOSFrame';
 import { DEMO, ROSTER, rosterWithEmergency } from '@/components/demo/demoData';
 import { DashboardLive } from '@/components/demo/screens/DashboardLive';
+import { DashboardReports } from '@/components/demo/screens/DashboardReports';
+import { TeacherHome } from '@/components/demo/screens/TeacherHome';
+import { TeacherStudentSheet } from '@/components/demo/screens/TeacherStudentSheet';
 import { ShieldOverlay } from '@/components/demo/screens/ShieldOverlay';
 import { StudentFocusActive } from '@/components/demo/screens/StudentFocusActive';
 import { StudentTapIn } from '@/components/demo/screens/StudentTapIn';
@@ -154,6 +157,35 @@ export function Demo() {
   );
 
   const SCENES = [
+    {
+      key: 'hub',
+      label: 'The hub',
+      caption: 'Teacher app · T1',
+      title: 'Before the bell, it\u2019s a list',
+      device: (s: number) => (
+        <IOSFrame time="9:54" scale={s} label="Teacher iPhone — home">
+          <TeacherHome />
+        </IOSFrame>
+      ),
+      body: (
+        <>
+          <p>
+            The whole teacher app at 9:54: the date, today&rsquo;s periods in the order they
+            happen, and what changed since yesterday. Period 1 is finished and grey. Period 3 has a
+            Start next to it.
+          </p>
+          <p>
+            There is no setup hiding behind this screen — no per-class app list to curate, nothing
+            scheduled that can quietly go wrong. A policy in Bali is just a name.
+          </p>
+          <ul>
+            <Li>Approvals are a row, not an inbox</Li>
+            <Li>A class that is neither live nor due shows no buttons at all</Li>
+            <Li>Every line in the feed is an event, never a measurement</Li>
+          </ul>
+        </>
+      ),
+    },
     {
       key: 'start',
       label: 'Start',
@@ -394,13 +426,51 @@ export function Demo() {
       {/* ---------------- the live grid, full width ---------------- */}
       <LiveGridSection roster={roster} seconds={seconds} unlocked={unlocked} />
 
+      {/* ---------------- one student (T3) — device left, copy right, so it
+           doesn't read as a repeat of the closing two-column ---------------- */}
+      <section className="demo-closing demo-closing--flip">
+        <div className="wrap">
+          <div className="demo-closing-grid">
+            <div className="demo-closing-stage">
+              <IOSFrame
+                time="10:36"
+                scale={Math.min(scale.pinned, 0.78)}
+                label="Teacher iPhone — student detail"
+              >
+                <TeacherStudentSheet />
+              </IOSFrame>
+            </div>
+            <div className="demo-closing-copy">
+              <div className="demo-step-num">
+                <i>08</i> One student
+              </div>
+              <h2>Everything Bali knows about Jordan</h2>
+              <p>
+                This is what <strong>Open student</strong> opens. The session so far as a timeline,
+                and two things a teacher can actually do: give a student time out of the room, or
+                mark them without a device today.
+              </p>
+              <p>
+                The pass ends itself. Switch to <strong>Recent</strong> and there is no score —
+                five past sessions, one line each. Nothing here can be sorted, ranked or exported.
+              </p>
+              <ul>
+                <Li>The no-device switch is for one day, not a label that follows him</Li>
+                <Li>Timestamps and states are the only student-level detail that exists</Li>
+                <Li>The last line of the sheet is the privacy contract, on the screen</Li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ---------------- the recap ---------------- */}
       <section className="demo-closing">
         <div className="wrap">
           <div className="demo-closing-grid">
             <div className="demo-closing-copy">
               <div className="demo-step-num">
-                <i>07</i> The bell
+                <i>09</i> The bell
               </div>
               <h2>What&rsquo;s left behind</h2>
               <p>
@@ -408,23 +478,33 @@ export function Demo() {
                 emergency listed plainly, and a nudge — not a verdict.
               </p>
               <p>
-                No scoreboard, no ranking, no red. On a period where nothing happened, this screen
-                simply says <em>&ldquo;Smooth period.&rdquo;</em> and gets out of the way.
+                Two periods, two recaps. One had an unlock in it. The other didn&rsquo;t, and the
+                screen says so in two words and stops.
               </p>
               <Quote label="From the app">Patterns are conversation starters, not verdicts.</Quote>
             </div>
-            <div className="demo-closing-stage">
+            <div className="demo-closing-stage demo-closing-stage--pair">
               <IOSFrame
                 time="10:45"
-                scale={Math.min(scale.pinned, 0.78)}
-                label="Teacher iPhone — session recap"
+                scale={Math.min(scale.pinned, 0.56)}
+                label="Teacher iPhone — session recap with an emergency"
               >
                 <TeacherRecap variant="incident" />
+              </IOSFrame>
+              <IOSFrame
+                time="11:45"
+                scale={Math.min(scale.pinned, 0.56)}
+                label="Teacher iPhone — a clean session recap"
+              >
+                <TeacherRecap variant="clean" />
               </IOSFrame>
             </div>
           </div>
         </div>
       </section>
+
+      {/* ---------------- reports: the same period, six weeks out ---------------- */}
+      <ReportsSection />
 
       {/* ---------------- CTA ---------------- */}
       <section className="demo-outro">
@@ -486,6 +566,7 @@ function LiveGridSection({
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [panning, setPanning] = useState(false);
+  const [projector, setProjector] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -509,7 +590,7 @@ function LiveGridSection({
       <div className="wrap">
         <div className="demo-feature-head">
           <div className="demo-step-num">
-            <i>06</i> For teachers
+            <i>07</i> For teachers
           </div>
           <h2>&ldquo;Is anything wrong?&rdquo; — answered from six feet</h2>
           <p>
@@ -517,19 +598,57 @@ function LiveGridSection({
             is an icon plus a label, legible across the room and on a washed-out projector.
           </p>
         </div>
+        <div className="demo-switch" role="group" aria-label="Dashboard view">
+          <button
+            type="button"
+            className={clsx('demo-switch-btn', !projector && 'is-on')}
+            aria-pressed={!projector}
+            onClick={() => setProjector(false)}
+          >
+            On her laptop
+          </button>
+          <button
+            type="button"
+            className={clsx('demo-switch-btn', projector && 'is-on')}
+            aria-pressed={projector}
+            onClick={() => setProjector(true)}
+          >
+            On the board
+          </button>
+        </div>
+
         <div className={clsx('demo-feature-stage', panning && 'is-panning')} ref={ref}>
           <BrowserFrame
             scale={scale}
-            height={620}
-            label="Teacher dashboard — live grid"
-            url="app.trybali.com/app/classes/algebra-ii/live"
+            // Projector chips are 'proj' size; 28 of them need the extra room.
+            height={projector ? 664 : 620}
+            label={projector ? 'Teacher dashboard — projector mode' : 'Teacher dashboard — live grid'}
+            url={
+              projector
+                ? 'app.trybali.com/app/classes/algebra-ii/live?projector=1'
+                : 'app.trybali.com/app/classes/algebra-ii/live'
+            }
           >
-            <DashboardLive roster={roster} seconds={seconds} toast={unlocked} />
+            <DashboardLive
+              roster={roster}
+              seconds={seconds}
+              toast={unlocked}
+              projector={projector}
+            />
           </BrowserFrame>
         </div>
         {panning ? <p className="demo-feature-swipe">Swipe the dashboard to see the whole room →</p> : null}
         <p className="demo-feature-note">
-          {unlocked ? (
+          {projector ? (
+            <>
+              <Maximize2 size={14} strokeWidth={ICON_STROKE} />
+              <span>
+                Same grid thrown on the board: four columns, twice the type size, and nothing
+                clickable — projector mode can&rsquo;t open a student. The room sees exactly what
+                the teacher sees.
+              </span>
+            </>
+          ) : unlocked ? (
             <>
               <Bell size={14} strokeWidth={ICON_STROKE} />
               <span>
@@ -546,6 +665,61 @@ function LiveGridSection({
               </span>
             </>
           )}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ReportsSection() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [panning, setPanning] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const calc = () => {
+      const fit = el.offsetWidth / 1120;
+      const next = Math.min(1, Math.max(0.75, fit));
+      setScale(next);
+      setPanning(next > fit + 0.001);
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <section className="demo-feature demo-feature--reports">
+      <div className="wrap">
+        <div className="demo-feature-head">
+          <div className="demo-step-num">
+            <i>10</i> Weeks later
+          </div>
+          <h2>Still not a scoreboard</h2>
+          <p>
+            Jordan&rsquo;s 10:31 shows up once more, six weeks out: one row, one reason, six small
+            bars. Beside it, average focus minutes per class — averages, never students.
+          </p>
+        </div>
+        <div className={clsx('demo-feature-stage', panning && 'is-panning')} ref={ref}>
+          <BrowserFrame
+            scale={scale}
+            height={520}
+            label="Teacher dashboard — reports"
+            url="app.trybali.com/app/reports"
+          >
+            <DashboardReports />
+          </BrowserFrame>
+        </div>
+        <p className="demo-feature-note">
+          <EyeOff size={14} strokeWidth={ICON_STROKE} />
+          <span>
+            There is nothing to sort and nothing per-student to export. A month with no unlocks in
+            it says so, and leaves it there.
+          </span>
         </p>
       </div>
     </section>

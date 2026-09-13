@@ -1485,6 +1485,30 @@
   justify-content: center;
 }
 
+/* The bullet list styling lives on .demo-step; the two-column sections reuse the
+   same markup, so it has to reach them too. */
+.demo-closing-copy ul {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.demo-closing-copy li {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  max-width: 44ch;
+}
+.demo-closing-copy li svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--green-600);
+}
+
 /* The teacher's side of the emergency unlock. It sits in the narration column, not
    under the phone: as a flow sibling of the device it reserved 142px of height even
    at opacity 0, which pushed the pinned phone 78px above where every other scene
@@ -1556,6 +1580,576 @@
   .demo-narration-toast,
   .demo-narration-toast.is-on,
   .demo-stage {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   T1 · Teacher Home
+   ============================================================ */
+
+.demo-t-home {
+  padding-top: 12px;
+  gap: 16px;
+  overflow-y: auto;
+}
+.demo-t-home-greet {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.demo-t-home-hello {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 31px;
+  margin: 0 0 4px;
+  color: #211f1b;
+}
+.demo-t-home-meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: #5b564e;
+}
+.demo-t-home-gear {
+  margin-left: auto;
+  color: #5b564e;
+  flex: none;
+}
+.demo-t-approvals {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 16px;
+  background: #fff;
+  border: 0;
+  border-radius: 14px;
+  font-family: inherit;
+  cursor: default;
+  text-align: left;
+}
+.demo-t-approvals-count {
+  font-size: 15px;
+  font-weight: 700;
+  color: #245a43;
+  background: #dceDe3;
+  background: #dcede3;
+  border-radius: 999px;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.demo-t-approvals-text {
+  font-size: 15px;
+  color: #211f1b;
+}
+.demo-t-chev {
+  margin-left: auto;
+  color: #8a847a;
+}
+.demo-t-today {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.demo-t-today-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: #fff;
+  border-radius: 14px;
+}
+.demo-t-today-row.is-done {
+  background: #efece7;
+}
+.demo-t-today-time {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #5b564e;
+  flex: none;
+}
+.demo-t-today-name {
+  font-size: 15px;
+  color: #211f1b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo-t-ended,
+.demo-t-start {
+  margin-left: auto;
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 5px 13px;
+}
+.demo-t-ended {
+  color: #6b665d;
+  background: #e3dfd8;
+}
+.demo-t-start {
+  color: #fff;
+  background: #245a43;
+}
+
+/* shared event feed (T1 recent activity + T3 timeline) */
+.demo-t-feed {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+.demo-t-feed-row {
+  display: flex;
+  gap: 10px;
+}
+.demo-t-feed-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  padding-top: 5px;
+}
+.demo-t-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.demo-t-dot.is-green {
+  background: #2c6f51;
+}
+.demo-t-dot.is-orange {
+  background: #db9347;
+}
+.demo-t-dot.is-blue {
+  background: #28528e;
+}
+.demo-t-feed-rail b {
+  flex: 1;
+  width: 1px;
+  min-height: 16px;
+  background: #e3dfd8;
+}
+.demo-t-feed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 14px;
+  min-width: 0;
+}
+.demo-t-feed-title {
+  font-size: 14px;
+  line-height: 19px;
+  color: #211f1b;
+}
+.demo-t-feed-sub {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: #5b564e;
+}
+.demo-t-feed-at {
+  margin-left: auto;
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: #8a847a;
+}
+.demo-t-feed-row:last-child .demo-t-feed-copy {
+  padding-bottom: 0;
+}
+
+/* ============================================================
+   T3 · Student detail sheet
+   ============================================================ */
+
+.demo-t-sheet {
+  padding-top: 26px;
+  gap: 16px;
+  overflow-y: auto;
+}
+.demo-t-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.demo-t-sheet-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.demo-t-sheet-name {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 27px;
+  color: #211f1b;
+}
+.demo-t-sheet-sub {
+  font-size: 13px;
+  color: #5b564e;
+}
+.demo-t-chip {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+.demo-t-chip.is-focused {
+  color: #245a43;
+  background: #dcede3;
+}
+.demo-t-seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #efece7;
+  border-radius: 10px;
+}
+.demo-t-seg-item {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 32px;
+  border-radius: 8px;
+  color: #5b564e;
+}
+.demo-t-seg-item.is-on {
+  background: #fff;
+  color: #211f1b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.demo-t-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+}
+.demo-t-timeline {
+  padding: 14px 16px;
+}
+.demo-t-pass {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.demo-t-durations {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #efece7;
+  border-radius: 10px;
+}
+.demo-t-dur {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 36px;
+  border-radius: 8px;
+  color: #5b564e;
+}
+.demo-t-dur.is-on {
+  background: #fff;
+  color: #211f1b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.demo-t-dur--custom {
+  color: #8a847a;
+}
+.demo-t-field {
+  display: block;
+  height: 50px;
+  line-height: 48px;
+  padding: 0 16px;
+  border: 1px solid #d2ccc2;
+  border-radius: 14px;
+  font-size: 17px;
+  color: #8a847a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo-t-pass-btn {
+  height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: #245a43;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: default;
+}
+.demo-t-pass-foot {
+  font-size: 12.5px;
+  color: #8a847a;
+}
+.demo-t-nodevice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.demo-t-nodevice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.demo-t-nodevice-title {
+  font-size: 16px;
+  color: #211f1b;
+}
+.demo-t-nodevice-sub {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: #8a847a;
+}
+.demo-t-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 32px;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: #8a847a;
+}
+.demo-t-boundary svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   Reports (web)
+   ============================================================ */
+
+.demo-rep {
+  height: 100%;
+  overflow: hidden;
+}
+.demo-rep-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 32px 36px;
+  max-width: 1190px;
+  margin: 0 auto;
+}
+.demo-rep-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.demo-rep-title {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.demo-rep-framing {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-style: italic;
+  line-height: 24px;
+  color: var(--text-secondary);
+}
+.demo-rep-export {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  font: var(--type-body);
+  font-weight: 600;
+}
+.demo-rep-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.demo-rep-spacer {
+  flex: 1;
+}
+.demo-rep-cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  align-items: start;
+  gap: 20px;
+}
+.demo-rep-eyebrow {
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.demo-rep-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-default);
+}
+.demo-rep-table th {
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-sunken);
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.demo-rep-table td {
+  border-bottom: 1px solid var(--border-default);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.demo-rep-table tr:last-child td {
+  border-bottom: 0;
+}
+.demo-rep-when {
+  font-size: 13px !important;
+  color: var(--text-secondary) !important;
+}
+.demo-rep-who {
+  font-weight: 600;
+}
+.demo-rep-muted {
+  color: var(--text-tertiary) !important;
+  font-size: 13px !important;
+}
+.demo-rep-spark {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+}
+.demo-rep-spark i {
+  width: 5px;
+  border-radius: 2px;
+  background: var(--green-500);
+  display: block;
+}
+.demo-rep-caption {
+  margin: 10px 0 0;
+  font: var(--type-caption);
+  color: var(--text-tertiary);
+}
+.demo-rep-focus {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--border-default);
+  overflow: hidden;
+}
+.demo-rep-focus-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 14px;
+}
+.demo-rep-focus-row:last-child {
+  border-bottom: 0;
+}
+.demo-rep-avg {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+/* ============================================================
+   New section chrome: laptop/board switch, flipped two-column,
+   paired recap phones
+   ============================================================ */
+
+.demo-switch {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 auto 20px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+.demo-switch-btn {
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-full);
+  padding: 7px 18px;
+  font: var(--type-body);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+.demo-switch-btn.is-on {
+  background: var(--surface-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-1);
+}
+.demo-switch-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.demo-closing--flip .demo-closing-grid {
+  grid-template-columns: 400px 1fr;
+}
+.demo-closing-stage--pair {
+  gap: 20px;
+}
+.demo-feature--reports {
+  padding-top: 40px;
+}
+
+@media (max-width: 900px) {
+  .demo-rep-cols {
+    grid-template-columns: 1fr;
+  }
+  .demo-closing--flip .demo-closing-grid {
+    grid-template-columns: 1fr;
+  }
+  .demo-closing--flip .demo-closing-stage {
+    grid-row: 2;
+  }
+  .demo-closing--flip .demo-closing-copy {
+    grid-row: 1;
+  }
+  .demo-closing-stage--pair {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-switch-btn {
     transition: none;
   }
 }

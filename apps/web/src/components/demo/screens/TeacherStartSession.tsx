@@ -10,7 +10,6 @@ import { DEMO } from '../demoData';
 export function TeacherStartSession() {
   return (
     <div className="demo-t-screen">
-      <span className="demo-t-grabber" aria-hidden="true" />
       <div className="demo-t-head">
         <h3 className="demo-t-head-title">Start a session</h3>
         <span className="demo-t-head-sub">{DEMO.className}</span>
@@ -39,7 +38,7 @@ export function TeacherStartSession() {
         <div className="demo-t-row">
           <Users size={16} strokeWidth={ICON_STROKE} className="demo-t-row-icon" />
           <span className="demo-t-row-label">Expecting</span>
-          <span className="demo-t-row-value demo-t-row-value--strong">26 students</span>
+          <span className="demo-t-row-value demo-t-row-value--strong">28 students</span>
         </div>
 
         <div className="demo-t-row demo-t-row--tall">

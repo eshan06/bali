@@ -44,7 +44,7 @@ function CleanHeader() {
 
 function StatsBlock() {
   const cells: Array<[string, string]> = [
-    ['25', 'stayed focused'],
+    ['24', 'stayed focused'],
     ['1', 'emergency unlock'],
     ['1', 'pass'],
     ['0', 'permission off'],
