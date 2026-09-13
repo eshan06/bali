@@ -348,9 +348,6 @@ export function Demo() {
             Bali
           </Link>
           <span style={{ flex: 1 }} />
-          <Link className="demo-navlink demo-nav-hideable" href="/#how">
-            How it works
-          </Link>
           <Link className="demo-navlink demo-nav-hideable" href="/privacy">
             Privacy
           </Link>

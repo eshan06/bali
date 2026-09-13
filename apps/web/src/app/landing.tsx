@@ -369,15 +369,9 @@ export function Landing() {
             Bali
           </span>
           <span style={{ flex: 1 }} />
-          <a className="navlink" href="#how">
-            How it works
-          </a>
           <Link className="navlink" href="/demo">
             Walkthrough
           </Link>
-          <a className="navlink" href="#trust">
-            The exit
-          </a>
           <a className="navlink" href="#privacy">
             Privacy
           </a>
@@ -734,8 +728,6 @@ export function Landing() {
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/demo">Walkthrough</Link>
-            <a href="#how">How it works</a>
           </div>
         </div>
       </footer>
