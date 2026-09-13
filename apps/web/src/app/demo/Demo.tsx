@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CircleCheck, EyeOff, Maximize2, Nfc, ShieldCheck, Zap } from 'lucide-react';
+import { Bell, CircleCheck, EyeOff, Maximize2, Monitor, Nfc, ShieldCheck, Smartphone, Zap } from 'lucide-react';
 import { ArcMark } from '@/components/bali/ArcMark';
 import { ToastCard } from '@/components/bali/Toaster';
 import { ICON_STROKE } from '@/components/bali/icons';
@@ -160,7 +160,8 @@ export function Demo() {
     {
       key: 'hub',
       label: 'The hub',
-      caption: 'Teacher app · T1',
+      surface: 'teacher' as const,
+      ref: 'T1 · Home',
       title: 'Before the bell, it\u2019s a list',
       device: (s: number) => (
         <IOSFrame time="9:54" scale={s} label="Teacher iPhone — home">
@@ -189,7 +190,8 @@ export function Demo() {
     {
       key: 'start',
       label: 'Start',
-      caption: 'Teacher app · T9',
+      surface: 'teacher' as const,
+      ref: 'T9 · Start session',
       title: 'The teacher starts the period',
       device: (s: number) => (
         <IOSFrame time="9:54" scale={s} label="Teacher iPhone — start a session">
@@ -215,7 +217,8 @@ export function Demo() {
     {
       key: 'tapin',
       label: 'Tap in',
-      caption: 'Student app · S4',
+      surface: 'student' as const,
+      ref: 'S4 · Tap-in',
       title: 'A student taps the desk tag',
       device: (s: number) => (
         <IOSFrame dark time="9:55" scale={s} label="Student iPhone — tapped in">
@@ -243,7 +246,8 @@ export function Demo() {
     {
       key: 'focus',
       label: 'Focus',
-      caption: 'Student app · S6',
+      surface: 'student' as const,
+      ref: 'S6 · Focus active',
       title: 'Everything rests until the bell',
       device: (s: number) => focusPhone(s, false),
       body: (
@@ -263,7 +267,8 @@ export function Demo() {
     {
       key: 'shield',
       label: 'The shield',
-      caption: 'iOS Screen Time shield',
+      surface: 'ios' as const,
+      ref: 'Screen Time shield',
       title: 'This is what a paused app looks like',
       device: (s: number) => (
         <IOSFrame dark time="10:02" scale={s} label="A shielded app — the Screen Time shield">
@@ -290,7 +295,8 @@ export function Demo() {
     {
       key: 'exit',
       label: 'The exit',
-      caption: 'Student app · S6 + S7',
+      surface: 'student' as const,
+      ref: 'S6 + S7 · The exit',
       title: 'The exit is always unlocked',
       device: (s: number) => focusPhone(s, true),
       body: (
@@ -348,9 +354,6 @@ export function Demo() {
           <Link className="demo-navlink demo-nav-hideable" href="/privacy">
             Privacy
           </Link>
-          <Link className="demo-navlink demo-nav-hideable" href="/login">
-            Sign in
-          </Link>
           <Link className="demo-nav-cta" href="/#demo">
             Book a demo
           </Link>
@@ -386,6 +389,14 @@ export function Demo() {
               No real students, rosters or schools
             </span>
           </div>
+
+          {/* Three surfaces, named once up front — every screen below is badged. */}
+          <div className="demo-legend">
+            <span className="demo-legend-lead">Three surfaces:</span>
+            <SurfaceBadge surface="student" />
+            <SurfaceBadge surface="teacher" />
+            <SurfaceBadge surface="web" />
+          </div>
         </div>
       </header>
 
@@ -400,7 +411,9 @@ export function Demo() {
                   {sc.device(scale.pinned)}
                 </div>
               ))}
-              <span className="demo-stage-caption">{SCENES[active]?.caption}</span>
+              <span className="demo-stage-caption">
+                <SurfaceBadge surface={SCENES[active]?.surface ?? 'student'} detail={SCENES[active]?.ref} />
+              </span>
             </div>
           </div>
 
@@ -439,6 +452,7 @@ export function Demo() {
               >
                 <TeacherStudentSheet />
               </IOSFrame>
+              <SurfaceBadge surface="teacher" detail="T3 · Student detail" />
             </div>
             <div className="demo-closing-copy">
               <div className="demo-step-num">
@@ -498,6 +512,7 @@ export function Demo() {
               >
                 <TeacherRecap variant="clean" />
               </IOSFrame>
+              <SurfaceBadge surface="teacher" detail="T10 · Session recap" />
             </div>
           </div>
         </div>
@@ -535,6 +550,30 @@ export function Demo() {
 }
 
 /* ---------------- small pieces ---------------- */
+
+/** Which product a screen belongs to. Dark badges are what the STUDENT sees
+ *  (their app is dark-first, and so is the system shield); light badges are the
+ *  teacher's side. The label is spelled out — the icon alone can't tell two
+ *  iPhone apps apart. */
+export type Surface = 'student' | 'teacher' | 'web' | 'ios';
+
+const SURFACES: Record<Surface, { label: string; Icon: typeof Smartphone; dark: boolean }> = {
+  student: { label: 'Student app', Icon: Smartphone, dark: true },
+  ios: { label: 'iOS system', Icon: ShieldCheck, dark: true },
+  teacher: { label: 'Teacher app', Icon: Smartphone, dark: false },
+  web: { label: 'Teacher dashboard · web', Icon: Monitor, dark: false },
+};
+
+function SurfaceBadge({ surface, detail }: { surface: Surface; detail?: string }) {
+  const { label, Icon, dark } = SURFACES[surface];
+  return (
+    <span className={clsx('demo-surface', dark ? 'is-dark' : 'is-light')}>
+      <Icon size={13} strokeWidth={ICON_STROKE} />
+      <b>{label}</b>
+      {detail ? <i>{detail}</i> : null}
+    </span>
+  );
+}
 
 function Li({ children }: { children: React.ReactNode }) {
   return (
@@ -637,6 +676,9 @@ function LiveGridSection({
             />
           </BrowserFrame>
         </div>
+        <div className="demo-feature-badge">
+          <SurfaceBadge surface="web" detail={projector ? 'Projector mode' : 'Live grid'} />
+        </div>
         {panning ? <p className="demo-feature-swipe">Swipe the dashboard to see the whole room →</p> : null}
         <p className="demo-feature-note">
           {projector ? (
@@ -713,6 +755,9 @@ function ReportsSection() {
           >
             <DashboardReports />
           </BrowserFrame>
+        </div>
+        <div className="demo-feature-badge">
+          <SurfaceBadge surface="web" detail="Reports" />
         </div>
         <p className="demo-feature-note">
           <EyeOff size={14} strokeWidth={ICON_STROKE} />

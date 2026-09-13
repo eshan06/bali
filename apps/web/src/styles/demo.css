@@ -1772,7 +1772,10 @@
 
 .demo-t-sheet {
   padding-top: 26px;
-  gap: 16px;
+  /* 13 rather than the iOS 16: the sheet is a full screen here with no room to
+     scroll, and the boundary line at the foot has to stay clear of the home
+     indicator — at 16 it landed 3px off the edge. */
+  gap: 13px;
   overflow-y: auto;
 }
 .demo-t-sheet-head {
@@ -2151,5 +2154,104 @@
 @media (prefers-reduced-motion: reduce) {
   .demo-switch-btn {
     transition: none;
+  }
+}
+
+/* ============================================================
+   Surface badges — which product a screen belongs to.
+   Dark = what the student sees (their app is dark-first, and so
+   is the system shield). Light = the teacher's side. Two of the
+   three are iPhone apps, so the label does the work, not the icon.
+   ============================================================ */
+
+.demo-surface {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--radius-full);
+  padding: 5px 13px;
+  font: var(--type-caption);
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+}
+.demo-surface b {
+  font-weight: 600;
+}
+.demo-surface i {
+  font-style: normal;
+  opacity: 0.68;
+}
+.demo-surface i::before {
+  content: '·';
+  margin-right: 6px;
+}
+.demo-surface svg {
+  flex: none;
+  opacity: 0.85;
+}
+.demo-surface.is-light {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+.demo-surface.is-light b {
+  color: var(--text-primary);
+}
+.demo-surface.is-dark {
+  background: #26241f;
+  border: 1px solid #3c3934;
+  color: #b0aaa1;
+}
+.demo-surface.is-dark b {
+  color: #f1efeb;
+}
+
+/* The pinned stage's pill is now just a positioned wrapper. */
+.demo-stage-caption {
+  background: none;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.demo-legend {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.demo-legend-lead {
+  font: var(--type-caption);
+  color: var(--text-tertiary);
+  margin-right: 2px;
+}
+
+.demo-feature-badge {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+/* Two-column sections stack the device and its badge. */
+.demo-closing-stage {
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.demo-closing-stage--pair {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.demo-closing-stage--pair .demo-surface {
+  flex-basis: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .demo-legend {
+    justify-content: flex-start;
   }
 }
