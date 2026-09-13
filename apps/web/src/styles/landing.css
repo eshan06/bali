@@ -812,8 +812,11 @@
 
 /* 1024 breakpoint: stacks gracefully */
 @media (max-width: 1024px) {
+  /* minmax(0, 1fr), not 1fr: a grid item defaults to min-width:auto, so the
+     fixed 330px phone and the chip grid held the column wider than the
+     viewport and every sibling — headline, lede, buttons — was clipped with it. */
   .landing .hero .wrap {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 64px;
   }
   .landing h1.display {
@@ -828,8 +831,9 @@
     padding: 48px 36px;
   }
   .landing .twocol {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+
   .landing .contract {
     grid-template-columns: 1fr;
   }
@@ -839,6 +843,111 @@
   }
   .landing .demoform {
     flex-direction: column;
+  }
+}
+
+/* The hero chips are absolutely positioned against .stagebox at negative
+   offsets (-42 / -54 / -64). They only clear the viewport once .wrap stops
+   growing and starts centring — its border box caps at 1224, so the right
+   chip fits from about 1268 up. Below that they hang off the page, clipped by
+   .hero's overflow, which reads as a chip sliced in half at the edge. */
+@media (max-width: 1280px) {
+  .landing .floatchip {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Phone portrait. The page had one breakpoint (1024) that collapsed
+   the grids but left type, the nav and the 330px phone at desktop
+   size, so the hero was clipped on every handset.
+   ============================================================ */
+@media (max-width: 640px) {
+  .landing .wrap {
+    padding: 0 20px;
+  }
+
+  /* Nav: wordmark + the one action. The links survive in the footer, and the
+     hero's own buttons cover Walkthrough. */
+  .landing .topnav .wrap {
+    gap: 12px;
+    height: 58px;
+  }
+  .landing .topnav a.navlink {
+    display: none;
+  }
+
+  .landing .hero {
+    padding: 48px 0 64px;
+  }
+  .landing .hero .wrap {
+    gap: 44px;
+  }
+  .landing h1.display {
+    font-size: 34px;
+    line-height: 40px;
+  }
+  .landing .lede {
+    font-size: 16px;
+    line-height: 25px;
+  }
+  .landing .hero-ctas {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .landing .hero-ctas .btn {
+    width: 100%;
+  }
+  .landing .trustline {
+    align-items: flex-start;
+    font-size: 12.5px;
+    line-height: 18px;
+  }
+
+  /* Fixed width -> fluid, and the float chips go: they are absolutely
+     positioned at negative offsets and would sit on top of the phone. */
+  .landing .phone {
+    width: 100%;
+    max-width: 300px;
+    padding: 22px 18px 20px;
+  }
+
+  .landing .band {
+    padding: 56px 0;
+  }
+  .landing h2.sec {
+    font-size: 26px;
+    line-height: 32px;
+  }
+  .landing .sec-sub {
+    font-size: 16px;
+    line-height: 25px;
+  }
+  .landing .darkband {
+    padding: 36px 22px;
+  }
+  .landing .glance {
+    padding: 18px;
+  }
+  /* Three columns cannot hold a name chip at this width — the chips were the
+     last thing still pushing past the viewport. */
+  .landing .glance .ggrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .landing .glance .ggrid .fc-chip {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .landing .contract > div {
+    padding: 24px 22px;
+  }
+  .landing .ctaband {
+    padding: 40px 22px;
+  }
+  .landing footer .wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
   }
 }
 
