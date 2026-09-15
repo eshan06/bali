@@ -106,7 +106,7 @@ CSV-export `res.ok` guard, auth-callback poll-retry (no more fixed 600ms hang).
 | Graceful shutdown | SIGTERM/SIGINT → stop sweeper, drain requests + SSE (`forceCloseConnections`), close DB pool, 10s hard-timeout; `uncaughtException` → clean exit | `docker stop` exits 0, "shutdown complete", node as PID 1 |
 | Readiness | `GET /v1/ready` (DB ping, 503 when down) distinct from `/v1/health` liveness | container probe returns 200 |
 | Config guards | Fail-fast env validation; **refuse to boot when `NODE_ENV=production` + `ALLOW_DEV_TOKENS=1`** | boot refused as expected |
-| CORS / proxy | Multi-origin `CORS_ORIGIN` (comma list); `trustProxy` so IP-keyed limits use the real client IP | preflight 204 |
+| CORS / proxy | Multi-origin `CORS_ORIGIN` (comma list); `trustProxy` scoped to **`TRUSTED_PROXIES`** (default `loopback`) so IP-keyed limits use the real client IP *and* a forged `X-Forwarded-For` cannot mint quota. **Behind an off-host proxy/ALB you must set `TRUSTED_PROXIES` to its CIDR** or every unauthenticated caller shares one bucket (fails safe, never forgeable). | preflight 204; rate-limit probe: forged XFF ignored off-loopback, per-client buckets restored once the hop is named |
 | Rate limits | `auth/bootstrap` 30/min per **token**; public tag lookup 120/min per IP (classroom-safe, blocks code enumeration) | tests pass |
 | Security headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` on all JSON; HSTS in prod | asserted in tests |
 | Tests + CI | `vitest` + `app.inject` integration suite (12 tests; **`TEST_DATABASE_URL`-only**, skips otherwise so a plain `npm test` never hits RDS). GitHub Actions: typecheck + shared tests + web build + API integration on a Postgres service | 12/12 green; all CI steps run locally |
@@ -178,6 +178,7 @@ These came out of an adversarial audit; all are low-risk and decision-free. Roug
 | `CORS_ORIGIN` | no | `localhost:3000` | comma-separated list |
 | `NODE_ENV` | no | development | `production` hardens logging/HSTS + blocks dev tokens |
 | `SWEEP_INTERVAL_MS` | no | 15000 | bell/pass sweeper |
+| `TRUSTED_PROXIES` | no | `loopback` | Proxy hops allowed to set `X-Forwarded-For` (Fastify/proxy-addr syntax: IPs/CIDRs, a hop count, or `loopback`). Unauthenticated rate limits key on the resulting client IP. **Behind an off-host proxy or ALB, set this to its CIDR** — otherwise every anonymous caller shares one bucket. Never forgeable from the open internet regardless. |
 | `TZ` | no | UTC | **Set to the school's IANA zone** (e.g. `America/Los_Angeles`). Class bell/schedule times are wall-clock and rendered server-local; a UTC container shows wrong bells. Single-tenant v1 assumes one zone per deployment. |
 | `ALLOW_DEV_TOKENS` | no | unset | `1` enables `Bearer dev:…`; forbidden in production |
 
