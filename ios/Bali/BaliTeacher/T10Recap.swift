@@ -11,6 +11,7 @@ struct T10RecapView: View {
     @EnvironmentObject private var store: TeacherStore
     @Environment(\.dismiss) private var dismiss
     @State private var recap: TRecap?
+    @State private var loadFailed = false
 
     var body: some View {
         ZStack {
@@ -27,12 +28,21 @@ struct T10RecapView: View {
                     .padding(.top, 28)
                     .padding(.bottom, 32)
                 }
+            } else if loadFailed {
+                loadErrorState
             } else {
-                ProgressView().tint(Tokens.Light.textSecondary)
+                loadingState
             }
         }
-        .task {
-            recap = try? await store.api.get("sessions/\(sessionId)/recap", as: TRecap.self)
+        .task { await load() }
+    }
+
+    private func load() async {
+        loadFailed = false
+        do {
+            recap = try await store.api.get("sessions/\(sessionId)/recap", as: TRecap.self)
+        } catch {
+            loadFailed = true
         }
     }
 
@@ -144,6 +154,38 @@ struct T10RecapView: View {
 
     private func reasonLine(_ e: TRecapEmergency) -> String {
         [e.reasonLabel, e.refocusedLabel].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    // MARK: loading / failed
+
+    // T10 is presented in a `.fullScreenCover` with no swipe-to-dismiss, so every state —
+    // including a request that fails or never returns — has to carry its own way out.
+    private var loadingState: some View {
+        VStack(spacing: 24) {
+            ProgressView().tint(Tokens.Light.textSecondary)
+            TSecondaryButton(title: "Done") { dismiss() }
+        }
+        .frame(maxWidth: 320)
+        .padding(.horizontal, 20)
+    }
+
+    private var loadErrorState: some View {
+        VStack(spacing: 8) {
+            Text("Couldn’t load the recap")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(Tokens.Light.textPrimary)
+            Text("Check your connection and try again.")
+                .font(.system(size: 14))
+                .foregroundColor(Tokens.Light.textSecondary)
+                .multilineTextAlignment(.center)
+            VStack(spacing: 10) {
+                TPrimaryButton(title: "Retry") { Task { await load() } }
+                TSecondaryButton(title: "Done") { dismiss() }
+            }
+            .padding(.top, 10)
+        }
+        .frame(maxWidth: 320)
+        .padding(.horizontal, 20)
     }
 
     // MARK: actions

@@ -1,7 +1,11 @@
 import SwiftUI
+#if canImport(FamilyControls)
+import FamilyControls
+#endif
 
-/// S9 · Settings — permission health on top, account + privacy, classes (tap to see
-/// the policy or leave), about. The Privacy page restates the S1 contract verbatim.
+/// S9 · Settings — permission health on top, the one-time allow-list, account + privacy,
+/// classes (tap to see the policy or leave), about. The Privacy page restates the S1
+/// contract verbatim.
 struct SettingsView: View {
     let student: StudentSelf
     @EnvironmentObject private var auth: AuthStore
@@ -9,6 +13,11 @@ struct SettingsView: View {
     @State private var classes: [StudentClass] = []
     @State private var selectedClass: StudentClass?
     @State private var confirmSignOut = false
+    #if canImport(FamilyControls)
+    @State private var allowPickerPresented = false
+    @State private var allowSelection = FamilyActivitySelection()
+    @State private var allowCount = FocusAllowList.load().map { FocusAllowList.count(of: $0) } ?? 0
+    #endif
     private let screenTime = ScreenTime.make()
 
     var body: some View {
@@ -24,6 +33,14 @@ struct SettingsView: View {
                     PermissionHealthRow(ok: screenTime.permissionOk)
 
                     group {
+                        #if canImport(FamilyControls)
+                        // The one-time allow-list, editable — onboarding promises exactly this.
+                        row(icon: "square.grid.2x2", title: "Apps that stay open", detail: allowDetail) {
+                            allowSelection = FocusAllowList.load() ?? FamilyActivitySelection()
+                            allowPickerPresented = true
+                        }
+                        divider
+                        #endif
                         row(icon: "person", title: "Account", detail: "\(student.firstName) \(student.lastName)") {
                             confirmSignOut = true
                         }
@@ -63,6 +80,16 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        #if canImport(FamilyControls)
+        .familyActivityPicker(isPresented: $allowPickerPresented, selection: $allowSelection)
+        .onChange(of: allowPickerPresented) { presented in
+            // The picker edits the binding live; persist the student's pick when it closes.
+            if !presented {
+                FocusAllowList.save(allowSelection)
+                allowCount = FocusAllowList.count(of: allowSelection)
+            }
+        }
+        #endif
         .navigationDestination(for: SettingsRoute.self) { route in
             switch route {
             case .privacy: PrivacyView()
@@ -89,6 +116,11 @@ struct SettingsView: View {
     }
 
     // MARK: pieces
+
+    #if canImport(FamilyControls)
+    /// "None" is the honest label for an empty pick: every app pauses in a session.
+    private var allowDetail: String { allowCount == 0 ? "None" : "\(allowCount) selected" }
+    #endif
 
     private func group<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) { content() }

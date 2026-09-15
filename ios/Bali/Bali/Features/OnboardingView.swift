@@ -12,6 +12,7 @@ struct OnboardingView: View {
     var onDone: () -> Void
 
     private enum Step { case what, contract, tapIn, permission, allowList, denied }
+    @Environment(\.scenePhase) private var scenePhase
     @State private var step: Step
     @State private var asking = false
     @State private var pickerPresented = false
@@ -44,7 +45,7 @@ struct OnboardingView: View {
                 shell(dot: 1, cta: "Continue", action: { step = .contract }) {
                     OnboardingArcIllustration()
                     title("Your class, focused together")
-                    body16("Bali quiets every app except the ones your class allows — until the bell.", maxWidth: 300)
+                    body16("Bali quiets every app except the few you pick to keep open — until the bell.", maxWidth: 300)
                 }
             case .contract:
                 shell(dot: 2, cta: "Continue", action: { step = .tapIn }) {
@@ -107,9 +108,10 @@ struct OnboardingView: View {
         #if canImport(FamilyControls)
         .familyActivityPicker(isPresented: $pickerPresented, selection: $allowSelection)
         #endif
-        .onChange(of: step) { _ in
-            // Returning from iOS Settings with permission now on routes to the allow-list.
-            if step == .denied, screenTime.permissionOk { step = .allowList }
+        .onChange(of: scenePhase) { phase in
+            // Coming back from iOS Settings is a scene change, not a step change — this is
+            // the only signal that the student turned Screen Time on out from under us.
+            if phase == .active, step == .denied, screenTime.permissionOk { step = .allowList }
         }
     }
 

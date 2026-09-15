@@ -1,9 +1,21 @@
 import Foundation
 
-/// Base-URL resolution — the proven legacy convention:
-/// DEBUG reads BALI_DEV_API_HOST (env or UserDefaults), defaulting to localhost,
-/// and talks to the Mac's API on :3001. Release talks HTTPS (set before shipping).
+/// Base-URL resolution.
+///
+/// DEBUG reads `BALI_DEV_API_HOST` (launch env first, then the persisted UserDefaults
+/// copy) and accepts EITHER form:
+///   • a bare host — `10.0.0.68` → `http://10.0.0.68:3001/v1` (the LAN `demo.sh` convention)
+///   • a full URL  — `https://foo.trycloudflare.com` → `https://foo.trycloudflare.com/v1`
+/// The full-URL form is what lets the phone reach the Mac's API from a network that
+/// blocks client-to-client traffic (campus Wi-Fi) or from cellular, via a tunnel.
+///
+/// Release reads `BALIAPIBaseURL` from Info.plist, which the `BALI_API_BASE_URL` build
+/// setting substitutes — so a TestFlight archive can be pointed at a staging host with
+/// no code change:  xcodebuild … BALI_API_BASE_URL=https://foo.trycloudflare.com
 enum APIConfig {
+    /// The API's only version prefix; callers pass paths relative to it.
+    private static let versionPath = "v1"
+
     static var baseURL: URL {
         #if DEBUG
         // devicectl launches pass the host as env; persist it so plain icon-tap
@@ -11,13 +23,34 @@ enum APIConfig {
         if let env = ProcessInfo.processInfo.environment["BALI_DEV_API_HOST"], !env.isEmpty {
             UserDefaults.standard.set(env, forKey: "BALI_DEV_API_HOST")
         }
-        let host = ProcessInfo.processInfo.environment["BALI_DEV_API_HOST"]
+        let override = ProcessInfo.processInfo.environment["BALI_DEV_API_HOST"]
             ?? UserDefaults.standard.string(forKey: "BALI_DEV_API_HOST")
-            ?? "localhost"
-        return URL(string: "http://\(host):3001/v1")!
+        if let override, let url = resolve(override) { return url }
+        return URL(string: "http://localhost:3001/\(versionPath)")!
         #else
-        return URL(string: "https://api.bali.app/v1")! // TODO: production host
+        if let configured = infoPlistBaseURL, let url = resolve(configured) { return url }
+        return URL(string: "https://api.bali.app/\(versionPath)")! // TODO: production host
         #endif
+    }
+
+    /// The Info.plist value, ignoring an empty or unsubstituted build setting.
+    private static var infoPlistBaseURL: String? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "BALIAPIBaseURL") as? String else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty || trimmed.hasPrefix("$(") ? nil : trimmed
+    }
+
+    /// Accepts a bare host or a full URL and guarantees exactly one `/v1` suffix.
+    private static func resolve(_ value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        // No scheme means a bare host — apply the LAN dev convention (http, :3001).
+        let text = trimmed.contains("://") ? trimmed : "http://\(trimmed):3001"
+        guard let url = URL(string: text), url.host != nil else { return nil }
+        var path = url.path
+        while path.hasSuffix("/") { path.removeLast() }
+        // Tolerate a host that already carries the version prefix.
+        return path.hasSuffix("/\(versionPath)") ? url : url.appendingPathComponent(versionPath)
     }
 }
 

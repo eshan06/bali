@@ -7,6 +7,9 @@ struct BaliTeacherApp: App {
     @StateObject private var store = TeacherStore()
 
     init() {
+        // Persist BALI_DEV_API_HOST from the launch env NOW — a signed-out first run
+        // makes no API call, and a later icon-tap relaunch would fall back to localhost.
+        _ = APIConfig.baseURL
         AmplifyAuth.configure()
     }
 

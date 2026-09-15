@@ -36,11 +36,19 @@
 		<string>arm64</string>
 	</array>
 	<!-- Dev-only LAN access, same convention as the student app. -->
+	<!-- Release API host. Substituted from the BALI_API_BASE_URL build setting, so an
+	     archive can be aimed at staging without a code change:
+	       xcodebuild … BALI_API_BASE_URL=https://staging.example.com
+	     Left undefined it expands to empty, and APIConfig falls back to the production URL. -->
+	<key>BALIAPIBaseURL</key>
+	<string>$(BALI_API_BASE_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DEBUG builds connect to the development API server on your local network.</string>
 	<key>NFCReaderUsageDescription</key>
 	<string>Bali writes and verifies desk tags for your classes.</string>
 </dict>

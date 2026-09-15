@@ -251,6 +251,12 @@ private struct DevSignInSheet: View {
                     .multilineTextAlignment(.center)
                 AuthField("First name", text: $firstName, contentType: .givenName)
                 AuthField("Last name", text: $lastName, contentType: .familyName)
+                if let error = auth.authError {
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundColor(Tokens.Dark.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
                 Button {
                     busy = true
                     Task {
@@ -259,7 +265,7 @@ private struct DevSignInSheet: View {
                             lastName: lastName.trimmingCharacters(in: .whitespaces)
                         )
                         busy = false
-                        dismiss()
+                        if auth.authError == nil { dismiss() }
                     }
                 } label: {
                     PrimaryButtonLabel(title: "Continue", busy: busy)

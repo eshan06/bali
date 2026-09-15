@@ -259,6 +259,8 @@ struct MemberSheet: View {
     @EnvironmentObject private var store: TeacherStore
     @Environment(\.dismiss) private var dismiss
     @State private var noDevice: Bool
+    @State private var noDeviceSaving = false
+    @State private var noDeviceError: String?
     @State private var confirmRemove = false
 
     init(member: TRosterMember, className: String, reload: @escaping () async -> Void) {
@@ -284,27 +286,38 @@ struct MemberSheet: View {
                 }
                 .padding(.top, 24)
 
-                Toggle(isOn: $noDevice) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("No device by default")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Tokens.Light.textPrimary)
-                        Text("\(firstName) starts every session marked no-device")
-                            .font(.system(size: 12.5))
-                            .foregroundColor(Tokens.Light.textTertiary)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Writing through the binding (not .onChange) keeps the rollback below from
+                    // looping back into another PATCH.
+                    Toggle(isOn: Binding(get: { noDevice }, set: { on in
+                        noDevice = on
+                        Task { await setDefaultNoDevice(on) }
+                    })) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("No device by default")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(Tokens.Light.textPrimary)
+                            Text("\(firstName) starts every session marked no-device")
+                                .font(.system(size: 12.5))
+                                .foregroundColor(Tokens.Light.textTertiary)
+                        }
+                    }
+                    .tint(Tokens.green600)
+                    .disabled(noDeviceSaving)
+                    .frame(minHeight: 64)
+
+                    if let noDeviceError {
+                        Text(noDeviceError)
+                            .font(.system(size: 13))
+                            .foregroundColor(Tokens.Light.red600)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, 14)
                     }
                 }
-                .tint(Tokens.green600)
                 .padding(.horizontal, 16)
-                .frame(minHeight: 64)
                 .background(Tokens.Light.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .onChange(of: noDevice) { on in
-                    Task {
-                        _ = try? await store.api.patch("memberships/\(member.membershipId)", body: UpdateMembershipBody(defaultNoDevice: on), as: MembershipPatchResult.self)
-                        await reload()
-                    }
-                }
 
                 Button(role: .destructive) { confirmRemove = true } label: {
                     Text("Remove from class")
@@ -328,6 +341,26 @@ struct MemberSheet: View {
             Button("Remove", role: .destructive) { Task { await remove() } }
         } message: {
             Text("Their focus history stays theirs. They can rejoin any time with the class code.")
+        }
+    }
+
+    /// A refused or unreachable write must not leave the switch claiming it saved. The server
+    /// answers with the stored default, so trust that over what was tapped.
+    private func setDefaultNoDevice(_ on: Bool) async {
+        noDeviceSaving = true
+        noDeviceError = nil
+        defer { noDeviceSaving = false }
+        do {
+            let result = try await store.api.patch(
+                "memberships/\(member.membershipId)",
+                body: UpdateMembershipBody(defaultNoDevice: on),
+                as: MembershipPatchResult.self
+            )
+            noDevice = result.defaultNoDevice
+            await reload()
+        } catch {
+            noDevice = !on
+            noDeviceError = (error as? APIError)?.message ?? "Couldn't save that — check your connection and try again."
         }
     }
 

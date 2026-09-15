@@ -37,11 +37,19 @@
 	</array>
 	<!-- Dev-only: lets DEBUG builds reach the Mac's API over the LAN (legacy convention).
 	     Release builds talk HTTPS and need no exception. -->
+	<!-- Release API host. Substituted from the BALI_API_BASE_URL build setting, so an
+	     archive can be aimed at staging without a code change:
+	       xcodebuild … BALI_API_BASE_URL=https://staging.example.com
+	     Left undefined it expands to empty, and APIConfig falls back to the production URL. -->
+	<key>BALIAPIBaseURL</key>
+	<string>$(BALI_API_BASE_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DEBUG builds connect to the development API server on your local network.</string>
 	<!-- W2's "Open in Bali" deep link: bali://t/<code> resolves the tag in-app. -->
 	<key>CFBundleURLTypes</key>
 	<array>

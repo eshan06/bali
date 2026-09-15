@@ -16,6 +16,8 @@ struct T3StudentSheet: View {
     @State private var events: [TEvent] = []
     @State private var history: TStudentHistory?
     @State private var noDevice: Bool
+    @State private var noDeviceSaving = false
+    @State private var noDeviceError: String?
     @State private var passMinutes = 10
     @State private var customMinutes = ""
     @State private var passReason = ""
@@ -266,26 +268,52 @@ struct T3StudentSheet: View {
     }
 
     private var noDeviceCard: some View {
-        Toggle(isOn: $noDevice) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("No device today")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Tokens.Light.textPrimary)
-                Text("Marks \(participant.firstName) out of today's grid only")
-                    .font(.system(size: 12.5))
-                    .foregroundColor(Tokens.Light.textTertiary)
+        VStack(alignment: .leading, spacing: 0) {
+            // The switch writes through this binding, so the rollback in setNoDevice — a plain
+            // @State write — cannot loop back round and fire a second request.
+            Toggle(isOn: Binding(get: { noDevice }, set: { on in
+                noDevice = on
+                Task { await setNoDevice(on) }
+            })) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("No device today")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Tokens.Light.textPrimary)
+                    Text("Marks \(participant.firstName) out of today's grid only")
+                        .font(.system(size: 12.5))
+                        .foregroundColor(Tokens.Light.textTertiary)
+                }
+            }
+            .tint(Tokens.green600)
+            .disabled(noDeviceSaving)
+            .frame(height: 64)
+
+            if let noDeviceError {
+                Text(noDeviceError)
+                    .font(.system(size: 13))
+                    .foregroundColor(Tokens.Light.red600)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
             }
         }
-        .tint(Tokens.green600)
         .padding(.horizontal, 16)
-        .frame(height: 64)
         .background(Tokens.Light.card)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .onChange(of: noDevice) { on in
-            Task {
-                _ = try? await store.api.postVoid("sessions/\(sessionId)/no-device", body: NoDeviceBody(studentId: participant.studentId, on: on))
-                await onChanged()
-            }
+    }
+
+    /// The server refuses "no device" over a student who has already tapped in (409). A
+    /// refused write must not leave the switch — or the grid chip — claiming it happened.
+    private func setNoDevice(_ on: Bool) async {
+        noDeviceSaving = true
+        noDeviceError = nil
+        defer { noDeviceSaving = false }
+        do {
+            _ = try await store.api.postVoid("sessions/\(sessionId)/no-device", body: NoDeviceBody(studentId: participant.studentId, on: on))
+            await onChanged()
+        } catch {
+            noDevice = !on
+            noDeviceError = (error as? APIError)?.message ?? "Couldn't save that — check your connection and try again."
         }
     }
 

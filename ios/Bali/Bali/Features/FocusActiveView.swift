@@ -4,7 +4,8 @@ import UIKit
 /// S6 · Focus Active — THE flagship student screen. Sits face-up on a desk for
 /// 50 minutes. Calm, almost empty: header, hero arc, allowed apps, and the
 /// always-available EmergencyUnlockControl. The arc draws in ONCE (600ms) — the
-/// product's only theatrical moment.
+/// product's only theatrical moment. In `.statusOnly` there is no shield to count
+/// down, so the arc is replaced by the honest notice instead.
 struct FocusActiveView: View {
     @ObservedObject var engine: FocusEngine
     var onExit: () -> Void
@@ -30,11 +31,15 @@ struct FocusActiveView: View {
 
                 Spacer()
 
-                heroArc
+                if isStatusOnly {
+                    statusOnlyNotice
+                } else {
+                    heroArc
 
-                FocusScopeRow()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 34)
+                    FocusScopeRow()
+                        .padding(.horizontal, 20)
+                        .padding(.top, 34)
+                }
 
                 Spacer()
 
@@ -110,6 +115,13 @@ struct FocusActiveView: View {
         return false
     }
 
+    /// Tapped in and reporting, but Screen Time is off: nothing is shielded, so
+    /// this screen may not draw the countdown or say apps are paused.
+    private var isStatusOnly: Bool {
+        if case .statusOnly = engine.state { return true }
+        return false
+    }
+
     private var final2: Bool {
         !isPass && remainingSeconds <= 120
     }
@@ -151,6 +163,27 @@ struct FocusActiveView: View {
         }
     }
 
+    /// Where the arc would be: the tap-in stands (the teacher sees the student is
+    /// here) and the way back to a real shield is one row down.
+    private var statusOnlyNotice: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "shield.slash")
+                .font(.system(size: 34))
+                .foregroundColor(Tokens.orange300)
+            Text("Nothing is paused")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(Tokens.Dark.textPrimary)
+            Text("You tapped in, so \(engine.teacherDisplayName) can see you're here. No apps are paused.")
+                .font(.system(size: 15))
+                .foregroundColor(Tokens.Dark.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            PermissionHealthRow(ok: false)
+                .padding(.top, 6)
+        }
+        .padding(.horizontal, 20)
+    }
+
     private var bottom: some View {
         VStack(spacing: 12) {
             EmergencyUnlockControl(
@@ -160,7 +193,7 @@ struct FocusActiveView: View {
             ) {
                 engine.emergencyUnlock()
             }
-            Text(isUnlocked ? "Re-focus any time by tapping the desk tag." : "Works without Wi-Fi. Releasing early does nothing.")
+            Text(bottomHint)
                 .font(.system(size: 13))
                 .foregroundColor(Tokens.Dark.textTertiary)
                 .multilineTextAlignment(.center)
@@ -172,6 +205,13 @@ struct FocusActiveView: View {
                     .padding(.top, 4)
             }
         }
+    }
+
+    private var bottomHint: String {
+        if isUnlocked { return "Re-focus any time by tapping the desk tag." }
+        // Nothing is shielded in .statusOnly, so there's no early release to promise.
+        if isStatusOnly { return "Nothing is paused, so this only tells \(engine.teacherDisplayName) you stepped out." }
+        return "Works without Wi-Fi. Releasing early does nothing."
     }
 
     // MARK: time math
@@ -222,6 +262,10 @@ struct FocusActiveView: View {
             // the heartbeat confirms, but the bell should never wait 30s
             engine.sessionEnded()
         }
+        // Offline the heartbeat never lands, so this is the only thing that notices the
+        // student switched Screen Time off — without it this screen keeps promising a shield
+        // that iOS already dropped.
+        engine.reconcileLocalShields()
     }
 }
 
