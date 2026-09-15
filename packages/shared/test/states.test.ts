@@ -86,6 +86,29 @@ describe('deriveParticipantState — precedence is law', () => {
     expect(d.staleSeconds).toBeNull();
   });
 
+  // Regression: a closed participation used to read `no_device`, so the phone of a student
+  // removed mid-session never heard "ended" and stayed shielded. Terminal beats the flag.
+  it('ended participation outranks a standing no_device mark', () => {
+    const d = deriveParticipantState(input({ storedState: 'ended', noDevice: true }));
+    expect(d.state).toBe('ended');
+  });
+
+  it('a session past the bell outranks a standing no_device mark', () => {
+    const d = deriveParticipantState(
+      input({
+        storedState: 'not_joined',
+        noDevice: true,
+        session: { endsAt: new Date('2026-06-10T10:20:00Z'), endedAt: null },
+      }),
+    );
+    expect(d.state).toBe('ended');
+  });
+
+  it('no_device still wins for a flagged student while the session is live', () => {
+    const d = deriveParticipantState(input({ storedState: 'not_joined', noDevice: true }));
+    expect(d.state).toBe('no_device');
+  });
+
   it('session past endsAt renders ended even before the sweeper runs', () => {
     const d = deriveParticipantState(
       input({

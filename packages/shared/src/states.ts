@@ -69,9 +69,14 @@ export interface DerivedParticipantState {
 }
 
 /**
- * Precedence (WIRING_PLAN §2): ended > revoked > emergency_unlocked > active pass >
- * focused > not_joined; `no_device` replaces the display when flagged; staleness
- * decorates any state and is never a state of its own.
+ * Precedence (WIRING_PLAN §2): ended > no_device > revoked > emergency_unlocked >
+ * active pass > focused > not_joined; `no_device` replaces the display when flagged;
+ * staleness decorates any state and is never a state of its own.
+ *
+ * `ended` outranks `no_device` because a closed participation is the truth and the flag is
+ * only a standing default: a student carrying a no-device mark who was removed mid-session
+ * (or whose bell rang) must still read `ended`, or the phone never hears that it is free —
+ * the student always holds the exit.
  */
 export function deriveParticipantState(input: DeriveInput): DerivedParticipantState {
   const { storedState, noDevice, passEndsAt, lastSeenAt, session, now } = input;
@@ -79,10 +84,10 @@ export function deriveParticipantState(input: DeriveInput): DerivedParticipantSt
   const sessionOver = session.endedAt !== null || now >= session.endsAt;
 
   let state: ChipState;
-  if (noDevice) {
-    state = 'no_device';
-  } else if (sessionOver || storedState === 'ended') {
+  if (sessionOver || storedState === 'ended') {
     state = 'ended';
+  } else if (noDevice) {
+    state = 'no_device';
   } else if (storedState === 'revoked') {
     state = 'revoked';
   } else if (storedState === 'emergency_unlocked') {

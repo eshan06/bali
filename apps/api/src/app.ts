@@ -11,6 +11,30 @@ import { manageRoutes } from './routes/manage';
 import { reportRoutes } from './routes/reports';
 import { studentRoutes } from './routes/student';
 
+/**
+ * Which upstream hops are allowed to set X-Forwarded-For — i.e. when `req.ip` may be
+ * believed. `TRUSTED_PROXIES` takes exactly what Fastify/proxy-addr take: a comma-separated
+ * list of IPs, CIDRs or the names `loopback` / `linklocal` / `uniquelocal`, or a plain hop
+ * count, or `none`/empty to trust nothing.
+ *
+ * Default `loopback`, because the topology is not pinned in this repo and that is the one
+ * setting that is safe everywhere: a cloudflared tunnel (`scripts/demo.sh --tunnel`) and a
+ * same-host nginx both connect from 127.0.0.1, so their forwarded client address is honoured,
+ * while a phone hitting the dev box directly over the LAN is NOT trusted and so cannot forge
+ * one. Off-host proxies (an ALB, a separate nginx) must be named explicitly — e.g.
+ * `TRUSTED_PROXIES=10.0.0.0/8` — or every unauthenticated caller collapses onto the proxy's
+ * own address and shares one rate-limit bucket.
+ */
+function trustedProxies(): boolean | number | string[] {
+  const raw = (process.env.TRUSTED_PROXIES ?? 'loopback').trim();
+  if (raw === '' || raw.toLowerCase() === 'none') return false; // direct exposure: req.ip is the TCP peer
+  if (/^\d+$/.test(raw)) return Number(raw); // hop count: trust the N proxies nearest us
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger:
@@ -19,8 +43,14 @@ export async function buildApp(): Promise<FastifyInstance> {
         : process.env.NODE_ENV === 'test'
           ? false
           : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } } },
-    // Behind an ALB/nginx: trust X-Forwarded-* so req.ip (and IP-keyed limits) are correct.
-    trustProxy: true,
+    // Trust X-Forwarded-* only from the hops named by TRUSTED_PROXIES (see above) — never
+    // from any peer, which is what `true` used to mean here. proxy-addr walks the forwarded
+    // chain outwards from the socket and stops at the first hop we do NOT trust, so `req.ip`
+    // is the nearest address the caller could not have forged: the real client behind a known
+    // proxy, the raw TCP peer otherwise. Entries a client stuffs into X-Forwarded-For sit
+    // further left in the chain and are dropped. That is what makes req.ip safe to log and
+    // safe to rate-limit on; see keyGenerator below.
+    trustProxy: trustedProxies(),
     // Let app.close() drain long-lived SSE streams on deploy instead of hanging.
     forceCloseConnections: true,
   });
@@ -43,12 +73,26 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // Opt-in rate limiting (student write routes carry `config.rateLimit`). Keyed by
-  // bearer token, NOT IP — a classroom of 28 phones shares one school IP and must
-  // never be throttled as a single client.
+  // Opt-in rate limiting (student write routes carry `config.rateLimit`). Keyed by the
+  // VERIFIED Cognito sub, not the raw Authorization header: the header is caller-chosen
+  // and public routes never validate it, so keying on it handed anyone a fresh quota per
+  // invented token. Running at preHandler instead of the plugin's default onRequest is
+  // what makes that possible — `authenticate` has populated req.identity by then, so a
+  // classroom of 28 phones behind one school IP still gets a bucket each.
+  //
+  // Unauthenticated callers (the two public GETs) fall back to req.ip, which the pinned
+  // trustProxy above makes BOTH unforgeable and per-client: a forged X-Forwarded-For from
+  // an untrusted peer is ignored, and a trusted proxy's forwarded client address is kept,
+  // so one parent refreshing their link cannot lock every desk-tag lookup in the school out
+  // of a single shared bucket. Keying on req.socket.remoteAddress instead would be equally
+  // unforgeable but would collapse exactly that way behind any proxy. Misconfiguring
+  // TRUSTED_PROXIES fails safe in the same direction — an unnamed proxy just means everyone
+  // behind it shares that proxy's bucket; it never lets a caller mint fresh buckets.
   await app.register(rateLimit, {
     global: false,
-    keyGenerator: (req) => req.headers.authorization ?? req.ip,
+    hook: 'preHandler',
+    // `?? 'unknown-peer'`: req.ip is undefined if the socket is already gone mid-request.
+    keyGenerator: (req) => req.identity?.sub ?? req.ip ?? 'unknown-peer',
     // The builder's return value is THROWN — hand back an HttpError so the app's
     // error handler renders the standard {error, message} envelope with a 429.
     errorResponseBuilder: () =>

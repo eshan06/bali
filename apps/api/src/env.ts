@@ -20,6 +20,14 @@ const envSchema = z
     SWEEP_INTERVAL_MS: z.coerce.number().int().min(1000).default(15_000),
     /** Dev-only auth bypass (`Bearer dev:...`). MUST be unset/0 in production; only '1' enables it. */
     ALLOW_DEV_TOKENS: z.string().optional(),
+    /**
+     * Which proxy hops may set X-Forwarded-For, in Fastify/proxy-addr syntax (a comma list of
+     * IPs/CIDRs, a hop count, or `loopback`). Read directly in app.ts because it is needed to
+     * build the server; declared here so it is validated and shows up with the rest of the env.
+     * Default `loopback` covers a same-host tunnel; an off-host proxy (ALB) MUST be named or
+     * every unauthenticated caller shares one rate-limit bucket.
+     */
+    TRUSTED_PROXIES: z.string().optional(),
   })
   // Defense in depth: even though devIdentity already disables itself when
   // NODE_ENV=production, refuse to boot a production process that asks for the bypass.

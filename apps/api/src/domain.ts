@@ -1,7 +1,11 @@
-import { and, asc, eq, isNull, lte } from 'drizzle-orm';
-import { getDb, schema as s, type Db } from '@bali/db';
-import { deriveParticipantState, type SessionDetailDTO, type UnlockReason } from '@bali/shared';
-import { bus } from './bus';
+import { and, asc, eq, isNull, lte } from "drizzle-orm";
+import { getDb, schema as s, type Db } from "@bali/db";
+import {
+  deriveParticipantState,
+  type SessionDetailDTO,
+  type UnlockReason,
+} from "@bali/shared";
+import { bus } from "./bus";
 import {
   countStates,
   renderEvent,
@@ -9,7 +13,7 @@ import {
   serializeSession,
   shortName,
   type ParticipantSource,
-} from './serialize';
+} from "./serialize";
 
 export class HttpError extends Error {
   constructor(
@@ -21,7 +25,7 @@ export class HttpError extends Error {
   }
 }
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type EventRow = typeof s.events.$inferSelect;
 type SessionRow = typeof s.sessions.$inferSelect;
 
@@ -52,54 +56,71 @@ async function appendEvent(tx: Tx, input: EventInput): Promise<EventRow> {
       at: input.at ?? new Date(),
     })
     .returning();
-  if (!row) throw new Error('event insert failed');
+  if (!row) throw new Error("event insert failed");
   return row;
 }
 
 function publishEvents(sessionId: string | null, events: EventRow[]): void {
   if (!sessionId) return;
-  for (const ev of events) bus.publish(sessionId, { kind: 'event', event: renderEvent(ev) });
+  for (const ev of events)
+    bus.publish(sessionId, { kind: "event", event: renderEvent(ev) });
 }
 
 // ---------- loading ----------
 
 export async function loadSessionWithClass(sessionId: string) {
   const db = getDb();
-  const session = await db.query.sessions.findFirst({ where: eq(s.sessions.id, sessionId) });
-  if (!session) throw new HttpError(404, 'not_found', 'Session not found');
-  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
-  if (!cls) throw new HttpError(404, 'not_found', 'Class not found');
+  const session = await db.query.sessions.findFirst({
+    where: eq(s.sessions.id, sessionId),
+  });
+  if (!session) throw new HttpError(404, "not_found", "Session not found");
+  const cls = await db.query.classes.findFirst({
+    where: eq(s.classes.id, session.classId),
+  });
+  if (!cls) throw new HttpError(404, "not_found", "Class not found");
   return { session, cls };
 }
 
 /** Full live detail: roster × participations × active passes × pending unlocks. */
-export async function getSessionDetail(sessionId: string, now = new Date()): Promise<SessionDetailDTO> {
+export async function getSessionDetail(
+  sessionId: string,
+  now = new Date(),
+): Promise<SessionDetailDTO> {
   const db = getDb();
   const { session, cls } = await loadSessionWithClass(sessionId);
 
   // The roster and the three participation tables are independent given the session —
   // fan them out (was four sequential round-trips; this path also backs the 5s live poll).
-  const [members, participations, activePasses, pendingUnlocks] = await Promise.all([
-    db
-      .select({
-        studentId: s.students.id,
-        firstName: s.students.firstName,
-        lastName: s.students.lastName,
-      })
-      .from(s.memberships)
-      .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
-      .where(and(eq(s.memberships.classId, session.classId), eq(s.memberships.status, 'active')))
-      .orderBy(asc(s.memberships.joinedAt)),
-    db.query.participations.findMany({
-      where: eq(s.participations.sessionId, sessionId),
-    }),
-    db.query.passes.findMany({
-      where: and(eq(s.passes.sessionId, sessionId), isNull(s.passes.endedAt)),
-    }),
-    db.query.unlocks.findMany({
-      where: and(eq(s.unlocks.sessionId, sessionId), isNull(s.unlocks.reason)),
-    }),
-  ]);
+  const [members, participations, activePasses, pendingUnlocks] =
+    await Promise.all([
+      db
+        .select({
+          studentId: s.students.id,
+          firstName: s.students.firstName,
+          lastName: s.students.lastName,
+        })
+        .from(s.memberships)
+        .innerJoin(s.students, eq(s.memberships.studentId, s.students.id))
+        .where(
+          and(
+            eq(s.memberships.classId, session.classId),
+            eq(s.memberships.status, "active"),
+          ),
+        )
+        .orderBy(asc(s.memberships.joinedAt)),
+      db.query.participations.findMany({
+        where: eq(s.participations.sessionId, sessionId),
+      }),
+      db.query.passes.findMany({
+        where: and(eq(s.passes.sessionId, sessionId), isNull(s.passes.endedAt)),
+      }),
+      db.query.unlocks.findMany({
+        where: and(
+          eq(s.unlocks.sessionId, sessionId),
+          isNull(s.unlocks.reason),
+        ),
+      }),
+    ]);
 
   const byStudent = new Map(participations.map((p) => [p.studentId, p]));
   const passByStudent = new Map(activePasses.map((p) => [p.studentId, p]));
@@ -107,7 +128,11 @@ export async function getSessionDetail(sessionId: string, now = new Date()): Pro
 
   const participants = members.map((m) => {
     const src: ParticipantSource = {
-      student: { id: m.studentId, firstName: m.firstName, lastName: m.lastName },
+      student: {
+        id: m.studentId,
+        firstName: m.firstName,
+        lastName: m.lastName,
+      },
       participation: byStudent.get(m.studentId) ?? null,
       activePass: passByStudent.get(m.studentId) ?? null,
       pendingUnlock: unlockByStudent.get(m.studentId) ?? null,
@@ -122,11 +147,21 @@ export async function getSessionDetail(sessionId: string, now = new Date()): Pro
   };
 }
 
-async function publishParticipant(sessionId: string, studentId: string): Promise<void> {
+async function publishParticipant(
+  sessionId: string,
+  studentId: string,
+): Promise<void> {
   try {
     const detail = await getSessionDetail(sessionId);
-    const participant = detail.participants.find((p) => p.studentId === studentId);
-    if (participant) bus.publish(sessionId, { kind: 'participant', participant, counts: detail.counts });
+    const participant = detail.participants.find(
+      (p) => p.studentId === studentId,
+    );
+    if (participant)
+      bus.publish(sessionId, {
+        kind: "participant",
+        participant,
+        counts: detail.counts,
+      });
   } catch {
     // live fan-out is best-effort; the poll fallback self-heals
   }
@@ -135,7 +170,10 @@ async function publishParticipant(sessionId: string, studentId: string): Promise
 async function publishSession(sessionId: string): Promise<void> {
   try {
     const { session, cls } = await loadSessionWithClass(sessionId);
-    bus.publish(sessionId, { kind: 'session', session: serializeSession(session, cls.name) });
+    bus.publish(sessionId, {
+      kind: "session",
+      session: serializeSession(session, cls.name),
+    });
   } catch {
     /* best-effort */
   }
@@ -143,7 +181,9 @@ async function publishSession(sessionId: string): Promise<void> {
 
 // ---------- teacher: session lifecycle ----------
 
-export async function findOpenSessionForClass(classId: string): Promise<SessionRow | null> {
+export async function findOpenSessionForClass(
+  classId: string,
+): Promise<SessionRow | null> {
   const db = getDb();
   const open = await db.query.sessions.findFirst({
     where: and(eq(s.sessions.classId, classId), isNull(s.sessions.endedAt)),
@@ -151,7 +191,7 @@ export async function findOpenSessionForClass(classId: string): Promise<SessionR
   if (!open) return null;
   // Lazy bell: an overdue session is ended on sight, not served as live.
   if (open.endsAt <= new Date()) {
-    await endSession(open.id, 'bell');
+    await endSession(open.id, "bell");
     return null;
   }
   return open;
@@ -165,16 +205,32 @@ export async function startSession(opts: {
   policyId?: string;
 }): Promise<SessionDetailDTO> {
   const db = getDb();
-  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, opts.classId) });
-  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Class not found');
+  const cls = await db.query.classes.findFirst({
+    where: eq(s.classes.id, opts.classId),
+  });
+  if (!cls || cls.teacherId !== opts.teacherId)
+    throw new HttpError(404, "not_found", "Class not found");
   if (await findOpenSessionForClass(opts.classId))
-    throw new HttpError(409, 'session_running', 'A session is already running for this class');
-  if (opts.endsAt <= new Date()) throw new HttpError(400, 'ends_in_past', 'Session end must be in the future');
+    throw new HttpError(
+      409,
+      "session_running",
+      "A session is already running for this class",
+    );
+  if (opts.endsAt <= new Date())
+    throw new HttpError(
+      400,
+      "ends_in_past",
+      "Session end must be in the future",
+    );
   // Guard against a runaway shield: a focus session is a class period, never a whole day.
   // Caps the blast radius of any client miscomputing the bell (e.g. rolling to tomorrow).
   const MAX_SESSION_MS = 10 * 60 * 60 * 1000; // 10h — comfortably longer than any period
   if (opts.endsAt.getTime() - Date.now() > MAX_SESSION_MS)
-    throw new HttpError(400, 'ends_too_far', 'A session can run at most 10 hours — pick an end time today.');
+    throw new HttpError(
+      400,
+      "ends_too_far",
+      "A session can run at most 10 hours — pick an end time today.",
+    );
 
   const policyId = opts.policyId ?? cls.policyId;
   const policy = policyId
@@ -185,67 +241,77 @@ export async function startSession(opts: {
   // The policy collapses to a name; `allowedAppLabels` stays in the snapshot (always [])
   // so historical recaps still render and a future class-wide allow-list has a home.
   // Snapshot frozen at start — sessions never re-resolve policy (WIRING_PLAN §1.5).
-  const snapshot = { name: policy?.name ?? 'Focus', messagesAllowed: true, allowedAppLabels: [] as string[] };
+  const snapshot = {
+    name: policy?.name ?? "Focus",
+    messagesAllowed: true,
+    allowedAppLabels: [] as string[],
+  };
 
   const events: EventRow[] = [];
   let sessionId: string;
   try {
     sessionId = await db.transaction(async (tx) => {
-    const [session] = await tx
-      .insert(s.sessions)
-      .values({
-        classId: cls.id,
-        teacherId: opts.teacherId,
-        policyId: policyId ?? null,
-        policySnapshot: snapshot,
-        endsAt: opts.endsAt,
-      })
-      .returning();
-    if (!session) throw new Error('session insert failed');
+      const [session] = await tx
+        .insert(s.sessions)
+        .values({
+          classId: cls.id,
+          teacherId: opts.teacherId,
+          policyId: policyId ?? null,
+          policySnapshot: snapshot,
+          endsAt: opts.endsAt,
+        })
+        .returning();
+      if (!session) throw new Error("session insert failed");
 
-    // Carry standing "no device" marks into the session — these students start the grid
-    // as `no_device` (T7's default-no-device → §2 state), without ever tapping in.
-    const defaultNoDevice = await tx
-      .select({ studentId: s.memberships.studentId })
-      .from(s.memberships)
-      .where(
-        and(
-          eq(s.memberships.classId, cls.id),
-          eq(s.memberships.status, 'active'),
-          eq(s.memberships.defaultNoDevice, true),
-        ),
+      // Carry standing "no device" marks into the session — these students start the grid
+      // as `no_device` (T7's default-no-device → §2 state), without ever tapping in.
+      const defaultNoDevice = await tx
+        .select({ studentId: s.memberships.studentId })
+        .from(s.memberships)
+        .where(
+          and(
+            eq(s.memberships.classId, cls.id),
+            eq(s.memberships.status, "active"),
+            eq(s.memberships.defaultNoDevice, true),
+          ),
+        );
+      if (defaultNoDevice.length > 0) {
+        await tx
+          .insert(s.participations)
+          .values(
+            defaultNoDevice.map((m) => ({
+              sessionId: session.id,
+              studentId: m.studentId,
+              state: "not_joined" as const,
+              noDevice: true,
+            })),
+          )
+          .onConflictDoNothing({
+            target: [s.participations.sessionId, s.participations.studentId],
+          });
+      }
+
+      events.push(
+        await appendEvent(tx, {
+          schoolId: opts.schoolId,
+          classId: cls.id,
+          sessionId: session.id,
+          teacherId: opts.teacherId,
+          type: "session_started",
+          payload: { className: cls.name, policyName: snapshot.name },
+        }),
       );
-    if (defaultNoDevice.length > 0) {
-      await tx
-        .insert(s.participations)
-        .values(
-          defaultNoDevice.map((m) => ({
-            sessionId: session.id,
-            studentId: m.studentId,
-            state: 'not_joined' as const,
-            noDevice: true,
-          })),
-        )
-        .onConflictDoNothing({ target: [s.participations.sessionId, s.participations.studentId] });
-    }
-
-    events.push(
-      await appendEvent(tx, {
-        schoolId: opts.schoolId,
-        classId: cls.id,
-        sessionId: session.id,
-        teacherId: opts.teacherId,
-        type: 'session_started',
-        payload: { className: cls.name, policyName: snapshot.name },
-      }),
-    );
-    return session.id;
-  });
+      return session.id;
+    });
   } catch (err) {
     // Lost the race with a concurrent start (partial unique index on the open session):
     // surface the same 409 the check-then-insert path returns, not a raw 500.
-    if ((err as { code?: string })?.code === '23505')
-      throw new HttpError(409, 'session_running', 'A session is already running for this class');
+    if ((err as { code?: string })?.code === "23505")
+      throw new HttpError(
+        409,
+        "session_running",
+        "A session is already running for this class",
+      );
     throw err;
   }
 
@@ -253,19 +319,32 @@ export async function startSession(opts: {
   return getSessionDetail(sessionId);
 }
 
-export async function endSession(sessionId: string, reason: 'bell' | 'teacher'): Promise<void> {
+export async function endSession(
+  sessionId: string,
+  reason: "bell" | "teacher",
+): Promise<void> {
   const db = getDb();
   const events: EventRow[] = [];
   const ended = await db.transaction(async (tx) => {
-    const session = await tx.query.sessions.findFirst({ where: eq(s.sessions.id, sessionId) });
+    const session = await tx.query.sessions.findFirst({
+      where: eq(s.sessions.id, sessionId),
+    });
     if (!session || session.endedAt) return false;
-    const cls = await tx.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
-    const endedAt = reason === 'bell' && session.endsAt < new Date() ? session.endsAt : new Date();
+    const cls = await tx.query.classes.findFirst({
+      where: eq(s.classes.id, session.classId),
+    });
+    const endedAt =
+      reason === "bell" && session.endsAt < new Date()
+        ? session.endsAt
+        : new Date();
 
-    await tx.update(s.sessions).set({ endedAt, endReason: reason }).where(eq(s.sessions.id, sessionId));
+    await tx
+      .update(s.sessions)
+      .set({ endedAt, endReason: reason })
+      .where(eq(s.sessions.id, sessionId));
     await tx
       .update(s.participations)
-      .set({ state: 'ended' })
+      .set({ state: "ended" })
       .where(eq(s.participations.sessionId, sessionId));
     await tx
       .update(s.passes)
@@ -277,7 +356,7 @@ export async function endSession(sessionId: string, reason: 'bell' | 'teacher'):
         classId: session.classId,
         sessionId,
         teacherId: session.teacherId,
-        type: 'session_ended',
+        type: "session_ended",
         payload: { className: cls?.name, reason },
         at: endedAt,
       }),
@@ -290,27 +369,41 @@ export async function endSession(sessionId: string, reason: 'bell' | 'teacher'):
     await publishSession(sessionId);
     // One snapshot so every chip flips to "Ended" together.
     const detail = await getSessionDetail(sessionId);
-    bus.publish(sessionId, { kind: 'snapshot', detail });
+    bus.publish(sessionId, { kind: "snapshot", detail });
   }
 }
 
-export async function extendSession(sessionId: string, minutes: number, teacherId: string, schoolId: string): Promise<void> {
+export async function extendSession(
+  sessionId: string,
+  minutes: number,
+  teacherId: string,
+  schoolId: string,
+): Promise<void> {
   const db = getDb();
   const events: EventRow[] = [];
   await db.transaction(async (tx) => {
-    const session = await tx.query.sessions.findFirst({ where: eq(s.sessions.id, sessionId) });
-    if (!session || session.endedAt) throw new HttpError(409, 'not_live', 'Session is not running');
-    if (session.teacherId !== teacherId) throw new HttpError(404, 'not_found', 'Session not found');
-    const cls = await tx.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
+    const session = await tx.query.sessions.findFirst({
+      where: eq(s.sessions.id, sessionId),
+    });
+    if (!session || session.endedAt)
+      throw new HttpError(409, "not_live", "Session is not running");
+    if (session.teacherId !== teacherId)
+      throw new HttpError(404, "not_found", "Session not found");
+    const cls = await tx.query.classes.findFirst({
+      where: eq(s.classes.id, session.classId),
+    });
     const endsAt = new Date(session.endsAt.getTime() + minutes * 60_000);
-    await tx.update(s.sessions).set({ endsAt }).where(eq(s.sessions.id, sessionId));
+    await tx
+      .update(s.sessions)
+      .set({ endsAt })
+      .where(eq(s.sessions.id, sessionId));
     events.push(
       await appendEvent(tx, {
         schoolId,
         classId: session.classId,
         sessionId,
         teacherId,
-        type: 'session_extended',
+        type: "session_extended",
         payload: { className: cls?.name, minutes },
       }),
     );
@@ -332,16 +425,29 @@ export async function grantPass(opts: {
   const db = getDb();
   const events: EventRow[] = [];
   const result = await db.transaction(async (tx) => {
-    const session = await tx.query.sessions.findFirst({ where: eq(s.sessions.id, opts.sessionId) });
+    const session = await tx.query.sessions.findFirst({
+      where: eq(s.sessions.id, opts.sessionId),
+    });
     if (!session || session.endedAt || session.endsAt <= new Date())
-      throw new HttpError(409, 'not_live', 'Session is not running');
-    if (session.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Session not found');
+      throw new HttpError(409, "not_live", "Session is not running");
+    if (session.teacherId !== opts.teacherId)
+      throw new HttpError(404, "not_found", "Session not found");
 
     const participation = await tx.query.participations.findFirst({
-      where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+      where: and(
+        eq(s.participations.sessionId, opts.sessionId),
+        eq(s.participations.studentId, opts.studentId),
+      ),
     });
-    if (!participation || (participation.state !== 'focused' && participation.state !== 'pass'))
-      throw new HttpError(409, 'not_focused', 'Passes go to students who are currently focused');
+    if (
+      !participation ||
+      (participation.state !== "focused" && participation.state !== "pass")
+    )
+      throw new HttpError(
+        409,
+        "not_focused",
+        "Passes go to students who are currently focused",
+      );
 
     const existing = await tx.query.passes.findFirst({
       where: and(
@@ -350,9 +456,16 @@ export async function grantPass(opts: {
         isNull(s.passes.endedAt),
       ),
     });
-    if (existing) throw new HttpError(409, 'pass_active', 'This student already has an active pass');
+    if (existing)
+      throw new HttpError(
+        409,
+        "pass_active",
+        "This student already has an active pass",
+      );
 
-    const endsAt = new Date(Math.min(Date.now() + opts.minutes * 60_000, session.endsAt.getTime()));
+    const endsAt = new Date(
+      Math.min(Date.now() + opts.minutes * 60_000, session.endsAt.getTime()),
+    );
     const [pass] = await tx
       .insert(s.passes)
       .values({
@@ -363,11 +476,18 @@ export async function grantPass(opts: {
         endsAt,
       })
       .returning();
-    if (!pass) throw new Error('pass insert failed');
-    await tx.update(s.participations).set({ state: 'pass' }).where(eq(s.participations.id, participation.id));
+    if (!pass) throw new Error("pass insert failed");
+    await tx
+      .update(s.participations)
+      .set({ state: "pass" })
+      .where(eq(s.participations.id, participation.id));
 
-    const student = await tx.query.students.findFirst({ where: eq(s.students.id, opts.studentId) });
-    const cls = await tx.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
+    const student = await tx.query.students.findFirst({
+      where: eq(s.students.id, opts.studentId),
+    });
+    const cls = await tx.query.classes.findFirst({
+      where: eq(s.classes.id, session.classId),
+    });
     events.push(
       await appendEvent(tx, {
         schoolId: opts.schoolId,
@@ -375,9 +495,11 @@ export async function grantPass(opts: {
         sessionId: opts.sessionId,
         studentId: opts.studentId,
         teacherId: opts.teacherId,
-        type: 'pass_granted',
+        type: "pass_granted",
         payload: {
-          studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+          studentName: student
+            ? `${student.firstName} ${student.lastName}`
+            : undefined,
           className: cls?.name,
           minutes: opts.minutes,
           reason: opts.reason,
@@ -402,22 +524,57 @@ export async function setNoDevice(opts: {
   const db = getDb();
   const events: EventRow[] = [];
   await db.transaction(async (tx) => {
-    const session = await tx.query.sessions.findFirst({ where: eq(s.sessions.id, opts.sessionId) });
+    const session = await tx.query.sessions.findFirst({
+      where: eq(s.sessions.id, opts.sessionId),
+    });
     if (!session || session.teacherId !== opts.teacherId)
-      throw new HttpError(404, 'not_found', 'Session not found');
+      throw new HttpError(404, "not_found", "Session not found");
 
     const existing = await tx.query.participations.findFirst({
-      where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+      where: and(
+        eq(s.participations.sessionId, opts.sessionId),
+        eq(s.participations.studentId, opts.studentId),
+      ),
     });
+    // A real participation outranks a standing default — the same precedence the chip derives.
+    // Marking "no device" over a student who has already tapped in (or whose participation is
+    // closed) would hide their true status behind one mis-click. Clearing is always allowed:
+    // dropping the flag can only reveal.
+    if (opts.on && existing && existing.state !== "not_joined") {
+      throw existing.state === "ended"
+        ? new HttpError(
+            409,
+            "participation_closed",
+            "This student is already out of this session.",
+          )
+        : new HttpError(
+            409,
+            "already_tapped_in",
+            "“No device” is for students who never tapped in — this one already did.",
+          );
+    }
+
     if (existing) {
-      await tx.update(s.participations).set({ noDevice: opts.on }).where(eq(s.participations.id, existing.id));
+      await tx
+        .update(s.participations)
+        .set({ noDevice: opts.on })
+        .where(eq(s.participations.id, existing.id));
     } else {
       await tx
         .insert(s.participations)
-        .values({ sessionId: opts.sessionId, studentId: opts.studentId, state: 'not_joined', noDevice: opts.on });
+        .values({
+          sessionId: opts.sessionId,
+          studentId: opts.studentId,
+          state: "not_joined",
+          noDevice: opts.on,
+        });
     }
-    const student = await tx.query.students.findFirst({ where: eq(s.students.id, opts.studentId) });
-    const cls = await tx.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
+    const student = await tx.query.students.findFirst({
+      where: eq(s.students.id, opts.studentId),
+    });
+    const cls = await tx.query.classes.findFirst({
+      where: eq(s.classes.id, session.classId),
+    });
     events.push(
       await appendEvent(tx, {
         schoolId: opts.schoolId,
@@ -425,9 +582,11 @@ export async function setNoDevice(opts: {
         sessionId: opts.sessionId,
         studentId: opts.studentId,
         teacherId: opts.teacherId,
-        type: opts.on ? 'no_device_set' : 'no_device_cleared',
+        type: opts.on ? "no_device_set" : "no_device_cleared",
         payload: {
-          studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+          studentName: student
+            ? `${student.firstName} ${student.lastName}`
+            : undefined,
           className: cls?.name,
         },
       }),
@@ -439,21 +598,52 @@ export async function setNoDevice(opts: {
 
 // ---------- student: membership gate ----------
 
-async function requireActiveMembership(sessionId: string, studentId: string) {
+async function requireActiveMembership(
+  sessionId: string,
+  studentId: string,
+  { orParticipant = false }: { orParticipant?: boolean } = {},
+) {
   const db = getDb();
   const { session, cls } = await loadSessionWithClass(sessionId);
   const membership = await db.query.memberships.findFirst({
     where: and(
       eq(s.memberships.classId, session.classId),
       eq(s.memberships.studentId, studentId),
-      eq(s.memberships.status, 'active'),
+      eq(s.memberships.status, "active"),
     ),
   });
-  if (!membership) throw new HttpError(403, 'not_member', "You're not in this class yet");
+  if (!membership) {
+    // The student always holds the exit: someone removed mid-session still gets to record
+    // the unlock they already took, instead of a 403 the client silently discards.
+    const participation = orParticipant
+      ? await db.query.participations.findFirst({
+          where: and(
+            eq(s.participations.sessionId, sessionId),
+            eq(s.participations.studentId, studentId),
+          ),
+        })
+      : null;
+    if (!participation)
+      throw new HttpError(403, "not_member", "You're not in this class yet");
+  }
   return { session, cls };
 }
 
 // ---------- student: tap-in / heartbeat / unlock / reason / refocus ----------
+
+/**
+ * A client-chosen timestamp is only trusted inside the session it belongs to. A genuine
+ * offline replay always lands in [startedAt, now]; a backdated one would otherwise drop the
+ * unlock out of the teacher's report window, or inflate focus minutes without limit.
+ */
+function clampToSession(
+  at: Date | undefined,
+  session: SessionRow,
+  now: Date,
+): Date {
+  if (!at || at > now) return now;
+  return at < session.startedAt ? session.startedAt : at;
+}
 
 export async function tapIn(opts: {
   studentId: string;
@@ -461,25 +651,32 @@ export async function tapIn(opts: {
   sessionId: string;
   clientEventId: string;
   tappedAt?: Date;
-}): Promise<{ state: 'focused'; alreadyIn: boolean }> {
-  const { session, cls } = await requireActiveMembership(opts.sessionId, opts.studentId);
+}): Promise<{ state: "focused"; alreadyIn: boolean }> {
+  const { session, cls } = await requireActiveMembership(
+    opts.sessionId,
+    opts.studentId,
+  );
   if (session.endedAt || session.endsAt <= new Date())
-    throw new HttpError(409, 'session_over', 'This session has ended');
+    throw new HttpError(409, "session_over", "This session has ended");
 
   const db = getDb();
   const events: EventRow[] = [];
   const alreadyIn = await db.transaction(async (tx) => {
     const existing = await tx.query.participations.findFirst({
-      where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+      where: and(
+        eq(s.participations.sessionId, opts.sessionId),
+        eq(s.participations.studentId, opts.studentId),
+      ),
     });
     const now = new Date();
-    const tappedAt = opts.tappedAt && opts.tappedAt < now ? opts.tappedAt : now;
+    const tappedAt = clampToSession(opts.tappedAt, session, now);
 
     if (!existing) {
       await tx.insert(s.participations).values({
         sessionId: opts.sessionId,
         studentId: opts.studentId,
-        state: 'focused',
+        state: "focused",
+        noDevice: false,
         tappedInAt: tappedAt,
         lastSeenAt: now,
         tapClientEventId: opts.clientEventId,
@@ -490,7 +687,7 @@ export async function tapIn(opts: {
           classId: cls.id,
           sessionId: opts.sessionId,
           studentId: opts.studentId,
-          type: 'tapped_in',
+          type: "tapped_in",
           payload: { studentName: opts.studentName, className: cls.name },
           at: tappedAt,
         }),
@@ -499,16 +696,24 @@ export async function tapIn(opts: {
     }
 
     // Idempotent replay of the same physical tap.
-    if (existing.tapClientEventId === opts.clientEventId && existing.state === 'focused') return true;
+    if (
+      existing.tapClientEventId === opts.clientEventId &&
+      existing.state === "focused"
+    )
+      return true;
 
-    if (existing.state === 'focused' || existing.state === 'pass') return true;
+    if (existing.state === "focused" || existing.state === "pass") return true;
 
     // Re-tap after an unlock (or after restoring permission) returns to focus.
-    const wasUnlocked = existing.state === 'emergency_unlocked';
+    const wasUnlocked = existing.state === "emergency_unlocked";
+    // A tap is proof of a device; the standing "no device" mark is only a default, so the
+    // teacher's grid must stop saying "No device" for a student who is actually shielded.
+    const clearedNoDevice = existing.noDevice;
     await tx
       .update(s.participations)
       .set({
-        state: 'focused',
+        state: "focused",
+        noDevice: false,
         tappedInAt: existing.tappedInAt ?? tappedAt,
         lastSeenAt: now,
         tapClientEventId: opts.clientEventId,
@@ -520,16 +725,28 @@ export async function tapIn(opts: {
         classId: cls.id,
         sessionId: opts.sessionId,
         studentId: opts.studentId,
-        type: wasUnlocked ? 'refocused' : 'tapped_in',
+        type: wasUnlocked ? "refocused" : "tapped_in",
         payload: { studentName: opts.studentName, className: cls.name },
       }),
     );
+    if (clearedNoDevice) {
+      events.push(
+        await appendEvent(tx, {
+          schoolId: cls.schoolId,
+          classId: cls.id,
+          sessionId: opts.sessionId,
+          studentId: opts.studentId,
+          type: "no_device_cleared",
+          payload: { studentName: opts.studentName, className: cls.name },
+        }),
+      );
+    }
     return false;
   });
 
   publishEvents(opts.sessionId, events);
   await publishParticipant(opts.sessionId, opts.studentId);
-  return { state: 'focused', alreadyIn };
+  return { state: "focused", alreadyIn };
 }
 
 export async function heartbeat(opts: {
@@ -543,9 +760,13 @@ export async function heartbeat(opts: {
   const { session, cls } = await loadSessionWithClass(opts.sessionId);
 
   const participation = await db.query.participations.findFirst({
-    where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+    where: and(
+      eq(s.participations.sessionId, opts.sessionId),
+      eq(s.participations.studentId, opts.studentId),
+    ),
   });
-  if (!participation) throw new HttpError(404, 'not_participating', 'Tap in first');
+  if (!participation)
+    throw new HttpError(404, "not_participating", "Tap in first");
 
   const sessionLive = !session.endedAt && session.endsAt > new Date();
   const events: EventRow[] = [];
@@ -553,27 +774,48 @@ export async function heartbeat(opts: {
 
   await db.transaction(async (tx) => {
     let state = participation.state;
-    if (sessionLive && !opts.permissionOk && (state === 'focused' || state === 'pass')) {
-      state = 'revoked';
+    // "Focused" has to mean the phone is ACTUALLY shielded. The client reports two separate
+    // facts and we used to read only the first: Screen Time can be authorized while the
+    // shields are not up (our own apply failed, or the device cannot shield at all), and
+    // trusting permissionOk alone puts a green chip on an unshielded phone. A pass is the
+    // deliberate exception — the shields are meant to be down for its duration.
+    const reallyShielded =
+      opts.permissionOk &&
+      (participation.state === "pass" || opts.shieldsApplied);
+    if (
+      sessionLive &&
+      !reallyShielded &&
+      (state === "focused" || state === "pass")
+    ) {
+      state = "revoked";
+      // Only say someone turned Screen Time off when they actually did. `permission_revoked`
+      // renders as "<Student> turned off Screen Time permission" — writing that because the
+      // shields merely failed to apply puts a false accusation about a child permanently into
+      // the teacher's timeline, recap and reports. The chip still moves off "Focused" (the
+      // material fact), it just does so without a claim we cannot stand behind.
+      // A distinct `shields_down` event type would be the complete fix; it needs a Postgres
+      // enum migration across 12 files, so it is the owner's call, not a silent addition.
+      if (!opts.permissionOk) {
+        events.push(
+          await appendEvent(tx, {
+            schoolId: cls.schoolId,
+            classId: cls.id,
+            sessionId: opts.sessionId,
+            studentId: opts.studentId,
+            type: "permission_revoked",
+            payload: { studentName: opts.studentName, className: cls.name },
+          }),
+        );
+      }
+    } else if (sessionLive && reallyShielded && state === "revoked") {
+      state = "focused";
       events.push(
         await appendEvent(tx, {
           schoolId: cls.schoolId,
           classId: cls.id,
           sessionId: opts.sessionId,
           studentId: opts.studentId,
-          type: 'permission_revoked',
-          payload: { studentName: opts.studentName, className: cls.name },
-        }),
-      );
-    } else if (sessionLive && opts.permissionOk && state === 'revoked') {
-      state = 'focused';
-      events.push(
-        await appendEvent(tx, {
-          schoolId: cls.schoolId,
-          classId: cls.id,
-          sessionId: opts.sessionId,
-          studentId: opts.studentId,
-          type: 'permission_restored',
+          type: "permission_restored",
           payload: { studentName: opts.studentName, className: cls.name },
         }),
       );
@@ -619,7 +861,10 @@ export async function heartbeat(opts: {
       endedAt: session.endedAt ? session.endedAt.toISOString() : null,
     },
     state: derived.state,
-    passEndsAt: derived.state === 'pass' && activePass ? activePass.endsAt.toISOString() : null,
+    passEndsAt:
+      derived.state === "pass" && activePass
+        ? activePass.endsAt.toISOString()
+        : null,
     allowedAppLabels: session.policySnapshot.allowedAppLabels,
     messagesAllowed: session.policySnapshot.messagesAllowed,
   };
@@ -633,7 +878,11 @@ export async function emergencyUnlock(opts: {
   at?: Date;
 }): Promise<{ unlockId: string | null; recorded: boolean }> {
   const db = getDb();
-  const { session, cls } = await requireActiveMembership(opts.sessionId, opts.studentId);
+  const { session, cls } = await requireActiveMembership(
+    opts.sessionId,
+    opts.studentId,
+    { orParticipant: true },
+  );
 
   // Offline replays may land after the bell: shields are already off, nothing to record
   // as a live state change — acknowledge so the client clears its queue.
@@ -648,7 +897,7 @@ export async function emergencyUnlock(opts: {
 
   const events: EventRow[] = [];
   const unlockId = await db.transaction(async (tx) => {
-    const at = opts.at && opts.at < new Date() ? opts.at : new Date();
+    const at = clampToSession(opts.at, session, new Date());
     const [unlock] = await tx
       .insert(s.unlocks)
       .values({
@@ -660,23 +909,28 @@ export async function emergencyUnlock(opts: {
       .onConflictDoNothing({ target: s.unlocks.clientEventId })
       .returning();
     if (!unlock) {
-      const raced = await tx.query.unlocks.findFirst({ where: eq(s.unlocks.clientEventId, opts.clientEventId) });
+      const raced = await tx.query.unlocks.findFirst({
+        where: eq(s.unlocks.clientEventId, opts.clientEventId),
+      });
       return raced?.id ?? null;
     }
 
     const participation = await tx.query.participations.findFirst({
-      where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+      where: and(
+        eq(s.participations.sessionId, opts.sessionId),
+        eq(s.participations.studentId, opts.studentId),
+      ),
     });
     if (participation) {
       await tx
         .update(s.participations)
-        .set({ state: 'emergency_unlocked', lastSeenAt: new Date() })
+        .set({ state: "emergency_unlocked", lastSeenAt: new Date() })
         .where(eq(s.participations.id, participation.id));
     } else {
       await tx.insert(s.participations).values({
         sessionId: opts.sessionId,
         studentId: opts.studentId,
-        state: 'emergency_unlocked',
+        state: "emergency_unlocked",
         lastSeenAt: new Date(),
       });
     }
@@ -685,7 +939,11 @@ export async function emergencyUnlock(opts: {
       .update(s.passes)
       .set({ endedAt: at })
       .where(
-        and(eq(s.passes.sessionId, opts.sessionId), eq(s.passes.studentId, opts.studentId), isNull(s.passes.endedAt)),
+        and(
+          eq(s.passes.sessionId, opts.sessionId),
+          eq(s.passes.studentId, opts.studentId),
+          isNull(s.passes.endedAt),
+        ),
       );
 
     events.push(
@@ -694,7 +952,7 @@ export async function emergencyUnlock(opts: {
         classId: cls.id,
         sessionId: opts.sessionId,
         studentId: opts.studentId,
-        type: 'emergency_unlock',
+        type: "emergency_unlock",
         payload: { studentName: opts.studentName, className: cls.name },
         at,
       }),
@@ -714,8 +972,11 @@ export async function shareUnlockReason(opts: {
   reason: UnlockReason;
 }): Promise<void> {
   const db = getDb();
-  const unlock = await db.query.unlocks.findFirst({ where: eq(s.unlocks.id, opts.unlockId) });
-  if (!unlock || unlock.studentId !== opts.studentId) throw new HttpError(404, 'not_found', 'Unlock not found');
+  const unlock = await db.query.unlocks.findFirst({
+    where: eq(s.unlocks.id, opts.unlockId),
+  });
+  if (!unlock || unlock.studentId !== opts.studentId)
+    throw new HttpError(404, "not_found", "Unlock not found");
   if (unlock.reason) return; // sharing is one-shot; replays are no-ops
 
   const { cls } = await loadSessionWithClass(unlock.sessionId);
@@ -731,8 +992,12 @@ export async function shareUnlockReason(opts: {
         classId: cls.id,
         sessionId: unlock.sessionId,
         studentId: opts.studentId,
-        type: 'reason_shared',
-        payload: { studentName: opts.studentName, className: cls.name, sharedReason: opts.reason },
+        type: "reason_shared",
+        payload: {
+          studentName: opts.studentName,
+          className: cls.name,
+          sharedReason: opts.reason,
+        },
       }),
     );
   });
@@ -740,22 +1005,36 @@ export async function shareUnlockReason(opts: {
   await publishParticipant(unlock.sessionId, opts.studentId);
 }
 
-export async function refocus(opts: { studentId: string; studentName: string; sessionId: string }): Promise<void> {
+export async function refocus(opts: {
+  studentId: string;
+  studentName: string;
+  sessionId: string;
+}): Promise<void> {
   const db = getDb();
-  const { session, cls } = await requireActiveMembership(opts.sessionId, opts.studentId);
+  // Deliberately strict, unlike emergencyUnlock: the exit falls open for anyone who was in the
+  // session, but re-shielding does not. A student who left or was removed is off the roster, so
+  // getSessionDetail would never list them again — re-focusing here would put shields back on a
+  // phone no teacher can see. The way back in is to rejoin the class and tap the tag again.
+  const { session, cls } = await requireActiveMembership(
+    opts.sessionId,
+    opts.studentId,
+  );
   if (session.endedAt || session.endsAt <= new Date())
-    throw new HttpError(409, 'session_over', 'This session has ended');
+    throw new HttpError(409, "session_over", "This session has ended");
 
   const events: EventRow[] = [];
   await db.transaction(async (tx) => {
     const participation = await tx.query.participations.findFirst({
-      where: and(eq(s.participations.sessionId, opts.sessionId), eq(s.participations.studentId, opts.studentId)),
+      where: and(
+        eq(s.participations.sessionId, opts.sessionId),
+        eq(s.participations.studentId, opts.studentId),
+      ),
     });
-    if (!participation || participation.state !== 'emergency_unlocked')
-      throw new HttpError(409, 'not_unlocked', 'Nothing to re-focus');
+    if (!participation || participation.state !== "emergency_unlocked")
+      throw new HttpError(409, "not_unlocked", "Nothing to re-focus");
     await tx
       .update(s.participations)
-      .set({ state: 'focused', lastSeenAt: new Date() })
+      .set({ state: "focused", lastSeenAt: new Date() })
       .where(eq(s.participations.id, participation.id));
     events.push(
       await appendEvent(tx, {
@@ -763,7 +1042,7 @@ export async function refocus(opts: { studentId: string; studentName: string; se
         classId: cls.id,
         sessionId: opts.sessionId,
         studentId: opts.studentId,
-        type: 'refocused',
+        type: "refocused",
         payload: { studentName: opts.studentName, className: cls.name },
       }),
     );
@@ -781,7 +1060,7 @@ export async function sweep(now = new Date()): Promise<void> {
   const overdueSessions = await db.query.sessions.findMany({
     where: and(isNull(s.sessions.endedAt), lte(s.sessions.endsAt, now)),
   });
-  for (const session of overdueSessions) await endSession(session.id, 'bell');
+  for (const session of overdueSessions) await endSession(session.id, "bell");
 
   const overduePasses = await db.query.passes.findMany({
     where: and(isNull(s.passes.endedAt), lte(s.passes.endsAt, now)),
@@ -791,27 +1070,44 @@ export async function sweep(now = new Date()): Promise<void> {
   for (const pass of overduePasses) {
     const events: EventRow[] = [];
     await db.transaction(async (tx) => {
-      await tx.update(s.passes).set({ endedAt: pass.endsAt }).where(eq(s.passes.id, pass.id));
+      await tx
+        .update(s.passes)
+        .set({ endedAt: pass.endsAt })
+        .where(eq(s.passes.id, pass.id));
       const participation = await tx.query.participations.findFirst({
-        where: and(eq(s.participations.sessionId, pass.sessionId), eq(s.participations.studentId, pass.studentId)),
+        where: and(
+          eq(s.participations.sessionId, pass.sessionId),
+          eq(s.participations.studentId, pass.studentId),
+        ),
       });
       // Shields return automatically — but only if the student is still on the pass.
-      if (participation?.state === 'pass') {
-        await tx.update(s.participations).set({ state: 'focused' }).where(eq(s.participations.id, participation.id));
+      if (participation?.state === "pass") {
+        await tx
+          .update(s.participations)
+          .set({ state: "focused" })
+          .where(eq(s.participations.id, participation.id));
       }
-      const session = await tx.query.sessions.findFirst({ where: eq(s.sessions.id, pass.sessionId) });
+      const session = await tx.query.sessions.findFirst({
+        where: eq(s.sessions.id, pass.sessionId),
+      });
       if (session && !session.endedAt) {
-        const student = await tx.query.students.findFirst({ where: eq(s.students.id, pass.studentId) });
-        const cls = await tx.query.classes.findFirst({ where: eq(s.classes.id, session.classId) });
+        const student = await tx.query.students.findFirst({
+          where: eq(s.students.id, pass.studentId),
+        });
+        const cls = await tx.query.classes.findFirst({
+          where: eq(s.classes.id, session.classId),
+        });
         events.push(
           await appendEvent(tx, {
-            schoolId: cls?.schoolId ?? '',
+            schoolId: cls?.schoolId ?? "",
             classId: session.classId,
             sessionId: pass.sessionId,
             studentId: pass.studentId,
-            type: 'pass_ended',
+            type: "pass_ended",
             payload: {
-              studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+              studentName: student
+                ? `${student.firstName} ${student.lastName}`
+                : undefined,
               className: cls?.name,
             },
             at: pass.endsAt,
@@ -826,13 +1122,15 @@ export async function sweep(now = new Date()): Promise<void> {
 
 // ---------- membership (join / approve / decline / remove / leave) ----------
 
-export async function joinByCode(opts: {
+/** Read-only twin of joinByCode for the S2 consent preview. Same class card, no
+ *  transaction and no event: a mistyped code that happens to match a stranger's class
+ *  must not enrol the student or write their name into that teacher's log. `'none'`
+ *  means they aren't in this class yet — the join is still theirs to make. */
+export async function previewClassByCode(opts: {
   studentId: string;
-  studentName: string;
   code: string;
-  source?: 'code' | 'tag';
 }): Promise<{
-  membershipStatus: 'pending' | 'active';
+  membershipStatus: "none" | "pending" | "active";
   classId: string;
   className: string;
   teacherDisplayName: string;
@@ -844,37 +1142,100 @@ export async function joinByCode(opts: {
   const cls = await db.query.classes.findFirst({
     where: and(eq(s.classes.joinCode, opts.code), isNull(s.classes.archivedAt)),
   });
-  if (!cls) throw new HttpError(404, 'bad_code', "That code doesn't match a class — check the board.");
+  if (!cls)
+    throw new HttpError(
+      404,
+      "bad_code",
+      "That code doesn't match a class — check the board.",
+    );
 
-  const teacher = await db.query.teachers.findFirst({ where: eq(s.teachers.id, cls.teacherId) });
+  const teacher = await db.query.teachers.findFirst({
+    where: eq(s.teachers.id, cls.teacherId),
+  });
   const policy = cls.policyId
-    ? await db.query.policies.findFirst({ where: eq(s.policies.id, cls.policyId) })
+    ? await db.query.policies.findFirst({
+        where: eq(s.policies.id, cls.policyId),
+      })
+    : null;
+  const existing = await db.query.memberships.findFirst({
+    where: and(
+      eq(s.memberships.classId, cls.id),
+      eq(s.memberships.studentId, opts.studentId),
+    ),
+  });
+
+  return {
+    membershipStatus: existing?.status ?? "none",
+    classId: cls.id,
+    className: cls.name,
+    teacherDisplayName: teacher?.displayName ?? "Your teacher",
+    scheduleLabel: `${cls.daysLabel}, ${cls.startTime.slice(0, 5)}–${cls.endTime.slice(0, 5)}`,
+    allowedAppLabels: policy?.allowedAppLabels ?? [],
+    messagesAllowed: policy?.messagesAllowed ?? true,
+  };
+}
+
+export async function joinByCode(opts: {
+  studentId: string;
+  studentName: string;
+  code: string;
+  source?: "code" | "tag";
+}): Promise<{
+  membershipStatus: "pending" | "active";
+  classId: string;
+  className: string;
+  teacherDisplayName: string;
+  scheduleLabel: string;
+  allowedAppLabels: string[];
+  messagesAllowed: boolean;
+}> {
+  const db = getDb();
+  const cls = await db.query.classes.findFirst({
+    where: and(eq(s.classes.joinCode, opts.code), isNull(s.classes.archivedAt)),
+  });
+  if (!cls)
+    throw new HttpError(
+      404,
+      "bad_code",
+      "That code doesn't match a class — check the board.",
+    );
+
+  const teacher = await db.query.teachers.findFirst({
+    where: eq(s.teachers.id, cls.teacherId),
+  });
+  const policy = cls.policyId
+    ? await db.query.policies.findFirst({
+        where: eq(s.policies.id, cls.policyId),
+      })
     : null;
 
   const existing = await db.query.memberships.findFirst({
-    where: and(eq(s.memberships.classId, cls.id), eq(s.memberships.studentId, opts.studentId)),
+    where: and(
+      eq(s.memberships.classId, cls.id),
+      eq(s.memberships.studentId, opts.studentId),
+    ),
   });
 
-  let status: 'pending' | 'active';
+  let status: "pending" | "active";
   if (existing) {
     status = existing.status;
   } else {
-    status = cls.requireApproval ? 'pending' : 'active';
+    status = cls.requireApproval ? "pending" : "active";
     const events: EventRow[] = [];
     await db.transaction(async (tx) => {
       await tx.insert(s.memberships).values({
         classId: cls.id,
         studentId: opts.studentId,
         status,
-        source: opts.source ?? 'code',
-        approvedAt: status === 'active' ? new Date() : null,
+        source: opts.source ?? "code",
+        approvedAt: status === "active" ? new Date() : null,
       });
       events.push(
         await appendEvent(tx, {
           schoolId: cls.schoolId,
           classId: cls.id,
           studentId: opts.studentId,
-          type: status === 'active' ? 'member_joined' : 'member_requested',
+          type: status === "active" ? "member_joined" : "member_requested",
           payload: { studentName: opts.studentName, className: cls.name },
         }),
       );
@@ -887,11 +1248,47 @@ export async function joinByCode(opts: {
     membershipStatus: status,
     classId: cls.id,
     className: cls.name,
-    teacherDisplayName: teacher?.displayName ?? 'Your teacher',
+    teacherDisplayName: teacher?.displayName ?? "Your teacher",
     scheduleLabel: `${cls.daysLabel}, ${cls.startTime.slice(0, 5)}–${cls.endTime.slice(0, 5)}`,
     allowedAppLabels: policy?.allowedAppLabels ?? [],
     messagesAllowed: policy?.messagesAllowed ?? true,
   };
+}
+
+/**
+ * Dropping a membership must also release the phone: leaving the participation open keeps the
+ * shields on (the heartbeat only needs a participation row) while the exit endpoints start
+ * 403ing. Fail open — end the participation and any pass in the same transaction. Shared by
+ * both exits from a class (teacher removes, student leaves) so they cannot drift apart.
+ */
+async function releaseFromLiveSession(
+  tx: Tx,
+  classId: string,
+  studentId: string,
+): Promise<void> {
+  const live = await tx.query.sessions.findFirst({
+    where: and(eq(s.sessions.classId, classId), isNull(s.sessions.endedAt)),
+  });
+  if (!live) return;
+  await tx
+    .update(s.participations)
+    .set({ state: "ended" })
+    .where(
+      and(
+        eq(s.participations.sessionId, live.id),
+        eq(s.participations.studentId, studentId),
+      ),
+    );
+  await tx
+    .update(s.passes)
+    .set({ endedAt: new Date() })
+    .where(
+      and(
+        eq(s.passes.sessionId, live.id),
+        eq(s.passes.studentId, studentId),
+        isNull(s.passes.endedAt),
+      ),
+    );
 }
 
 export async function removeMembership(opts: {
@@ -900,24 +1297,37 @@ export async function removeMembership(opts: {
   membershipId: string;
 }): Promise<void> {
   const db = getDb();
-  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, opts.membershipId) });
-  if (!membership) throw new HttpError(404, 'not_found', 'Membership not found');
-  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
-  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Membership not found');
+  const membership = await db.query.memberships.findFirst({
+    where: eq(s.memberships.id, opts.membershipId),
+  });
+  if (!membership)
+    throw new HttpError(404, "not_found", "Membership not found");
+  const cls = await db.query.classes.findFirst({
+    where: eq(s.classes.id, membership.classId),
+  });
+  if (!cls || cls.teacherId !== opts.teacherId)
+    throw new HttpError(404, "not_found", "Membership not found");
 
-  const student = await db.query.students.findFirst({ where: eq(s.students.id, membership.studentId) });
+  const student = await db.query.students.findFirst({
+    where: eq(s.students.id, membership.studentId),
+  });
   const events: EventRow[] = [];
   await db.transaction(async (tx) => {
-    await tx.delete(s.memberships).where(eq(s.memberships.id, opts.membershipId));
+    await tx
+      .delete(s.memberships)
+      .where(eq(s.memberships.id, opts.membershipId));
+    await releaseFromLiveSession(tx, cls.id, membership.studentId);
     events.push(
       await appendEvent(tx, {
         schoolId: opts.schoolId,
         classId: cls.id,
         studentId: membership.studentId,
         teacherId: opts.teacherId,
-        type: 'member_removed',
+        type: "member_removed",
         payload: {
-          studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+          studentName: student
+            ? `${student.firstName} ${student.lastName}`
+            : undefined,
           className: cls.name,
         },
       }),
@@ -928,7 +1338,33 @@ export async function removeMembership(opts: {
   // Roster shrank — push a fresh snapshot so a live grid drops the chip immediately.
   if (open) {
     const detail = await getSessionDetail(open.id);
-    bus.publish(open.id, { kind: 'snapshot', detail });
+    bus.publish(open.id, { kind: "snapshot", detail });
+  }
+}
+
+/** The student's own exit from a class. Same release as a teacher removal — a student who
+ *  walks out mid-session must not stay shielded — but it stays silent: leaving is the
+ *  student's own business, and the teacher only ever sees status. */
+export async function leaveMembership(opts: {
+  studentId: string;
+  membershipId: string;
+}): Promise<void> {
+  const db = getDb();
+  const membership = await db.query.memberships.findFirst({
+    where: eq(s.memberships.id, opts.membershipId),
+  });
+  if (!membership || membership.studentId !== opts.studentId)
+    throw new HttpError(404, "not_found", "Membership not found");
+
+  await db.transaction(async (tx) => {
+    await tx.delete(s.memberships).where(eq(s.memberships.id, membership.id));
+    await releaseFromLiveSession(tx, membership.classId, membership.studentId);
+  });
+  // Roster shrank — push a fresh snapshot so a live grid drops the chip immediately.
+  const open = await findOpenSessionForClass(membership.classId);
+  if (open) {
+    const detail = await getSessionDetail(open.id);
+    bus.publish(open.id, { kind: "snapshot", detail });
   }
 }
 
@@ -938,30 +1374,46 @@ export async function setMembershipDefaults(opts: {
   defaultNoDevice?: boolean;
 }): Promise<{ membershipId: string; defaultNoDevice: boolean }> {
   const db = getDb();
-  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, opts.membershipId) });
-  if (!membership) throw new HttpError(404, 'not_found', 'Membership not found');
-  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
-  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Membership not found');
+  const membership = await db.query.memberships.findFirst({
+    where: eq(s.memberships.id, opts.membershipId),
+  });
+  if (!membership)
+    throw new HttpError(404, "not_found", "Membership not found");
+  const cls = await db.query.classes.findFirst({
+    where: eq(s.classes.id, membership.classId),
+  });
+  if (!cls || cls.teacherId !== opts.teacherId)
+    throw new HttpError(404, "not_found", "Membership not found");
 
   const [updated] = await db
     .update(s.memberships)
-    .set({ ...(opts.defaultNoDevice !== undefined ? { defaultNoDevice: opts.defaultNoDevice } : {}) })
+    .set({
+      ...(opts.defaultNoDevice !== undefined
+        ? { defaultNoDevice: opts.defaultNoDevice }
+        : {}),
+    })
     .where(eq(s.memberships.id, opts.membershipId))
     .returning();
-  if (!updated) throw new Error('membership update failed');
+  if (!updated) throw new Error("membership update failed");
 
   // A live session reflects the new default immediately: flip the student's no-device
   // mark so the grid follows the roster (carries the dashed chip in/out at once).
   if (opts.defaultNoDevice !== undefined) {
     const open = await findOpenSessionForClass(membership.classId);
     if (open) {
-      await setNoDevice({
-        teacherId: opts.teacherId,
-        schoolId: cls.schoolId,
-        sessionId: open.id,
-        studentId: membership.studentId,
-        on: opts.defaultNoDevice,
-      });
+      try {
+        await setNoDevice({
+          teacherId: opts.teacherId,
+          schoolId: cls.schoolId,
+          sessionId: open.id,
+          studentId: membership.studentId,
+          on: opts.defaultNoDevice,
+        });
+      } catch (err) {
+        // The roster default is about future sessions, so it saves either way; today's grid
+        // just refuses to be masked when the student has already tapped in (or is out).
+        if (!(err instanceof HttpError && err.statusCode === 409)) throw err;
+      }
     }
   }
   return { membershipId: updated.id, defaultNoDevice: updated.defaultNoDevice };
@@ -974,22 +1426,32 @@ export async function decideMembership(opts: {
   approve: boolean;
 }): Promise<void> {
   const db = getDb();
-  const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, opts.membershipId) });
-  if (!membership) throw new HttpError(404, 'not_found', 'Request not found');
-  const cls = await db.query.classes.findFirst({ where: eq(s.classes.id, membership.classId) });
-  if (!cls || cls.teacherId !== opts.teacherId) throw new HttpError(404, 'not_found', 'Request not found');
-  if (membership.status !== 'pending') throw new HttpError(409, 'not_pending', 'Already decided');
+  const membership = await db.query.memberships.findFirst({
+    where: eq(s.memberships.id, opts.membershipId),
+  });
+  if (!membership) throw new HttpError(404, "not_found", "Request not found");
+  const cls = await db.query.classes.findFirst({
+    where: eq(s.classes.id, membership.classId),
+  });
+  if (!cls || cls.teacherId !== opts.teacherId)
+    throw new HttpError(404, "not_found", "Request not found");
+  if (membership.status !== "pending")
+    throw new HttpError(409, "not_pending", "Already decided");
 
-  const student = await db.query.students.findFirst({ where: eq(s.students.id, membership.studentId) });
+  const student = await db.query.students.findFirst({
+    where: eq(s.students.id, membership.studentId),
+  });
   const events: EventRow[] = [];
   await db.transaction(async (tx) => {
     if (opts.approve) {
       await tx
         .update(s.memberships)
-        .set({ status: 'active', approvedAt: new Date() })
+        .set({ status: "active", approvedAt: new Date() })
         .where(eq(s.memberships.id, opts.membershipId));
     } else {
-      await tx.delete(s.memberships).where(eq(s.memberships.id, opts.membershipId));
+      await tx
+        .delete(s.memberships)
+        .where(eq(s.memberships.id, opts.membershipId));
     }
     events.push(
       await appendEvent(tx, {
@@ -997,9 +1459,11 @@ export async function decideMembership(opts: {
         classId: cls.id,
         studentId: membership.studentId,
         teacherId: opts.teacherId,
-        type: opts.approve ? 'member_approved' : 'member_declined',
+        type: opts.approve ? "member_approved" : "member_declined",
         payload: {
-          studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
+          studentName: student
+            ? `${student.firstName} ${student.lastName}`
+            : undefined,
           className: cls.name,
         },
       }),

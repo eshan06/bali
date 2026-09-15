@@ -2,12 +2,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { getDb, schema as s } from '@bali/db';
 import {
+  deriveParticipantState,
   heartbeatBodySchema,
   joinBodySchema,
   resolveTagBodySchema,
   tapInBodySchema,
   unlockBodySchema,
   unlockReasonBodySchema,
+  type ChipState,
 } from '@bali/shared';
 import { authenticate, requireStudent, type StudentCtx } from '../auth';
 import {
@@ -15,6 +17,8 @@ import {
   findOpenSessionForClass,
   heartbeat,
   joinByCode,
+  leaveMembership,
+  previewClassByCode,
   refocus,
   shareUnlockReason,
   tapIn,
@@ -36,6 +40,15 @@ export function studentRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', authenticate);
 
   // ---------- join ----------
+  // S2 shows the class before the student commits, so the preview has to be free of
+  // side effects — same shape as /v1/join, same limit, but no membership and no event.
+  app.get('/v1/classes/preview', limited(10), async (req, reply) => {
+    const student = await studentGate(req, reply);
+    if (!student) return;
+    const query = joinBodySchema.parse(req.query);
+    return previewClassByCode({ studentId: student.id, code: query.code });
+  });
+
   app.post('/v1/join', limited(10), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
@@ -70,7 +83,7 @@ export function studentRoutes(app: FastifyInstance): void {
       const teacher = await db.query.teachers.findFirst({ where: eq(s.teachers.id, row.teacherId) });
       const open = row.status === 'active' ? await findOpenSessionForClass(row.classId) : null;
 
-      let mine: { state: string; passEndsAt: string | null; pendingUnlockId: string | null } | null = null;
+      let mine: { state: ChipState; passEndsAt: string | null; pendingUnlockId: string | null } | null = null;
       if (open) {
         const participation = await db.query.participations.findFirst({
           where: and(eq(s.participations.sessionId, open.id), eq(s.participations.studentId, student.id)),
@@ -90,9 +103,23 @@ export function studentRoutes(app: FastifyInstance): void {
           ),
           orderBy: desc(s.unlocks.at),
         });
+        // One state vocabulary everywhere: home returns the same DERIVED chip state the
+        // heartbeat and the teacher's grid render, never the raw participation row. Two
+        // vocabularies for one field meant the phone had to guess (a stored `pass` whose
+        // window has closed is `focused` — shields are already returning).
+        const now = new Date();
+        const derived = deriveParticipantState({
+          storedState: participation?.state ?? null,
+          noDevice: participation?.noDevice ?? false,
+          passEndsAt: activePass && !activePass.endedAt ? activePass.endsAt : null,
+          lastSeenAt: participation?.lastSeenAt ?? null,
+          session: { endsAt: open.endsAt, endedAt: open.endedAt },
+          now,
+        });
         mine = {
-          state: participation?.state ?? 'not_joined',
-          passEndsAt: activePass && activePass.endsAt > new Date() ? activePass.endsAt.toISOString() : null,
+          state: derived.state,
+          // Gated on the derived state so `pass` always arrives with an end time to act on.
+          passEndsAt: derived.state === 'pass' && activePass ? activePass.endsAt.toISOString() : null,
           pendingUnlockId: pendingUnlock?.id ?? null,
         };
       }
@@ -320,11 +347,9 @@ export function studentRoutes(app: FastifyInstance): void {
   app.post<{ Params: { id: string } }>('/v1/memberships/:id/leave', limited(10), async (req, reply) => {
     const student = await studentGate(req, reply);
     if (!student) return;
-    const db = getDb();
-    const membership = await db.query.memberships.findFirst({ where: eq(s.memberships.id, req.params.id) });
-    if (!membership || membership.studentId !== student.id)
-      return reply.code(404).send({ error: 'not_found', message: 'Membership not found' });
-    await db.delete(s.memberships).where(eq(s.memberships.id, membership.id));
+    // Domain-side so leaving releases a live session the same way a teacher removal does —
+    // a student who walks out mid-period must not be left shielded with the exit 403ing.
+    await leaveMembership({ studentId: student.id, membershipId: req.params.id });
     return { ok: true };
   });
 }
