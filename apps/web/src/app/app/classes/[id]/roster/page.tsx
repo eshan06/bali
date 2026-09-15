@@ -19,6 +19,7 @@ export default function RosterPage() {
   const [projecting, setProjecting] = useState(false);
   const [parentLink, setParentLink] = useState<{ membershipId: string; name: string; url: string } | null>(null);
   const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -80,14 +81,20 @@ export default function RosterPage() {
     }
   };
 
+  // A failed revoke must not look like a successful one — the token stays live and this
+  // overlay is the only place to retry, so keep it open and say so.
   const revokeParent = async () => {
     if (!parentLink) return;
+    setRevoking(true);
+    setLinkError(null);
     try {
       await api.del(`/memberships/${parentLink.membershipId}/parent-link`);
+      setParentLink(null);
     } catch {
-      /* best-effort; closing the panel is enough for the teacher */
+      setLinkError('Couldn’t revoke that link — it is still active. Please try again.');
+    } finally {
+      setRevoking(false);
     }
-    setParentLink(null);
   };
 
   if (!roster)
@@ -244,10 +251,11 @@ export default function RosterPage() {
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                className="text-[13px] font-semibold text-ink-tertiary hover:text-red-600"
+                className="text-[13px] font-semibold text-ink-tertiary hover:text-red-600 disabled:opacity-50"
+                disabled={revoking}
                 onClick={() => void revokeParent()}
               >
-                Revoke link
+                {revoking ? 'Revoking…' : 'Revoke link'}
               </button>
               <div className="flex gap-2">
                 <a href={parentLink.url} target="_blank" rel="noopener noreferrer">

@@ -12,8 +12,11 @@ export interface LiveState {
    *  must be told loudly (not just a calm "Reconnecting" pill) — this is a monitoring
    *  surface where a silently-frozen grid is a safety gap. */
   liveLost: boolean;
-  /** Recent emergency/revoked/info events for the toast stack. */
-  lastEvent: EventDTO | null;
+  /** Recent emergency/revoked/info events for the toast stack, oldest first. A bounded
+   *  queue rather than one slot: several frames can arrive in a single chunk and land in
+   *  one React batch, and a slot would keep only the last — on a monitoring surface a
+   *  dropped emergency toast is a safety gap. Consumers drain it. */
+  events: EventDTO[];
   /** The student whose chip should soft-pulse (set on emergency arrival). */
   pulseStudentId: string | null;
 }
@@ -28,6 +31,10 @@ const LIVE_LOST_AFTER = 3;
  *  arrives within this window, treat the transport as dead and reconnect/poll. */
 const STREAM_STALE_MS = 30_000;
 
+/** How many recent events the queue holds. Far more than a period ever produces, so no
+ *  toast is lost, while a long session can't grow the array without bound. */
+const EVENT_QUEUE_MAX = 50;
+
 /**
  * SSE via fetch-streaming (EventSource can't carry Authorization), with automatic
  * 5s polling fallback on transport loss — the grid never goes blind, it goes honest.
@@ -36,7 +43,7 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
   const [detail, setDetail] = useState<SessionDetailDTO | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [liveLost, setLiveLost] = useState(false);
-  const [lastEvent, setLastEvent] = useState<EventDTO | null>(null);
+  const [events, setEvents] = useState<EventDTO[]>([]);
   const [pulseStudentId, setPulseStudentId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const failuresRef = useRef(0);
@@ -64,9 +71,15 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
       case 'session':
         setDetail((prev) => (prev ? { ...prev, session: msg.session } : prev));
         break;
-      case 'event':
-        setLastEvent(msg.event);
+      case 'event': {
+        // Functional append (never a plain set) so two frames parsed from the same chunk
+        // both survive the batch; ignore an id we already hold — a reconnect can replay.
+        const ev = msg.event;
+        setEvents((prev) =>
+          prev.some((e) => e.id === ev.id) ? prev : [...prev, ev].slice(-EVENT_QUEUE_MAX),
+        );
         break;
+      }
       case 'ping':
         break;
     }
@@ -87,6 +100,8 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
   }, [sessionId]);
 
   useEffect(() => {
+    // Events belong to one session — never hand a new session the previous one's queue.
+    setEvents([]);
     if (!sessionId) {
       setDetail(null);
       setReconnecting(false);
@@ -182,7 +197,14 @@ export function useLiveSession(sessionId: string | null): LiveState & { refresh:
     };
   }, [sessionId, applyMessage, refresh]);
 
-  return { detail, reconnecting, liveLost, lastEvent, pulseStudentId, refresh };
+  return {
+    detail,
+    reconnecting,
+    liveLost,
+    events,
+    pulseStudentId,
+    refresh,
+  };
 }
 
 /** 1s ticking "23:14" countdown to an ISO end time (tabular digits upstream). */

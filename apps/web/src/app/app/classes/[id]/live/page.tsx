@@ -5,19 +5,32 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bell, ChevronDown, Maximize2, Minimize2, Nfc, X } from 'lucide-react';
+import { Maximize2, Minimize2, Nfc, X } from 'lucide-react';
 import type { EventDTO, SessionDetailDTO, ParticipantDTO } from '@bali/shared';
 import { Arc } from '@/components/bali/Arc';
 import { Button, Input, Label, Segmented, Toggle } from '@/components/bali/Button';
 import { EventTimeline } from '@/components/bali/EventTimeline';
 import { StatusChip, SummaryStrip, chipLabel } from '@/components/bali/StatusChip';
 import { LoadError, ReconnectingPill } from '@/components/bali/bits';
-import { ToastCard, useToasts } from '@/components/bali/Toaster';
+import { ToastCard, useToasts, type ToastItem } from '@/components/bali/Toaster';
 import { ICON_STROKE } from '@/components/bali/icons';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { useCountdown, useLiveSession, useSessionProgress } from '@/lib/live';
 import { hhmm } from '@/lib/format';
-import type { ClassCardDTO } from '@/lib/types';
+import type { ClassCardDTO, PolicyDTO } from '@/lib/types';
+
+/** Local "HH:MM" for an <input type="time">. */
+const clockValue = (d: Date) =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/**
+ * The server's own words for a deliberate refusal (4xx), so the teacher reads *why* the
+ * write was rejected instead of a "try again" that will fail identically forever. A 5xx or
+ * a transport failure has nothing specific to say, so those keep the generic advice.
+ */
+function refusalMessage(err: unknown): string | undefined {
+  return err instanceof ApiError && err.status >= 400 && err.status < 500 ? err.message : undefined;
+}
 
 /** Tick pass countdowns locally between server pushes. */
 function useTickedParticipants(detail: SessionDetailDTO | null): ParticipantDTO[] {
@@ -49,7 +62,7 @@ export default function LivePage() {
 
   const [cls, setCls] = useState<ClassCardDTO | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const { detail, reconnecting, liveLost, lastEvent, pulseStudentId } = useLiveSession(sessionId);
+  const { detail, reconnecting, liveLost, events, pulseStudentId } = useLiveSession(sessionId);
   const participants = useTickedParticipants(detail);
   const { toasts, push, dismiss } = useToasts();
   const [panelStudentId, setPanelStudentId] = useState<string | null>(null);
@@ -57,8 +70,11 @@ export default function LivePage() {
   const [loadError, setLoadError] = useState(false);
 
   // Surface a failed teacher action instead of swallowing it (docs/PRODUCTION.md #1).
+  // `detail` carries the server's own explanation of a deliberate refusal; telling the
+  // teacher to "try again" when the server will never accept the write is a lie.
   const actionFailed = useCallback(
-    (title: string) => push({ id: 'action-error', variant: 'revoked', title, sub: 'Please try again.' }),
+    (title: string, detail?: string) =>
+      push({ id: 'action-error', variant: 'revoked', title, sub: detail ?? 'Please try again.' }),
     [push],
   );
 
@@ -84,51 +100,76 @@ export default function LivePage() {
   }, [detail?.session.endedAt, loadClass]);
 
   // SSE events → toasts (sticky emergency/revoked; info auto-dismiss)
-  const seenEvents = useRef(new Set<string>());
+  // Two sets, not one: an event counts as handled only once it has actually been
+  // surfaced. `settled` holds events shown in their full form; `degraded` holds events
+  // shown without a roster match (a student removed mid-session can still record an
+  // emergency unlock, and getSessionDetail lists active memberships only). Those stay
+  // re-checkable so a participant frame arriving later upgrades the same toast in place.
+  const settledEvents = useRef(new Set<string>());
+  const degradedEvents = useRef(new Set<string>());
+  // Cards the teacher has closed. push() updates a card with the same id *in place*, so an
+  // upgrade is only an upgrade while that card is on screen; once it is dismissed the same
+  // call re-opens it, which is how a dismissed toast comes back the moment a participant
+  // frame arrives. Remembering the dismissal is what makes "update in place" true.
+  const dismissedToasts = useRef(new Set<string>());
+  const seenSessionId = useRef<string | null>(null);
+  const dismissToast = useCallback(
+    (id: string) => {
+      dismissedToasts.current.add(id);
+      dismiss(id);
+    },
+    [dismiss],
+  );
   useEffect(() => {
-    if (!lastEvent || seenEvents.current.has(lastEvent.id)) return;
-    seenEvents.current.add(lastEvent.id);
-    const ev = lastEvent;
-    // Match by stable studentId (duplicate display names otherwise misdirect or silently
-    // drop the toast on a monitoring surface); fall back to name only if id is absent.
-    const student = detail?.participants.find((p) =>
-      ev.studentId ? p.studentId === ev.studentId : `${p.firstName} ${p.lastName}` === ev.studentName,
-    );
-    const at = hhmm(ev.at);
-    if (ev.type === 'emergency_unlock' && student) {
-      push({
-        id: `unlock-${student.studentId}`,
-        variant: 'emergency',
-        title: `${student.shortName} used Emergency Unlock`,
-        sub: `Reason pending · ${at}`,
-        action: { label: 'Open student', onClick: () => setPanelStudentId(student.studentId) },
-      });
-    } else if (ev.type === 'reason_shared' && student) {
-      const reason = ev.title.split('— ')[1] ?? 'Reason shared';
-      push({
-        id: `unlock-${student.studentId}`,
-        variant: 'emergency',
-        title: `${student.shortName} used Emergency Unlock`,
-        sub: `${reason.replace('Reason: ', '').replace(/^skipped$/, 'Reason: skipped')} · ${at}`,
-        action: { label: 'Open student', onClick: () => setPanelStudentId(student.studentId) },
-      });
-    } else if (ev.type === 'permission_revoked' && student) {
-      push({
-        id: `revoked-${student.studentId}`,
-        variant: 'revoked',
-        title: `${student.shortName} turned off Screen Time permission`,
-        sub: 'Their shields are off',
-        action: { label: 'Open student', onClick: () => setPanelStudentId(student.studentId) },
-      });
-    } else if (ev.type === 'pass_ended' && ev.studentName) {
-      push({
-        id: `passend-${ev.id}`,
-        variant: 'info',
-        title: `Pass ended for ${ev.studentName}`,
-        sub: 'Shields returned automatically',
-      });
+    // Seen-ids are session-scoped — otherwise the sets grow for the life of the tab.
+    if (seenSessionId.current !== sessionId) {
+      seenSessionId.current = sessionId;
+      settledEvents.current.clear();
+      degradedEvents.current.clear();
+      dismissedToasts.current.clear();
     }
-  }, [lastEvent, detail, push]);
+    // Drain the whole queue, oldest first — several frames can arrive in one chunk and
+    // land in a single React batch, and reading one slot would toast only the last.
+    // The refs still guarantee one toast per event across re-renders and server replays.
+    for (const ev of events) {
+      // A frame left over from the previous session (the queue clears asynchronously).
+      if (ev.sessionId && ev.sessionId !== sessionId) continue;
+      if (settledEvents.current.has(ev.id)) continue;
+      // Match by stable studentId (duplicate display names otherwise misdirect or silently
+      // drop the toast on a monitoring surface); fall back to name only if id is absent.
+      const student = detail?.participants.find((p) =>
+        ev.studentId ? p.studentId === ev.studentId : `${p.firstName} ${p.lastName}` === ev.studentName,
+      );
+      const built = eventToast(ev, student ?? null, setPanelStudentId);
+      if (!built) {
+        // Nothing to show for this type — handled by being ignored, not by being dropped.
+        settledEvents.current.add(ev.id);
+        continue;
+      }
+      if (degradedEvents.current.has(ev.id)) {
+        // Surfaced once already in its degraded form. Re-push only to upgrade a card the
+        // teacher can still see: while it stays unmatched there is nothing new to say, and
+        // once it has been dismissed the "upgrade" would just resurrect it. The event is
+        // settled either way — it was shown, and the teacher closed it.
+        if (!built.final) continue;
+        if (dismissedToasts.current.has(built.toast.id)) {
+          settledEvents.current.add(ev.id);
+          degradedEvents.current.delete(ev.id);
+          continue;
+        }
+      }
+      push(built.toast);
+      // A *new* event is new information and legitimately opens the card again (a shared
+      // reason after a dismissed unlock); from here it is on screen, so it can be upgraded.
+      dismissedToasts.current.delete(built.toast.id);
+      if (built.final) {
+        settledEvents.current.add(ev.id);
+        degradedEvents.current.delete(ev.id);
+      } else {
+        degradedEvents.current.add(ev.id);
+      }
+    }
+  }, [events, detail, push, sessionId]);
 
   const countdown = useCountdown(detail?.session.endsAt);
   const pct = useSessionProgress(detail?.session.startedAt, detail?.session.endsAt);
@@ -246,7 +287,7 @@ export default function LivePage() {
         style={panelStudent ? { right: 390, top: 150 } : { right: 18, top: 18 }}
       >
         {toasts.map((t) => (
-          <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
+          <ToastCard key={t.id} toast={t} onDismiss={() => dismissToast(t.id)} />
         ))}
       </div>
 
@@ -354,6 +395,86 @@ export default function LivePage() {
   );
 }
 
+/**
+ * One toast per event, whether or not the student is still in the live grid. A student
+ * removed mid-session can still record an emergency unlock (the server accepts it on
+ * purpose — the exit is always theirs), and the grid is built from active memberships
+ * only, so that unlock matches nobody: it is still shown, named from the event itself
+ * and marked as off the grid, because a dropped emergency toast is a safety gap.
+ * `final: false` means the card was degraded by the missing participant and should be
+ * rebuilt if that participant shows up (push() updates a card with the same id in place).
+ */
+function eventToast(
+  ev: EventDTO,
+  student: ParticipantDTO | null,
+  openStudent: (studentId: string) => void,
+): { toast: ToastItem; final: boolean } | null {
+  const at = hhmm(ev.at);
+  const name = student?.shortName ?? ev.studentName ?? 'A student';
+  // Only what this page actually knows: they are not in the grid it is rendering.
+  const offGrid = student ? null : 'Not in the live grid';
+  // No chip to open, so no "Open student" link that would do nothing.
+  const action = student
+    ? { label: 'Open student', onClick: () => openStudent(student.studentId) }
+    : null;
+  // Keyed per student so a follow-up reason updates the same emergency card.
+  const key = ev.studentId ?? student?.studentId ?? ev.id;
+
+  switch (ev.type) {
+    case 'emergency_unlock':
+      return {
+        toast: {
+          id: `unlock-${key}`,
+          variant: 'emergency',
+          title: `${name} used Emergency Unlock`,
+          sub: `${offGrid ?? 'Reason pending'} · ${at}`,
+          action,
+        },
+        final: student !== null,
+      };
+    case 'reason_shared': {
+      const reason = ev.title.split('— ')[1] ?? 'Reason shared';
+      const line = reason.replace('Reason: ', '').replace(/^skipped$/, 'Reason: skipped');
+      return {
+        toast: {
+          id: `unlock-${key}`,
+          variant: 'emergency',
+          title: `${name} used Emergency Unlock`,
+          sub: [line, offGrid, at].filter(Boolean).join(' · '),
+          action,
+        },
+        final: student !== null,
+      };
+    }
+    case 'permission_revoked':
+      return {
+        toast: {
+          id: `revoked-${key}`,
+          variant: 'revoked',
+          title: `${name} turned off Screen Time permission`,
+          sub: offGrid ? `Their shields are off · ${offGrid}` : 'Their shields are off',
+          action,
+        },
+        final: student !== null,
+      };
+    case 'pass_ended':
+      // Reads off the event alone, so the roster never gates it.
+      return ev.studentName
+        ? {
+            toast: {
+              id: `passend-${ev.id}`,
+              variant: 'info',
+              title: `Pass ended for ${ev.studentName}`,
+              sub: 'Shields returned automatically',
+            },
+            final: true,
+          }
+        : null;
+    default:
+      return null;
+  }
+}
+
 /** State (c): inline start card — never a fake empty grid. */
 function NoSessionState({
   cls,
@@ -362,32 +483,48 @@ function NoSessionState({
 }: {
   cls: ClassCardDTO;
   onStarted: (sessionId: string) => void;
-  onError: (title: string) => void;
+  onError: (title: string, detail?: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  // Today's bell. If it has already passed, fall back to a bounded default (a class
-  // period from now) instead of silently rolling to *tomorrow* — an after-bell start
-  // must not create a ~24h session that shields every phone until the next day.
+  const [policies, setPolicies] = useState<PolicyDTO[]>([]);
+  const [policyId, setPolicyId] = useState(cls.policyId ?? '');
+  // Today's bell. If it has already passed, prefill a bounded default (a class period
+  // from now) instead of silently rolling to *tomorrow* — an after-bell start must not
+  // create a ~24h session that shields every phone until the next day.
   const bellPassed = useMemo(() => {
     const [h = 0, m = 0] = cls.endTime.split(':').map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
     return d <= new Date();
   }, [cls.endTime]);
-  const bellIso = useMemo(() => {
-    const [h = 0, m = 0] = cls.endTime.split(':').map(Number);
+  const [endTime, setEndTime] = useState(() =>
+    bellPassed ? clockValue(new Date(Date.now() + 50 * 60_000)) : cls.endTime,
+  );
+  const endsAt = useMemo(() => {
+    const [h = 0, m = 0] = endTime.split(':').map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    if (d <= new Date()) return new Date(Date.now() + 50 * 60_000); // 50-min default period
     return d;
-  }, [cls.endTime]);
+  }, [endTime]);
+  // A time earlier than now is always today's past, never tomorrow (see above).
+  const endsInPast = endsAt <= new Date();
+
+  useEffect(() => {
+    void api
+      .get<{ policies: PolicyDTO[] }>('/policies')
+      .then((r) => {
+        setPolicies(r.policies);
+        setPolicyId((prev) => prev || r.policies[0]?.id || '');
+      })
+      .catch(() => {});
+  }, []);
 
   const start = async () => {
     setBusy(true);
     try {
       const detail = await api.post<SessionDetailDTO>(`/classes/${cls.id}/sessions`, {
-        endsAt: bellIso.toISOString(),
-        policyId: cls.policyId ?? undefined,
+        endsAt: endsAt.toISOString(),
+        policyId: policyId || undefined,
       });
       onStarted(detail.session.id);
     } catch {
@@ -396,6 +533,8 @@ function NoSessionState({
       setBusy(false);
     }
   };
+
+  const policyName = policies.find((p) => p.id === policyId)?.name ?? cls.policyName ?? 'Focus';
 
   return (
     <div className="mx-auto flex max-w-[1190px] flex-col gap-[18px] px-8 pb-9 pt-6">
@@ -417,28 +556,57 @@ function NoSessionState({
         <div className="text-[18px] font-semibold leading-6">Start a session</div>
         <div className="flex gap-3">
           <div className="flex-1">
-            <Label className="mb-1.5">Ends at</Label>
-            <div className="flex items-center gap-2 rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5">
-              <Bell size={15} strokeWidth={ICON_STROKE} className="text-ink-tertiary" />
-              <b className="tnum">{bellPassed ? hhmm(bellIso.toISOString()) : cls.endTime}</b>
-              <span className="text-[13px] text-ink-tertiary">
-                {bellPassed ? 'today’s bell passed · +50 min' : 'next bell'}
-              </span>
-              <ChevronDown size={14} strokeWidth={ICON_STROKE} className="ml-auto text-ink-tertiary" />
+            <Label className="mb-1.5" htmlFor="ends-at">
+              Ends at
+            </Label>
+            <Input
+              id="ends-at"
+              type="time"
+              value={endTime}
+              error={endsInPast}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+            <div className="mt-1 text-[12.5px] leading-[17px] text-ink-tertiary">
+              {endsInPast
+                ? 'Pick a time later today'
+                : endTime === cls.endTime
+                  ? 'next bell'
+                  : `${Math.round((endsAt.getTime() - Date.now()) / 60_000)} min from now`}
             </div>
           </div>
           <div className="flex-1">
-            <Label className="mb-1.5">Policy</Label>
-            <div className="flex items-center gap-2 rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5">
-              <b>{cls.policyName ?? 'Focus'}</b>
-              <ChevronDown size={14} strokeWidth={ICON_STROKE} className="ml-auto text-ink-tertiary" />
-            </div>
+            <Label className="mb-1.5" htmlFor="policy">
+              Policy
+            </Label>
+            {policies.length === 0 ? (
+              <div className="rounded-sm border border-line bg-surface-sunken px-3 py-[9px] text-[15px] leading-5 text-ink-secondary">
+                {policyName}
+              </div>
+            ) : (
+              <select
+                id="policy"
+                className="w-full rounded-sm border border-line-strong bg-surface-card px-3 py-[9px] text-[15px] leading-5"
+                value={policyId}
+                onChange={(e) => setPolicyId(e.target.value)}
+              >
+                {policies.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
         <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
-          {cls.policyName ?? 'Focus'} · Full focus — students keep the apps they chose during setup
+          {policyName} · Full focus — students keep the apps they chose during setup
         </div>
-        <Button className="self-start px-7 py-[11px]" loading={busy} onClick={() => void start()}>
+        <Button
+          className="self-start px-7 py-[11px]"
+          disabled={endsInPast}
+          loading={busy}
+          onClick={() => void start()}
+        >
           Start session
         </Button>
       </div>
@@ -460,7 +628,7 @@ function StudentPanel({
   sessionId: string;
   participant: ParticipantDTO;
   onClose: () => void;
-  onError: (title: string) => void;
+  onError: (title: string, detail?: string) => void;
 }) {
   const [events, setEvents] = useState<EventDTO[]>([]);
   const [preset, setPreset] = useState<'5' | '10' | '15' | 'custom'>('10');
@@ -476,6 +644,12 @@ function StudentPanel({
 
   const minutes = preset === 'custom' ? Math.max(1, parseInt(customMin, 10) || 10) : parseInt(preset, 10);
   const canPass = participant.state === 'focused';
+  // The server refuses "no device" over anyone whose participation is open or closed — a
+  // tap-in is proof of a device, and a closed row is the truth (domain.setNoDevice 409s).
+  // `not_joined` is exactly the case it accepts; clearing the flag is always allowed, so
+  // only the off→on direction is gated.
+  const noDeviceOn = participant.state === 'no_device';
+  const canMarkNoDevice = participant.state === 'not_joined';
 
   const grant = async () => {
     setBusy(true);
@@ -565,15 +739,20 @@ function StudentPanel({
           <div className="flex-1">
             <div className="text-[14px] font-medium leading-[19px]">No device today</div>
             <div className="text-[12.5px] leading-[17px] text-ink-tertiary">
-              Marks {participant.firstName} out of today&apos;s grid only
+              {noDeviceOn || canMarkNoDevice
+                ? `Marks ${participant.firstName} out of today’s grid only`
+                : participant.tappedInAt
+                  ? 'Only for students who never tapped in'
+                  : 'This session is already closed for them'}
             </div>
           </div>
           <Toggle
-            on={participant.state === 'no_device'}
+            on={noDeviceOn}
+            disabled={!noDeviceOn && !canMarkNoDevice}
             onChange={(next) =>
               void api
                 .post(`/sessions/${sessionId}/no-device`, { studentId: participant.studentId, on: next })
-                .catch(() => onError('Couldn’t update “no device”'))
+                .catch((err) => onError('Couldn’t update “no device”', refusalMessage(err)))
             }
             ariaLabel="No device today"
           />
