@@ -1,92 +1,100 @@
 # Bali v3 — Architecture
 
-The plan we build on. Decisions get recorded here; changing one means discussing it first.
-Plain language on purpose.
-
----
+Decisions live here. Changing one means discussing it first.
 
 ## What Bali is
 
-A teacher taps their Bali block to run a timed focus session for their class. Each student's
-iPhone locks itself down for the session (everything shielded except a small allow-list the
-student picked once). The teacher watches a live grid of who's focused, and gets honest
-reports afterward — including every emergency unlock. Parents can get a view-only link.
+A teacher taps their Bali block (an NFC tag) to start a timed focus session for the class.
+Each student's iPhone locks itself for the session using Screen Time shields — everything
+blocked except a short allow-list the student picked once. The teacher sees a live grid of
+who's focused. Afterward: reports, including every emergency unlock. Parents can get a
+view-only link.
 
-v3 is a from-scratch rebuild of v2. The v2 code and its bug audit live on the `v2-archive`
-branch. The goal of v3: the same product, built so it stays correct and honest when many
-schools use it at the same time.
+v3 is a from-scratch rebuild. The v2 code and its bug audit live on the `v2-archive` branch.
 
-## The shape
+## The system
 
 ```
- Student iPhones          Teacher (web + iPhone)
-       │                          │
-       ▼                          ▼
- ┌─────────────────────────────────────┐
- │    API — identical server copies    │   need more capacity? add copies
- └──────────────────┬──────────────────┘
-                    ▼
-          ┌──────────────────┐
-          │     Postgres     │   the single source of truth
-          └──────────────────┘
+Student iPhones     Teacher web + iPhone
+      │                    │
+      ▼                    ▼
+┌───────────────────────────────┐
+│ API — identical server copies │
+└───────────────┬───────────────┘
+                ▼
+           PostgreSQL
+    (single source of truth)
 ```
 
-Three parts:
+- **Apps** — student iPhone app, teacher iPhone app, teacher web portal.
+- **API** — stateless servers: they keep nothing in memory worth keeping, so every copy is
+  interchangeable and scaling means adding copies behind a load balancer.
+- **PostgreSQL** — the database. If anything else disagrees with it, the database is right.
 
-- **The apps** (student iPhone app, teacher iPhone app, teacher web portal) — what people touch.
-- **The API** — a row of identical servers. None of them keeps anything important in its own
-  memory; everything worth keeping goes in the database. That's what makes them identical —
-  any copy can answer any request, and handling more schools just means adding copies.
-- **The database (Postgres)** — the single source of truth. If the database and anything
-  else ever disagree, the database is right.
+## How a tap works
 
-## Decision: how a tap gets saved — A + C (decided 2026-09-15)
+Decided 2026-09-15: **direct database writes + local-first phone.** (A message queue in the
+middle was considered and rejected — see below.)
 
-**A — straight into the book.** Every tap is written directly into the database while the
-student waits (a fraction of a second). When the phone hears "you're in," the tap is saved
-for real — no maybes.
+**Step 1 — on the phone, instantly, no internet required:**
+1. The app reads the tag's ID over NFC.
+2. It writes a tap record to local storage (a small database on the phone itself):
+   `{event_id, tag_id, timestamp}` — `event_id` is a random unique ID the phone generates.
+3. It turns on the Screen Time shields.
+4. The student sees "You're in" — total time under a second, even with zero signal.
 
-**C — the phone waits for nobody.** The phone locks itself the instant the student taps,
-then reports to the server whenever it can — immediately on good Wi-Fi, later with retries
-on bad Wi-Fi. Retries use a small random delay so a whole school's reports arrive spread
-out instead of as one stampede.
+**Step 2 — in the background, whenever there's internet:**
+5. The app sends the record to the API: `POST /taps` (an HTTP request carrying that same
+   JSON).
+6. If the request fails, the app retries with exponential backoff plus jitter — wait 2s,
+   4s, 8s… with a random extra delay so 600 phones never retry in unison. The record stays
+   in local storage until a retry succeeds.
 
-**Why not B (a waiting line in the middle)?** A waiting line ("we'll write it to the
-database in a moment") makes "got it" stop meaning "saved it" — if the line crashes,
-records vanish and nobody knows. That trade only makes sense at a scale we don't have:
-our biggest moment, a whole school tapping at the bell, is a few hundred small writes
-spread over a minute, which the database handles easily. For a product whose value is
-records people trust, we don't trade certainty for crowd-handling we don't need.
-Escape hatch: the "save a tap" code lives in one tidy spot, so if we ever truly need a
-waiting line, adding it later is a small surgery, not a rebuild.
+**Step 3 — on the server:**
+7. Verify the student's auth token, and that the tag belongs to a class they're enrolled in.
+8. Check the timestamp against the server's own clock; anything outside the session's
+   window gets clamped to it (see rule 1).
+9. `INSERT` one row into the `taps` table. If a row with that `event_id` already exists —
+   a retry — do nothing. This makes retries safe to repeat (idempotency).
+10. Respond `200 OK`. Only now does the phone delete the record from local storage.
+11. Insert an event row so the teacher's live grid updates (see rule 6).
 
-## The rules every part follows
+**Why no queue in the middle.** A queue (e.g. Redis) between the API and the database means
+the server replies "got it" before the row is actually written. If the queue crashes first,
+the record is gone — after the phone already deleted its copy. Disqualifying for a product
+built on trustworthy records. Also unnecessary: a whole school tapping at the bell is a few
+hundred INSERTs spread over a minute, and Postgres handles thousands per second. The
+tap-saving code lives in one module, so if real load ever demands a queue, adding one is a
+contained change.
 
-These exist because v2 broke each one, and each break became a real bug (see
-`docs/AUDIT-2026-09-09.md` on the `v2-archive` branch).
+## The six rules
 
-1. **The server owns the clock.** Phone-supplied times are only accepted for offline
-   catch-up, and always clipped to fit inside the session's real time window. (v2 let a
-   student's backdated clock erase unlocks from reports and inflate focus minutes.)
-2. **One brain for student state.** Every screen — student app, teacher grid, reports,
-   parent view — computes "what state is this student in" using the same single piece of
-   shared code. (v2 showed the teacher "No device" while the student saw "Focused.")
-3. **The phone proves, never assumes.** Every heartbeat, the app checks that shields are
-   *actually* on and re-applies them if not. The screen only ever claims what it can prove.
-   (v2's worst bug: phone showed a ticking focus timer while nothing was shielded.)
-4. **Every action has an ID.** Taps, unlocks, and retries carry a unique ID, so sending
-   twice counts once. Retrying must always be safe.
-5. **No silent failures.** If something fails, the person sees it and can retry. An error
-   the user isn't told about is itself a bug. (v2's "Revoke link" could fail and close as
-   if it worked.)
-6. **Live updates are saved events, not shouted messages.** Every change is written into
-   the database as a numbered event. Teacher screens read the stream and, after any
-   disconnect, catch up from their last number — nothing missed, nothing doubled.
-   (v2 could only hold one event at a time and dropped simultaneous ones.)
+Each exists because v2 broke it and shipped a real bug
+(`docs/AUDIT-2026-09-09.md` on `v2-archive`).
+
+1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
+   and always clamped into the session's real window. (v2: a backdated phone clock erased
+   unlocks from reports and inflated focus minutes.)
+2. **One shared state function.** Student app, teacher grid, reports, and parent page all
+   compute "what state is this student in" with the same shared code. (v2: teacher saw
+   "No device" while the student saw "Focused.")
+3. **Verify shields on every heartbeat.** A heartbeat is the app's small status request
+   every ~30s. On each one, the app checks the shields are actually on and re-applies them
+   if not; the screen only claims what was verified. (v2: showed a ticking focus timer
+   while nothing was shielded.)
+4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
+   safe. (v2: had no such IDs on some paths.)
+5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
+   "Revoke link" could fail and close as if it had worked.)
+6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event
+   row. Live screens stream those rows and, after a disconnect, resume from the last number
+   they received — nothing missed, nothing duplicated. (v2: held one event in memory and
+   dropped simultaneous ones.)
 
 ## Status
 
-- **Decided:** A + C; the shape above; the six rules; issues #1 and #2 in
-  [ISSUES.md](ISSUES.md) are design requirements, not nice-to-haves.
-- **Open:** which cloud hosts the API and database; whether extra realtime infrastructure
-  is ever needed (only with measurements proving it).
+- **Decided:** the system shape; direct writes + local-first phone; the six rules; both
+  items in [ISSUES.md](ISSUES.md) are requirements, not nice-to-haves.
+- **Open:** hosting provider for the API and database.
+- **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
+  `main` is v3 only.
