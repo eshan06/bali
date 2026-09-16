@@ -20,9 +20,9 @@ one minute. A naive rule blocks the entire school at the exact moment everyone n
 - Only trust the account after the sign-in is **verified**. (v2 counted requests by a label
   the phone wrote on itself, without checking it — an attacker could change the label every
   request and get a fresh budget each time, making the limit useless.)
-- Requests where nobody is signed in yet (signing in, the parent's view-only page): budget
-  by address, but sized generously for "a whole school at once," and slow requests down
-  before ever blocking them.
+- Requests where nobody is signed in yet (signing in): budget by address, but sized
+  generously for "a whole school at once," and slow requests down before ever blocking
+  them.
 - Phones retry with a small random delay, so even a server hiccup doesn't cause everyone
   to retry in lockstep and pile the crowd back up.
 
