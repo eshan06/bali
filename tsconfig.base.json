@@ -2,6 +2,10 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
+    // Explicit: TypeScript 6 no longer auto-includes node_modules/@types, so
+    // without this, Node globals (URL, process, import.meta.url) only exist in
+    // packages whose dependencies happen to reference them.
+    "types": ["node"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
