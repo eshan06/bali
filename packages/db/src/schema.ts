@@ -1,4 +1,9 @@
-import type { EventType, ParticipationState, UserRole } from '@bali/shared';
+import type {
+  EventType,
+  ParticipationEndedReason,
+  ParticipationState,
+  UserRole,
+} from '@bali/shared';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -45,31 +50,53 @@ export const users = pgTable('users', {
   removedAt: removedAt(),
 });
 
-export const blocks = pgTable('blocks', {
-  id: id(),
-  /** The ID the physical NFC tag broadcasts. */
-  tagId: text('tag_id').notNull().unique(),
-  teacherId: uuid('teacher_id')
-    .notNull()
-    .references(() => users.id),
-  createdAt: createdAt(),
-  removedAt: removedAt(),
-});
+export const blocks = pgTable(
+  'blocks',
+  {
+    id: id(),
+    /** The ID the physical NFC tag broadcasts. */
+    tagId: text('tag_id').notNull(),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+    removedAt: removedAt(),
+  },
+  (t) => [
+    // One active owner per physical tag — but a tag can be re-registered
+    // after its block row is soft-removed (blocks get reassigned; history stays).
+    uniqueIndex('blocks_tag_active_unique')
+      .on(t.tagId)
+      .where(sql`${t.removedAt} IS NULL`),
+  ],
+);
 
-export const classes = pgTable('classes', {
-  id: id(),
-  teacherId: uuid('teacher_id')
-    .notNull()
-    .references(() => users.id),
-  schoolId: uuid('school_id')
-    .notNull()
-    .references(() => schools.id),
-  name: text('name').notNull(),
-  /** Students join by typing this (auth decision 3). */
-  joinCode: text('join_code').notNull().unique(),
-  createdAt: createdAt(),
-  removedAt: removedAt(),
-});
+export const classes = pgTable(
+  'classes',
+  {
+    id: id(),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => users.id),
+    schoolId: uuid('school_id')
+      .notNull()
+      .references(() => schools.id),
+    name: text('name').notNull(),
+    /** Students join by typing this (auth decision 3). */
+    joinCode: text('join_code').notNull(),
+    createdAt: createdAt(),
+    removedAt: removedAt(),
+  },
+  (t) => [
+    // Codes are short and human-typed: unique among live classes only, so an
+    // archived class doesn't reserve its code forever.
+    uniqueIndex('classes_join_code_active_unique')
+      .on(t.joinCode)
+      .where(sql`${t.removedAt} IS NULL`),
+    // The teacher's boot call lists their classes on every app launch.
+    index('classes_teacher_idx').on(t.teacherId),
+  ],
+);
 
 export const enrollments = pgTable(
   'enrollments',
@@ -88,6 +115,10 @@ export const enrollments = pgTable(
     // A student is in a class once — but may re-join after a soft removal.
     uniqueIndex('enrollments_active_unique')
       .on(t.classId, t.studentId)
+      .where(sql`${t.removedAt} IS NULL`),
+    // The student's boot call: "which classes am I in" — every phone, every bell.
+    index('enrollments_student_active_idx')
+      .on(t.studentId)
       .where(sql`${t.removedAt} IS NULL`),
   ],
 );
@@ -131,8 +162,8 @@ export const participations = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     /** Set when the participation ended; NULL = live. */
     endedAt: timestamp('ended_at', { withTimezone: true }),
-    /** Why it ended, e.g. left_for_other_session — so reports never miscount (decision 4). */
-    endedReason: text('ended_reason'),
+    /** Why it ended — typed, so reports can never miscount a switch as an unlock (decision 4). */
+    endedReason: text('ended_reason').$type<ParticipationEndedReason>(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -174,5 +205,9 @@ export const events = pgTable(
   (t) => [
     // The catch-up read: "everything for this session after seq N".
     index('events_session_seq_idx').on(t.sessionId, t.seq),
+    // GET /v1/me/history — the student's own timeline, in stream order.
+    index('events_user_seq_idx').on(t.userId, t.seq),
+    // GET /v1/classes/{id}/reports/… — a class's events over a date range.
+    index('events_class_occurred_idx').on(t.classId, t.occurredAt),
   ],
 );

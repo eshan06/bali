@@ -31,6 +31,19 @@ export const PARTICIPATION_STATES = ['focused', 'unlocked', 'protection_off'] as
 export type ParticipationState = (typeof PARTICIPATION_STATES)[number];
 
 /**
+ * Why a participation ended. Reports branch on this — decision 4's promise is
+ * that `left_for_other_session` is never counted as an emergency unlock, which
+ * only holds if the value can't be misspelled.
+ */
+export const PARTICIPATION_ENDED_REASONS = [
+  'left_for_other_session',
+  'session_ended',
+  'session_expired',
+  'removed_from_class',
+] as const;
+export type ParticipationEndedReason = (typeof PARTICIPATION_ENDED_REASONS)[number];
+
+/**
  * Everything the `events` table records — one value per thing that can happen.
  * Every name here is taken from a decided flow in docs/ARCHITECTURE.md.
  */

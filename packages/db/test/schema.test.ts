@@ -1,5 +1,7 @@
+import { fileURLToPath } from 'node:url';
+
 import { PGlite } from '@electric-sql/pglite';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { validate, version } from 'uuid';
@@ -7,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import {
+  blocks,
   classes,
   enrollments,
   events,
@@ -53,7 +56,7 @@ let db: ReturnType<typeof drizzle>;
 beforeAll(async () => {
   pg = new PGlite();
   db = drizzle(pg);
-  await migrate(db, { migrationsFolder: new URL('../migrations', import.meta.url).pathname });
+  await migrate(db, { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
 });
 
 afterAll(async () => {
@@ -148,30 +151,104 @@ describe('events', () => {
       db.delete(events).where(eq(events.eventId, eventId)),
       /events is append-only: DELETE/,
     );
+    // Row triggers don't see TRUNCATE — the statement trigger must catch it.
+    await expectRefused(db.execute(sql`TRUNCATE TABLE events`), /events is append-only: TRUNCATE/);
   });
 
-  it('hands out increasing stream numbers', async () => {
-    const { klass, student } = await seedClassroom('ev-seq');
-    const inserted = [];
-    for (const type of ['tap_in', 'unlock', 'refocus'] as const) {
-      const row = one(
+  it('numbers the stream so the catch-up read works: after seq N, one session, in order', async () => {
+    const a = await seedClassroom('ev-catchup-a');
+    const b = await seedClassroom('ev-catchup-b');
+    const [sessionA, sessionB] = [
+      one(
+        await db
+          .insert(sessions)
+          .values({ classId: a.klass.id, ...sessionWindow() })
+          .returning(),
+      ),
+      one(
+        await db
+          .insert(sessions)
+          .values({ classId: b.klass.id, ...sessionWindow() })
+          .returning(),
+      ),
+    ];
+
+    // Interleave events across the two sessions, remembering where A's stream was.
+    const insertEvent = async (sessionId: string, userId: string, type: 'tap_in' | 'unlock') =>
+      one(
         await db
           .insert(events)
-          .values({
-            eventId: newUuidV7(),
-            type,
-            classId: klass.id,
-            userId: student.id,
-            occurredAt: new Date(),
-          })
+          .values({ eventId: newUuidV7(), type, sessionId, userId, occurredAt: new Date() })
           .returning(),
       );
-      inserted.push(row);
-    }
-    const seqs = inserted.map((row) => row.seq);
-    expect(seqs).toHaveLength(3);
-    expect(new Set(seqs).size).toBe(3);
-    expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+    const seen = await insertEvent(sessionA.id, a.student.id, 'tap_in');
+    await insertEvent(sessionB.id, b.student.id, 'tap_in');
+    const later1 = await insertEvent(sessionA.id, a.student.id, 'unlock');
+    await insertEvent(sessionB.id, b.student.id, 'unlock');
+    const later2 = await insertEvent(sessionA.id, a.student.id, 'tap_in');
+
+    // The reconnect read: everything for session A after the last seq the screen saw.
+    const caughtUp = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, sessionA.id), gt(events.seq, seen.seq)))
+      .orderBy(asc(events.seq));
+
+    expect(caughtUp.map((row) => row.eventId)).toEqual([later1.eventId, later2.eventId]);
+    expect(caughtUp.every((row) => row.seq > seen.seq)).toBe(true);
+  });
+});
+
+describe('natural keys', () => {
+  it('one users row per Cognito account — total, so the account always reuses its row', async () => {
+    await db.insert(users).values({ cognitoId: 'cognito-dup', role: 'student' });
+    await expectRefused(
+      db.insert(users).values({ cognitoId: 'cognito-dup', role: 'student' }),
+      /duplicate key.*users_cognito_id_unique/,
+    );
+  });
+
+  it('a physical tag has one active block, and can be re-registered after removal', async () => {
+    const { teacher } = await seedClassroom('tag');
+    const block = one(
+      await db.insert(blocks).values({ tagId: 'TAG-recycled', teacherId: teacher.id }).returning(),
+    );
+
+    await expectRefused(
+      db.insert(blocks).values({ tagId: 'TAG-recycled', teacherId: teacher.id }),
+      /duplicate key.*blocks_tag_active_unique/,
+    );
+
+    // The block is handed to another teacher: soft-remove, then re-register.
+    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, block.id));
+    const other = await seedClassroom('tag-other');
+    await expect(
+      db.insert(blocks).values({ tagId: 'TAG-recycled', teacherId: other.teacher.id }),
+    ).resolves.toBeDefined();
+  });
+
+  it('a join code is unique among live classes, and freed when a class is archived', async () => {
+    const { teacher, school, klass } = await seedClassroom('code');
+
+    await expectRefused(
+      db.insert(classes).values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Copycat',
+        joinCode: klass.joinCode,
+      }),
+      /duplicate key.*classes_join_code_active_unique/,
+    );
+
+    await db.update(classes).set({ removedAt: new Date() }).where(eq(classes.id, klass.id));
+    await expect(
+      db.insert(classes).values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Next year',
+        joinCode: klass.joinCode,
+      }),
+    ).resolves.toBeDefined();
   });
 });
 
@@ -303,8 +380,8 @@ describe('participations', () => {
   });
 });
 
-describe('soft delete', () => {
-  it('a referenced row cannot be hard-deleted', async () => {
+describe('foreign keys', () => {
+  it('a referenced row cannot be hard-deleted — removal means removed_at, not DELETE', async () => {
     const { school } = await seedClassroom('fk');
     await expectRefused(
       db.delete(schools).where(eq(schools.id, school.id)),

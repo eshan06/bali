@@ -13,3 +13,9 @@ $$;
 CREATE TRIGGER events_append_only
 BEFORE UPDATE OR DELETE ON events
 FOR EACH ROW EXECUTE FUNCTION events_forbid_mutation();
+--> statement-breakpoint
+-- Row triggers never fire for TRUNCATE, so it needs its own statement trigger —
+-- otherwise one TRUNCATE quietly does what UPDATE and DELETE are forbidden to.
+CREATE TRIGGER events_append_only_truncate
+BEFORE TRUNCATE ON events
+FOR EACH STATEMENT EXECUTE FUNCTION events_forbid_mutation();
