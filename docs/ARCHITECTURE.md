@@ -7,8 +7,7 @@ Decisions live here. Changing one means discussing it first.
 A teacher taps their Bali block (an NFC tag) to start a timed focus session for the class.
 Each student's iPhone locks itself for the session using Screen Time shields — everything
 blocked except a short allow-list the student picked once. The teacher sees a live grid of
-who's focused. Afterward: reports, including every emergency unlock. Parents can get a
-view-only link.
+who's focused. Afterward: reports, including every emergency unlock.
 
 v3 is a from-scratch rebuild. The v2 code and its bug audit live on the `v2-archive` branch.
 
@@ -40,9 +39,295 @@ middle was considered and rejected — see below.)
 10. Respond `200 OK`. Only now does the phone delete the record from local storage.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
-**Why no queue (Redis) in the middle:** the server would reply "got it" before the row is
-written, so a queue crash loses records the phone has already deleted. Wrong trade for us,
-and unneeded at our scale — if that ever changes, the tap-saving module can add one later.
+**Why there's no queue between the API and the database.** A queue (usually Redis — a
+database that keeps everything in RAM: very fast, but wiped by a crash) would change the
+flow to: tap goes into the queue → API replies `200 OK` → a worker writes it to Postgres
+moments later. The danger is that gap: the phone deletes its local copy at `200 OK`
+(step 10), so a queue crash inside the gap silently destroys the last copy of the tap.
+That risk is only worth it when the database can't keep up — ours can (a school at the
+bell ≈ a few hundred INSERTs over a minute; Postgres does thousands per second). If that
+ever changes, a queue slots in at step 9 without touching the rest of the flow.
+
+## Data model
+
+This section decides what Bali remembers. Everything the product knows lives in tables in
+Postgres. A table is like a spreadsheet: each row is one record, each column is one fact
+about that record. Every screen in the app is just a read of these tables — if a fact was
+never stored here, no screen can ever show it.
+
+### The tables
+
+- `users` — one row per teacher or student, with a `role` column saying which.
+- `schools` — one row per school, so users and classes can be grouped under one.
+- `blocks` — one row per physical Bali block: the ID its NFC tag broadcasts, and which
+  teacher owns it.
+- `classes` — one row per class. Each class belongs to a teacher and a school.
+- `enrollments` — one row saying "this student is in this class." (Connecting students to
+  classes needs its own table because a student has many classes and a class has many
+  students.)
+- `sessions` — one row per focus session: which class, when it started, when it ends.
+- `participations` — one row saying "this student is part of this session, and here is
+  their state right now" (focused, unlocked, and so on). The row is overwritten as the
+  student's state changes.
+- `events` — one row for every single thing that happens: a tap-in, an emergency unlock, a
+  refocus. Rows here are only ever added, never changed — this table is the permanent
+  history.
+
+### The decisions (2026-09-15)
+
+**1. The current picture and the history are two different tables, always updated
+together.** "Who is focused right now" is answered by the `participations` table in one
+cheap read. "What happened during this session" is answered by the `events` table, whose
+rows are never overwritten. Whenever a student's state changes, the server updates their
+`participations` row and adds an `events` row inside one transaction — a database feature
+meaning both writes happen or neither does — so the two tables can never disagree. One
+shared function performs every state change; no other code is allowed to touch these
+tables. The reason for the strictness: v2's most common bug was the same fact stored in
+two places drifting apart, like the teacher's screen saying "No device" while the
+student's phone said "Focused." This structure makes that impossible.
+
+**2. Every row's ID is a UUIDv7.** An ID is a row's permanent, unique name — what other
+tables and API requests use to point at it. UUIDv7 is an ID format that a phone can
+generate by itself with no internet (needed for offline taps), that can't be guessed from
+a URL, and that begins with a timestamp, which keeps the database's lookup structures
+fast.
+
+**3. Nothing is truly deleted; it is marked as removed.** Removing a student from a class
+sets a `removed_at` date on their `enrollments` row instead of deleting the row. History
+stays answerable ("who was in this class in March?") and nothing pointing at the row
+breaks; screens simply skip rows where `removed_at` is set. Really deleting the row is
+exactly how v2 stranded a student in a locked session with no way out.
+
+**4. A student can be in only one session at a time.** If a student in one session taps
+into another, their first participation is ended and recorded in the `events` table as
+`left_for_other_session` — its own kind of event, so switching classes is never counted
+as an emergency unlock in any report.
+
+**5. A tap before the teacher has started is saved and waits — an "armed" tap.** It's
+7:58, the bell hasn't rung, and a student taps the block walking to their seat — no
+session exists yet. Rejecting the tap punishes normal behavior; shielding now locks the
+phone before class starts. So the server just saves "this student tapped this teacher's
+block" and the phone shows "Ready — waiting for your teacher." When the teacher presses
+Start, every waiting tap becomes a participation and those phones shield — nobody taps
+twice. It's saved as student + teacher, since one block serves all of a teacher's classes
+and the class is only knowable once a session starts. It expires at the end of the school
+day.
+
+**6. Sessions end themselves.** The phone knows the session's end time, so it removes the
+shields at that moment using its own clock, even with no internet. On the server, a small
+scheduled program marks the session and its participations as ended and adds a
+`session_expired` event. If the teacher adds time, that is recorded as its own
+`session_extended` event, so reports show exactly what happened.
+
+**7. The every-30-seconds "still here" message only updates one column — it never adds
+history rows.** During a session, each app tells the server every ~30 seconds: "still
+here, shields still on." That's useful — it's how we notice a phone going silent — but
+nothing *changed*, so it isn't history. The server just overwrites `last_seen_at` on that
+student's `participations` row. The `events` table gets a row only when something really
+changes: tapped in, unlocked, went silent, came back. Otherwise a 1,000-student school
+would add ~720,000 useless rows a day to the table every screen reads.
+
+### Rules that keep the data honest
+
+- **The database itself refuses duplicates.** Every event carries an `event_id` made by
+  the phone, and the `events` table has a unique constraint on that column — a rule the
+  database enforces during the write itself. If the same tap arrives twice (a retry, or
+  two servers handling it at once), one insert wins and the other is refused, no matter
+  how the timing falls. Our code never has to win a race.
+- **A screen that reconnects asks for a little more than it missed.** Live screens
+  receive events by number and remember the last one they got — say 480. The timing
+  quirk: an event's number is handed out when its write starts, but the row only appears
+  when the write finishes, so a slow 481 can show up *after* a fast 482. A screen that
+  asked "everything after 482" would then never see 481 — one event skipped forever, with
+  no error anywhere. So on reconnect the screen asks from slightly before its remembered
+  number and throws away rows it already has (it recognizes them by `event_id`).
+  Receiving an event twice costs nothing; silently missing one is how a teacher's grid
+  loses an emergency unlock.
+- **Changes that touch several tables happen in one transaction.** Removing a student
+  mid-session must update the enrollment, end the participation, and record the events —
+  all together or not at all. A halfway-done removal is exactly the v2 bug that left a
+  phone locked while refusing to record its emergency unlock.
+- **One class can't have two sessions running.** The `sessions` table has a rule for this
+  (a partial unique index — uniqueness that applies only to rows not yet ended), so a
+  teacher who starts a session twice, from a phone and a laptop at once, gets the
+  already-running session back instead of a duplicate.
+
+### Decided later, on purpose
+
+- What happens when a family legally asks for their child's data to be deleted. That
+  collides with "unlock records are never lost," so it needs a deliberate policy decision,
+  not a quick rule.
+
+## Auth
+
+This section decides how the server knows who it's talking to. Signing in proves who you
+are; what you're allowed to do is then checked against our tables — a teacher can end a
+session, a student can't, a stranger can do nothing. Every flow in this document starts
+with this check.
+
+### The decisions (2026-09-16)
+
+**1. Sign-in is run by AWS Cognito, not by us.** Cognito is Amazon's managed sign-in
+service: it stores the passwords, runs "Sign in with Google," handles resets, and hands
+the app a token after a successful sign-in. We chose it because our users include
+minors — password security should be a giant company's liability, not a solo
+developer's — and because it's free until 50,000 monthly users and already proven in v2
+(v2's auth bugs were in our code around Cognito, not in Cognito). If its clunkiness
+becomes real pain during the iOS build, the named fallback is Clerk.
+
+**2. Every request carries a JWT — a signed identity note.** The server doesn't remember
+anyone between requests, so each request must say who it's from without re-sending a
+password. At sign-in, Cognito gives the app a JWT: a small note saying "this is user
+82f3, valid until 3:00," signed so that changing a single character breaks the
+signature. The app attaches it to every request, and any of our servers verifies the
+signature with math alone — no database lookup — which matters when every student's
+phone checks in every 30 seconds. A JWT can't be taken back early, so it expires after
+about an hour and a refresh token quietly fetches the next one; a student signs in
+roughly once, ever. Our `users` table stores each row's Cognito ID, linking "who Cognito
+says this is" to our data about them.
+
+**3. Students join a class with a join code.** The teacher's class screen shows a short
+code; a student types it in once, and the server creates their `enrollments` row. No
+email invites, no setup. Importing whole rosters (CSV or Google Classroom) is a later
+feature, built when a school asks for it.
+
+### Rules that keep auth honest
+
+- **Only a real "no" signs anyone out.** A timeout or server error is not proof that a
+  sign-in is invalid — the app keeps the session and shows "can't reach the server —
+  retry." Only a definitive `401 Unauthorized` (Cognito rejecting the token) ends a
+  session. v2 got this wrong: one network blip signed the teacher out into a login page
+  that then rejected their correct password.
+- **A saved emergency unlock outlives an expired token.** If a student's token expired
+  while they were offline, the app refreshes the token first and then sends the queued
+  record. An auth problem is never a reason to throw a record away.
+- **Sign-in limits are sized for a school.** Sign-in happens before we know who's asking,
+  so it's limited by internet address — with budgets sized for a whole school behind one
+  address, slowing requests down before ever blocking them (ISSUES.md #1).
+- **Under-13 consent is a flagged policy decision.** Accounts for young students carry
+  legal requirements (parental consent). It's parked next to data deletion in "decided
+  later, on purpose" — to be settled deliberately, not mid-sprint.
+
+## API surface
+
+The API is the server's front door: the complete list of requests the apps are allowed
+to make. Each entry is an endpoint — a URL plus a verb, with JSON going in and out
+(`GET /v1/me` reads who you are; `POST /v1/taps` records a tap). The apps can only do
+what an endpoint permits. Two facts drive everything here: every endpoint is a promise
+to shipped apps (iPhones update slowly, so old app versions will call us for months),
+and every endpoint is attack surface — a small, boring list is the security strategy.
+
+### The decisions (2026-09-16)
+
+**1. The style is REST.** Resource-shaped URLs with standard verbs, as above. Boring,
+universal, easy to rate-limit, and a log line reads like a sentence. GraphQL (one
+endpoint where clients compose custom queries) earns its complexity with many varied
+screens and teams — we have neither. tRPC's TypeScript magic doesn't reach our most
+important client, which speaks Swift.
+
+**2. Every path starts with `/v1`, and changes are additive only.** If behavior must
+ever change, we add `/v2` endpoints alongside instead of breaking phones still calling
+`/v1`. New optional fields are allowed; renaming or removing anything shipped is not.
+
+**3. The endpoint list — NOT final.** A working set, expected to change as the screens
+get designed; edits land here as they're decided.
+
+Student app:
+- `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
+  call quietly creates the student's `users` row.
+- `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
+  or switched sessions.
+- `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
+  carries the current truth (state, end time) so the phone can reconcile.
+- `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
+  unlock, and coming back from one.
+- `POST /v1/enrollments` — join a class by code.
+- `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
+  to the teacher, so quietly leaving to dodge a session is always on the record.
+- `GET /v1/me/history` — the student's own timeline screens.
+
+Teacher app and web portal:
+- `GET /v1/me` — same boot call, role-aware.
+- `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes.
+- `GET /v1/classes/{id}/roster` — the roster; `DELETE /v1/enrollments/{id}` — remove a
+  student (the one-transaction removal).
+- `POST /v1/classes/{id}/sessions` — start a session; if one is already open for this
+  class, the response returns that session instead of creating a duplicate.
+- `POST /v1/sessions/{id}/end` and `POST /v1/sessions/{id}/extend`.
+- `GET /v1/sessions/{id}/events?after={number}` — catch-up reads of the event log.
+  (The live stream endpoint is decided in the live-updates section.)
+- `GET /v1/classes/{id}/reports/…` — focus minutes and unlocks.
+- `POST /v1/blocks` — register a physical block to a teacher.
+
+**4. Every request is checked; every error has one shape.** No request body is trusted:
+each endpoint validates its input (right types, sane sizes) before touching the
+database. Failures return one standard JSON error shape with the right status code —
+`400` bad input, `401` bad token, `403` signed in but not allowed, `409` conflict,
+`429` over budget (per-user budgets on signed-in endpoints, per-address on sign-in,
+per ISSUES.md #1) — so every screen can show something honest instead of guessing.
+
+### Rules that keep the API honest
+
+- **The response is the reconciliation channel.** Every student-action response carries
+  the server's current truth — that's how a phone discovers "you were removed,"
+  "session ended," or "you're armed, not joined." An API that only says "ok" recreates
+  v2's drift.
+- **For unlock records, no response ever means "discard."** The contract spells out
+  which errors mean retry later and which mean recorded-with-a-note. v2's lost-unlock
+  bug lived exactly at this gap.
+- **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
+  review, not a feature.
+
+## Live updates
+
+How a new row in the `events` table reaches the teacher's screen within a second or two.
+Only teacher screens get a live feed — student phones learn the truth from the responses
+to their own requests — so live connections ≈ one per running class, not one per student.
+
+### The decisions (2026-09-16)
+
+**1. Teacher screens stream over SSE (Server-Sent Events).** The screen makes one HTTP
+request and the server never finishes the response; each new event is written down the
+open connection as a line. One-way fits us (teacher actions are ordinary POSTs), plain
+HTTP passes school networks, and after a drop the browser reconnects with the last event
+number it saw — which plugs straight into the catch-up endpoint and the overlap-window
+rule.
+
+**2. Servers hear about new rows through Postgres LISTEN/NOTIFY — a doorbell, not a
+mailbox.** The server that writes an event sends a notify for that session; any server
+holding streams for it gets pinged, reads the actual rows from the `events` table, and
+pushes them out. The table stays the single source of truth, and no Redis is needed.
+
+**3. Three protections.** Correctness never depends on the doorbell: every stream also
+re-checks the table on a slow timer (~20s). The server writes a no-op comment line every
+~20s so proxies don't kill idle-looking connections. Streams are capped per teacher
+account so a bug can't leak thousands of connections.
+
+## Hosting
+
+Where everything physically runs.
+
+### The decisions (2026-09-16)
+
+**1. The API and database run on Railway.** A container platform: connect the GitHub
+repo, every push to the deploy branch builds and deploys itself, Postgres is managed on
+the same platform, and secrets live in its dashboard — never in git. Roughly $10–20 a
+month at our stage. Named fallback: Render (near-identical). AWS (ECS + RDS) is the
+"later, if big" path — using Cognito does not require hosting there. Serverless
+platforms are ruled out by our long-lived SSE connections.
+
+**2. Two environments: production and dev.** Each has its own API and database, so a
+bad change can never touch a real school's data.
+
+**3. The session-expiry sweep runs as a Railway cron job** calling an internal
+endpoint. The sweep is idempotent, so an accidental double-run is harmless.
+
+**4. Database safety from day one.** Automatic daily backups with point-in-time
+recovery, and the database in the same region as the API.
+
+Context from v2: Cognito was AWS (kept for v3) and an RDS Postgres instance existed,
+but the v2 API itself was never deployed — it only ran locally, with the website on
+Vercel. The old RDS instance should be decommissioned once v2 is fully retired.
 
 ## The six rules
 
@@ -52,13 +337,13 @@ Each exists because v2 broke it and shipped a real bug
 1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
    and always clamped into the session's real window. (v2: a backdated phone clock erased
    unlocks from reports and inflated focus minutes.)
-2. **One shared state function.** Student app, teacher grid, reports, and parent page all
-   compute "what state is this student in" with the same shared code. (v2: teacher saw
+2. **One shared state function.** Student app, teacher grid, and reports all compute
+   "what state is this student in" with the same shared code. (v2: teacher saw
    "No device" while the student saw "Focused.")
-3. **Verify shields on every heartbeat.** A heartbeat is the app's small status request
-   every ~30s. On each one, the app checks the shields are actually on and re-applies them
-   if not; the screen only claims what was verified. (v2: showed a ticking focus timer
-   while nothing was shielded.)
+3. **Verify shields on every check-in.** Each time the app sends its every-30-seconds
+   request, it also checks the shields are actually on and re-applies them if not; the
+   screen only claims what was verified. (v2: showed a ticking focus timer while nothing
+   was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
    safe. (v2: had no such IDs on some paths.)
 5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
@@ -70,8 +355,11 @@ Each exists because v2 broke it and shipped a real bug
 
 ## Status
 
-- **Decided:** direct writes + local-first phone; the six rules; both items in
-  [ISSUES.md](ISSUES.md) are requirements, not nice-to-haves.
-- **Open:** the overall system shape (servers, hosting) — not locked yet.
+- **Decided:** direct writes + local-first phone; the data model (its tables, seven
+  decisions, and honesty rules); auth (Cognito sign-in, JWT tokens, join codes); the API
+  surface (REST, `/v1` additive-only, one error shape — endpoint list itself not final);
+  the six rules; live updates (SSE + Postgres LISTEN/NOTIFY); hosting (Railway, two
+  environments); both items in [ISSUES.md](ISSUES.md) are requirements.
+- **Open:** iOS and web app structure.
 - **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
   `main` is v3 only.
