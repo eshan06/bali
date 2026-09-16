@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "NODE_ENV=development tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@bali/shared": "^0.0.0",
+    "@bali/shared": "*",
     "dotenv": "^17.4.2",
     "fastify": "^5.12.5",
     "zod": "^4.6.5"

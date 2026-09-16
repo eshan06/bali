@@ -11,10 +11,12 @@ config({
 });
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Default to production: unset env must take the safe JSON-logging path, never
+  // the dev one (pino-pretty is a devDependency). `npm run dev` sets development.
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   /** 0.0.0.0 so containers (Railway) and LAN devices (iPhone dev) can reach the API. */
-  HOST: z.string().default('0.0.0.0'),
+  HOST: z.string().min(1).default('0.0.0.0'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
