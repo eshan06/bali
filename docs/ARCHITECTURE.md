@@ -12,25 +12,6 @@ view-only link.
 
 v3 is a from-scratch rebuild. The v2 code and its bug audit live on the `v2-archive` branch.
 
-## The system
-
-```
-Student iPhones     Teacher web + iPhone
-      │                    │
-      ▼                    ▼
-┌───────────────────────────────┐
-│ API — identical server copies │
-└───────────────┬───────────────┘
-                ▼
-           PostgreSQL
-    (single source of truth)
-```
-
-- **Apps** — student iPhone app, teacher iPhone app, teacher web portal.
-- **API** — stateless servers: they keep nothing in memory worth keeping, so every copy is
-  interchangeable and scaling means adding copies behind a load balancer.
-- **PostgreSQL** — the database. If anything else disagrees with it, the database is right.
-
 ## How a tap works
 
 Decided 2026-09-15: **direct database writes + local-first phone.** (A message queue in the
@@ -59,13 +40,9 @@ middle was considered and rejected — see below.)
 10. Respond `200 OK`. Only now does the phone delete the record from local storage.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
-**Why no queue in the middle.** A queue (e.g. Redis) between the API and the database means
-the server replies "got it" before the row is actually written. If the queue crashes first,
-the record is gone — after the phone already deleted its copy. Disqualifying for a product
-built on trustworthy records. Also unnecessary: a whole school tapping at the bell is a few
-hundred INSERTs spread over a minute, and Postgres handles thousands per second. The
-tap-saving code lives in one module, so if real load ever demands a queue, adding one is a
-contained change.
+**Why no queue (Redis) in the middle:** the server would reply "got it" before the row is
+written, so a queue crash loses records the phone has already deleted. Wrong trade for us,
+and unneeded at our scale — if that ever changes, the tap-saving module can add one later.
 
 ## The six rules
 
@@ -93,8 +70,8 @@ Each exists because v2 broke it and shipped a real bug
 
 ## Status
 
-- **Decided:** the system shape; direct writes + local-first phone; the six rules; both
-  items in [ISSUES.md](ISSUES.md) are requirements, not nice-to-haves.
-- **Open:** hosting provider for the API and database.
+- **Decided:** direct writes + local-first phone; the six rules; both items in
+  [ISSUES.md](ISSUES.md) are requirements, not nice-to-haves.
+- **Open:** the overall system shape (servers, hosting) — not locked yet.
 - **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
   `main` is v3 only.
