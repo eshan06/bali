@@ -1,5 +1,10 @@
 /**
  * @bali/db — Drizzle schema, migrations, and the Postgres client.
- * Lands in Phase 1, step 2; this stub only proves the workspace wiring.
+ * The schema is the data model from docs/ARCHITECTURE.md; migrations live in
+ * ./migrations and are generated (`npm run db:generate -w @bali/db`), never
+ * hand-edited.
  */
-export {};
+
+export { createDb, type Db } from './client.js';
+export { newUuidV7 } from './ids.js';
+export * from './schema.js';
