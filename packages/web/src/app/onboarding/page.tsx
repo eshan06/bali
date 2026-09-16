@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { updateUserAttributes } from 'aws-amplify/auth';
 import { useAuthContext } from '@/components/auth/AuthProvider';
@@ -12,7 +12,7 @@ function withRedirect(path: string, redirect: string | null) {
   return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
 }
 
-export default function OnboardingPage() {
+function OnboardingPageInner() {
   const { isAuthenticated, isLoading, role, user, refresh, logout } = useAuthContext();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -186,5 +186,15 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary above it or the production
+// build fails when prerendering this route.
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPageInner />
+    </Suspense>
   );
 }

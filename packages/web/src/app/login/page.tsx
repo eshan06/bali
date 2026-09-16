@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -18,7 +18,7 @@ function routeForRole(role: string | null | undefined, redirect: string | null):
   return '/dashboard/';
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
   const { loginWithEmail, loginWithGoogle, isAuthenticated, role } = useAuthContext();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -151,5 +151,15 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary above it or the production
+// build fails when prerendering this route.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

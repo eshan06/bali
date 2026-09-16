@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { api } from '@/lib/api-client';
 import type { StudentSelf } from '@bali/shared';
 
-export default function StudentProfileOnboardingPage() {
+function StudentProfileOnboardingPageInner() {
   const { isAuthenticated, isLoading, role, user, refresh, logout } = useAuthContext();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -156,5 +156,15 @@ export default function StudentProfileOnboardingPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary above it or the production
+// build fails when prerendering this route.
+export default function StudentProfileOnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <StudentProfileOnboardingPageInner />
+    </Suspense>
   );
 }
