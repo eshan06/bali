@@ -1,0 +1,16 @@
+# Secrets and local config — never commit these
+.env
+.env.*
+!.env.example
+.env-archive/
+
+# Local tooling and OS noise
+.claude/
+.DS_Store
+
+# Dependencies and build output (regenerable)
+node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
