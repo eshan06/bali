@@ -329,6 +329,103 @@ Context from v2: Cognito was AWS (kept for v3) and an RDS Postgres instance exis
 but the v2 API itself was never deployed — it only ran locally, with the website on
 Vercel. The old RDS instance should be decommissioned once v2 is fully retired.
 
+## iOS app structure
+
+How the student app is organized so the phone can read the tap, enforce the shields, work
+offline, and never lose a record. The iPhone is where Bali's promise is physically kept.
+Guiding philosophy (owner, 2026-09-16): Bali is a mirror, not a cage — the phone doesn't
+fight the student, it makes sure the teacher always sees the truth.
+
+### The decisions (2026-09-16)
+
+**1. Native Swift + SwiftUI.** The shield technology (Family Controls / Screen Time) exists
+only as native Apple APIs, so cross-platform frameworks can't reach it. Not really a choice.
+
+**2. It's a main app plus an extension — enforcement never depends on the app being open.**
+An extension is a small separate program iOS runs for us at set moments, even if the student
+swiped the app away. The main app handles screens, sign-in, reading the NFC tap, and turning
+shields on; a DeviceActivity monitor extension is registered with the session's time window,
+so iOS runs our code at the session's start and end regardless of the app being closed. Built
+first, not last.
+
+**3. The phone's own records live in a small SQLite database in a shared app group.** SQLite
+is a tiny on-phone database; it holds the current session and the outbox (unsent taps and
+unlocks waiting for internet). An app group is a shared folder Apple lets related programs
+use — required because the extension is a separate program and otherwise couldn't read what
+the app wrote. Library: GRDB (battle-tested; SwiftData is still flaky in extensions).
+
+**4. One sync engine owns all server communication.** It drains the outbox with retry and
+backoff, runs the every-30-seconds check-in while the app is open, and applies the server's
+answer (the reconcile step). iOS won't let us run a timer forever in the background, so
+check-ins are best-effort, enforcement never requires network (decision 2 guarantees that),
+and the grid shows "last seen 4m ago" rather than pretending silence is focus.
+
+**5. The teacher iOS app is a thin client sharing a `BaliCore` Swift package.** Same API as
+the web portal, no enforcement machinery. Both apps share one package holding the API client
+and data types, so the two apps can't drift out of type-agreement.
+
+### Rules that keep the phone honest
+
+- **Turning off Screen Time permission is handled by being honest, not by fighting it.** iOS
+  itself drops all shields the instant the permission is revoked — we can't prevent it. So the
+  next check-in notices, the server records it as its own event, and the grid shows "turned
+  protection off" (a distinct state — never green, never an unlock). Returning to focus needs
+  an explicit re-tap. This permanently kills v2's worst bug, which was pretending to be
+  shielded after exactly this.
+- **A closed app still shows the truth fast.** When the app is force-quit, check-ins stop and
+  within about a minute the grid shows "app closed" honestly. (What should happen to the
+  shields themselves in that case is in "decided later" below.)
+- **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
+  time, so a clock change is a real bypass family; the server compares against its own clock
+  (rule 1) and surfaces it to the teacher rather than trusting it.
+
+### Decided later, on purpose
+
+- **What the shields do when the app is force-quit.** Two options: (a) shields stay until the
+  session ends — the extension guarantees the unlock at the bell even with the app closed, and
+  Emergency Unlock is the one-tap sanctioned exit during the session; or (b) a watchdog turns
+  shields off after force-quit, but iOS's coarse wake clock makes the honest promise "off
+  within ~15 minutes," not instant. Leaning (a). The teacher-portal half ("app closed" within
+  a minute) is locked regardless.
+- **A second enforcement layer: a local VPN filter.** The app installs a VPN profile whose
+  traffic loops through a small filter on the phone itself, refusing connections to blocked
+  destinations. It adds what Screen Time can't: starving apps of internet, blocking websites
+  in every browser, instant server-updated block lists, and a backup layer that still works if
+  Screen Time permission is revoked. Catches: the student can switch the VPN off in Settings
+  (detect and mark it), offline apps/games are untouched, a VPN badge shows in the status bar,
+  and it means seeing traffic on a minor's phone (a deliberate privacy call). Not in the launch
+  path, but a genuine candidate for production as a layer-2 enforcement engine alongside
+  Screen Time.
+- **Applied for now:** the Family Controls distribution entitlement (longest lead time, weeks
+  to months) — submitted per bundle ID including the monitor extension.
+
+## Web portal
+
+The teacher's website: classes, sessions, the live grid, reports — plus the static
+marketing pages. The phone is where enforcement lives; the portal is where trust lives.
+
+### The decisions (2026-09-16)
+
+**1. Next.js, as in v2.** React for the interactive screens, plus free static marketing
+pages in the same project.
+
+**2. A thin client — the API stays the only brain.** Portal screens run in the browser,
+calling the same `/v1` API as the iPhone apps, with the same JWT and the same SSE stream.
+No second mini-backend inside Next.js. One brain, three thin clients.
+
+**3. It imports `packages/shared` directly.** The same TypeScript state function and
+types the API uses — on web, "one shared state function" is literally the same file.
+(iOS mirrors it in `BaliCore` with contract tests, since Swift can't import TypeScript.)
+
+**4. The grid states its own health.** On a dropped stream it shows "reconnecting — last
+updated 40s ago" instead of freezing green, then catches up by event number. Only a real
+`401` signs a teacher out; a network blip shows "can't reach the server — retry."
+
+**5. Deploys on Vercel when we ship.** A new project watching `main`; removing the
+`vercel.json` deploy block is the deliberate flip. Two open tabs are fine (each stream
+has its own cursor; capped at 5 per account), and a tab left open across a deploy gets a
+"new version — refresh" banner.
+
 ## The six rules
 
 Each exists because v2 broke it and shipped a real bug
@@ -359,7 +456,9 @@ Each exists because v2 broke it and shipped a real bug
   decisions, and honesty rules); auth (Cognito sign-in, JWT tokens, join codes); the API
   surface (REST, `/v1` additive-only, one error shape — endpoint list itself not final);
   the six rules; live updates (SSE + Postgres LISTEN/NOTIFY); hosting (Railway, two
-  environments); both items in [ISSUES.md](ISSUES.md) are requirements.
-- **Open:** iOS and web app structure.
+  environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
+  (Next.js thin client on Vercel); both items in [ISSUES.md](ISSUES.md) are requirements.
+- **Open:** nothing — the design is complete. Next: the build plan (what gets coded
+  first). Items deliberately parked live in each section's "decided later" list.
 - **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
   `main` is v3 only.
