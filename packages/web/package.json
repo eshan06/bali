@@ -12,6 +12,7 @@
     "@bali/shared": "*",
     "@yudiel/react-qr-scanner": "^2.5.1",
     "aws-amplify": "^6.3.0",
+    "framer-motion": "^13.3.0",
     "next": "^14.2.0",
     "papaparse": "^5.4.0",
     "qrcode.react": "^4.2.0",
