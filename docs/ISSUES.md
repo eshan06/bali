@@ -1,0 +1,62 @@
+# Bali v3 — Known issues and how we plan to handle them
+
+A running list of the problems that could genuinely hurt Bali, and the plan for each.
+New issues get added as we find them. Plain language on purpose.
+
+---
+
+## 1. The whole school shares one internet address
+
+**The problem.** On school Wi-Fi, all ~600 phones reach the internet through **one shared
+address** — like an apartment building where every letter shows the same street address.
+Servers normally protect themselves with a rule like "too many requests from one address =
+block it, it's probably an attack." At the bell, 600 honest taps arrive from one address in
+one minute. A naive rule blocks the entire school at the exact moment everyone needs us.
+
+**The plan.**
+- Count request budgets **per signed-in student account**, not per address. 600 students
+  tapping once each = everyone comfortably within their own budget. One bad actor flooding
+  us hits *their* limit and gets stopped without anyone else noticing.
+- Only trust the account after the sign-in is **verified**. (v2 counted requests by a label
+  the phone wrote on itself, without checking it — an attacker could change the label every
+  request and get a fresh budget each time, making the limit useless.)
+- Requests where nobody is signed in yet (signing in, the parent's view-only page): budget
+  by address, but sized generously for "a whole school at once," and slow requests down
+  before ever blocking them.
+- Phones retry with a small random delay, so even a server hiccup doesn't cause everyone
+  to retry in lockstep and pile the crowd back up.
+
+**Done when:** a simulated school — hundreds of accounts behind one address — can all tap
+in the same minute with zero blocks, while a single flooding account still gets stopped.
+
+## 2. An emergency unlock record must never be lost
+
+**The problem.** Emergency Unlock means shields drop immediately, no permission needed.
+The deal that makes that freedom okay: it's always allowed, but it's **always recorded**.
+If a record can silently vanish, the button becomes a secret off-switch and every report
+we show a teacher is untrustworthy. v2 really did this: a student removed from class
+mid-session hit Emergency Unlock; the server answered "you're not in this class," and the
+app threw the record away. Unshielded phone, zero trace, nobody ever knew.
+
+**The plan.**
+- The phone **saves the record to its own storage first**, before telling anyone — like
+  writing it in a notebook before mailing the letter.
+- The phone retries sending — minutes, hours, days if needed — until the server confirms
+  "saved for real." Only then does it cross the record out of its notebook.
+- The server **never throws an unlock record away**, even in weird situations. Removed
+  from the class? Session already over? It gets recorded with a note attached. No server
+  reply may ever mean "delete this."
+- Every record carries a unique ID, so retries and double-sends count once, never twice.
+
+**Done when:** killing the Wi-Fi mid-unlock, force-quitting the app, and the
+"removed from class" case all still end with the record visible to the teacher.
+
+---
+
+## Considered and set aside (so we don't re-argue them)
+
+- **Copying the NFC tag.** Not an issue in our setup: the block belongs to the *teacher* —
+  it is not stuck on desks — so students never get quiet access to clone it. Revisit only
+  if a tap ever needs to prove physical presence (attendance-style claims).
+- **Bell-minute load testing.** Real, but it's a testing task, not a design issue — it will
+  be part of pre-launch testing.
