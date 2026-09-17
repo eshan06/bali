@@ -7,6 +7,7 @@
 
 export { createDb, type Db } from './client.js';
 export { newUuidV7 } from './ids.js';
+export { runMigrations } from './migrate.js';
 export { MIGRATIONS_DIR } from './paths.js';
 export * from './queries.js';
 export * from './schema.js';

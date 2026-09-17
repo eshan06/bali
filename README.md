@@ -21,9 +21,23 @@ npm run typecheck && npm run lint && npm test
 npm run dev:api        # then: curl localhost:3001/healthz
 ```
 
-Configuration comes from a single `.env` at the repo root. Every variable the API reads
-is declared and validated in `apps/api/src/env.ts`; a missing or malformed value fails
-the boot with a readable list instead of a crash somewhere downstream.
+Configuration comes from a single `.env` at the repo root (`.env.example` lists every
+variable with notes). Every variable the API reads is declared and validated in
+`apps/api/src/env.ts`; a missing or malformed value fails the boot with a readable list
+instead of a crash somewhere downstream.
+
+See the whole Phase-1 flow end-to-end, with no external services, via an in-memory
+Postgres:
+
+```bash
+npm run demo
+```
+
+## Deploying
+
+`npm run migrate` applies migrations to `DATABASE_URL`; `npm start` serves the API. The
+container builds from the root `Dockerfile` and runs both. Full deploy steps (Railway,
+Cognito, the session-expiry cron, required env vars) are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Database
 
@@ -32,5 +46,4 @@ generated SQL and is never hand-edited (custom migrations, like the events appen
 trigger, are added with `drizzle-kit generate --custom`). After a schema change, run
 `npm run db:generate -w @bali/db` and commit the new migration with it. Tests apply the
 committed migrations to an in-process Postgres (PGlite), so `npm test` needs no database
-server — locally or in CI. Applying migrations to a real database is wired up in the
-hosting step.
+server — locally or in CI. `npm run migrate` applies them to a real `DATABASE_URL`.

@@ -6,6 +6,7 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors } from './errors.js';
+import { registerInternalRoutes } from './routes/internal.js';
 import { registerMeRoute } from './routes/me.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
@@ -37,6 +38,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerMeRoute(app, deps.db);
   registerTapsRoute(app, deps.db);
   registerSessionsRoute(app, deps.db);
+  registerInternalRoutes(app, deps.db, env.INTERNAL_API_KEY);
 
   return app;
 }

@@ -55,6 +55,12 @@ const envSchema = z.object({
   AUTH_AUDIENCE: z.string().min(1),
   /** Postgres connection string. Required; the client connects lazily so boot needs no live DB. */
   DATABASE_URL: z.string().min(1),
+  /**
+   * Shared secret the session-expiry cron presents to the internal sweep
+   * endpoint (hosting decision 3). Server-to-server, not a user JWT; long enough
+   * that it can't be guessed.
+   */
+  INTERNAL_API_KEY: z.string().min(16),
 });
 
 export type Env = z.infer<typeof envSchema>;

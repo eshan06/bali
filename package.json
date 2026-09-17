@@ -12,6 +12,9 @@
   },
   "scripts": {
     "dev:api": "npm run dev -w @bali/api",
+    "start": "npm start -w @bali/api",
+    "migrate": "npm run migrate -w @bali/api",
+    "demo": "npm run demo -w @bali/api",
     "typecheck": "npm run typecheck -ws --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",
