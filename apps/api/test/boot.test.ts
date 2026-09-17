@@ -109,6 +109,24 @@ describe('boot contracts', () => {
     }
   }, 30_000);
 
+  it('a missing explicitly-pointed-at .env fails the boot', async () => {
+    // DOTENV_CONFIG_PATH names a file that does not exist: ENOENT, which a
+    // missing *default* .env tolerates but an explicit path must not.
+    const scratch = mkdtempSync(join(tmpdir(), 'bali-env-'));
+    try {
+      const { child, exited } = bootServer({
+        DOTENV_CONFIG_PATH: join(scratch, 'nope.env'),
+        PORT: '0',
+        HOST: '127.0.0.1',
+      });
+      const result = await exitWithin(child, exited, 20_000);
+      expect(result.code).not.toBe(0);
+      expect(result.output).toContain('ENOENT');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it('SIGINT then SIGTERM shuts down once, cleanly', async () => {
     // PORT=0 lets the OS pick a free port — no collision window.
     const { child, exited, waitForOutput } = bootServer({ PORT: '0', HOST: '127.0.0.1' });

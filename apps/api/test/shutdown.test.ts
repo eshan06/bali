@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 describe('makeShutdown', () => {
-  it('a second signal while close() is pending logs and does not close twice', async () => {
+  it('a second signal while close() is pending logs and does not close twice', () => {
     const { app, logs, close } = fakeApp();
     const exit = vi.fn();
     const shutdown = makeShutdown(app, { deadlineMs: 8000, exit });

@@ -50,6 +50,8 @@ export function makeShutdown(
         exit(0);
       },
       (err: unknown) => {
+        clearInterval(sweep);
+        clearTimeout(deadline);
         app.log.error(err, 'shutdown failed');
         exit(1);
       },
