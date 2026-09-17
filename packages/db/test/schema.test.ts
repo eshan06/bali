@@ -1,13 +1,10 @@
-import { fileURLToPath } from 'node:url';
-
-import { PGlite } from '@electric-sql/pglite';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
 import { validate, version } from 'uuid';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
+import { makeTestDb } from '../src/testing.js';
+import type { Database } from '../src/types.js';
 import {
   blocks,
   classes,
@@ -20,9 +17,10 @@ import {
 } from '../src/schema.js';
 
 /*
- * These tests run the committed migrations against PGlite — real Postgres,
- * in-process — and then try to break every rule the database is supposed to
- * enforce. Each test seeds its own rows, so they share one instance.
+ * These tests run the committed migrations against the test database (PGlite by
+ * default, real Postgres when TEST_DATABASE_URL is set — both are Postgres) and
+ * then try to break every rule the database is supposed to enforce. Each test
+ * seeds its own rows, so they share one instance.
  */
 
 /**
@@ -50,17 +48,15 @@ function one<T>(rows: T[]): T {
   return row;
 }
 
-let pg: PGlite;
-let db: ReturnType<typeof drizzle>;
+let db: Database;
+let close: () => Promise<void>;
 
 beforeAll(async () => {
-  pg = new PGlite();
-  db = drizzle(pg);
-  await migrate(db, { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
+  ({ db, close } = await makeTestDb());
 });
 
 afterAll(async () => {
-  await pg.close();
+  await close();
 });
 
 /** One school, one teacher, one student, one class with the student enrolled. */

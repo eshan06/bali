@@ -1,12 +1,7 @@
-import { PGlite } from '@electric-sql/pglite';
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { drizzle, type PgliteDatabase } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import * as schema from '../src/schema.js';
 import {
   armedTaps,
   classes,
@@ -29,18 +24,18 @@ import {
   TransitionError,
   unlock,
 } from '../src/transitions.js';
+import { makeTestDb } from '../src/testing.js';
+import type { Database } from '../src/types.js';
 
-let pg: PGlite;
-let db: PgliteDatabase<typeof schema>;
+let db: Database;
+let close: () => Promise<void>;
 
 beforeAll(async () => {
-  pg = new PGlite();
-  db = drizzle(pg, { schema });
-  await migrate(db, { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
+  ({ db, close } = await makeTestDb());
 });
 
 afterAll(async () => {
-  await pg.close();
+  await close();
 });
 
 function one<T>(rows: T[]): T {
