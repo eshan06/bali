@@ -64,6 +64,24 @@ describe('POST /v1/taps', () => {
     expect(body.session).toBeNull();
   });
 
+  it('a non-enrolled student cannot join — the tap arms, never joins someone else class', async () => {
+    // Teacher A runs a session; an outsider student (enrolled elsewhere) taps A's block.
+    const a = await seedClassroom(db, 'tap-idor-a');
+    const outsider = await seedClassroom(db, 'tap-idor-b');
+    await startSession(db, {
+      classId: a.klass.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+
+    const { status, body } = await tap(await ctx.tokenFor(outsider.student.cognitoId), {
+      tagId: a.block.tagId,
+    });
+    expect(status).toBe(200);
+    expect(body.outcome).toBe('armed'); // NOT 'joined' — outsider isn't enrolled in A's class
+    expect(body.session).toBeNull();
+  });
+
   it('is idempotent on eventId (a retried join counts once)', async () => {
     const { student, klass, block } = await seedClassroom(db, 'tap-retry');
     await startSession(db, {

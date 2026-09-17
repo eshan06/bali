@@ -25,6 +25,8 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       const { durationMinutes } = parse(Body, request.body);
 
       const user = await findUserByCognitoId(db, identity.sub);
+      // Defense-in-depth over the ownership check below (a student is never a
+      // class's teacherId), but it gives a student a clearer reason.
       if (!user || user.role !== 'teacher') {
         throw ApiError.forbidden('only a teacher can start a session');
       }

@@ -585,6 +585,7 @@ describe('armed taps', () => {
       eventId,
       deviceTime: new Date('2026-01-01T07:58:00Z'),
       expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T08:00:00Z'), // the waiting tap is still valid
     };
     const first = await armTap(db, req);
     expect(first.outcome).toBe('armed');
@@ -630,6 +631,76 @@ describe('armed taps', () => {
       await db.select().from(armedTaps).where(eq(armedTaps.eventId, armEventId)),
     );
     expect(consumed.consumedAt).not.toBeNull();
+  });
+
+  it('a refreshed arm replaces an expired waiting tap instead of swallowing it', async () => {
+    const { teacher, student } = await seedClass('arm-refresh');
+    const stale = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T07:00:00Z'),
+      expiresAt: new Date('2026-01-01T07:30:00Z'),
+      now: new Date('2026-01-01T07:00:00Z'),
+    });
+    // Next day's tap, after the stale one has expired.
+    const fresh = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-02T07:58:00Z'),
+      expiresAt: new Date('2026-01-02T23:59:59Z'),
+      now: new Date('2026-01-02T07:58:00Z'),
+    });
+    expect(fresh.outcome).toBe('armed');
+    expect(fresh.armedTapId).toBe(stale.armedTapId); // same row, refreshed in place
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
+    expect(rows).toHaveLength(1);
+    expect(one(rows).expiresAt.toISOString()).toBe('2026-01-02T23:59:59.000Z');
+  });
+
+  it('conversion ends a student who is live in another session (decision 4, no crash)', async () => {
+    // Student armed for teacher B, then joined teacher A's running session. When
+    // B starts, the conversion must end the A participation, not violate the
+    // one-live-per-student index and 500 the whole Start.
+    const a = await seedClass('arm-cross-a');
+    const b = await seedClass('arm-cross-b');
+    // The A student is also enrolled in B's class and taps B's block early.
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+    await armTap(db, {
+      studentId: a.student.id,
+      teacherId: b.teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T08:58:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+    // Then A starts and the student joins A's session.
+    const sessionA = (
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    await tapIn(db, {
+      sessionId: sessionA.id,
+      studentId: a.student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    // B starts: converting the armed tap must succeed and end the A participation.
+    const startB = await startSession(db, {
+      classId: b.klass.id,
+      ...window('2026-01-01T09:05:00Z'),
+    });
+    expect(startB.armedConverted).toBe(1);
+    const live = await db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.studentId, a.student.id), isNull(participations.endedAt)));
+    expect(live).toHaveLength(1);
+    expect(one(live).sessionId).toBe(startB.session.id);
+    const partA = one(
+      await db.select().from(participations).where(eq(participations.sessionId, sessionA.id)),
+    );
+    expect(partA.endedReason).toBe('left_for_other_session');
   });
 
   it('does not convert an expired armed tap', async () => {

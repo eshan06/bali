@@ -13,10 +13,15 @@ const TapBody = z.object({
   deviceTime: z.string().datetime(),
 });
 
-/** End of the current civil day, UTC — when an armed tap expires (decision 5). */
+/**
+ * End of the current school day — when an armed tap expires (decision 5). Uses
+ * the server's local time zone, which the deploy sets to the school's (the
+ * hosting doc requires TZ; bell times render in that zone), so a pre-bell tap
+ * lasts until that evening rather than a UTC boundary that could fall mid-day.
+ */
 function endOfDay(now: Date): Date {
   const end = new Date(now);
-  end.setUTCHours(23, 59, 59, 999);
+  end.setHours(23, 59, 59, 999);
   return end;
 }
 

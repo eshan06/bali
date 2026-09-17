@@ -132,6 +132,58 @@ async function loadLiveParticipation(
   );
 }
 
+/**
+ * End every live participation this student has in a session OTHER than
+ * `exceptSessionId`, as `left_for_other_session` (decision 4), emitting the
+ * switch-out event on each. Returns how many were ended. Both `tapIn` and the
+ * armed-tap conversion call this so the one-live-per-student rule always holds
+ * before a new focused participation is opened.
+ */
+async function endParticipationsElsewhere(
+  tx: Database,
+  studentId: string,
+  exceptSessionId: string,
+  occurredAt: Date,
+): Promise<number> {
+  const elsewhere = await tx
+    .select({
+      id: participations.id,
+      sessionId: participations.sessionId,
+      classId: sessions.classId,
+    })
+    .from(participations)
+    .innerJoin(sessions, eq(participations.sessionId, sessions.id))
+    .where(
+      and(
+        eq(participations.studentId, studentId),
+        isNull(participations.endedAt),
+        ne(participations.sessionId, exceptSessionId),
+      ),
+    );
+  let ended = 0;
+  for (const other of elsewhere) {
+    // Guard on ended_at IS NULL: if that session ended between the select and
+    // here, this no-ops rather than overwriting its end reason, and we skip
+    // the switch-out event.
+    const done = await tx
+      .update(participations)
+      .set({ endedAt: occurredAt, endedReason: 'left_for_other_session' })
+      .where(and(eq(participations.id, other.id), isNull(participations.endedAt)))
+      .returning({ id: participations.id });
+    if (done.length === 0) continue;
+    await insertEvent(tx, {
+      eventId: newUuidV7(),
+      type: 'left_for_other_session',
+      sessionId: other.sessionId,
+      classId: other.classId,
+      userId: studentId,
+      occurredAt,
+    });
+    ended += 1;
+  }
+  return ended;
+}
+
 export interface StartSessionInput {
   classId: string;
   startedAt: Date;
@@ -181,6 +233,11 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
   let converted = 0;
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
+    // Decision 4: a student armed here may already be live in another session
+    // (they tapped a different teacher's running block after arming). End that
+    // first, or the insert below would violate one-live-per-student and roll
+    // back the whole Start.
+    await endParticipationsElsewhere(tx, tap.studentId, session.id, occurredAt);
     await tx
       .insert(participations)
       .values({
@@ -275,9 +332,11 @@ export interface ArmTapInput {
   deviceTime: Date;
   /** End of the school day; the tap is ignored at conversion if this has passed. */
   expiresAt: Date;
+  /** Server clock for the expiry comparison; defaults to now. */
+  now?: Date;
 }
 export interface ArmTapResult {
-  /** 'armed' new; 'already_armed' a prior waiting tap stands; 'replay' this exact tap again. */
+  /** 'armed' new/refreshed; 'already_armed' a live waiting tap stands; 'replay' this exact tap again. */
   outcome: 'armed' | 'already_armed' | 'replay';
   armedTapId: string;
 }
@@ -286,8 +345,13 @@ export interface ArmTapResult {
  * Save a tap that arrived before any session was running (decision 5). Stored as
  * student+teacher; it waits until the teacher presses Start. Idempotent on the
  * client's event_id, and at most one waiting tap per student+teacher stands.
+ * `now` decides whether an existing waiting tap is still valid; a stale
+ * (expired-but-unconsumed) one is refreshed in place rather than blocking the
+ * new tap — until the expiry sweep lands, that stale row is the only thing that
+ * could otherwise swallow a fresh pre-bell tap.
  */
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
+  const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
     const exact = firstOrUndefined(
       await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
@@ -307,7 +371,23 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         )
         .limit(1),
     );
-    if (waiting) return { outcome: 'already_armed', armedTapId: waiting.id };
+    if (waiting) {
+      if (waiting.expiresAt.getTime() > now.getTime()) {
+        return { outcome: 'already_armed', armedTapId: waiting.id };
+      }
+      // The existing waiting tap has expired: replace it with this fresh one
+      // (the partial unique index allows only one unconsumed row per pair).
+      await tx
+        .update(armedTaps)
+        .set({
+          blockId: input.blockId ?? null,
+          eventId: input.eventId,
+          deviceTime: input.deviceTime,
+          expiresAt: input.expiresAt,
+        })
+        .where(eq(armedTaps.id, waiting.id));
+      return { outcome: 'armed', armedTapId: waiting.id };
+    }
 
     const row = firstOrUndefined(
       await tx
@@ -481,44 +561,9 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
     }
 
     // Decision 4: end any live participation in a DIFFERENT session first, so
-    // the one-live-per-student rule holds before we open this one. Carry the
-    // leaving session's class so the switch-out event lands in class reports.
-    const elsewhere = await tx
-      .select({
-        id: participations.id,
-        sessionId: participations.sessionId,
-        classId: sessions.classId,
-      })
-      .from(participations)
-      .innerJoin(sessions, eq(participations.sessionId, sessions.id))
-      .where(
-        and(
-          eq(participations.studentId, input.studentId),
-          isNull(participations.endedAt),
-          ne(participations.sessionId, session.id),
-        ),
-      );
-    let outcome: 'joined' | 'switched' = 'joined';
-    for (const other of elsewhere) {
-      // Guard on ended_at IS NULL: if that session ended between the select and
-      // here, this no-ops rather than overwriting its end reason, and we skip
-      // the switch-out event.
-      const ended = await tx
-        .update(participations)
-        .set({ endedAt: occurredAt, endedReason: 'left_for_other_session' })
-        .where(and(eq(participations.id, other.id), isNull(participations.endedAt)))
-        .returning({ id: participations.id });
-      if (ended.length === 0) continue;
-      await insertEvent(tx, {
-        eventId: newUuidV7(),
-        type: 'left_for_other_session',
-        sessionId: other.sessionId,
-        classId: other.classId,
-        userId: input.studentId,
-        occurredAt,
-      });
-      outcome = 'switched';
-    }
+    // the one-live-per-student rule holds before we open this one.
+    const switched = await endParticipationsElsewhere(tx, input.studentId, session.id, occurredAt);
+    const outcome: 'joined' | 'switched' = switched > 0 ? 'switched' : 'joined';
 
     const upserted = firstOrUndefined(
       await tx
