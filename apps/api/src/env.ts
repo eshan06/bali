@@ -5,10 +5,16 @@ import { config } from 'dotenv';
 import { z } from 'zod';
 
 // One .env for the whole monorepo, at the repo root (same convention as v2).
-config({
+const loaded = config({
   path: resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..', '.env'),
   quiet: true,
 });
+// dotenv reports read failures via the return value, not by throwing. A missing
+// .env is fine (defaults and platform env apply); an unreadable one must fail
+// the boot — silently running on defaults would break the fail-fast contract.
+if (loaded.error && (loaded.error as NodeJS.ErrnoException).code !== 'ENOENT') {
+  throw loaded.error;
+}
 
 const envSchema = z.object({
   // Default to production: unset env must take the safe JSON-logging path, never

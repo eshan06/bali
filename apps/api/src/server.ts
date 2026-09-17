@@ -5,7 +5,12 @@ const app = buildApp(env);
 
 // SIGTERM is how deploy platforms ask a process to stop; close() finishes
 // in-flight requests instead of dropping them mid-response.
+let closing = false;
 function shutdown(signal: NodeJS.Signals): void {
+  // A second signal (SIGINT then SIGTERM) must not start a second close()
+  // racing the first one's exit.
+  if (closing) return;
+  closing = true;
   app.log.info({ signal }, 'shutting down');
   app.close().then(
     () => process.exit(0),
