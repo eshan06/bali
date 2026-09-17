@@ -8,3 +8,4 @@
 export { createDb, type Db } from './client.js';
 export { newUuidV7 } from './ids.js';
 export * from './schema.js';
+export * from './transitions.js';

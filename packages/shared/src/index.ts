@@ -40,6 +40,7 @@ export const PARTICIPATION_ENDED_REASONS = [
   'session_ended',
   'session_expired',
   'removed_from_class',
+  'left_class',
 ] as const;
 export type ParticipationEndedReason = (typeof PARTICIPATION_ENDED_REASONS)[number];
 
@@ -63,3 +64,5 @@ export const EVENT_TYPES = [
   'enrollment_removed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+export * from './state.js';

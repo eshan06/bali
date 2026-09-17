@@ -365,6 +365,7 @@ describe('participations', () => {
       state: 'focused',
       joinedAt: new Date(),
       endedAt: new Date(),
+      endedReason: 'session_ended',
     });
 
     // Re-joining the same session must update the row, never add a second one.

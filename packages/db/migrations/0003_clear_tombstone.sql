@@ -1,0 +1,1 @@
+ALTER TABLE "participations" ADD CONSTRAINT "participations_ended_consistent" CHECK (("participations"."ended_at" IS NULL) = ("participations"."ended_reason" IS NULL));

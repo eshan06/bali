@@ -7,6 +7,7 @@ import type {
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  check,
   index,
   jsonb,
   pgTable,
@@ -173,6 +174,13 @@ export const participations = pgTable(
     uniqueIndex('participations_one_live_per_student')
       .on(t.studentId)
       .where(sql`${t.endedAt} IS NULL`),
+    // ended_at and ended_reason move together: a live row has neither, an ended
+    // row has both. Reports branch on ended_reason, so an ended-but-reasonless
+    // row (or the reverse) would be a silent miscount — the DB refuses it.
+    check(
+      'participations_ended_consistent',
+      sql`(${t.endedAt} IS NULL) = (${t.endedReason} IS NULL)`,
+    ),
   ],
 );
 
