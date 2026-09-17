@@ -5,7 +5,7 @@ import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 
 import { newUuidV7 } from './ids.js';
 import * as schema from './schema.js';
-import { events, participations, sessions } from './schema.js';
+import { classes, events, participations, sessions } from './schema.js';
 
 /*
  * The transition engine (data-model decision 1). This module is the ONLY code
@@ -87,9 +87,37 @@ async function insertEvent(
   return inserted.length > 0;
 }
 
-async function loadSession(tx: Database, sessionId: string): Promise<SessionRow | undefined> {
+/**
+ * Load a session, optionally locking the row FOR UPDATE. Every operation that
+ * mutates a session or its participations locks it first, so concurrent
+ * transactions serialize on the session: a tap can't slip a live participation
+ * into a session another transaction is ending (which would leave the two
+ * tables disagreeing — decision 1), and two end/expiry runs can't both emit an
+ * end event (decision 6's idempotent sweep). Read-only callers skip the lock.
+ * (PGlite is single-connection, so the tests can't stage the race; the lock is
+ * verified by reasoning and belongs in a real-Postgres integration test once a
+ * live database exists — the hosting step.)
+ */
+async function loadSession(
+  tx: Database,
+  sessionId: string,
+  opts: { forUpdate?: boolean } = {},
+): Promise<SessionRow | undefined> {
+  const query = tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  return firstOrUndefined(await (opts.forUpdate ? query.for('update') : query));
+}
+
+async function loadParticipation(
+  tx: Database,
+  sessionId: string,
+  studentId: string,
+): Promise<ParticipationRow | undefined> {
   return firstOrUndefined(
-    await tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    await tx
+      .select()
+      .from(participations)
+      .where(and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)))
+      .limit(1),
   );
 }
 
@@ -135,6 +163,16 @@ export async function startSession(
   input: StartSessionInput,
 ): Promise<StartSessionResult> {
   return db.transaction(async (tx) => {
+    // Lock the class row so two simultaneous starts serialize: the loser waits,
+    // then sees the running session and returns it rather than hitting the
+    // one-running-per-class index with a raw unique violation (the doc's
+    // "from a phone and a laptop at once" promise).
+    await tx
+      .select({ id: classes.id })
+      .from(classes)
+      .where(eq(classes.id, input.classId))
+      .for('update');
+
     const existing = firstOrUndefined(
       await tx
         .select()
@@ -172,7 +210,7 @@ export interface ExtendSessionInput {
 /** Move a running session's end time forward (teacher "add time"). */
 export async function extendSession(db: Database, input: ExtendSessionInput): Promise<SessionRow> {
   return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId);
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
     if (input.newEndsAt.getTime() <= session.endsAt.getTime()) {
@@ -224,7 +262,7 @@ export interface EndSessionResult {
  */
 export async function endSession(db: Database, input: EndSessionInput): Promise<EndSessionResult> {
   return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId);
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
     if (session.endedAt) return { ended: false, endedParticipations: 0 };
 
@@ -293,7 +331,7 @@ export interface TapResult {
  */
 export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId);
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
@@ -308,18 +346,25 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       occurredAt,
     });
     if (!isNew) {
-      // Replay: the tap already landed. Return the current truth, unchanged.
-      const current = await loadLiveParticipation(tx, session.id, input.studentId);
+      // Replay: the tap already landed. Return the current truth (the row for
+      // this session and student, even if it has since ended), never a 4xx.
+      const current = await loadParticipation(tx, session.id, input.studentId);
       if (!current)
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no live participation');
+        throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no participation');
       return { outcome: 'replay', state: current.state, participationId: current.id, session };
     }
 
     // Decision 4: end any live participation in a DIFFERENT session first, so
-    // the one-live-per-student rule holds before we open this one.
+    // the one-live-per-student rule holds before we open this one. Carry the
+    // leaving session's class so the switch-out event lands in class reports.
     const elsewhere = await tx
-      .select()
+      .select({
+        id: participations.id,
+        sessionId: participations.sessionId,
+        classId: sessions.classId,
+      })
       .from(participations)
+      .innerJoin(sessions, eq(participations.sessionId, sessions.id))
       .where(
         and(
           eq(participations.studentId, input.studentId),
@@ -329,14 +374,20 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       );
     let outcome: 'joined' | 'switched' = 'joined';
     for (const other of elsewhere) {
-      await tx
+      // Guard on ended_at IS NULL: if that session ended between the select and
+      // here, this no-ops rather than overwriting its end reason, and we skip
+      // the switch-out event.
+      const ended = await tx
         .update(participations)
         .set({ endedAt: occurredAt, endedReason: 'left_for_other_session' })
-        .where(eq(participations.id, other.id));
+        .where(and(eq(participations.id, other.id), isNull(participations.endedAt)))
+        .returning({ id: participations.id });
+      if (ended.length === 0) continue;
       await insertEvent(tx, {
         eventId: newUuidV7(),
         type: 'left_for_other_session',
         sessionId: other.sessionId,
+        classId: other.classId,
         userId: input.studentId,
         occurredAt,
       });
@@ -380,6 +431,8 @@ export interface StateChangeResult {
   outcome: 'applied' | 'replay';
   state: ParticipationState;
   participationId: string;
+  /** The current session, so the response carries the end time for reconciliation. */
+  session: SessionRow;
 }
 
 /** Shared body for the in-session state changes (unlock / refocus / protection off). */
@@ -390,7 +443,7 @@ async function changeState(
   nextState: ParticipationState,
 ): Promise<StateChangeResult> {
   return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId);
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
@@ -405,16 +458,25 @@ async function changeState(
       occurredAt,
     });
 
-    const live = await loadLiveParticipation(tx, session.id, input.studentId);
-    if (!live) throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
+    const row = await loadParticipation(tx, session.id, input.studentId);
 
-    if (!isNew) return { outcome: 'replay', state: live.state, participationId: live.id };
+    if (!isNew) {
+      // Replay: return the current truth even if the participation has ended.
+      if (!row)
+        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
+      return { outcome: 'replay', state: row.state, participationId: row.id, session };
+    }
+
+    // A fresh change needs a live participation to move.
+    if (!row || row.endedAt !== null) {
+      throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
+    }
 
     await tx
       .update(participations)
       .set({ state: nextState, lastSeenAt: occurredAt })
-      .where(eq(participations.id, live.id));
-    return { outcome: 'applied', state: nextState, participationId: live.id };
+      .where(eq(participations.id, row.id));
+    return { outcome: 'applied', state: nextState, participationId: row.id, session };
   });
 }
 
@@ -442,22 +504,25 @@ export interface CheckInResult {
   /** 'live' with the current state, or 'gone' when there's no live participation to touch. */
   status: 'live' | 'gone';
   state: ParticipationState | null;
+  /** The current session — carries the end time the phone reconciles against (decision 6 / API surface). */
+  session: SessionRow;
 }
 
 /**
  * The ~30s heartbeat (decision 7). Overwrites `last_seen_at` only — it never
  * adds an events row, because nothing changed. The response carries the
- * current stored state so the phone can reconcile; silence is derived from
- * `last_seen_at` on read, not stored here.
+ * current session (its end time, so a phone that missed an extension learns
+ * of it) and the stored state; silence is derived from `last_seen_at` on read,
+ * not stored here.
  */
 export async function checkIn(db: Database, input: CheckInInput): Promise<CheckInResult> {
   const session = await loadSession(db, input.sessionId);
   if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
 
   const live = await loadLiveParticipation(db, input.sessionId, input.studentId);
-  if (!live) return { status: 'gone', state: null };
+  if (!live) return { status: 'gone', state: null, session };
 
   const seenAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
   await db.update(participations).set({ lastSeenAt: seenAt }).where(eq(participations.id, live.id));
-  return { status: 'live', state: live.state };
+  return { status: 'live', state: live.state, session };
 }

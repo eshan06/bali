@@ -210,10 +210,12 @@ describe('tapIn', () => {
       .where(and(eq(participations.studentId, a.student.id), isNull(participations.endedAt)));
     expect(live).toHaveLength(1);
     expect(live[0]!.sessionId).toBe(sessionB.id);
-    // The switch produced a left_for_other_session event on session A.
-    expect((await eventsFor(sessionA.id)).some((e) => e.type === 'left_for_other_session')).toBe(
-      true,
+    // The switch produced a left_for_other_session event on session A, carrying
+    // session A's class so it lands in that class's reports.
+    const leftEvent = one(
+      (await eventsFor(sessionA.id)).filter((e) => e.type === 'left_for_other_session'),
     );
+    expect(leftEvent.classId).toBe(a.klass.id);
   });
 
   it('re-tapping a session the student left updates the same row, no duplicate', async () => {
@@ -356,6 +358,45 @@ describe('state changes', () => {
       }),
     ).rejects.toBeInstanceOf(TransitionError);
   });
+
+  it('the response carries the session so the phone learns the end time', async () => {
+    const { session, student } = await joined('unlock-window');
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.session.endsAt.toISOString()).toBe(session.endsAt.toISOString());
+  });
+
+  it('a replay whose participation has since ended returns current truth, not an error', async () => {
+    const { session, student } = await joined('unlock-replay-pended');
+    const eventId = newUuidV7();
+    await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    // The participation ends (e.g. the student left the class) while the session
+    // keeps running; a stale retry of the unlock then arrives.
+    await db
+      .update(participations)
+      .set({ endedAt: new Date('2026-01-01T09:06:00Z'), endedReason: 'left_class' })
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+
+    const replay = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(replay.outcome).toBe('replay');
+    expect(replay.state).toBe('unlocked');
+  });
 });
 
 describe('checkIn', () => {
@@ -489,6 +530,13 @@ describe('endSession & expiry', () => {
     const sessionOpen = (
       await startSession(db, { classId: notDue.klass.id, ...window('2026-01-01T09:00:00Z') })
     ).session;
+    // A student in the due session, so the expiry path's participation reason is pinned.
+    await tapIn(db, {
+      sessionId: sessionDue.id,
+      studentId: due.student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
 
     const now = new Date('2026-01-01T09:30:00Z'); // past sessionDue's 09:25 end, but both share it...
     // Give the open one a later window so it isn't due.
@@ -509,6 +557,12 @@ describe('endSession & expiry', () => {
       (e) => e.type === 'session_expired',
     );
     expect(expiredEvents).toHaveLength(1);
+    // The child participation ended as session_expired (not session_ended) —
+    // reports branch on this.
+    const part = one(
+      await db.select().from(participations).where(eq(participations.sessionId, sessionDue.id)),
+    );
+    expect(part.endedReason).toBe('session_expired');
   });
 });
 
