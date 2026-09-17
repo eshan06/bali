@@ -1,11 +1,10 @@
 import type { EventType, ParticipationEndedReason, ParticipationState } from '@bali/shared';
 import { clampToWindow } from '@bali/shared';
-import { and, eq, isNull, lte, ne, type ExtractTablesWithRelations } from 'drizzle-orm';
-import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
-import * as schema from './schema.js';
-import { classes, events, participations, sessions } from './schema.js';
+import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
+import type { Database } from './types.js';
 
 /*
  * The transition engine (data-model decision 1). This module is the ONLY code
@@ -23,14 +22,6 @@ import { classes, events, participations, sessions } from './schema.js';
  * State derivation for display lives in @bali/shared (rule 2); this is the
  * write side.
  */
-
-// A handle that is either the pool or an open transaction — both satisfy this,
-// so the internal helpers work whether called at top level or inside tx.
-type Database = PgDatabase<
-  PgQueryResultHKT,
-  typeof schema,
-  ExtractTablesWithRelations<typeof schema>
->;
 
 export type TransitionErrorCode =
   'SESSION_NOT_FOUND' | 'SESSION_NOT_RUNNING' | 'NOT_PARTICIPATING' | 'INVALID_EXTENSION';
@@ -150,13 +141,86 @@ export interface StartSessionResult {
   /** 'created' for a new session; 'existing' when one was already running (no duplicate). */
   outcome: 'created' | 'existing';
   session: SessionRow;
+  /** How many waiting armed taps became participations at this start (decision 5). */
+  armedConverted: number;
+}
+
+/**
+ * Convert this class's waiting armed taps into participations. Called inside the
+ * start transaction: a tap the student made before the bell (saved as
+ * student+teacher, decision 5) becomes a focused participation the moment the
+ * teacher presses Start, emitting the deferred tap_in event with the armed
+ * tap's original id so a later phone retry dedupes. Returns the count converted.
+ */
+async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
+  const cls = firstOrUndefined(
+    await tx.select().from(classes).where(eq(classes.id, session.classId)).limit(1),
+  );
+  if (!cls) return 0;
+
+  const enrolled = await tx
+    .select({ studentId: enrollments.studentId })
+    .from(enrollments)
+    .where(and(eq(enrollments.classId, cls.id), isNull(enrollments.removedAt)));
+  if (enrolled.length === 0) return 0;
+  const enrolledIds = enrolled.map((e) => e.studentId);
+
+  // This teacher's still-waiting, unexpired taps from students in this class.
+  const waiting = await tx
+    .select()
+    .from(armedTaps)
+    .where(
+      and(
+        eq(armedTaps.teacherId, cls.teacherId),
+        isNull(armedTaps.consumedAt),
+        gt(armedTaps.expiresAt, session.startedAt),
+        inArray(armedTaps.studentId, enrolledIds),
+      ),
+    );
+
+  let converted = 0;
+  for (const tap of waiting) {
+    const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
+    await tx
+      .insert(participations)
+      .values({
+        sessionId: session.id,
+        studentId: tap.studentId,
+        state: 'focused',
+        joinedAt: occurredAt,
+        lastSeenAt: occurredAt,
+      })
+      .onConflictDoUpdate({
+        target: [participations.sessionId, participations.studentId],
+        set: {
+          state: 'focused',
+          joinedAt: occurredAt,
+          lastSeenAt: occurredAt,
+          endedAt: null,
+          endedReason: null,
+        },
+      });
+    await insertEvent(tx, {
+      eventId: tap.eventId,
+      type: 'tap_in',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: tap.studentId,
+      occurredAt,
+    });
+    await tx
+      .update(armedTaps)
+      .set({ consumedAt: session.startedAt })
+      .where(eq(armedTaps.id, tap.id));
+    converted += 1;
+  }
+  return converted;
 }
 
 /**
  * Start a focus session for a class. If one is already running, return it
- * rather than creating a duplicate (API-surface decision). Waiting "armed"
- * taps becoming participations is deferred to the taps endpoint step, where
- * armed-tap storage is decided; students join a running session via `tapIn`.
+ * rather than creating a duplicate (API-surface decision). Every armed tap
+ * waiting for this class's teacher becomes a focused participation (decision 5).
  */
 export async function startSession(
   db: Database,
@@ -180,7 +244,7 @@ export async function startSession(
         .where(and(eq(sessions.classId, input.classId), isNull(sessions.endedAt)))
         .limit(1),
     );
-    if (existing) return { outcome: 'existing', session: existing };
+    if (existing) return { outcome: 'existing', session: existing, armedConverted: 0 };
 
     const session = firstOrUndefined(
       await tx
@@ -197,7 +261,69 @@ export async function startSession(
       classId: session.classId,
       occurredAt: session.startedAt,
     });
-    return { outcome: 'created', session };
+
+    const armedConverted = await convertArmedTaps(tx, session);
+    return { outcome: 'created', session, armedConverted };
+  });
+}
+
+export interface ArmTapInput {
+  studentId: string;
+  teacherId: string;
+  blockId?: string;
+  eventId: string;
+  deviceTime: Date;
+  /** End of the school day; the tap is ignored at conversion if this has passed. */
+  expiresAt: Date;
+}
+export interface ArmTapResult {
+  /** 'armed' new; 'already_armed' a prior waiting tap stands; 'replay' this exact tap again. */
+  outcome: 'armed' | 'already_armed' | 'replay';
+  armedTapId: string;
+}
+
+/**
+ * Save a tap that arrived before any session was running (decision 5). Stored as
+ * student+teacher; it waits until the teacher presses Start. Idempotent on the
+ * client's event_id, and at most one waiting tap per student+teacher stands.
+ */
+export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
+  return db.transaction(async (tx) => {
+    const exact = firstOrUndefined(
+      await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
+    );
+    if (exact) return { outcome: 'replay', armedTapId: exact.id };
+
+    const waiting = firstOrUndefined(
+      await tx
+        .select()
+        .from(armedTaps)
+        .where(
+          and(
+            eq(armedTaps.studentId, input.studentId),
+            eq(armedTaps.teacherId, input.teacherId),
+            isNull(armedTaps.consumedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (waiting) return { outcome: 'already_armed', armedTapId: waiting.id };
+
+    const row = firstOrUndefined(
+      await tx
+        .insert(armedTaps)
+        .values({
+          studentId: input.studentId,
+          teacherId: input.teacherId,
+          blockId: input.blockId ?? null,
+          eventId: input.eventId,
+          deviceTime: input.deviceTime,
+          expiresAt: input.expiresAt,
+        })
+        .returning(),
+    );
+    if (!row) throw new Error('armTap: insert returned no row');
+    return { outcome: 'armed', armedTapId: row.id };
   });
 }
 

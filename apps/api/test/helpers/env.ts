@@ -12,6 +12,7 @@ export const testEnv: Env = {
   AUTH_ISSUER: TEST_ISSUER,
   AUTH_JWKS_URI: `${TEST_ISSUER}/.well-known/jwks.json`,
   AUTH_AUDIENCE: TEST_AUDIENCE,
+  DATABASE_URL: 'postgres://unused@localhost:5432/test',
 };
 
 /**
@@ -25,4 +26,6 @@ export const testEnvVars: Record<string, string> = {
   AUTH_ISSUER: TEST_ISSUER,
   AUTH_JWKS_URI: `${TEST_ISSUER}/.well-known/jwks.json`,
   AUTH_AUDIENCE: TEST_AUDIENCE,
+  // postgres.js connects lazily, so a dummy URL is fine for the boot smoke test.
+  DATABASE_URL: 'postgres://unused@localhost:5432/test',
 };

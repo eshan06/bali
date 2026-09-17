@@ -1,3 +1,4 @@
+import type { Database } from '@bali/db';
 import { API_VERSION, type HealthzResponse } from '@bali/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
 
@@ -5,8 +6,13 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors } from './errors.js';
+import { registerMeRoute } from './routes/me.js';
+import { registerSessionsRoute } from './routes/sessions.js';
+import { registerTapsRoute } from './routes/taps.js';
 
 export interface AppDeps {
+  /** The database handle. Injected in tests (PGlite); server.ts builds it from DATABASE_URL. */
+  db: Database;
   /** Injected in tests (the test issuer); defaults to the Cognito remote-JWKS verifier. */
   verifyToken?: TokenVerifier;
 }
@@ -15,7 +21,7 @@ export interface AppDeps {
  * Builds the app without binding a port, so tests drive it in-process via
  * app.inject() — no listener, no port collisions, no network flakiness.
  */
-export function buildApp(env: Env, deps: AppDeps = {}): FastifyInstance {
+export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
@@ -28,6 +34,9 @@ export function buildApp(env: Env, deps: AppDeps = {}): FastifyInstance {
   registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env));
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
+  registerMeRoute(app, deps.db);
+  registerTapsRoute(app, deps.db);
+  registerSessionsRoute(app, deps.db);
 
   return app;
 }

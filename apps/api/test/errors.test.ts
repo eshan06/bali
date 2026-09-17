@@ -1,18 +1,30 @@
+import type { Database } from '@bali/db';
 import type { ApiErrorBody } from '@bali/shared';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { buildApp } from '../src/app.js';
 import { ApiError, parse } from '../src/errors.js';
+import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 
 const bodyOf = (res: LightMyRequestResponse): ApiErrorBody => res.json<ApiErrorBody>();
 
 let app: FastifyInstance;
+let db: Database;
+let closeDb: () => Promise<void>;
+
+beforeAll(async () => {
+  ({ db, close: closeDb } = await makeTestDb());
+});
+
+afterAll(async () => {
+  await closeDb();
+});
 
 beforeEach(() => {
-  app = buildApp(testEnv, { verifyToken: () => Promise.reject(ApiError.unauthorized()) });
+  app = buildApp(testEnv, { db, verifyToken: () => Promise.reject(ApiError.unauthorized()) });
 });
 
 afterEach(async () => {

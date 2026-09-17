@@ -53,6 +53,8 @@ const envSchema = z.object({
   AUTH_JWKS_URI: z.string().url(),
   /** The Cognito app client id: an access token's `client_id` or an id token's `aud`. */
   AUTH_AUDIENCE: z.string().min(1),
+  /** Postgres connection string. Required; the client connects lazily so boot needs no live DB. */
+  DATABASE_URL: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

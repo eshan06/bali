@@ -219,3 +219,51 @@ export const events = pgTable(
     index('events_class_occurred_idx').on(t.classId, t.occurredAt),
   ],
 );
+
+/*
+ * Armed taps (data-model decision 5). A tap before the teacher has started has
+ * no session yet, so it can't be a participation. It is saved as student +
+ * teacher (one block serves all of a teacher's classes; the class is only known
+ * once a session starts), waits, and becomes a participation when the teacher
+ * presses Start. It expires at the end of the school day. This is the ninth
+ * table the tap-flow section always implied; the data-model list is updated to
+ * match.
+ */
+export const armedTaps = pgTable(
+  'armed_taps',
+  {
+    id: id(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => users.id),
+    teacherId: uuid('teacher_id')
+      .notNull()
+      .references(() => users.id),
+    /** Which physical block was tapped — for auditing; the class isn't known yet. */
+    blockId: uuid('block_id').references(() => blocks.id),
+    /**
+     * The client's idempotency key. It becomes the tap_in event's id when this
+     * armed tap converts to a participation, so a retry that arrives after the
+     * session started dedupes against the same key (rule 4).
+     */
+    eventId: uuid('event_id').notNull().unique(),
+    /** Device time of the tap; clamped into the session window at conversion (rule 1). */
+    deviceTime: timestamp('device_time', { withTimezone: true }).notNull(),
+    /** End of the school day; conversion skips a past-expiry tap, a sweep clears it. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Set when this tap became a participation at session start; NULL = still waiting. */
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // At most one waiting tap per student per teacher — a re-tap before Start
+    // doesn't pile up (decision 5: "nobody taps twice").
+    uniqueIndex('armed_taps_student_teacher_waiting_unique')
+      .on(t.studentId, t.teacherId)
+      .where(sql`${t.consumedAt} IS NULL`),
+    // Conversion at Start looks up a teacher's waiting taps.
+    index('armed_taps_teacher_waiting_idx')
+      .on(t.teacherId)
+      .where(sql`${t.consumedAt} IS NULL`),
+  ],
+);

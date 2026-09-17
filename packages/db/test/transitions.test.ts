@@ -7,8 +7,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import * as schema from '../src/schema.js';
-import { classes, enrollments, events, participations, schools, users } from '../src/schema.js';
 import {
+  armedTaps,
+  classes,
+  enrollments,
+  events,
+  participations,
+  schools,
+  users,
+} from '../src/schema.js';
+import {
+  armTap,
   checkIn,
   endSession,
   expireDueSessions,
@@ -563,6 +572,80 @@ describe('endSession & expiry', () => {
       await db.select().from(participations).where(eq(participations.sessionId, sessionDue.id)),
     );
     expect(part.endedReason).toBe('session_expired');
+  });
+});
+
+describe('armed taps', () => {
+  it('arms a tap when no session is running, idempotent on eventId', async () => {
+    const { teacher, student } = await seedClass('arm');
+    const eventId = newUuidV7();
+    const req = {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T07:58:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    };
+    const first = await armTap(db, req);
+    expect(first.outcome).toBe('armed');
+    const retry = await armTap(db, req);
+    expect(retry.outcome).toBe('replay');
+    expect(retry.armedTapId).toBe(first.armedTapId);
+    // A different eventId for the same student+teacher doesn't pile up.
+    const second = await armTap(db, { ...req, eventId: newUuidV7() });
+    expect(second.outcome).toBe('already_armed');
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
+    expect(rows).toHaveLength(1);
+  });
+
+  it('a waiting tap becomes a focused participation at session start (decision 5)', async () => {
+    const { teacher, student, klass } = await seedClass('arm-convert');
+    const armEventId = newUuidV7();
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: armEventId,
+      deviceTime: new Date('2026-01-01T08:58:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+
+    const { session, armedConverted } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    expect(armedConverted).toBe(1);
+
+    // A focused participation exists, and the deferred tap_in carries the armed
+    // tap's event id (so a later phone retry dedupes), clamped into the window.
+    const part = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(part.state).toBe('focused');
+    expect(part.studentId).toBe(student.id);
+    const tapEvent = one((await eventsFor(session.id)).filter((e) => e.type === 'tap_in'));
+    expect(tapEvent.eventId).toBe(armEventId);
+    expect(tapEvent.occurredAt.toISOString()).toBe('2026-01-01T09:00:00.000Z'); // clamped to start
+    // The armed tap is consumed and won't convert again.
+    const consumed = one(
+      await db.select().from(armedTaps).where(eq(armedTaps.eventId, armEventId)),
+    );
+    expect(consumed.consumedAt).not.toBeNull();
+  });
+
+  it('does not convert an expired armed tap', async () => {
+    const { teacher, student, klass } = await seedClass('arm-expired');
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T08:00:00Z'),
+      expiresAt: new Date('2026-01-01T08:30:00Z'), // already past by session start
+    });
+    const { armedConverted } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    expect(armedConverted).toBe(0);
   });
 });
 

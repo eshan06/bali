@@ -7,5 +7,9 @@
 
 export { createDb, type Db } from './client.js';
 export { newUuidV7 } from './ids.js';
+export { MIGRATIONS_DIR } from './paths.js';
+export * from './queries.js';
 export * from './schema.js';
+export * as schema from './schema.js';
 export * from './transitions.js';
+export type { Database } from './types.js';

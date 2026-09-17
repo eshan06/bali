@@ -72,6 +72,10 @@ never stored here, no screen can ever show it.
 - `events` — one row for every single thing that happens: a tap-in, an emergency unlock, a
   refocus. Rows here are only ever added, never changed — this table is the permanent
   history.
+- `armed_taps` — one row per tap made before a session was running (decision 5): saved as
+  student + teacher and waiting. When the teacher presses Start, each becomes a
+  participation; it expires at the end of the school day. Transient — not the permanent
+  history that lives in `events`.
 
 ### The decisions (2026-09-15)
 

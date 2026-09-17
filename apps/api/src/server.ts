@@ -1,8 +1,11 @@
+import { createDb } from '@bali/db';
+
 import { buildApp } from './app.js';
 import { env } from './env.js';
 import { makeShutdown } from './shutdown.js';
 
-const app = buildApp(env);
+// postgres.js connects lazily, so this makes no network call at boot.
+const app = buildApp(env, { db: createDb(env.DATABASE_URL) });
 
 // SIGTERM is how deploy platforms ask a process to stop; the shutdown handler
 // drains in-flight requests instead of dropping them mid-response.

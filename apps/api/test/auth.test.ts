@@ -1,12 +1,14 @@
+import type { Database } from '@bali/db';
 import type { ApiErrorBody } from '@bali/shared';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { errors as joseErrors } from 'jose';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
 import { requireAuth } from '../src/auth/plugin.js';
 import { createVerifier, type TokenVerifier } from '../src/auth/verify.js';
 import { ApiError } from '../src/errors.js';
+import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import {
   makeTestIssuer,
@@ -21,21 +23,31 @@ const errorOf = (res: LightMyRequestResponse): ApiErrorBody['error'] =>
 /*
  * The auth middleware, exercised end-to-end against the real verifier and a
  * local key set (the test issuer). A throwaway protected route stands in for
- * the step-7 endpoints.
+ * the step-7 endpoints. The db is shared and unused (these routes don't touch it).
  */
 
 let issuer: TestIssuer;
 let app: FastifyInstance;
+let db: Database;
+let closeDb: () => Promise<void>;
 
 /** Build an app with a protected route, using the given verifier. */
 function appWith(verify: TokenVerifier): FastifyInstance {
-  const instance = buildApp(testEnv, { verifyToken: verify });
+  const instance = buildApp(testEnv, { db, verifyToken: verify });
   instance.get('/whoami', { preHandler: instance.authenticate }, (request) => {
     const identity = requireAuth(request);
     return { sub: identity.sub };
   });
   return instance;
 }
+
+beforeAll(async () => {
+  ({ db, close: closeDb } = await makeTestDb());
+});
+
+afterAll(async () => {
+  await closeDb();
+});
 
 beforeEach(async () => {
   issuer = await makeTestIssuer();
