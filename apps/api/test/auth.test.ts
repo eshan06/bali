@@ -1,13 +1,19 @@
 import type { ApiErrorBody } from '@bali/shared';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
+import { errors as joseErrors } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
 import { requireAuth } from '../src/auth/plugin.js';
-import type { TokenVerifier } from '../src/auth/verify.js';
+import { createVerifier, type TokenVerifier } from '../src/auth/verify.js';
 import { ApiError } from '../src/errors.js';
 import { testEnv } from './helpers/env.js';
-import { makeTestIssuer, TEST_AUDIENCE, type TestIssuer } from './helpers/test-issuer.js';
+import {
+  makeTestIssuer,
+  TEST_AUDIENCE,
+  TEST_ISSUER,
+  type TestIssuer,
+} from './helpers/test-issuer.js';
 
 const errorOf = (res: LightMyRequestResponse): ApiErrorBody['error'] =>
   res.json<ApiErrorBody>().error;
@@ -103,9 +109,7 @@ describe('authenticate', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('returns 503 (not 401) when the token cannot be verified for infra reasons', async () => {
-    // A verifier that fails with a non-auth error stands in for a JWKS-fetch
-    // failure; the honesty rule says this must not read as a rejected token.
+  it('surfaces a verifier 503 through the middleware as unavailable', async () => {
     const flakyApp = appWith(() => Promise.reject(ApiError.unavailable('could not verify token')));
     try {
       const res = await flakyApp.inject({
@@ -118,5 +122,57 @@ describe('authenticate', () => {
     } finally {
       await flakyApp.close();
     }
+  });
+});
+
+/*
+ * The 401-vs-503 classification is the crux of the honesty rule, so it is tested
+ * against the REAL createVerifier (not an injected stub): a genuinely bad token
+ * is a 401, but a failure to reach or parse the key set is a 503 — never a
+ * logout. Key-set failures are simulated by a getKey that throws the jose error
+ * jwtVerify would surface, so no network is needed.
+ */
+describe('createVerifier failure classification', () => {
+  async function classify(token: string, getKey: Parameters<typeof createVerifier>[0]['getKey']) {
+    const verify = createVerifier({ issuer: TEST_ISSUER, audience: TEST_AUDIENCE, getKey });
+    return verify(token).then(
+      () => null,
+      (err: unknown) => (err instanceof ApiError ? err.code : 'threw-non-api'),
+    );
+  }
+
+  it('a JWKS timeout is 503, not a logout', async () => {
+    const issuer = await makeTestIssuer();
+    const token = await issuer.sign({});
+    expect(
+      await classify(token, () => {
+        throw new joseErrors.JWKSTimeout();
+      }),
+    ).toBe('unavailable');
+  });
+
+  it('a non-200 / unparseable JWKS response is 503', async () => {
+    const issuer = await makeTestIssuer();
+    const token = await issuer.sign({});
+    expect(
+      await classify(token, () => {
+        // What jose throws for a non-200 key-set fetch: a plain JOSEError.
+        throw new joseErrors.JOSEError('Expected 200 OK from the JSON Web Key Set HTTP response');
+      }),
+    ).toBe('unavailable');
+  });
+
+  it('an expired token is a 401 even though the key set was reachable', async () => {
+    const issuer = await makeTestIssuer();
+    const token = await issuer.sign({ expiresInSeconds: -10 });
+    expect(await classify(token, issuer.getKey)).toBe('unauthorized');
+  });
+
+  it('a bad signature (wrong key reachable) is a 401', async () => {
+    const issuer = await makeTestIssuer();
+    const otherIssuer = await makeTestIssuer();
+    const token = await issuer.sign({});
+    // The key set resolves fine, but to the wrong key → signature fails.
+    expect(await classify(token, otherIssuer.getKey)).toBe('unauthorized');
   });
 });

@@ -9,6 +9,28 @@ import {
 import type { Env } from '../env.js';
 import { ApiError } from '../errors.js';
 
+/**
+ * jose errors that mean the token itself is bad — a real "no" from the pool.
+ * ANYTHING NOT ON THIS LIST is treated as infrastructure (couldn't reach or
+ * parse the key set) and maps to 503, so a JWKS timeout or a Cognito 5xx never
+ * signs a user out (the auth honesty rule / the v2 regression). The default is
+ * the safe one: unknown failure → transient, not logout.
+ */
+const TOKEN_REJECTION_ERRORS = [
+  joseErrors.JWTExpired,
+  joseErrors.JWTClaimValidationFailed,
+  joseErrors.JWSSignatureVerificationFailed,
+  joseErrors.JWTInvalid,
+  joseErrors.JWSInvalid,
+  joseErrors.JWKSNoMatchingKey,
+  joseErrors.JOSEAlgNotAllowed,
+  joseErrors.JOSENotSupported,
+] as const;
+
+function isTokenRejection(err: unknown): boolean {
+  return TOKEN_REJECTION_ERRORS.some((cls) => err instanceof cls);
+}
+
 /*
  * JWT verification (auth decision 2). We check the signature against the pool's
  * public keys, the issuer, expiry, and the app client id — with math, no
@@ -42,11 +64,16 @@ export function createVerifier(config: VerifierConfig): TokenVerifier {
   return async (token: string): Promise<AuthedIdentity> => {
     let payload: JWTPayload;
     try {
-      ({ payload } = await jwtVerify(token, config.getKey, { issuer: config.issuer }));
+      ({ payload } = await jwtVerify(token, config.getKey, {
+        issuer: config.issuer,
+        // Pin the algorithm rather than trusting the token header / key set to
+        // constrain it (defence against alg confusion). Cognito signs RS256.
+        algorithms: ['RS256'],
+      }));
     } catch (err) {
-      // jose's JOSEError subclasses mean the token itself is bad → 401. Anything
-      // else (e.g. the JWKS fetch failed) is infrastructure → 503, not a logout.
-      if (err instanceof joseErrors.JOSEError) {
+      // Only a genuine token rejection is a 401; a failure to reach or parse the
+      // key set is infrastructure → 503, so a blip never logs anyone out.
+      if (isTokenRejection(err)) {
         throw ApiError.unauthorized('invalid token');
       }
       throw ApiError.unavailable('could not verify token');

@@ -17,10 +17,10 @@ declare module 'fastify' {
   }
 }
 
-/** Pull the token out of `Authorization: Bearer <token>`, strictly. */
+/** Pull the token out of `Authorization: Bearer <token>` (scheme is case-insensitive per RFC 6750). */
 function bearerToken(header: string | undefined): string | null {
   if (!header) return null;
-  const match = /^Bearer (\S+)$/.exec(header);
+  const match = /^Bearer (\S+)$/i.exec(header);
   return match ? match[1]! : null;
 }
 

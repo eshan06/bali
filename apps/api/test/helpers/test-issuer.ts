@@ -1,4 +1,11 @@
-import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
+import {
+  createLocalJWKSet,
+  exportJWK,
+  generateKeyPair,
+  SignJWT,
+  type JWK,
+  type JWTVerifyGetKey,
+} from 'jose';
 
 import { createVerifier, type TokenVerifier } from '../../src/auth/verify.js';
 
@@ -32,6 +39,8 @@ export interface TestIssuer {
   sign(opts?: SignOptions): Promise<string>;
   /** The public JWK, for building a mismatched verifier in tests. */
   publicJwk: JWK;
+  /** The key resolver, for building a verifier that reaches a real key (401 cases). */
+  getKey: JWTVerifyGetKey;
 }
 
 export async function makeTestIssuer(): Promise<TestIssuer> {
@@ -62,5 +71,5 @@ export async function makeTestIssuer(): Promise<TestIssuer> {
     return jwt.sign(privateKey);
   }
 
-  return { verifier, sign, publicJwk };
+  return { verifier, sign, publicJwk, getKey };
 }
