@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { testEnvVars } from './helpers/env.js';
+
 /*
  * Boot-contract integration tests: these spawn the real server entry
  * (tsx + server.ts), because both contracts live at module/process level
@@ -38,7 +40,9 @@ function bootServer(extraEnv: Record<string, string>): {
 } {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
     cwd: apiDir,
-    env: { ...process.env, ...extraEnv },
+    // testEnvVars satisfies the required auth config so the server can boot; the
+    // broken-.env cases fail at dotenv read, before the schema is even checked.
+    env: { ...process.env, ...testEnvVars, ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   liveChildren.add(child);

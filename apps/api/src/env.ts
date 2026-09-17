@@ -42,6 +42,17 @@ const envSchema = z.object({
    * above this value).
    */
   SHUTDOWN_DEADLINE_MS: z.coerce.number().int().min(100).default(8000),
+  /*
+   * Auth (Cognito). The API verifies every request's JWT against the pool's
+   * public keys with math alone — no per-request network call in the hot path
+   * once the key set is cached (auth decision 2). Required so a deploy can't
+   * silently come up unable to authenticate anyone; real values are set at the
+   * hosting step, and tests inject a verifier instead of reaching the network.
+   */
+  AUTH_ISSUER: z.string().url(),
+  AUTH_JWKS_URI: z.string().url(),
+  /** The Cognito app client id: an access token's `client_id` or an id token's `aud`. */
+  AUTH_AUDIENCE: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
