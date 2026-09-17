@@ -329,6 +329,11 @@ endpoint. The sweep is idempotent, so an accidental double-run is harmless.
 **4. Database safety from day one.** Automatic daily backups with point-in-time
 recovery, and the database in the same region as the API.
 
+**5. The deploy sets `TZ` to the school's zone.** The server's local time is the
+school's: bell times render in it (carried over from v2) and an armed tap's
+"end of the school day" expiry is computed against it. Railway defaults to UTC,
+so this must be set explicitly per environment.
+
 Context from v2: Cognito was AWS (kept for v3) and an RDS Postgres instance existed,
 but the v2 API itself was never deployed — it only ran locally, with the website on
 Vercel. The old RDS instance should be decommissioned once v2 is fully retired.
