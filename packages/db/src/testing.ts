@@ -61,21 +61,37 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
 
   await withAdmin(baseUrl, (sql) => createDatabase(sql, name));
 
-  const client = postgres(databaseUrl(baseUrl, name), { max: 5, onnotice: () => {} });
-  const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+  // WITH (FORCE) terminates any lingering connections (Postgres 13+, and CI runs
+  // 16), so a leaked stream connection can't keep the throwaway database alive.
+  const dropDatabase = () =>
+    withAdmin(baseUrl, (sql) => sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`));
 
-  return {
-    db,
-    close: async () => {
-      await client.end({ timeout: 5 });
-      // WITH (FORCE) terminates any lingering connections (Postgres 13+), so a
-      // leaked stream connection can't keep the throwaway database alive.
-      await withAdmin(baseUrl, (sql) =>
-        sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`),
-      );
-    },
-  };
+  let client: Sql | undefined;
+  try {
+    client = postgres(databaseUrl(baseUrl, name), { max: 5, onnotice: () => {} });
+    const db = drizzle(client, { schema });
+    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+
+    const pool = client;
+    return {
+      db,
+      close: async () => {
+        // Drop even if the pool teardown rejects, so a failed end() can't strand
+        // the database (the forced drop closes any connection end() missed).
+        await pool.end({ timeout: 5 }).catch(() => {});
+        await dropDatabase();
+      },
+    };
+  } catch (err) {
+    // Setup failed after the database was created — a bad migration, or a
+    // transient connect error under parallel load. Release the pool and drop the
+    // database before rethrowing: a failed setup must never strand a database or
+    // a connection, and must never leave `close` undefined for afterEach to trip
+    // on (which would mask this error with a "close is not a function").
+    if (client) await client.end({ timeout: 5 }).catch(() => {});
+    await dropDatabase().catch(() => {});
+    throw err;
+  }
 }
 
 /** Run one statement on the maintenance database, then close the connection. */

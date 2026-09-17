@@ -1,3 +1,4 @@
+import type { EventType } from '@bali/shared';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -83,11 +84,11 @@ async function openSession(classId: string, opts: { due?: boolean } = {}) {
   return result.session;
 }
 
-function eventsOfType(sessionId: string, type: string) {
+function eventsOfType(sessionId: string, type: EventType) {
   return db
     .select()
     .from(events)
-    .where(and(eq(events.sessionId, sessionId), eq(events.type, type as never)))
+    .where(and(eq(events.sessionId, sessionId), eq(events.type, type)))
     .orderBy(asc(events.seq));
 }
 
@@ -110,8 +111,11 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       tapIn(db, { sessionId: session.id, studentId, eventId, deviceTime }),
     ]);
 
-    // The event's unique constraint is the dedupe; the session FOR UPDATE lock
-    // serializes the two, so exactly one applies and the other replays.
+    // The events.eventId unique constraint is the dedupe: the loser's insert
+    // no-ops (onConflictDoNothing), so exactly one tap applies and the other
+    // replays, under any interleaving. (The session FOR UPDATE lock is what
+    // races 3 and 4 exercise — for two identical taps the unique constraint
+    // alone serializes them, so this race does not depend on the lock.)
     const outcomes = results.map((r) => r.outcome).sort();
     expect(outcomes).toEqual(['joined', 'replay']);
 
@@ -124,28 +128,33 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
   });
 
   it('two concurrent starts create one session and both callers get it', async () => {
-    const { classId } = await seed('race-start');
-    const now = Date.now();
-    const window = { startedAt: new Date(now), endsAt: new Date(now + 25 * 60_000) };
+    // Looped, like the tap/end race below: a single shot could pass against a
+    // missing class-row lock if the scheduler happened to serialize the two
+    // starts, so several rounds drive that miss probability down.
+    for (let round = 0; round < 10; round += 1) {
+      const { classId } = await seed(`race-start-${round}`);
+      const now = Date.now();
+      const window = { startedAt: new Date(now), endsAt: new Date(now + 25 * 60_000) };
 
-    const [a, b] = await Promise.all([
-      startSession(db, { classId, ...window }),
-      startSession(db, { classId, ...window }),
-    ]);
+      const [a, b] = await Promise.all([
+        startSession(db, { classId, ...window }),
+        startSession(db, { classId, ...window }),
+      ]);
 
-    // One creates, the other finds the running one — never a duplicate (the
-    // class-row lock plus the one-running-per-class partial unique index).
-    expect([a.outcome, b.outcome].sort()).toEqual(['created', 'existing']);
-    expect(a.session.id).toBe(b.session.id);
+      // One creates, the other finds the running one — never a duplicate (the
+      // class-row lock plus the one-running-per-class partial unique index).
+      expect([a.outcome, b.outcome].sort()).toEqual(['created', 'existing']);
+      expect(a.session.id).toBe(b.session.id);
 
-    const running = await db
-      .select()
-      .from(sessions)
-      .where(and(eq(sessions.classId, classId), isNull(sessions.endedAt)));
-    expect(running).toHaveLength(1);
+      const running = await db
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.classId, classId), isNull(sessions.endedAt)));
+      expect(running).toHaveLength(1);
 
-    const started = await eventsOfType(a.session.id, 'session_started');
-    expect(started).toHaveLength(1);
+      const started = await eventsOfType(a.session.id, 'session_started');
+      expect(started).toHaveLength(1);
+    }
   });
 
   it('a tap racing endSession never leaves a live participation in an ended session', async () => {
@@ -175,21 +184,28 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
   });
 
   it('two concurrent expiry sweeps emit one session_expired per session', async () => {
-    const { classId } = await seed('race-expire');
-    const session = await openSession(classId, { due: true });
-    const now = new Date();
+    // Looped for the same reason as the two races above, and it matters most
+    // here: "one session_expired per session" has no DB-constraint backstop (a
+    // fresh event id each time), so this race is the sole guardian of that
+    // guarantee — a single serialized shot must not be its only exercise.
+    for (let round = 0; round < 10; round += 1) {
+      const { classId } = await seed(`race-expire-${round}`);
+      const session = await openSession(classId, { due: true });
+      const now = new Date();
 
-    const [first, second] = await Promise.all([
-      expireDueSessions(db, now),
-      expireDueSessions(db, now),
-    ]);
+      const [first, second] = await Promise.all([
+        expireDueSessions(db, now),
+        expireDueSessions(db, now),
+      ]);
 
-    // Between the two runs the session is ended exactly once; the loser's
-    // endSession is an idempotent no-op (decision 6).
-    const bothEnded = [...first, ...second].filter((id) => id === session.id);
-    expect(bothEnded).toHaveLength(1);
+      // Between the two runs the session is ended exactly once; the loser's
+      // endSession is an idempotent no-op (decision 6). Scoped to this round's
+      // session, so the global sweep touching nothing else stays irrelevant.
+      const bothEnded = [...first, ...second].filter((id) => id === session.id);
+      expect(bothEnded).toHaveLength(1);
 
-    const expired = await eventsOfType(session.id, 'session_expired');
-    expect(expired).toHaveLength(1);
+      const expired = await eventsOfType(session.id, 'session_expired');
+      expect(expired).toHaveLength(1);
+    }
   });
 });

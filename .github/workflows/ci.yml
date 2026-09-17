@@ -61,3 +61,7 @@ jobs:
       - run: npm test
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          # Asserted by packages/db/test/real-lane.test.ts: if this lane ever
+          # loses TEST_DATABASE_URL, fail the job instead of silently skipping
+          # the race tests.
+          REQUIRE_REAL_PG: '1'
