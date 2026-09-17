@@ -12,6 +12,8 @@ const loaded = config({
 // dotenv reports read failures via the return value, not by throwing. A missing
 // .env is fine (defaults and platform env apply); an unreadable one must fail
 // the boot — silently running on defaults would break the fail-fast contract.
+// The cast is load-bearing: dotenv types `code` as its vault-only literals,
+// but read failures carry fs errno codes like ENOENT.
 if (loaded.error && (loaded.error as NodeJS.ErrnoException).code !== 'ENOENT') {
   throw loaded.error;
 }
