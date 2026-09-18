@@ -373,12 +373,16 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       const removed = one(await db.select().from(enrollments).where(eq(enrollments.id, enrC.id)));
       expect(removed.removedAt).not.toBeNull();
       expect(await liveParticipations(sessionC.id)).toHaveLength(0);
-      // one-live-per-student holds: at most one live participation total.
+      // one-live-per-student AND the switch-tap was not dropped: the student ends
+      // up with exactly one live participation, and it is the tap into D. Asserting
+      // only `<= 1` would still pass if the removal stranded the student
+      // live-nowhere — endEnrollment is class-C-scoped and must never touch D.
       const liveAll = await db
         .select()
         .from(participations)
         .where(and(eq(participations.studentId, student.id), isNull(participations.endedAt)));
-      expect(liveAll.length).toBeLessThanOrEqual(1);
+      expect(liveAll).toHaveLength(1);
+      expect(liveAll[0]!.sessionId).toBe(sessionD.id);
     }
   }, 20_000);
 });
