@@ -291,4 +291,94 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       expect(await liveParticipations(session.id)).toHaveLength(0);
     }
   });
+
+  it('a removal racing a cross-class switch-tap is deadlock-free and consistent', async () => {
+    // The dangerous interleaving: a student live in class C is removed from C at
+    // the instant they tap into class D. endEnrollment (ending C's participation
+    // under C's lock) and tapIn(D) -> endParticipationsElsewhere (ending the SAME
+    // C participation under D's lock) can deadlock; both retry on 40P01, so both
+    // succeed. Uses Promise.all — a leaked deadlock would reject and fail here.
+    // Heavier setup per round (two classes/sessions) + real-PG latency + retries,
+    // so it gets a generous timeout.
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-switch-${round}`;
+      const school = one(
+        await db
+          .insert(schools)
+          .values({ name: `S ${tag}` })
+          .returning(),
+      );
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `t-${tag}`, role: 'teacher', schoolId: school.id })
+          .returning(),
+      );
+      const student = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `s-${tag}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      const classC = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: teacher.id,
+            schoolId: school.id,
+            name: `C ${tag}`,
+            joinCode: `C-${tag}`,
+          })
+          .returning(),
+      );
+      const classD = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: teacher.id,
+            schoolId: school.id,
+            name: `D ${tag}`,
+            joinCode: `D-${tag}`,
+          })
+          .returning(),
+      );
+      const enrC = one(
+        await db
+          .insert(enrollments)
+          .values({ classId: classC.id, studentId: student.id })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: classD.id, studentId: student.id });
+      const now = Date.now();
+      const win = { startedAt: new Date(now - 60_000), endsAt: new Date(now + 25 * 60_000) };
+      const sessionC = (await startSession(db, { classId: classC.id, ...win })).session;
+      const sessionD = (await startSession(db, { classId: classD.id, ...win })).session;
+      await tapIn(db, {
+        sessionId: sessionC.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+
+      await Promise.all([
+        endEnrollment(db, { enrollmentId: enrC.id, reason: 'removed_from_class', at: new Date() }),
+        tapIn(db, {
+          sessionId: sessionD.id,
+          studentId: student.id,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        }),
+      ]);
+
+      const removed = one(await db.select().from(enrollments).where(eq(enrollments.id, enrC.id)));
+      expect(removed.removedAt).not.toBeNull();
+      expect(await liveParticipations(sessionC.id)).toHaveLength(0);
+      // one-live-per-student holds: at most one live participation total.
+      const liveAll = await db
+        .select()
+        .from(participations)
+        .where(and(eq(participations.studentId, student.id), isNull(participations.endedAt)));
+      expect(liveAll.length).toBeLessThanOrEqual(1);
+    }
+  }, 20_000);
 });

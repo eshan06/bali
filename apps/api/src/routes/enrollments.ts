@@ -43,6 +43,11 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
       const body = parse(JoinBody, request.body);
 
       const student = await findOrCreateStudent(db, identity.sub);
+      // Enrollments are the student-to-class relation; a teacher owns classes,
+      // they don't join one as a student (which would only pollute the roster).
+      if (student.role === 'teacher') {
+        throw ApiError.forbidden('teachers cannot join a class as a student');
+      }
       const result = await mapTransitionError(() =>
         joinClassByCode(db, {
           studentId: student.id,
@@ -77,6 +82,10 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
       if (enrollment.studentId === user.id) {
         reason = 'left_class';
       } else {
+        // findClassById returns only active classes, so a soft-removed class would
+        // make even its own teacher hit this 403. No production path sets
+        // classes.removedAt yet; when Step 4 adds class soft-delete it must end the
+        // class's enrollments (or this authz must tolerate a removed class here).
         const klass = await findClassById(db, enrollment.classId);
         if (!klass || klass.teacherId !== user.id) {
           throw ApiError.forbidden('not allowed to remove this enrollment');

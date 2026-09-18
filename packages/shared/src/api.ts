@@ -109,7 +109,12 @@ export interface RosterResponse {
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
 export interface EndEnrollmentResponse {
   outcome: 'ended' | 'already_removed';
-  /** How it was recorded: 'left_class' (student left) or 'removed_from_class' (teacher removed). */
+  /**
+   * How this caller's action was classified: 'left_class' (the student left) or
+   * 'removed_from_class' (the class's teacher removed them). On 'ended' it is how
+   * the event was recorded; on 'already_removed' (a no-op) it is only this
+   * caller's intent — the earlier removal recorded its own reason.
+   */
   reason: 'left_class' | 'removed_from_class';
   /** True when a live participation was ended too (the mid-session removal case). */
   endedParticipation: boolean;

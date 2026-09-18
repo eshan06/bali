@@ -1060,4 +1060,42 @@ describe('enrollment lifecycle', () => {
       endEnrollment(db, { enrollmentId: newUuidV7(), reason: 'left_class', at: new Date() }),
     ).rejects.toMatchObject({ code: 'ENROLLMENT_NOT_FOUND' });
   });
+
+  it('removing a student from one class leaves their live participation in another class untouched', async () => {
+    const c = await seedClass('scope-c');
+    const d = await seedClass('scope-d');
+    // Enroll c's student into d too, start a session in d, and go live there.
+    await db.insert(enrollments).values({ classId: d.klass.id, studentId: c.student.id });
+    const { session: sessionD } = await startSession(db, {
+      classId: d.klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: sessionD.id,
+      studentId: c.student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    // Remove the student from class C (which has no running session).
+    const enrC = one(await activeEnrollment(c.klass.id, c.student.id));
+    const result = await endEnrollment(db, {
+      enrollmentId: enrC.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(result.endedParticipation).toBe(false);
+    // The student's class-D participation is untouched — removal is scoped to C.
+    const liveD = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, sessionD.id),
+            eq(participations.studentId, c.student.id),
+          ),
+        ),
+    );
+    expect(liveD.endedAt).toBeNull();
+  });
 });

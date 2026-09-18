@@ -89,6 +89,16 @@ describe('POST /v1/enrollments', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('a teacher cannot join a class as a student (403)', async () => {
+    const { teacher, klass } = await seedClassroom(db, 'join-teacher');
+    const res = await join(await ctx.tokenFor(teacher.cognitoId), {
+      joinCode: klass.joinCode,
+      eventId: randomUUID(),
+      deviceTime: new Date().toISOString(),
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
   it('requires authentication', async () => {
     const res = await ctx.app.inject({ method: 'POST', url: '/v1/enrollments', payload: {} });
     expect(res.statusCode).toBe(401);
@@ -166,6 +176,16 @@ describe('DELETE /v1/enrollments/:id', () => {
     const other = await seedClassroom(db, 'remove-idor-other');
     const enrollmentId = await activeEnrollmentId(klass.id, student.id);
     const res = await del(await ctx.tokenFor(other.student.cognitoId), enrollmentId);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('a teacher who does not own the class cannot remove its enrollment (403)', async () => {
+    const { klass, student } = await seedClassroom(db, 'remove-crossteacher');
+    const other = await seedClassroom(db, 'remove-crossteacher-other');
+    const enrollmentId = await activeEnrollmentId(klass.id, student.id);
+    // other.teacher is a real teacher, just not of THIS class — must be 403, not
+    // 200 (a role-only check instead of ownership would wrongly allow this).
+    const res = await del(await ctx.tokenFor(other.teacher.cognitoId), enrollmentId);
     expect(res.statusCode).toBe(403);
   });
 
