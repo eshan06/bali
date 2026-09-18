@@ -320,6 +320,19 @@ re-checks the table on a slow timer (~20s). The server writes a no-op comment li
 ~20s so proxies don't kill idle-looking connections. Streams are capped per teacher
 account so a bug can't leak thousands of connections.
 
+The engine's `insertEvent` is the single place that rings the doorbell (a `pg_notify`
+after a genuinely new event that belongs to a session), so no writer can forget it; it
+fires inside the write's transaction, so Postgres delivers it on commit, never for a
+rolled-back event. The overlap window is `EVENT_RESUME_OVERLAP` in `@bali/shared`: a
+`seq` is handed out when a row is inserted but only becomes visible on commit, so a slow
+transaction can make a lower seq appear after a higher one. The stream re-reads a sliding
+`lastSeq − overlap` window and a reconnecting client resumes from `lastSeq − overlap`,
+both de-duping by `event_id`, so a late-committing event is still delivered exactly once.
+The boot snapshot (`GET /v1/sessions/{id}`) returns the latest seq to stream from, so the
+grid loads and goes live in one round trip. The stream reads the Authorization header only
+— never a token in the query string — so the portal drives it with `fetch`, not
+`EventSource`.
+
 ## Hosting
 
 Where everything physically runs.

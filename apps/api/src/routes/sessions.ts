@@ -5,7 +5,6 @@ import {
   extendSession,
   findClassById,
   findOrCreateStudent,
-  findSessionById,
   refocus,
   startSession,
   unlock,
@@ -19,11 +18,11 @@ import type {
   StartSessionResponse,
   UnlockResponse,
 } from '@bali/shared';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { requireTeacher } from '../auth/teacher.js';
+import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 
@@ -83,9 +82,10 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
     '/v1/sessions/:id/end',
     { preHandler: app.authenticate },
     async (request): Promise<EndSessionResponse> => {
-      const { id } = await requireSessionOwner(db, request);
+      const { id } = parse(SessionParams, request.params);
+      const { session } = await requireSessionOwner(db, request, id);
       const result = await mapTransitionError(() =>
-        endSession(db, { sessionId: id, at: new Date(), reason: 'ended' }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
       );
       return {
         outcome: result.ended ? 'ended' : 'already_ended',
@@ -99,7 +99,8 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
     '/v1/sessions/:id/extend',
     { preHandler: app.authenticate },
     async (request): Promise<ExtendSessionResponse> => {
-      const { session } = await requireSessionOwner(db, request);
+      const { id } = parse(SessionParams, request.params);
+      const { session } = await requireSessionOwner(db, request, id);
       const { durationMinutes } = parse(DurationBody, request.body);
       const now = Date.now();
       // Add time to whichever is later — the current end (extend the remaining
@@ -181,23 +182,4 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       };
     },
   );
-}
-
-/**
- * Resolve the session named in the URL and require the caller be its class's
- * teacher. Shared by end/extend. A soft-removed class would 403 even its own
- * teacher (findClassById returns active classes only) — no path removes a class
- * yet, and Step 4's note tracks it.
- */
-async function requireSessionOwner(
-  db: Database,
-  request: FastifyRequest,
-): Promise<{ id: string; session: NonNullable<Awaited<ReturnType<typeof findSessionById>>> }> {
-  const teacher = await requireTeacher(db, request);
-  const { id } = parse(SessionParams, request.params);
-  const session = await findSessionById(db, id);
-  if (!session) throw ApiError.notFound('session not found');
-  const klass = await findClassById(db, session.classId);
-  if (!klass || klass.teacherId !== teacher.id) throw ApiError.forbidden('not your session');
-  return { id, session };
 }

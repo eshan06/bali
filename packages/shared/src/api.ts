@@ -1,5 +1,5 @@
 import type { DisplayState } from './state.js';
-import type { ParticipationState, UnlockRecordedAs, UserRole } from './index.js';
+import type { EventType, ParticipationState, UnlockRecordedAs, UserRole } from './index.js';
 import type { UnlockRecordedOutcome } from './unlock-contract.js';
 
 /*
@@ -197,4 +197,52 @@ export interface EndEnrollmentResponse {
   reason: 'left_class' | 'removed_from_class';
   /** True when a live participation was ended too (the mid-session removal case). */
   endedParticipation: boolean;
+}
+
+// GET /v1/sessions/{id} — the grid boot snapshot (decision 5): the session, its
+// roster with each student's participation, and the latest event seq to stream
+// from, in one round trip.
+export interface SnapshotStudent {
+  enrollmentId: string;
+  studentId: string;
+  displayName: string | null;
+  /** The stored participation state in THIS session, or null if the student never joined it. */
+  state: ParticipationState | null;
+  /**
+   * All null when the student has no participation in this session. The client
+   * derives the display state (including `silent`/`ended`) from these with its
+   * own clock (rule 2), so the server ships the stored slice, not a derived label.
+   */
+  joinedAt: string | null;
+  lastSeenAt: string | null;
+  endedAt: string | null;
+}
+export interface SessionSnapshot {
+  session: SessionView & { startedAt: string };
+  ended: boolean;
+  /** The highest event seq for this session; stream from `latestSeq - EVENT_RESUME_OVERLAP`. */
+  latestSeq: number;
+  students: SnapshotStudent[];
+}
+
+/**
+ * One event as the catch-up feed and the live stream carry it. On the SSE stream
+ * this JSON is the `data:` frame, with `seq` echoed in the SSE `id:` line so a
+ * reconnect can resume from it.
+ */
+export interface FeedEvent {
+  seq: number;
+  eventId: string;
+  type: EventType;
+  /** The user the event is about (the tapping/unlocking student), if any. */
+  userId: string | null;
+  occurredAt: string;
+  payload: unknown;
+}
+
+// GET /v1/sessions/{id}/events?after=seq — the catch-up page, seq-ascending.
+export interface EventsPage {
+  events: FeedEvent[];
+  /** Resume after this: the max seq returned, or the requested `after` when the page is empty. */
+  nextAfter: number;
 }

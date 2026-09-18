@@ -1,6 +1,7 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import type { EventType, ParticipationState } from '@bali/shared';
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 
-import { blocks, classes, enrollments, participations, sessions, users } from './schema.js';
+import { blocks, classes, enrollments, events, participations, sessions, users } from './schema.js';
 import type { Database } from './types.js';
 
 /*
@@ -197,4 +198,93 @@ export async function findEnrollmentById(
   return first(
     await db.select().from(enrollments).where(eq(enrollments.id, enrollmentId)).limit(1),
   );
+}
+
+export interface SnapshotRosterRow {
+  enrollmentId: string;
+  studentId: string;
+  displayName: string | null;
+  /** Null when the student has no participation in this session (never joined it). */
+  state: ParticipationState | null;
+  joinedAt: Date | null;
+  lastSeenAt: Date | null;
+  endedAt: Date | null;
+}
+
+/**
+ * The grid-boot roster for a session (decision 5): every active enrollment of the
+ * class LEFT JOINed to that student's participation IN THIS SESSION, so a student
+ * who hasn't tapped in yet still appears (with null participation fields). The
+ * caller derives each display state; this returns the stored slice.
+ */
+export async function getSessionRoster(
+  db: Database,
+  sessionId: string,
+  classId: string,
+): Promise<SnapshotRosterRow[]> {
+  return db
+    .select({
+      enrollmentId: enrollments.id,
+      studentId: users.id,
+      displayName: users.displayName,
+      state: participations.state,
+      joinedAt: participations.joinedAt,
+      lastSeenAt: participations.lastSeenAt,
+      endedAt: participations.endedAt,
+    })
+    .from(enrollments)
+    .innerJoin(users, eq(enrollments.studentId, users.id))
+    .leftJoin(
+      participations,
+      and(eq(participations.studentId, users.id), eq(participations.sessionId, sessionId)),
+    )
+    .where(and(eq(enrollments.classId, classId), isNull(enrollments.removedAt)))
+    .orderBy(enrollments.createdAt);
+}
+
+/** The highest event seq for a session (0 when it has none) — the snapshot's stream cursor. */
+export async function getLatestSeq(db: Database, sessionId: string): Promise<number> {
+  const row = first(
+    await db
+      .select({ seq: sql<number>`coalesce(max(${events.seq}), 0)` })
+      .from(events)
+      .where(eq(events.sessionId, sessionId)),
+  );
+  return Number(row?.seq ?? 0);
+}
+
+export interface FeedEventRow {
+  seq: number;
+  eventId: string;
+  type: EventType;
+  userId: string | null;
+  occurredAt: Date;
+  payload: unknown;
+}
+
+/**
+ * A page of a session's events with `seq` strictly greater than `afterSeq`, in
+ * seq order — the catch-up read and the stream's re-read both use this. The
+ * server is dumb and literal: it returns exactly what the cursor asks for, and
+ * the caller handles the overlap/dedupe (decision 2).
+ */
+export async function getEventsSince(
+  db: Database,
+  sessionId: string,
+  afterSeq: number,
+  limit: number,
+): Promise<FeedEventRow[]> {
+  return db
+    .select({
+      seq: events.seq,
+      eventId: events.eventId,
+      type: events.type,
+      userId: events.userId,
+      occurredAt: events.occurredAt,
+      payload: events.payload,
+    })
+    .from(events)
+    .where(and(eq(events.sessionId, sessionId), gt(events.seq, afterSeq)))
+    .orderBy(asc(events.seq))
+    .limit(limit);
 }

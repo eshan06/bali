@@ -120,7 +120,20 @@ async function insertEvent(
     })
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
-  return inserted.length > 0;
+  const isNew = inserted.length > 0;
+
+  // The live-updates doorbell (decision 2): ping listeners for this session so a
+  // stream re-reads the events table (the only source of truth) immediately
+  // instead of waiting for its slow re-poll. insertEvent is the single chokepoint
+  // for writing an event, so no writer can forget to ring it. It fires inside the
+  // transaction, so Postgres delivers it on commit (never for a rolled-back
+  // event), and only for a genuinely new event that belongs to a session. On
+  // PGlite (tests) there is no cross-connection listener, so it is a harmless
+  // no-op — correctness never depends on it (the re-poll does).
+  if (isNew && e.sessionId) {
+    await tx.execute(sql`select pg_notify('bali_events', ${e.sessionId})`);
+  }
+  return isNew;
 }
 
 /**

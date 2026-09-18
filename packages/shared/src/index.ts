@@ -6,6 +6,20 @@
 /** URL version prefix. Additive-only once shipped; see docs/ARCHITECTURE.md "API surface". */
 export const API_VERSION = 'v1';
 
+/**
+ * The live-updates overlap window (decision 2). An event's `seq` is handed out
+ * when its row is inserted but only becomes visible on commit, so a slow
+ * transaction can make a lower seq appear AFTER a higher one. Both the stream's
+ * own re-read and a client reconnect therefore resume from
+ * `lastSeq - EVENT_RESUME_OVERLAP` and dedupe by `event_id`, so a late-committing
+ * event is still delivered exactly once. 50 covers far more concurrent in-flight
+ * writers than a classroom ever has.
+ */
+export const EVENT_RESUME_OVERLAP = 50;
+
+/** Max events one catch-up page (or one stream re-read) returns; the feed is paged. */
+export const EVENT_PAGE_LIMIT = 200;
+
 /** Response shape of GET /healthz. */
 export interface HealthzResponse {
   status: 'ok';

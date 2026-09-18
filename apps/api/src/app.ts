@@ -9,16 +9,20 @@ import { registerErrors } from './errors.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
+import { registerFeedRoutes } from './routes/feed.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMeRoute } from './routes/me.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
+import type { StreamHubOptions } from './sse/hub.js';
 
 export interface AppDeps {
   /** The database handle. Injected in tests (PGlite); server.ts builds it from DATABASE_URL. */
   db: Database;
   /** Injected in tests (the test issuer); defaults to the Cognito remote-JWKS verifier. */
   verifyToken?: TokenVerifier;
+  /** Live-stream tuning; tests shorten the re-poll/heartbeat for deterministic delivery. */
+  stream?: StreamHubOptions;
 }
 
 /**
@@ -44,6 +48,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerEnrollmentsRoutes(app, deps.db);
   registerClassesRoutes(app, deps.db);
   registerBlocksRoutes(app, deps.db);
+  registerFeedRoutes(app, deps.db, deps.stream);
   registerInternalRoutes(app, deps.db, env.INTERNAL_API_KEY);
 
   return app;
