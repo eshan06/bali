@@ -965,7 +965,16 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
     const closed = await tx
       .update(participations)
       .set({ lastSeenAt: seenAt, silentSince: null })
-      .where(and(eq(participations.id, live.id), isNotNull(participations.silentSince)))
+      // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
+      // participation only: a check-in racing endSession then records no
+      // came_back on the just-ended row (it falls through to the heartbeat below).
+      .where(
+        and(
+          eq(participations.id, live.id),
+          isNotNull(participations.silentSince),
+          isNull(participations.endedAt),
+        ),
+      )
       .returning({ id: participations.id });
     if (closed.length === 0) {
       await tx

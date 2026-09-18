@@ -145,6 +145,26 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('a student cannot extend (403)', async () => {
+    const { student, session } = await seedRunning('extend-student');
+    const res = await post(
+      await ctx.tokenFor(student.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 10 },
+    );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('requires authentication', async () => {
+    const { session } = await seedRunning('extend-auth');
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/extend`,
+      payload: { durationMinutes: 10 },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
   it('is a 404 for an unknown session', async () => {
     const { teacher } = await seedClassroom(db, 'extend-404');
     const res = await post(

@@ -16,6 +16,7 @@ import {
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  checkIn,
   endEnrollment,
   endSession,
   expireDueSessions,
@@ -492,5 +493,78 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       .from(events)
       .where(and(eq(events.sessionId, session.id), eq(events.type, 'went_silent')));
     expect(silent).toHaveLength(studentCount);
+  });
+
+  // The mirror of the sweep race, on the close side: two heartbeats landing at
+  // once on one open episode must close it with exactly one came_back. The
+  // guarded UPDATE (silent_since IS NOT NULL) in checkIn is what holds this.
+  it('two concurrent check-ins closing one episode emit exactly one came_back', async () => {
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-comeback-${round}`;
+      const school = one(
+        await db
+          .insert(schools)
+          .values({ name: `S ${tag}` })
+          .returning(),
+      );
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `t-${tag}`, role: 'teacher', schoolId: school.id })
+          .returning(),
+      );
+      const student = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `s-${tag}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      const klass = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: teacher.id,
+            schoolId: school.id,
+            name: `C ${tag}`,
+            joinCode: `J-${tag}`,
+          })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
+      const session = (
+        await startSession(db, {
+          classId: klass.id,
+          startedAt: new Date(Date.now() - 60_000),
+          endsAt: new Date(Date.now() + 25 * 60_000),
+        })
+      ).session;
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      // Open a silence episode for the student.
+      await db
+        .update(participations)
+        .set({ lastSeenAt: new Date(Date.now() - 5 * 60_000) })
+        .where(eq(participations.sessionId, session.id));
+      await markSilentParticipations(db, new Date());
+
+      await Promise.all([
+        checkIn(db, { sessionId: session.id, studentId: student.id, deviceTime: new Date() }),
+        checkIn(db, { sessionId: session.id, studentId: student.id, deviceTime: new Date() }),
+      ]);
+
+      const comebacks = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.sessionId, session.id), eq(events.type, 'came_back')));
+      expect(comebacks).toHaveLength(1);
+      const participation = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(participation.silentSince).toBeNull();
+    }
   });
 });
