@@ -60,6 +60,7 @@ export const EVENT_TYPES = [
   'session_extended',
   'session_expired',
   'session_ended',
+  'enrollment_joined',
   'enrollment_left',
   'enrollment_removed',
 ] as const;

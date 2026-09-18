@@ -12,6 +12,7 @@ type UserRow = typeof users.$inferSelect;
 type ClassRow = typeof classes.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 type ParticipationRow = typeof participations.$inferSelect;
+type EnrollmentRow = typeof enrollments.$inferSelect;
 
 function first<T>(rows: T[]): T | undefined {
   return rows[0];
@@ -156,4 +157,36 @@ export async function resolveTapTarget(
   );
 
   return { blockId: block.id, teacherId: block.teacherId, session: session?.session ?? null };
+}
+
+export interface RosterEntry {
+  enrollmentId: string;
+  studentId: string;
+  displayName: string | null;
+  joinedAt: Date;
+}
+
+/** A class's active roster: enrolled students with their names, in join order. */
+export async function getRoster(db: Database, classId: string): Promise<RosterEntry[]> {
+  return db
+    .select({
+      enrollmentId: enrollments.id,
+      studentId: users.id,
+      displayName: users.displayName,
+      joinedAt: enrollments.createdAt,
+    })
+    .from(enrollments)
+    .innerJoin(users, eq(enrollments.studentId, users.id))
+    .where(and(eq(enrollments.classId, classId), isNull(enrollments.removedAt)))
+    .orderBy(enrollments.createdAt);
+}
+
+/** An enrollment by id (any state), so the DELETE route can authorize before ending it. */
+export async function findEnrollmentById(
+  db: Database,
+  enrollmentId: string,
+): Promise<EnrollmentRow | undefined> {
+  return first(
+    await db.select().from(enrollments).where(eq(enrollments.id, enrollmentId)).limit(1),
+  );
 }

@@ -80,3 +80,37 @@ export interface UnlockResponse {
   /** The session for reconciliation; null only when the session id was unknown. */
   session: SessionView | null;
 }
+
+// POST /v1/enrollments — join a class by code (auth decision 3).
+export interface EnrollmentJoinRequest {
+  joinCode: string;
+  /** Client idempotency key for the enrollment_joined event. */
+  eventId: string;
+  /** Device clock, ISO 8601 — the join event's occurredAt. */
+  deviceTime: string;
+}
+export interface EnrollmentJoinResponse {
+  outcome: 'joined' | 'already_enrolled';
+  enrollmentId: string;
+  class: MeClass;
+}
+
+// GET /v1/classes/{id}/roster — the teacher's roster of active students.
+export interface RosterStudent {
+  enrollmentId: string;
+  studentId: string;
+  displayName: string | null;
+  joinedAt: string;
+}
+export interface RosterResponse {
+  students: RosterStudent[];
+}
+
+// DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
+export interface EndEnrollmentResponse {
+  outcome: 'ended' | 'already_removed';
+  /** How it was recorded: 'left_class' (student left) or 'removed_from_class' (teacher removed). */
+  reason: 'left_class' | 'removed_from_class';
+  /** True when a live participation was ended too (the mid-session removal case). */
+  endedParticipation: boolean;
+}

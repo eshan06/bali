@@ -30,7 +30,12 @@ import type { Database } from './types.js';
  */
 
 export type TransitionErrorCode =
-  'SESSION_NOT_FOUND' | 'SESSION_NOT_RUNNING' | 'NOT_PARTICIPATING' | 'INVALID_EXTENSION';
+  | 'SESSION_NOT_FOUND'
+  | 'SESSION_NOT_RUNNING'
+  | 'NOT_PARTICIPATING'
+  | 'INVALID_EXTENSION'
+  | 'CLASS_NOT_FOUND'
+  | 'ENROLLMENT_NOT_FOUND';
 
 /** A refusal the engine can produce; endpoints (step 7) map these to the error shape. */
 export class TransitionError extends Error {
@@ -45,6 +50,7 @@ export class TransitionError extends Error {
 
 type SessionRow = typeof sessions.$inferSelect;
 type ParticipationRow = typeof participations.$inferSelect;
+type ClassRow = typeof classes.$inferSelect;
 
 function firstOrUndefined<T>(rows: T[]): T | undefined {
   return rows[0];
@@ -820,4 +826,198 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   const seenAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
   await db.update(participations).set({ lastSeenAt: seenAt }).where(eq(participations.id, live.id));
   return { status: 'live', state: live.state, session };
+}
+
+export interface JoinClassInput {
+  studentId: string;
+  joinCode: string;
+  /** The client's idempotency key for the enrollment_joined event (rule 4). */
+  eventId: string;
+  occurredAt: Date;
+}
+export interface JoinClassResult {
+  /** 'joined' created a new enrollment; 'already_enrolled' the student was already in (no-op). */
+  outcome: 'joined' | 'already_enrolled';
+  enrollmentId: string;
+  class: ClassRow;
+}
+
+/**
+ * Join a class by its code (auth decision 3). Locks the class row so concurrent
+ * joins serialize, enrolls the student if they are not already actively enrolled,
+ * and records an `enrollment_joined` event. Joining a class you are already in is
+ * a no-op ('already_enrolled'), not an error. A prior removed enrollment is left
+ * as history (decision 3): a re-join adds a fresh active row, so "who was in this
+ * class in March" stays answerable rather than being rewritten.
+ */
+export async function joinClassByCode(
+  db: Database,
+  input: JoinClassInput,
+): Promise<JoinClassResult> {
+  return db.transaction(async (tx) => {
+    const cls = firstOrUndefined(
+      await tx
+        .select()
+        .from(classes)
+        .where(and(eq(classes.joinCode, input.joinCode), isNull(classes.removedAt)))
+        .limit(1)
+        .for('update'),
+    );
+    if (!cls) throw new TransitionError('CLASS_NOT_FOUND', 'no active class with that join code');
+
+    const active = firstOrUndefined(
+      await tx
+        .select()
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.classId, cls.id),
+            eq(enrollments.studentId, input.studentId),
+            isNull(enrollments.removedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (active) return { outcome: 'already_enrolled', enrollmentId: active.id, class: cls };
+
+    const enrollment = firstOrUndefined(
+      await tx
+        .insert(enrollments)
+        .values({ classId: cls.id, studentId: input.studentId })
+        .returning(),
+    );
+    if (!enrollment) throw new Error('joinClassByCode: insert returned no row');
+
+    await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'enrollment_joined',
+      classId: cls.id,
+      userId: input.studentId,
+      occurredAt: input.occurredAt,
+    });
+    return { outcome: 'joined', enrollmentId: enrollment.id, class: cls };
+  });
+}
+
+export interface EndEnrollmentInput {
+  enrollmentId: string;
+  /** 'left_class' when the student leaves their own; 'removed_from_class' when the teacher removes them. */
+  reason: 'left_class' | 'removed_from_class';
+  at: Date;
+}
+export interface EndEnrollmentResult {
+  /** 'ended' this call removed it; 'already_removed' it was gone (idempotent no-op). */
+  outcome: 'ended' | 'already_removed';
+  /** True when a live participation in this class's running session was ended too. */
+  endedParticipation: boolean;
+  classId: string;
+  studentId: string;
+}
+
+/**
+ * End an enrollment — a student leaving ('left_class') or a teacher removing them
+ * ('removed_from_class'). The doc's canonical one-transaction case ("changes that
+ * touch several tables happen in one transaction"): set removed_at, end the
+ * student's live participation in this class's running session (if any) with the
+ * matching reason, and record the event — all together or not at all. So the grid
+ * learns via the session feed (the event carries the session id), the phone's
+ * next check-in reads 'gone' and unshields, and a later emergency unlock still
+ * lands (ISSUES #2 / step 2). Idempotent: an already-removed enrollment no-ops.
+ */
+export async function endEnrollment(
+  db: Database,
+  input: EndEnrollmentInput,
+): Promise<EndEnrollmentResult> {
+  const eventType: EventType =
+    input.reason === 'left_class' ? 'enrollment_left' : 'enrollment_removed';
+  const participationReason: ParticipationEndedReason = input.reason;
+  return db.transaction(async (tx) => {
+    const enrollment = firstOrUndefined(
+      await tx
+        .select()
+        .from(enrollments)
+        .where(eq(enrollments.id, input.enrollmentId))
+        .limit(1)
+        .for('update'),
+    );
+    if (!enrollment) throw new TransitionError('ENROLLMENT_NOT_FOUND', 'no such enrollment');
+    if (enrollment.removedAt !== null) {
+      return {
+        outcome: 'already_removed',
+        endedParticipation: false,
+        classId: enrollment.classId,
+        studentId: enrollment.studentId,
+      };
+    }
+
+    // This class's running session, locked so a concurrent tap/end serializes on
+    // it — the removal can't leave a live participation stranded in an ended
+    // session, and endSession can't re-end this participation under a wrong reason.
+    const session = firstOrUndefined(
+      await tx
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.classId, enrollment.classId), isNull(sessions.endedAt)))
+        .limit(1)
+        .for('update'),
+    );
+    const live = session
+      ? firstOrUndefined(
+          await tx
+            .select()
+            .from(participations)
+            .where(
+              and(
+                eq(participations.sessionId, session.id),
+                eq(participations.studentId, enrollment.studentId),
+                isNull(participations.endedAt),
+              ),
+            )
+            .limit(1),
+        )
+      : undefined;
+
+    await tx
+      .update(enrollments)
+      .set({ removedAt: input.at })
+      .where(eq(enrollments.id, enrollment.id));
+
+    if (session && live) {
+      const occurredAt = clampToWindow(input.at, session.startedAt, session.endsAt);
+      await tx
+        .update(participations)
+        .set({ endedAt: occurredAt, endedReason: participationReason })
+        .where(eq(participations.id, live.id));
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: eventType,
+        sessionId: session.id,
+        classId: enrollment.classId,
+        userId: enrollment.studentId,
+        occurredAt,
+      });
+      return {
+        outcome: 'ended',
+        endedParticipation: true,
+        classId: enrollment.classId,
+        studentId: enrollment.studentId,
+      };
+    }
+
+    // No live participation to end — an enrollment-level event with no session.
+    await insertEvent(tx, {
+      eventId: newUuidV7(),
+      type: eventType,
+      sessionId: null,
+      classId: enrollment.classId,
+      userId: enrollment.studentId,
+      occurredAt: input.at,
+    });
+    return {
+      outcome: 'ended',
+      endedParticipation: false,
+      classId: enrollment.classId,
+      studentId: enrollment.studentId,
+    };
+  });
 }

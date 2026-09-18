@@ -13,7 +13,14 @@ import {
   users,
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
-import { endSession, expireDueSessions, startSession, tapIn, unlock } from '../src/transitions.js';
+import {
+  endEnrollment,
+  endSession,
+  expireDueSessions,
+  startSession,
+  tapIn,
+  unlock,
+} from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
 /*
@@ -239,6 +246,48 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       // Step 1's invariant still holds: no live participation in an ended session.
       const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
       expect(ended.endedAt).not.toBeNull();
+      expect(await liveParticipations(session.id)).toHaveLength(0);
+    }
+  });
+
+  it('a mid-session removal racing endSession stays atomic (enrollment removed, participation ended once)', async () => {
+    // Both endEnrollment and endSession lock the session FOR UPDATE, so they
+    // serialize: whichever wins, the enrollment is removed and the participation
+    // ends exactly once with a valid reason — never left live in an ended session.
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-remove-end-${round}`);
+      const session = await openSession(classId);
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      const enr = one(
+        await db
+          .select()
+          .from(enrollments)
+          .where(
+            and(
+              eq(enrollments.classId, classId),
+              eq(enrollments.studentId, studentId),
+              isNull(enrollments.removedAt),
+            ),
+          ),
+      );
+
+      await Promise.allSettled([
+        endEnrollment(db, { enrollmentId: enr.id, reason: 'removed_from_class', at: new Date() }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+      ]);
+
+      const removed = one(await db.select().from(enrollments).where(eq(enrollments.id, enr.id)));
+      expect(removed.removedAt).not.toBeNull();
+      const part = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(part.endedAt).not.toBeNull();
+      expect(['removed_from_class', 'session_ended']).toContain(part.endedReason);
       expect(await liveParticipations(session.id)).toHaveLength(0);
     }
   });
