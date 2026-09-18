@@ -106,6 +106,38 @@ export interface RosterResponse {
   students: RosterStudent[];
 }
 
+// POST /v1/classes — a teacher creates a class (the join code is server-generated).
+export interface CreateClassRequest {
+  name: string;
+}
+
+/** A class as its owning teacher manages it — the POST/GET/PATCH /v1/classes/{id} body. */
+export interface ClassDetail {
+  id: string;
+  name: string;
+  /** Server-generated, unique among live classes; students type it to join. */
+  joinCode: string;
+  createdAt: string;
+}
+
+// PATCH /v1/classes/{id} — rename and/or regenerate the join code (at least one).
+export interface UpdateClassRequest {
+  name?: string;
+  /** True to mint a fresh join code (the old one stops working immediately). */
+  regenerateCode?: boolean;
+}
+
+// POST /v1/blocks — a teacher registers a physical NFC tag to themselves.
+export interface CreateBlockRequest {
+  /** The id the physical tag broadcasts. */
+  tagId: string;
+}
+export interface BlockDetail {
+  id: string;
+  tagId: string;
+  createdAt: string;
+}
+
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
 export interface EndEnrollmentResponse {
   outcome: 'ended' | 'already_removed';

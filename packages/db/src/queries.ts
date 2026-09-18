@@ -8,7 +8,7 @@ import type { Database } from './types.js';
  * participations/events; these never touch those two tables except to read).
  */
 
-type UserRow = typeof users.$inferSelect;
+export type UserRow = typeof users.$inferSelect;
 type ClassRow = typeof classes.$inferSelect;
 type SessionRow = typeof sessions.$inferSelect;
 type ParticipationRow = typeof participations.$inferSelect;

@@ -193,7 +193,10 @@ says this is" to our data about them.
 **3. Students join a class with a join code.** The teacher's class screen shows a short
 code; a student types it in once, and the server creates their `enrollments` row. No
 email invites, no setup. Importing whole rosters (CSV or Google Classroom) is a later
-feature, built when a school asks for it.
+feature, built when a school asks for it. The code is server-generated from an
+unambiguous alphabet (no `0`/`O`, `1`/`I`/`L`) and unique among *live* classes only, so
+an archived class never reserves its code forever; a teacher can regenerate it (`PATCH
+/v1/classes/{id}`), which invalidates the old one immediately.
 
 ### Rules that keep auth honest
 

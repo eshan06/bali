@@ -3,7 +3,9 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
+import { createBlock } from '../src/management.js';
 import {
+  blocks,
   classes,
   enrollments,
   events,
@@ -385,4 +387,41 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       expect(liveAll[0]!.sessionId).toBe(sessionD.id);
     }
   }, 20_000);
+
+  // Block registration (Step 4). Not an engine mutation, but the active-tag
+  // index is arbitrated the same way the join-code index is, so this proves the
+  // ON CONFLICT DO NOTHING path is race-safe: two simultaneous claims of one tag
+  // resolve to exactly one live block, never two and never a lost registration.
+  it('two simultaneous registrations of the same tag yield exactly one live block', async () => {
+    for (let round = 0; round < 20; round += 1) {
+      const tag = `race-block-${round}`;
+      const teacherA = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `ta-${tag}`, role: 'teacher' })
+          .returning(),
+      );
+      const teacherB = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `tb-${tag}`, role: 'teacher' })
+          .returning(),
+      );
+      const tagId = `TAG-RACE-${tag}`;
+
+      const [ra, rb] = await Promise.all([
+        createBlock(db, { teacherId: teacherA.id, tagId }),
+        createBlock(db, { teacherId: teacherB.id, tagId }),
+      ]);
+
+      // Exactly one side registered; the other saw the tag as taken.
+      expect([ra.outcome, rb.outcome].sort()).toEqual(['registered', 'tag_taken']);
+
+      const live = await db
+        .select()
+        .from(blocks)
+        .where(and(eq(blocks.tagId, tagId), isNull(blocks.removedAt)));
+      expect(live).toHaveLength(1);
+    }
+  });
 });
