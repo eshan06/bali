@@ -75,9 +75,13 @@ describe('POST /v1/classes', () => {
   it('two classes get distinct join codes', async () => {
     const { teacher } = await seedClassroom(db, 'create-two');
     const token = await ctx.tokenFor(teacher.cognitoId);
-    const a = (await post(token, '/v1/classes', { name: 'A' })).json<ClassDetail>();
-    const b = (await post(token, '/v1/classes', { name: 'B' })).json<ClassDetail>();
-    expect(a.joinCode).not.toBe(b.joinCode);
+    const resA = await post(token, '/v1/classes', { name: 'A' });
+    const resB = await post(token, '/v1/classes', { name: 'B' });
+    // Both must actually succeed — otherwise a `undefined !== undefined-or-value`
+    // comparison could pass vacuously and mask a broken generator.
+    expect(resA.statusCode).toBe(200);
+    expect(resB.statusCode).toBe(200);
+    expect(resA.json<ClassDetail>().joinCode).not.toBe(resB.json<ClassDetail>().joinCode);
   });
 
   it('a student cannot create a class (403)', async () => {
@@ -205,6 +209,14 @@ describe('PATCH /v1/classes/:id', () => {
         name: 'Nope',
       },
     );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('a student cannot patch a class (403)', async () => {
+    const { klass, student } = await seedClassroom(db, 'patch-student');
+    const res = await patch(await ctx.tokenFor(student.cognitoId), `/v1/classes/${klass.id}`, {
+      name: 'Nope',
+    });
     expect(res.statusCode).toBe(403);
   });
 

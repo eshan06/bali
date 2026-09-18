@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createBlock, createClass, generateJoinCode, updateClass } from '../src/management.js';
@@ -46,6 +46,19 @@ async function classById(id: string) {
   return one(await db.select().from(classes).where(eq(classes.id, id)));
 }
 
+/**
+ * A deterministic stand-in for `generateJoinCode`, so a test can force the exact
+ * collision-then-success sequence the retry loops are meant to survive.
+ */
+function sequence(...values: string[]): () => string {
+  const iter = values[Symbol.iterator]();
+  return () => {
+    const next = iter.next();
+    if (next.done) throw new Error('join-code sequence exhausted');
+    return next.value;
+  };
+}
+
 describe('generateJoinCode', () => {
   it('is six characters from the unambiguous alphabet, never 0/O/1/I/L', () => {
     for (let i = 0; i < 100; i += 1) {
@@ -74,6 +87,25 @@ describe('createClass', () => {
       codes.add(klass.joinCode);
     }
     expect(codes.size).toBe(25);
+  });
+
+  it('retries past a taken join code and never duplicates it', async () => {
+    const { teacherId, schoolId } = await makeTeacher('cc-retry');
+    const taken = 'ZZZZ22';
+    await createClass(db, { teacherId, schoolId, name: 'holder' }, () => taken);
+    // The next create mints the taken code first (a forced collision), then a free one.
+    const klass = await createClass(
+      db,
+      { teacherId, schoolId, name: 'newcomer' },
+      sequence(taken, 'ZZZZ33'),
+    );
+    expect(klass.joinCode).toBe('ZZZZ33');
+    // The collision produced no second live class holding the taken code.
+    const live = await db
+      .select()
+      .from(classes)
+      .where(and(eq(classes.joinCode, taken), isNull(classes.removedAt)));
+    expect(live).toHaveLength(1);
   });
 });
 
@@ -119,6 +151,22 @@ describe('updateClass', () => {
   it('returns undefined for a class that does not exist', async () => {
     const updated = await updateClass(db, { classId: newUuidV7(), name: 'Ghost' });
     expect(updated).toBeUndefined();
+  });
+
+  it('regenerate retries past a taken join code', async () => {
+    const { teacherId, schoolId } = await makeTeacher('uc-retry');
+    const holder = await createClass(db, { teacherId, schoolId, name: 'holder' }, () => 'YYYY22');
+    const target = await createClass(db, { teacherId, schoolId, name: 'target' });
+    // Regenerate mints the holder's code first (a forced collision -> 23505 -> retry),
+    // then a free one.
+    const updated = await updateClass(
+      db,
+      { classId: target.id, regenerateCode: true },
+      sequence('YYYY22', 'YYYY33'),
+    );
+    expect(updated?.joinCode).toBe('YYYY33');
+    // The holder still owns the contested code.
+    expect((await classById(holder.id)).joinCode).toBe('YYYY22');
   });
 });
 

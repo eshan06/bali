@@ -41,11 +41,13 @@ export function generateJoinCode(): string {
 const activeClass = sql`${classes.removedAt} is null`;
 
 /**
- * A Postgres unique violation (SQLSTATE 23505). `classes` has exactly one unique
- * constraint — the active join-code index — so a 23505 from an UPDATE that set a
- * new join code is always a code collision, and the regenerate loop retries with
- * a fresh code. (INSERT uses ON CONFLICT DO NOTHING instead and never throws
- * here.) Drizzle wraps the driver error, so the code sits on a nested cause.
+ * A Postgres unique violation (SQLSTATE 23505). Besides the primary key on `id`
+ * (which the regenerate UPDATE never sets), the active join-code index is the
+ * only unique constraint on `classes` — so a 23505 from an UPDATE that changed
+ * only `name`/`join_code` is always a code collision, and the regenerate loop
+ * retries with a fresh code. (INSERT uses ON CONFLICT DO NOTHING instead and
+ * never throws here.) Drizzle wraps the driver error, so the code sits on a
+ * nested cause.
  */
 function isJoinCodeCollision(err: unknown): boolean {
   for (let e: unknown = err; e instanceof Error; e = e.cause) {
@@ -65,6 +67,9 @@ function isJoinCodeCollision(err: unknown): boolean {
 export async function createClass(
   db: Database,
   input: { teacherId: string; schoolId: string; name: string },
+  // Injection point for deterministic tests (force a collision); defaults to the
+  // real generator, so every production caller behaves identically.
+  gen: () => string = generateJoinCode,
 ): Promise<ClassRow> {
   for (let attempt = 0; attempt < JOIN_CODE_ATTEMPTS; attempt += 1) {
     const [row] = await db
@@ -73,7 +78,7 @@ export async function createClass(
         teacherId: input.teacherId,
         schoolId: input.schoolId,
         name: input.name,
-        joinCode: generateJoinCode(),
+        joinCode: gen(),
       })
       .onConflictDoNothing({ target: classes.joinCode, where: activeClass })
       .returning();
@@ -91,6 +96,9 @@ export async function createClass(
 export async function updateClass(
   db: Database,
   input: { classId: string; name?: string; regenerateCode?: boolean },
+  // Injection point for deterministic tests (force a collision); defaults to the
+  // real generator, so every production caller behaves identically.
+  gen: () => string = generateJoinCode,
 ): Promise<ClassRow | undefined> {
   const rename: { name?: string } = {};
   if (input.name !== undefined) rename.name = input.name;
@@ -110,7 +118,7 @@ export async function updateClass(
     try {
       const [row] = await db
         .update(classes)
-        .set({ ...rename, joinCode: generateJoinCode() })
+        .set({ ...rename, joinCode: gen() })
         .where(and(eq(classes.id, input.classId), isNull(classes.removedAt)))
         .returning();
       return row;
