@@ -66,5 +66,5 @@ npm start              # serve on PORT (default 3001)
 No external services are needed to see the core flow end-to-end:
 
 ```bash
-npm run demo           # walks arm → start → join → unlock → refocus → end (in-memory)
+npm run demo           # drives the real HTTP API over a local socket; see the README
 ```
