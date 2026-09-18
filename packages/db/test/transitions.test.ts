@@ -493,6 +493,29 @@ describe('state changes', () => {
     expect(replay.outcome).toBe('replay');
     expect(replay.state).toBe('unlocked');
   });
+
+  it('a replay of an unlock for a never-participating student returns replay, not a refusal (ISSUES #2)', async () => {
+    const { klass, student } = await seedClass('unlock-norow-replay');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const eventId = newUuidV7();
+    const req = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    };
+    const first = await unlock(db, req);
+    expect(first.outcome).toBe('recorded');
+    // The student never had a participation row, so the replay path sees no row.
+    // The old changeState threw NOT_PARTICIPATING here — it must now return replay.
+    const replay = await unlock(db, req);
+    expect(replay.outcome).toBe('replay');
+    expect(replay.state).toBeNull();
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
 });
 
 describe('checkIn', () => {

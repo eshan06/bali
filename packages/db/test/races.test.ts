@@ -13,7 +13,7 @@ import {
   users,
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
-import { endSession, expireDueSessions, startSession, tapIn } from '../src/transitions.js';
+import { endSession, expireDueSessions, startSession, tapIn, unlock } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
 /*
@@ -206,6 +206,40 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
 
       const expired = await eventsOfType(session.id, 'session_expired');
       expect(expired).toHaveLength(1);
+    }
+  });
+
+  it('an unlock racing endSession always commits the unlock event (ISSUES #2)', async () => {
+    // The headline never-discard function under contention. unlock and endSession
+    // both lock the session FOR UPDATE, so they serialize either way: unlock then
+    // end flips the participation then ends it; end then unlock records
+    // `after_session_end`. In both interleavings the unlock event must survive.
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-unlock-end-${round}`);
+      const session = await openSession(classId);
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+
+      await Promise.allSettled([
+        unlock(db, {
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+      ]);
+
+      const unlocks = await eventsOfType(session.id, 'unlock');
+      expect(unlocks).toHaveLength(1);
+      // Step 1's invariant still holds: no live participation in an ended session.
+      const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(ended.endedAt).not.toBeNull();
+      expect(await liveParticipations(session.id)).toHaveLength(0);
     }
   });
 });

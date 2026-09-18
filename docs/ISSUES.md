@@ -61,7 +61,10 @@ that could let the phone discard the record. The retry side of the contract —
 which responses let the phone delete the record versus keep retrying — is the
 typed table in `@bali/shared` (`unlockDisposition`), so the Phase 3 iOS outbox
 implements against an explicit rule. The phone-side "save first, retry until
-confirmed" half lands with iOS (Phase 3).
+confirmed" half lands with iOS (Phase 3). One residual: an `unknown_session`
+unlock is durable but, lacking a session/class, shows only in the student's own
+history rather than a teacher report — an ops surface for these orphan records is
+an API-layer follow-up, bounded meanwhile by the per-account rate limits of #1.
 
 ---
 

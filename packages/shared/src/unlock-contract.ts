@@ -12,16 +12,25 @@
 export type UnlockDisposition =
   /** Durably recorded server-side (or on a replay) — safe to delete from the outbox. */
   | 'recorded'
-  /** Not saved yet — keep it and try again later. */
+  /** Not saved yet, transiently — keep it and try again later. */
   | 'retry'
   /** The token was rejected — refresh it, then retry (keep the record). */
-  | 'reauth';
+  | 'reauth'
+  /**
+   * A non-401 4xx that must NOT happen for a well-formed authenticated unlock
+   * under this contract (the server records instead of refusing). Keep the
+   * record and keep retrying, but ALSO surface it: a client bug (e.g. a
+   * malformed 400) must not hide behind an endless silent retry (rule 5).
+   */
+  | 'retry_and_surface';
 
 /**
- * The unlock response outcomes that all mean "durably recorded", so the outbox
- * can stop retrying. Kept in sync with the engine's unlock() outcomes and the
- * UnlockResponse DTO: 'applied' flipped a live participation, 'recorded' saved
- * the note when there was none to flip, 'replay' means the event already landed.
+ * Every outcome an unlock can have — and, because unlock always records, they
+ * all mean "durably recorded", so the outbox stops retrying on any of them:
+ * 'applied' flipped a live participation, 'recorded' saved the note when there
+ * was none to flip, 'replay' means the event already landed. This is the single
+ * source of truth for the outcome union: the engine's UnlockResult.outcome and
+ * the UnlockResponse DTO both derive from it, so the three cannot drift.
  */
 export const UNLOCK_RECORDED_OUTCOMES = ['applied', 'recorded', 'replay'] as const;
 export type UnlockRecordedOutcome = (typeof UNLOCK_RECORDED_OUTCOMES)[number];
@@ -34,11 +43,17 @@ export function isUnlockRecorded(outcome: string): outcome is UnlockRecordedOutc
 /**
  * The outbox's decision from one send attempt. `result` is the HTTP status code,
  * or 'network_error' when there was no response at all. The rule that keeps
- * ISSUES #2: only a 200 whose body carries a recorded outcome deletes the
- * record; a 401 means refresh-and-retry; everything else — a transport failure,
- * a transient 5xx/429, an unexpected 2xx, even a 4xx that must never occur for an
- * unlock under this contract (the server records instead of refusing) — keeps
- * the record and retries. Discarding is never a disposition.
+ * ISSUES #2 — the record is deleted ONLY when it is durably saved, and no result
+ * ever means discard:
+ *
+ *   - any 2xx whose body carries a recorded outcome -> 'recorded' (delete). The
+ *     body outcome is the authoritative signal, so the exact 2xx code is not
+ *     coupled to the decision.
+ *   - 401 -> 'reauth' (refresh the token, then retry).
+ *   - a transport failure, 429 (rate limited, ISSUES #1), any 5xx, or a 2xx
+ *     without a recorded outcome -> 'retry' (transient; keep and try later).
+ *   - any other non-401 4xx -> 'retry_and_surface' (keep and retry, but surface —
+ *     it must not happen for an unlock, so it signals a bug, not a lost record).
  */
 export function unlockDisposition(
   result: number | 'network_error',
@@ -46,8 +61,12 @@ export function unlockDisposition(
 ): UnlockDisposition {
   if (result === 'network_error') return 'retry';
   if (result === 401) return 'reauth';
-  if (result === 200 && typeof body?.outcome === 'string' && isUnlockRecorded(body.outcome)) {
-    return 'recorded';
+  if (result === 429) return 'retry';
+  if (result >= 200 && result < 300) {
+    return typeof body?.outcome === 'string' && isUnlockRecorded(body.outcome)
+      ? 'recorded'
+      : 'retry';
   }
+  if (result >= 400 && result < 500) return 'retry_and_surface';
   return 'retry';
 }

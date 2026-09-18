@@ -3,6 +3,7 @@ import type {
   ParticipationEndedReason,
   ParticipationState,
   UnlockRecordedAs,
+  UnlockRecordedOutcome,
 } from '@bali/shared';
 import { clampToWindow } from '@bali/shared';
 import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
@@ -662,8 +663,8 @@ async function changeState(
 }
 
 export interface UnlockResult {
-  /** 'applied' flipped a live participation; 'recorded' saved the note with no live participation to flip; 'replay' the event already existed. */
-  outcome: 'applied' | 'recorded' | 'replay';
+  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved the note with none to flip, 'replay' the event already existed. */
+  outcome: UnlockRecordedOutcome;
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
   /** 'unlocked' when a live participation flipped; the participation's current state on a replay; null when nothing is participating. */
@@ -693,6 +694,15 @@ export interface UnlockResult {
  * truth as 'replay'. The response is the phone's signal to stop retrying
  * (@bali/shared unlockDisposition); every other result means "keep the record
  * and try again", never "discard".
+ *
+ * Two caller preconditions the endpoint must enforce, or a rollback loses the
+ * record: `studentId` must be a real users row (events.userId is a NO-ACTION FK
+ * — the verified Cognito principal satisfies it, and a soft-removed student keeps
+ * their row), and `deviceTime` must be a finite Date (a NaN date passes straight
+ * through clampToWindow into the NOT NULL occurred_at and throws in the driver,
+ * so the endpoint rejects an unparseable deviceTime with 400 first). Clamp note:
+ * for a session ended early, occurredAt clamps to the scheduled endsAt, which can
+ * land after the real endedAt but stays inside the window.
  */
 export async function unlock(db: Database, input: StateChangeInput): Promise<UnlockResult> {
   return db.transaction(async (tx) => {
