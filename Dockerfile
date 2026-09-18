@@ -6,13 +6,17 @@ FROM node:22-slim AS base
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install workspace dependencies from the lockfile. Copying the manifests first
-# keeps this layer cached across source-only changes.
+# Install only production dependencies from the lockfile. The app runs its
+# TypeScript source directly under tsx (a prod dependency), so the image needs
+# nothing from devDependencies — --omit=dev keeps pglite, vitest, drizzle-kit
+# and the rest of the test/build tooling out of the deployed image. (Verified:
+# the server boots on prod-only deps.) Copying the manifests first keeps this
+# layer cached across source-only changes.
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
-RUN npm ci
+RUN npm ci --omit=dev
 
 # App source.
 COPY . .
