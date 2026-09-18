@@ -62,24 +62,35 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
   let unlisten: (() => Promise<void>) | null = null;
   let closed = false;
 
-  // The postgres.js client exposes `.listen`; PGlite does not, so the hub then
-  // runs on the re-poll alone (NOTIFY is a latency optimization, never a
-  // correctness dependency).
+  // Both postgres.js and PGlite expose `.listen`; only the resolve shape differs
+  // (postgres.js → `{ unlisten }`, PGlite → a bare unsubscribe fn), which
+  // normalizeUnlisten smooths over. A driver with no `.listen` (none today) would
+  // fall back to the re-poll alone — NOTIFY is a latency optimization, never a
+  // correctness dependency.
   function listenClient(): {
-    listen: (
-      ch: string,
-      cb: (payload: string) => void,
-    ) => Promise<{ unlisten: () => Promise<void> }>;
+    listen: (ch: string, cb: (payload: string) => void) => Promise<unknown>;
   } | null {
     const client = (db as unknown as { $client?: { listen?: unknown } }).$client;
     return client && typeof client.listen === 'function'
-      ? (client as {
-          listen: (
-            ch: string,
-            cb: (payload: string) => void,
-          ) => Promise<{ unlisten: () => Promise<void> }>;
-        })
+      ? (client as { listen: (ch: string, cb: (payload: string) => void) => Promise<unknown> })
       : null;
+  }
+
+  function normalizeUnlisten(handle: unknown): () => Promise<void> {
+    if (typeof handle === 'function') {
+      const stop = handle as () => unknown;
+      return async () => {
+        await stop();
+      };
+    }
+    const h = handle as { unlisten?: () => unknown } | null;
+    if (h && typeof h.unlisten === 'function') {
+      const stop = h.unlisten;
+      return async () => {
+        await stop();
+      };
+    }
+    return () => Promise.resolve();
   }
 
   function ensureListening(): void {
@@ -92,8 +103,9 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
         if (subs) for (const s of subs) s.wake();
       })
       .then((handle) => {
-        if (closed) void handle.unlisten();
-        else unlisten = handle.unlisten;
+        const stop = normalizeUnlisten(handle);
+        if (closed) void stop();
+        else unlisten = stop;
       })
       .catch(() => {
         // A failed listen is non-fatal: the re-poll still delivers everything.

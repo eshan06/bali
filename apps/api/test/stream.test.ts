@@ -184,6 +184,9 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
     // Reconnect with the overlap window and dedupe by event id (decision 2).
     const second = await openStream(session.id, token, Math.max(0, lastSeq - EVENT_RESUME_OVERLAP));
     await second.waitFor((e) => e.some((x) => x.seq > lastSeq));
+    // Give the re-poll several cycles: a broken dedupe would re-deliver the
+    // window each cycle, so the no-duplicate check must outlast a few of them.
+    await new Promise((r) => setTimeout(r, 300));
     for (const e of second.events) seen.set(e.eventId, e);
 
     // Within the reconnected stream, no event id is delivered twice (its own
@@ -233,6 +236,9 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
 
     // The overlap re-read must still deliver the late, lower-seq event.
     await stream.waitFor((e) => e.some((x) => x.eventId === slowId));
+    // Let several re-poll cycles pass: a broken dedupe would re-deliver it, so
+    // "exactly one" only means something once the re-reads have had their chance.
+    await new Promise((r) => setTimeout(r, 300));
     const delivered = stream.events.filter((e) => e.eventId === slowId);
     expect(delivered).toHaveLength(1);
     stream.close();
@@ -248,6 +254,14 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
     const overflow = await openStream(session.id, token);
     expect(overflow.status).toBe(429);
     overflow.close();
-    for (const s of open) s.close();
+
+    // Closing a stream frees its slot: after the server sees the disconnect, a
+    // new stream is admitted again (teardown decrements the per-teacher count).
+    open[0]!.close();
+    await new Promise((r) => setTimeout(r, 200));
+    const readmitted = await openStream(session.id, token);
+    expect(readmitted.status).toBe(200);
+    readmitted.close();
+    for (const s of open.slice(1)) s.close();
   });
 });
