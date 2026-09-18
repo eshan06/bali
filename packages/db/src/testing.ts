@@ -85,9 +85,11 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
   } catch (err) {
     // Setup failed after the database was created — a bad migration, or a
     // transient connect error under parallel load. Release the pool and drop the
-    // database before rethrowing: a failed setup must never strand a database or
-    // a connection, and must never leave `close` undefined for afterEach to trip
-    // on (which would mask this error with a "close is not a function").
+    // database before rethrowing, so a failed setup strands neither a database
+    // nor a connection. (makeTestDb still rejects, so a caller that destructures
+    // `close` never assigns it — but everything close() would free is already
+    // released here, so an afterEach calling the undefined `close` is only
+    // harmless noise on an already-failing test, never a leak.)
     if (client) await client.end({ timeout: 5 }).catch(() => {});
     await dropDatabase().catch(() => {});
     throw err;
