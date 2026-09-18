@@ -12,10 +12,11 @@ ENV NODE_ENV=production
 # image. Verified both `npm run migrate` and the server boot on a --omit=dev
 # install. (@electric-sql/pglite is NOT removed here: drizzle-orm pulls it as an
 # optional peer dependency, which --omit=dev keeps. It is never imported at
-# runtime; fully dropping it needs --omit=optional, left for a dedicated image
-# pass since that also strips esbuild's platform binary and can't be Docker-
-# tested here.) Copying the manifests first caches this layer across source-only
-# changes.
+# runtime; fully dropping it needs --omit=optional, which also removes esbuild's
+# platform binary — esbuild re-fetches that in a postinstall, but the fetch is
+# network-dependent and can't be validated in the image build here, so it is
+# left for a dedicated image pass.) Copying the manifests first caches this
+# layer across source-only changes.
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/db/package.json packages/db/package.json
