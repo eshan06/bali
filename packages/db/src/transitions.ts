@@ -698,9 +698,10 @@ export interface UnlockResult {
  * Two caller preconditions the endpoint must enforce, or a rollback loses the
  * record: `studentId` must be a real users row (events.userId is a NO-ACTION FK
  * — the verified Cognito principal satisfies it, and a soft-removed student keeps
- * their row), and `deviceTime` must be a finite Date (a NaN date passes straight
- * through clampToWindow into the NOT NULL occurred_at and throws in the driver,
- * so the endpoint rejects an unparseable deviceTime with 400 first). Clamp note:
+ * their row), and `deviceTime` must be a finite Date (a NaN date reaches the NOT
+ * NULL occurred_at — through clampToWindow on a known session, or raw on an
+ * unknown one — and throws in the driver, so the endpoint rejects an unparseable
+ * deviceTime with 400 first). Clamp note:
  * for a session ended early, occurredAt clamps to the scheduled endsAt, which can
  * land after the real endedAt but stays inside the window.
  */

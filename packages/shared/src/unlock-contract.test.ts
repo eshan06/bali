@@ -38,6 +38,16 @@ describe('unlock durability contract (ISSUES #2)', () => {
     }
   });
 
+  it('a recorded outcome on a non-2xx status never deletes — the status gate wins', () => {
+    // The body outcome is authoritative only on a 2xx; a stale recorded body on
+    // a failure status must not be mistaken for a durable save. This fences off a
+    // future refactor that hoisted the body check above the status gate.
+    expect(unlockDisposition(500, { outcome: 'recorded' })).toBe('retry');
+    expect(unlockDisposition('network_error', { outcome: 'recorded' })).toBe('retry');
+    expect(unlockDisposition(400, { outcome: 'recorded' })).toBe('retry_and_surface');
+    expect(unlockDisposition(401, { outcome: 'recorded' })).toBe('reauth');
+  });
+
   it('isUnlockRecorded recognizes exactly the recorded outcomes', () => {
     expect(isUnlockRecorded('applied')).toBe(true);
     expect(isUnlockRecorded('recorded')).toBe(true);
