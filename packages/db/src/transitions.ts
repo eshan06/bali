@@ -1,4 +1,9 @@
-import type { EventType, ParticipationEndedReason, ParticipationState } from '@bali/shared';
+import type {
+  EventType,
+  ParticipationEndedReason,
+  ParticipationState,
+  UnlockRecordedAs,
+} from '@bali/shared';
 import { clampToWindow } from '@bali/shared';
 import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
 
@@ -606,7 +611,12 @@ export interface StateChangeResult {
   session: SessionRow;
 }
 
-/** Shared body for the in-session state changes (unlock / refocus / protection off). */
+/**
+ * Shared body for the strict in-session state changes (refocus / protection
+ * off): they need a live participation to move and refuse otherwise. Emergency
+ * unlock does NOT use this — it must never refuse in a way that discards a
+ * record (ISSUES.md #2), so it has its own body below.
+ */
 async function changeState(
   db: Database,
   input: StateChangeInput,
@@ -651,9 +661,112 @@ async function changeState(
   });
 }
 
-/** Emergency unlock (rule 5: always recorded). */
-export function unlock(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
-  return changeState(db, input, 'unlock', 'unlocked');
+export interface UnlockResult {
+  /** 'applied' flipped a live participation; 'recorded' saved the note with no live participation to flip; 'replay' the event already existed. */
+  outcome: 'applied' | 'recorded' | 'replay';
+  /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
+  recordedAs: UnlockRecordedAs | null;
+  /** 'unlocked' when a live participation flipped; the participation's current state on a replay; null when nothing is participating. */
+  state: ParticipationState | null;
+  participationId: string | null;
+  /** The session, so the response can carry the end time for reconciliation; null only when the session id was unknown. */
+  session: SessionRow | null;
+}
+
+/**
+ * Emergency unlock — rule 5 and ISSUES.md #2: ALWAYS recorded, never discarded.
+ * The v2 bug this kills: a student removed from a class mid-session hit Emergency
+ * Unlock, the server answered "not in this class", and the app threw the record
+ * away — an unshielded phone with no trace. So this never refuses in a way that
+ * could mean "discard":
+ *
+ *   - a live participation flips to `unlocked` (the normal case, outcome 'applied');
+ *   - no live participation (removed mid-session, or the participation already
+ *     ended) still commits the event with a `payload.recorded_as` note and
+ *     returns 'recorded' — the record stands though there is no state to move;
+ *   - an already-ended session records with `after_session_end` rather than the
+ *     old SESSION_NOT_RUNNING refusal;
+ *   - even an unknown session id records an orphan event (no session/class) with
+ *     `unknown_session`, so a bad id can't become a lost record either.
+ *
+ * Idempotent on event_id: a retried unlock re-reads and returns the current
+ * truth as 'replay'. The response is the phone's signal to stop retrying
+ * (@bali/shared unlockDisposition); every other result means "keep the record
+ * and try again", never "discard".
+ */
+export async function unlock(db: Database, input: StateChangeInput): Promise<UnlockResult> {
+  return db.transaction(async (tx) => {
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+
+    if (!session) {
+      // Unknown session: nothing to clamp to or attach, but the record must
+      // still survive — save an orphan event carrying the claimed id.
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'unlock',
+        sessionId: null,
+        classId: null,
+        userId: input.studentId,
+        occurredAt: input.deviceTime,
+        payload: { recorded_as: 'unknown_session', claimed_session_id: input.sessionId },
+      });
+      return {
+        outcome: isNew ? 'recorded' : 'replay',
+        recordedAs: isNew ? 'unknown_session' : null,
+        state: null,
+        participationId: null,
+        session: null,
+      };
+    }
+
+    const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+    const row = await loadParticipation(tx, session.id, input.studentId);
+    const live = row !== undefined && row.endedAt === null ? row : undefined;
+
+    // The note when there's nothing live to flip: an ended session dominates
+    // (the whole session is over), otherwise it's a student with no live
+    // participation — removed from the class mid-session, the ISSUES #2 case.
+    const note: UnlockRecordedAs = session.endedAt ? 'after_session_end' : 'no_live_participation';
+
+    const isNew = await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'unlock',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: input.studentId,
+      occurredAt,
+      payload: live ? null : { recorded_as: note },
+    });
+
+    if (!isNew) {
+      // Replay: return the current truth — the stored state if a participation
+      // row exists at all (live or since-ended), never a refusal.
+      return {
+        outcome: 'replay',
+        recordedAs: null,
+        state: row?.state ?? null,
+        participationId: row?.id ?? null,
+        session,
+      };
+    }
+
+    if (live) {
+      await tx
+        .update(participations)
+        .set({ state: 'unlocked', lastSeenAt: occurredAt })
+        .where(eq(participations.id, live.id));
+      return {
+        outcome: 'applied',
+        recordedAs: null,
+        state: 'unlocked',
+        participationId: live.id,
+        session,
+      };
+    }
+
+    // No live participation: the committed event is itself the record.
+    return { outcome: 'recorded', recordedAs: note, state: null, participationId: null, session };
+  });
 }
 
 /** Return to focus after an unlock. */

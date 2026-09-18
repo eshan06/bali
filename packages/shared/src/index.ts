@@ -65,6 +65,20 @@ export const EVENT_TYPES = [
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
+/**
+ * Why an emergency unlock was recorded without a live participation to flip
+ * (ISSUES.md #2 — the record must never be lost). It lands in the unlock event's
+ * `payload.recorded_as`, and reports read it to explain a "recorded" unlock that
+ * moved no student state. Additive-only like the other vocab.
+ */
+export const UNLOCK_RECORDED_AS = [
+  'no_live_participation',
+  'after_session_end',
+  'unknown_session',
+] as const;
+export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
+
 export * from './api.js';
 export * from './errors.js';
 export * from './state.js';
+export * from './unlock-contract.js';

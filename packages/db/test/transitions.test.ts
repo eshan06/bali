@@ -21,7 +21,6 @@ import {
   refocus,
   startSession,
   tapIn,
-  TransitionError,
   unlock,
 } from '../src/transitions.js';
 import { makeTestDb } from '../src/testing.js';
@@ -347,20 +346,38 @@ describe('state changes', () => {
     expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
   });
 
-  it('refuses a state change for a student who is not participating', async () => {
+  it('records an unlock for a student with no live participation instead of discarding it (ISSUES #2)', async () => {
     const { klass, student } = await seedClass('unlock-none');
     const { session } = await startSession(db, {
       classId: klass.id,
       ...window('2026-01-01T09:00:00Z'),
     });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('no_live_participation');
+    expect(u.state).toBeNull();
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+
+  it('refocus still refuses for a student with no live participation', async () => {
+    const { klass, student } = await seedClass('refocus-none');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
     await expect(
-      unlock(db, {
+      refocus(db, {
         sessionId: session.id,
         studentId: student.id,
         eventId: newUuidV7(),
         deviceTime: new Date('2026-01-01T09:05:00Z'),
       }),
-    ).rejects.toBeInstanceOf(TransitionError);
+    ).rejects.toMatchObject({ code: 'NOT_PARTICIPATING' });
   });
 
   it('the response carries the session so the phone learns the end time', async () => {
@@ -371,7 +388,82 @@ describe('state changes', () => {
       eventId: newUuidV7(),
       deviceTime: new Date('2026-01-01T09:05:00Z'),
     });
-    expect(u.session.endsAt.toISOString()).toBe(session.endsAt.toISOString());
+    expect(u.session).not.toBeNull();
+    expect(u.session?.endsAt.toISOString()).toBe(session.endsAt.toISOString());
+  });
+
+  it('records an unlock after the session has ended, clamped into the window (ISSUES #2)', async () => {
+    const { session, student } = await joined('unlock-after-end');
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:25:00Z'),
+      reason: 'ended',
+    });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:30:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('after_session_end');
+    const unlocks = (await eventsFor(session.id)).filter((e) => e.type === 'unlock');
+    expect(unlocks).toHaveLength(1);
+    // Rule 1: a device time past the bell is clamped back into the window.
+    expect(unlocks[0]!.occurredAt.getTime()).toBeLessThanOrEqual(session.endsAt.getTime());
+  });
+
+  it('records an unlock for a student removed mid-session, and survives a replay (ISSUES #2)', async () => {
+    const { session, student } = await joined('unlock-removed');
+    // The student is removed from the class mid-session: their participation ends
+    // while the session keeps running (the canonical ISSUES #2 scenario).
+    await db
+      .update(participations)
+      .set({ endedAt: new Date('2026-01-01T09:04:00Z'), endedReason: 'removed_from_class' })
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+    const eventId = newUuidV7();
+    const req = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    };
+    const first = await unlock(db, req);
+    expect(first.outcome).toBe('recorded');
+    expect(first.recordedAs).toBe('no_live_participation');
+    // A retry after a token refresh must not create a second record or throw.
+    const replay = await unlock(db, req);
+    expect(replay.outcome).toBe('replay');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+
+  it('records an unlock against an unknown session as an orphan event (ISSUES #2)', async () => {
+    const { student } = await seedClass('unlock-unknown');
+    const bogusSessionId = newUuidV7();
+    const u = await unlock(db, {
+      sessionId: bogusSessionId,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('unknown_session');
+    expect(u.session).toBeNull();
+    // Recorded with no session/class attached, carrying the claimed id in payload.
+    const orphan = one(
+      await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, student.id), eq(events.type, 'unlock'))),
+    );
+    expect(orphan.sessionId).toBeNull();
+    expect(orphan.classId).toBeNull();
+    expect(orphan.payload).toMatchObject({
+      recorded_as: 'unknown_session',
+      claimed_session_id: bogusSessionId,
+    });
   });
 
   it('a replay whose participation has since ended returns current truth, not an error', async () => {

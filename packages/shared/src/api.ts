@@ -1,5 +1,5 @@
 import type { DisplayState } from './state.js';
-import type { ParticipationState, UserRole } from './index.js';
+import type { ParticipationState, UnlockRecordedAs, UserRole } from './index.js';
 
 /*
  * The DTOs for the step-7 endpoints — the wire contract clients depend on, so
@@ -54,4 +54,22 @@ export interface StartSessionResponse {
   session: SessionView & { startedAt: string };
   /** Armed taps that became participations at this start (decision 5). */
   armedConverted: number;
+}
+
+// POST /v1/sessions/{id}/unlock — emergency unlock (ISSUES.md #2: never discarded).
+export type UnlockOutcome = 'applied' | 'recorded' | 'replay';
+export interface UnlockResponse {
+  /**
+   * 'applied' flipped a live participation to unlocked; 'recorded' saved the
+   * event with a note when there was no live participation to flip; 'replay'
+   * means the event already landed. All three mean "durably recorded" — the
+   * phone's outbox stops retrying (see unlockDisposition).
+   */
+  outcome: UnlockOutcome;
+  /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
+  recordedAs: UnlockRecordedAs | null;
+  /** 'unlocked' when a live participation flipped; the current state on a replay; null otherwise. */
+  state: ParticipationState | null;
+  /** The session for reconciliation; null only when the session id was unknown. */
+  session: SessionView | null;
 }

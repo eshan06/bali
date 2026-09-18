@@ -278,7 +278,11 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   v2's drift.
 - **For unlock records, no response ever means "discard."** The contract spells out
   which errors mean retry later and which mean recorded-with-a-note. v2's lost-unlock
-  bug lived exactly at this gap.
+  bug lived exactly at this gap. The engine implements this: `unlock` always commits
+  the event, tagging it `payload.recorded_as` (`no_live_participation` /
+  `after_session_end` / `unknown_session`) when there is no live participation to flip;
+  the outbox disposition (`recorded` / `retry` / `reauth`) is the typed table in
+  `@bali/shared`.
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
 
