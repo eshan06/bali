@@ -129,7 +129,13 @@ here, shields still on." That's useful — it's how we notice a phone going sile
 nothing *changed*, so it isn't history. The server just overwrites `last_seen_at` on that
 student's `participations` row. The `events` table gets a row only when something really
 changes: tapped in, unlocked, went silent, came back. Otherwise a 1,000-student school
-would add ~720,000 useless rows a day to the table every screen reads.
+would add ~720,000 useless rows a day to the table every screen reads. The "went
+silent" / "came back" pair is server-minted, not sent by the phone: the per-minute
+sweep opens an episode by stamping a `silent_since` marker on the row (emitting one
+`went_silent`) once a focused phone passes the 90-second threshold, and the next
+check-in clears the marker (emitting one `came_back`). That marker exists only to make
+the pair fire exactly once per episode — a grid still derives the live "silent" badge
+from `last_seen_at` (rule 2), never from the column.
 
 ### Rules that keep the data honest
 

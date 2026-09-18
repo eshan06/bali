@@ -5,8 +5,8 @@ import type {
   UnlockRecordedAs,
   UnlockRecordedOutcome,
 } from '@bali/shared';
-import { clampToWindow } from '@bali/shared';
-import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
+import { clampToWindow, SILENCE_THRESHOLD_MS } from '@bali/shared';
+import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
 import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
@@ -558,6 +558,83 @@ export async function expireDueSessions(db: Database, now: Date): Promise<string
   return ended;
 }
 
+/**
+ * The silence sweep (decision 3), the sweep's second duty. Open a silence
+ * episode for every live, FOCUSED participation whose last contact
+ * (`last_seen_at`, else `joined_at`) is older than SILENCE_THRESHOLD_MS and that
+ * has no episode open. Only `focused` counts — `unlocked`/`protection_off` are
+ * already not-green and stand regardless of contact, mirroring
+ * deriveDisplayState. Each opening sets `silent_since` and emits one
+ * `went_silent`.
+ *
+ * The per-candidate guarded UPDATE re-checks every mutable condition
+ * (silent_since / ended_at / state / threshold) at write time, so it is
+ * exactly-once even when two sweeps run at once — the loser marks nothing and
+ * emits nothing — and it never opens an episode on a participation that a racing
+ * check-in, unlock, or session-end changed after the scan. Idempotent and safe
+ * to double-run. Returns how many episodes opened.
+ */
+export async function markSilentParticipations(db: Database, now: Date): Promise<number> {
+  // Bind the cutoff as an ISO string with an explicit cast: a raw Date param
+  // inside a bare sql template has no column type to guide the driver, and
+  // postgres.js then can't serialize it (PGlite tolerates it, so casting keeps
+  // both lanes identical).
+  const cutoff = new Date(now.getTime() - SILENCE_THRESHOLD_MS).toISOString();
+  const silent = sql`coalesce(${participations.lastSeenAt}, ${participations.joinedAt}) < ${cutoff}::timestamptz`;
+
+  const candidates = await db
+    .select({
+      participationId: participations.id,
+      sessionId: sessions.id,
+      classId: sessions.classId,
+      startedAt: sessions.startedAt,
+      endsAt: sessions.endsAt,
+      studentId: participations.studentId,
+    })
+    .from(participations)
+    .innerJoin(sessions, eq(participations.sessionId, sessions.id))
+    .where(
+      and(
+        isNull(participations.endedAt),
+        isNull(participations.silentSince),
+        eq(participations.state, 'focused'),
+        isNull(sessions.endedAt),
+        silent,
+      ),
+    );
+
+  let opened = 0;
+  for (const c of candidates) {
+    const didOpen = await db.transaction(async (tx) => {
+      const marked = await tx
+        .update(participations)
+        .set({ silentSince: now })
+        .where(
+          and(
+            eq(participations.id, c.participationId),
+            isNull(participations.silentSince),
+            isNull(participations.endedAt),
+            eq(participations.state, 'focused'),
+            silent,
+          ),
+        )
+        .returning({ id: participations.id });
+      if (marked.length === 0) return false; // a racing sweep or a state change won
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'went_silent',
+        sessionId: c.sessionId,
+        classId: c.classId,
+        userId: c.studentId,
+        occurredAt: clampToWindow(now, c.startedAt, c.endsAt),
+      });
+      return true;
+    });
+    if (didOpen) opened += 1;
+  }
+  return opened;
+}
+
 export interface TapInput {
   sessionId: string;
   studentId: string;
@@ -867,8 +944,46 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   if (!live) return { status: 'gone', state: null, session };
 
   const seenAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
-  await db.update(participations).set({ lastSeenAt: seenAt }).where(eq(participations.id, live.id));
-  return { status: 'live', state: live.state, session };
+
+  // The common heartbeat: no silence episode open, so a single cheap UPDATE and
+  // no events row (decision 7 — a heartbeat that changes nothing writes no
+  // history).
+  if (live.silentSince === null) {
+    await db
+      .update(participations)
+      .set({ lastSeenAt: seenAt })
+      .where(eq(participations.id, live.id));
+    return { status: 'live', state: live.state, session };
+  }
+
+  // Closing a silence episode IS a change, so it earns a `came_back` event. The
+  // guarded UPDATE (silent_since IS NOT NULL) emits exactly one per episode even
+  // if two check-ins race — the loser just records its heartbeat. (If a sweep
+  // opens an episode between the read above and here, the next check-in closes
+  // it: a one-heartbeat lag, never a lost or duplicated `came_back`.)
+  return db.transaction(async (tx) => {
+    const closed = await tx
+      .update(participations)
+      .set({ lastSeenAt: seenAt, silentSince: null })
+      .where(and(eq(participations.id, live.id), isNotNull(participations.silentSince)))
+      .returning({ id: participations.id });
+    if (closed.length === 0) {
+      await tx
+        .update(participations)
+        .set({ lastSeenAt: seenAt })
+        .where(eq(participations.id, live.id));
+      return { status: 'live', state: live.state, session };
+    }
+    await insertEvent(tx, {
+      eventId: newUuidV7(),
+      type: 'came_back',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: input.studentId,
+      occurredAt: seenAt,
+    });
+    return { status: 'live', state: live.state, session };
+  });
 }
 
 export interface JoinClassInput {

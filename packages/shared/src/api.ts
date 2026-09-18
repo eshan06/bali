@@ -81,6 +81,53 @@ export interface UnlockResponse {
   session: SessionView | null;
 }
 
+// POST /v1/sessions/{id}/end — the class's teacher ends a running session.
+export interface EndSessionResponse {
+  outcome: 'ended' | 'already_ended';
+  /** Live participations ended by this call; 0 on an already-ended session. */
+  endedParticipations: number;
+}
+
+// POST /v1/sessions/{id}/extend — the teacher adds time.
+export interface ExtendSessionRequest {
+  /** Minutes to add; the new end is max(now, current end) + this many minutes. */
+  durationMinutes: number;
+}
+export interface ExtendSessionResponse {
+  outcome: 'extended';
+  session: SessionView;
+}
+
+// POST /v1/sessions/{id}/checkin — the ~30s heartbeat (any enrolled student).
+export interface CheckInRequest {
+  /** Device clock, ISO 8601; clamped into the session window server-side. */
+  deviceTime: string;
+}
+export interface CheckInResponse {
+  /** 'live' with the current stored state, or 'gone' when there's no live participation. */
+  status: 'live' | 'gone';
+  state: ParticipationState | null;
+  session: SessionView;
+}
+
+// POST /v1/sessions/{id}/unlock — emergency unlock (never discarded; see UnlockResponse).
+export interface UnlockRequest {
+  /** Client idempotency key for the unlock event (rule 4). */
+  eventId: string;
+  deviceTime: string;
+}
+
+// POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
+export interface RefocusRequest {
+  eventId: string;
+  deviceTime: string;
+}
+export interface RefocusResponse {
+  outcome: 'applied' | 'replay';
+  state: ParticipationState;
+  session: SessionView;
+}
+
 // POST /v1/enrollments — join a class by code (auth decision 3).
 export interface EnrollmentJoinRequest {
   joinCode: string;

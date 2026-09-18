@@ -85,6 +85,14 @@ export async function findClassById(db: Database, classId: string): Promise<Clas
   );
 }
 
+/** A session by id (any state), so the lifecycle routes can authorize the teacher. */
+export async function findSessionById(
+  db: Database,
+  sessionId: string,
+): Promise<SessionRow | undefined> {
+  return first(await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1));
+}
+
 /** A teacher's active classes. */
 export async function getTaughtClasses(db: Database, teacherId: string): Promise<ClassRow[]> {
   return db

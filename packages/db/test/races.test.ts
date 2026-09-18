@@ -19,6 +19,7 @@ import {
   endEnrollment,
   endSession,
   expireDueSessions,
+  markSilentParticipations,
   startSession,
   tapIn,
   unlock,
@@ -423,5 +424,73 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         .where(and(eq(blocks.tagId, tagId), isNull(blocks.removedAt)));
       expect(live).toHaveLength(1);
     }
+  });
+
+  // The silence sweep's exactly-once guarantee (decision 3) under real
+  // contention: two minute-sweeps firing at once must open one episode per phone
+  // — never two went_silent for the same student, never a missed one. The
+  // guarded UPDATE (silent_since IS NULL) is what makes that hold.
+  it('two sweeps racing open exactly one silence episode per phone', async () => {
+    const tag = 'race-silence';
+    const school = one(
+      await db
+        .insert(schools)
+        .values({ name: `S ${tag}` })
+        .returning(),
+    );
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `t-${tag}`, role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const klass = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: `C ${tag}`,
+          joinCode: `J-${tag}`,
+        })
+        .returning(),
+    );
+    const session = (
+      await startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      })
+    ).session;
+    const studentCount = 8;
+    for (let i = 0; i < studentCount; i += 1) {
+      const student = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `s-${tag}-${i}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+    }
+    // Everyone silent past the threshold.
+    await db
+      .update(participations)
+      .set({ lastSeenAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(participations.sessionId, session.id));
+
+    const now = new Date();
+    await Promise.all([markSilentParticipations(db, now), markSilentParticipations(db, now)]);
+
+    const silent = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'went_silent')));
+    expect(silent).toHaveLength(studentCount);
   });
 });
