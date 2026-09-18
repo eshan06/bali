@@ -1,3 +1,4 @@
+import cors from '@fastify/cors';
 import type { Database } from '@bali/db';
 import { API_VERSION, type HealthzResponse } from '@bali/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -39,6 +40,18 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   });
 
   registerErrors(app);
+
+  // CORS only when origins are configured (the browser portal). Native apps and
+  // server-to-server send no Origin and are unaffected; the header list is the
+  // Authorization bearer, no cookies, so no credentials mode. Unset = no CORS.
+  const corsOrigins =
+    env.CORS_ORIGINS?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean) ?? [];
+  if (corsOrigins.length > 0) {
+    void app.register(cors, { origin: corsOrigins });
+  }
+
   registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env));
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));

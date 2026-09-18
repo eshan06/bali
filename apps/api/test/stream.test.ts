@@ -23,11 +23,12 @@ let db: Database;
 let closeDb: () => Promise<void>;
 let app: FastifyInstance;
 let port: number;
+let issuer: Awaited<ReturnType<typeof makeTestIssuer>>;
 let tokenFor: (sub: string) => Promise<string>;
 
 beforeEach(async () => {
   ({ db, close: closeDb } = await makeTestDb());
-  const issuer = await makeTestIssuer();
+  issuer = await makeTestIssuer();
   tokenFor = (sub) => issuer.sign({ sub });
   // Short re-poll so delivery is deterministic even if a NOTIFY is missed.
   app = buildApp(testEnv, {
@@ -120,6 +121,58 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
     const s = await openStream(session.id, await tokenFor(other.teacher.cognitoId));
     expect(s.status).toBe(403);
     s.close();
+  });
+
+  it('mirrors CORS (ACAO + Vary: Origin) onto the hijacked stream when configured', async () => {
+    // The stream hijacks the reply, bypassing Fastify's header flush — so the
+    // cors plugin's Access-Control-Allow-Origin must be copied onto the raw
+    // response by hand, or the browser silently blocks the live grid even though
+    // the snapshot/events routes (non-hijacked) work. Pin that copy.
+    const { teacher, session } = await seedRunning('stream-cors');
+    const corsApp = buildApp(
+      { ...testEnv, CORS_ORIGINS: 'http://localhost:3000' },
+      {
+        db,
+        verifyToken: issuer.verifier,
+        stream: { repollMs: 80, heartbeatMs: 1000, maxPerTeacher: 3 },
+      },
+    );
+    await corsApp.listen({ port: 0, host: '127.0.0.1' });
+    try {
+      const addr = corsApp.server.address();
+      if (addr === null || typeof addr === 'string') throw new Error('no port');
+      const controller = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${addr.port}/v1/sessions/${session.id}/stream`, {
+        headers: {
+          authorization: `Bearer ${await tokenFor(teacher.cognitoId)}`,
+          origin: 'http://localhost:3000',
+        },
+        signal: controller.signal,
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:3000');
+      expect((res.headers.get('vary') ?? '').toLowerCase()).toContain('origin');
+      controller.abort();
+    } finally {
+      await corsApp.close();
+    }
+  });
+
+  it('adds no CORS header to the stream when CORS is unset (the default app)', async () => {
+    // The beforeEach app has no CORS_ORIGINS, so even a browser-looking request
+    // (with an Origin) gets no ACAO — today's native-app behavior, unchanged.
+    const { teacher, session } = await seedRunning('stream-nocors');
+    const controller = new AbortController();
+    const res = await fetch(`http://127.0.0.1:${port}/v1/sessions/${session.id}/stream`, {
+      headers: {
+        authorization: `Bearer ${await tokenFor(teacher.cognitoId)}`,
+        origin: 'http://localhost:3000',
+      },
+      signal: controller.signal,
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+    controller.abort();
   });
 
   it('delivers every event from concurrent writers to one stream', async () => {

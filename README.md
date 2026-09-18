@@ -5,11 +5,12 @@ Tap a block, the phone locks into focus. This is the v3 rebuild; the design doc 
 
 ## Layout
 
-| Workspace         | What it is                                          |
-| ----------------- | --------------------------------------------------- |
-| `apps/api`        | The Fastify HTTP API                                |
-| `packages/db`     | Drizzle schema, migrations, and the Postgres client |
-| `packages/shared` | Types and constants shared by server and clients    |
+| Workspace         | What it is                                                        |
+| ----------------- | ----------------------------------------------------------------- |
+| `apps/api`        | The Fastify HTTP API                                              |
+| `apps/web`        | The teacher web portal (Next.js) — see [docs/WEB.md](docs/WEB.md) |
+| `packages/db`     | Drizzle schema, migrations, and the Postgres client               |
+| `packages/shared` | Types and constants shared by server and clients                  |
 
 ## From zero
 
@@ -32,6 +33,22 @@ Postgres:
 ```bash
 npm run demo
 ```
+
+## Web portal
+
+The teacher portal lives in `apps/web` (Next.js). It runs locally against the dev
+API and signs in through Cognito with a public PKCE client:
+
+```bash
+npm run dev -w @bali/web    # http://localhost:3000
+```
+
+It needs a Cognito **web** app client and a few `NEXT_PUBLIC_*` variables; the full
+setup — app-client provisioning, callback URLs, and the teacher role flip
+(`UPDATE users SET role = 'teacher' WHERE cognito_id = '<sub>'`, since every first
+sign-in provisions a student) — is in [docs/WEB.md](docs/WEB.md). The API serves the
+portal cross-origin only when `CORS_ORIGINS` is set; unset means no CORS, today's
+behavior for the native apps.
 
 ## Deploying
 

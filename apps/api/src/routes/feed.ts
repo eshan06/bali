@@ -98,9 +98,18 @@ export function registerFeedRoutes(
       throw ApiError.rateLimited('too many live streams for this teacher');
     }
 
+    // The cors plugin set Access-Control-Allow-Origin on `reply` in its
+    // onRequest hook, but hijacking bypasses reply's header flush — mirror it
+    // onto the raw response, or the browser blocks the cross-origin stream.
+    const acao = reply.getHeader('access-control-allow-origin');
+    const headers: Record<string, string> =
+      typeof acao === 'string'
+        ? { ...SSE_HEADERS, 'access-control-allow-origin': acao, vary: 'Origin' }
+        : { ...SSE_HEADERS };
+
     reply.hijack();
     const raw = reply.raw;
-    raw.writeHead(200, SSE_HEADERS);
+    raw.writeHead(200, headers);
     raw.write(': open\n\n'); // flush headers and confirm the stream is live
 
     const sub = hub.subscribe({
