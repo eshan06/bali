@@ -1,0 +1,40 @@
+# The plan backstop: a PR that changes source code must also update
+# docs/PLAN.md, so every session/contributor leaves the shared status doc
+# accurate. Escape hatch for trivial fixes: put [no-plan] in a commit message.
+name: Plan doc
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plan-updated:
+    name: Plan doc updated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Source changes must update docs/PLAN.md
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          echo "Changed files:"
+          echo "$CHANGED"
+          if ! echo "$CHANGED" | grep -qE '^(apps/|packages/|ios/)'; then
+            echo "No source changes — plan update not required."
+            exit 0
+          fi
+          if echo "$CHANGED" | grep -q '^docs/PLAN\.md$'; then
+            echo "docs/PLAN.md updated — ok."
+            exit 0
+          fi
+          if git log --format=%B "$BASE"..HEAD | grep -qF '[no-plan]'; then
+            echo "[no-plan] escape used — ok."
+            exit 0
+          fi
+          echo "::error::This PR changes source code but not docs/PLAN.md. Update the plan (status + what landed), or add [no-plan] to a commit message if the change is truly trivial."
+          exit 1
