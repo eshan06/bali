@@ -37,13 +37,17 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
 1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`. Locate the
    task: already done? planned for a later phase? deliberately cut? For a new
    phase, its step list lives in PLAN.md / the agreed phase plans.
-2. **Plan, then go — no approval gate:** for anything non-trivial, write the
-   step plan first (PR-sized steps, key tradeoffs, risks, how each step gets
-   tested), post it in chat for the record, then **start executing
-   immediately**. Never block waiting for the owner to approve a plan. Message
-   the owner only for: `/santa-loop` escalations, device checkpoints (anything
-   needing a physical iPhone), genuine scope or architecture decisions the
-   docs don't answer, and destructive/irreversible actions.
+2. **Plan, then go — no approval gate:** for anything non-trivial, run
+   `/plan` (ecc's planner, ported at `.claude/commands/plan.md`) to produce
+   the plan — requirements restated, PR-sized steps, patterns to mirror,
+   risks, a validation command per step. Its wait-for-confirmation gate is
+   disabled in this repo: post the plan in chat for the record, then **start
+   executing immediately**. Never block waiting for the owner to approve a
+   plan. **Repeat steps 3–5 below for EACH PR-sized step — one step, one
+   `/santa-loop` pass, one PR.** Message the owner only for: `/santa-loop`
+   escalations, device checkpoints (anything needing a physical iPhone),
+   genuine scope or architecture decisions the docs don't answer, and
+   destructive/irreversible actions.
 3. **Execute** step by step on a branch: code + tests together, fast checks
    locally as you go.
 4. **Verify:** first the deterministic checks (`npm run typecheck && npm run
