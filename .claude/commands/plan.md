@@ -3,9 +3,10 @@ description: Restate requirements, assess risks, and create a step-by-step imple
 argument-hint: '[feature description | path/to/*.prd.md]'
 ---
 
-<!-- Ported from everything-claude-code (affaan-m, MIT). Bali adaptation: the
-     wait-for-confirmation gate is removed per CLAUDE.md ("plan, then go");
-     integration pointers now reference this repo's own working loop. -->
+<!-- Ported from everything-claude-code — Copyright (c) 2026 Affaan Mustafa,
+     MIT license: https://github.com/affaan-m/everything-claude-code/blob/main/LICENSE
+     Bali adaptation: the wait-for-confirmation gate is removed per CLAUDE.md
+     ("plan, then go"); integration pointers reference this repo's own loop. -->
 
 # Plan Command
 
@@ -51,11 +52,23 @@ The assistant will:
 | Free-form text          | Conversational mode | Produce an inline plan                                                                                                   |
 | Empty input             | Clarification mode  | Ask what should be planned                                                                                               |
 
-In PRD artifact mode, create `.claude/plans/` if needed. If the PRD contains a `Delivery Milestones` table, update only the selected row from `pending` to `in-progress` and set its `Plan` cell to the generated plan path. If the PRD uses the legacy `.claude/PRPs/prds/` format with `Implementation Phases`, read it without migrating paths.
+In PRD artifact mode, create `.claude/plans/` if needed. Files under
+`.claude/plans/` are working artifacts of a single task — `docs/PLAN.md`
+remains the ONLY living status doc and must still be updated per CLAUDE.md;
+never treat a `.plan.md` artifact as a substitute. Run Prettier over any
+generated `.plan.md` before committing it (the `format:check` CI step covers
+`.claude/`).
 
 ## Pattern Grounding
 
-Before writing the plan, search the codebase for conventions the implementation should mirror. Capture the top example for each relevant category with file references:
+**First, re-read `docs/ARCHITECTURE.md` and `docs/PLAN.md`.** ARCHITECTURE.md is
+law: a plan may never contradict a decided design (e.g. it explicitly rejects a
+queue in the tap path — see "Why there's no queue"). If the task genuinely
+requires changing an architecture decision, that is an owner question per
+CLAUDE.md, not something the plan quietly overrides. PLAN.md says whether the
+work is already done, scheduled, or deliberately cut.
+
+Then search the codebase for conventions the implementation should mirror. Capture the top example for each relevant category with file references:
 
 | Category       | What to capture                                                      |
 | -------------- | -------------------------------------------------------------------- |
