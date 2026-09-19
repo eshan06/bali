@@ -1,0 +1,93 @@
+# Bali v3 — build plan & live status
+
+The one file every session reads (after ARCHITECTURE.md) and updates when it
+finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
+are*. Update rules are at the bottom.
+
+_Last updated: 2026-09-19 — quality gates installed (this PR)._
+
+## Now
+
+- **Phase 2 is code-complete** (steps 1–8) on branch `claude/laughing-sagan-y2tvkc` — needs: merge to `main`, then its exit demo run against the Railway dev environment.
+- **Quality gates land in this PR**: CLAUDE.md, this file, Claude Review (blocking), plan backstop, CONTRIBUTING, PR template. Owner is configuring branch protection.
+- **Next up:** merge Phase 2 → exit demo vs dev → start Phase 3 (iOS student app).
+
+## Phases
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
+| 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
+| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ code done on `claude/laughing-sagan-y2tvkc` · ⏳ merge + dev exit demo |
+| 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
+| 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
+| 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
+
+## Go-live features
+
+### In scope for launch (phase noted)
+
+| Feature | Phase | Notes |
+|---|---|---|
+| Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3 |
+| Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
+| Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
+| Consent preview before joining a class | 3 | small |
+| Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch |
+| Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
+| Minimal student personal history + edit own name | 3 | backs the privacy contract |
+| Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
+| End-of-session recap card (portal) | 4 | |
+| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | |
+| Teacher signup gating (invite code) | 4 | today: manual role flip |
+| Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch |
+| Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |
+
+### Out at launch (fast-follow order)
+
+Passes as a real state → QR join → teacher push notification on unlock →
+lock-screen Live Activity → teacher iOS app → auto-start at bell / bell
+schedules → weekly summary email → admin portal / multi-school self-serve →
+substitute-day link → parent links (cut in v3) → solo focus → VPN enforcement
+layer → roster import (CSV / Google Classroom).
+
+### Open product decisions (owner to confirm; lean in parentheses)
+
+1. Bathroom breaks: unlock-with-reason at launch vs real passes (lean: reasons).
+2. Custom shield screen in launch scope (lean: in).
+3. Minimal student history in launch scope (lean: in).
+4. Under-13: pilot with 13+ classes only at launch (lean: yes).
+5. Recap card in Phase 4 (lean: yes).
+
+Parked by design, blocking before real students: data-deletion policy,
+under-13 parental-consent machinery.
+
+## External / waiting
+
+- **Family Controls distribution entitlement** (Apple) — applied for; blocks
+  TestFlight/App Store, not development builds. Bundle IDs incl. monitor
+  extension (and shield-UI extension) should be in the request.
+- Apple checklist: bundle IDs registered, App Store Connect record created.
+
+## Decision log
+
+- **2026-09-19** — Quality gates: `main` protected (PRs only, no human-approval
+  requirement while the team is 1), Claude Review is a required blocking check
+  (Opus), "Plan doc updated" backstop with `[no-plan]` escape, tests required
+  with every code change. CodeRabbit et al. skipped (free tier doesn't review
+  private repos).
+- **2026-09-19** — Merge policy: auto-merge on green. Every PR gets auto-merge
+  (squash) enabled at open; GitHub merges the moment all required checks pass.
+- **2026-09-19** — OpenAPI snapshot check deferred to Phase 4 (needs
+  `@fastify/swagger` wiring; avoid conflicting with the unmerged Phase 2 branch).
+- Earlier design decisions live in `docs/ARCHITECTURE.md` (dated inline).
+
+## How to update this file (every session that changes code)
+
+- Flip statuses, refresh **Now**, and re-date the header line.
+- Built a new feature? Add a row under Go-live features with a one-line
+  architecture note; if a design decision changed, ARCHITECTURE.md is updated
+  too.
+- Keep it scannable — statuses and one-liners, not essays. History belongs in
+  git; this file is the current truth.

@@ -4,8 +4,10 @@
 !.env.example
 .env-archive/
 
-# Local tooling and OS noise
-.claude/
+# Local tooling and OS noise — but shared repo commands/skills ARE tracked
+.claude/*
+!.claude/commands/
+!.claude/skills/
 .DS_Store
 
 # Dependencies and build output (regenerable)
