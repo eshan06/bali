@@ -27,6 +27,25 @@ is always allowed and always recorded.
 - **An emergency unlock record is never discarded** — the contract lives in
   `packages/shared/src/unlock-contract.ts`; no response may ever mean "delete".
 
+## How to work — every task follows this loop
+
+Applies to anything: a new phase, a new feature, a fix the owner asks for.
+
+1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`. Locate the
+   task: already done? planned for a later phase? deliberately cut? For a new
+   phase, its step list lives in PLAN.md / the agreed phase plans.
+2. **Plan:** for anything non-trivial, enter plan mode first and break the work
+   into PR-sized steps before writing code. Surface open questions to the
+   owner then — not mid-build.
+3. **Execute** step by step on a branch: code + tests together, fast checks
+   locally as you go.
+4. **Verify:** run `/santa` (the final verification loop in
+   `.claude/commands/santa.md`) until it comes back fully clean.
+5. **Ship:** push, open the PR, enable auto-merge (squash). Drive every check
+   green — fix Claude Review findings and CI failures, never weaken a check.
+   Green = it merges itself; report back when merged.
+6. Confirm `docs/PLAN.md` reflects the new state (it should have ridden the PR).
+
 ## Working rules (CI enforces most of these)
 
 - Code changes ship **with their tests in the same PR**. New endpoint →
