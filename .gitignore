@@ -8,6 +8,7 @@
 .claude/*
 !.claude/commands/
 !.claude/skills/
+!.claude/agents/
 .DS_Store
 
 # Dependencies and build output (regenerable)
