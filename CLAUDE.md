@@ -80,6 +80,7 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 - **Enable auto-merge (squash) on every PR you open.** Green checks = merged;
   a PR never waits for a human unless the owner asked to review it or a check
   is red. Drive red checks to green — never by weakening a check.
+- verify against dev when applicable / the environment has the AWS + Railway access / prod is off-limits
 - Commit style: `feat(api): …`, `fix(db): …`, `test(web): …`, `docs: …`.
 - **No Claude attribution in commits** — no `Co-Authored-By`, no session
   trailers. Cloud sessions: before committing, set the repo-local git author
