@@ -44,6 +44,9 @@ is always allowed and always recorded.
   GitHub Actions secrets.
 - Work on a branch, open a PR to `main`, keep it green. `main` is protected —
   nobody pushes to it directly.
+- **Enable auto-merge (squash) on every PR you open.** Green checks = merged;
+  a PR never waits for a human unless the owner asked to review it or a check
+  is red. Drive red checks to green — never by weakening a check.
 - Commit style: `feat(api): …`, `fix(db): …`, `test(web): …`, `docs: …`.
 
 ## Commands

@@ -77,6 +77,8 @@ under-13 parental-consent machinery.
   (Opus), "Plan doc updated" backstop with `[no-plan]` escape, tests required
   with every code change. CodeRabbit et al. skipped (free tier doesn't review
   private repos).
+- **2026-09-19** — Merge policy: auto-merge on green. Every PR gets auto-merge
+  (squash) enabled at open; GitHub merges the moment all required checks pass.
 - **2026-09-19** — OpenAPI snapshot check deferred to Phase 4 (needs
   `@fastify/swagger` wiring; avoid conflicting with the unmerged Phase 2 branch).
 - Earlier design decisions live in `docs/ARCHITECTURE.md` (dated inline).
