@@ -39,8 +39,11 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    owner then — not mid-build.
 3. **Execute** step by step on a branch: code + tests together, fast checks
    locally as you go.
-4. **Verify:** run `/santa` (the final verification loop in
-   `.claude/commands/santa.md`) until it comes back fully clean.
+4. **Verify:** first the deterministic checks (`npm run typecheck && npm run
+lint && npm test`, plus `npm run demo` when API behavior changed), then run
+   `/santa-loop` (ecc's adversarial dual-review convergence loop — two
+   independent reviewers, both must return NICE) until it converges. It pushes
+   on NICE; if it escalates after 3 rounds, stop and show the owner.
 5. **Ship:** push, open the PR, enable auto-merge (squash). Drive every check
    green — fix Claude Review findings and CI failures, never weaken a check.
    Green = it merges itself; report back when merged.
@@ -67,6 +70,12 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
   a PR never waits for a human unless the owner asked to review it or a check
   is red. Drive red checks to green — never by weakening a check.
 - Commit style: `feat(api): …`, `fix(db): …`, `test(web): …`, `docs: …`.
+- **No Claude attribution in commits** — no `Co-Authored-By`, no session
+  trailers. Cloud sessions: before committing, set the repo-local git author
+  to the owner's GitHub identity
+  (`git config user.name "eshans" && git config user.email
+"40549302+eshan06@users.noreply.github.com"`), or squash merges will
+  re-add a Claude co-author line automatically.
 
 ## Commands
 
