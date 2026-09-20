@@ -20,6 +20,12 @@ jobs:
 
       - name: Source changes must update docs/PLAN.md
         run: |
+          # Dependabot only bumps dependency manifests and will never edit
+          # PLAN.md; its PRs are exempt (policy: docs/PLAN.md, 2026-09-20).
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            echo "Dependabot PR — plan backstop not required."
+            exit 0
+          fi
           BASE="origin/${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"
