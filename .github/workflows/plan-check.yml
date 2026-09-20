@@ -19,6 +19,10 @@ jobs:
           fetch-depth: 0
 
       - name: Source changes must update docs/PLAN.md
+        env:
+          # Through env, not inline interpolation, so no author string ever
+          # becomes shell syntax.
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           BASE="origin/${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
@@ -34,7 +38,7 @@ jobs:
           # and trips the backstop, and a session adding a new dependency (a
           # plan-worthy decision) is not exempt merely because its diff is
           # manifest-only (policy: docs/PLAN.md, 2026-09-20).
-          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ] \
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ] \
             && ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
             echo "Dependabot manifest-only change — plan update not required."
             exit 0
