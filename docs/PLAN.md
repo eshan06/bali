@@ -81,6 +81,12 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — Web sessions install dependencies via a repo-tracked
+  SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
+  environment's setup-script field (it ran outside the repo root and broke
+  every web session at startup; the field stays empty). Tracked hook means
+  checking out a branch runs that branch's hook — accepted for a
+  single-owner repo; revisit before adding outside contributors.
 - **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
   with the owner's Max subscription (`CLAUDE_CODE_OAUTH_TOKEN`), replacing
   prepaid API credits; reviewer model unchanged. The token also lives in the
