@@ -10,6 +10,9 @@
   "engines": {
     "node": "^22"
   },
+  "overrides": {
+    "postcss": "^8.5.23"
+  },
   "scripts": {
     "dev:api": "npm run dev -w @bali/api",
     "start": "npm start -w @bali/api",
