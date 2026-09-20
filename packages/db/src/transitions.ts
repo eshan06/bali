@@ -58,6 +58,28 @@ function firstOrUndefined<T>(rows: T[]): T | undefined {
 }
 
 /**
+ * When the server last heard from a phone — always the server's own clock,
+ * never the device's (even clamped).
+ *
+ * `last_seen_at` is not a record of when something happened; it is the input to
+ * liveness. The sweep asks `coalesce(last_seen_at, joined_at) < now - 90s` and
+ * `deriveDisplayState` asks the same question at render, so a device-supplied
+ * value hands a student control of whether they appear present. A clock running
+ * fast clamps to `endsAt` — a time in the future — and `now - last_seen_at`
+ * stays negative for the rest of the lesson: the phone never goes silent and the
+ * grid shows a solid green chip for a phone that is gone, which is precisely
+ * rule 3's v2 bug. A clock running slow clamps to `startedAt` and flaps the
+ * episode open and shut against decision 7's "exactly once per episode".
+ *
+ * Rule 1 is unchanged and still does its job: the device's claim orders the
+ * action through the event's clamped `occurred_at`. Liveness is the server's
+ * observation, so the server stamps it.
+ */
+function heardNow(): Date {
+  return new Date();
+}
+
+/**
  * Walk an error's cause chain for a Postgres deadlock (SQLSTATE 40P01). Drizzle
  * wraps the driver error, so the code sits on a nested `cause`.
  */
@@ -122,6 +144,34 @@ async function insertEvent(
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
   const isNew = inserted.length > 0;
+
+  // The id was taken — but that is a *replay* only if it names the same event.
+  // An id reused for a different event is a client bug, and calling it a replay
+  // silently drops this write. On the unlock path that is v2's lost-unlock bug
+  // exactly: 'replay' is a recorded outcome, so the phone's outbox is told the
+  // record is safe to delete while no unlock row was ever written — an
+  // unshielded phone with zero trace. A student's app is an adversary here, and
+  // reusing its own tap_in id is a one-line change. So refuse loudly instead:
+  // the unlock contract turns a non-401 4xx into "keep the record, retry, and
+  // surface", which loses nothing. Checked here, at the single chokepoint, so
+  // no writer can forget it.
+  if (!isNew) {
+    const prior = firstOrUndefined(
+      await tx
+        .select({ type: events.type, sessionId: events.sessionId, userId: events.userId })
+        .from(events)
+        .where(eq(events.eventId, e.eventId))
+        .limit(1),
+    );
+    if (
+      prior === undefined ||
+      prior.type !== e.type ||
+      prior.sessionId !== (e.sessionId ?? null) ||
+      prior.userId !== (e.userId ?? null)
+    ) {
+      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+    }
+  }
 
   // The live-updates doorbell (decision 2): ping listeners for this session so a
   // stream re-reads the events table (the only source of truth) immediately
@@ -304,14 +354,14 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         studentId: tap.studentId,
         state: 'focused',
         joinedAt: occurredAt,
-        lastSeenAt: occurredAt,
+        lastSeenAt: heardNow(),
       })
       .onConflictDoUpdate({
         target: [participations.sessionId, participations.studentId],
         set: {
           state: 'focused',
           joinedAt: occurredAt,
-          lastSeenAt: occurredAt,
+          lastSeenAt: heardNow(),
           endedAt: null,
           endedReason: null,
           // A silence marker must never outlive the participation that opened
@@ -573,31 +623,38 @@ export interface EndSessionResult {
  * expiry sweep can double-fire harmlessly.
  */
 export async function endSession(db: Database, input: EndSessionInput): Promise<EndSessionResult> {
-  return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
-    if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-    if (session.endedAt) return { ended: false, endedParticipations: 0 };
+  // Wrapped like startSession/tapIn/endEnrollment: this ends every participation
+  // in the session set-wise while convertArmedTaps and endParticipationsElsewhere
+  // touch the same rows one at a time, so either side can be the deadlock victim.
+  // Ending a session is idempotent (the endedAt guard below), so re-running the
+  // loser converges.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+      if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+      if (session.endedAt) return { ended: false, endedParticipations: 0 };
 
-    const endedAt = clampToWindow(input.at, session.startedAt, session.endsAt);
-    await tx.update(sessions).set({ endedAt }).where(eq(sessions.id, session.id));
+      const endedAt = clampToWindow(input.at, session.startedAt, session.endsAt);
+      await tx.update(sessions).set({ endedAt }).where(eq(sessions.id, session.id));
 
-    const participationReason: ParticipationEndedReason =
-      input.reason === 'expired' ? 'session_expired' : 'session_ended';
-    const endedRows = await tx
-      .update(participations)
-      .set({ endedAt, endedReason: participationReason })
-      .where(and(eq(participations.sessionId, session.id), isNull(participations.endedAt)))
-      .returning({ id: participations.id });
+      const participationReason: ParticipationEndedReason =
+        input.reason === 'expired' ? 'session_expired' : 'session_ended';
+      const endedRows = await tx
+        .update(participations)
+        .set({ endedAt, endedReason: participationReason })
+        .where(and(eq(participations.sessionId, session.id), isNull(participations.endedAt)))
+        .returning({ id: participations.id });
 
-    await insertEvent(tx, {
-      eventId: newUuidV7(),
-      type: input.reason === 'expired' ? 'session_expired' : 'session_ended',
-      sessionId: session.id,
-      classId: session.classId,
-      occurredAt: endedAt,
-    });
-    return { ended: true, endedParticipations: endedRows.length };
-  });
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: input.reason === 'expired' ? 'session_expired' : 'session_ended',
+        sessionId: session.id,
+        classId: session.classId,
+        occurredAt: endedAt,
+      });
+      return { ended: true, endedParticipations: endedRows.length };
+    }),
+  );
 }
 
 /**
@@ -612,9 +669,23 @@ export async function expireDueSessions(db: Database, now: Date): Promise<string
     .where(and(isNull(sessions.endedAt), lte(sessions.endsAt, now)));
 
   const ended: string[] = [];
+  const failed: string[] = [];
   for (const { id } of due) {
-    const result = await endSession(db, { sessionId: id, at: now, reason: 'expired' });
-    if (result.ended) ended.push(id);
+    // Per session, so one failure cannot abort the pass and leave the rest of
+    // this minute's due sessions running — a session that never ends blocks the
+    // next class and shows a live grid for a lesson that is over. Each expiry is
+    // idempotent, so whatever failed is simply retried on the next tick.
+    try {
+      const result = await endSession(db, { sessionId: id, at: now, reason: 'expired' });
+      if (result.ended) ended.push(id);
+    } catch {
+      failed.push(id);
+    }
+  }
+  // Silence is not an option (rule 5): the caller logs this, and the next tick
+  // retries. Throwing here would undo the point of the per-session guard.
+  if (failed.length > 0) {
+    console.warn(`expireDueSessions: ${failed.length} session(s) failed to expire`, failed);
   }
   return ended;
 }
@@ -786,14 +857,14 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
             studentId: input.studentId,
             state: 'focused',
             joinedAt: occurredAt,
-            lastSeenAt: occurredAt,
+            lastSeenAt: heardNow(),
           })
           .onConflictDoUpdate({
             target: [participations.sessionId, participations.studentId],
             set: {
               state: 'focused',
               joinedAt: occurredAt,
-              lastSeenAt: occurredAt,
+              lastSeenAt: heardNow(),
               endedAt: null,
               endedReason: null,
               // See convertArmedTaps: a revived row starts a fresh stint, so
@@ -913,7 +984,7 @@ async function changeState(
     );
     await tx
       .update(participations)
-      .set({ state: nextState, lastSeenAt: occurredAt })
+      .set({ state: nextState, lastSeenAt: heardNow() })
       .where(eq(participations.id, row.id));
     return { outcome: 'applied', state: nextState, participationId: row.id, session };
   });
@@ -1079,7 +1150,7 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
       );
       await tx
         .update(participations)
-        .set({ state: 'unlocked', lastSeenAt: occurredAt })
+        .set({ state: 'unlocked', lastSeenAt: heardNow() })
         .where(eq(participations.id, live.id));
       return {
         outcome: 'applied',
@@ -1140,7 +1211,7 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   if (live.silentSince === null) {
     await db
       .update(participations)
-      .set({ lastSeenAt: seenAt })
+      .set({ lastSeenAt: heardNow() })
       .where(eq(participations.id, live.id));
     return { status: 'live', state: live.state, session };
   }
@@ -1153,7 +1224,7 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   return db.transaction(async (tx) => {
     const closed = await tx
       .update(participations)
-      .set({ lastSeenAt: seenAt, silentSince: null })
+      .set({ lastSeenAt: heardNow(), silentSince: null })
       // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
       // participation only: a check-in racing endSession then records no
       // came_back on the just-ended row (it falls through to the heartbeat below).
@@ -1168,7 +1239,7 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
     if (closed.length === 0) {
       await tx
         .update(participations)
-        .set({ lastSeenAt: seenAt })
+        .set({ lastSeenAt: heardNow() })
         .where(eq(participations.id, live.id));
       return { status: 'live', state: live.state, session };
     }

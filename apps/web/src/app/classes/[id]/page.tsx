@@ -24,9 +24,17 @@ export default function ClassDetailPage() {
 
   const load = useCallback(() => {
     setError(null);
-    api
-      .get<ClassDetail>(`/v1/classes/${classId}`)
-      .then(setKlass, (e: unknown) => setError(errText(e)));
+    api.get<ClassDetail>(`/v1/classes/${classId}`).then(
+      (c) => {
+        setKlass(c);
+        // Recover the live grid across a reload. `sessionId` is otherwise seeded
+        // only by the Start response, so refreshing mid-lesson dropped the grid
+        // and offered to start a session that was already running — which reads
+        // as the session having ended.
+        setSessionId((cur) => cur ?? c.liveSessionId);
+      },
+      (e: unknown) => setError(errText(e)),
+    );
     api
       .get<RosterResponse>(`/v1/classes/${classId}/roster`)
       .then(setRoster, (e: unknown) => setError(errText(e)));

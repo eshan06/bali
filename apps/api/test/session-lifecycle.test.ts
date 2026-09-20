@@ -7,6 +7,7 @@ import type {
   RefocusResponse,
   UnlockResponse,
 } from '@bali/shared';
+import { unlockDisposition } from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -341,6 +342,32 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const body = res.json<UnlockResponse>();
     expect(body.outcome).toBe('recorded');
     expect(body.recordedAs).toBe('unknown_session');
+  });
+
+  it('a reused event_id is a 409 the outbox keeps retrying, never a swallowed unlock', async () => {
+    // insertEvent de-dupes on event_id alone, so an unlock carrying an id the
+    // phone already spent on its own tap_in used to come back outcome
+    // 'replay' — a recorded outcome — telling the outbox to delete a record
+    // that was never written. A 409 maps to 'retry_and_surface', so the phone
+    // keeps the record and the client bug is visible instead.
+    const { student, session } = await seedRunning('unlock-id-reuse-api');
+    const eventId = randomUUID();
+    await tap(session.id, student.id, eventId);
+
+    const res = await post(
+      await ctx.tokenFor(student.cognitoId),
+      `/v1/sessions/${session.id}/unlock`,
+      { eventId, deviceTime: now() },
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('conflict');
+    expect(unlockDisposition(res.statusCode, res.json())).toBe('retry_and_surface');
+
+    const unlocks = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(unlocks).toHaveLength(0);
   });
 
   it("records a stranger's unlock as an orphan rather than writing into a foreign session", async () => {

@@ -77,6 +77,18 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — `last_seen_at` is stamped with the server's clock, not the
+  device's clamped timestamp. The clamp orders events; liveness is an
+  observation the server makes. Keying silence off the device's claim let a
+  phone with a fast clock pin `last_seen_at` to `ends_at` and stay green for the
+  rest of the lesson (rule 3's v2 bug), and a slow one flap the episode open and
+  shut against decision 7's "exactly once".
+- **2026-09-20** — An `event_id` identifies one event, checked at `insertEvent`.
+  Reusing an id for a *different* event is a client bug, not a replay: treating
+  it as one silently dropped the write, and on the unlock path 'replay' is a
+  recorded outcome, so the phone would delete a record the server never stored —
+  v2's lost-unlock bug through a different door. It is now `EVENT_ID_CONFLICT` →
+  409, which the unlock contract reads as "keep the record, retry, surface".
 - **2026-09-20** — Emergency unlock gets the one authorization check the rule
   allows. `POST /v1/sessions/:id/unlock` previously accepted any valid token for
   any session id, so a stranger could write permanent rows into another

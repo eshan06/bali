@@ -151,12 +151,19 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       const { id: sessionId } = parse(SessionParams, request.params);
       const body = parse(StateChangeBody, request.body);
       const student = await findOrCreateStudent(db, identity.sub);
-      const result = await unlock(db, {
-        sessionId,
-        studentId: student.id,
-        eventId: body.eventId,
-        deviceTime: new Date(body.deviceTime),
-      });
+      // Wrapped even though unlock is built never to refuse: it can still raise
+      // EVENT_ID_CONFLICT when the client reuses an id that already belongs to
+      // a different event. That must reach the phone as a 409 — which the
+      // unlock contract reads as "keep the record, retry, and surface" — rather
+      // than an unmapped 500.
+      const result = await mapTransitionError(() =>
+        unlock(db, {
+          sessionId,
+          studentId: student.id,
+          eventId: body.eventId,
+          deviceTime: new Date(body.deviceTime),
+        }),
+      );
       return {
         outcome: result.outcome,
         recordedAs: result.recordedAs,

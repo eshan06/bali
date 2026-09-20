@@ -127,7 +127,7 @@ scheduled program marks the session and its participations as ended and adds a
 history rows.** During a session, each app tells the server every ~30 seconds: "still
 here, shields still on." That's useful — it's how we notice a phone going silent — but
 nothing *changed*, so it isn't history. The server just overwrites `last_seen_at` on that
-student's `participations` row. The `events` table gets a row only when something really
+student's `participations` row with the time the *server* heard from the phone. The `events` table gets a row only when something really
 changes: tapped in, unlocked, went silent, came back. Otherwise a 1,000-student school
 would add ~720,000 useless rows a day to the table every screen reads. The "went
 silent" / "came back" pair is server-minted, not sent by the phone: the per-minute
@@ -473,7 +473,11 @@ Each exists because v2 broke it and shipped a real bug
 
 1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
    and always clamped into the session's real window. (v2: a backdated phone clock erased
-   unlocks from reports and inflated focus minutes.)
+   unlocks from reports and inflated focus minutes.) The clamp orders *events*; it is not a
+   substitute for the server's own clock. `participations.last_seen_at` — the input to
+   silence, and so to every green chip — is stamped server-side, never from the device's
+   claim: a clock running fast would clamp to `ends_at`, a time in the future, and the phone
+   would never go silent however long it had been gone.
 2. **One shared state function.** Student app, teacher grid, and reports all compute
    "what state is this student in" with the same shared code. (v2: teacher saw
    "No device" while the student saw "Focused.")

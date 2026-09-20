@@ -1,4 +1,11 @@
-import { createClass, type Database, findClassById, getRoster, updateClass } from '@bali/db';
+import {
+  createClass,
+  type Database,
+  findClassById,
+  findLiveSessionForClass,
+  getRoster,
+  updateClass,
+} from '@bali/db';
 import type { ClassDetail, RosterResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -18,13 +25,22 @@ const UpdateBody = z
     message: 'provide a new name or set regenerateCode',
   });
 
-function toClassDetail(c: {
-  id: string;
-  name: string;
-  joinCode: string;
-  createdAt: Date;
-}): ClassDetail {
-  return { id: c.id, name: c.name, joinCode: c.joinCode, createdAt: c.createdAt.toISOString() };
+function toClassDetail(
+  c: {
+    id: string;
+    name: string;
+    joinCode: string;
+    createdAt: Date;
+  },
+  liveSessionId: string | null,
+): ClassDetail {
+  return {
+    id: c.id,
+    name: c.name,
+    joinCode: c.joinCode,
+    createdAt: c.createdAt.toISOString(),
+    liveSessionId,
+  };
 }
 
 /**
@@ -55,7 +71,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
         schoolId: teacher.schoolId,
         name: body.name,
       });
-      return toClassDetail(klass);
+      return toClassDetail(klass, null);
     },
   );
 
@@ -68,7 +84,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
       const klass = await findClassById(db, id);
       if (!klass) throw ApiError.notFound('class not found');
       if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
-      return toClassDetail(klass);
+      return toClassDetail(klass, (await findLiveSessionForClass(db, id))?.id ?? null);
     },
   );
 
@@ -91,7 +107,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
       // Undefined only if the class was removed between the check and the write
       // (no production path does this yet) — treat as gone.
       if (!updated) throw ApiError.notFound('class not found');
-      return toClassDetail(updated);
+      return toClassDetail(updated, (await findLiveSessionForClass(db, id))?.id ?? null);
     },
   );
 

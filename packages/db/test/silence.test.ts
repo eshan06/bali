@@ -1,3 +1,4 @@
+import { SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -231,5 +232,61 @@ describe('checkIn and silence episodes', () => {
     // The episode is closed — a further heartbeat adds no second came_back.
     await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
     expect(await eventsOf(session.id, 'came_back')).toHaveLength(1);
+  });
+
+  it("a phone with a fast clock still goes silent — liveness is the server's observation", async () => {
+    const { session, studentId } = await seed('sil-skew-fast');
+    // The student sets the phone clock an hour forward, checks in once, then
+    // force-quits. clampToWindow pins a device time past the bell to endsAt —
+    // a moment in the future — so keying silence off the device's claim leaves
+    // `now - last_seen_at` negative for the rest of the lesson: a solid green
+    // chip for a phone that is gone, which is rule 3's v2 bug on the new grid.
+    await checkIn(db, {
+      sessionId: session.id,
+      studentId,
+      deviceTime: new Date(Date.now() + 60 * 60_000),
+    });
+
+    const row = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, session.id), eq(participations.studentId, studentId)),
+        ),
+    );
+    expect(row.lastSeenAt).not.toBeNull();
+    expect(row.lastSeenAt!.getTime()).toBeLessThanOrEqual(Date.now());
+
+    // ...so the sweep still opens an episode once the threshold passes. Scoped
+    // to this session: the suite shares one database, so the global count also
+    // picks up earlier tests' rows.
+    await markSilentParticipations(db, new Date(Date.now() + SILENCE_THRESHOLD_MS + 5_000));
+    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
+  });
+
+  it('a phone with a slow clock does not have its last contact pinned backwards', async () => {
+    // The mirror case: a clock far behind clamps to startedAt on every
+    // heartbeat, so the sweep opens an episode, the next check-in closes it,
+    // and the sweep reopens it — two event rows a minute against decision 7's
+    // "exactly once per episode".
+    const { session, studentId } = await seed('sil-skew-slow');
+    await checkIn(db, {
+      sessionId: session.id,
+      studentId,
+      deviceTime: new Date(Date.now() - 60 * 60_000),
+    });
+    const row = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, session.id), eq(participations.studentId, studentId)),
+        ),
+    );
+    expect(Math.abs(Date.now() - row.lastSeenAt!.getTime())).toBeLessThan(60_000);
+    // Nothing to open: the contact is genuinely recent, so no episode flaps.
+    await markSilentParticipations(db, new Date());
+    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(0);
   });
 });

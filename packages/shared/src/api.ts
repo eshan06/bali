@@ -177,6 +177,12 @@ export interface ClassDetail {
   /** Server-generated, unique among live classes; students type it to join. */
   joinCode: string;
   createdAt: string;
+  /**
+   * The class's running session, or null when none is running. Lets a screen
+   * recover the live grid on reload instead of showing "start a session" for a
+   * lesson that is already under way.
+   */
+  liveSessionId: string | null;
 }
 
 // PATCH /v1/classes/{id} — rename and/or regenerate the join code (at least one).

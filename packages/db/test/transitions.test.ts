@@ -512,6 +512,63 @@ describe('state changes', () => {
     expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
   });
 
+  it('refuses an unlock whose event_id already belongs to a different event, rather than swallowing it', async () => {
+    // The sharpest version of v2's lost-unlock bug. insertEvent de-dupes on
+    // event_id alone, so an unlock carrying an id the phone already spent on
+    // its own tap_in used to no-op: outcome 'replay', which the unlock contract
+    // counts as recorded, so the outbox deletes the record — an unshielded
+    // phone with zero trace. A student's app is an adversary here, and this is
+    // a one-line change on their side.
+    const { session, student } = await joined('unlock-id-reuse');
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    await expect(
+      unlock(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:05:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // Nothing recorded, and — critically — nothing claimed to be recorded.
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+    const row = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(row.state).toBe('focused');
+  });
+
+  it('refuses a protection_off whose event_id already belongs to a different event', async () => {
+    // Same hole through changeState: protection_off is an honesty record too,
+    // and swallowing it leaves the grid green for an unshielded phone.
+    const { session, student } = await joined('protoff-id-reuse');
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+    await expect(
+      protectionOff(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:05:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'protection_off')).toHaveLength(
+      0,
+    );
+  });
+
   it('an enrolled student who never tapped in still attaches their unlock to the session', async () => {
     // The enrollment check must not catch the ordinary case the ISSUES #2 note
     // is written for: enrolled, present, but no participation row yet.
@@ -608,7 +665,12 @@ describe('checkIn', () => {
     const live = one(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
     );
-    expect(live.lastSeenAt?.toISOString()).toBe('2026-01-01T09:02:00.000Z');
+    // last_seen_at is the server's observation, never the device's claim: the
+    // heartbeat carries a 2026-01-01 device time and the row still records when
+    // this process actually heard from the phone.
+    expect(live.lastSeenAt).not.toBeNull();
+    expect(live.lastSeenAt!.getTime()).toBeGreaterThan(new Date('2026-01-02T00:00:00Z').getTime());
+    expect(Math.abs(Date.now() - live.lastSeenAt!.getTime())).toBeLessThan(60_000);
   });
 
   it('reports gone when there is no live participation', async () => {

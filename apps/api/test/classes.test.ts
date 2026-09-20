@@ -128,6 +128,33 @@ describe('GET /v1/classes/:id', () => {
     expect(res.json<ClassDetail>().id).toBe(klass.id);
   });
 
+  it("reports the class's running session so a reload can recover the grid", async () => {
+    const { teacher, klass } = await seedClassroom(db, 'get-live');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+
+    const before = await get(token, `/v1/classes/${klass.id}`);
+    expect(before.json<ClassDetail>().liveSessionId).toBeNull();
+
+    const started = await authedInject(ctx.app, token, {
+      method: 'POST',
+      url: `/v1/classes/${klass.id}/sessions`,
+      payload: { durationMinutes: 25 },
+    });
+    expect(started.statusCode).toBe(200);
+    const sessionId = started.json<{ session: { id: string } }>().session.id;
+
+    const during = await get(token, `/v1/classes/${klass.id}`);
+    expect(during.json<ClassDetail>().liveSessionId).toBe(sessionId);
+
+    await authedInject(ctx.app, token, {
+      method: 'POST',
+      url: `/v1/sessions/${sessionId}/end`,
+      payload: {},
+    });
+    const after = await get(token, `/v1/classes/${klass.id}`);
+    expect(after.json<ClassDetail>().liveSessionId).toBeNull();
+  });
+
   it('another teacher cannot see it (403)', async () => {
     const { klass } = await seedClassroom(db, 'get-a');
     const other = await seedClassroom(db, 'get-b');

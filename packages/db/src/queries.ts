@@ -94,6 +94,25 @@ export async function findSessionById(
   return first(await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1));
 }
 
+/**
+ * A class's running session, if any — the same definition startSession uses to
+ * decide "existing" (`ended_at IS NULL`), so the portal can recover the live
+ * grid after a reload instead of offering to start a session that is already
+ * running.
+ */
+export async function findLiveSessionForClass(
+  db: Database,
+  classId: string,
+): Promise<SessionRow | undefined> {
+  return first(
+    await db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.classId, classId), isNull(sessions.endedAt)))
+      .limit(1),
+  );
+}
+
 /** A teacher's active classes. */
 export async function getTaughtClasses(db: Database, teacherId: string): Promise<ClassRow[]> {
   return db
