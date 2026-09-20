@@ -9,6 +9,8 @@
 !.claude/commands/
 !.claude/skills/
 !.claude/agents/
+!.claude/hooks/
+!.claude/settings.json
 .DS_Store
 
 # Dependencies and build output (regenerable)
