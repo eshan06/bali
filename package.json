@@ -10,6 +10,10 @@
   "engines": {
     "node": "^22"
   },
+  "//": "overrides.postcss patches the vulnerable copy Next 15 pins; retire the override when the Next 16 migration lands (docs/PLAN.md decision log, 2026-09-20).",
+  "overrides": {
+    "postcss": "^8.5.23"
+  },
   "scripts": {
     "dev:api": "npm run dev -w @bali/api",
     "start": "npm start -w @bali/api",

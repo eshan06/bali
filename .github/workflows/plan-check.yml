@@ -28,6 +28,14 @@ jobs:
             echo "No source changes — plan update not required."
             exit 0
           fi
+          # A diff that is nothing but dependency manifests (Dependabot's whole
+          # output) carries no plan-worthy decisions. Content-based on purpose:
+          # a real source commit pushed onto a Dependabot branch still trips
+          # the backstop (policy: docs/PLAN.md, 2026-09-20).
+          if ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
+            echo "Manifest-only change — plan update not required."
+            exit 0
+          fi
           if echo "$CHANGED" | grep -q '^docs/PLAN\.md$'; then
             echo "docs/PLAN.md updated — ok."
             exit 0

@@ -2,19 +2,21 @@ name: CI
 
 on:
   push:
-    # main plus the Claude working branches, so every step of a phase runs both
-    # CI lanes on push (not only once it reaches a PR or main).
-    branches: [main, 'claude/**']
+    # main only. Branch commits get their CI from the pull_request event;
+    # running both events on the same commit left a concurrency-cancelled
+    # twin of each required check on the head SHA, and branch rulesets count
+    # a cancelled required check as unmet — auto-merge blocked on #9 exactly
+    # that way.
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  # Key on the branch name so a branch's push event and its pull_request event
-  # share one group (github.ref differs between them, which would double-run the
-  # expensive real-Postgres job on every PR commit). On push head_ref is empty,
-  # so ref_name (the branch) is used; on a PR head_ref is the source branch.
+  # One group per branch: a newer push to the same PR cancels the outdated
+  # run. On push (main) head_ref is empty, so ref_name is used; on a PR
+  # head_ref is the source branch.
   group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 

@@ -1,0 +1,32 @@
+# Arms GitHub auto-merge on Dependabot PRs into main whose highest bump is
+# patch or minor, so a green security fix merges itself. Majors (framework
+# jumps like next 15→16) are never armed — a session handles those
+# deliberately — and PRs into any other base branch are never armed, since
+# only main's ruleset guarantees the required checks. Arming is not merging:
+# the PR still merges only when every required check (Claude Review
+# included) passes.
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Arm auto-merge (patch/minor)
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read update metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge (squash)
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
