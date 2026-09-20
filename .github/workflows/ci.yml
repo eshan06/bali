@@ -2,14 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # main plus the Claude working branches, so every step of a phase runs both
+    # CI lanes on push (not only once it reaches a PR or main).
+    branches: [main, 'claude/**']
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Key on the branch name so a branch's push event and its pull_request event
+  # share one group (github.ref differs between them, which would double-run the
+  # expensive real-Postgres job on every PR commit). On push head_ref is empty,
+  # so ref_name (the branch) is used; on a PR head_ref is the source branch.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -30,3 +36,41 @@ jobs:
       # A schema.ts change must ship with its generated migration: regenerate
       # and fail if anything under migrations/ differs from what's committed.
       - run: npm run db:generate -w @bali/db && git diff --exit-code -- packages/db/migrations
+
+  # The same Vitest suite, but against a real multi-connection Postgres. This is
+  # the only lane where the engine's FOR UPDATE serialization actually contends,
+  # so the race tests (packages/db/test/races.test.ts) run here and are skipped
+  # on the fast PGlite lane above. TEST_DATABASE_URL flips the shared test-db
+  # factory (@bali/db/testing) onto Postgres.
+  test-postgres:
+    name: Integration + race tests (real Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        env:
+          # localhost is correct because the service container's 5432 is published
+          # to the runner VM; if this job is ever moved to run inside a container,
+          # the host becomes the service name (postgres) instead.
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          # Asserted by packages/db/test/real-lane.test.ts: if this lane ever
+          # loses TEST_DATABASE_URL, fail the job instead of silently skipping
+          # the race tests.
+          REQUIRE_REAL_PG: '1'

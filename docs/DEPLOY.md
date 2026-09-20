@@ -14,8 +14,9 @@ also works on Render or plain Docker.
   migrator (no drizzle-kit in production); it records and skips already-applied
   migrations, so it is safe to re-run.
 - **Health check:** `GET /healthz`.
-- **Session expiry:** a scheduled `POST /internal/sessions/expire` with the
-  `x-internal-key` header (see below). Idempotent, so a double-fire is harmless.
+- **Sweep:** a scheduled `POST /internal/sweep` with the `x-internal-key` header
+  (see below) — one minute-tick that expires ended sessions and opens silence
+  episodes for phones gone quiet. Idempotent, so a double-fire is harmless.
 
 ## Environment variables
 
@@ -27,7 +28,7 @@ with notes. The ones a deploy must set:
 | --- | --- |
 | `DATABASE_URL` | Managed Postgres connection string. |
 | `AUTH_ISSUER` / `AUTH_JWKS_URI` / `AUTH_AUDIENCE` | The Cognito pool's issuer, its JWKS endpoint, and the app client id. |
-| `INTERNAL_API_KEY` | Long random secret (`openssl rand -hex 32`) for the expiry cron. |
+| `INTERNAL_API_KEY` | Long random secret (`openssl rand -hex 32`) for the sweep cron. |
 | `TZ` | The school's zone (e.g. `America/Chicago`). Bell times and armed-tap end-of-day expiry use server-local time; Railway defaults to UTC. |
 | `LOG_LEVEL` | `info` in production. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | Set above `SHUTDOWN_DEADLINE_MS` (8s) so graceful shutdown finishes before SIGKILL. |
@@ -47,10 +48,11 @@ them fully separate):
    backups + point-in-time recovery, same region as the service (decision 4).
 3. **Deploy the service** — connect this repo; Railway reads `railway.json` and
    builds from the `Dockerfile`. Set all environment variables above.
-4. **Session-expiry cron** — add a Railway cron (e.g. every 5 minutes) that
-   POSTs to `/internal/sessions/expire` with `x-internal-key: $INTERNAL_API_KEY`.
+4. **Sweep cron** — add a Railway cron that runs **every minute** (the silence
+   threshold is 90s, so a per-minute tick opens episodes promptly) and POSTs to
+   `/internal/sweep` with `x-internal-key: $INTERNAL_API_KEY`.
 5. **Verify** — `GET /healthz` returns `{"status":"ok"}`; a signed request to
-   `GET /v1/me` returns the caller; the cron shows `{"expired":N}`.
+   `GET /v1/me` returns the caller; the cron shows `{"expired":N,"wentSilent":M}`.
 
 ## Local run
 
@@ -64,5 +66,5 @@ npm start              # serve on PORT (default 3001)
 No external services are needed to see the core flow end-to-end:
 
 ```bash
-npm run demo           # walks arm → start → join → unlock → refocus → end (in-memory)
+npm run demo           # drives the real HTTP API over a local socket; see the README
 ```

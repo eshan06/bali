@@ -1,6 +1,12 @@
-import type { EventType, ParticipationEndedReason, ParticipationState } from '@bali/shared';
-import { clampToWindow } from '@bali/shared';
-import { and, eq, gt, inArray, isNull, lte, ne } from 'drizzle-orm';
+import type {
+  EventType,
+  ParticipationEndedReason,
+  ParticipationState,
+  UnlockRecordedAs,
+  UnlockRecordedOutcome,
+} from '@bali/shared';
+import { clampToWindow, SILENCE_THRESHOLD_MS } from '@bali/shared';
+import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
 import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
@@ -24,7 +30,12 @@ import type { Database } from './types.js';
  */
 
 export type TransitionErrorCode =
-  'SESSION_NOT_FOUND' | 'SESSION_NOT_RUNNING' | 'NOT_PARTICIPATING' | 'INVALID_EXTENSION';
+  | 'SESSION_NOT_FOUND'
+  | 'SESSION_NOT_RUNNING'
+  | 'NOT_PARTICIPATING'
+  | 'INVALID_EXTENSION'
+  | 'CLASS_NOT_FOUND'
+  | 'ENROLLMENT_NOT_FOUND';
 
 /** A refusal the engine can produce; endpoints (step 7) map these to the error shape. */
 export class TransitionError extends Error {
@@ -39,9 +50,43 @@ export class TransitionError extends Error {
 
 type SessionRow = typeof sessions.$inferSelect;
 type ParticipationRow = typeof participations.$inferSelect;
+type ClassRow = typeof classes.$inferSelect;
 
 function firstOrUndefined<T>(rows: T[]): T | undefined {
   return rows[0];
+}
+
+/**
+ * Walk an error's cause chain for a Postgres deadlock (SQLSTATE 40P01). Drizzle
+ * wraps the driver error, so the code sits on a nested `cause`.
+ */
+function isDeadlock(err: unknown): boolean {
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    if ((e as { code?: string }).code === '40P01') return true;
+  }
+  return false;
+}
+
+/**
+ * Retry a transaction that Postgres aborts with a deadlock (40P01). A
+ * session-scoped participation-ender (endEnrollment) and a cross-session switch
+ * (tapIn -> endParticipationsElsewhere) can both reach the same participation row
+ * while holding different session locks, and Postgres aborts one side. Every
+ * engine mutation is idempotent (event_id / removed_at), so re-running the loser
+ * is safe and converges. PGlite is single-connection and never deadlocks, so this
+ * is a no-op there.
+ */
+async function withDeadlockRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
+  for (let i = 0; ; i += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isDeadlock(err) || i >= attempts - 1) throw err;
+      // Jittered backoff so two mutually-deadlocking transactions don't retry in
+      // lockstep and collide again.
+      await new Promise((resolve) => setTimeout(resolve, 10 * (i + 1) + Math.random() * 10));
+    }
+  }
 }
 
 /**
@@ -75,7 +120,20 @@ async function insertEvent(
     })
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
-  return inserted.length > 0;
+  const isNew = inserted.length > 0;
+
+  // The live-updates doorbell (decision 2): ping listeners for this session so a
+  // stream re-reads the events table (the only source of truth) immediately
+  // instead of waiting for its slow re-poll. insertEvent is the single chokepoint
+  // for writing an event, so no writer can forget to ring it. It fires inside the
+  // transaction, so Postgres delivers it on commit (never for a rolled-back
+  // event), and only for a genuinely new event that belongs to a session. On
+  // PGlite (tests) there is no cross-connection listener, so it is a harmless
+  // no-op — correctness never depends on it (the re-poll does).
+  if (isNew && e.sessionId) {
+    await tx.execute(sql`select pg_notify('bali_events', ${e.sessionId})`);
+  }
+  return isNew;
 }
 
 /**
@@ -513,6 +571,83 @@ export async function expireDueSessions(db: Database, now: Date): Promise<string
   return ended;
 }
 
+/**
+ * The silence sweep (decision 3), the sweep's second duty. Open a silence
+ * episode for every live, FOCUSED participation whose last contact
+ * (`last_seen_at`, else `joined_at`) is older than SILENCE_THRESHOLD_MS and that
+ * has no episode open. Only `focused` counts — `unlocked`/`protection_off` are
+ * already not-green and stand regardless of contact, mirroring
+ * deriveDisplayState. Each opening sets `silent_since` and emits one
+ * `went_silent`.
+ *
+ * The per-candidate guarded UPDATE re-checks every mutable condition
+ * (silent_since / ended_at / state / threshold) at write time, so it is
+ * exactly-once even when two sweeps run at once — the loser marks nothing and
+ * emits nothing — and it never opens an episode on a participation that a racing
+ * check-in, unlock, or session-end changed after the scan. Idempotent and safe
+ * to double-run. Returns how many episodes opened.
+ */
+export async function markSilentParticipations(db: Database, now: Date): Promise<number> {
+  // Bind the cutoff as an ISO string with an explicit cast: a raw Date param
+  // inside a bare sql template has no column type to guide the driver, and
+  // postgres.js then can't serialize it (PGlite tolerates it, so casting keeps
+  // both lanes identical).
+  const cutoff = new Date(now.getTime() - SILENCE_THRESHOLD_MS).toISOString();
+  const silent = sql`coalesce(${participations.lastSeenAt}, ${participations.joinedAt}) < ${cutoff}::timestamptz`;
+
+  const candidates = await db
+    .select({
+      participationId: participations.id,
+      sessionId: sessions.id,
+      classId: sessions.classId,
+      startedAt: sessions.startedAt,
+      endsAt: sessions.endsAt,
+      studentId: participations.studentId,
+    })
+    .from(participations)
+    .innerJoin(sessions, eq(participations.sessionId, sessions.id))
+    .where(
+      and(
+        isNull(participations.endedAt),
+        isNull(participations.silentSince),
+        eq(participations.state, 'focused'),
+        isNull(sessions.endedAt),
+        silent,
+      ),
+    );
+
+  let opened = 0;
+  for (const c of candidates) {
+    const didOpen = await db.transaction(async (tx) => {
+      const marked = await tx
+        .update(participations)
+        .set({ silentSince: now })
+        .where(
+          and(
+            eq(participations.id, c.participationId),
+            isNull(participations.silentSince),
+            isNull(participations.endedAt),
+            eq(participations.state, 'focused'),
+            silent,
+          ),
+        )
+        .returning({ id: participations.id });
+      if (marked.length === 0) return false; // a racing sweep or a state change won
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'went_silent',
+        sessionId: c.sessionId,
+        classId: c.classId,
+        userId: c.studentId,
+        occurredAt: clampToWindow(now, c.startedAt, c.endsAt),
+      });
+      return true;
+    });
+    if (didOpen) opened += 1;
+  }
+  return opened;
+}
+
 export interface TapInput {
   sessionId: string;
   studentId: string;
@@ -536,60 +671,70 @@ export interface TapResult {
  * row (there is one row per student per session), never a duplicate.
  */
 export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
-  return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
-    if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-    if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+  // Retry on deadlock: a cross-session switch-tap ends the student's other-session
+  // participation while a concurrent endEnrollment reaches for the same row, so
+  // either side can be the deadlock victim. Idempotent on event_id — safe to retry.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+      if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+      if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+      const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
 
-    const isNew = await insertEvent(tx, {
-      eventId: input.eventId,
-      type: 'tap_in',
-      sessionId: session.id,
-      classId: session.classId,
-      userId: input.studentId,
-      occurredAt,
-    });
-    if (!isNew) {
-      // Replay: the tap already landed. Return the current truth (the row for
-      // this session and student, even if it has since ended), never a 4xx.
-      const current = await loadParticipation(tx, session.id, input.studentId);
-      if (!current)
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no participation');
-      return { outcome: 'replay', state: current.state, participationId: current.id, session };
-    }
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'tap_in',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: input.studentId,
+        occurredAt,
+      });
+      if (!isNew) {
+        // Replay: the tap already landed. Return the current truth (the row for
+        // this session and student, even if it has since ended), never a 4xx.
+        const current = await loadParticipation(tx, session.id, input.studentId);
+        if (!current)
+          throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no participation');
+        return { outcome: 'replay', state: current.state, participationId: current.id, session };
+      }
 
-    // Decision 4: end any live participation in a DIFFERENT session first, so
-    // the one-live-per-student rule holds before we open this one.
-    const switched = await endParticipationsElsewhere(tx, input.studentId, session.id, occurredAt);
-    const outcome: 'joined' | 'switched' = switched > 0 ? 'switched' : 'joined';
+      // Decision 4: end any live participation in a DIFFERENT session first, so
+      // the one-live-per-student rule holds before we open this one.
+      const switched = await endParticipationsElsewhere(
+        tx,
+        input.studentId,
+        session.id,
+        occurredAt,
+      );
+      const outcome: 'joined' | 'switched' = switched > 0 ? 'switched' : 'joined';
 
-    const upserted = firstOrUndefined(
-      await tx
-        .insert(participations)
-        .values({
-          sessionId: session.id,
-          studentId: input.studentId,
-          state: 'focused',
-          joinedAt: occurredAt,
-          lastSeenAt: occurredAt,
-        })
-        .onConflictDoUpdate({
-          target: [participations.sessionId, participations.studentId],
-          set: {
+      const upserted = firstOrUndefined(
+        await tx
+          .insert(participations)
+          .values({
+            sessionId: session.id,
+            studentId: input.studentId,
             state: 'focused',
             joinedAt: occurredAt,
             lastSeenAt: occurredAt,
-            endedAt: null,
-            endedReason: null,
-          },
-        })
-        .returning(),
-    );
-    if (!upserted) throw new Error('tapIn: upsert returned no row');
-    return { outcome, state: 'focused', participationId: upserted.id, session };
-  });
+          })
+          .onConflictDoUpdate({
+            target: [participations.sessionId, participations.studentId],
+            set: {
+              state: 'focused',
+              joinedAt: occurredAt,
+              lastSeenAt: occurredAt,
+              endedAt: null,
+              endedReason: null,
+            },
+          })
+          .returning(),
+      );
+      if (!upserted) throw new Error('tapIn: upsert returned no row');
+      return { outcome, state: 'focused', participationId: upserted.id, session };
+    }),
+  );
 }
 
 export interface StateChangeInput {
@@ -606,7 +751,12 @@ export interface StateChangeResult {
   session: SessionRow;
 }
 
-/** Shared body for the in-session state changes (unlock / refocus / protection off). */
+/**
+ * Shared body for the strict in-session state changes (refocus / protection
+ * off): they need a live participation to move and refuse otherwise. Emergency
+ * unlock does NOT use this — it must never refuse in a way that discards a
+ * record (ISSUES.md #2), so it has its own body below.
+ */
 async function changeState(
   db: Database,
   input: StateChangeInput,
@@ -651,9 +801,122 @@ async function changeState(
   });
 }
 
-/** Emergency unlock (rule 5: always recorded). */
-export function unlock(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
-  return changeState(db, input, 'unlock', 'unlocked');
+export interface UnlockResult {
+  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved the note with none to flip, 'replay' the event already existed. */
+  outcome: UnlockRecordedOutcome;
+  /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
+  recordedAs: UnlockRecordedAs | null;
+  /** 'unlocked' when a live participation flipped; the participation's current state on a replay; null when nothing is participating. */
+  state: ParticipationState | null;
+  participationId: string | null;
+  /** The session, so the response can carry the end time for reconciliation; null only when the session id was unknown. */
+  session: SessionRow | null;
+}
+
+/**
+ * Emergency unlock — rule 5 and ISSUES.md #2: ALWAYS recorded, never discarded.
+ * The v2 bug this kills: a student removed from a class mid-session hit Emergency
+ * Unlock, the server answered "not in this class", and the app threw the record
+ * away — an unshielded phone with no trace. So this never refuses in a way that
+ * could mean "discard":
+ *
+ *   - a live participation flips to `unlocked` (the normal case, outcome 'applied');
+ *   - no live participation (removed mid-session, or the participation already
+ *     ended) still commits the event with a `payload.recorded_as` note and
+ *     returns 'recorded' — the record stands though there is no state to move;
+ *   - an already-ended session records with `after_session_end` rather than the
+ *     old SESSION_NOT_RUNNING refusal;
+ *   - even an unknown session id records an orphan event (no session/class) with
+ *     `unknown_session`, so a bad id can't become a lost record either.
+ *
+ * Idempotent on event_id: a retried unlock re-reads and returns the current
+ * truth as 'replay'. The response is the phone's signal to stop retrying
+ * (@bali/shared unlockDisposition); every other result means "keep the record
+ * and try again", never "discard".
+ *
+ * Two caller preconditions the endpoint must enforce, or a rollback loses the
+ * record: `studentId` must be a real users row (events.userId is a NO-ACTION FK
+ * — the verified Cognito principal satisfies it, and a soft-removed student keeps
+ * their row), and `deviceTime` must be a finite Date (a NaN date reaches the NOT
+ * NULL occurred_at — through clampToWindow on a known session, or raw on an
+ * unknown one — and throws in the driver, so the endpoint rejects an unparseable
+ * deviceTime with 400 first). Clamp note:
+ * for a session ended early, occurredAt clamps to the scheduled endsAt, which can
+ * land after the real endedAt but stays inside the window.
+ */
+export async function unlock(db: Database, input: StateChangeInput): Promise<UnlockResult> {
+  return db.transaction(async (tx) => {
+    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+
+    if (!session) {
+      // Unknown session: nothing to clamp to or attach, but the record must
+      // still survive — save an orphan event carrying the claimed id.
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'unlock',
+        sessionId: null,
+        classId: null,
+        userId: input.studentId,
+        occurredAt: input.deviceTime,
+        payload: { recorded_as: 'unknown_session', claimed_session_id: input.sessionId },
+      });
+      return {
+        outcome: isNew ? 'recorded' : 'replay',
+        recordedAs: isNew ? 'unknown_session' : null,
+        state: null,
+        participationId: null,
+        session: null,
+      };
+    }
+
+    const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+    const row = await loadParticipation(tx, session.id, input.studentId);
+    const live = row !== undefined && row.endedAt === null ? row : undefined;
+
+    // The note when there's nothing live to flip: an ended session dominates
+    // (the whole session is over), otherwise it's a student with no live
+    // participation — removed from the class mid-session, the ISSUES #2 case.
+    const note: UnlockRecordedAs = session.endedAt ? 'after_session_end' : 'no_live_participation';
+
+    const isNew = await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'unlock',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: input.studentId,
+      occurredAt,
+      payload: live ? null : { recorded_as: note },
+    });
+
+    if (!isNew) {
+      // Replay: return the current truth — the stored state if a participation
+      // row exists at all (live or since-ended), never a refusal.
+      return {
+        outcome: 'replay',
+        recordedAs: null,
+        state: row?.state ?? null,
+        participationId: row?.id ?? null,
+        session,
+      };
+    }
+
+    if (live) {
+      await tx
+        .update(participations)
+        .set({ state: 'unlocked', lastSeenAt: occurredAt })
+        .where(eq(participations.id, live.id));
+      return {
+        outcome: 'applied',
+        recordedAs: null,
+        state: 'unlocked',
+        participationId: live.id,
+        session,
+      };
+    }
+
+    // No live participation: the committed event is itself the record.
+    return { outcome: 'recorded', recordedAs: note, state: null, participationId: null, session };
+  });
 }
 
 /** Return to focus after an unlock. */
@@ -694,6 +957,260 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   if (!live) return { status: 'gone', state: null, session };
 
   const seenAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
-  await db.update(participations).set({ lastSeenAt: seenAt }).where(eq(participations.id, live.id));
-  return { status: 'live', state: live.state, session };
+
+  // The common heartbeat: no silence episode open, so a single cheap UPDATE and
+  // no events row (decision 7 — a heartbeat that changes nothing writes no
+  // history).
+  if (live.silentSince === null) {
+    await db
+      .update(participations)
+      .set({ lastSeenAt: seenAt })
+      .where(eq(participations.id, live.id));
+    return { status: 'live', state: live.state, session };
+  }
+
+  // Closing a silence episode IS a change, so it earns a `came_back` event. The
+  // guarded UPDATE (silent_since IS NOT NULL) emits exactly one per episode even
+  // if two check-ins race — the loser just records its heartbeat. (If a sweep
+  // opens an episode between the read above and here, the next check-in closes
+  // it: a one-heartbeat lag, never a lost or duplicated `came_back`.)
+  return db.transaction(async (tx) => {
+    const closed = await tx
+      .update(participations)
+      .set({ lastSeenAt: seenAt, silentSince: null })
+      // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
+      // participation only: a check-in racing endSession then records no
+      // came_back on the just-ended row (it falls through to the heartbeat below).
+      .where(
+        and(
+          eq(participations.id, live.id),
+          isNotNull(participations.silentSince),
+          isNull(participations.endedAt),
+        ),
+      )
+      .returning({ id: participations.id });
+    if (closed.length === 0) {
+      await tx
+        .update(participations)
+        .set({ lastSeenAt: seenAt })
+        .where(eq(participations.id, live.id));
+      return { status: 'live', state: live.state, session };
+    }
+    await insertEvent(tx, {
+      eventId: newUuidV7(),
+      type: 'came_back',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: input.studentId,
+      occurredAt: seenAt,
+    });
+    return { status: 'live', state: live.state, session };
+  });
+}
+
+export interface JoinClassInput {
+  studentId: string;
+  joinCode: string;
+  /** The client's idempotency key for the enrollment_joined event (rule 4). */
+  eventId: string;
+  occurredAt: Date;
+}
+export interface JoinClassResult {
+  /** 'joined' created a new enrollment; 'already_enrolled' the student was already in (no-op). */
+  outcome: 'joined' | 'already_enrolled';
+  enrollmentId: string;
+  class: ClassRow;
+}
+
+/**
+ * Join a class by its code (auth decision 3). Locks the class row so concurrent
+ * joins serialize, enrolls the student if they are not already actively enrolled,
+ * and records an `enrollment_joined` event. Joining a class you are already in is
+ * a no-op ('already_enrolled'), not an error. A prior removed enrollment is left
+ * as history (decision 3): a re-join adds a fresh active row, so "who was in this
+ * class in March" stays answerable rather than being rewritten.
+ */
+export async function joinClassByCode(
+  db: Database,
+  input: JoinClassInput,
+): Promise<JoinClassResult> {
+  return db.transaction(async (tx) => {
+    const cls = firstOrUndefined(
+      await tx
+        .select()
+        .from(classes)
+        .where(and(eq(classes.joinCode, input.joinCode), isNull(classes.removedAt)))
+        .limit(1)
+        .for('update'),
+    );
+    if (!cls) throw new TransitionError('CLASS_NOT_FOUND', 'no active class with that join code');
+
+    const active = firstOrUndefined(
+      await tx
+        .select()
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.classId, cls.id),
+            eq(enrollments.studentId, input.studentId),
+            isNull(enrollments.removedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (active) return { outcome: 'already_enrolled', enrollmentId: active.id, class: cls };
+
+    const enrollment = firstOrUndefined(
+      await tx
+        .insert(enrollments)
+        .values({ classId: cls.id, studentId: input.studentId })
+        .returning(),
+    );
+    if (!enrollment) throw new Error('joinClassByCode: insert returned no row');
+
+    // Idempotency here is the active-enrollment check above, not the event id: a
+    // realistic re-join carries a fresh event id, and joins aren't offline-queued
+    // like taps. (A replay of the original join's event id after a removal would
+    // add a fresh enrollment while this event dedupes — narrow and benign.)
+    await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'enrollment_joined',
+      classId: cls.id,
+      userId: input.studentId,
+      occurredAt: input.occurredAt,
+    });
+    return { outcome: 'joined', enrollmentId: enrollment.id, class: cls };
+  });
+}
+
+export interface EndEnrollmentInput {
+  enrollmentId: string;
+  /** 'left_class' when the student leaves their own; 'removed_from_class' when the teacher removes them. */
+  reason: 'left_class' | 'removed_from_class';
+  at: Date;
+}
+export interface EndEnrollmentResult {
+  /** 'ended' this call removed it; 'already_removed' it was gone (idempotent no-op). */
+  outcome: 'ended' | 'already_removed';
+  /** True when a live participation in this class's running session was ended too. */
+  endedParticipation: boolean;
+  classId: string;
+  studentId: string;
+}
+
+/**
+ * End an enrollment — a student leaving ('left_class') or a teacher removing them
+ * ('removed_from_class'). The doc's canonical one-transaction case ("changes that
+ * touch several tables happen in one transaction"): set removed_at, end the
+ * student's live participation in this class's running session (if any) with the
+ * matching reason, and record the event — all together or not at all. So the grid
+ * learns via the session feed (the event carries the session id), the phone's
+ * next check-in reads 'gone' and unshields, and a later emergency unlock still
+ * lands (ISSUES #2 / step 2). Idempotent: an already-removed enrollment no-ops.
+ */
+export async function endEnrollment(
+  db: Database,
+  input: EndEnrollmentInput,
+): Promise<EndEnrollmentResult> {
+  const eventType: EventType =
+    input.reason === 'left_class' ? 'enrollment_left' : 'enrollment_removed';
+  const participationReason: ParticipationEndedReason = input.reason;
+  // Retry on deadlock: a concurrent cross-session tapIn (the student switching
+  // classes at the instant of removal) ends this same participation while holding
+  // a different session's lock, so the two can deadlock on the participations row.
+  // Idempotent on removed_at, so re-running is safe.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const enrollment = firstOrUndefined(
+        await tx
+          .select()
+          .from(enrollments)
+          .where(eq(enrollments.id, input.enrollmentId))
+          .limit(1)
+          .for('update'),
+      );
+      if (!enrollment) throw new TransitionError('ENROLLMENT_NOT_FOUND', 'no such enrollment');
+      if (enrollment.removedAt !== null) {
+        return {
+          outcome: 'already_removed',
+          endedParticipation: false,
+          classId: enrollment.classId,
+          studentId: enrollment.studentId,
+        };
+      }
+
+      // This class's running session, locked so a concurrent tap/end into THIS
+      // class serializes (a removal can't leave a live participation stranded in
+      // an ended session, and endSession can't re-end this participation under a
+      // wrong reason).
+      const session = firstOrUndefined(
+        await tx
+          .select()
+          .from(sessions)
+          .where(and(eq(sessions.classId, enrollment.classId), isNull(sessions.endedAt)))
+          .limit(1)
+          .for('update'),
+      );
+
+      await tx
+        .update(enrollments)
+        .set({ removedAt: input.at })
+        .where(eq(enrollments.id, enrollment.id));
+
+      if (session) {
+        // End the student's live participation with ONE guarded set-based UPDATE,
+        // matching endSession — no read-then-update-by-id (that pattern, held
+        // under two locks, made a cross-session tapIn deadlock near-certain). The
+        // isNull guard means a participation ended by a racing switch-tap is left
+        // as-is rather than overwritten.
+        const occurredAt = clampToWindow(input.at, session.startedAt, session.endsAt);
+        const ended = await tx
+          .update(participations)
+          .set({ endedAt: occurredAt, endedReason: participationReason })
+          .where(
+            and(
+              eq(participations.sessionId, session.id),
+              eq(participations.studentId, enrollment.studentId),
+              isNull(participations.endedAt),
+            ),
+          )
+          .returning({ id: participations.id });
+        if (ended.length > 0) {
+          // A live participation was ended — record it on the session feed so the
+          // teacher's grid learns.
+          await insertEvent(tx, {
+            eventId: newUuidV7(),
+            type: eventType,
+            sessionId: session.id,
+            classId: enrollment.classId,
+            userId: enrollment.studentId,
+            occurredAt,
+          });
+          return {
+            outcome: 'ended',
+            endedParticipation: true,
+            classId: enrollment.classId,
+            studentId: enrollment.studentId,
+          };
+        }
+      }
+
+      // No live participation to end (no running session, or the student was not
+      // in it) — an enrollment-level event with no session.
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: eventType,
+        sessionId: null,
+        classId: enrollment.classId,
+        userId: enrollment.studentId,
+        occurredAt: input.at,
+      });
+      return {
+        outcome: 'ended',
+        endedParticipation: false,
+        classId: enrollment.classId,
+        studentId: enrollment.studentId,
+      };
+    }),
+  );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "participations" ADD COLUMN "silent_since" timestamp with time zone;

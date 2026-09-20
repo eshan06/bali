@@ -16,5 +16,6 @@ node_modules/
 dist/
 build/
 .next/
+next-env.d.ts
 coverage/
 *.tsbuildinfo

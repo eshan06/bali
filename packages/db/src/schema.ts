@@ -161,6 +161,15 @@ export const participations = pgTable(
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull(),
     /** Overwritten by the ~30s check-in; never produces an events row (decision 7). */
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /**
+     * When a silence episode opened for this participation — a focused phone that
+     * stopped checking in past SILENCE_THRESHOLD_MS; NULL = in contact. The sweep
+     * sets it (emitting one `went_silent`), a check-in clears it (emitting one
+     * `came_back`), so each episode's two events fire exactly once. This is the
+     * episode marker for the event feed; the `silent` shown on a grid is still
+     * derived from `last_seen_at` on read (decision 7), never from this column.
+     */
+    silentSince: timestamp('silent_since', { withTimezone: true }),
     /** Set when the participation ended; NULL = live. */
     endedAt: timestamp('ended_at', { withTimezone: true }),
     /** Why it ended — typed, so reports can never miscount a switch as an unlock (decision 4). */

@@ -4,13 +4,14 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-19 — quality gates installed (this PR)._
+_Last updated: 2026-09-20 — Phase 2 merged to `main` (this PR)._
 
 ## Now
 
-- **Phase 2 is code-complete** (steps 1–8) on branch `claude/laughing-sagan-y2tvkc` — needs: merge to `main`, then its exit demo run against the Railway dev environment.
-- **Quality gates land in this PR**: CLAUDE.md, this file, Claude Review (blocking), plan backstop, CONTRIBUTING, PR template. Owner is configuring branch protection.
-- **Next up:** merge Phase 2 → exit demo vs dev → start Phase 3 (iOS student app).
+- **Phase 2 is merged to `main`** (steps 1–8) — the walking skeleton is complete: session lifecycle over HTTP, events feed + SSE live grid, teacher portal, phone simulator.
+- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
+- **Owner action:** add "Integration + race tests (real Postgres)" to the `protect-main` ruleset's required checks — the job exists on `main` as of this merge.
+- **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -18,7 +19,7 @@ _Last updated: 2026-09-19 — quality gates installed (this PR)._
 |---|---|---|
 | 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
-| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ code done on `claude/laughing-sagan-y2tvkc` · ⏳ merge + dev exit demo |
+| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
 | 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
@@ -72,6 +73,11 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — Bali Design System created at [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
+  (tokens, brand book, reference screens); UI work designs against it.
+- **2026-09-19** — Plan-then-go (no plan-approval gate) and no-Claude-attribution
+  adopted as standing rules; ecc `/plan` and `/santa-loop` ported as the loop's
+  planner and verifier.
 - **2026-09-19** — Quality gates: `main` protected (PRs only, no human-approval
   requirement while the team is 1), Claude Review is a required blocking check
   (Opus), "Plan doc updated" backstop with `[no-plan]` escape, tests required
