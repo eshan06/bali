@@ -45,6 +45,16 @@ export function snapshotIsFresh(snapshotLatestSeq: number, appliedSeq: number): 
   return snapshotLatestSeq >= appliedSeq;
 }
 
+/**
+ * Last contact only ever moves forward. The first stream connect resumes at
+ * `latestSeq - EVENT_RESUME_OVERLAP`, so events the boot snapshot already
+ * reflects are replayed; letting an old `tap_in` rewind `lastSeenAt` would
+ * flash a wrong "Silent" chip on a phone that has been checking in all along.
+ */
+function advance(current: Date | null, at: Date): Date {
+  return current !== null && current.getTime() > at.getTime() ? current : at;
+}
+
 /** A student the roster hasn't seen yet (mid-session joiner, or one removed). */
 function unknownStudent(studentId: string): Student {
   return {
@@ -74,25 +84,29 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
   switch (e.type) {
     case 'tap_in':
       s.state = 'focused';
-      s.lastSeenAt = at;
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       s.endedAt = null;
       s.joinedAt ??= at;
       break;
     case 'unlock':
       s.state = 'unlocked';
-      s.lastSeenAt = at;
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'refocus':
       s.state = 'focused';
-      s.lastSeenAt = at;
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'protection_off':
       s.state = 'protection_off';
-      s.lastSeenAt = at;
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'came_back':
-      s.lastSeenAt = at;
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
+    // left_for_other_session means this phone belongs to another teacher's
+    // session now — the engine already ended that participation, so the chip
+    // must not stay green until the next snapshot refresh.
+    case 'left_for_other_session':
     case 'enrollment_removed':
     case 'enrollment_left':
       s.endedAt = at;
@@ -103,4 +117,18 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       return prev;
   }
   return { ...prev, [id]: s };
+}
+
+/**
+ * Fold a refreshed snapshot over the current roster. The snapshot is
+ * authoritative for everyone it carries, but `getSessionRoster` joins only
+ * *active* enrollments — so a student the stream surfaced who has since left the
+ * roster (removed mid-session, whose phone then hit Emergency Unlock) is kept
+ * rather than blinking off the grid seconds later. The event record is durable;
+ * the screen should agree with it.
+ */
+export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
+  const next = fromSnapshot(snap);
+  for (const [id, student] of Object.entries(prev)) if (!(id in next)) next[id] = student;
+  return next;
 }

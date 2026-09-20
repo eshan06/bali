@@ -1,7 +1,13 @@
 import type { EventType, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
-import { applyEvent, fromSnapshot, snapshotIsFresh, type Students } from './grid-state';
+import {
+  applyEvent,
+  fromSnapshot,
+  mergeSnapshot,
+  snapshotIsFresh,
+  type Students,
+} from './grid-state';
 
 const T0 = '2026-01-01T08:00:00.000Z';
 const T1 = '2026-01-01T08:05:00.000Z';
@@ -80,6 +86,46 @@ describe('grid-state', () => {
 
     const joined = applyEvent(s, evt(6, 'tap_in', 'dana'));
     expect(joined.dana.state).toBe('focused');
+  });
+
+  it('never rewinds last contact when the overlap replays an old event', () => {
+    // The first connect resumes at latestSeq - overlap, so events the snapshot
+    // already reflects come back. A stale tap_in must not rewind lastSeenAt and
+    // flash "Silent" on a phone that has been checking in all along.
+    const snap = snapshot(30, [{ id: 'ana' }]);
+    let s = fromSnapshot(snap);
+    const fresh = new Date('2026-01-01T08:10:00.000Z');
+    s = applyEvent(s, evt(30, 'came_back', 'ana', fresh.toISOString()));
+    expect(s.ana.lastSeenAt).toEqual(fresh);
+
+    s = applyEvent(s, evt(12, 'tap_in', 'ana', '2026-01-01T08:00:00.000Z'));
+    expect(s.ana.lastSeenAt).toEqual(fresh); // held, not rewound
+  });
+
+  it('ends the chip when the phone leaves for another teacher session', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'left_for_other_session', 'ana'));
+    expect(s.ana.endedAt).toBeInstanceOf(Date);
+  });
+
+  describe('mergeSnapshot', () => {
+    it('keeps a student the refreshed roster no longer carries', () => {
+      // Cal was removed mid-session and then his phone unlocked: the roster
+      // (active enrollments only) drops him, but the grid must not.
+      let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+      s = applyEvent(s, evt(6, 'unlock', 'cal'));
+      const merged = mergeSnapshot(s, snapshot(7, [{ id: 'ana' }]));
+      expect(merged.cal).toBeDefined();
+      expect(merged.cal.state).toBe('unlocked');
+      expect(merged.ana).toBeDefined();
+    });
+
+    it('lets the snapshot win for students it does carry', () => {
+      let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+      s = applyEvent(s, evt(6, 'unlock', 'ana'));
+      const merged = mergeSnapshot(s, snapshot(7, [{ id: 'ana', state: 'focused' }]));
+      expect(merged.ana.state).toBe('focused');
+    });
   });
 
   describe('snapshotIsFresh — the refresh must never roll the grid backwards', () => {

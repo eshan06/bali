@@ -10,7 +10,11 @@ _Last updated: 2026-09-20 — Phase 2 merged to `main` (this PR)._
 
 - **Phase 2 is merged to `main`** (steps 1–8) — the walking skeleton is complete: session lifecycle over HTTP, events feed + SSE live grid, teacher portal, phone simulator.
 - **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
-- **Owner action:** add "Integration + race tests (real Postgres)" to the `protect-main` ruleset's required checks — the job exists on `main` as of this merge.
+- **Owner actions:** add "Integration + race tests (real Postgres)" to the
+  `protect-main` ruleset's required checks (the job exists on `main` as of this
+  merge); and **repoint the Railway dev cron** from `/internal/sessions/expire`
+  to `/internal/sweep` — the route was renamed in Phase 2, so the old path 404s
+  and sessions would stop expiring in dev until it is updated.
 - **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
@@ -73,6 +77,11 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — Portal auth ships access-token-only for the Phase 2 skeleton:
+  no refresh token is requested or stored, so a teacher is signed out when the
+  ~1h Cognito access token expires. Deliberate for the walking skeleton and
+  written down rather than silently omitted; token renewal lands with the real
+  portal UI (ARCHITECTURE.md auth decision 2 assumes it).
 - **2026-09-20** — Bali Design System created at [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
   (tokens, brand book, reference screens); UI work designs against it.
 - **2026-09-19** — Plan-then-go (no plan-approval gate) and no-Claude-attribution

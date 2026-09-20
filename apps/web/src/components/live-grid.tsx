@@ -6,7 +6,13 @@ import { useEffect, useRef, useState } from 'react';
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
-import { applyEvent, fromSnapshot, snapshotIsFresh, type Students } from '@/lib/grid-state';
+import {
+  applyEvent,
+  fromSnapshot,
+  mergeSnapshot,
+  snapshotIsFresh,
+  type Students,
+} from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
 
@@ -83,7 +89,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         (snap) => {
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
-          setStudents(fromSnapshot(snap));
+          setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));
         },
         () => {
           /* keep the last-known grid; the banner already shows staleness */

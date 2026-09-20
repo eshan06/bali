@@ -95,3 +95,13 @@ A browser calling the API cross-origin needs CORS. The API adds it only when
 apps and server-to-server call it. Set `CORS_ORIGINS` on the dev API to the portal's
 origin. The allowed request header is the `Authorization` bearer; there are no
 cookies, so the API runs CORS without credentials mode.
+
+## Known gap — token renewal
+
+The portal stores only the Cognito **access token** (sessionStorage, per tab).
+There is no refresh token and no silent renewal, so when the ~1h access token
+expires the next API call or stream read returns 401 and the teacher is dropped
+to `/login` — mid-class if it happens then. This is deliberate for the Phase 2
+skeleton, not an oversight: the honesty rule still holds (only a definitive 401
+ever signs anyone out), and renewal lands with the real portal UI. It is tracked
+in `docs/PLAN.md`'s decision log.

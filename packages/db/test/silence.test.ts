@@ -118,6 +118,46 @@ describe('markSilentParticipations', () => {
     expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
   });
 
+  it('a revived participation starts a fresh silence stint, not a stale one', async () => {
+    // Regression: the marker must never outlive the participation that opened
+    // it. Tap in → go quiet (episode opens) → the stint ends (the student tapped
+    // another teacher's block, or was removed) → they tap back in while the
+    // session still runs. A surviving silent_since would either fire a came_back
+    // for an episode that no longer exists, or suppress the next went_silent
+    // forever because the sweep's isNull(silent_since) guard skips the row.
+    const { session, studentId } = await seed('sil-revive');
+    await backdateContact(session.id, studentId, SILENT_AGO);
+    expect(await markSilentParticipations(db, new Date())).toBe(1);
+    expect((await participationOf(session.id, studentId)).silentSince).not.toBeNull();
+
+    await db
+      .update(participations)
+      .set({ endedAt: new Date(), endedReason: 'left_for_other_session' })
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, studentId)),
+      );
+
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+
+    const revived = await participationOf(session.id, studentId);
+    expect(revived.endedAt).toBeNull();
+    expect(revived.silentSince).toBeNull();
+
+    // A heartbeat now must not claim a return from an episode that is over.
+    await checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() });
+    expect(await eventsOf(session.id, 'came_back')).toHaveLength(0);
+
+    // And going quiet again opens a genuinely new episode.
+    await backdateContact(session.id, studentId, SILENT_AGO);
+    expect(await markSilentParticipations(db, new Date())).toBe(1);
+    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(2);
+  });
+
   it('leaves a phone still in contact alone', async () => {
     const { session } = await seed('sil-fresh'); // lastSeenAt null, joinedAt just now
     expect(await markSilentParticipations(db, new Date())).toBe(0);

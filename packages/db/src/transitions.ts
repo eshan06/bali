@@ -313,6 +313,11 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
           lastSeenAt: occurredAt,
           endedAt: null,
           endedReason: null,
+          // A silence marker must never outlive the participation that opened
+          // it: reviving the row starts a fresh stint, so a stale silent_since
+          // would either fire a came_back for an episode that no longer exists
+          // or suppress the next went_silent forever (decision 7's pairing).
+          silentSince: null,
         },
       });
     await insertEvent(tx, {
@@ -735,6 +740,9 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
               lastSeenAt: occurredAt,
               endedAt: null,
               endedReason: null,
+              // See convertArmedTaps: a revived row starts a fresh stint, so
+              // the previous episode's marker must not survive it.
+              silentSince: null,
             },
           })
           .returning(),
