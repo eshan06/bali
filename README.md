@@ -33,7 +33,9 @@ instead of a crash somewhere downstream.
 with no external services. It stands up a local server on a throwaway port backed
 by an in-memory Postgres (or a real one when `TEST_DATABASE_URL` is set), mints its
 own tokens against an in-process stand-in for Cognito, and then drives it exactly as
-four phones and a teacher's browser would:
+four phones and a teacher's browser would — or, with `DEMO_API_URL` set, it drives a
+**deployed** API with real Cognito sign-ins instead (see below). The incidents are
+identical either way:
 
 - Ms. Rivera creates a class and a block, four students join by code, the session
   starts, and every phone taps in (all focused) and heartbeats.
@@ -44,6 +46,13 @@ four phones and a teacher's browser would:
 - **Cal** is removed mid-session; his phone, not yet knowing, still hits unlock —
   which is **recorded with a note** (`no_live_participation`), never a 404 or a
   discard (the ISSUES #2 guarantee) — and his next check-in learns he is `gone`.
+- The teacher's grid watches all of it **live over SSE**: the stream is opened before
+  the first incident, and the run asserts that every event written afterwards arrived
+  on it, not merely that it could be read back later (rule 6).
+- A second, one-minute session then **ends itself at the bell** — nobody presses
+  anything; the sweep expires it, `session_expired` reaches the grid live, the
+  participations close, and the phone learns the truth from its own next check-in
+  (decision 6).
 
 It prints the live grid and the permanent event log at the end, and it is
 **self-checking**: each incident asserts the guarantee it exists to prove, so a
@@ -54,9 +63,56 @@ npm run demo                                    # in-memory Postgres, zero setup
 TEST_DATABASE_URL=postgres://…@localhost/db npm run demo   # against real Postgres
 ```
 
-To run it against Railway-dev with real Cognito instead of the local stand-in, the
-pool needs a handful of dev test students provisioned AWS-side — an author action;
-the local and real-Postgres modes above need none.
+### Running it against a deployed API
+
+Setting `DEMO_API_URL` switches the demo to a deployed environment (Railway **dev** —
+never production). Nothing about the incidents changes; what changes is that there is
+no database handle, so the two things local mode fakes happen for real instead: the
+actors sign in through **real Cognito**, and time compression becomes waiting, which is
+what makes the run prove the _deployed_ sweep works rather than one the script poked.
+A remote run therefore takes a few minutes and prints progress while it waits.
+
+```bash
+DEMO_API_URL=https://your-dev-api.example \
+DEMO_COGNITO_CLIENT_ID=<app client id> \
+DEMO_USER_TEACHER=teacher@example DEMO_USER_ANA=ana@example \
+DEMO_USER_BEN=ben@example DEMO_USER_CAL=cal@example DEMO_USER_DANA=dana@example \
+DEMO_PASSWORD=<their password> \
+npm run demo
+```
+
+| Variable                 | Notes                                                                                                                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEMO_API_URL`           | The deployed API's base URL. Its presence selects remote mode.                                                                                                                                        |
+| `DEMO_COGNITO_CLIENT_ID` | The pool's app client id (the same value the API validates as `AUTH_AUDIENCE`).                                                                                                                       |
+| `DEMO_COGNITO_REGION`    | Defaults to `AWS_REGION`, then `us-east-1`.                                                                                                                                                           |
+| `DEMO_USER_<ACTOR>`      | The Cognito username per actor: `TEACHER`, `ANA`, `BEN`, `CAL`, `DANA`.                                                                                                                               |
+| `DEMO_PASSWORD`          | Their password. `DEMO_PASSWORD_<ACTOR>` overrides it for one actor.                                                                                                                                   |
+| `DEMO_INTERNAL_KEY`      | Optional. The deployment's `INTERNAL_API_KEY`, which lets the demo run the sweep itself instead of waiting for the platform's cron — minutes faster. Read from the environment only; never commit it. |
+| `DEMO_SWEEP_WAIT_MS`     | How long an incident waits for a sweep-produced event. Defaults to 150s (a per-minute cron plus margin).                                                                                              |
+
+Credentials are read from the environment and never logged — a failed sign-in reports
+Cognito's own error type, not the password.
+
+**AWS-side prerequisites** (once per environment, and the demo tells you which one is
+missing rather than failing obscurely):
+
+1. Five test users in the dev pool, each with a permanent password (a temporary one
+   leaves the account in `NEW_PASSWORD_REQUIRED` and no token is issued).
+2. `ALLOW_USER_PASSWORD_AUTH` enabled on the app client — the flow the demo signs in
+   with.
+3. The teacher's **role flip**. Every first sign-in provisions a _student_
+   (`GET /v1/me`), so the demo teacher needs
+   `UPDATE users SET role = 'teacher' WHERE id = '<their id>';` once. The demo prints
+   that exact statement, with the id filled in, if the account is still a student.
+
+The run creates a fresh class, block, and session each time and ends the session it
+started, so it never needs anything wiped between runs. If a previous run crashed and
+left a session live, the tap asserts say so — wait for the sweep to expire it, or end
+it from the portal, and re-run.
+
+If you run this from a network that requires an HTTPS proxy, Node's built-in `fetch`
+ignores `HTTPS_PROXY` unless you set `NODE_USE_ENV_PROXY=1`.
 
 ## Web portal
 

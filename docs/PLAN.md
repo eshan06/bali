@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patched, gates Dependabot-aware, web-session install hook._
+_Last updated: 2026-09-20 — exit demo wired for deployed environments (remote mode, real Cognito) and extended to assert live SSE delivery + self-expiry. The dev run itself is blocked on network egress — see **Now**._
 
 ## Now
 
@@ -17,9 +17,28 @@ _Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patc
 - **Owner actions from the Phase 2 merge: done** — "Integration + race tests
   (real Postgres)" is now a required check, and the Claude workflows bill the
   owner's subscription (see decision log).
-- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
-- **Next up:** exit demo vs dev → retroactive audit of pre-gates Phase 1 code →
-  start Phase 3 (iOS student app).
+- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the
+  Railway **dev** environment. The simulator is now *able* to: `DEMO_API_URL=…`
+  runs every incident against a deployed API with real Cognito sign-ins
+  (README, "Running it against a deployed API"). Verified end-to-end against a
+  real listening server; not yet run against dev itself.
+- **⛔ Blocked — owner action (network egress).** Cloud sessions cannot reach
+  Railway at all: every `*.railway.app` / `*.railway.com` host is refused by the
+  environment's egress policy (`403` to the proxy `CONNECT`), including the dev
+  API and `backboard.railway.app`, so neither the demo nor a read of the service
+  variables is possible from a session. `RAILWAY_TOKEN` and `DEV_API_URL` *are*
+  set, so only the allowlist is missing. **To unblock:** add the dev API host and
+  `backboard.railway.app` to the environment's network-egress allowlist
+  (Claude Code → the environment's settings → network access), then re-run.
+  AWS Cognito (`cognito-idp.us-east-1.amazonaws.com`) and GitHub are already
+  reachable; `bali-dev.auth.us-east-1.amazoncognito.com` is not, though the demo
+  does not need it.
+- **Also needed before the dev run (AWS, one-time):** five test users in the dev
+  pool with permanent passwords, `ALLOW_USER_PASSWORD_AUTH` on the app client,
+  and the teacher's role flip. The demo names whichever is missing; the README
+  lists all three.
+- **Next up:** exit demo vs dev (once unblocked) → retroactive audit of pre-gates
+  Phase 1 code → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -27,7 +46,7 @@ _Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patc
 |---|---|---|
 | 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
-| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo |
+| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo (simulator ready; **blocked on egress allowlist** — see Now) |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
 | 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
@@ -81,6 +100,22 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — The exit demo runs in two worlds behind one seam
+  (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
+  issuer all local, time compressed by backdating rows) and remote
+  (`DEMO_API_URL` — a deployed API with real Cognito sign-ins). Remote mode does
+  **not** get a database handle, and deliberately: with no way to backdate, the
+  silence and expiry incidents wait out the real threshold and the deployment's
+  own cron, which is what makes a dev run evidence about the deployment rather
+  than about the script. The other phones keep heartbeating through those waits,
+  so "Ben went quiet" stays about Ben. Cost: a remote run takes minutes where a
+  local one takes seconds; `npm run demo` is unchanged and still needs nothing.
+- **2026-09-20** — The demo now asserts two guarantees it previously only
+  implied: that events reach the teacher's grid **live over SSE** (the stream is
+  opened before the incidents, and every event written afterwards must arrive on
+  it), and that a session **expires by itself** — the sweep ends it, the grid
+  learns live, participations close, and the phone reconciles on its next
+  check-in. Both were named Phase 2 exit criteria with no assertion behind them.
 - **2026-09-20** — Web sessions install dependencies via a repo-tracked
   SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
   environment's setup-script field (it ran outside the repo root and broke
