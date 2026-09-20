@@ -77,6 +77,12 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — `POST /v1/classes` ships without an idempotency key: a lost
+  response that the client retries leaves two identically named classes with
+  different join codes. Accepted for now because it is visible and correctable
+  by the teacher, and because classes do not pass through the event log, so the
+  fix needs its own mechanism rather than an `event_id`. Tracked here; it lands
+  with the portal work that actually calls it.
 - **2026-09-20** — Portal auth ships access-token-only for the Phase 2 skeleton:
   no refresh token is requested or stored, so a teacher is signed out when the
   ~1h Cognito access token expires. Deliberate for the walking skeleton and

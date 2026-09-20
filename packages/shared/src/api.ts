@@ -92,6 +92,13 @@ export interface EndSessionResponse {
 export interface ExtendSessionRequest {
   /** Minutes to add; the new end is max(now, current end) + this many minutes. */
   durationMinutes: number;
+  /**
+   * Client-minted UUIDv7 making the extend idempotent (rule 4). Required: the
+   * new end is relative to the current one, so a retry without it silently adds
+   * the time twice. `/v1` is additive-only, so this cannot be promoted from
+   * optional later — it ships required.
+   */
+  eventId: string;
 }
 export interface ExtendSessionResponse {
   outcome: 'extended';

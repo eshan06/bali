@@ -24,7 +24,7 @@ function secretMatches(presented: string, expected: string): boolean {
  * cron runs) is harmless (decision 6 / decision 3).
  */
 export function registerInternalRoutes(app: FastifyInstance, db: Database, apiKey: string): void {
-  app.post('/internal/sweep', async (request) => {
+  const sweep = async (request: { headers: Record<string, unknown> }) => {
     const presented = request.headers['x-internal-key'];
     if (typeof presented !== 'string' || !secretMatches(presented, apiKey)) {
       throw ApiError.unauthorized('invalid internal key');
@@ -35,5 +35,13 @@ export function registerInternalRoutes(app: FastifyInstance, db: Database, apiKe
     const expired = await expireDueSessions(db, now);
     const wentSilent = await markSilentParticipations(db, now);
     return { expired: expired.length, wentSilent };
-  });
+  };
+
+  app.post('/internal/sweep', sweep);
+  // The Phase 1 path, kept as an alias onto the same handler. Without it, the
+  // window between this deploy and someone repointing the Railway cron is one
+  // where the cron 404s and nothing expires: startSession keeps handing back a
+  // stale running session, so a teacher cannot start the next class and every
+  // grid shows a session that never ends.
+  app.post('/internal/sessions/expire', sweep);
 }

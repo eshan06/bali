@@ -743,6 +743,27 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       );
       const outcome: 'joined' | 'switched' = switched > 0 ? 'switched' : 'joined';
 
+      // A tap on a row that is STILL LIVE with an open episode is contact, so it
+      // closes that episode properly (one came_back) before the upsert below
+      // clears the marker. Without this the episode never closes in the event
+      // log and a silence report over-counts by the rest of the session. The
+      // ended-stint case is different and already right: closeOpenSilence's
+      // ended_at IS NULL guard skips it, and the upsert clears the stale marker
+      // without a came_back, because that episode ended with the stint.
+      const priorStint = await loadParticipation(tx, session.id, input.studentId);
+      if (priorStint) {
+        await closeOpenSilence(
+          tx,
+          {
+            id: priorStint.id,
+            sessionId: session.id,
+            classId: session.classId,
+            studentId: input.studentId,
+          },
+          occurredAt,
+        );
+      }
+
       const upserted = firstOrUndefined(
         await tx
           .insert(participations)

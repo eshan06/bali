@@ -118,6 +118,28 @@ describe('markSilentParticipations', () => {
     expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
   });
 
+  it('a tap on a still-live silent phone closes the episode with one came_back', async () => {
+    // The app is force-quit, the sweep opens an episode, then the student
+    // reopens and taps the block while the participation is still live. The
+    // upsert clears the marker either way — without closing the episode first
+    // the went_silent would never be paired and a report would over-count the
+    // silence by the rest of the session.
+    const { session, studentId } = await seed('sil-live-tap');
+    await backdateContact(session.id, studentId, SILENT_AGO);
+    expect(await markSilentParticipations(db, new Date())).toBe(1);
+    expect(await eventsOf(session.id, 'went_silent')).toHaveLength(1);
+
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+
+    expect((await participationOf(session.id, studentId)).silentSince).toBeNull();
+    expect(await eventsOf(session.id, 'came_back')).toHaveLength(1);
+  });
+
   it('a revived participation starts a fresh silence stint, not a stale one', async () => {
     // Regression: the marker must never outlive the participation that opened
     // it. Tap in → go quiet (episode opens) → the stint ends (the student tapped

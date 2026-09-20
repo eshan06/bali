@@ -105,6 +105,7 @@ describe('POST /v1/sessions/:id/extend', () => {
       `/v1/sessions/${session.id}/extend`,
       {
         durationMinutes: 10,
+        eventId: randomUUID(),
       },
     );
     expect(res.statusCode).toBe(200);
@@ -142,6 +143,16 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(extended).toHaveLength(1);
   });
 
+  it('rejects an extend with no event id (400) — rule 4 is not optional', async () => {
+    const { teacher, session } = await seedRunning('extend-no-id');
+    const res = await post(
+      await ctx.tokenFor(teacher.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 10 },
+    );
+    expect(res.statusCode).toBe(400);
+  });
+
   it('a non-owner teacher cannot extend (403)', async () => {
     const { session } = await seedRunning('extend-owner');
     const other = await seedClassroom(db, 'extend-other');
@@ -150,6 +161,7 @@ describe('POST /v1/sessions/:id/extend', () => {
       `/v1/sessions/${session.id}/extend`,
       {
         durationMinutes: 10,
+        eventId: randomUUID(),
       },
     );
     expect(res.statusCode).toBe(403);
@@ -159,7 +171,10 @@ describe('POST /v1/sessions/:id/extend', () => {
     const { teacher, session } = await seedRunning('extend-ended');
     const token = await ctx.tokenFor(teacher.cognitoId);
     await post(token, `/v1/sessions/${session.id}/end`);
-    const res = await post(token, `/v1/sessions/${session.id}/extend`, { durationMinutes: 10 });
+    const res = await post(token, `/v1/sessions/${session.id}/extend`, {
+      durationMinutes: 10,
+      eventId: randomUUID(),
+    });
     expect(res.statusCode).toBe(409);
   });
 
@@ -202,6 +217,7 @@ describe('POST /v1/sessions/:id/extend', () => {
       `/v1/sessions/${randomUUID()}/extend`,
       {
         durationMinutes: 10,
+        eventId: randomUUID(),
       },
     );
     expect(res.statusCode).toBe(404);

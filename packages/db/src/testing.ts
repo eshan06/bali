@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { and, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
@@ -131,4 +132,28 @@ function databaseUrl(baseUrl: string, name: string): string {
   const url = new URL(baseUrl);
   url.pathname = `/${name}`;
   return url.toString();
+}
+
+/**
+ * Move a live participation's last contact into the past — time compression for
+ * the demo and tests, so a silence episode can be exercised without idling out
+ * the real 90s threshold. It lives here, beside the other test-only helpers, so
+ * the "only the transition engine writes participations" grep stays clean in
+ * scripts; the sweep it sets up still does the real work through the engine.
+ */
+export async function backdateLastSeen(
+  db: Database,
+  where: { sessionId: string; studentId: string },
+  at: Date,
+): Promise<void> {
+  await db
+    .update(schema.participations)
+    .set({ lastSeenAt: at })
+    .where(
+      and(
+        eq(schema.participations.sessionId, where.sessionId),
+        eq(schema.participations.studentId, where.studentId),
+        isNull(schema.participations.endedAt),
+      ),
+    );
 }

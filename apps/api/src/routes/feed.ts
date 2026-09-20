@@ -44,10 +44,14 @@ export function registerFeedRoutes(
       const { id } = parse(Params, request.params);
       const { session } = await requireSessionOwner(db, request, id);
 
-      const [roster, latestSeq] = await Promise.all([
-        getSessionRoster(db, session.id, session.classId),
-        getLatestSeq(db, session.id),
-      ]);
+      // Read the cursor BEFORE the roster, never concurrently. Two independent
+      // snapshots can straddle a commit: a roster read just before an unlock
+      // paired with a latestSeq read just after would let the client's
+      // freshness guard accept a stale roster and paint the green chip back
+      // over a streamed unlock. Sequenced this way latestSeq can only
+      // under-state the roster, which the guard handles safely.
+      const latestSeq = await getLatestSeq(db, session.id);
+      const roster = await getSessionRoster(db, session.id, session.classId);
 
       return {
         session: {

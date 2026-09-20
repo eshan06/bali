@@ -31,7 +31,7 @@ const SessionParams = z.object({ id: z.string().uuid() });
 const DurationBody = z.object({ durationMinutes: z.number().int().positive().max(480) });
 // Extend carries an optional client-minted event id: the new end is relative to
 // the current one, so a retry without it would add the time twice (rule 4).
-const ExtendBody = DurationBody.extend({ eventId: z.string().uuid().optional() });
+const ExtendBody = DurationBody.extend({ eventId: z.string().uuid() });
 const CheckInBody = z.object({ deviceTime: z.string().datetime() });
 const StateChangeBody = z.object({
   eventId: z.string().uuid(),

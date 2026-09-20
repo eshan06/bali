@@ -1,6 +1,5 @@
-import { participations, schools, users } from '@bali/db';
-import { makeTestDb } from '@bali/db/testing';
-import { and, eq, isNull } from 'drizzle-orm';
+import { schools, users } from '@bali/db';
+import { backdateLastSeen, makeTestDb } from '@bali/db/testing';
 import {
   type BlockDetail,
   type CheckInResponse,
@@ -241,16 +240,11 @@ async function main(): Promise<void> {
     // 90s silence threshold, backdate Ben's last contact so the very next sweep —
     // exactly what the per-minute cron runs — opens his silence episode now.
     const benId = studentIds.get('sim-ben')!;
-    await db
-      .update(participations)
-      .set({ lastSeenAt: new Date(Date.now() - SILENCE_THRESHOLD_MS - 5_000) })
-      .where(
-        and(
-          eq(participations.sessionId, sid),
-          eq(participations.studentId, benId),
-          isNull(participations.endedAt),
-        ),
-      );
+    await backdateLastSeen(
+      db,
+      { sessionId: sid, studentId: benId },
+      new Date(Date.now() - SILENCE_THRESHOLD_MS - 5_000),
+    );
     const sweep = await call<{ expired: number; wentSilent: number }>('POST', '/internal/sweep', {
       internalKey: INTERNAL_KEY,
     });
