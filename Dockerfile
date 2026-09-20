@@ -19,6 +19,10 @@ ENV NODE_ENV=production
 # layer across source-only changes.
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
+# apps/web is a workspace in the lockfile, so its manifest must be present for
+# `npm ci` to reproduce the tree — even though the portal is not served by this
+# image. Omitting it leaves npm resolving a workspace with no directory on disk.
+COPY apps/web/package.json apps/web/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci --omit=dev

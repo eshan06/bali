@@ -482,6 +482,13 @@ export interface ExtendSessionInput {
   sessionId: string;
   newEndsAt: Date;
   at: Date;
+  /**
+   * Client-minted id that makes the extend idempotent (rule 4). The new end is
+   * computed relative to the current one, so a retry after a lost response
+   * would add the time a second time and shield the class past the bell. When
+   * this id is already recorded the session is returned unchanged.
+   */
+  eventId?: string;
 }
 
 /** Move a running session's end time forward (teacher "add time"). */
@@ -490,6 +497,20 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+
+    // Replay before the extension guard: a retry carries the same event id but
+    // a newEndsAt recomputed from the already-extended end, so it would look
+    // like a fresh, valid extension. Returning the current truth is the whole
+    // of rule 4 here.
+    if (input.eventId) {
+      const seen = await tx
+        .select({ id: events.id })
+        .from(events)
+        .where(eq(events.eventId, input.eventId))
+        .limit(1);
+      if (seen.length > 0) return session;
+    }
+
     if (input.newEndsAt.getTime() <= session.endsAt.getTime()) {
       throw new TransitionError(
         'INVALID_EXTENSION',
@@ -507,7 +528,7 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     if (!updated) throw new Error('extendSession: update returned no row');
 
     await insertEvent(tx, {
-      eventId: newUuidV7(),
+      eventId: input.eventId ?? newUuidV7(),
       type: 'session_extended',
       sessionId: session.id,
       classId: session.classId,
@@ -753,6 +774,42 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   );
 }
 
+/**
+ * Contact from a phone closes any open silence episode: clear the marker and
+ * record the one `came_back` it earns. Without this the marker outlives the
+ * silence it recorded, and the sweep's `isNull(silent_since)` guard suppresses
+ * that phone's NEXT went_silent forever (decision 7 promises the pair fires
+ * exactly once per episode). The guarded UPDATE keeps it to one event even if
+ * two contacts race; `ended_at IS NULL` keeps it to a live participation, like
+ * the sweep and checkIn.
+ */
+async function closeOpenSilence(
+  tx: Database,
+  p: { id: string; sessionId: string; classId: string; studentId: string },
+  at: Date,
+): Promise<void> {
+  const closed = await tx
+    .update(participations)
+    .set({ silentSince: null })
+    .where(
+      and(
+        eq(participations.id, p.id),
+        isNotNull(participations.silentSince),
+        isNull(participations.endedAt),
+      ),
+    )
+    .returning({ id: participations.id });
+  if (closed.length === 0) return;
+  await insertEvent(tx, {
+    eventId: newUuidV7(),
+    type: 'came_back',
+    sessionId: p.sessionId,
+    classId: p.classId,
+    userId: p.studentId,
+    occurredAt: at,
+  });
+}
+
 export interface StateChangeInput {
   sessionId: string;
   studentId: string;
@@ -809,6 +866,16 @@ async function changeState(
       throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
     }
 
+    await closeOpenSilence(
+      tx,
+      {
+        id: row.id,
+        sessionId: session.id,
+        classId: session.classId,
+        studentId: input.studentId,
+      },
+      occurredAt,
+    );
     await tx
       .update(participations)
       .set({ state: nextState, lastSeenAt: occurredAt })
@@ -925,6 +992,16 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
     }
 
     if (live) {
+      await closeOpenSilence(
+        tx,
+        {
+          id: live.id,
+          sessionId: session.id,
+          classId: session.classId,
+          studentId: input.studentId,
+        },
+        occurredAt,
+      );
       await tx
         .update(participations)
         .set({ state: 'unlocked', lastSeenAt: occurredAt })
@@ -1101,7 +1178,13 @@ export async function joinClassByCode(
       type: 'enrollment_joined',
       classId: cls.id,
       userId: input.studentId,
-      occurredAt: input.occurredAt,
+      // Rule 1 — the server owns the clock. A join has no session window to
+      // clamp to, so it is stamped server-side and the phone's claim is kept in
+      // the payload. events is append-only: a 2099 row from a wrong or hostile
+      // device clock could never be corrected, and would skew every history
+      // read that orders on occurred_at.
+      occurredAt: new Date(),
+      payload: { device_time: input.occurredAt.toISOString() },
     });
     return { outcome: 'joined', enrollmentId: enrollment.id, class: cls };
   });

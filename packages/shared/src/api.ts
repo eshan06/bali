@@ -107,7 +107,12 @@ export interface CheckInResponse {
   /** 'live' with the current stored state, or 'gone' when there's no live participation. */
   status: 'live' | 'gone';
   state: ParticipationState | null;
-  session: SessionView;
+  /**
+   * The session, for a caller with a live participation in it. Null on 'gone':
+   * anyone holding a session id would otherwise learn that class's id and bell
+   * window without being enrolled.
+   */
+  session: SessionView | null;
 }
 
 // POST /v1/sessions/{id}/unlock — emergency unlock (never discarded; see UnlockResponse).

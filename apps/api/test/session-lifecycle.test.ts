@@ -1,4 +1,5 @@
-import { type Database, startSession, tapIn } from '@bali/db';
+import { type Database, events, startSession, tapIn } from '@bali/db';
+import { and, eq } from 'drizzle-orm';
 import type {
   CheckInResponse,
   EndSessionResponse,
@@ -112,6 +113,35 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(new Date(body.session.endsAt).getTime()).toBeGreaterThan(session.endsAt.getTime());
   });
 
+  it('a retried extend with the same event id adds the time once (rule 4)', async () => {
+    // The new end is relative to the current one, so a retry after a lost
+    // response would shield the class a second increment past the bell and
+    // write a second session_extended into permanent history.
+    const { teacher, session } = await seedRunning('extend-replay');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const eventId = randomUUID();
+
+    const first = await post(token, `/v1/sessions/${session.id}/extend`, {
+      durationMinutes: 10,
+      eventId,
+    });
+    expect(first.statusCode).toBe(200);
+    const firstEnd = first.json<ExtendSessionResponse>().session.endsAt;
+
+    const replayed = await post(token, `/v1/sessions/${session.id}/extend`, {
+      durationMinutes: 10,
+      eventId,
+    });
+    expect(replayed.statusCode).toBe(200);
+    expect(replayed.json<ExtendSessionResponse>().session.endsAt).toBe(firstEnd);
+
+    const extended = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'session_extended')));
+    expect(extended).toHaveLength(1);
+  });
+
   it('a non-owner teacher cannot extend (403)', async () => {
     const { session } = await seedRunning('extend-owner');
     const other = await seedClassroom(db, 'extend-other');
@@ -193,7 +223,7 @@ describe('POST /v1/sessions/:id/checkin', () => {
     const body = res.json<CheckInResponse>();
     expect(body.status).toBe('live');
     expect(body.state).toBe('focused');
-    expect(body.session.id).toBe(session.id);
+    expect(body.session?.id).toBe(session.id);
   });
 
   it('a student not in the session reads gone', async () => {
@@ -207,6 +237,8 @@ describe('POST /v1/sessions/:id/checkin', () => {
     );
     expect(res.json<CheckInResponse>().status).toBe('gone');
     expect(res.json<CheckInResponse>().state).toBeNull();
+    // Knowing a session id must not reveal that class's id and bell window.
+    expect(res.json<CheckInResponse>().session).toBeNull();
   });
 
   it('is a 404 for an unknown session', async () => {

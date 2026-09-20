@@ -29,6 +29,9 @@ import { mapTransitionError } from './errors.js';
 const ClassParams = z.object({ id: z.string().uuid() });
 const SessionParams = z.object({ id: z.string().uuid() });
 const DurationBody = z.object({ durationMinutes: z.number().int().positive().max(480) });
+// Extend carries an optional client-minted event id: the new end is relative to
+// the current one, so a retry without it would add the time twice (rule 4).
+const ExtendBody = DurationBody.extend({ eventId: z.string().uuid().optional() });
 const CheckInBody = z.object({ deviceTime: z.string().datetime() });
 const StateChangeBody = z.object({
   eventId: z.string().uuid(),
@@ -101,7 +104,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
     async (request): Promise<ExtendSessionResponse> => {
       const { id } = parse(SessionParams, request.params);
       const { session } = await requireSessionOwner(db, request, id);
-      const { durationMinutes } = parse(DurationBody, request.body);
+      const { durationMinutes, eventId } = parse(ExtendBody, request.body);
       const now = Date.now();
       // Add time to whichever is later — the current end (extend the remaining
       // time) or now (a session already past its end but not yet swept gets a
@@ -109,7 +112,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       const base = Math.max(now, session.endsAt.getTime());
       const newEndsAt = new Date(base + durationMinutes * 60_000);
       const updated = await mapTransitionError(() =>
-        extendSession(db, { sessionId: session.id, newEndsAt, at: new Date() }),
+        extendSession(db, { sessionId: session.id, newEndsAt, at: new Date(), eventId }),
       );
       return { outcome: 'extended', session: toSessionView(updated) };
     },
@@ -127,7 +130,13 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       const result = await mapTransitionError(() =>
         checkIn(db, { sessionId, studentId: student.id, deviceTime: new Date(body.deviceTime) }),
       );
-      return { status: result.status, state: result.state, session: toSessionView(result.session) };
+      return {
+        status: result.status,
+        state: result.state,
+        // 'gone' means this caller has nothing live here — don't hand back the
+        // class id and bell window to someone who merely knows a session id.
+        session: result.status === 'live' ? toSessionView(result.session) : null,
+      };
     },
   );
 
