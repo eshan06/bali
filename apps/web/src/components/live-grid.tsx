@@ -1,6 +1,6 @@
 'use client';
 
-import { deriveDisplayState, EVENT_RESUME_OVERLAP, type SessionSnapshot } from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type SessionSnapshot } from '@bali/shared';
 import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
@@ -9,6 +9,7 @@ import { errText } from '@/lib/errors';
 import {
   applyEvent,
   fromSnapshot,
+  gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
   type Students,
@@ -22,6 +23,9 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   protection_off: { label: 'Protection off', cls: 'bg-red-100 text-red-800 border-red-400' },
   silent: { label: 'Silent', cls: 'bg-slate-200 text-slate-600 border-slate-400' },
   ended: { label: 'Left', cls: 'bg-slate-100 text-slate-400 border-slate-200' },
+  // Left the session AND unshielded — the ISSUES #2 case. Loud on purpose: it
+  // must not read as the quiet "Left" chip.
+  left_unprotected: { label: 'Left · unlocked', cls: 'bg-red-100 text-red-800 border-red-400' },
   absent: { label: 'Not here', cls: 'bg-white text-slate-400 border-dashed border-slate-300' },
 };
 
@@ -117,18 +121,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
       ) : (
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {rows.map((s) => {
-            const display =
-              s.state === null
-                ? 'absent'
-                : deriveDisplayState(
-                    {
-                      state: s.state,
-                      joinedAt: s.joinedAt ?? now,
-                      lastSeenAt: s.lastSeenAt,
-                      endedAt: s.endedAt,
-                    },
-                    now,
-                  );
+            const display = gridDisplay(s, now);
             const chip = CHIP[display] ?? CHIP.absent;
             return (
               <li key={s.studentId} className={`rounded-lg border px-3 py-2 text-sm ${chip.cls}`}>

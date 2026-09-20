@@ -39,8 +39,8 @@ async function seedRunning(tag: string) {
   return { ...c, session };
 }
 
-async function tap(sessionId: string, studentId: string) {
-  await tapIn(db, { sessionId, studentId, eventId: randomUUID(), deviceTime: new Date() });
+async function tap(sessionId: string, studentId: string, eventId: string = randomUUID()) {
+  await tapIn(db, { sessionId, studentId, eventId, deviceTime: new Date() });
 }
 
 function post(token: string, url: string, body: object = {}) {
@@ -112,6 +112,19 @@ describe('POST /v1/sessions/:id/extend', () => {
     const body = res.json<ExtendSessionResponse>();
     expect(body.outcome).toBe('extended');
     expect(new Date(body.session.endsAt).getTime()).toBeGreaterThan(session.endsAt.getTime());
+  });
+
+  it('reusing an event id already spent on another event is a 409, not a phantom extend', async () => {
+    const { teacher, student, session } = await seedRunning('extend-id-reuse');
+    const eventId = randomUUID();
+    await tap(session.id, student.id, eventId);
+    const res = await post(
+      await ctx.tokenFor(teacher.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 10, eventId },
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('conflict');
   });
 
   it('a retried extend with the same event id adds the time once (rule 4)', async () => {
@@ -328,6 +341,32 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const body = res.json<UnlockResponse>();
     expect(body.outcome).toBe('recorded');
     expect(body.recordedAs).toBe('unknown_session');
+  });
+
+  it("records a stranger's unlock as an orphan rather than writing into a foreign session", async () => {
+    const { session } = await seedRunning('unlock-stranger');
+    // A valid, fully authenticated account with no enrollment in this class —
+    // it has only learned (or guessed) the session id, which is a plain path
+    // parameter. Without an authorization check this wrote permanent rows into
+    // another teacher's history and put a phantom chip on their live grid.
+    const res = await post(await ctx.tokenFor('outsider'), `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+
+    // Never a refusal (rule 6) — but not attached, and no session handed back.
+    expect(res.statusCode).toBe(200);
+    const body = res.json<UnlockResponse>();
+    expect(body.outcome).toBe('recorded');
+    expect(body.recordedAs).toBe('not_enrolled');
+    expect(body.session).toBeNull();
+
+    // The teacher's session feed never sees it.
+    const attached = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(attached).toHaveLength(0);
   });
 
   it('a retried unlock replays', async () => {

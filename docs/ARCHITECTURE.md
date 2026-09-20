@@ -289,9 +289,14 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   which errors mean retry later and which mean recorded-with-a-note. v2's lost-unlock
   bug lived exactly at this gap. The engine implements this: `unlock` always commits
   the event, tagging it `payload.recorded_as` (`no_live_participation` /
-  `after_session_end` / `unknown_session`) when there is no live participation to flip;
-  the outbox disposition (`recorded` / `retry` / `reauth`) is the typed table in
-  `@bali/shared`.
+  `after_session_end` / `unknown_session` / `not_enrolled`) when there is no live
+  participation to flip; the outbox disposition (`recorded` / `retry` / `reauth`) is
+  the typed table in `@bali/shared`. "Never refuse" is not "never check": a caller
+  with no participation row in the session **and** no active enrollment in its class
+  has no standing there, so their unlock records as an orphan (`not_enrolled`, no
+  session or class attached, the claimed id in the payload) rather than writing into
+  a stranger's history and live grid. A student removed mid-session keeps their ended
+  participation row, so the case this rule exists for is untouched.
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
 

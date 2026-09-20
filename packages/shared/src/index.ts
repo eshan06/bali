@@ -90,6 +90,7 @@ export const UNLOCK_RECORDED_AS = [
   'no_live_participation',
   'after_session_end',
   'unknown_session',
+  'not_enrolled',
 ] as const;
 export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
 

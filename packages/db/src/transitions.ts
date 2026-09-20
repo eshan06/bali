@@ -34,6 +34,7 @@ export type TransitionErrorCode =
   | 'SESSION_NOT_RUNNING'
   | 'NOT_PARTICIPATING'
   | 'INVALID_EXTENSION'
+  | 'EVENT_ID_CONFLICT'
   | 'CLASS_NOT_FOUND'
   | 'ENROLLMENT_NOT_FOUND';
 
@@ -496,20 +497,33 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-    if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    // Replay before the extension guard: a retry carries the same event id but
-    // a newEndsAt recomputed from the already-extended end, so it would look
-    // like a fresh, valid extension. Returning the current truth is the whole
-    // of rule 4 here.
+    // Replay first — ahead of BOTH guards below. A retry carries the same event
+    // id but a newEndsAt recomputed from the already-extended end, so it would
+    // otherwise read as a fresh, valid extension; and once the session has
+    // ended, a retry of an extend that did commit must still re-read and return
+    // the current truth (rule 4) rather than 409.
     if (input.eventId) {
-      const seen = await tx
-        .select({ id: events.id })
-        .from(events)
-        .where(eq(events.eventId, input.eventId))
-        .limit(1);
-      if (seen.length > 0) return session;
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type, sessionId: events.sessionId })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (prior) {
+        // This session's own extend: a genuine replay, so return current truth.
+        if (prior.type === 'session_extended' && prior.sessionId === session.id) return session;
+        // A different event already owns this id. Carrying on would move the
+        // end time while insertEvent de-duped the matching event row away,
+        // leaving the session and its history disagreeing — the one thing this
+        // engine exists to prevent. Refuse loudly rather than answer "extended"
+        // for a write that did not happen (rule 5).
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
     }
+
+    if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
     if (input.newEndsAt.getTime() <= session.endsAt.getTime()) {
       throw new TransitionError(
@@ -918,6 +932,43 @@ export interface UnlockResult {
 }
 
 /**
+ * Record an unlock that must survive but must NOT attach to a session — an
+ * unknown session id, or a caller with no standing in the session they named.
+ * Rule 6 forbids a refusal (the phone would read one as "discard"), so the
+ * claim is kept as an orphan event instead: no session, no class, the claimed
+ * id in the payload. There is no window to clamp to, so rule 1 applies the only
+ * way it can — the server's clock stamps the row and the device's claim is
+ * preserved beside it, so a wrong or hostile phone clock cannot write a 2099
+ * unlock into permanent history.
+ */
+async function recordOrphanUnlock(
+  tx: Database,
+  input: StateChangeInput,
+  recordedAs: Extract<UnlockRecordedAs, 'unknown_session' | 'not_enrolled'>,
+): Promise<UnlockResult> {
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId,
+    type: 'unlock',
+    sessionId: null,
+    classId: null,
+    userId: input.studentId,
+    occurredAt: new Date(),
+    payload: {
+      recorded_as: recordedAs,
+      claimed_session_id: input.sessionId,
+      device_time: input.deviceTime.toISOString(),
+    },
+  });
+  return {
+    outcome: isNew ? 'recorded' : 'replay',
+    recordedAs: isNew ? recordedAs : null,
+    state: null,
+    participationId: null,
+    session: null,
+  };
+}
+
+/**
  * Emergency unlock — rule 5 and ISSUES.md #2: ALWAYS recorded, never discarded.
  * The v2 bug this kills: a student removed from a class mid-session hit Emergency
  * Unlock, the server answered "not in this class", and the app threw the record
@@ -953,36 +1004,39 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
 
     if (!session) {
-      // Unknown session: nothing to attach to, but the record must still
-      // survive — save an orphan event carrying the claimed id. There is no
-      // window to clamp to, so rule 1 still applies the only way it can: the
-      // server's clock stamps the row and the phone's claim is kept in the
-      // payload. A wrong or hostile device clock must not be able to write a
-      // 2099 unlock into permanent history, and nothing is lost either way.
-      const isNew = await insertEvent(tx, {
-        eventId: input.eventId,
-        type: 'unlock',
-        sessionId: null,
-        classId: null,
-        userId: input.studentId,
-        occurredAt: new Date(),
-        payload: {
-          recorded_as: 'unknown_session',
-          claimed_session_id: input.sessionId,
-          device_time: input.deviceTime.toISOString(),
-        },
-      });
-      return {
-        outcome: isNew ? 'recorded' : 'replay',
-        recordedAs: isNew ? 'unknown_session' : null,
-        state: null,
-        participationId: null,
-        session: null,
-      };
+      // Nothing to attach to — the record still survives, unattached.
+      return recordOrphanUnlock(tx, input, 'unknown_session');
     }
 
     const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
     const row = await loadParticipation(tx, session.id, input.studentId);
+
+    // The only authorization this endpoint has — and it can never be a refusal.
+    // Without it any account holding a valid token could POST an unlock for a
+    // session id it merely guessed and write permanent rows into a stranger's
+    // class history, live grid and unlock reports. A caller with no
+    // participation row here AND no active enrollment in the class has no
+    // standing in this session, so the record is kept as an orphan (rule 6 —
+    // never discarded) rather than attached to someone else's session.
+    //
+    // This does not weaken ISSUES #2: a student removed mid-session still has
+    // their (now ended) participation row, so they keep attaching to the
+    // session and their unlock is recorded against it exactly as before.
+    if (row === undefined) {
+      const enrolled = await tx
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.classId, session.classId),
+            eq(enrollments.studentId, input.studentId),
+            isNull(enrollments.removedAt),
+          ),
+        )
+        .limit(1);
+      if (enrolled.length === 0) return recordOrphanUnlock(tx, input, 'not_enrolled');
+    }
+
     const live = row !== undefined && row.endedAt === null ? row : undefined;
 
     // The note when there's nothing live to flip: an ended session dominates

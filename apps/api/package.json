@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "migrate": "tsx scripts/migrate.ts",
-    "demo": "tsx scripts/demo.ts",
+    "demo": "NODE_ENV=test tsx scripts/demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

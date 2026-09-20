@@ -9,6 +9,7 @@ import {
   events,
   participations,
   schools,
+  sessions,
   users,
 } from '../src/schema.js';
 import {
@@ -468,6 +469,67 @@ describe('state changes', () => {
     });
   });
 
+  it("records a stranger's unlock as an orphan rather than writing into a session they have no standing in", async () => {
+    // The victim: a real running session belonging to someone else's class.
+    const { klass } = await seedClass('unlock-stranger-victim');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    // The attacker: a fully valid account at another school, holding a good
+    // token, who has merely learned (or guessed) the session id.
+    const { student: stranger } = await seedClass('unlock-stranger-other');
+
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: stranger.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+
+    // Still recorded — rule 6 means this can never be a refusal — but as an
+    // orphan, and it hands back no session (so a stranger learns neither the
+    // class id nor the bell window).
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('not_enrolled');
+    expect(u.session).toBeNull();
+    expect(u.state).toBeNull();
+
+    const orphan = one(
+      await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, stranger.id), eq(events.type, 'unlock'))),
+    );
+    expect(orphan.sessionId).toBeNull();
+    expect(orphan.classId).toBeNull();
+    expect(orphan.payload).toMatchObject({
+      recorded_as: 'not_enrolled',
+      claimed_session_id: session.id,
+    });
+
+    // The victim's session history and live grid are untouched.
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+  });
+
+  it('an enrolled student who never tapped in still attaches their unlock to the session', async () => {
+    // The enrollment check must not catch the ordinary case the ISSUES #2 note
+    // is written for: enrolled, present, but no participation row yet.
+    const { klass, student } = await seedClass('unlock-enrolled-no-tap');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.recordedAs).toBe('no_live_participation');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+
   it('a replay whose participation has since ended returns current truth, not an error', async () => {
     const { session, student } = await joined('unlock-replay-pended');
     const eventId = newUuidV7();
@@ -591,6 +653,73 @@ describe('extendSession', () => {
         at: new Date('2026-01-01T09:10:00Z'),
       }),
     ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+  });
+
+  it('a replay after the session has ended returns current truth, not SESSION_NOT_RUNNING', async () => {
+    // A lost 200 on an extend that did commit: the phone retries, and by then
+    // the bell has rung. Rule 4 says re-read and answer with the truth — the
+    // old ordering threw 409 here and left the client unable to tell whether
+    // its extend had landed.
+    const { klass } = await seedClass('extend-replay-ended');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const newEnd = new Date(w.endsAt.getTime() + 10 * 60_000);
+    const eventId = newUuidV7();
+    await extendSession(db, {
+      sessionId: session.id,
+      newEndsAt: newEnd,
+      at: new Date('2026-01-01T09:20:00Z'),
+      eventId,
+    });
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:35:00Z'),
+      reason: 'ended',
+    });
+
+    const replay = await extendSession(db, {
+      sessionId: session.id,
+      newEndsAt: new Date(newEnd.getTime() + 10 * 60_000),
+      at: new Date('2026-01-01T09:36:00Z'),
+      eventId,
+    });
+    expect(replay.endsAt.toISOString()).toBe(newEnd.toISOString());
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses an event_id already spent on a different event instead of reporting a phantom extend', async () => {
+    // insertEvent de-dupes on event_id, so treating a foreign id as a replay
+    // (or carrying on past it) would move the end time with no matching event
+    // row — the session and its history disagreeing, which is the one thing
+    // this engine exists to prevent. It must be a loud refusal (rule 5).
+    const { klass, student } = await seedClass('extend-id-reuse');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        newEndsAt: new Date(w.endsAt.getTime() + 10 * 60_000),
+        at: new Date('2026-01-01T09:20:00Z'),
+        eventId,
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // The end time did not move, and no session_extended row was written.
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt.toISOString()).toBe(w.endsAt.toISOString());
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
+      0,
+    );
   });
 });
 

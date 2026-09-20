@@ -135,17 +135,39 @@ function databaseUrl(baseUrl: string, name: string): string {
 }
 
 /**
+ * Refuse to run outside an explicitly non-production process. `@bali/db`
+ * publishes this module on a public subpath (`@bali/db/testing`) and the
+ * production image runs TypeScript straight from source under tsx, so nothing
+ * structural stops runtime code importing it and writing `participations`
+ * behind the transition engine's back. NODE_ENV is `production` in the image
+ * and unset in a bare shell, so this denies by default exactly the way
+ * `apps/api/src/env.ts` does: only an explicit 'test' or 'development' passes.
+ */
+function assertNotProduction(helper: string): void {
+  const env = process.env.NODE_ENV;
+  if (env !== 'test' && env !== 'development') {
+    throw new Error(
+      `${helper} is a test-only helper: it writes participations outside the transition ` +
+        `engine and must not run with NODE_ENV=${env ?? '<unset>'}`,
+    );
+  }
+}
+
+/**
  * Move a live participation's last contact into the past — time compression for
  * the demo and tests, so a silence episode can be exercised without idling out
  * the real 90s threshold. It lives here, beside the other test-only helpers, so
  * the "only the transition engine writes participations" grep stays clean in
  * scripts; the sweep it sets up still does the real work through the engine.
+ * Guarded, because "it's only ever called from tests" is a convention, not a
+ * mechanism.
  */
 export async function backdateLastSeen(
   db: Database,
   where: { sessionId: string; studentId: string },
   at: Date,
 ): Promise<void> {
+  assertNotProduction('backdateLastSeen');
   await db
     .update(schema.participations)
     .set({ lastSeenAt: at })

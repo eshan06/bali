@@ -11,3 +11,7 @@ coverage
 .env.*
 !.env.example
 docs
+
+# Test-only helpers must not reach the production image (they write
+# participations outside the transition engine).
+packages/db/src/testing.ts

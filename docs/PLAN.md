@@ -77,6 +77,21 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — Emergency unlock gets the one authorization check the rule
+  allows. `POST /v1/sessions/:id/unlock` previously accepted any valid token for
+  any session id, so a stranger could write permanent rows into another
+  teacher's history and live grid. A refusal is still forbidden (the phone would
+  read it as "discard"), so a caller with no participation row in the session
+  *and* no active enrollment in its class now records as an orphan
+  (`recorded_as: 'not_enrolled'`, no session/class attached, the claimed id in
+  the payload) — durable, but unattached. A student removed mid-session keeps
+  their ended participation row, so ISSUES #2's actual case is unchanged.
+- **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
+  ended-session guard and scoped to this session's own `session_extended` rows.
+  An id already spent on a different event is now a 409 rather than a reported
+  "extended" for a write that never happened: `insertEvent` de-dupes on
+  `event_id`, so carrying on would have moved the end time with no matching
+  event row — the session and its history disagreeing.
 - **2026-09-20** — `POST /v1/classes` ships without an idempotency key: a lost
   response that the client retries leaves two identically named classes with
   different join codes. Accepted for now because it is visible and correctable

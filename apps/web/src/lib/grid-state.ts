@@ -1,4 +1,5 @@
-import type { FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
+import type { DisplayState, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
+import { deriveDisplayState } from '@bali/shared';
 
 /**
  * The live grid's pure state machine, kept out of the component so it can be
@@ -131,4 +132,31 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
   const next = fromSnapshot(snap);
   for (const [id, student] of Object.entries(prev)) if (!(id in next)) next[id] = student;
   return next;
+}
+
+/**
+ * What the grid shows for one student: `deriveDisplayState`, plus the two cases
+ * a participation snapshot alone cannot express.
+ *
+ * `absent` — enrolled but never tapped in, so there is no state at all.
+ *
+ * `left_unprotected` — the student's participation ended (removed mid-session,
+ * or moved to another teacher's session) and their phone then reported an
+ * unlock or protection_off. `deriveDisplayState` answers `ended` for anything
+ * with an `endedAt`, which would put the calmest chip on the grid over exactly
+ * the event ISSUES #2 exists to surface: an unshielded phone the teacher no
+ * longer has in their roster. The record is durable either way; the screen has
+ * to agree with it.
+ */
+export type GridDisplay = DisplayState | 'absent' | 'left_unprotected';
+
+export function gridDisplay(s: Student, now: Date): GridDisplay {
+  if (s.state === null) return 'absent';
+  if (s.endedAt !== null && (s.state === 'unlocked' || s.state === 'protection_off')) {
+    return 'left_unprotected';
+  }
+  return deriveDisplayState(
+    { state: s.state, joinedAt: s.joinedAt ?? now, lastSeenAt: s.lastSeenAt, endedAt: s.endedAt },
+    now,
+  );
 }

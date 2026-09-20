@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyEvent,
   fromSnapshot,
+  gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
   type Students,
@@ -150,5 +151,47 @@ describe('grid-state', () => {
       if (snapshotIsFresh(stale.latestSeq, applied)) s = fromSnapshot(stale);
       expect(s.ana.state).toBe('unlocked');
     });
+  });
+});
+
+describe('gridDisplay', () => {
+  const now = new Date(T1);
+
+  it('shows a removed student whose phone then unlocked as unprotected, not as "Left"', () => {
+    // The ISSUES #2 case seen from the teacher's screen: the student is out of
+    // the roster, but their phone is unshielded and the record is permanent.
+    // deriveDisplayState answers 'ended' for anything with an endedAt, which
+    // would put the quietest chip on the grid over exactly the event the rule
+    // exists to surface.
+    let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    students = applyEvent(students, evt(2, 'enrollment_removed', 'ana'));
+    expect(gridDisplay(students.ana, now)).toBe('ended');
+
+    students = applyEvent(students, evt(3, 'unlock', 'ana'));
+    expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
+  });
+
+  it('treats protection_off after leaving the same way', () => {
+    let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    students = applyEvent(students, evt(2, 'enrollment_removed', 'ana'));
+    students = applyEvent(students, evt(3, 'protection_off', 'ana'));
+    expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
+  });
+
+  it('leaves the ordinary states alone', () => {
+    const students = fromSnapshot(snapshot(1, [{ id: 'ana' }, { id: 'ben', state: null }]));
+    // Still enrolled and focused, seen within the threshold.
+    expect(gridDisplay(students.ana, new Date(T0))).toBe('focused');
+    // Enrolled but never tapped in.
+    expect(gridDisplay(students.ben, now)).toBe('absent');
+    // A plain departure with no unlock still reads as 'ended'.
+    const left = applyEvent(students, evt(2, 'enrollment_left', 'ana'));
+    expect(gridDisplay(left.ana, now)).toBe('ended');
+  });
+
+  it('derives silence from last contact, unchanged', () => {
+    const students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    // T0 + 5 minutes with no contact is well past the 90s threshold.
+    expect(gridDisplay(students.ana, now)).toBe('silent');
   });
 });
