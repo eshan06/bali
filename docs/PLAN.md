@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed and being fixed as gated PRs._
+_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: eight findings confirmed, landing as gated PRs._
 
 ## Now
 
@@ -19,11 +19,14 @@ _Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code:
   owner's subscription (see decision log).
 - **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
 - **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
-  reviewed against `apps/` + `packages/`; nine reproduced and are landing as
-  small gated PRs (offset timestamps, SSE write-after-end, the armTap race,
-  tap/extend idempotency, block re-registration, portal backoff and staleness,
-  one SQLSTATE helper). The `POST /v1/classes` idempotency deferral was
-  re-examined and stands — see the decision log.
+  reviewed against `apps/` + `packages/`; eight reproduced and are landing as
+  small gated PRs, one PR per finding or related pair: offset timestamps
+  (**landed**), the armTap insert race, a replayed tap re-resolved to another
+  session, block re-registration by the tag's own teacher, extend's arithmetic
+  outside the engine transaction, the portal's reconnect backoff, the portal's
+  staleness banner, and one shared SQLSTATE helper. Of the two that did not:
+  the reported SSE write-after-end crash cannot happen (see the decision log),
+  and the `POST /v1/classes` idempotency deferral was re-examined and stands.
 - **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
@@ -86,13 +89,18 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
-- **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads,
-  nine confirmed against the code and fixed, one dropped as already-adjudicated.
-  The theme is that the gates (tests-with-code, Claude Review, the race lane)
-  caught what they were pointed at and the un-gated code drifted underneath:
-  four of the nine were idempotency or race holes on paths whose *happy* case
-  was tested. `POST /v1/classes`'s missing idempotency key (below) was
-  re-examined as part of the audit and deliberately left as it stands.
+- **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads
+  checked against the code, eight reproduced and are being fixed as a series of
+  gated PRs (status in **Now**; this entry records what the audit decided, not
+  work already on `main`). Four of the eight are idempotency or race holes on
+  paths whose *happy* case was already tested — the shape of what the gates
+  miss, and the argument for keeping the real-Postgres lane required.
+  Two leads were rejected. The SSE "a write after end kills the whole API
+  process" report does not reproduce: Fastify keeps an `'error'` listener on
+  the response across `reply.hijack()`, so that error is absorbed rather than
+  fatal — verified on the running route, not by reading. `POST /v1/classes`'s
+  missing idempotency key (below) was re-examined and deliberately left as it
+  stands.
 - **2026-09-20** — Web sessions install dependencies via a repo-tracked
   SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
   environment's setup-script field (it ran outside the repo root and broke
@@ -100,10 +108,12 @@ under-13 parental-consent machinery.
   checking out a branch runs that branch's hook — accepted for a
   single-owner repo; revisit before adding outside contributors. The hook's
   drift guard deliberately tolerates a session's own uncommitted dependency
-  work: it snapshots the lockfile around the install (one-shot per container)
-  rather than treating an edited lockfile as drift, and CI's `npm ci` remains
-  the backstop that catches a lockfile genuinely out of step with the
-  manifests.
+  work: it hashes the lockfile immediately before and after its own install and
+  compares those two, rather than comparing against the git index, so only what
+  that install changed counts as drift. Both the hash and an install run on
+  every SessionStart (`npm ci` on a fresh container, `npm install` on a cached
+  one); CI's `npm ci` remains the backstop that catches a lockfile genuinely
+  out of step with the manifests.
 - **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
   with the owner's Max subscription (`CLAUDE_CODE_OAUTH_TOKEN`), replacing
   prepaid API credits; reviewer model unchanged. The token also lives in the
