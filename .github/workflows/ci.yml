@@ -14,10 +14,12 @@ permissions:
   contents: read
 
 concurrency:
-  # One group per branch: a newer push to the same PR cancels the outdated
-  # run. On push (main) head_ref is empty, so ref_name is used; on a PR
-  # head_ref is the source branch.
-  group: ci-${{ github.head_ref || github.ref_name }}
+  # One group per event + branch: a newer push to the same PR cancels the
+  # outdated run, and a push to main can never share a group with (and
+  # cancel) a PR whose head branch happens to be named "main". On push
+  # head_ref is empty, so ref_name is used; on a PR head_ref is the source
+  # branch.
+  group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
