@@ -20,18 +20,20 @@ jobs:
 
       - name: Source changes must update docs/PLAN.md
         run: |
-          # Dependabot only bumps dependency manifests and will never edit
-          # PLAN.md; its PRs are exempt (policy: docs/PLAN.md, 2026-09-20).
-          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
-            echo "Dependabot PR — plan backstop not required."
-            exit 0
-          fi
           BASE="origin/${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"
           echo "$CHANGED"
           if ! echo "$CHANGED" | grep -qE '^(apps/|packages/|ios/)'; then
             echo "No source changes — plan update not required."
+            exit 0
+          fi
+          # A diff that is nothing but dependency manifests (Dependabot's whole
+          # output) carries no plan-worthy decisions. Content-based on purpose:
+          # a real source commit pushed onto a Dependabot branch still trips
+          # the backstop (policy: docs/PLAN.md, 2026-09-20).
+          if ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
+            echo "Manifest-only change — plan update not required."
             exit 0
           fi
           if echo "$CHANGED" | grep -q '^docs/PLAN\.md$'; then
