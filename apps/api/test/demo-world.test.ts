@@ -1,4 +1,4 @@
-import { type Database, startSession, tapIn } from '@bali/db';
+import { type Database, startSession, tapIn, users } from '@bali/db';
 import { backdateLastSeen } from '@bali/db/testing';
 import { SILENCE_THRESHOLD_MS } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
@@ -85,6 +85,7 @@ function remoteConfig(overrides: Partial<RemoteConfig> = {}): RemoteConfig {
       [ANA.key, { username: 'demo-ana@example.test', password: 'pw' }],
     ]),
     sweepWaitMs: 5_000,
+    liveWaitMs: 15_000,
     ...overrides,
   };
 }
@@ -148,6 +149,22 @@ describe('resolveRemoteConfig', () => {
       'eu-west-2',
     );
   });
+
+  it('falls back past an EMPTY region rather than building a hostless endpoint', () => {
+    // '' is not nullish, so `??` would keep it and produce
+    // https://cognito-idp..amazonaws.com — a DNS error instead of a fallback.
+    const env = { ...complete(), DEMO_COGNITO_REGION: '', AWS_REGION: 'eu-west-2' };
+
+    expect(resolveRemoteConfig(env, specs).region).toBe('eu-west-2');
+  });
+
+  it('falls back past an EMPTY per-actor password to the shared one', () => {
+    const env = { ...complete(), [passwordVar('ana')]: '' };
+
+    expect(resolveRemoteConfig(env, specs).credentials.get('ana')?.password).toBe(
+      'shared-password',
+    );
+  });
 });
 
 describe('normalizeBase', () => {
@@ -175,7 +192,7 @@ describe('the remote world, against a real server', () => {
   it('provisions students through GET /v1/me, exactly as a phone does', async () => {
     const { school } = await seedClassroom(db, 'remote-a');
     // Only the teacher is seeded — the student must not exist yet.
-    await db.insert((await import('@bali/db')).users).values({
+    await db.insert(users).values({
       cognitoId: 'demo-teacher',
       role: 'teacher',
       schoolId: school.id,

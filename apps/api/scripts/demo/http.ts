@@ -19,17 +19,33 @@ export type Call = <T>(method: string, path: string, opts?: CallOpts) => Promise
  * (`teacher access required`, `session not found`), and swallowing it would turn
  * a clear failure into a mystery.
  */
-export function createCall(base: string, fetchImpl: typeof fetch = fetch): Call {
+/** A stalled request must become a message, not a stare. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+export function createCall(
+  base: string,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Call {
   return async function call<T>(method: string, path: string, opts: CallOpts = {}): Promise<T> {
     const headers: Record<string, string> = {};
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
     if (opts.internalKey) headers['x-internal-key'] = opts.internalKey;
     if (opts.body !== undefined) headers['content-type'] = 'application/json';
-    const res = await fetchImpl(`${base}${path}`, {
-      method,
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
+    let res: Response;
+    try {
+      res = await fetchImpl(`${base}${path}`, {
+        method,
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new Error(`${method} ${path} → no response within ${timeoutMs}ms`, { cause: err });
+      }
+      throw err;
+    }
     const text = await res.text();
     const want = opts.expectStatus ?? 200;
     if (res.status !== want) {

@@ -31,6 +31,8 @@ export interface CognitoAuthConfig {
   clientId: string;
   /** Injection point for tests; defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** A stalled sign-in must name Cognito, not sit on undici's 300s default. */
+  timeoutMs?: number;
 }
 
 export interface CognitoCredentials {
@@ -71,18 +73,29 @@ export async function fetchCognitoAccessToken(
   credentials: CognitoCredentials,
 ): Promise<string> {
   const doFetch = config.fetchImpl ?? fetch;
-  const res = await doFetch(cognitoEndpoint(config.region), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-amz-json-1.1',
-      'x-amz-target': 'AWSCognitoIdentityProviderService.InitiateAuth',
-    },
-    body: JSON.stringify({
-      AuthFlow: 'USER_PASSWORD_AUTH',
-      ClientId: config.clientId,
-      AuthParameters: { USERNAME: credentials.username, PASSWORD: credentials.password },
-    }),
-  });
+  const timeoutMs = config.timeoutMs ?? 30_000;
+  let res: Response;
+  try {
+    res = await doFetch(cognitoEndpoint(config.region), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-amz-json-1.1',
+        'x-amz-target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: JSON.stringify({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: config.clientId,
+        AuthParameters: { USERNAME: credentials.username, PASSWORD: credentials.password },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    throw new Error(
+      `Cognito sign-in for ${credentials.username} did not answer within ${timeoutMs}ms ` +
+        `(${cognitoEndpoint(config.region)})`,
+      { cause: err },
+    );
+  }
 
   const text = await res.text();
   if (!res.ok) {

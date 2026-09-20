@@ -73,11 +73,11 @@ what makes the run prove the _deployed_ sweep works rather than one the script p
 A remote run therefore takes a few minutes and prints progress while it waits.
 
 ```bash
-DEMO_API_URL=https://your-dev-api.example \
-DEMO_COGNITO_CLIENT_ID=<app client id> \
-DEMO_USER_TEACHER=teacher@example DEMO_USER_ANA=ana@example \
-DEMO_USER_BEN=ben@example DEMO_USER_CAL=cal@example DEMO_USER_DANA=dana@example \
-DEMO_PASSWORD=<their password> \
+# Keep the password out of shell history and `ps` output: put the variables in
+# `.env.demo` (already gitignored by the `.env.*` rule) and source it, prompting
+# for the password itself. DEMO_INTERNAL_KEY is a real secret — never commit it.
+set -a; . ./.env.demo; set +a
+read -rsp 'demo password: ' DEMO_PASSWORD && export DEMO_PASSWORD
 npm run demo
 ```
 
@@ -101,10 +101,19 @@ missing rather than failing obscurely):
    leaves the account in `NEW_PASSWORD_REQUIRED` and no token is issued).
 2. `ALLOW_USER_PASSWORD_AUTH` enabled on the app client — the flow the demo signs in
    with.
-3. The teacher's **role flip**. Every first sign-in provisions a _student_
-   (`GET /v1/me`), so the demo teacher needs
-   `UPDATE users SET role = 'teacher' WHERE id = '<their id>';` once. The demo prints
-   that exact statement, with the id filled in, if the account is still a student.
+3. The teacher's **role flip and a school**. Every first sign-in provisions a
+   _student_ with no school (`GET /v1/me`), and nothing ever assigns one — but
+   `classes.school_id` is `NOT NULL`, so the role by itself is not enough:
+
+   ```sql
+   INSERT INTO schools (name) VALUES ('Demo School');   -- if the table is empty
+   UPDATE users
+   SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1)
+   WHERE id = '<their id>';
+   ```
+
+   The demo prints whichever half is missing, with the id filled in, rather than
+   failing obscurely.
 
 The run creates a fresh class, block, and session each time and ends the session it
 started, so it never needs anything wiped between runs. If a previous run crashed and

@@ -58,6 +58,13 @@ export interface DemoWorld {
   readonly base: string;
   /** How long an incident may wait for a sweep-produced event to appear. */
   readonly sweepWaitMs: number;
+  /**
+   * How long an incident may wait for an ordinary event to arrive live.
+   * Correctness rests on the hub's slow re-poll, not the LISTEN/NOTIFY doorbell
+   * (ARCHITECTURE, live updates decision 3), and production re-polls every 20s —
+   * so a deadline under that asserts more than the system promises.
+   */
+  readonly liveWaitMs: number;
   /** Ensure every actor exists with the right role, and mint their tokens. */
   provision(actors: DemoActorSpec[]): Promise<Map<string, DemoActor>>;
   /**
@@ -71,7 +78,7 @@ export interface DemoWorld {
     teacherToken: string;
   }): Promise<void>;
   /** Bring a running session past its end time. */
-  compressSessionEnd(where: { sessionId: string; endsAt: Date }): Promise<void>;
+  compressSessionEnd(where: { sessionId: string; startedAt: Date; endsAt: Date }): Promise<void>;
   /**
    * Run the minute sweep, or return null when this world cannot run it itself
    * and the deployment's own cron must — the caller then polls for the effect
@@ -84,8 +91,18 @@ export interface DemoWorld {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Sleep, printing a countdown, so a multi-minute wait never looks like a hang. */
+const MAX_WAIT_MS = 10 * 60_000;
+
 async function waitWithNotice(ms: number, label: string): Promise<void> {
   if (ms <= 0) return;
+  if (ms > MAX_WAIT_MS) {
+    // Every wait here is derived from a server timestamp minus this machine's
+    // clock, so an absurd one means skew, not a slow classroom.
+    throw new Error(
+      `refusing to wait ${Math.ceil(ms / 1000)}s for ${label} — that implies this machine's ` +
+        "clock is far from the deployment's; fix the clock and re-run",
+    );
+  }
   const started = Date.now();
   console.log(`  …waiting ${Math.ceil(ms / 1000)}s — ${label}`);
   for (;;) {
@@ -155,8 +172,9 @@ export async function createLocalWorld(): Promise<DemoWorld> {
   return {
     mode: 'local',
     base,
-    // The sweep runs inline here, so its effects are already committed.
+    // The sweep runs inline here, and the hub re-polls every 100ms.
     sweepWaitMs: 5_000,
+    liveWaitMs: 15_000,
     provision: (specs) => seedLocalActors(db, specs, tokenFor),
     compressSilence: ({ sessionId, studentId }) =>
       backdateLastSeen(
@@ -164,8 +182,15 @@ export async function createLocalWorld(): Promise<DemoWorld> {
         { sessionId, studentId },
         new Date(Date.now() - SILENCE_THRESHOLD_MS - 5_000),
       ),
+    // One millisecond past the start, so the window stays ordered: an end time
+    // before `started_at` would make clampToWindow stamp session_expired before
+    // the session began.
     compressSessionEnd: (where) =>
-      backdateSessionEnd(db, { sessionId: where.sessionId }, new Date(Date.now() - 1_000)),
+      backdateSessionEnd(
+        db,
+        { sessionId: where.sessionId },
+        new Date(where.startedAt.getTime() + 1),
+      ),
     sweep: () => call<SweepResult>('POST', '/internal/sweep', { internalKey: LOCAL_INTERNAL_KEY }),
     close: async () => {
       await app.close();
@@ -225,9 +250,14 @@ export interface RemoteConfig {
    */
   internalKey?: string;
   sweepWaitMs: number;
+  liveWaitMs: number;
 }
 
 const DEFAULT_REMOTE_SWEEP_WAIT_MS = 150_000; // a per-minute cron, plus margin
+/** Comfortably past the hub's 20s production re-poll, plus WAN round trips. */
+const REMOTE_LIVE_WAIT_MS = 45_000;
+/** Slack for clock skew between this machine and the deployment. */
+const SKEW_MARGIN_MS = 15_000;
 
 /** The env var this actor's Cognito username comes from. */
 export function usernameVar(key: string): string {
@@ -256,7 +286,8 @@ export function resolveRemoteConfig(env: NodeJS.ProcessEnv, specs: DemoActorSpec
   const credentials = new Map<string, CognitoCredentials>();
   for (const spec of specs) {
     const username = env[usernameVar(spec.key)]?.trim();
-    const password = env[passwordVar(spec.key)]?.trim() ?? sharedPassword;
+    // `||`, not `??`: an empty override must fall back, not survive as ''.
+    const password = env[passwordVar(spec.key)]?.trim() || sharedPassword;
     if (!username) missing.push(usernameVar(spec.key));
     if (!password) missing.push(`${passwordVar(spec.key)} (or DEMO_PASSWORD)`);
     if (username && password) credentials.set(spec.key, { username, password });
@@ -279,11 +310,12 @@ export function resolveRemoteConfig(env: NodeJS.ProcessEnv, specs: DemoActorSpec
 
   return {
     base: normalizeBase(apiUrl),
-    region: env.DEMO_COGNITO_REGION?.trim() ?? env.AWS_REGION?.trim() ?? 'us-east-1',
+    region: env.DEMO_COGNITO_REGION?.trim() || env.AWS_REGION?.trim() || 'us-east-1',
     clientId,
     credentials,
     internalKey: env.DEMO_INTERNAL_KEY?.trim() || undefined,
     sweepWaitMs,
+    liveWaitMs: REMOTE_LIVE_WAIT_MS,
   };
 }
 
@@ -299,13 +331,14 @@ export function createRemoteWorld(config: RemoteConfig, deps: RemoteWorldDeps = 
     mode: 'remote',
     base: config.base,
     sweepWaitMs: config.sweepWaitMs,
+    liveWaitMs: config.liveWaitMs,
     provision: (specs) => signInRemoteActors(call, config, specs, deps.cognitoFetch),
 
     /*
      * No database out here, so silence is reached by actually being quiet. The
      * snapshot reports the server's own `last_seen_at` (rule 1 — the server
-     * stamps it, never the device), so the wait is computed from the server's
-     * clock rather than this machine's.
+     * stamps it, never the device), so the wait STARTS from the server's clock;
+     * its length is still measured on this machine's, hence the skew margin.
      */
     compressSilence: async ({ sessionId, studentId, teacherToken }) => {
       const snap = await call<SessionSnapshot>('GET', `/v1/sessions/${sessionId}`, {
@@ -313,7 +346,7 @@ export function createRemoteWorld(config: RemoteConfig, deps: RemoteWorldDeps = 
       });
       const row = snap.students.find((s) => s.studentId === studentId);
       const lastSeen = row?.lastSeenAt ? new Date(row.lastSeenAt).getTime() : Date.now();
-      const quietUntil = lastSeen + SILENCE_THRESHOLD_MS + 5_000;
+      const quietUntil = lastSeen + SILENCE_THRESHOLD_MS + SKEW_MARGIN_MS;
       await waitWithNotice(
         quietUntil - Date.now(),
         'the phone must really go quiet (90s threshold)',
@@ -322,7 +355,7 @@ export function createRemoteWorld(config: RemoteConfig, deps: RemoteWorldDeps = 
 
     compressSessionEnd: async ({ endsAt }) => {
       await waitWithNotice(
-        endsAt.getTime() + 2_000 - Date.now(),
+        endsAt.getTime() + SKEW_MARGIN_MS - Date.now(),
         'the session must reach its end time',
       );
     },
@@ -363,7 +396,10 @@ async function signInRemoteActors(
         `${credentials.username} signed in as "${me.user.role}" but the demo needs "${spec.role}". ` +
           (spec.role === 'teacher'
             ? 'Every first sign-in provisions a student, so the demo teacher needs the one-time ' +
-              `role flip: UPDATE users SET role = 'teacher' WHERE id = '${me.user.id}';`
+              'out-of-band provisioning — the role AND a school, because classes.school_id is ' +
+              'NOT NULL and no code path ever assigns it:\n' +
+              "  INSERT INTO schools (name) VALUES ('Demo School');  -- if you have none\n" +
+              `  UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1) WHERE id = '${me.user.id}';`
             : 'Use a different account for this actor.'),
       );
     }

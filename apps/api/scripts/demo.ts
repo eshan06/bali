@@ -78,7 +78,7 @@ function startHeartbeats(
   let failure: Error | null = null;
 
   const loop = (async () => {
-    let lastBeat = Date.now();
+    let lastBeat = 0; // beat on the first tick, not 30s in
     while (!stopped) {
       // Tick often so `stop()` is noticed promptly, but only beat on schedule.
       await sleep(500);
@@ -147,6 +147,17 @@ async function main(): Promise<void> {
     const klass = await call<ClassDetail>('POST', '/v1/classes', {
       token: teacher.token,
       body: { name: `Period 1 (demo ${new Date().toISOString().slice(0, 19)})` },
+    }).catch((err: unknown) => {
+      // classes.school_id is NOT NULL and nothing ever assigns it, so a teacher
+      // provisioned by role alone gets this far and no further.
+      if (err instanceof Error && err.message.includes('not assigned to a school')) {
+        throw new Error(
+          `${teacher.displayName} has no school, so no class can be created. Assign one ` +
+            'out of band:\n  UPDATE users SET school_id = (SELECT id FROM schools LIMIT 1) ' +
+            `WHERE id = '${teacher.userId}';`,
+        );
+      }
+      throw err;
     });
     const tagId = `SIM-BLOCK-${randomUUID().slice(0, 8)}`;
     const block = await call<BlockDetail>('POST', '/v1/blocks', {
@@ -233,7 +244,7 @@ async function main(): Promise<void> {
     // readable afterwards — that is the whole promise of the live grid (rule 6).
     const liveUnlock = await stream.waitFor((e) => e.type === 'unlock' && e.userId === ana.userId, {
       label: "Ana's unlock",
-      timeoutMs: 15_000,
+      timeoutMs: world.liveWaitMs,
     });
     console.log(`  live: unlock for Ana arrived on the stream at seq ${liveUnlock.seq}.`);
 
@@ -244,7 +255,7 @@ async function main(): Promise<void> {
     assert(anaRefocus.state === 'focused', `Ana should be refocused, got ${anaRefocus.state}`);
     await stream.waitFor((e) => e.type === 'refocus' && e.userId === ana.userId, {
       label: "Ana's refocus",
-      timeoutMs: 15_000,
+      timeoutMs: world.liveWaitMs,
     });
     console.log('Ana: focused → unlocked → focused, every step live on the grid.');
 
@@ -253,6 +264,7 @@ async function main(): Promise<void> {
     // Everyone else keeps checking in, so the silence that follows is Ben's alone.
     const others = students.filter((s) => s.key !== ben.key);
     const beats = startHeartbeats(call, sid, others);
+    let incidentError: Error | null = null;
     try {
       await world.compressSilence({
         sessionId: sid,
@@ -261,20 +273,40 @@ async function main(): Promise<void> {
       });
       // Local mode runs the sweep itself; against a deployment without the sweep
       // key, the platform's own per-minute cron does it and we wait for the event.
+      // Deliberately not asserted: /internal/sweep reports what THIS call did,
+      // both duties are idempotent, and the deployment runs the same sweep every
+      // minute — so whether our call or the cron opened the episode is a coin
+      // flip. The event below is the proof either way.
       const swept = await world.sweep();
-      if (swept) {
-        assert(
-          swept.wentSilent >= 1,
-          `sweep should open ≥1 silence episode, got ${swept.wentSilent}`,
-        );
-      }
+      if (swept) console.log(`  our sweep: ${swept.wentSilent} silence episode(s) opened`);
       const silentEvent = await stream.waitFor(
         (e) => e.type === 'went_silent' && e.userId === ben.userId,
         { label: "Ben's went_silent (from the sweep)", timeoutMs: world.sweepWaitMs },
       );
       console.log(`  live: went_silent for Ben at seq ${silentEvent.seq}.`);
-    } finally {
-      await beats.stop();
+    } catch (err) {
+      incidentError = err instanceof Error ? err : new Error(String(err));
+    }
+    // Stop the pump outside the try, so neither failure can replace the other:
+    // the incident's own error is the diagnosis worth keeping, and a phone that
+    // could not check in is still reported rather than swallowed.
+    const beatError = await beats.stop().then(
+      () => null,
+      (err: unknown) => err as Error,
+    );
+    if (incidentError) {
+      if (beatError)
+        console.error('  (a phone also failed to check in during the wait):', beatError);
+      throw incidentError;
+    }
+    if (beatError) throw beatError;
+    // The pump stopped, and the came_back wait below can run for liveWaitMs.
+    // One round now keeps the rest of the room comfortably inside the threshold.
+    for (const s of others) {
+      await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
+        token: s.token,
+        body: { deviceTime: iso() },
+      });
     }
     const afterSilence = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
       token: teacher.token,
@@ -293,7 +325,7 @@ async function main(): Promise<void> {
     assert(benBack.status === 'live', `Ben check-in status ${benBack.status}`);
     const cameBack = await stream.waitFor(
       (e) => e.type === 'came_back' && e.userId === ben.userId,
-      { label: "Ben's came_back", timeoutMs: 15_000 },
+      { label: "Ben's came_back", timeoutMs: world.liveWaitMs },
     );
     const afterReturn = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
       token: teacher.token,
@@ -328,6 +360,17 @@ async function main(): Promise<void> {
       calUnlock.recordedAs === 'no_live_participation',
       `Cal unlock recordedAs ${String(calUnlock.recordedAs)}`,
     );
+    // Both of Cal's events must reach the grid live before the aggregate check
+    // below compares the log against the stream — otherwise that check silently
+    // asserts zero delivery latency for the two most recent events.
+    await stream.waitFor((e) => e.type === 'enrollment_removed' && e.userId === cal.userId, {
+      label: "Cal's removal",
+      timeoutMs: world.liveWaitMs,
+    });
+    await stream.waitFor((e) => e.type === 'unlock' && e.userId === cal.userId, {
+      label: "Cal's recorded unlock",
+      timeoutMs: world.liveWaitMs,
+    });
     // His next check-in learns he is gone.
     const calCheck = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
       token: cal.token,
@@ -465,15 +508,12 @@ async function main(): Promise<void> {
 
     await world.compressSessionEnd({
       sessionId: expiringId,
+      startedAt: new Date(second.session.startedAt),
       endsAt: new Date(second.session.endsAt),
     });
+    // Same race as the silence sweep: the cron may have expired it first.
     const expirySweep = await world.sweep();
-    if (expirySweep) {
-      assert(
-        expirySweep.expired >= 1,
-        `sweep should expire ≥1 session, got ${expirySweep.expired}`,
-      );
-    }
+    if (expirySweep) console.log(`  our sweep: ${expirySweep.expired} session(s) expired`);
     const expiredEvent = await expiryStream.waitFor((e) => e.type === 'session_expired', {
       label: 'session_expired (from the sweep)',
       timeoutMs: world.sweepWaitMs,
@@ -493,8 +533,8 @@ async function main(): Promise<void> {
       body: { deviceTime: iso() },
     });
     assert(
-      danaAfter.status !== 'live',
-      `Dana's check-in after expiry should not read live, got ${danaAfter.status}`,
+      danaAfter.status === 'gone',
+      `Dana's check-in after expiry should read gone, got ${danaAfter.status}`,
     );
     openSessionId = null;
     expiryStream.close();
