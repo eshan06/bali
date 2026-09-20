@@ -341,45 +341,53 @@ export async function startSession(
   db: Database,
   input: StartSessionInput,
 ): Promise<StartSessionResult> {
-  return db.transaction(async (tx) => {
-    // Lock the class row so two simultaneous starts serialize: the loser waits,
-    // then sees the running session and returns it rather than hitting the
-    // one-running-per-class index with a raw unique violation (the doc's
-    // "from a phone and a laptop at once" promise).
-    await tx
-      .select({ id: classes.id })
-      .from(classes)
-      .where(eq(classes.id, input.classId))
-      .for('update');
-
-    const existing = firstOrUndefined(
+  // Retry on deadlock: converting armed taps ends those students' live
+  // participations in OTHER sessions row by row, while endSession and the
+  // sweep update a session's participations as one set-based statement — the
+  // two can take the same row locks in opposite order, so either side can be
+  // the victim. Idempotent (a re-run returns the running session), so retrying
+  // is safe, and a 40P01 here would otherwise be a 500 at the bell.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      // Lock the class row so two simultaneous starts serialize: the loser waits,
+      // then sees the running session and returns it rather than hitting the
+      // one-running-per-class index with a raw unique violation (the doc's
+      // "from a phone and a laptop at once" promise).
       await tx
-        .select()
-        .from(sessions)
-        .where(and(eq(sessions.classId, input.classId), isNull(sessions.endedAt)))
-        .limit(1),
-    );
-    if (existing) return { outcome: 'existing', session: existing, armedConverted: 0 };
+        .select({ id: classes.id })
+        .from(classes)
+        .where(eq(classes.id, input.classId))
+        .for('update');
 
-    const session = firstOrUndefined(
-      await tx
-        .insert(sessions)
-        .values({ classId: input.classId, startedAt: input.startedAt, endsAt: input.endsAt })
-        .returning(),
-    );
-    if (!session) throw new Error('startSession: insert returned no row');
+      const existing = firstOrUndefined(
+        await tx
+          .select()
+          .from(sessions)
+          .where(and(eq(sessions.classId, input.classId), isNull(sessions.endedAt)))
+          .limit(1),
+      );
+      if (existing) return { outcome: 'existing', session: existing, armedConverted: 0 };
 
-    await insertEvent(tx, {
-      eventId: newUuidV7(),
-      type: 'session_started',
-      sessionId: session.id,
-      classId: session.classId,
-      occurredAt: session.startedAt,
-    });
+      const session = firstOrUndefined(
+        await tx
+          .insert(sessions)
+          .values({ classId: input.classId, startedAt: input.startedAt, endsAt: input.endsAt })
+          .returning(),
+      );
+      if (!session) throw new Error('startSession: insert returned no row');
 
-    const armedConverted = await convertArmedTaps(tx, session);
-    return { outcome: 'created', session, armedConverted };
-  });
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'session_started',
+        sessionId: session.id,
+        classId: session.classId,
+        occurredAt: session.startedAt,
+      });
+
+      const armedConverted = await convertArmedTaps(tx, session);
+      return { outcome: 'created', session, armedConverted };
+    }),
+  );
 }
 
 export interface ArmTapInput {
@@ -849,16 +857,24 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
 
     if (!session) {
-      // Unknown session: nothing to clamp to or attach, but the record must
-      // still survive — save an orphan event carrying the claimed id.
+      // Unknown session: nothing to attach to, but the record must still
+      // survive — save an orphan event carrying the claimed id. There is no
+      // window to clamp to, so rule 1 still applies the only way it can: the
+      // server's clock stamps the row and the phone's claim is kept in the
+      // payload. A wrong or hostile device clock must not be able to write a
+      // 2099 unlock into permanent history, and nothing is lost either way.
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,
         type: 'unlock',
         sessionId: null,
         classId: null,
         userId: input.studentId,
-        occurredAt: input.deviceTime,
-        payload: { recorded_as: 'unknown_session', claimed_session_id: input.sessionId },
+        occurredAt: new Date(),
+        payload: {
+          recorded_as: 'unknown_session',
+          claimed_session_id: input.sessionId,
+          device_time: input.deviceTime.toISOString(),
+        },
       });
       return {
         outcome: isNew ? 'recorded' : 'replay',

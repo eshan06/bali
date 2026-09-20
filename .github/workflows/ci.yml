@@ -36,6 +36,10 @@ jobs:
       # A schema.ts change must ship with its generated migration: regenerate
       # and fail if anything under migrations/ differs from what's committed.
       - run: npm run db:generate -w @bali/db && git diff --exit-code -- packages/db/migrations
+      # tsc alone doesn't exercise the Next build (the webpack extensionAlias
+      # that resolves @bali/shared's .js specifiers, Tailwind's PostCSS step),
+      # so a portal that type-checks but cannot build would merge green.
+      - run: npm run build -w @bali/web
 
   # The same Vitest suite, but against a real multi-connection Postgres. This is
   # the only lane where the engine's FOR UPDATE serialization actually contends,

@@ -89,7 +89,28 @@ export function registerFeedRoutes(
   app.get('/v1/sessions/:id/stream', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = parse(Params, request.params);
     const { after } = parse(AfterQuery, request.query);
+
+    // Watch for the client going away BEFORE the first await. A tab closed
+    // while the ownership queries run fires 'close' immediately; a listener
+    // attached afterwards never sees it, and the subscription's repoll and
+    // heartbeat timers would then run forever while the per-teacher slot is
+    // never released (write() on a destroyed socket returns false rather than
+    // throwing, so the hub never notices either) — the teacher ends up
+    // permanently 429'd by the cap.
+    let clientGone = false;
+    let sub: { close: () => void } | null = null;
+    request.raw.on('close', () => {
+      clientGone = true;
+      sub?.close();
+    });
+
     const { teacher, session } = await requireSessionOwner(db, request, id);
+
+    if (clientGone || request.raw.destroyed) {
+      reply.hijack();
+      reply.raw.end();
+      return;
+    }
 
     // Enforce the per-teacher cap before hijacking, so it returns the standard
     // 429 shape. The check and the subscribe below run without an await between
@@ -112,7 +133,7 @@ export function registerFeedRoutes(
     raw.writeHead(200, headers);
     raw.write(': open\n\n'); // flush headers and confirm the stream is live
 
-    const sub = hub.subscribe({
+    sub = hub.subscribe({
       sessionId: session.id,
       teacherId: teacher.id,
       after,
@@ -120,7 +141,8 @@ export function registerFeedRoutes(
       onClose: () => raw.end(),
     });
 
-    // A client disconnect (tab closed, network drop) tears the stream down.
-    request.raw.on('close', () => sub.close());
+    // The disconnect may have landed between the check above and subscribe, in
+    // which case the handler ran while `sub` was still null — release it here.
+    if (clientGone || request.raw.destroyed) sub.close();
   });
 }

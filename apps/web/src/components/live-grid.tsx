@@ -1,90 +1,14 @@
 'use client';
 
-import {
-  deriveDisplayState,
-  EVENT_RESUME_OVERLAP,
-  type FeedEvent,
-  type ParticipationState,
-  type SessionSnapshot,
-} from '@bali/shared';
+import { deriveDisplayState, EVENT_RESUME_OVERLAP, type SessionSnapshot } from '@bali/shared';
 import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
+import { applyEvent, fromSnapshot, snapshotIsFresh, type Students } from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
-
-interface Student {
-  studentId: string;
-  displayName: string | null;
-  state: ParticipationState | null;
-  joinedAt: Date | null;
-  lastSeenAt: Date | null;
-  endedAt: Date | null;
-}
-type Students = Record<string, Student>;
-
-function fromSnapshot(snap: SessionSnapshot): Students {
-  const out: Students = {};
-  for (const s of snap.students) {
-    out[s.studentId] = {
-      studentId: s.studentId,
-      displayName: s.displayName,
-      state: s.state,
-      joinedAt: s.joinedAt ? new Date(s.joinedAt) : null,
-      lastSeenAt: s.lastSeenAt ? new Date(s.lastSeenAt) : null,
-      endedAt: s.endedAt ? new Date(s.endedAt) : null,
-    };
-  }
-  return out;
-}
-
-/** Apply one streamed event onto a copy of the roster (idempotent for the grid). */
-function applyEvent(prev: Students, e: FeedEvent): Students {
-  const at = new Date(e.occurredAt);
-  if (e.type === 'session_ended' || e.type === 'session_expired') {
-    const next: Students = {};
-    for (const [id, s] of Object.entries(prev)) next[id] = s.endedAt ? s : { ...s, endedAt: at };
-    return next;
-  }
-  const id = e.userId;
-  const existing = id ? prev[id] : undefined;
-  if (!id || !existing) return prev;
-  const s: Student = { ...existing };
-  switch (e.type) {
-    case 'tap_in':
-      s.state = 'focused';
-      s.lastSeenAt = at;
-      s.endedAt = null;
-      s.joinedAt ??= at;
-      break;
-    case 'unlock':
-      s.state = 'unlocked';
-      s.lastSeenAt = at;
-      break;
-    case 'refocus':
-      s.state = 'focused';
-      s.lastSeenAt = at;
-      break;
-    case 'protection_off':
-      s.state = 'protection_off';
-      s.lastSeenAt = at;
-      break;
-    case 'came_back':
-      s.lastSeenAt = at;
-      break;
-    case 'enrollment_removed':
-    case 'enrollment_left':
-      s.endedAt = at;
-      break;
-    default:
-      // went_silent is reflected by deriveDisplayState from last_seen_at; other
-      // types don't change a chip.
-      return prev;
-  }
-  return { ...prev, [id]: s };
-}
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
@@ -103,6 +27,9 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const lastUpdate = useRef<number>(Date.now());
+  // The newest event seq the grid has applied, so a stale in-flight snapshot
+  // can't roll it backwards over a streamed unlock.
+  const appliedSeq = useRef<number>(0);
 
   // Boot from the snapshot, then stream.
   useEffect(() => {
@@ -113,6 +40,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
+        appliedSeq.current = snap.latestSeq;
         lastUpdate.current = Date.now();
         sse = createSseClient({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
@@ -121,6 +49,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           overlap: EVENT_RESUME_OVERLAP,
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
+            if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
             lastUpdate.current = Date.now();
           },
           onStatus: setStatus,
@@ -144,11 +73,18 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
 
   // Slow snapshot refresh keeps derived silence honest for quietly-present
   // students: heartbeats update last_seen_at server-side but emit no event
-  // (decision 7), so they never reach the grid through the stream alone.
+  // (decision 7), so they never reach the grid through the stream alone. It is
+  // dropped when the stream has already applied something newer — a snapshot
+  // read before an unlock but resolving after it would put the chip back to
+  // green for an unshielded phone.
   useEffect(() => {
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
-        (snap) => setStudents(fromSnapshot(snap)),
+        (snap) => {
+          if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
+          appliedSeq.current = snap.latestSeq;
+          setStudents(fromSnapshot(snap));
+        },
         () => {
           /* keep the last-known grid; the banner already shows staleness */
         },
