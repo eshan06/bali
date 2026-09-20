@@ -36,6 +36,13 @@
       "when": 1789619631296,
       "tag": "0004_broken_wildside",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789760117572,
+      "tag": "0005_sloppy_guardian",
+      "breakpoints": true
     }
   ]
 }

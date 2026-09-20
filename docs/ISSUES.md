@@ -51,6 +51,24 @@ app threw the record away. Unshielded phone, zero trace, nobody ever knew.
 **Done when:** killing the Wi-Fi mid-unlock, force-quitting the app, and the
 "removed from class" case all still end with the record visible to the teacher.
 
+**Status (Phase 2 — server half done):** the transition engine's `unlock` now
+always commits the event. A live participation flips to `unlocked` as before;
+otherwise the event is still written with a `payload.recorded_as` note —
+`no_live_participation` (removed from the class mid-session), `after_session_end`
+(the session is already over), `unknown_session` (an unrecognized session id,
+recorded as an orphan event), or `not_enrolled` (a caller with no participation
+row here and no active enrollment in the class — recorded as an orphan too, so a
+stranger who merely knows a session id cannot write into someone else's history
+or live grid) — and the call returns `recorded`, never a refusal that could let
+the phone discard the record. The retry side of the contract —
+which responses let the phone delete the record versus keep retrying — is the
+typed table in `@bali/shared` (`unlockDisposition`), so the Phase 3 iOS outbox
+implements against an explicit rule. The phone-side "save first, retry until
+confirmed" half lands with iOS (Phase 3). One residual: an `unknown_session`
+unlock is durable but, lacking a session/class, shows only in the student's own
+history rather than a teacher report — an ops surface for these orphan records is
+an API-layer follow-up, bounded meanwhile by the per-account rate limits of #1.
+
 ---
 
 ## Considered and set aside (so we don't re-argue them)

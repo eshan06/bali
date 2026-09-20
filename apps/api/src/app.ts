@@ -1,3 +1,4 @@
+import cors from '@fastify/cors';
 import type { Database } from '@bali/db';
 import { API_VERSION, type HealthzResponse } from '@bali/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -6,16 +7,23 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors } from './errors.js';
+import { registerBlocksRoutes } from './routes/blocks.js';
+import { registerClassesRoutes } from './routes/classes.js';
+import { registerEnrollmentsRoutes } from './routes/enrollments.js';
+import { registerFeedRoutes } from './routes/feed.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMeRoute } from './routes/me.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
+import type { StreamHubOptions } from './sse/hub.js';
 
 export interface AppDeps {
   /** The database handle. Injected in tests (PGlite); server.ts builds it from DATABASE_URL. */
   db: Database;
   /** Injected in tests (the test issuer); defaults to the Cognito remote-JWKS verifier. */
   verifyToken?: TokenVerifier;
+  /** Live-stream tuning; tests shorten the re-poll/heartbeat for deterministic delivery. */
+  stream?: StreamHubOptions;
 }
 
 /**
@@ -32,12 +40,28 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   });
 
   registerErrors(app);
+
+  // CORS only when origins are configured (the browser portal). Native apps and
+  // server-to-server send no Origin and are unaffected; the header list is the
+  // Authorization bearer, no cookies, so no credentials mode. Unset = no CORS.
+  const corsOrigins =
+    env.CORS_ORIGINS?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean) ?? [];
+  if (corsOrigins.length > 0) {
+    void app.register(cors, { origin: corsOrigins });
+  }
+
   registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env));
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
   registerMeRoute(app, deps.db);
   registerTapsRoute(app, deps.db);
   registerSessionsRoute(app, deps.db);
+  registerEnrollmentsRoutes(app, deps.db);
+  registerClassesRoutes(app, deps.db);
+  registerBlocksRoutes(app, deps.db);
+  registerFeedRoutes(app, deps.db, deps.stream);
   registerInternalRoutes(app, deps.db, env.INTERNAL_API_KEY);
 
   return app;

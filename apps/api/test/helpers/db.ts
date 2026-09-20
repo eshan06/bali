@@ -1,28 +1,12 @@
-import {
-  blocks,
-  classes,
-  enrollments,
-  type Database,
-  MIGRATIONS_DIR,
-  schema,
-  schools,
-  users,
-} from '@bali/db';
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
+import { blocks, classes, type Database, enrollments, schools, users } from '@bali/db';
 
 /**
- * An in-process Postgres (PGlite) with the committed migrations applied — the
- * real schema, no external database. Each test gets its own so they can't
- * interfere. Returns the handle typed as the shared Database and a closer.
+ * The test database factory lives in `@bali/db/testing` so the api and db suites
+ * share one backend switch (PGlite by default, real Postgres when
+ * TEST_DATABASE_URL is set). Re-exported here so existing api tests keep
+ * importing it from this helper.
  */
-export async function makeTestDb(): Promise<{ db: Database; close: () => Promise<void> }> {
-  const pg = new PGlite();
-  const db = drizzle(pg, { schema });
-  await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-  return { db, close: () => pg.close() };
-}
+export { makeTestDb } from '@bali/db/testing';
 
 function one<T>(rows: T[]): T {
   const row = rows[0];

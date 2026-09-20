@@ -127,9 +127,15 @@ scheduled program marks the session and its participations as ended and adds a
 history rows.** During a session, each app tells the server every ~30 seconds: "still
 here, shields still on." That's useful — it's how we notice a phone going silent — but
 nothing *changed*, so it isn't history. The server just overwrites `last_seen_at` on that
-student's `participations` row. The `events` table gets a row only when something really
+student's `participations` row with the time the *server* heard from the phone. The `events` table gets a row only when something really
 changes: tapped in, unlocked, went silent, came back. Otherwise a 1,000-student school
-would add ~720,000 useless rows a day to the table every screen reads.
+would add ~720,000 useless rows a day to the table every screen reads. The "went
+silent" / "came back" pair is server-minted, not sent by the phone: the per-minute
+sweep opens an episode by stamping a `silent_since` marker on the row (emitting one
+`went_silent`) once a focused phone passes the 90-second threshold, and the next
+check-in clears the marker (emitting one `came_back`). That marker exists only to make
+the pair fire exactly once per episode — a grid still derives the live "silent" badge
+from `last_seen_at` (rule 2), never from the column.
 
 ### Rules that keep the data honest
 
@@ -193,7 +199,10 @@ says this is" to our data about them.
 **3. Students join a class with a join code.** The teacher's class screen shows a short
 code; a student types it in once, and the server creates their `enrollments` row. No
 email invites, no setup. Importing whole rosters (CSV or Google Classroom) is a later
-feature, built when a school asks for it.
+feature, built when a school asks for it. The code is server-generated from an
+unambiguous alphabet (no `0`/`O`, `1`/`I`/`L`) and unique among *live* classes only, so
+an archived class never reserves its code forever; a teacher can regenerate it (`PATCH
+/v1/classes/{id}`), which invalidates the old one immediately.
 
 ### Rules that keep auth honest
 
@@ -278,7 +287,16 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   v2's drift.
 - **For unlock records, no response ever means "discard."** The contract spells out
   which errors mean retry later and which mean recorded-with-a-note. v2's lost-unlock
-  bug lived exactly at this gap.
+  bug lived exactly at this gap. The engine implements this: `unlock` always commits
+  the event, tagging it `payload.recorded_as` (`no_live_participation` /
+  `after_session_end` / `unknown_session` / `not_enrolled`) when there is no live
+  participation to flip; the outbox disposition (`recorded` / `retry` / `reauth`) is
+  the typed table in `@bali/shared`. "Never refuse" is not "never check": a caller
+  with no participation row in the session **and** no active enrollment in its class
+  has no standing there, so their unlock records as an orphan (`not_enrolled`, no
+  session or class attached, the claimed id in the payload) rather than writing into
+  a stranger's history and live grid. A student removed mid-session keeps their ended
+  participation row, so the case this rule exists for is untouched.
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
 
@@ -306,6 +324,19 @@ pushes them out. The table stays the single source of truth, and no Redis is nee
 re-checks the table on a slow timer (~20s). The server writes a no-op comment line every
 ~20s so proxies don't kill idle-looking connections. Streams are capped per teacher
 account so a bug can't leak thousands of connections.
+
+The engine's `insertEvent` is the single place that rings the doorbell (a `pg_notify`
+after a genuinely new event that belongs to a session), so no writer can forget it; it
+fires inside the write's transaction, so Postgres delivers it on commit, never for a
+rolled-back event. The overlap window is `EVENT_RESUME_OVERLAP` in `@bali/shared`: a
+`seq` is handed out when a row is inserted but only becomes visible on commit, so a slow
+transaction can make a lower seq appear after a higher one. The stream re-reads a sliding
+`lastSeq − overlap` window and a reconnecting client resumes from `lastSeq − overlap`,
+both de-duping by `event_id`, so a late-committing event is still delivered exactly once.
+The boot snapshot (`GET /v1/sessions/{id}`) returns the latest seq to stream from, so the
+grid loads and goes live in one round trip. The stream reads the Authorization header only
+— never a token in the query string — so the portal drives it with `fetch`, not
+`EventSource`.
 
 ## Hosting
 
@@ -442,7 +473,11 @@ Each exists because v2 broke it and shipped a real bug
 
 1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
    and always clamped into the session's real window. (v2: a backdated phone clock erased
-   unlocks from reports and inflated focus minutes.)
+   unlocks from reports and inflated focus minutes.) The clamp orders *events*; it is not a
+   substitute for the server's own clock. `participations.last_seen_at` — the input to
+   silence, and so to every green chip — is stamped server-side, never from the device's
+   claim: a clock running fast would clamp to `ends_at`, a time in the future, and the phone
+   would never go silent however long it had been gone.
 2. **One shared state function.** Student app, teacher grid, and reports all compute
    "what state is this student in" with the same shared code. (v2: teacher saw
    "No device" while the student saw "Focused.")

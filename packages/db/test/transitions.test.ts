@@ -1,12 +1,7 @@
-import { PGlite } from '@electric-sql/pglite';
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { drizzle, type PgliteDatabase } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import * as schema from '../src/schema.js';
 import {
   armedTaps,
   classes,
@@ -14,33 +9,35 @@ import {
   events,
   participations,
   schools,
+  sessions,
   users,
 } from '../src/schema.js';
 import {
   armTap,
   checkIn,
+  endEnrollment,
   endSession,
   expireDueSessions,
   extendSession,
+  joinClassByCode,
   protectionOff,
   refocus,
   startSession,
   tapIn,
-  TransitionError,
   unlock,
 } from '../src/transitions.js';
+import { makeTestDb } from '../src/testing.js';
+import type { Database } from '../src/types.js';
 
-let pg: PGlite;
-let db: PgliteDatabase<typeof schema>;
+let db: Database;
+let close: () => Promise<void>;
 
 beforeAll(async () => {
-  pg = new PGlite();
-  db = drizzle(pg, { schema });
-  await migrate(db, { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
+  ({ db, close } = await makeTestDb());
 });
 
 afterAll(async () => {
-  await pg.close();
+  await close();
 });
 
 function one<T>(rows: T[]): T {
@@ -352,20 +349,38 @@ describe('state changes', () => {
     expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
   });
 
-  it('refuses a state change for a student who is not participating', async () => {
+  it('records an unlock for a student with no live participation instead of discarding it (ISSUES #2)', async () => {
     const { klass, student } = await seedClass('unlock-none');
     const { session } = await startSession(db, {
       classId: klass.id,
       ...window('2026-01-01T09:00:00Z'),
     });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('no_live_participation');
+    expect(u.state).toBeNull();
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+
+  it('refocus still refuses for a student with no live participation', async () => {
+    const { klass, student } = await seedClass('refocus-none');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
     await expect(
-      unlock(db, {
+      refocus(db, {
         sessionId: session.id,
         studentId: student.id,
         eventId: newUuidV7(),
         deviceTime: new Date('2026-01-01T09:05:00Z'),
       }),
-    ).rejects.toBeInstanceOf(TransitionError);
+    ).rejects.toMatchObject({ code: 'NOT_PARTICIPATING' });
   });
 
   it('the response carries the session so the phone learns the end time', async () => {
@@ -376,7 +391,200 @@ describe('state changes', () => {
       eventId: newUuidV7(),
       deviceTime: new Date('2026-01-01T09:05:00Z'),
     });
-    expect(u.session.endsAt.toISOString()).toBe(session.endsAt.toISOString());
+    expect(u.session).not.toBeNull();
+    expect(u.session?.endsAt.toISOString()).toBe(session.endsAt.toISOString());
+  });
+
+  it('records an unlock after the session has ended, clamped into the window (ISSUES #2)', async () => {
+    const { session, student } = await joined('unlock-after-end');
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:25:00Z'),
+      reason: 'ended',
+    });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:30:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('after_session_end');
+    const unlocks = (await eventsFor(session.id)).filter((e) => e.type === 'unlock');
+    expect(unlocks).toHaveLength(1);
+    // Rule 1: a device time past the bell is clamped back into the window.
+    expect(unlocks[0]!.occurredAt.getTime()).toBeLessThanOrEqual(session.endsAt.getTime());
+  });
+
+  it('records an unlock for a student removed mid-session, and survives a replay (ISSUES #2)', async () => {
+    const { session, student } = await joined('unlock-removed');
+    // The student is removed from the class mid-session: their participation ends
+    // while the session keeps running (the canonical ISSUES #2 scenario).
+    await db
+      .update(participations)
+      .set({ endedAt: new Date('2026-01-01T09:04:00Z'), endedReason: 'removed_from_class' })
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+    const eventId = newUuidV7();
+    const req = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    };
+    const first = await unlock(db, req);
+    expect(first.outcome).toBe('recorded');
+    expect(first.recordedAs).toBe('no_live_participation');
+    // A retry after a token refresh must not create a second record or throw.
+    const replay = await unlock(db, req);
+    expect(replay.outcome).toBe('replay');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+
+  it('records an unlock against an unknown session as an orphan event (ISSUES #2)', async () => {
+    const { student } = await seedClass('unlock-unknown');
+    const bogusSessionId = newUuidV7();
+    const u = await unlock(db, {
+      sessionId: bogusSessionId,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('unknown_session');
+    expect(u.session).toBeNull();
+    // Recorded with no session/class attached, carrying the claimed id in payload.
+    const orphan = one(
+      await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, student.id), eq(events.type, 'unlock'))),
+    );
+    expect(orphan.sessionId).toBeNull();
+    expect(orphan.classId).toBeNull();
+    expect(orphan.payload).toMatchObject({
+      recorded_as: 'unknown_session',
+      claimed_session_id: bogusSessionId,
+    });
+  });
+
+  it("records a stranger's unlock as an orphan rather than writing into a session they have no standing in", async () => {
+    // The victim: a real running session belonging to someone else's class.
+    const { klass } = await seedClass('unlock-stranger-victim');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    // The attacker: a fully valid account at another school, holding a good
+    // token, who has merely learned (or guessed) the session id.
+    const { student: stranger } = await seedClass('unlock-stranger-other');
+
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: stranger.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+
+    // Still recorded — rule 6 means this can never be a refusal — but as an
+    // orphan, and it hands back no session (so a stranger learns neither the
+    // class id nor the bell window).
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('not_enrolled');
+    expect(u.session).toBeNull();
+    expect(u.state).toBeNull();
+
+    const orphan = one(
+      await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, stranger.id), eq(events.type, 'unlock'))),
+    );
+    expect(orphan.sessionId).toBeNull();
+    expect(orphan.classId).toBeNull();
+    expect(orphan.payload).toMatchObject({
+      recorded_as: 'not_enrolled',
+      claimed_session_id: session.id,
+    });
+
+    // The victim's session history and live grid are untouched.
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+  });
+
+  it('refuses an unlock whose event_id already belongs to a different event, rather than swallowing it', async () => {
+    // The sharpest version of v2's lost-unlock bug. insertEvent de-dupes on
+    // event_id alone, so an unlock carrying an id the phone already spent on
+    // its own tap_in used to no-op: outcome 'replay', which the unlock contract
+    // counts as recorded, so the outbox deletes the record — an unshielded
+    // phone with zero trace. A student's app is an adversary here, and this is
+    // a one-line change on their side.
+    const { session, student } = await joined('unlock-id-reuse');
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    await expect(
+      unlock(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:05:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // Nothing recorded, and — critically — nothing claimed to be recorded.
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+    const row = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(row.state).toBe('focused');
+  });
+
+  it('refuses a protection_off whose event_id already belongs to a different event', async () => {
+    // Same hole through changeState: protection_off is an honesty record too,
+    // and swallowing it leaves the grid green for an unshielded phone.
+    const { session, student } = await joined('protoff-id-reuse');
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+    await expect(
+      protectionOff(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:05:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'protection_off')).toHaveLength(
+      0,
+    );
+  });
+
+  it('an enrolled student who never tapped in still attaches their unlock to the session', async () => {
+    // The enrollment check must not catch the ordinary case the ISSUES #2 note
+    // is written for: enrolled, present, but no participation row yet.
+    const { klass, student } = await seedClass('unlock-enrolled-no-tap');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(u.recordedAs).toBe('no_live_participation');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
   });
 
   it('a replay whose participation has since ended returns current truth, not an error', async () => {
@@ -406,6 +614,29 @@ describe('state changes', () => {
     expect(replay.outcome).toBe('replay');
     expect(replay.state).toBe('unlocked');
   });
+
+  it('a replay of an unlock for a never-participating student returns replay, not a refusal (ISSUES #2)', async () => {
+    const { klass, student } = await seedClass('unlock-norow-replay');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const eventId = newUuidV7();
+    const req = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    };
+    const first = await unlock(db, req);
+    expect(first.outcome).toBe('recorded');
+    // The student never had a participation row, so the replay path sees no row.
+    // The old changeState threw NOT_PARTICIPATING here — it must now return replay.
+    const replay = await unlock(db, req);
+    expect(replay.outcome).toBe('replay');
+    expect(replay.state).toBeNull();
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
 });
 
 describe('checkIn', () => {
@@ -434,7 +665,12 @@ describe('checkIn', () => {
     const live = one(
       await db.select().from(participations).where(eq(participations.sessionId, session.id)),
     );
-    expect(live.lastSeenAt?.toISOString()).toBe('2026-01-01T09:02:00.000Z');
+    // last_seen_at is the server's observation, never the device's claim: the
+    // heartbeat carries a 2026-01-01 device time and the row still records when
+    // this process actually heard from the phone.
+    expect(live.lastSeenAt).not.toBeNull();
+    expect(live.lastSeenAt!.getTime()).toBeGreaterThan(new Date('2026-01-02T00:00:00Z').getTime());
+    expect(Math.abs(Date.now() - live.lastSeenAt!.getTime())).toBeLessThan(60_000);
   });
 
   it('reports gone when there is no live participation', async () => {
@@ -479,6 +715,73 @@ describe('extendSession', () => {
         at: new Date('2026-01-01T09:10:00Z'),
       }),
     ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+  });
+
+  it('a replay after the session has ended returns current truth, not SESSION_NOT_RUNNING', async () => {
+    // A lost 200 on an extend that did commit: the phone retries, and by then
+    // the bell has rung. Rule 4 says re-read and answer with the truth — the
+    // old ordering threw 409 here and left the client unable to tell whether
+    // its extend had landed.
+    const { klass } = await seedClass('extend-replay-ended');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const newEnd = new Date(w.endsAt.getTime() + 10 * 60_000);
+    const eventId = newUuidV7();
+    await extendSession(db, {
+      sessionId: session.id,
+      newEndsAt: newEnd,
+      at: new Date('2026-01-01T09:20:00Z'),
+      eventId,
+    });
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:35:00Z'),
+      reason: 'ended',
+    });
+
+    const replay = await extendSession(db, {
+      sessionId: session.id,
+      newEndsAt: new Date(newEnd.getTime() + 10 * 60_000),
+      at: new Date('2026-01-01T09:36:00Z'),
+      eventId,
+    });
+    expect(replay.endsAt.toISOString()).toBe(newEnd.toISOString());
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses an event_id already spent on a different event instead of reporting a phantom extend', async () => {
+    // insertEvent de-dupes on event_id, so treating a foreign id as a replay
+    // (or carrying on past it) would move the end time with no matching event
+    // row — the session and its history disagreeing, which is the one thing
+    // this engine exists to prevent. It must be a loud refusal (rule 5).
+    const { klass, student } = await seedClass('extend-id-reuse');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        newEndsAt: new Date(w.endsAt.getTime() + 10 * 60_000),
+        at: new Date('2026-01-01T09:20:00Z'),
+        eventId,
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // The end time did not move, and no session_extended row was written.
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt.toISOString()).toBe(w.endsAt.toISOString());
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'session_extended')).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -739,5 +1042,251 @@ describe('the ended-consistency check constraint', () => {
         .set({ endedAt: new Date('2026-01-01T09:05:00Z') })
         .where(eq(participations.id, p.participationId)),
     ).rejects.toThrow();
+  });
+});
+
+describe('enrollment lifecycle', () => {
+  async function freshStudent(tag: string, schoolId: string) {
+    return one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `newstudent-${tag}`, role: 'student', schoolId })
+        .returning(),
+    );
+  }
+
+  function activeEnrollment(classId: string, studentId: string) {
+    return db
+      .select()
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.classId, classId),
+          eq(enrollments.studentId, studentId),
+          isNull(enrollments.removedAt),
+        ),
+      );
+  }
+
+  function enrollmentEvents(
+    type: 'enrollment_joined' | 'enrollment_left' | 'enrollment_removed',
+    userId: string,
+  ) {
+    return db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, type), eq(events.userId, userId)));
+  }
+
+  it('joins a class by code and records enrollment_joined', async () => {
+    const { klass, school } = await seedClass('join');
+    const newbie = await freshStudent('join', school.id);
+    const result = await joinClassByCode(db, {
+      studentId: newbie.id,
+      joinCode: klass.joinCode,
+      eventId: newUuidV7(),
+      occurredAt: new Date('2026-01-01T08:00:00Z'),
+    });
+    expect(result.outcome).toBe('joined');
+    expect(await activeEnrollment(klass.id, newbie.id)).toHaveLength(1);
+    const joined = one(await enrollmentEvents('enrollment_joined', newbie.id));
+    expect(joined.classId).toBe(klass.id);
+    expect(joined.sessionId).toBeNull();
+  });
+
+  it('joining a class you are already in is a no-op, not an error or a duplicate', async () => {
+    const { klass, student } = await seedClass('join-dup');
+    const result = await joinClassByCode(db, {
+      studentId: student.id,
+      joinCode: klass.joinCode,
+      eventId: newUuidV7(),
+      occurredAt: new Date('2026-01-01T08:00:00Z'),
+    });
+    expect(result.outcome).toBe('already_enrolled');
+    expect(await activeEnrollment(klass.id, student.id)).toHaveLength(1);
+    expect(await enrollmentEvents('enrollment_joined', student.id)).toHaveLength(0);
+  });
+
+  it('rejects an unknown join code', async () => {
+    const { school } = await seedClass('join-bad');
+    const newbie = await freshStudent('bad', school.id);
+    await expect(
+      joinClassByCode(db, {
+        studentId: newbie.id,
+        joinCode: 'NOPE-NONEXISTENT',
+        eventId: newUuidV7(),
+        occurredAt: new Date('2026-01-01T08:00:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'CLASS_NOT_FOUND' });
+  });
+
+  it('re-joining after removal adds a fresh enrollment and keeps the removed one as history', async () => {
+    const { klass, student } = await seedClass('rejoin');
+    const enr = one(await activeEnrollment(klass.id, student.id));
+    await endEnrollment(db, {
+      enrollmentId: enr.id,
+      reason: 'left_class',
+      at: new Date('2026-01-01T08:00:00Z'),
+    });
+    const result = await joinClassByCode(db, {
+      studentId: student.id,
+      joinCode: klass.joinCode,
+      eventId: newUuidV7(),
+      occurredAt: new Date('2026-01-01T09:00:00Z'),
+    });
+    expect(result.outcome).toBe('joined');
+    const all = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    expect(all).toHaveLength(2);
+    expect(all.filter((e) => e.removedAt === null)).toHaveLength(1);
+  });
+
+  it('a mid-session removal ends the live participation and records it on the session feed (one transaction)', async () => {
+    const { klass, student } = await seedClass('remove-mid');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const enr = one(await activeEnrollment(klass.id, student.id));
+
+    const result = await endEnrollment(db, {
+      enrollmentId: enr.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(result.outcome).toBe('ended');
+    expect(result.endedParticipation).toBe(true);
+
+    const removed = one(await db.select().from(enrollments).where(eq(enrollments.id, enr.id)));
+    expect(removed.removedAt).not.toBeNull();
+    const part = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+        ),
+    );
+    expect(part.endedAt).not.toBeNull();
+    expect(part.endedReason).toBe('removed_from_class');
+    // The event carries the session id so the grid's session feed surfaces it.
+    const ev = one(await enrollmentEvents('enrollment_removed', student.id));
+    expect(ev.sessionId).toBe(session.id);
+    expect(ev.classId).toBe(klass.id);
+  });
+
+  it('after a mid-session removal the check-in reads gone and a later unlock is still recorded (ISSUES #2)', async () => {
+    const { klass, student } = await seedClass('remove-then-unlock');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const enr = one(await activeEnrollment(klass.id, student.id));
+    await endEnrollment(db, {
+      enrollmentId: enr.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
+
+    const checkin = await checkIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      deviceTime: new Date('2026-01-01T09:06:00Z'),
+    });
+    expect(checkin.status).toBe('gone');
+
+    const u = await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:07:00Z'),
+    });
+    expect(u.outcome).toBe('recorded');
+    expect(u.recordedAs).toBe('no_live_participation');
+  });
+
+  it('a student leaving with no running session records an enrollment-level event', async () => {
+    const { klass, student } = await seedClass('leave-nosession');
+    const enr = one(await activeEnrollment(klass.id, student.id));
+    const result = await endEnrollment(db, {
+      enrollmentId: enr.id,
+      reason: 'left_class',
+      at: new Date('2026-01-01T08:00:00Z'),
+    });
+    expect(result.outcome).toBe('ended');
+    expect(result.endedParticipation).toBe(false);
+    const ev = one(await enrollmentEvents('enrollment_left', student.id));
+    expect(ev.sessionId).toBeNull();
+  });
+
+  it('removing an already-removed enrollment is a no-op', async () => {
+    const { klass, student } = await seedClass('remove-twice');
+    const enr = one(await activeEnrollment(klass.id, student.id));
+    await endEnrollment(db, { enrollmentId: enr.id, reason: 'removed_from_class', at: new Date() });
+    const again = await endEnrollment(db, {
+      enrollmentId: enr.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    expect(again.outcome).toBe('already_removed');
+    expect(await enrollmentEvents('enrollment_removed', student.id)).toHaveLength(1);
+  });
+
+  it('rejects removing an unknown enrollment', async () => {
+    await expect(
+      endEnrollment(db, { enrollmentId: newUuidV7(), reason: 'left_class', at: new Date() }),
+    ).rejects.toMatchObject({ code: 'ENROLLMENT_NOT_FOUND' });
+  });
+
+  it('removing a student from one class leaves their live participation in another class untouched', async () => {
+    const c = await seedClass('scope-c');
+    const d = await seedClass('scope-d');
+    // Enroll c's student into d too, start a session in d, and go live there.
+    await db.insert(enrollments).values({ classId: d.klass.id, studentId: c.student.id });
+    const { session: sessionD } = await startSession(db, {
+      classId: d.klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: sessionD.id,
+      studentId: c.student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    // Remove the student from class C (which has no running session).
+    const enrC = one(await activeEnrollment(c.klass.id, c.student.id));
+    const result = await endEnrollment(db, {
+      enrollmentId: enrC.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
+    expect(result.endedParticipation).toBe(false);
+    // The student's class-D participation is untouched — removal is scoped to C.
+    const liveD = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, sessionD.id),
+            eq(participations.studentId, c.student.id),
+          ),
+        ),
+    );
+    expect(liveD.endedAt).toBeNull();
   });
 });

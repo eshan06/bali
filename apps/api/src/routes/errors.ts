@@ -12,6 +12,11 @@ const STATUS_BY_CODE: Record<TransitionErrorCode, () => ApiError> = {
   SESSION_NOT_RUNNING: () => ApiError.conflict('session has ended'),
   NOT_PARTICIPATING: () => ApiError.conflict('not in this session'),
   INVALID_EXTENSION: () => ApiError.badInput('new end time must be later than the current one'),
+  // The client reused an event_id that already belongs to a different event, so
+  // the write cannot be made idempotently — a conflict, and never silent.
+  EVENT_ID_CONFLICT: () => ApiError.conflict('event_id already used by another event'),
+  CLASS_NOT_FOUND: () => ApiError.notFound('no class with that join code'),
+  ENROLLMENT_NOT_FOUND: () => ApiError.notFound('enrollment not found'),
 };
 
 /** Run `fn`, converting any TransitionError into the matching ApiError. */

@@ -4,13 +4,18 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-19 — quality gates installed (this PR)._
+_Last updated: 2026-09-20 — Phase 2 merged to `main` (this PR)._
 
 ## Now
 
-- **Phase 2 is code-complete** (steps 1–8) on branch `claude/laughing-sagan-y2tvkc` — needs: merge to `main`, then its exit demo run against the Railway dev environment.
-- **Quality gates land in this PR**: CLAUDE.md, this file, Claude Review (blocking), plan backstop, CONTRIBUTING, PR template. Owner is configuring branch protection.
-- **Next up:** merge Phase 2 → exit demo vs dev → start Phase 3 (iOS student app).
+- **Phase 2 is merged to `main`** (steps 1–8) — the walking skeleton is complete: session lifecycle over HTTP, events feed + SSE live grid, teacher portal, phone simulator.
+- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
+- **Owner actions:** add "Integration + race tests (real Postgres)" to the
+  `protect-main` ruleset's required checks (the job exists on `main` as of this
+  merge); and **repoint the Railway dev cron** from `/internal/sessions/expire`
+  to `/internal/sweep` — the route was renamed in Phase 2, so the old path 404s
+  and sessions would stop expiring in dev until it is updated.
+- **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -18,7 +23,7 @@ _Last updated: 2026-09-19 — quality gates installed (this PR)._
 |---|---|---|
 | 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
-| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ code done on `claude/laughing-sagan-y2tvkc` · ⏳ merge + dev exit demo |
+| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
 | 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
@@ -72,6 +77,49 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — `last_seen_at` is stamped with the server's clock, not the
+  device's clamped timestamp. The clamp orders events; liveness is an
+  observation the server makes. Keying silence off the device's claim let a
+  phone with a fast clock pin `last_seen_at` to `ends_at` and stay green for the
+  rest of the lesson (rule 3's v2 bug), and a slow one flap the episode open and
+  shut against decision 7's "exactly once".
+- **2026-09-20** — An `event_id` identifies one event, checked at `insertEvent`.
+  Reusing an id for a *different* event is a client bug, not a replay: treating
+  it as one silently dropped the write, and on the unlock path 'replay' is a
+  recorded outcome, so the phone would delete a record the server never stored —
+  v2's lost-unlock bug through a different door. It is now `EVENT_ID_CONFLICT` →
+  409, which the unlock contract reads as "keep the record, retry, surface".
+- **2026-09-20** — Emergency unlock gets the one authorization check the rule
+  allows. `POST /v1/sessions/:id/unlock` previously accepted any valid token for
+  any session id, so a stranger could write permanent rows into another
+  teacher's history and live grid. A refusal is still forbidden (the phone would
+  read it as "discard"), so a caller with no participation row in the session
+  *and* no active enrollment in its class now records as an orphan
+  (`recorded_as: 'not_enrolled'`, no session/class attached, the claimed id in
+  the payload) — durable, but unattached. A student removed mid-session keeps
+  their ended participation row, so ISSUES #2's actual case is unchanged.
+- **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
+  ended-session guard and scoped to this session's own `session_extended` rows.
+  An id already spent on a different event is now a 409 rather than a reported
+  "extended" for a write that never happened: `insertEvent` de-dupes on
+  `event_id`, so carrying on would have moved the end time with no matching
+  event row — the session and its history disagreeing.
+- **2026-09-20** — `POST /v1/classes` ships without an idempotency key: a lost
+  response that the client retries leaves two identically named classes with
+  different join codes. Accepted for now because it is visible and correctable
+  by the teacher, and because classes do not pass through the event log, so the
+  fix needs its own mechanism rather than an `event_id`. Tracked here; it lands
+  with the portal work that actually calls it.
+- **2026-09-20** — Portal auth ships access-token-only for the Phase 2 skeleton:
+  no refresh token is requested or stored, so a teacher is signed out when the
+  ~1h Cognito access token expires. Deliberate for the walking skeleton and
+  written down rather than silently omitted; token renewal lands with the real
+  portal UI (ARCHITECTURE.md auth decision 2 assumes it).
+- **2026-09-20** — Bali Design System created at [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
+  (tokens, brand book, reference screens); UI work designs against it.
+- **2026-09-19** — Plan-then-go (no plan-approval gate) and no-Claude-attribution
+  adopted as standing rules; ecc `/plan` and `/santa-loop` ported as the loop's
+  planner and verifier.
 - **2026-09-19** — Quality gates: `main` protected (PRs only, no human-approval
   requirement while the team is 1), Claude Review is a required blocking check
   (Opus), "Plan doc updated" backstop with `[no-plan]` escape, tests required

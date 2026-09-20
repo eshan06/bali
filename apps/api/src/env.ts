@@ -61,6 +61,14 @@ const envSchema = z.object({
    * that it can't be guessed.
    */
   INTERNAL_API_KEY: z.string().min(16),
+  /**
+   * Comma-separated browser origins allowed by CORS (the web portal). Unset —
+   * the default — means no CORS headers at all, which is correct while the API
+   * is called only by native apps and server-to-server. Set it to the portal's
+   * origin(s) (e.g. `http://localhost:3000`) once the browser portal talks to
+   * this API.
+   */
+  CORS_ORIGINS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
