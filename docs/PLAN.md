@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — dev is live on Phase 2; gates made Dependabot-aware, postcss patched (this PR)._
+_Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patched, gates Dependabot-aware, web-session install hook._
 
 ## Now
 
