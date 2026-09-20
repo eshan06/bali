@@ -87,7 +87,8 @@ under-13 parental-consent machinery.
   Dependabot secrets store, since GitHub withholds Actions secrets from
   Dependabot-triggered workflows.
 - **2026-09-20** — Dependabot policy: alerts and security PRs stay on. The plan
-  backstop exempts Dependabot PRs; patch/minor bumps get auto-merge armed
+  backstop exempts Dependabot's manifest-only PRs (author and content both
+  checked); patch/minor bumps get auto-merge armed
   automatically (merge still requires every required check green); majors are
   handled deliberately by a session. First case: postcss's high-severity alert
   is fixed by a root npm override to `^8.5.23` instead of riding Dependabot's

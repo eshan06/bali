@@ -28,12 +28,15 @@ jobs:
             echo "No source changes — plan update not required."
             exit 0
           fi
-          # A diff that is nothing but dependency manifests (Dependabot's whole
-          # output) carries no plan-worthy decisions. Content-based on purpose:
-          # a real source commit pushed onto a Dependabot branch still trips
-          # the backstop (policy: docs/PLAN.md, 2026-09-20).
-          if ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
-            echo "Manifest-only change — plan update not required."
+          # Dependabot's PRs are exempt while they stay what Dependabot ships:
+          # nothing but dependency-manifest changes. Both conditions on purpose:
+          # a human commit on a Dependabot branch makes the diff non-manifest
+          # and trips the backstop, and a session adding a new dependency (a
+          # plan-worthy decision) is not exempt merely because its diff is
+          # manifest-only (policy: docs/PLAN.md, 2026-09-20).
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ] \
+            && ! echo "$CHANGED" | grep -vqE '(^|/)package(-lock)?\.json$'; then
+            echo "Dependabot manifest-only change — plan update not required."
             exit 0
           fi
           if echo "$CHANGED" | grep -q '^docs/PLAN\.md$'; then
