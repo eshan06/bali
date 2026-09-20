@@ -4,18 +4,22 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — Phase 2 merged to `main` (this PR)._
+_Last updated: 2026-09-20 — dev is live on Phase 2; gates made Dependabot-aware, postcss patched (this PR)._
 
 ## Now
 
 - **Phase 2 is merged to `main`** (steps 1–8) — the walking skeleton is complete: session lifecycle over HTTP, events feed + SSE live grid, teacher portal, phone simulator.
+- **Dev runs Phase 2** (2026-09-20): Railway auto-deploy repaired (the Railway
+  GitHub App was never installed — it is now), environment renamed `dev`, and
+  the sweep cron created: it POSTs `/internal/sweep` every minute and returns
+  healthy. (The earlier "repoint the cron" note is settled; the Phase 1 path is
+  kept as an alias, nothing 404s.)
+- **Owner actions from the Phase 2 merge: done** — "Integration + race tests
+  (real Postgres)" is now a required check, and the Claude workflows bill the
+  owner's subscription (see decision log).
 - **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
-- **Owner actions:** add "Integration + race tests (real Postgres)" to the
-  `protect-main` ruleset's required checks (the job exists on `main` as of this
-  merge); and **repoint the Railway dev cron** from `/internal/sessions/expire`
-  to `/internal/sweep` — the route was renamed in Phase 2, so the old path 404s
-  and sessions would stop expiring in dev until it is updated.
-- **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
+- **Next up:** exit demo vs dev → retroactive audit of pre-gates Phase 1 code →
+  start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -77,6 +81,18 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
+  with the owner's Max subscription (`CLAUDE_CODE_OAUTH_TOKEN`), replacing
+  prepaid API credits; reviewer model unchanged. The token also lives in the
+  Dependabot secrets store, since GitHub withholds Actions secrets from
+  Dependabot-triggered workflows.
+- **2026-09-20** — Dependabot policy: alerts and security PRs stay on. The plan
+  backstop exempts Dependabot PRs; patch/minor bumps get auto-merge armed
+  automatically (merge still requires every required check green); majors are
+  handled deliberately by a session. First case: postcss's high-severity alert
+  is fixed by a root npm override to `^8.5.23` instead of riding Dependabot's
+  Next 15→16 major (#8); the override retires when Next 16 lands as its own
+  task.
 - **2026-09-20** — `last_seen_at` is stamped with the server's clock, not the
   device's clamped timestamp. The clamp orders events; liveness is an
   observation the server makes. Keying silence off the device's claim let a
