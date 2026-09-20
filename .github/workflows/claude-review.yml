@@ -30,7 +30,10 @@ jobs:
       - name: Claude reviews the diff
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Billed to the owner's Claude subscription, not API credits. If
+          # reviews start failing with credential errors, re-run
+          # `claude setup-token` locally and update this repo secret.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --model claude-opus-5
             --allowedTools "Bash(git diff:*),Bash(git log:*),Read,Grep,Glob,Write"
