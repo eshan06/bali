@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patched, gates Dependabot-aware, web-session install hook._
+_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed and being fixed as gated PRs._
 
 ## Now
 
@@ -18,8 +18,13 @@ _Last updated: 2026-09-20 — pipeline hardening series (#9–#11): postcss patc
   (real Postgres)" is now a required check, and the Claude workflows bill the
   owner's subscription (see decision log).
 - **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
-- **Next up:** exit demo vs dev → retroactive audit of pre-gates Phase 1 code →
-  start Phase 3 (iOS student app).
+- **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
+  reviewed against `apps/` + `packages/`; nine reproduced and are landing as
+  small gated PRs (offset timestamps, SSE write-after-end, the armTap race,
+  tap/extend idempotency, block re-registration, portal backoff and staleness,
+  one SQLSTATE helper). The `POST /v1/classes` idempotency deferral was
+  re-examined and stands — see the decision log.
+- **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -81,12 +86,24 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads,
+  nine confirmed against the code and fixed, one dropped as already-adjudicated.
+  The theme is that the gates (tests-with-code, Claude Review, the race lane)
+  caught what they were pointed at and the un-gated code drifted underneath:
+  four of the nine were idempotency or race holes on paths whose *happy* case
+  was tested. `POST /v1/classes`'s missing idempotency key (below) was
+  re-examined as part of the audit and deliberately left as it stands.
 - **2026-09-20** — Web sessions install dependencies via a repo-tracked
   SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
   environment's setup-script field (it ran outside the repo root and broke
   every web session at startup; the field stays empty). Tracked hook means
   checking out a branch runs that branch's hook — accepted for a
-  single-owner repo; revisit before adding outside contributors.
+  single-owner repo; revisit before adding outside contributors. The hook's
+  drift guard deliberately tolerates a session's own uncommitted dependency
+  work: it snapshots the lockfile around the install (one-shot per container)
+  rather than treating an edited lockfile as drift, and CI's `npm ci` remains
+  the backstop that catches a lockfile genuinely out of step with the
+  manifests.
 - **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
   with the owner's Max subscription (`CLAUDE_CODE_OAUTH_TOKEN`), replacing
   prepaid API credits; reviewer model unchanged. The token also lives in the
