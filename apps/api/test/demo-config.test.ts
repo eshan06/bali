@@ -137,8 +137,10 @@ describe('normalizeBase', () => {
 });
 
 describe('createCall', () => {
-  const responds = (body: string, status = 200): typeof fetch =>
-    (() => Promise.resolve(new Response(body, { status }))) as unknown as typeof fetch;
+  const responds =
+    (body: string, status = 200): typeof fetch =>
+    () =>
+      Promise.resolve(new Response(body, { status }));
 
   it('names the request when a 200 is not JSON', async () => {
     // A proxy or captive portal answering 200 with HTML would otherwise die as
