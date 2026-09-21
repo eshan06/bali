@@ -47,14 +47,25 @@ export interface CognitoCredentials {
  * the top-level message alone says nothing an operator can act on.
  */
 function detailOf(err: unknown): string {
-  const seen: string[] = [];
-  let current: unknown = err;
-  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
-    const message = current.message.trim();
-    if (message && !seen.includes(message)) seen.push(message);
-    current = current.cause;
-  }
-  return seen.length > 0 ? seen.join(' — ') : String(err);
+  const found: string[] = [];
+  const visited = new Set<unknown>();
+  const visit = (node: unknown, depth: number): void => {
+    if (depth > 4 || !(node instanceof Error) || visited.has(node)) return;
+    visited.add(node);
+    const message = node.message.trim();
+    if (message && !found.includes(message)) found.push(message);
+    // A host resolving to several addresses that all refuse the connection
+    // arrives as an AggregateError whose own message is EMPTY, with the real
+    // per-address failures on `errors` — walking `cause` alone would report
+    // "fetch failed" and nothing else, which is what this function exists to
+    // stop.
+    if (node instanceof AggregateError) {
+      for (const inner of node.errors) visit(inner, depth + 1);
+    }
+    visit(node.cause, depth + 1);
+  };
+  visit(err, 0);
+  return found.length > 0 ? found.join(' — ') : String(err);
 }
 
 /**
@@ -83,16 +94,40 @@ function redact(text: string, secret: string): string {
  * lookalike.
  */
 function redactInPlace(err: unknown, secret: string): void {
-  let current: unknown = err;
-  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
-    try {
-      current.message = redact(current.message, secret);
-    } catch {
-      // A frozen error cannot be scrubbed; the message we throw is redacted
-      // regardless, and there is nothing else useful to do here.
+  const visited = new Set<object>();
+  const scrub = (node: unknown, depth: number): void => {
+    if (depth > 4 || node === null || typeof node !== 'object' || visited.has(node)) return;
+    visited.add(node);
+
+    if (node instanceof Error) {
+      try {
+        node.message = redact(node.message, secret);
+      } catch {
+        // A frozen error cannot be scrubbed; the message we throw is redacted
+        // regardless, and there is nothing else useful to do here.
+      }
+      if (node instanceof AggregateError) {
+        for (const inner of node.errors) scrub(inner, depth + 1);
+      }
+      scrub(node.cause, depth + 1);
     }
-    current = current.cause;
-  }
+
+    // Messages are not the only thing printed: inspecting an error prints its
+    // enumerable own properties too, so a client that hangs the request body
+    // off the error puts the secret there rather than in any message.
+    for (const [key, value] of Object.entries(node)) {
+      if (typeof value === 'string') {
+        try {
+          (node as Record<string, unknown>)[key] = redact(value, secret);
+        } catch {
+          // Frozen, as above.
+        }
+      } else {
+        scrub(value, depth + 1);
+      }
+    }
+  };
+  scrub(err, 0);
 }
 
 /** The endpoint for a region — exported so callers can report what they called. */

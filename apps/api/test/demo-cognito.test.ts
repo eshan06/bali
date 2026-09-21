@@ -171,6 +171,59 @@ describe('fetchCognitoAccessToken', () => {
     expect(printed).toContain('<redacted>');
   });
 
+  it('redacts a password hung off the error as a property, not just a message', async () => {
+    // Inspecting an error prints its enumerable own properties, so a client
+    // that attaches the request leaks through a path no message-only scrub
+    // reaches.
+    const chatty = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('socket hang up'), {
+        request: { body: `{"PASSWORD":"${creds.password}"}` },
+      }),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(chatty);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+  });
+
+  it('reports the per-address failures inside an AggregateError', async () => {
+    // A host resolving to several addresses that all refuse arrives as an
+    // AggregateError with an EMPTY message: walking `cause` alone reports
+    // "fetch failed" and buries the reason.
+    const aggregate = new AggregateError(
+      [new Error('connect ECONNREFUSED 10.0.0.1:443'), new Error('connect ECONNREFUSED ::1:443')],
+      '',
+    );
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause: aggregate }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('ECONNREFUSED');
+  });
+
+  it('redacts a password buried in an AggregateError member', async () => {
+    const aggregate = new AggregateError([new Error(`sent {"PASSWORD":"${creds.password}"}`)], '');
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause: aggregate }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+  });
+
   it('keeps the timeout path free of the password too', async () => {
     const timeout = Object.assign(new TypeError('fetch failed'), {
       name: 'TimeoutError',
