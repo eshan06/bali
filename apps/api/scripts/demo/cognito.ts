@@ -57,10 +57,42 @@ function detailOf(err: unknown): string {
   return seen.length > 0 ? seen.join(' — ') : String(err);
 }
 
-/** Remove a secret from text that is about to be thrown or printed. */
+/**
+ * Remove a secret from text that is about to be thrown or printed — in both the
+ * raw form and the JSON-escaped one, since a client that echoes the request body
+ * quotes it, and a password containing `"` or `\` would otherwise sail straight
+ * through an exact-substring match.
+ */
 function redact(text: string, secret: string): string {
   if (!secret) return text;
-  return text.split(secret).join('<redacted>');
+  let out = text.split(secret).join('<redacted>');
+  const escaped = JSON.stringify(secret).slice(1, -1);
+  if (escaped !== secret) out = out.split(escaped).join('<redacted>');
+  return out;
+}
+
+/**
+ * Scrub a secret out of a caught error and its whole cause chain, in place.
+ *
+ * Redacting only the message we throw is not enough: the caught error rides
+ * along as `cause`, and Node prints the entire chain whenever an error is
+ * inspected — which is exactly what the demo's top-level handler does — so the
+ * secret would land in the transcript one line below the redacted copy.
+ * Scrubbing the objects themselves also covers anything else that inspects them
+ * later, and keeps the real error attached as the cause rather than a
+ * lookalike.
+ */
+function redactInPlace(err: unknown, secret: string): void {
+  let current: unknown = err;
+  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    try {
+      current.message = redact(current.message, secret);
+    } catch {
+      // A frozen error cannot be scrubbed; the message we throw is redacted
+      // regardless, and there is nothing else useful to do here.
+    }
+    current = current.cause;
+  }
 }
 
 /** The endpoint for a region — exported so callers can report what they called. */
@@ -113,6 +145,9 @@ export async function fetchCognitoAccessToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
+    // Before anything else: the fetch layer's error may quote the request body,
+    // so scrub the secret out of it and its causes while it is still ours.
+    redactInPlace(err, credentials.password);
     // Only a timeout is reported as one: a mistyped region fails DNS instantly,
     // and telling the operator to look at Cognito's latency would point them
     // away from the thing they actually got wrong.

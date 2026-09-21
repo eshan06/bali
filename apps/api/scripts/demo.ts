@@ -328,8 +328,18 @@ async function main(): Promise<void> {
     const cal = byKey('cal');
 
     line('8:08am — Ben comes back');
-    // Ben's own check-in, with no pump running, so the episode is closed by his
-    // return and nothing else. Starting the pump first would let a background
+    // The room reports in first: the pump has been stopped since the silence
+    // incident, and Ana's and Dana's last beat can already be ~30s old, so this
+    // restores the full margin to the 90s threshold before the long stretch
+    // below rather than spending part of it on the gap between pumps.
+    for (const other of others) {
+      await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
+        token: other.token,
+        body: { deviceTime: iso() },
+      });
+    }
+    // Then Ben's own check-in, with no pump running, so the episode is closed by
+    // his return and nothing else. Starting the pump first would let a background
     // beat win the race: every assertion would still pass, but the incident
     // would prove "some check-in closed it" rather than "Ben's return did", and
     // a regression in exactly that path would be masked.

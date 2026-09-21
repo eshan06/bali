@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cognitoEndpoint, fetchCognitoAccessToken } from '../scripts/demo/cognito.js';
@@ -140,8 +141,49 @@ describe('fetchCognitoAccessToken', () => {
       (e: unknown) => e as Error,
     );
 
-    expect(err?.message).not.toContain(creds.password);
-    expect(err?.message).toContain('<redacted>');
+    // Inspect the WHOLE error, cause chain included: asserting only on
+    // `.message` is what let a leak through `{ cause: err }` pass review — the
+    // demo's top-level handler prints the inspected error, so that is the thing
+    // that actually reaches a CI transcript.
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(creds.password);
+    expect(printed).toContain('<redacted>');
+  });
+
+  it('redacts a password that the fetch layer JSON-escaped', async () => {
+    // A quoted body escapes `"` and `\\`, so an exact-substring match alone
+    // would print such a password in full.
+    const awkward = { username: creds.username, password: 'pa"ss\\word' };
+    const escaped = JSON.stringify(awkward.password).slice(1, -1);
+    const chatty = Object.assign(new TypeError('fetch failed'), {
+      cause: new Error(`body was {"PASSWORD":"${escaped}"}`),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(chatty);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, awkward).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(awkward.password);
+    expect(printed).not.toContain(escaped);
+    expect(printed).toContain('<redacted>');
+  });
+
+  it('keeps the timeout path free of the password too', async () => {
+    const timeout = Object.assign(new TypeError('fetch failed'), {
+      name: 'TimeoutError',
+      cause: new Error(`sending {"PASSWORD":"${creds.password}"}`),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(timeout);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
   });
 
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {
