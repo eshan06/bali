@@ -157,6 +157,14 @@ describe('createCall', () => {
     expect(err?.message).toContain('<html>');
   });
 
+  it('names the status that actually came back, not a hardcoded 200', async () => {
+    const call = createCall('https://api.example.test', responds('<html>hi</html>', 201));
+
+    await expect(call('POST', '/v1/thing', { expectStatus: 201 })).rejects.toThrow(
+      /→ 201 but not JSON/,
+    );
+  });
+
   it('returns null for an empty body rather than throwing', async () => {
     const call = createCall('https://api.example.test', responds(''));
 

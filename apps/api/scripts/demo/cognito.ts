@@ -40,6 +40,23 @@ export interface CognitoCredentials {
   password: string;
 }
 
+/**
+ * The readable detail of a failure, cause chain included. Node's fetch reports
+ * every network error as a bare `TypeError: fetch failed` and puts the part
+ * worth reading — ENOTFOUND, ECONNREFUSED, a TLS message — on `err.cause`, so
+ * the top-level message alone says nothing an operator can act on.
+ */
+function detailOf(err: unknown): string {
+  const seen: string[] = [];
+  let current: unknown = err;
+  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    const message = current.message.trim();
+    if (message && !seen.includes(message)) seen.push(message);
+    current = current.cause;
+  }
+  return seen.length > 0 ? seen.join(' — ') : String(err);
+}
+
 /** Remove a secret from text that is about to be thrown or printed. */
 function redact(text: string, secret: string): string {
   if (!secret) return text;
@@ -110,7 +127,7 @@ export async function fetchCognitoAccessToken(
     // this module promises a password never leaves it, and an interceptor or a
     // future client that echoed the request body would otherwise put
     // DEMO_PASSWORD straight into a CI transcript. Structural, not incidental.
-    const detail = err instanceof Error ? err.message : String(err);
+    const detail = detailOf(err);
     throw new Error(
       `Cognito sign-in for ${credentials.username} could not reach ` +
         `${cognitoEndpoint(config.region)}: ${redact(detail, credentials.password)}`,

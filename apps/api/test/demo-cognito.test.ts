@@ -108,12 +108,12 @@ describe('fetchCognitoAccessToken', () => {
   it('does NOT report a DNS failure as a timeout — that points at the wrong thing', async () => {
     // A mistyped DEMO_COGNITO_REGION fails resolution instantly; blaming
     // Cognito's latency would send the operator looking in the wrong place.
-    const dns = Object.assign(
-      new Error('getaddrinfo ENOTFOUND cognito-idp.us-east-99.amazonaws.com'),
-      {
-        name: 'TypeError',
-      },
-    );
+    // The shape Node's fetch really produces: a bare `TypeError: fetch failed`
+    // whose readable half lives on `cause`. An error carrying ENOTFOUND in its
+    // own message would pass this test while the real path stayed vague.
+    const dns = Object.assign(new TypeError('fetch failed'), {
+      cause: new Error('getaddrinfo ENOTFOUND cognito-idp.us-east-99.amazonaws.com'),
+    });
     const fetchImpl = vi.fn().mockRejectedValue(dns);
 
     const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(

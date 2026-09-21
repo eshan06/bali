@@ -13,15 +13,15 @@ export interface CallOpts {
 
 export type Call = <T>(method: string, path: string, opts?: CallOpts) => Promise<T>;
 
+/** A stalled request must become a message, not a stare. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 /**
  * A caller bound to one API base URL. An unexpected status throws with the body
  * attached: against a deployed API the body is usually the whole diagnosis
  * (`teacher access required`, `session not found`), and swallowing it would turn
  * a clear failure into a mystery.
  */
-/** A stalled request must become a message, not a stare. */
-const DEFAULT_TIMEOUT_MS = 30_000;
-
 export function createCall(
   base: string,
   fetchImpl: typeof fetch = fetch,
@@ -59,9 +59,10 @@ export function createCall(
     try {
       return JSON.parse(text) as T;
     } catch (err) {
-      // A proxy or captive portal answering 200 with HTML would otherwise die
-      // as a bare SyntaxError naming no request at all.
-      throw new Error(`${method} ${path} → 200 but not JSON: ${text.slice(0, 200)}`, {
+      // A proxy or captive portal answering with HTML would otherwise die as a
+      // bare SyntaxError naming no request at all. Report the status that
+      // actually came back, not a hardcoded 200 — `want` is configurable.
+      throw new Error(`${method} ${path} → ${status} but not JSON: ${text.slice(0, 200)}`, {
         cause: err,
       });
     }
