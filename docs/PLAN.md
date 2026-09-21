@@ -46,6 +46,13 @@ _Last updated: 2026-09-21 — exit demo wired for deployed environments (remote 
   Railway's TCP proxy — publishing the dev database, which is not worth it for
   two statements. Teacher provisioning is deliberately out-of-band until the
   Phase 4 invite-code work.
+- **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
+  scrubs enumerable own properties, not just messages (inspecting an error
+  prints them, so a client hanging the request body off it leaked through a path
+  no message-only scrub reached), and both the redaction and the detail walk
+  follow `AggregateError.errors` as well as `cause` — a host whose addresses all
+  refuse arrives as an AggregateError with an empty message, so the operator was
+  getting "fetch failed" and nothing else.
 - **Exit-demo follow-ups from #14's review (done):** Ben's own check-in closes
   his silence episode with no pump running, so the incident proves his return
   did it rather than "some check-in did"; a fetch failure reports its cause
