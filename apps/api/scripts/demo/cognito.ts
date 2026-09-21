@@ -90,9 +90,19 @@ export async function fetchCognitoAccessToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
+    // Only a timeout is reported as one: a mistyped region fails DNS instantly,
+    // and telling the operator to look at Cognito's latency would point them
+    // away from the thing they actually got wrong.
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      throw new Error(
+        `Cognito sign-in for ${credentials.username} did not answer within ${timeoutMs}ms ` +
+          `(${cognitoEndpoint(config.region)})`,
+        { cause: err },
+      );
+    }
     throw new Error(
-      `Cognito sign-in for ${credentials.username} did not answer within ${timeoutMs}ms ` +
-        `(${cognitoEndpoint(config.region)})`,
+      `Cognito sign-in for ${credentials.username} could not reach ` +
+        `${cognitoEndpoint(config.region)}: ${err instanceof Error ? err.message : String(err)}`,
       { cause: err },
     );
   }

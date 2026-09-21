@@ -94,6 +94,38 @@ describe('fetchCognitoAccessToken', () => {
     );
   });
 
+  it('reports a timeout as a timeout', async () => {
+    const timeout = Object.assign(new Error('The operation was aborted'), {
+      name: 'TimeoutError',
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(timeout);
+
+    await expect(fetchCognitoAccessToken({ ...config, fetchImpl }, creds)).rejects.toThrow(
+      /did not answer within 30000ms/,
+    );
+  });
+
+  it('does NOT report a DNS failure as a timeout — that points at the wrong thing', async () => {
+    // A mistyped DEMO_COGNITO_REGION fails resolution instantly; blaming
+    // Cognito's latency would send the operator looking in the wrong place.
+    const dns = Object.assign(
+      new Error('getaddrinfo ENOTFOUND cognito-idp.us-east-99.amazonaws.com'),
+      {
+        name: 'TypeError',
+      },
+    );
+    const fetchImpl = vi.fn().mockRejectedValue(dns);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).not.toMatch(/did not answer within/);
+    expect(err?.message).toMatch(/ENOTFOUND/);
+    expect(err?.message).toContain('cognito-idp.us-east-1.amazonaws.com');
+  });
+
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {
     const fetchImpl = vi
       .fn()

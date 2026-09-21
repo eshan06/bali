@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeBase } from '../scripts/demo/http.js';
+import { createCall, normalizeBase } from '../scripts/demo/http.js';
 import {
   type DemoActorSpec,
   passwordVar,
@@ -133,5 +133,39 @@ describe('normalizeBase', () => {
     };
 
     expect(() => resolveRemoteConfig(env, [TEACHER, ANA])).toThrow(/DEMO_SWEEP_WAIT_MS/);
+  });
+});
+
+describe('createCall', () => {
+  const responds =
+    (body: string, status = 200): typeof fetch =>
+    () =>
+      Promise.resolve(new Response(body, { status }));
+
+  it('names the request when a 200 is not JSON', async () => {
+    // A proxy or captive portal answering 200 with HTML would otherwise die as
+    // a bare SyntaxError naming no request at all.
+    const call = createCall('https://api.example.test', responds('<html>hi</html>'));
+
+    const err = await call('GET', '/v1/me').then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('GET /v1/me');
+    expect(err?.message).toContain('200 but not JSON');
+    expect(err?.message).toContain('<html>');
+  });
+
+  it('returns null for an empty body rather than throwing', async () => {
+    const call = createCall('https://api.example.test', responds(''));
+
+    await expect(call('POST', '/v1/thing')).resolves.toBeNull();
+  });
+
+  it('attaches the response body to an unexpected status', async () => {
+    const call = createCall('https://api.example.test', responds('{"error":"nope"}', 409));
+
+    await expect(call('POST', '/v1/classes')).rejects.toThrow(/409 \(wanted 200\).*nope/s);
   });
 });

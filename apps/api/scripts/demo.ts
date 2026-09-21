@@ -330,7 +330,11 @@ async function main(): Promise<void> {
     // slow-but-healthy run drifts Ana and Dana past the 90s threshold and the
     // sweep opens episodes the "exactly one" assertions below forbid.
     const cal = byKey('cal');
-    const roomBeats = startHeartbeats(call, sid, others);
+    // Everyone this time, Ben included: his episode is closed by the check-in at
+    // the top of this block, and a phone that is back is a phone that checks in.
+    // Reusing `others` here would leave him silent across three liveWaitMs
+    // budgets, and the sweep would open a second episode the assertions forbid.
+    const roomBeats = startHeartbeats(call, sid, students);
     await withHeartbeats(roomBeats, async () => {
       line('8:08am — Ben comes back');
       const benBack = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {

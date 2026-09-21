@@ -55,7 +55,16 @@ export function createCall(
     if (status !== want) {
       throw new Error(`${method} ${path} → ${status} (wanted ${want}): ${text}`);
     }
-    return (text ? JSON.parse(text) : null) as T;
+    if (!text) return null as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch (err) {
+      // A proxy or captive portal answering 200 with HTML would otherwise die
+      // as a bare SyntaxError naming no request at all.
+      throw new Error(`${method} ${path} → 200 but not JSON: ${text.slice(0, 200)}`, {
+        cause: err,
+      });
+    }
   };
 }
 
