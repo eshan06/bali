@@ -45,11 +45,14 @@ describe('DeviceTime', () => {
     expect(DeviceTime.safeParse(value).success).toBe(false);
   });
 
-  it('never accepts a string that Date cannot parse', () => {
+  it('accepts nothing that Date reads as an invalid instant', () => {
     // Load-bearing, not hygiene: the engine documents an unparseable deviceTime
     // reaching the NOT NULL occurred_at column as a real hazard, and this
     // schema's 400 is the only thing standing in front of it
-    // (packages/db/src/transitions.ts, unlock's caller preconditions).
+    // (packages/db/src/transitions.ts, unlock's caller preconditions). This
+    // checks the table above, not every accepted string — zod's own grammar
+    // bounds the offset to ±23:59 and validates the calendar day, so the
+    // property holds by construction rather than by this assertion.
     for (const [, value] of accepted) {
       expect(Number.isNaN(new Date(value).getTime())).toBe(false);
     }

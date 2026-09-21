@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: eight findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
 
 ## Now
 
@@ -19,14 +19,14 @@ _Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code:
   owner's subscription (see decision log).
 - **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
 - **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
-  reviewed against `apps/` + `packages/`; eight reproduced and are landing as
+  reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
-  (**landed**), the armTap insert race, a replayed tap re-resolved to another
-  session, block re-registration by the tag's own teacher, extend's arithmetic
-  outside the engine transaction, the portal's reconnect backoff, the portal's
-  staleness banner, and one shared SQLSTATE helper. Of the two that did not:
-  the reported SSE write-after-end crash cannot happen (see the decision log),
-  and the `POST /v1/classes` idempotency deferral was re-examined and stands.
+  (**landed**), the SSE stream's borrowed crash-safety, the armTap insert race,
+  a replayed tap re-resolved to another session, block re-registration by the
+  tag's own teacher, extend's arithmetic outside the engine transaction, the
+  portal's reconnect backoff, the portal's staleness banner, and one shared
+  SQLSTATE helper. The tenth, `POST /v1/classes`'s missing idempotency key, was
+  re-examined and the deferral stands.
 - **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
 
 ## Phases
@@ -90,17 +90,35 @@ under-13 parental-consent machinery.
 ## Decision log
 
 - **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads
-  checked against the code, eight reproduced and are being fixed as a series of
+  checked against the code, nine reproduced and are being fixed as a series of
   gated PRs (status in **Now**; this entry records what the audit decided, not
-  work already on `main`). Four of the eight are idempotency or race holes on
+  work already on `main`). Four of the nine are idempotency or race holes on
   paths whose *happy* case was already tested — the shape of what the gates
   miss, and the argument for keeping the real-Postgres lane required.
-  Two leads were rejected. The SSE "a write after end kills the whole API
-  process" report does not reproduce: Fastify keeps an `'error'` listener on
-  the response across `reply.hijack()`, so that error is absorbed rather than
-  fatal — verified on the running route, not by reading. `POST /v1/classes`'s
-  missing idempotency key (below) was re-examined and deliberately left as it
-  stands.
+  `POST /v1/classes`'s missing idempotency key (below) was the one lead
+  rejected: re-examined and deliberately left as it stands.
+- **2026-09-20** — The SSE stream's crash-safety is borrowed, so the route will
+  own it. The audit reported that a write after `end()` on the hijacked
+  response is an unhandled `'error'` and kills the API process. Measured on the
+  running route, the reported chain does not fire *as the app is configured
+  today*, for a narrower reason than it looks: the error only emits while the
+  response still has data buffered (before `'finish'`), and in exactly that
+  window Fastify's own `onResFinished` listener is still attached to absorb it;
+  once flushed, `'finish'` removes that listener but also detaches the
+  response, so the write is a silent no-op instead. The two states are mutually
+  exclusive, which is the whole reason it is safe. But Fastify installs that
+  listener only when a logger, an `onResponse` hook, or a handler timeout is
+  configured — remove the logger and the backpressured case is a genuine
+  uncaught exception. A live grid that survives on another component's
+  incidental listener is not a guarantee, so the stream route gets its own.
+- **2026-09-20** — The offset-timestamp fix closes a spelling, not a class. Any
+  4xx on an unlock body still means the outbox keeps the record and retries
+  forever — a malformed `eventId` would do it too. That is the contract working
+  as written (`retry_and_surface` also requires the client to *surface* it, so
+  it is never silent), and the exposure it leaves is a server that refuses a
+  well-formed client. Removing that for timestamps is the fix; the general
+  guard — never let validation be the reason an unlock is unrecordable — is a
+  standing constraint on anything added to the unlock body.
 - **2026-09-20** — Web sessions install dependencies via a repo-tracked
   SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
   environment's setup-script field (it ran outside the repo root and broke
@@ -111,7 +129,7 @@ under-13 parental-consent machinery.
   work: it hashes the lockfile immediately before and after its own install and
   compares those two, rather than comparing against the git index, so only what
   that install changed counts as drift. Both the hash and an install run on
-  every SessionStart (`npm ci` on a fresh container, `npm install` on a cached
+  every web SessionStart (`npm ci` on a fresh container, `npm install` on a cached
   one); CI's `npm ci` remains the backstop that catches a lockfile genuinely
   out of step with the manifests.
 - **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
