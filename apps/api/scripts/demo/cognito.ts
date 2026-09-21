@@ -40,6 +40,12 @@ export interface CognitoCredentials {
   password: string;
 }
 
+/** Remove a secret from text that is about to be thrown or printed. */
+function redact(text: string, secret: string): string {
+  if (!secret) return text;
+  return text.split(secret).join('<redacted>');
+}
+
 /** The endpoint for a region — exported so callers can report what they called. */
 export function cognitoEndpoint(region: string): string {
   return `https://cognito-idp.${region}.amazonaws.com/`;
@@ -100,9 +106,14 @@ export async function fetchCognitoAccessToken(
         { cause: err },
       );
     }
+    // The detail comes from the fetch layer, so redact before interpolating:
+    // this module promises a password never leaves it, and an interceptor or a
+    // future client that echoed the request body would otherwise put
+    // DEMO_PASSWORD straight into a CI transcript. Structural, not incidental.
+    const detail = err instanceof Error ? err.message : String(err);
     throw new Error(
       `Cognito sign-in for ${credentials.username} could not reach ` +
-        `${cognitoEndpoint(config.region)}: ${err instanceof Error ? err.message : String(err)}`,
+        `${cognitoEndpoint(config.region)}: ${redact(detail, credentials.password)}`,
       { cause: err },
     );
   }

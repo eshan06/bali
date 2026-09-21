@@ -124,6 +124,24 @@ describe('fetchCognitoAccessToken', () => {
     expect(err?.message).not.toMatch(/did not answer within/);
     expect(err?.message).toMatch(/ENOTFOUND/);
     expect(err?.message).toContain('cognito-idp.us-east-1.amazonaws.com');
+    expect(err?.message).not.toContain(creds.password);
+  });
+
+  it('redacts the password out of a fetch-layer message that quoted it', async () => {
+    // A client that echoed the request body would otherwise put DEMO_PASSWORD
+    // into a CI transcript; the module's promise has to hold structurally.
+    const chatty = Object.assign(new Error(`request failed: {"PASSWORD":"${creds.password}"}`), {
+      name: 'TypeError',
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(chatty);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).not.toContain(creds.password);
+    expect(err?.message).toContain('<redacted>');
   });
 
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {

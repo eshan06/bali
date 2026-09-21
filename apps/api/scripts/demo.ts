@@ -325,23 +325,26 @@ async function main(): Promise<void> {
     assert(benSilent.length === 1, `expected one went_silent for Ben, got ${benSilent.length}`);
     console.log('Ben is marked silent — exactly one episode opened.');
 
-    // Ben's return and Cal's removal can together run for several liveWaitMs
-    // budgets against a deployment. Keep the rest of the room checking in, or a
-    // slow-but-healthy run drifts Ana and Dana past the 90s threshold and the
-    // sweep opens episodes the "exactly one" assertions below forbid.
     const cal = byKey('cal');
-    // Everyone this time, Ben included: his episode is closed by the check-in at
-    // the top of this block, and a phone that is back is a phone that checks in.
-    // Reusing `others` here would leave him silent across three liveWaitMs
-    // budgets, and the sweep would open a second episode the assertions forbid.
+
+    line('8:08am — Ben comes back');
+    // Ben's own check-in, with no pump running, so the episode is closed by his
+    // return and nothing else. Starting the pump first would let a background
+    // beat win the race: every assertion would still pass, but the incident
+    // would prove "some check-in closed it" rather than "Ben's return did", and
+    // a regression in exactly that path would be masked.
+    const benBack = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
+      token: ben.token,
+      body: { deviceTime: iso() },
+    });
+    assert(benBack.status === 'live', `Ben check-in status ${benBack.status}`);
+
+    // From here the room keeps checking in — Ben included, now that he is back.
+    // What follows can run for several liveWaitMs budgets against a deployment,
+    // and a silent room drifts past the 90s threshold, whereupon the sweep opens
+    // episodes the "exactly one" assertions below forbid.
     const roomBeats = startHeartbeats(call, sid, students);
     await withHeartbeats(roomBeats, async () => {
-      line('8:08am — Ben comes back');
-      const benBack = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
-        token: ben.token,
-        body: { deviceTime: iso() },
-      });
-      assert(benBack.status === 'live', `Ben check-in status ${benBack.status}`);
       const cameBack = await grid.waitFor(
         (e) => e.type === 'came_back' && e.userId === ben.userId,
         {
