@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cognitoEndpoint, fetchCognitoAccessToken } from '../scripts/demo/cognito.js';
@@ -108,12 +109,12 @@ describe('fetchCognitoAccessToken', () => {
   it('does NOT report a DNS failure as a timeout — that points at the wrong thing', async () => {
     // A mistyped DEMO_COGNITO_REGION fails resolution instantly; blaming
     // Cognito's latency would send the operator looking in the wrong place.
-    const dns = Object.assign(
-      new Error('getaddrinfo ENOTFOUND cognito-idp.us-east-99.amazonaws.com'),
-      {
-        name: 'TypeError',
-      },
-    );
+    // The shape Node's fetch really produces: a bare `TypeError: fetch failed`
+    // whose readable half lives on `cause`. An error carrying ENOTFOUND in its
+    // own message would pass this test while the real path stayed vague.
+    const dns = Object.assign(new TypeError('fetch failed'), {
+      cause: new Error('getaddrinfo ENOTFOUND cognito-idp.us-east-99.amazonaws.com'),
+    });
     const fetchImpl = vi.fn().mockRejectedValue(dns);
 
     const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
@@ -124,6 +125,65 @@ describe('fetchCognitoAccessToken', () => {
     expect(err?.message).not.toMatch(/did not answer within/);
     expect(err?.message).toMatch(/ENOTFOUND/);
     expect(err?.message).toContain('cognito-idp.us-east-1.amazonaws.com');
+    expect(err?.message).not.toContain(creds.password);
+  });
+
+  it('redacts the password out of a fetch-layer message that quoted it', async () => {
+    // A client that echoed the request body would otherwise put DEMO_PASSWORD
+    // into a CI transcript; the module's promise has to hold structurally.
+    const chatty = Object.assign(new Error(`request failed: {"PASSWORD":"${creds.password}"}`), {
+      name: 'TypeError',
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(chatty);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    // Inspect the WHOLE error, cause chain included: asserting only on
+    // `.message` is what let a leak through `{ cause: err }` pass review — the
+    // demo's top-level handler prints the inspected error, so that is the thing
+    // that actually reaches a CI transcript.
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(creds.password);
+    expect(printed).toContain('<redacted>');
+  });
+
+  it('redacts a password that the fetch layer JSON-escaped', async () => {
+    // A quoted body escapes `"` and `\\`, so an exact-substring match alone
+    // would print such a password in full.
+    const awkward = { username: creds.username, password: 'pa"ss\\word' };
+    const escaped = JSON.stringify(awkward.password).slice(1, -1);
+    const chatty = Object.assign(new TypeError('fetch failed'), {
+      cause: new Error(`body was {"PASSWORD":"${escaped}"}`),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(chatty);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, awkward).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(awkward.password);
+    expect(printed).not.toContain(escaped);
+    expect(printed).toContain('<redacted>');
+  });
+
+  it('keeps the timeout path free of the password too', async () => {
+    const timeout = Object.assign(new TypeError('fetch failed'), {
+      name: 'TimeoutError',
+      cause: new Error(`sending {"PASSWORD":"${creds.password}"}`),
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(timeout);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
   });
 
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {

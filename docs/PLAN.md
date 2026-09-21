@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-21 — exit demo wired for deployed environments (remote mode, real Cognito) and extended to assert live SSE delivery + self-expiry (#13), plus its review follow-ups. Real Cognito auth is proven against dev; the run stops on one-time dev provisioning — see **Now**._
+_Last updated: 2026-09-21 — exit demo wired for deployed environments (remote mode, real Cognito) and extended to assert live SSE delivery + self-expiry (#13), plus review follow-ups (#14 and this one). Real Cognito auth is proven against dev; the run stops on one-time dev provisioning — see **Now**._
 
 ## Now
 
@@ -46,6 +46,13 @@ _Last updated: 2026-09-21 — exit demo wired for deployed environments (remote 
   Railway's TCP proxy — publishing the dev database, which is not worth it for
   two statements. Teacher provisioning is deliberately out-of-band until the
   Phase 4 invite-code work.
+- **Exit-demo follow-ups from #14's review (done):** Ben's own check-in closes
+  his silence episode with no pump running, so the incident proves his return
+  did it rather than "some check-in did"; a fetch failure reports its cause
+  chain, because Node reports every network error as a bare `fetch failed` and
+  puts ENOTFOUND on `cause`; that detail is redacted so a client echoing the
+  request body could not leak `DEMO_PASSWORD`; and a non-JSON body names the
+  status that actually came back.
 - **Exit-demo follow-ups from #13's review (done):** the second heartbeat stretch
   now includes Ben, so a slow remote run cannot fabricate a second silence
   episode and blame the engine for a simulation artefact; a Cognito failure that
