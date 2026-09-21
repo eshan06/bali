@@ -1,5 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as schema from '../src/schema.js';
 import { backdateLastSeen, backdateSessionEnd, makeTestDb } from '../src/testing.js';
@@ -91,9 +91,23 @@ describe('backdateSessionEnd', () => {
  * pin what it actually does.
  */
 describe('backdateSessionEnd, against a database', () => {
+  // In a hook, like every other db suite: standing up PGlite (or creating and
+  // migrating a throwaway database on the real-Postgres lane) costs seconds,
+  // and only hooks get vitest's 10s budget — inside `it` it shares the 5s one
+  // and goes red under a loaded full-suite run.
+  let db: Awaited<ReturnType<typeof makeTestDb>>['db'];
+  let close: () => Promise<void>;
+
+  beforeAll(async () => {
+    ({ db, close } = await makeTestDb());
+  });
+
+  afterAll(async () => {
+    await close();
+  });
+
   it('moves a running session end time and leaves an already-ended one alone', async () => {
-    const { db, close } = await makeTestDb();
-    try {
+    {
       const [school] = await db.insert(schema.schools).values({ name: 'S' }).returning();
       const [teacher] = await db
         .insert(schema.users)
@@ -134,8 +148,6 @@ describe('backdateSessionEnd, against a database', () => {
         .from(schema.sessions)
         .where(and(eq(schema.sessions.id, ended!.id), isNull(schema.sessions.endedAt)));
       expect(stillLive).toHaveLength(0);
-    } finally {
-      await close();
     }
   });
 });

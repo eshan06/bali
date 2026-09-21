@@ -78,5 +78,15 @@ export function normalizeBase(raw: string): string {
   if (!/^https?:$/.test(url.protocol) || url.hostname === '') {
     throw new Error(`not a usable API base URL: ${JSON.stringify(raw)}`);
   }
+  // Plain http is fine for a local server and nowhere else: every request
+  // carries a bearer token, and some carry the deployment's sweep key. A
+  // mistyped host must not put those on the wire in the clear.
+  const loopback = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
+  if (url.protocol === 'http:' && !loopback) {
+    throw new Error(
+      `refusing to send credentials over plain http to ${url.hostname} — use https ` +
+        `(got ${JSON.stringify(raw)})`,
+    );
+  }
   return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
 }

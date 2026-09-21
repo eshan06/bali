@@ -94,6 +94,10 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const MAX_WAIT_MS = 10 * 60_000;
 
 async function waitWithNotice(ms: number, label: string): Promise<void> {
+  // NaN would slip past both guards below and then spin on sleep(NaN) forever.
+  if (!Number.isFinite(ms)) {
+    throw new Error(`cannot wait for ${label}: computed a non-finite duration`);
+  }
   if (ms <= 0) return;
   if (ms > MAX_WAIT_MS) {
     // Every wait here is derived from a server timestamp minus this machine's
@@ -302,7 +306,9 @@ export function resolveRemoteConfig(env: NodeJS.ProcessEnv, specs: DemoActorSpec
 
   const sweepWaitRaw = env.DEMO_SWEEP_WAIT_MS?.trim();
   const sweepWaitMs = sweepWaitRaw ? Number(sweepWaitRaw) : DEFAULT_REMOTE_SWEEP_WAIT_MS;
-  if (!Number.isFinite(sweepWaitMs) || sweepWaitMs <= 0) {
+  // Above the 32-bit ceiling setTimeout fires after 1ms, so an operator typo
+  // would surface as an instant "timed out after 9999999999ms".
+  if (!Number.isFinite(sweepWaitMs) || sweepWaitMs <= 0 || sweepWaitMs > 2 ** 31 - 1) {
     throw new Error(
       `DEMO_SWEEP_WAIT_MS must be a positive number of milliseconds, got ${sweepWaitRaw ?? ''}`,
     );

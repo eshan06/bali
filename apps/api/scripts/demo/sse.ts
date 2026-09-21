@@ -246,6 +246,9 @@ export async function openSseRecorder(opts: SseRecorderOptions): Promise<SseReco
     },
     close: () => {
       closed = true;
+      // Record it, so a waitFor issued after close rejects at once instead of
+      // sitting out its full timeout and then blaming the timeout.
+      failure ??= new Error('SSE stream closed while still waiting');
       // Reject rather than drop: a waiter left pending on close is the same
       // never-settles shape this module exists to avoid.
       for (const w of waiters) {

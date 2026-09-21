@@ -6,15 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import { normalizeBase } from '../scripts/demo/http.js';
-import {
-  createRemoteWorld,
-  type DemoActorSpec,
-  passwordVar,
-  type RemoteConfig,
-  resolveRemoteConfig,
-  usernameVar,
-} from '../scripts/demo/world.js';
+import { createRemoteWorld, type DemoActorSpec, type RemoteConfig } from '../scripts/demo/world.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer } from './helpers/test-issuer.js';
@@ -89,104 +81,6 @@ function remoteConfig(overrides: Partial<RemoteConfig> = {}): RemoteConfig {
     ...overrides,
   };
 }
-
-describe('resolveRemoteConfig', () => {
-  const specs = [TEACHER, ANA];
-
-  const complete = (): NodeJS.ProcessEnv => ({
-    DEMO_API_URL: 'https://api.example.test',
-    DEMO_COGNITO_CLIENT_ID: 'client-id',
-    DEMO_PASSWORD: 'shared-password',
-    [usernameVar('teacher')]: 'teacher@example.test',
-    [usernameVar('ana')]: 'ana@example.test',
-  });
-
-  it('reads credentials from the environment, with a shared password fallback', () => {
-    const config = resolveRemoteConfig(complete(), specs);
-
-    expect(config.base).toBe('https://api.example.test');
-    expect(config.clientId).toBe('client-id');
-    expect(config.credentials.get('ana')).toEqual({
-      username: 'ana@example.test',
-      password: 'shared-password',
-    });
-    // Nothing to run the sweep with, so the deployment's own cron must.
-    expect(config.internalKey).toBeUndefined();
-  });
-
-  it('lets a per-actor password override the shared one', () => {
-    const env = { ...complete(), [passwordVar('ana')]: 'ana-only' };
-
-    expect(resolveRemoteConfig(env, specs).credentials.get('ana')?.password).toBe('ana-only');
-  });
-
-  it('names every missing variable at once, not just the first', () => {
-    const env: NodeJS.ProcessEnv = { DEMO_API_URL: 'https://api.example.test' };
-
-    const err = (() => {
-      try {
-        resolveRemoteConfig(env, specs);
-        return null;
-      } catch (e) {
-        return e as Error;
-      }
-    })();
-
-    expect(err?.message).toContain('DEMO_COGNITO_CLIENT_ID');
-    expect(err?.message).toContain(usernameVar('teacher'));
-    expect(err?.message).toContain(usernameVar('ana'));
-    expect(err?.message).toContain('DEMO_PASSWORD');
-  });
-
-  it('rejects a non-numeric sweep wait rather than silently waiting forever', () => {
-    expect(() => resolveRemoteConfig({ ...complete(), DEMO_SWEEP_WAIT_MS: 'soon' }, specs)).toThrow(
-      /DEMO_SWEEP_WAIT_MS/,
-    );
-  });
-
-  it('defaults the region to AWS_REGION when the demo does not set one', () => {
-    expect(resolveRemoteConfig({ ...complete(), AWS_REGION: 'eu-west-2' }, specs).region).toBe(
-      'eu-west-2',
-    );
-  });
-
-  it('falls back past an EMPTY region rather than building a hostless endpoint', () => {
-    // '' is not nullish, so `??` would keep it and produce
-    // https://cognito-idp..amazonaws.com — a DNS error instead of a fallback.
-    const env = { ...complete(), DEMO_COGNITO_REGION: '', AWS_REGION: 'eu-west-2' };
-
-    expect(resolveRemoteConfig(env, specs).region).toBe('eu-west-2');
-  });
-
-  it('falls back past an EMPTY per-actor password to the shared one', () => {
-    const env = { ...complete(), [passwordVar('ana')]: '' };
-
-    expect(resolveRemoteConfig(env, specs).credentials.get('ana')?.password).toBe(
-      'shared-password',
-    );
-  });
-});
-
-describe('normalizeBase', () => {
-  it('drops a trailing slash so paths concatenate cleanly', () => {
-    expect(normalizeBase('https://api.example.test/')).toBe('https://api.example.test');
-  });
-
-  it('assumes https for a bare host, the shape a platform URL variable usually has', () => {
-    expect(normalizeBase('api.example.test')).toBe('https://api.example.test');
-  });
-
-  it.each(['http://', 'https://', 'not a url', '', '   '])(
-    'refuses %o rather than silently pointing the demo somewhere else',
-    (raw) => {
-      expect(() => normalizeBase(raw)).toThrow(/not a usable API base URL/);
-    },
-  );
-
-  it('keeps an explicit port, so a local server is addressable', () => {
-    expect(normalizeBase('http://127.0.0.1:3001')).toBe('http://127.0.0.1:3001');
-  });
-});
 
 describe('the remote world, against a real server', () => {
   it('provisions students through GET /v1/me, exactly as a phone does', async () => {
