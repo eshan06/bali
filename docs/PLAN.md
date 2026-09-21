@@ -21,8 +21,8 @@ _Last updated: 2026-09-21 — retroactive audit of the pre-gates Phase 1/2 code:
 - **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
-  (**landed**), the SSE stream's borrowed crash-safety, the armTap insert race,
-  a replayed tap re-resolved to another session, block re-registration by the
+  (**landed**), an SSE write-after-end that kills the API process, the armTap
+  insert race, a replayed tap re-resolved to another session, block re-registration by the
   tag's own teacher, extend's arithmetic outside the engine transaction, the
   portal's reconnect backoff, the portal's staleness banner, and one shared
   SQLSTATE helper. The tenth, `POST /v1/classes`'s missing idempotency key, was
@@ -97,32 +97,6 @@ under-13 parental-consent machinery.
   miss, and the argument for keeping the real-Postgres lane required.
   `POST /v1/classes`'s missing idempotency key (below) was the one lead
   rejected: re-examined and deliberately left as it stands.
-- **2026-09-21** — The SSE stream's crash-safety is borrowed, so the route will
-  own it. The audit reported that a write after `end()` on the hijacked
-  response is an unhandled `'error'` that kills the API process. Measured, the
-  reported chain does not fire *as the app is configured today* — for a
-  narrower reason than it looks, and one worth writing down because it is the
-  spec for the fix.
-  The gate is `writableEnded && !destroyed`: a write lands after `end()` but
-  before `'finish'` has detached the response. Buffering is **not** required —
-  a same-tick write on a fully drained socket emits with zero bytes queued; it
-  only widens the window, since `'finish'` cannot fire while data is still
-  waiting. In exactly that window Fastify's `onResFinished` is still attached
-  and absorbs the error (it removes itself from both `'finish'` and `'error'`
-  on first fire, and `reply.hijack()` does not remove it —
-  `fastify/lib/reply.js:973-976, 1010-1011, 134`). After `'finish'` the
-  listener is gone, but so is the socket, so the write is a silent no-op. Both
-  halves are keyed on `'finish'`, which is why they are mutually exclusive and
-  why nothing crashes.
-  Two caveats the fix must respect. Fastify installs that listener only under
-  `hasLogger === true || context.onResponse !== null || handlerTimeout > 0`
-  (`fastify/lib/route.js:553`); with none of them the same window is a genuine
-  uncaught exception, measured. And in `feed.ts`'s own race the late write is
-  always at least a microtask after `onClose`'s `end()`, so the reachable
-  window there is the buffered one — a regression test must make the client
-  stop reading, not just race the two calls. A live grid that survives on
-  another component's incidental listener is not a guarantee, so the stream
-  route gets its own.
 - **2026-09-20** — The offset-timestamp fix closes a spelling, not a class. Any
   4xx on an unlock body still means the outbox keeps the record and retries
   forever — a malformed `eventId` would do it too. That is the contract working
