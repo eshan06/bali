@@ -50,7 +50,7 @@ _Last updated: 2026-09-20 — exit demo wired for deployed environments (remote 
   passwords (a temporary one parks the account in `NEW_PASSWORD_REQUIRED`) and
   `ALLOW_USER_PASSWORD_AUTH` on the app client. The demo names whichever is
   missing; the README lists them with the school step.
-- **Next up:** finish the exit demo vs dev (one SQL statement away) → retroactive
+- **Next up:** finish the exit demo vs dev (two SQL statements away) → retroactive
   audit of pre-gates Phase 1 code → start Phase 3 (iOS student app).
 
 ## Phases

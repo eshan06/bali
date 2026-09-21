@@ -148,6 +148,23 @@ describe('openSseRecorder over a real socket', () => {
     rec.close();
   });
 
+  it('rejects a waitFor issued after close, immediately rather than on timeout', async () => {
+    const base = await listen((_req, res) => {
+      res.writeHead(200, SSE_HEADERS);
+      res.write(': open\n\n');
+    });
+
+    const rec = await open(base);
+    rec.close();
+
+    const started = Date.now();
+    await expect(rec.waitFor((e) => e.type === 'unlock', { timeoutMs: 30_000 })).rejects.toThrow(
+      /closed/,
+    );
+    // Immediately: sitting out the 30s deadline and then blaming it would be a lie.
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it('delivers a frame split across two writes', async () => {
     const whole = frame(event(9, 'split'));
     const base = await listen((_req, res) => {

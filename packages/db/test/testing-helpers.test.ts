@@ -128,6 +128,17 @@ describe('backdateSessionEnd, against a database', () => {
         .insert(schema.sessions)
         .values({ classId: klass!.id, startedAt, endsAt: farFuture, endedAt: new Date() })
         .returning();
+      // A second RUNNING session, in its own class so the one-running-per-class
+      // index allows it. Without this, a where-clause of only isNull(endedAt) —
+      // which would backdate every live session on the deployment — passes.
+      const [other] = await db
+        .insert(schema.classes)
+        .values({ teacherId: teacher!.id, schoolId: school!.id, name: 'C2', joinCode: 'JC2' })
+        .returning();
+      const [bystander] = await db
+        .insert(schema.sessions)
+        .values({ classId: other!.id, startedAt, endsAt: farFuture })
+        .returning();
 
       const target = new Date(startedAt.getTime() + 1);
       await backdateSessionEnd(db, { sessionId: running!.id }, target);
@@ -140,6 +151,12 @@ describe('backdateSessionEnd, against a database', () => {
       const after = new Map(rows.map((r) => [r.id, r]));
 
       expect(after.get(running!.id)?.endsAt.getTime()).toBe(target.getTime());
+      // Scoped by id, not just by "is running".
+      const untouched = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, bystander!.id));
+      expect(untouched[0]?.endsAt.getTime()).toBe(farFuture.getTime());
       // The isNull(endedAt) guard must skip a session that already ended.
       expect(after.get(ended!.id)?.endsAt.getTime()).toBe(farFuture.getTime());
 

@@ -109,6 +109,35 @@ function startHeartbeats(
   };
 }
 
+/**
+ * Run an incident with the room checking in underneath it. The precedence rule
+ * matters: a phone that could not check in is always reported, but it must never
+ * replace the incident's own error — that is the diagnosis worth keeping.
+ */
+async function withHeartbeats<T>(
+  beats: { stop: () => Promise<void> },
+  body: () => Promise<T>,
+): Promise<T> {
+  let incidentError: Error | null = null;
+  let result: T | undefined;
+  try {
+    result = await body();
+  } catch (err) {
+    incidentError = err instanceof Error ? err : new Error(String(err));
+  }
+  // Outside the try, so neither failure can mask the other.
+  const beatError = await beats.stop().then(
+    () => null,
+    (err: unknown) => err as Error,
+  );
+  if (incidentError) {
+    if (beatError) console.error('  (a phone also failed to check in meanwhile):', beatError);
+    throw incidentError;
+  }
+  if (beatError) throw beatError;
+  return result as T;
+}
+
 async function main(): Promise<void> {
   const specs = [TEACHER, ...STUDENTS];
   const world: DemoWorld = await createWorld(process.env, specs);
@@ -221,12 +250,15 @@ async function main(): Promise<void> {
     const boot = await call<SessionSnapshot>('GET', `/v1/sessions/${sid}`, {
       token: teacher.token,
     });
+    // `stream` stays nullable for the cleanup in `finally`; `grid` is the same
+    // recorder, non-null, so the incident closures below keep a concrete type.
     stream = await openSseRecorder({
       base: world.base,
       sessionId: sid,
       token: teacher.token,
       after: boot.latestSeq,
     });
+    const grid = stream;
     console.log(`stream open, resuming from seq ${boot.latestSeq}.`);
 
     line('8:05am — Ana hits emergency unlock, then refocuses');
@@ -242,7 +274,7 @@ async function main(): Promise<void> {
     );
     // The unlock must reach the teacher's screen over the stream, not merely be
     // readable afterwards — that is the whole promise of the live grid (rule 6).
-    const liveUnlock = await stream.waitFor((e) => e.type === 'unlock' && e.userId === ana.userId, {
+    const liveUnlock = await grid.waitFor((e) => e.type === 'unlock' && e.userId === ana.userId, {
       label: "Ana's unlock",
       timeoutMs: world.liveWaitMs,
     });
@@ -253,7 +285,7 @@ async function main(): Promise<void> {
       body: { eventId: randomUUID(), deviceTime: iso() },
     });
     assert(anaRefocus.state === 'focused', `Ana should be refocused, got ${anaRefocus.state}`);
-    await stream.waitFor((e) => e.type === 'refocus' && e.userId === ana.userId, {
+    await grid.waitFor((e) => e.type === 'refocus' && e.userId === ana.userId, {
       label: "Ana's refocus",
       timeoutMs: world.liveWaitMs,
     });
@@ -264,8 +296,7 @@ async function main(): Promise<void> {
     // Everyone else keeps checking in, so the silence that follows is Ben's alone.
     const others = students.filter((s) => s.key !== ben.key);
     const beats = startHeartbeats(call, sid, others);
-    let incidentError: Error | null = null;
-    try {
+    await withHeartbeats(beats, async () => {
       await world.compressSilence({
         sessionId: sid,
         studentId: ben.userId,
@@ -279,35 +310,12 @@ async function main(): Promise<void> {
       // flip. The event below is the proof either way.
       const swept = await world.sweep();
       if (swept) console.log(`  our sweep: ${swept.wentSilent} silence episode(s) opened`);
-      const silentEvent = await stream.waitFor(
+      const silentEvent = await grid.waitFor(
         (e) => e.type === 'went_silent' && e.userId === ben.userId,
         { label: "Ben's went_silent (from the sweep)", timeoutMs: world.sweepWaitMs },
       );
       console.log(`  live: went_silent for Ben at seq ${silentEvent.seq}.`);
-    } catch (err) {
-      incidentError = err instanceof Error ? err : new Error(String(err));
-    }
-    // Stop the pump outside the try, so neither failure can replace the other:
-    // the incident's own error is the diagnosis worth keeping, and a phone that
-    // could not check in is still reported rather than swallowed.
-    const beatError = await beats.stop().then(
-      () => null,
-      (err: unknown) => err as Error,
-    );
-    if (incidentError) {
-      if (beatError)
-        console.error('  (a phone also failed to check in during the wait):', beatError);
-      throw incidentError;
-    }
-    if (beatError) throw beatError;
-    // The pump stopped, and the came_back wait below can run for liveWaitMs.
-    // One round now keeps the rest of the room comfortably inside the threshold.
-    for (const s of others) {
-      await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
-        token: s.token,
-        body: { deviceTime: iso() },
-      });
-    }
+    });
     const afterSilence = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
       token: teacher.token,
     });
@@ -317,69 +325,79 @@ async function main(): Promise<void> {
     assert(benSilent.length === 1, `expected one went_silent for Ben, got ${benSilent.length}`);
     console.log('Ben is marked silent — exactly one episode opened.');
 
-    line('8:08am — Ben comes back');
-    const benBack = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
-      token: ben.token,
-      body: { deviceTime: iso() },
-    });
-    assert(benBack.status === 'live', `Ben check-in status ${benBack.status}`);
-    const cameBack = await stream.waitFor(
-      (e) => e.type === 'came_back' && e.userId === ben.userId,
-      { label: "Ben's came_back", timeoutMs: world.liveWaitMs },
-    );
-    const afterReturn = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
-      token: teacher.token,
-    });
-    const benCameBack = afterReturn.events.filter(
-      (e) => e.type === 'came_back' && e.userId === ben.userId,
-    );
-    assert(benCameBack.length === 1, `expected one came_back for Ben, got ${benCameBack.length}`);
-    console.log(
-      `Ben checked in — one came_back (seq ${cameBack.seq}), and the plain heartbeats emitted nothing.`,
-    );
-
-    line('8:10am — Cal is removed mid-session, then his phone unlocks anyway (ISSUES #2)');
+    // Ben's return and Cal's removal can together run for several liveWaitMs
+    // budgets against a deployment. Keep the rest of the room checking in, or a
+    // slow-but-healthy run drifts Ana and Dana past the 90s threshold and the
+    // sweep opens episodes the "exactly one" assertions below forbid.
     const cal = byKey('cal');
-    const calEnrollment = enrollmentIds.get(cal.key);
-    assert(calEnrollment, 'Cal must have an enrollment id');
-    const removal = await call<EndEnrollmentResponse>(
-      'DELETE',
-      `/v1/enrollments/${calEnrollment}`,
-      { token: teacher.token },
-    );
-    assert(removal.reason === 'removed_from_class', `Cal removal reason ${removal.reason}`);
-    assert(removal.endedParticipation, 'Cal was live, so his participation should end');
-    // Cal's phone hasn't heard yet and hits emergency unlock. The contract: it is
-    // never a 404 and never discarded — it is recorded with a note.
-    const calUnlock = await call<UnlockResponse>('POST', `/v1/sessions/${sid}/unlock`, {
-      token: cal.token,
-      body: { eventId: randomUUID(), deviceTime: iso() },
+    const roomBeats = startHeartbeats(call, sid, others);
+    await withHeartbeats(roomBeats, async () => {
+      line('8:08am — Ben comes back');
+      const benBack = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
+        token: ben.token,
+        body: { deviceTime: iso() },
+      });
+      assert(benBack.status === 'live', `Ben check-in status ${benBack.status}`);
+      const cameBack = await grid.waitFor(
+        (e) => e.type === 'came_back' && e.userId === ben.userId,
+        {
+          label: "Ben's came_back",
+          timeoutMs: world.liveWaitMs,
+        },
+      );
+      const afterReturn = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
+        token: teacher.token,
+      });
+      const benCameBack = afterReturn.events.filter(
+        (e) => e.type === 'came_back' && e.userId === ben.userId,
+      );
+      assert(benCameBack.length === 1, `expected one came_back for Ben, got ${benCameBack.length}`);
+      console.log(
+        `Ben checked in — one came_back (seq ${cameBack.seq}), and the plain heartbeats emitted nothing.`,
+      );
+
+      line('8:10am — Cal is removed mid-session, then his phone unlocks anyway (ISSUES #2)');
+      const calEnrollment = enrollmentIds.get(cal.key);
+      assert(calEnrollment, 'Cal must have an enrollment id');
+      const removal = await call<EndEnrollmentResponse>(
+        'DELETE',
+        `/v1/enrollments/${calEnrollment}`,
+        { token: teacher.token },
+      );
+      assert(removal.reason === 'removed_from_class', `Cal removal reason ${removal.reason}`);
+      assert(removal.endedParticipation, 'Cal was live, so his participation should end');
+      // Cal's phone hasn't heard yet and hits emergency unlock. The contract: it is
+      // never a 404 and never discarded — it is recorded with a note.
+      const calUnlock = await call<UnlockResponse>('POST', `/v1/sessions/${sid}/unlock`, {
+        token: cal.token,
+        body: { eventId: randomUUID(), deviceTime: iso() },
+      });
+      assert(calUnlock.outcome === 'recorded', `Cal unlock outcome ${calUnlock.outcome}`);
+      assert(
+        calUnlock.recordedAs === 'no_live_participation',
+        `Cal unlock recordedAs ${String(calUnlock.recordedAs)}`,
+      );
+      // Both of Cal's events must reach the grid live before the aggregate check
+      // below compares the log against the stream — otherwise that check silently
+      // asserts zero delivery latency for the two most recent events.
+      await grid.waitFor((e) => e.type === 'enrollment_removed' && e.userId === cal.userId, {
+        label: "Cal's removal",
+        timeoutMs: world.liveWaitMs,
+      });
+      await grid.waitFor((e) => e.type === 'unlock' && e.userId === cal.userId, {
+        label: "Cal's recorded unlock",
+        timeoutMs: world.liveWaitMs,
+      });
+      // His next check-in learns he is gone.
+      const calCheck = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
+        token: cal.token,
+        body: { deviceTime: iso() },
+      });
+      assert(calCheck.status === 'gone', `Cal check-in status ${calCheck.status}`);
+      console.log(
+        'Cal removed; his unlock was recorded (no_live_participation), next check-in: gone.',
+      );
     });
-    assert(calUnlock.outcome === 'recorded', `Cal unlock outcome ${calUnlock.outcome}`);
-    assert(
-      calUnlock.recordedAs === 'no_live_participation',
-      `Cal unlock recordedAs ${String(calUnlock.recordedAs)}`,
-    );
-    // Both of Cal's events must reach the grid live before the aggregate check
-    // below compares the log against the stream — otherwise that check silently
-    // asserts zero delivery latency for the two most recent events.
-    await stream.waitFor((e) => e.type === 'enrollment_removed' && e.userId === cal.userId, {
-      label: "Cal's removal",
-      timeoutMs: world.liveWaitMs,
-    });
-    await stream.waitFor((e) => e.type === 'unlock' && e.userId === cal.userId, {
-      label: "Cal's recorded unlock",
-      timeoutMs: world.liveWaitMs,
-    });
-    // His next check-in learns he is gone.
-    const calCheck = await call<CheckInResponse>('POST', `/v1/sessions/${sid}/checkin`, {
-      token: cal.token,
-      body: { deviceTime: iso() },
-    });
-    assert(calCheck.status === 'gone', `Cal check-in status ${calCheck.status}`);
-    console.log(
-      'Cal removed; his unlock was recorded (no_live_participation), next check-in: gone.',
-    );
 
     line('the live grid (the teacher snapshot, derived like the portal)');
     // The phones still in the room report in first, exactly as they would every
@@ -455,7 +473,7 @@ async function main(): Promise<void> {
     // Everything the log carries for this session should also have reached the
     // grid live. The stream opened at `boot.latestSeq`, so compare against the
     // events from that point on.
-    const liveIds = new Set(stream.received().map((e: FeedEvent) => e.eventId));
+    const liveIds = new Set(grid.received().map((e: FeedEvent) => e.eventId));
     const missedLive = log.events.filter((e) => e.seq > boot.latestSeq && !liveIds.has(e.eventId));
     assert(
       missedLive.length === 0,
@@ -466,7 +484,7 @@ async function main(): Promise<void> {
     const postBoot = log.events.filter((e) => e.seq > boot.latestSeq).length;
     console.log(
       `  all ${String(postBoot)} events written after the stream opened arrived live ` +
-        `(${String(stream.received().length)} delivered in total, plus ${String(stream.commentCount())} comment/keep-alive frames).`,
+        `(${String(grid.received().length)} delivered in total, plus ${String(grid.commentCount())} comment/keep-alive frames).`,
     );
 
     line('8:25am — the teacher ends the session');
@@ -559,7 +577,10 @@ async function main(): Promise<void> {
         console.error(`could not clean up session ${openSessionId}:`, err);
       }
     }
-    await world.close();
+    // Never let teardown replace the run's own diagnosis.
+    await world.close().catch((err: unknown) => {
+      console.error('could not close the demo world:', err);
+    });
   }
 }
 

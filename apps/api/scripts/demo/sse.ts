@@ -108,10 +108,15 @@ export async function openSseRecorder(opts: SseRecorderOptions): Promise<SseReco
     throw openError ?? (err instanceof Error ? err : new Error(String(err)));
   }
   if (!res.ok) {
-    // Clear before reading: a body-side error here would otherwise leave the
-    // deadline armed on the event loop.
-    clearTimeout(openTimer);
-    const body = (await res.text().catch(() => '')).slice(0, 200);
+    // Keep the deadline armed across the read — a body that never completes
+    // would otherwise be bounded only by undici's 300s default — but make sure
+    // it is cleared either way.
+    let body: string;
+    try {
+      body = (await res.text().catch(() => '')).slice(0, 200);
+    } finally {
+      clearTimeout(openTimer);
+    }
     controller.abort();
     throw new Error(`SSE stream → ${res.status}: ${body}`);
   }

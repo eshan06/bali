@@ -83,7 +83,7 @@ npm run demo
 
 | Variable                 | Notes                                                                                                                                                                                                 |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEMO_API_URL`           | The deployed API's base URL. Its presence selects remote mode.                                                                                                                                        |
+| `DEMO_API_URL`           | The deployed API's base URL; must be `https` for any non-loopback host, since every request carries a bearer token. Its presence selects remote mode.                                                 |
 | `DEMO_COGNITO_CLIENT_ID` | The pool's app client id (the same value the API validates as `AUTH_AUDIENCE`).                                                                                                                       |
 | `DEMO_COGNITO_REGION`    | Defaults to `AWS_REGION`, then `us-east-1`.                                                                                                                                                           |
 | `DEMO_USER_<ACTOR>`      | The Cognito username per actor: `TEACHER`, `ANA`, `BEN`, `CAL`, `DANA`.                                                                                                                               |

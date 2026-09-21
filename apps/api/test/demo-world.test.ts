@@ -131,6 +131,20 @@ describe('the remote world, against a real server', () => {
     await expect(world.sweep()).resolves.toBeNull();
   });
 
+  it('refuses a non-finite wait rather than spinning on sleep(NaN)', async () => {
+    const world = createRemoteWorld(remoteConfig(), { cognitoFetch: stubCognito() });
+
+    // An unparseable timestamp makes the computed duration NaN, which slips past
+    // both a `<= 0` and a `> max` guard and would otherwise spin forever.
+    await expect(
+      world.compressSessionEnd({
+        sessionId: 'session-1',
+        startedAt: new Date(),
+        endsAt: new Date('not a date'),
+      }),
+    ).rejects.toThrow(/non-finite/);
+  });
+
   it('reads last contact from the server snapshot, and waits no longer than it must', async () => {
     const { teacher, student, klass } = await seedClassroom(db, 'remote-b');
     const started = await startSession(db, {

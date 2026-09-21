@@ -32,24 +32,28 @@ export function createCall(
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
     if (opts.internalKey) headers['x-internal-key'] = opts.internalKey;
     if (opts.body !== undefined) headers['content-type'] = 'application/json';
-    let res: Response;
+    let text: string;
+    let status: number;
     try {
-      res = await fetchImpl(`${base}${path}`, {
+      const res = await fetchImpl(`${base}${path}`, {
         method,
         headers,
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: AbortSignal.timeout(timeoutMs),
       });
+      status = res.status;
+      // Inside the try: a deadline that fires while the body streams must still
+      // report the deadline, not a bare AbortError.
+      text = await res.text();
     } catch (err) {
       if (err instanceof Error && err.name === 'TimeoutError') {
         throw new Error(`${method} ${path} → no response within ${timeoutMs}ms`, { cause: err });
       }
       throw err;
     }
-    const text = await res.text();
     const want = opts.expectStatus ?? 200;
-    if (res.status !== want) {
-      throw new Error(`${method} ${path} → ${res.status} (wanted ${want}): ${text}`);
+    if (status !== want) {
+      throw new Error(`${method} ${path} → ${status} (wanted ${want}): ${text}`);
     }
     return (text ? JSON.parse(text) : null) as T;
   };
