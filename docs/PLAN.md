@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-20 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-21 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
 
 ## Now
 
@@ -97,20 +97,32 @@ under-13 parental-consent machinery.
   miss, and the argument for keeping the real-Postgres lane required.
   `POST /v1/classes`'s missing idempotency key (below) was the one lead
   rejected: re-examined and deliberately left as it stands.
-- **2026-09-20** — The SSE stream's crash-safety is borrowed, so the route will
+- **2026-09-21** — The SSE stream's crash-safety is borrowed, so the route will
   own it. The audit reported that a write after `end()` on the hijacked
-  response is an unhandled `'error'` and kills the API process. Measured on the
-  running route, the reported chain does not fire *as the app is configured
-  today*, for a narrower reason than it looks: the error only emits while the
-  response still has data buffered (before `'finish'`), and in exactly that
-  window Fastify's own `onResFinished` listener is still attached to absorb it;
-  once flushed, `'finish'` removes that listener but also detaches the
-  response, so the write is a silent no-op instead. The two states are mutually
-  exclusive, which is the whole reason it is safe. But Fastify installs that
-  listener only when a logger, an `onResponse` hook, or a handler timeout is
-  configured — remove the logger and the backpressured case is a genuine
-  uncaught exception. A live grid that survives on another component's
-  incidental listener is not a guarantee, so the stream route gets its own.
+  response is an unhandled `'error'` that kills the API process. Measured, the
+  reported chain does not fire *as the app is configured today* — for a
+  narrower reason than it looks, and one worth writing down because it is the
+  spec for the fix.
+  The gate is `writableEnded && !destroyed`: a write lands after `end()` but
+  before `'finish'` has detached the response. Buffering is **not** required —
+  a same-tick write on a fully drained socket emits with zero bytes queued; it
+  only widens the window, since `'finish'` cannot fire while data is still
+  waiting. In exactly that window Fastify's `onResFinished` is still attached
+  and absorbs the error (it removes itself from both `'finish'` and `'error'`
+  on first fire, and `reply.hijack()` does not remove it —
+  `fastify/lib/reply.js:973-976, 1010-1011, 134`). After `'finish'` the
+  listener is gone, but so is the socket, so the write is a silent no-op. Both
+  halves are keyed on `'finish'`, which is why they are mutually exclusive and
+  why nothing crashes.
+  Two caveats the fix must respect. Fastify installs that listener only under
+  `hasLogger === true || context.onResponse !== null || handlerTimeout > 0`
+  (`fastify/lib/route.js:553`); with none of them the same window is a genuine
+  uncaught exception, measured. And in `feed.ts`'s own race the late write is
+  always at least a microtask after `onClose`'s `end()`, so the reachable
+  window there is the buffered one — a regression test must make the client
+  stop reading, not just race the two calls. A live grid that survives on
+  another component's incidental listener is not a guarantee, so the stream
+  route gets its own.
 - **2026-09-20** — The offset-timestamp fix closes a spelling, not a class. Any
   4xx on an unlock body still means the outbox keeps the record and retries
   forever — a malformed `eventId` would do it too. That is the contract working

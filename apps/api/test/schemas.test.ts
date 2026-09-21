@@ -18,6 +18,9 @@ const accepted = [
   ['a half-hour offset', '2026-09-20T17:30:00+05:30'],
   ['zero written as an offset', '2026-09-20T12:00:00+00:00'],
   ['fractional seconds with an offset', '2026-09-20T14:00:00.123+02:00'],
+  // The upper bound the NaN argument below leans on. Pinned so a zod bump
+  // cannot widen it unnoticed.
+  ['the widest offset the grammar allows', '2026-09-20T12:00:00+23:59'],
 ] as const;
 
 const rejected = [
@@ -29,6 +32,7 @@ const rejected = [
   ['ISO basic format — the extended form is the contract', '2026-09-20T14:00:00+0200'],
   ['an hour-only offset', '2026-09-20T14:00:00+02'],
   ['an out-of-range offset', '2026-09-20T14:00:00+25:00'],
+  ['one minute past the widest allowed offset', '2026-09-20T12:00:00+24:00'],
   ['a lowercase zone marker', '2026-09-20T12:00:00z'],
   ['a space instead of T', '2026-09-20 12:00:00Z'],
   ['a day that does not exist', '2026-02-30T12:00:00Z'],
