@@ -732,8 +732,20 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       if (!consumedUnderUs) {
         // Three violations and the owner gone every time. Falling through to
         // the insert would answer `already_armed` about the very row this
-        // branch just judged stale, which is the lie the stale check exists to
-        // stop, so say what happened instead.
+        // branch just judged stale — the lie the stale check exists to stop,
+        // since the conversion will not honour that row — so say what happened
+        // instead. A bare Error means a 500, and a 500 is the right answer
+        // here: what we lost is a race against a rival that keeps appearing
+        // and vanishing, which is transient by construction, so "retry" is
+        // exactly what the outbox should do. It is not the wall the savepoints
+        // removed — that one was permanent.
+        //
+        // DISCLOSED SURVIVOR, like the read-order guard in tapIn: nothing goes
+        // red if this throw is deleted. Staging it needs a rival to COMMIT
+        // (any earlier and the index is free, so the refresh just succeeds)
+        // and then be deleted before `ownerOfEventId` reads it in the same
+        // transaction — three times running. No test here stages that, and a
+        // test that pretended to would be worse than this sentence.
         throw new Error('armTap: could not refresh a stale standing tap', {
           cause: lastRefreshViolation,
         });

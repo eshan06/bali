@@ -728,10 +728,17 @@ async function conversionGapRound(tag: string): Promise<boolean> {
   } catch {
     contended = false;
   }
-  const [, refreshed] = await settled;
-  // Name the reason. A bare `expected 'rejected' to be 'fulfilled'` tells the
-  // next person nothing about which of armTap's throws fired, and several are
-  // reachable from here.
+  const [started, refreshed] = await settled;
+  // Name the reason, on BOTH sides. A bare `expected 'rejected' to be
+  // 'fulfilled'` tells the next person nothing about which throw fired, and
+  // several are reachable from each. Dropping the conversion's was worse
+  // still: a Start that threw surfaced further down as
+  // `expected 0 to be greater than 0`, which names nothing at all.
+  if (started.status === 'rejected') {
+    throw new Error(`the conversion rejected: ${String(started.reason)}`, {
+      cause: started.reason,
+    });
+  }
   if (refreshed.status === 'rejected') {
     throw new Error(`the refresh rejected: ${String(refreshed.reason)}`, {
       cause: refreshed.reason,

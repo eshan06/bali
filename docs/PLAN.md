@@ -329,6 +329,20 @@ under-13 parental-consent machinery.
   Caught on the way: CI's `format:check` failed a push that `typecheck` and
   `lint` both passed — a double-quoted test name. `format:check` belongs in
   the pre-push routine next to the other two.
+  **Fifth round.** The `events_user_seq_idx` warning now sits on the index
+  whose own comment promised "in stream order", not only at the call site that
+  broke that promise — the trap was set where the next reader would look.
+  `conversionGapRound` settled both sides of its race and rethrew only the
+  refresh's rejection, so a Start that threw surfaced as
+  `expected 0 to be greater than 0`, which names nothing; both are named now.
+  And the refresh's give-up throw is labelled a DISCLOSED SURVIVOR, the
+  convention #28 established: nothing goes red if it is deleted, staging it
+  needs a rival to commit and then be deleted before the owner lookup reads it
+  three times running, and a test that pretended to cover that would be worse
+  than the sentence saying it does not. The 500 it produces is also the right
+  answer, and the comment now says why: what was lost is a race against a
+  rival that keeps appearing and vanishing, which is transient by
+  construction, so "retry" is exactly what the outbox should do.
 
 - **2026-09-22** — Last of the audit's ten, and the smallest one only because
   the thing it removes is invisible. Two files had independently grown the
