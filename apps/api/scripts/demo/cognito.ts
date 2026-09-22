@@ -182,7 +182,8 @@ const TYPE_HINTS = new Map([
   ],
   [
     'InvalidParameterException',
-    'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client',
+    'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client, or the client ' +
+      'id is malformed',
   ],
   ['ResourceNotFoundException', 'no app client with this id in this region'],
   ['UserNotFoundException', 'no such user in this pool'],

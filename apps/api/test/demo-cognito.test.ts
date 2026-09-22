@@ -126,8 +126,28 @@ describe('fetchCognitoAccessToken', () => {
 
     expect(err.message).toBe(
       'Cognito sign-in failed for demo-ana@example.test — InvalidParameterException (HTTP 400): ' +
-        'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client',
+        'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client, or the client ' +
+        'id is malformed',
     );
+  });
+
+  it('does not print a validation message quoting the request back', async () => {
+    // The body real Cognito returned for a malformed client id (probed against
+    // us-east-1): its message quotes the request's own value. Here that value
+    // is a client id; the same mechanism is why no message text is printed.
+    const err = await thrownBy(() =>
+      Promise.resolve(
+        new Response(
+          '{"__type":"InvalidParameterException","message":"1 validation error detected: ' +
+            "Value 'bad client id!' at 'clientId' failed to satisfy constraint: Member must " +
+            'satisfy regular expression pattern: [\\\\w+]+"}',
+          { status: 400, headers: { 'content-type': 'application/x-amz-json-1.1' } },
+        ),
+      ),
+    );
+
+    expect(err.message).not.toContain('bad client id!');
+    expect(err.message).toContain('InvalidParameterException (HTTP 400)');
   });
 
   it('names an error type it has no explanation for', async () => {
@@ -147,7 +167,8 @@ describe('fetchCognitoAccessToken', () => {
     ],
     [
       'InvalidParameterException',
-      'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client',
+      'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client, or the client id ' +
+        'is malformed',
     ],
     ['ResourceNotFoundException', 'no app client with this id in this region'],
     ['UserNotFoundException', 'no such user in this pool'],
