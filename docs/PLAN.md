@@ -138,6 +138,41 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Fourth pass on the same decision, and the third time I
+  closed half a hole. #27 added a test that the stream route's log dispatch
+  really writes `debug` for the teardown race — and asserted only that
+  direction. Measured: hardcode `request.log[level]` to `.debug` and all six
+  tests stay green, while every code the listener has never seen is logged at
+  `debug` and swallowed by `LOG_LEVEL`'s `info` default. That is the MORE
+  dangerous half — the `warn` branch exists precisely so an unheard-of code is
+  not discarded — and it was the one left unpinned. Both directions are
+  asserted now: hardcoding either way turns one case red, and inverting the
+  helper turns five.
+  The rest of #27's review, all of it fair: the new test performs a deliberate
+  write-after-end without the `uncaughtException` net its sibling documents, so
+  a regression in the route's own listener would have taken the worker down
+  instead of reporting a failure; `logStream` was spread on top of `transport`,
+  which pino refuses outright, so the injected stream wins explicitly now
+  rather than leaving a trap for the next caller; and the `'request'` listener
+  that #27 moved into `afterEach` outlived the request it captured, so
+  anything else reaching the app could reassign it — first match only now, in
+  both files, with the `cleanups` convention #27 established applied to the
+  new file too.
+  That precedence fix then shipped with nothing pinning it, which is the PR's
+  own thesis one more time: every test builds with `NODE_ENV: 'test'`, so the
+  transport branch was never taken and flipping the ternary back left the
+  suite green. There is a test now that builds in development WITH an injected
+  stream and reads the raw JSON line off it — both wrong shapes turn it red.
+  And the first version of that test failed on the real-Postgres lane with
+  every assertion green: it waited on `headersSent`, which fires at
+  `writeHead` and therefore BEFORE `hub.subscribe()`, so it ended the response
+  while the subscription's first `getEventsSince` was still in flight and the
+  pool closed under it — `write CONNECTION_ENDED`, an unhandled rejection that
+  fails the run without failing a test. It waits for the opening frame to
+  reach the client now, which is the proof that read finished. Causation
+  measured, not guessed: the old shape reproduces it 2/2 locally, the new one
+  is clean.
+
 - **2026-09-22** — The stream route's log decision took three passes to
   actually pin, and the last hole was one level below the last fix. #24 folded
   the level and the line into one tested helper so the listener had no branch
