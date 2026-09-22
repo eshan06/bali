@@ -271,11 +271,16 @@ const SKEW_MARGIN_MS = 15_000;
  * `INSERT … WHERE NOT EXISTS` so re-running is safe and an existing school is
  * left alone, and the UPDATE attaches to the oldest school — which is the row
  * just inserted when the table was empty, and the operator's own otherwise, so
- * the two statements are one coherent recipe either way. A bare
- * `SET school_id = (SELECT …)` against an empty table would set NULL, report
- * `UPDATE 1`, and leave the operator believing they had complied. The insert
- * supplies an id because `schools.id` has no database default: ids are minted
- * in TypeScript (data-model decision 2).
+ * the two statements are one coherent recipe either way. The insert supplies an
+ * id because `schools.id` has no database default: ids are minted in TypeScript
+ * (data-model decision 2).
+ *
+ * The UPDATE carries its own `AND EXISTS` because the two halves get pasted
+ * separately: `SET school_id = (SELECT …)` with no live school sets NULL and
+ * still reports `UPDATE 1`, so an operator who ran only the second statement
+ * would believe they had complied and hit the real failure a demo run later.
+ * With the guard that case reports `UPDATE 0` and changes nothing; when the
+ * insert did run, the guard is true and costs nothing.
  *
  * Both halves skip soft-removed rows. Nothing is really deleted (decision 3), so
  * a database whose only school was retired would otherwise fail the NOT EXISTS
@@ -290,7 +295,7 @@ export function provisioningSql(userId: string, what: 'role-and-school' | 'schoo
     `  INSERT INTO schools (id, name)\n` +
     `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools ${live});\n` +
     `  UPDATE users SET ${assignments} = (SELECT id FROM schools ${live} ORDER BY created_at LIMIT 1)\n` +
-    `  WHERE id = '${userId}';`
+    `  WHERE id = '${userId}' AND EXISTS (SELECT 1 FROM schools ${live});`
   );
 }
 

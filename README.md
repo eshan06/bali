@@ -115,11 +115,12 @@ missing rather than failing obscurely):
    ```sql
    -- Creates a school only if you have no live one, then attaches the teacher to
    -- the oldest — correct whether or not the table was empty, and it ignores
-   -- soft-removed schools (nothing is really deleted, decision 3).
+   -- soft-removed schools (nothing is really deleted, decision 3). Run both: the
+   -- UPDATE alone reports "UPDATE 0" rather than quietly setting school_id NULL.
    INSERT INTO schools (id, name)
    SELECT '<uuidv7>', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools WHERE removed_at IS NULL);
    UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools WHERE removed_at IS NULL ORDER BY created_at LIMIT 1)
-   WHERE id = '<their id>';
+   WHERE id = '<their id>' AND EXISTS (SELECT 1 FROM schools WHERE removed_at IS NULL);
    ```
 
    The demo prints whichever half is missing, with the id filled in, rather than
