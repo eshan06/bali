@@ -240,11 +240,15 @@ describe('a hijacked stream response owns its own error handling', () => {
       requestClosed = true;
     });
 
-    // Queue more than the socket buffers can take, so end() cannot complete.
-    // Measured on this box: 0-2MB drains and 'finish' fires; 4MB and up stall.
-    // 16MB is a ~4x margin, and too small fails loudly on the assertions
-    // below rather than passing for the wrong reason.
-    for (let i = 0; i < 16; i += 1) raw.write('x'.repeat(1024 * 1024));
+    // Queue until the socket genuinely stops draining, rather than trusting a
+    // byte count measured on one machine: a runner with larger autotuned
+    // socket buffers would flush a fixed pad, 'finish' would fire, and this
+    // test would go red for an environment difference instead of a regression.
+    const MB = 'x'.repeat(1024 * 1024);
+    let stalled = false;
+    for (let i = 0; i < 64 && !stalled; i += 1) stalled = !raw.write(MB);
+    expect(stalled, 'socket never stopped draining — the window cannot be staged').toBe(true);
+    for (let i = 0; i < 4; i += 1) raw.write(MB); // headroom while the kernel catches up
     raw.end();
     expect(raw.writableEnded, 'ended').toBe(true);
     expect(raw.destroyed, 'not detached — the window is open').toBe(false);

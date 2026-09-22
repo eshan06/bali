@@ -20,6 +20,19 @@ const SSE_HEADERS = {
 };
 
 /**
+ * Which level a hijacked stream's error deserves. A bare string comparison on
+ * the teardown path is easy to mistype or invert, and getting it wrong sends
+ * every ordinary tab-close to `warn` in production — the noise this split
+ * exists to avoid — with nothing going red. Named so it can be asserted.
+ *
+ * Measured: ERR_STREAM_WRITE_AFTER_END is the only code that actually reaches
+ * such a listener, so everything else means "never seen before".
+ */
+export function streamErrorLevel(code: string | undefined): 'debug' | 'warn' {
+  return code === 'ERR_STREAM_WRITE_AFTER_END' ? 'debug' : 'warn';
+}
+
+/**
  * The teacher grid's read + live sides (decision 5), all owner-only:
  * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq).
  * - GET /v1/sessions/:id/events?after=seq — catch-up page, seq-ascending.
@@ -141,7 +154,7 @@ export function registerFeedRoutes(
         // `debug`, and `warn` is not a proxy-reset alarm — it is "something
         // reached this listener that we have never seen", which LOG_LEVEL's
         // `info` default would otherwise swallow entirely.
-        if (err.code === 'ERR_STREAM_WRITE_AFTER_END') {
+        if (streamErrorLevel(err.code) === 'debug') {
           request.log.debug({ err }, 'live stream ended mid-write');
         } else {
           request.log.warn({ err }, 'unexpected error on a live stream');
