@@ -128,6 +128,13 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
       const from = Math.max(0, highSeq - EVENT_RESUME_OVERLAP);
       const rows = await getEventsSince(db, input.sessionId, from, EVENT_PAGE_LIMIT);
       for (const row of rows) {
+        // The stream can be torn down while this read is in flight — a closed
+        // tab, or the shutdown hook — and close() ends the HTTP response as it
+        // runs. Every remaining row would then be written into a response that
+        // is already finished. Checked per row, not once per page: close() can
+        // land inside this loop, which is exactly what a client disconnecting
+        // mid-delivery looks like.
+        if (removed || closed) return false;
         if (row.seq <= input.after) continue; // at/below the resume point; the client has it
         if (delivered.has(row.eventId)) continue; // already sent on this stream
         input.write(frameFor(row));

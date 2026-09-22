@@ -132,6 +132,27 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
+  now owns it. A write after `end()` on the hijacked SSE response does not
+  throw — it returns false and emits `'error'` a tick later, so the hub's
+  try/catch never sees it, and an `'error'` with no listener is an
+  uncaughtException. Fastify does attach one, but only under
+  `hasLogger || onResponse hook || handlerTimeout` (`lib/route.js`), and it
+  removes itself from both `'finish'` and `'error'` the first time either fires
+  (`lib/reply.js`). Measured on the running route with the app exactly as it
+  ships: a late write in the same tick, on a microtask, or **resuming from an
+  awaited `getEventsSince`** all die with an uncaught
+  `ERR_STREAM_WRITE_AFTER_END`; only a backpressured write survives, because
+  `'finish'` cannot fire while data is queued so the borrowed listener is still
+  there. The `getEventsSince` case is the hub's own path — a teacher closing a
+  tab while a read is in flight killed the API process and every other class's
+  grid with it. Two changes: the route installs an `'error'` listener it never
+  removes (verified: borrowed → crash, own → survives), and the hub stops
+  handing over the rest of a page to a subscriber it has already torn down.
+  The audit reported this as a crash and it was twice written off as
+  theoretical here; it was real, and the lesson is that a probe which attaches
+  its own listener can only ever observe the emission, never the crash.
+
 - **2026-09-20** — The exit demo runs in two worlds behind one seam
   (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
   issuer all local, time compressed by backdating rows) and remote
