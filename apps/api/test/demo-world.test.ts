@@ -3,6 +3,7 @@ import { backdateLastSeen } from '@bali/db/testing';
 import { SILENCE_THRESHOLD_MS } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
@@ -215,7 +216,7 @@ describe('provisioningSql', () => {
   });
 
   it('guards the insert so re-running leaves an existing school alone', () => {
-    expect(provisioningSql(USER, 'school')).toContain('WHERE NOT EXISTS (SELECT 1 FROM schools)');
+    expect(provisioningSql(USER, 'school')).toContain('WHERE NOT EXISTS (SELECT 1 FROM schools');
   });
 
   it('never emits a bare UPDATE that would silently set NULL', () => {
@@ -227,6 +228,37 @@ describe('provisioningSql', () => {
       expect(sql).toContain('ORDER BY created_at LIMIT 1');
       expect(sql).toContain(USER);
     }
+  });
+
+  it('skips soft-removed schools, since nothing is really deleted', () => {
+    // A database whose only school was retired would otherwise fail the guard,
+    // skip the insert, and attach the teacher to the retired school (decision 3).
+    const sql = provisioningSql(USER, 'role-and-school');
+
+    expect(sql).toContain('FROM schools WHERE removed_at IS NULL)');
+    expect(sql).toContain('WHERE removed_at IS NULL ORDER BY created_at LIMIT 1');
+  });
+
+  it('is the same recipe the README prints — the fourth copy cannot drift', async () => {
+    // Consolidating the three in-code copies left the README hand-maintained,
+    // which is the same drift this builder exists to end. This pins it.
+    const readme = await readFile(new URL('../../../README.md', import.meta.url), 'utf8');
+    const fence = [...readme.matchAll(/```sql\n([\s\S]*?)```/g)]
+      .map((m) => m[1] ?? '')
+      .find((block) => block.includes('INSERT INTO schools'));
+    expect(fence).toBeDefined();
+
+    const normalize = (sql: string) =>
+      sql
+        .replace(/--[^\n]*/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const built = provisioningSql('<their id>', 'role-and-school').replace(
+      /'[0-9a-f-]{36}'/,
+      "'<uuidv7>'",
+    );
+
+    expect(normalize(fence ?? '')).toBe(normalize(built));
   });
 
   it('flips the role only when the role is what is missing', () => {

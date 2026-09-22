@@ -276,14 +276,20 @@ const SKEW_MARGIN_MS = 15_000;
  * `UPDATE 1`, and leave the operator believing they had complied. The insert
  * supplies an id because `schools.id` has no database default: ids are minted
  * in TypeScript (data-model decision 2).
+ *
+ * Both halves skip soft-removed rows. Nothing is really deleted (decision 3), so
+ * a database whose only school was retired would otherwise fail the NOT EXISTS
+ * guard, skip the insert, and quietly attach the teacher — and every class the
+ * demo creates — to the retired school.
  */
 export function provisioningSql(userId: string, what: 'role-and-school' | 'school'): string {
   const schoolId = newUuidV7();
   const assignments = what === 'role-and-school' ? "role = 'teacher', school_id" : 'school_id';
+  const live = 'WHERE removed_at IS NULL';
   return (
     `  INSERT INTO schools (id, name)\n` +
-    `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools);\n` +
-    `  UPDATE users SET ${assignments} = (SELECT id FROM schools ORDER BY created_at LIMIT 1)\n` +
+    `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools ${live});\n` +
+    `  UPDATE users SET ${assignments} = (SELECT id FROM schools ${live} ORDER BY created_at LIMIT 1)\n` +
     `  WHERE id = '${userId}';`
   );
 }

@@ -113,12 +113,12 @@ missing rather than failing obscurely):
    (run from a checkout after `npm ci`, or use any UUIDv7 generator).
 
    ```sql
-   -- Creates a school only if you have none, then attaches the teacher to the
-   -- oldest one — so the pair is correct whether or not the table was empty.
+   -- Creates a school only if you have no live one, then attaches the teacher to
+   -- the oldest — correct whether or not the table was empty, and it ignores
+   -- soft-removed schools (nothing is really deleted, decision 3).
    INSERT INTO schools (id, name)
-   SELECT '<uuidv7>', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools);
-   UPDATE users
-   SET role = 'teacher', school_id = (SELECT id FROM schools ORDER BY created_at LIMIT 1)
+   SELECT '<uuidv7>', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools WHERE removed_at IS NULL);
+   UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools WHERE removed_at IS NULL ORDER BY created_at LIMIT 1)
    WHERE id = '<their id>';
    ```
 
