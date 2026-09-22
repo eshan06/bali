@@ -594,100 +594,115 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
      * nothing. So the real assertion is Postgres's own counter, which records
      * a deadlock whether or not the error escaped; the per-result check stays
      * as the faster, clearer signal for one that does escape.
+     *
+     * On a database of its OWN, not the file's. `pg_stat_database.deadlocks`
+     * is database-wide, and the file's database is shared with "a removal
+     * racing a cross-class switch-tap", which provokes 40P01 deliberately —
+     * see `deadlockCount`. A delta almost covers that; a late stats flush from
+     * another backend defeats it.
      */
-    const school = one(await db.insert(schools).values({ name: 'Cross' }).returning());
-    const teacher = one(
+    const { db: iso, close: closeIso } = await makeTestDb();
+    try {
+      await crossingTapsRound(iso);
+    } finally {
+      await closeIso();
+    }
+  }, 60_000);
+});
+
+/** The body of the crossing-taps test, on a database nothing else touches. */
+async function crossingTapsRound(db: Database): Promise<void> {
+  const school = one(await db.insert(schools).values({ name: 'Cross' }).returning());
+  const teacher = one(
+    await db
+      .insert(users)
+      .values({ cognitoId: 'cross-teacher', role: 'teacher', schoolId: school.id })
+      .returning(),
+  );
+  const mkClass = async (name: string, code: string) =>
+    one(
       await db
-        .insert(users)
-        .values({ cognitoId: 'cross-teacher', role: 'teacher', schoolId: school.id })
+        .insert(classes)
+        .values({ teacherId: teacher.id, schoolId: school.id, name, joinCode: code })
         .returning(),
     );
-    const mkClass = async (name: string, code: string) =>
-      one(
-        await db
-          .insert(classes)
-          .values({ teacherId: teacher.id, schoolId: school.id, name, joinCode: code })
-          .returning(),
-      );
-    const a = await mkClass('A', 'CROSSA');
-    const b = await mkClass('B', 'CROSSB');
-    const mkStudent = async (tag: string) => {
-      const u = one(
-        await db
-          .insert(users)
-          .values({ cognitoId: `cross-${tag}`, role: 'student', schoolId: school.id })
-          .returning(),
-      );
-      await db.insert(enrollments).values([
-        { classId: a.id, studentId: u.id },
-        { classId: b.id, studentId: u.id },
-      ]);
-      return u;
-    };
-    const x = await mkStudent('x');
-    const y = await mkStudent('y');
+  const a = await mkClass('A', 'CROSSA');
+  const b = await mkClass('B', 'CROSSB');
+  const mkStudent = async (tag: string) => {
+    const u = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `cross-${tag}`, role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    await db.insert(enrollments).values([
+      { classId: a.id, studentId: u.id },
+      { classId: b.id, studentId: u.id },
+    ]);
+    return u;
+  };
+  const x = await mkStudent('x');
+  const y = await mkStudent('y');
 
-    const deadlocksBefore = await deadlockCount();
-    for (let round = 0; round < 8; round += 1) {
-      const at = new Date(Date.now() + round * 1000);
-      const sa = (
-        await startSession(db, {
-          classId: a.id,
-          startedAt: at,
-          endsAt: new Date(at.getTime() + 45 * 60_000),
-        })
-      ).session;
-      const sb = (
-        await startSession(db, {
-          classId: b.id,
-          startedAt: at,
-          endsAt: new Date(at.getTime() + 45 * 60_000),
-        })
-      ).session;
+  for (let round = 0; round < 8; round += 1) {
+    const at = new Date(Date.now() + round * 1000);
+    const sa = (
+      await startSession(db, {
+        classId: a.id,
+        startedAt: at,
+        endsAt: new Date(at.getTime() + 45 * 60_000),
+      })
+    ).session;
+    const sb = (
+      await startSession(db, {
+        classId: b.id,
+        startedAt: at,
+        endsAt: new Date(at.getTime() + 45 * 60_000),
+      })
+    ).session;
 
-      // Each student's id is spent in the session the OTHER one is tapping,
-      // so both replays have to reach across.
-      const ex = newUuidV7();
-      const ey = newUuidV7();
-      await tapIn(db, { sessionId: sb.id, studentId: x.id, eventId: ex, deviceTime: at });
-      await tapIn(db, { sessionId: sa.id, studentId: y.id, eventId: ey, deviceTime: at });
+    // Each student's id is spent in the session the OTHER one is tapping,
+    // so both replays have to reach across.
+    const ex = newUuidV7();
+    const ey = newUuidV7();
+    await tapIn(db, { sessionId: sb.id, studentId: x.id, eventId: ex, deviceTime: at });
+    await tapIn(db, { sessionId: sa.id, studentId: y.id, eventId: ey, deviceTime: at });
 
-      const results = await Promise.allSettled([
-        tapIn(db, { sessionId: sa.id, studentId: x.id, eventId: ex, deviceTime: at }),
-        tapIn(db, { sessionId: sb.id, studentId: y.id, eventId: ey, deviceTime: at }),
-      ]);
-      for (const r of results) {
-        if (r.status === 'rejected') {
-          const err = r.reason as Error & { cause?: { code?: string } };
-          expect(
-            err.cause?.code,
-            `round ${round}: a tap failed with ${err.message} — a 40P01 here means the cross-session read took a lock`,
-          ).not.toBe('40P01');
-        }
+    const results = await Promise.allSettled([
+      tapIn(db, { sessionId: sa.id, studentId: x.id, eventId: ex, deviceTime: at }),
+      tapIn(db, { sessionId: sb.id, studentId: y.id, eventId: ey, deviceTime: at }),
+    ]);
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        const err = r.reason as Error & { cause?: { code?: string } };
+        expect(
+          err.cause?.code,
+          `round ${round}: a tap failed with ${err.message} — a 40P01 here means the cross-session read took a lock`,
+        ).not.toBe('40P01');
       }
-      await endSession(db, {
-        sessionId: sa.id,
-        at: new Date(at.getTime() + 1000),
-        reason: 'ended',
-      });
-      await endSession(db, {
-        sessionId: sb.id,
-        at: new Date(at.getTime() + 1000),
-        reason: 'ended',
-      });
     }
+    await endSession(db, {
+      sessionId: sa.id,
+      at: new Date(at.getTime() + 1000),
+      reason: 'ended',
+    });
+    await endSession(db, {
+      sessionId: sb.id,
+      at: new Date(at.getTime() + 1000),
+      reason: 'ended',
+    });
+  }
 
-    // The one that survives withDeadlockRetry.
-    expect(
-      (await deadlockCount()) - deadlocksBefore,
-      'Postgres broke a deadlock in this database — the cross-session read took a lock, ' +
-        'and the retry wrapper hid it',
-    ).toBe(0);
-    // Generous budget on purpose: with the lock reintroduced, every round
-    // waits out `deadlock_timeout` (1 s) before a retry wins, so a 5 s default
-    // would report "Test timed out" and bury the assertion above.
-  }, 60_000);
+  // The one that survives withDeadlockRetry. Absolute, not a delta: this
+  // database is this test's alone, so anything above zero is ours.
+  expect(
+    await deadlockCount(db),
+    'Postgres broke a deadlock in this database — the cross-session read took a lock, ' +
+      'and the retry wrapper hid it',
+  ).toBe(0);
+}
 
+describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
   it('two simultaneous +10s extends both land, and the session gains both', async () => {
     /*
      * Finding 7. The route reads the session, does the arithmetic, and hands
@@ -730,20 +745,28 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
 });
 
 /**
- * Deadlocks Postgres has broken in THIS database since it was created.
+ * Deadlocks Postgres has broken in the database `on` is connected to.
  *
- * The only honest way to see a deadlock that `withDeadlockRetry` handled.
- * Postgres counts it here whether or not the loser's error escaped, and
- * `makeTestDb` gives each suite a freshly created throwaway database, so the
- * counter starts at 0 and nothing else can contribute to it.
+ * The only honest way to see a deadlock that `withDeadlockRetry` handled:
+ * Postgres counts it whether or not the loser's error ever escaped.
  *
- * `pg_stat_clear_snapshot()` first: a session caches its stats snapshot for
- * the transaction, so a plain read can return the value from before the round
- * that is being measured.
+ * MUST be given a database nothing else is using, and the first version of
+ * this was wrong about that. It read the file-level `db`, whose database is
+ * shared by all three describes here — including "a removal racing a
+ * cross-class switch-tap", which deliberately provokes 40P01 and says so. A
+ * before/after delta covers most of that, but not all: `pg_stat_clear_snapshot()`
+ * drops only the READING backend's cached snapshot, and other backends flush
+ * their pending stats on their own schedule (at transaction end, at most every
+ * PGSTAT_MIN_INTERVAL). A deadlock from an earlier test, still pending when
+ * the `before` read happens and flushed before the `after` one, lands in the
+ * delta and reddens CI over code that is correct.
+ *
+ * So the caller hands it a database of its own. Then the counter really does
+ * start at 0 and nothing else can contribute.
  */
-async function deadlockCount(): Promise<number> {
-  await db.execute(sql`select pg_stat_clear_snapshot()`);
-  const rows = (await db.execute(
+async function deadlockCount(on: Database): Promise<number> {
+  await on.execute(sql`select pg_stat_clear_snapshot()`);
+  const rows = (await on.execute(
     sql`select deadlocks::int as n from pg_stat_database where datname = current_database()`,
   )) as { n: number }[];
   return rows[0]?.n ?? 0;

@@ -323,6 +323,20 @@ under-13 parental-consent machinery.
   (decision 3) so that is unreachable today, but it would have misdirected
   whoever first hit it. It says "you are no longer in this session" now, which
   is true of both.
+  **And the deadlock-counter test I had just added was resting on a false
+  claim about its own fixture.** Its comment said `makeTestDb` gives the suite
+  a fresh database so "nothing else can contribute to" the counter. Not true:
+  `makeTestDb` is called once in a file-scope `beforeAll` and the database is
+  shared by all three describes in `races.test.ts` — including "a removal
+  racing a cross-class switch-tap", which provokes 40P01 deliberately and says
+  so in its own comment. The before/after delta covers most of that but not
+  all: `pg_stat_clear_snapshot()` drops only the READING backend's cached
+  snapshot, and other backends flush pending stats on their own schedule, so a
+  deadlock from the earlier test arriving mid-window lands in the delta and
+  reddens CI over correct code. The crossing-taps test runs on a database of
+  its own now, which makes the claim true and lets the assertion be absolute
+  rather than a delta; green 3 of 3 on sound code, red 3 of 3 with the lock
+  reintroduced.
   **Two more from the next round, and one of them was another overclaim of
   mine.** The comment on `tapIn`'s replay reads said the session-before-
   participation order was "staged and confirmed". It is not: swapping the two
