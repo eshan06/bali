@@ -136,6 +136,23 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — #22's own review found the same class of hole one level up
+  from the one #22 fixed. That PR extracted `streamErrorLevel` so the stream
+  route's log decision could be asserted, but the listener then RE-BRANCHED on
+  what it returned, and that branch was hand-written and unseen: swapping its
+  two bodies left the whole api suite green (verified — 244 passed) while
+  every ordinary tab-close would log at `warn` in production, which is the
+  exact noise the split existed to avoid. A pinned function with an unpinned
+  call site pins nothing. The helper now returns the level AND the line
+  together (`streamErrorLog`) and the listener dispatches on what comes back,
+  so there is no branch left outside the tested function. Inverting the helper
+  turns all five of its cases red.
+  Also from that review: the crash-regression test's socket is registered with
+  the same `extraSockets` net its neighbour already had, and its `'request'`
+  listener is removed once it has what it needs — a `waitFor` timing out
+  before the `try` used to leave a live streaming connection attached to an
+  app the suite was about to close.
+
 - **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
   reviewer disproved. The stream route's `'error'` listener logged at `debug`
   while production runs at `info`, so the fix that stopped the crash would also

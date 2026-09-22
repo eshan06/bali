@@ -289,11 +289,13 @@ describe('a hijacked stream response owns its own error handling', () => {
     const token = await tokenFor(teacher.cognitoId);
 
     let res: ServerResponse | null = null;
-    app.server.on('request', (req, r) => {
+    const onRequest = (req: IncomingMessage, r: ServerResponse) => {
       if (req.url?.includes('/stream') === true) res = r;
-    });
+    };
+    app.server.on('request', onRequest);
 
     const sock = net.connect(port, '127.0.0.1');
+    extraSockets.push(sock); // torn down by afterEach even if a waitFor below throws
     await once(sock, 'connect');
     sock.resume(); // an ordinary, draining client — no backpressure needed
     sock.write(
@@ -302,6 +304,7 @@ describe('a hijacked stream response owns its own error handling', () => {
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
     await waitFor(() => res !== null);
+    app.server.off('request', onRequest);
     const raw = res as unknown as ServerResponse;
     await waitFor(() => raw.headersSent);
 

@@ -20,16 +20,29 @@ const SSE_HEADERS = {
 };
 
 /**
- * Which level a hijacked stream's error deserves. A bare string comparison on
- * the teardown path is easy to mistype or invert, and getting it wrong sends
- * every ordinary tab-close to `warn` in production — the noise this split
- * exists to avoid — with nothing going red. Named so it can be asserted.
+ * How a hijacked stream's error should be logged — BOTH the level and the
+ * line, together. A bare string comparison on the teardown path is easy to
+ * mistype or invert, and getting it wrong sends every ordinary tab-close to
+ * `warn` in production, the noise this split exists to avoid, with nothing
+ * going red.
+ *
+ * Returning the pair is the point. An earlier version returned only the level
+ * and left the listener to re-branch on it, which put the decision back in
+ * hand-written code that no test could see: swapping those two branch bodies
+ * left the entire api suite green while production inverted. Now the listener
+ * dispatches on what comes back and has no branch of its own, so this function
+ * and its test are the whole decision.
  *
  * Measured: ERR_STREAM_WRITE_AFTER_END is the only code that actually reaches
  * such a listener, so everything else means "never seen before".
  */
-export function streamErrorLevel(code: string | undefined): 'debug' | 'warn' {
-  return code === 'ERR_STREAM_WRITE_AFTER_END' ? 'debug' : 'warn';
+export function streamErrorLog(code: string | undefined): {
+  level: 'debug' | 'warn';
+  msg: string;
+} {
+  return code === 'ERR_STREAM_WRITE_AFTER_END'
+    ? { level: 'debug', msg: 'live stream ended mid-write' }
+    : { level: 'warn', msg: 'unexpected error on a live stream' };
 }
 
 /**
@@ -154,11 +167,8 @@ export function registerFeedRoutes(
         // `debug`, and `warn` is not a proxy-reset alarm — it is "something
         // reached this listener that we have never seen", which LOG_LEVEL's
         // `info` default would otherwise swallow entirely.
-        if (streamErrorLevel(err.code) === 'debug') {
-          request.log.debug({ err }, 'live stream ended mid-write');
-        } else {
-          request.log.warn({ err }, 'unexpected error on a live stream');
-        }
+        const { level, msg } = streamErrorLog(err.code);
+        request.log[level]({ err }, msg);
         sub?.close();
       });
       return res;
