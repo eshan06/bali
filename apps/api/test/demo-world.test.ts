@@ -207,10 +207,19 @@ describe('the remote world, against a real server', () => {
 
 describe('provisioningSql', () => {
   const USER = '01a0bb08-563f-7050-8d19-48b7b3150865';
+  /** The one wording of the "run both" guidance, shared by the recipe and the README. */
+  const RUN_BOTH =
+    '-- Run both: with no live school the UPDATE attaches nothing and reports "UPDATE 0".';
 
   /**
    * The statements as an operator meets them: one paste at a time, which is
    * also the only way to paste just one half of the recipe.
+   *
+   * Splitting on a bare `;` is exact for what the builder emits today — the only
+   * literals are a minted UUID, `'Demo School'` and `'teacher'`. Put a semicolon
+   * inside a literal (a configurable school name) and this hands fragments to
+   * the database, and these tests fail as syntax errors instead of as the
+   * assertions they are: split on `;\n` if that day comes.
    */
   function statementsOf(recipe: string): string[] {
     return recipe
@@ -287,6 +296,31 @@ describe('provisioningSql', () => {
     );
 
     expect(normalize(fence ?? '')).toBe(normalize(built));
+  });
+
+  it('tells the operator to run both, since a lone UPDATE is now a no-op', () => {
+    // The guard made the half-paste honest but silent. Operator-facing guidance
+    // that nothing pins is how this whole line of fixes started, so: pinned —
+    // and pinned as the whole sentence, because the earlier draft promised
+    // `UPDATE 0` unconditionally. On the `school` path a deployment may already
+    // have a live school, where a lone UPDATE correctly reports `UPDATE 1`, and
+    // a hint that contradicts what the operator just saw is worse than none.
+    for (const what of ['role-and-school', 'school'] as const) {
+      expect(provisioningSql(USER, what)).toContain(RUN_BOTH);
+      // The claim is conditional, never a flat promise about the row count.
+      expect(RUN_BOTH).toContain('with no live school');
+    }
+  });
+
+  it('prints the very same sentence the README does', async () => {
+    // The README-parity test below strips `--` comments from both sides, so the
+    // guidance itself is the one part of this recipe it cannot cover. Two copies
+    // of an instruction with nothing holding them together is the drift that
+    // started all of this, so the sentence is compared verbatim.
+    const readme = await readFile(new URL('../../../README.md', import.meta.url), 'utf8');
+
+    expect(provisioningSql(USER, 'role-and-school')).toContain(RUN_BOTH);
+    expect(readme).toContain(RUN_BOTH);
   });
 
   it('flips the role only when the role is what is missing', () => {
