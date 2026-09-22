@@ -19,7 +19,13 @@ import { randomUUID } from 'node:crypto';
 
 import { type Call, createCall } from './demo/http.js';
 import { openSseRecorder, type SseRecorder } from './demo/sse.js';
-import { createWorld, type DemoActor, type DemoActorSpec, type DemoWorld } from './demo/world.js';
+import {
+  createWorld,
+  type DemoActor,
+  type DemoActorSpec,
+  type DemoWorld,
+  provisioningSql,
+} from './demo/world.js';
 
 /*
  * The Phase-2 exit demo: a phone + classroom simulator driving the REAL HTTP API
@@ -182,8 +188,7 @@ async function main(): Promise<void> {
       if (err instanceof Error && err.message.includes('not assigned to a school')) {
         throw new Error(
           `${teacher.displayName} has no school, so no class can be created. Assign one ` +
-            'out of band:\n  UPDATE users SET school_id = (SELECT id FROM schools LIMIT 1) ' +
-            `WHERE id = '${teacher.userId}';`,
+            `out of band:\n${provisioningSql(teacher.userId, 'school')}`,
         );
       }
       throw err;
