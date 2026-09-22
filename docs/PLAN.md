@@ -619,8 +619,9 @@ under-13 parental-consent machinery.
   the day, and it needed no race to reach. A tap lands in a session, its
   response is lost, the bell ends the session, and the phone's outbox retries.
   Nothing of that teacher's is running, so the route arms the retry —
-  `armTap` de-dupes against `armed_taps.event_id` and never against `events`,
-  so a SPENT id is accepted. The next Start converts it, `insertEvent` sees
+  `armTap` de-duped against `armed_taps.event_id` and never against `events`
+  (it refuses such an id at arming now), so a SPENT id was
+  accepted. The next Start converts it, `insertEvent` sees
   the id against a different session and refuses, and because conversion runs
   inside `startSession`'s transaction the whole Start rolls back with the tap
   still unconsumed. Waiting taps are selected by TEACHER, not by class, so

@@ -352,10 +352,12 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // A waiting tap can carry an event id that is ALREADY on record as this
     // student's own `tap_in`, and when it does the tap is not a fresh pre-bell
     // tap at all. The phone mints one id per PHYSICAL tap, so such an id can
-    // only be a retry of one that already landed: it went into an earlier session, the
-    // response was lost, and the retry — finding nothing of this teacher's
-    // running — armed the same id, because `armTap` de-dupes against
-    // `armed_taps.event_id` and never against `events`.
+    // only be a retry of one that already landed: it went into an earlier
+    // session, the response was lost, and the retry — finding nothing of this
+    // teacher's running — armed the same id. `armTap` used to de-dupe only
+    // against `armed_taps.event_id`; it refuses an id already in `events` now
+    // (see its top), so a row reaching here was armed by an older deploy, or
+    // armed before the `tap_in` under its id was recorded.
     //
     // Converting it is wrong in both directions. Under the spent id,
     // `insertEvent` refuses and rolls back this whole Start; since `waiting`
@@ -957,9 +959,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // already this student's own `tap_in`, answering `already_armed` drops
         // this physical tap and the conversion then skips the row at Start. Joined never, which is the
         // exact failure the waiting branch was fixed for, through the fallback
-        // door. Only reachable against a row this build would not have
-        // written (an older deploy, or one armed before that fix), which is
-        // why it is symmetry rather than a live bug.
+        // door. `armTap` refuses an id already in `events`, so such a row was
+        // armed by an older deploy, or armed before the `tap_in` under its id
+        // was recorded.
         if (!(await rowIsStale(tx, standing, now))) {
           return { outcome: 'already_armed', armedTapId: standing.id };
         }
