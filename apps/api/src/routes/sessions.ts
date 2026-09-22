@@ -25,6 +25,7 @@ import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
+import { DeviceTime } from './schemas.js';
 
 const ClassParams = z.object({ id: z.string().uuid() });
 const SessionParams = z.object({ id: z.string().uuid() });
@@ -32,10 +33,10 @@ const DurationBody = z.object({ durationMinutes: z.number().int().positive().max
 // Extend carries an optional client-minted event id: the new end is relative to
 // the current one, so a retry without it would add the time twice (rule 4).
 const ExtendBody = DurationBody.extend({ eventId: z.string().uuid() });
-const CheckInBody = z.object({ deviceTime: z.string().datetime() });
+const CheckInBody = z.object({ deviceTime: DeviceTime });
 const StateChangeBody = z.object({
   eventId: z.string().uuid(),
-  deviceTime: z.string().datetime(),
+  deviceTime: DeviceTime,
 });
 
 function toSessionView(s: { id: string; classId: string; endsAt: Date }): SessionView {
