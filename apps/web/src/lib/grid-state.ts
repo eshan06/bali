@@ -160,3 +160,44 @@ export function gridDisplay(s: Student, now: Date): GridDisplay {
     now,
   );
 }
+
+/**
+ * Whether the grid should say it might be out of date, and why.
+ *
+ * Rule 3: the screen only claims what was verified. The banner used to appear
+ * solely when the client KNEW it had lost the stream — the one case it can
+ * already see — so the dangerous shape showed nothing: a connection that stays
+ * open and stops delivering (a wedged proxy, a hub that died without closing
+ * the socket) left a fully green grid ageing silently, every chip claiming a
+ * freshness nothing had checked.
+ *
+ * `lastActivityAt` is any sign of life: an event, a heartbeat comment, or a
+ * successful snapshot refresh. A heartbeat counts as freshness, not just
+ * liveness — a quiet class emits no events for minutes (decision 7: a
+ * heartbeat that changes nothing writes no history), so silence on the wire is
+ * the normal case and only silence from the SERVER means the screen is
+ * guessing.
+ *
+ * The threshold is two missed heartbeats, so one dropped frame or a slow tick
+ * does not flap the banner on a healthy class.
+ */
+export const STALE_AFTER_MISSED_HEARTBEATS = 2;
+
+export interface Staleness {
+  /** `reconnecting` — the client knows it is disconnected. `stale` — the stream is open but silent. */
+  reason: 'reconnecting' | 'stale';
+  secondsAgo: number;
+}
+
+export function staleness(input: {
+  status: 'connecting' | 'open' | 'reconnecting';
+  lastActivityAt: number;
+  now: number;
+  heartbeatMs: number;
+}): Staleness | null {
+  const sinceMs = Math.max(0, input.now - input.lastActivityAt);
+  const secondsAgo = Math.round(sinceMs / 1000);
+  if (input.status !== 'open') return { reason: 'reconnecting', secondsAgo };
+  const quietFor = input.heartbeatMs * (STALE_AFTER_MISSED_HEARTBEATS + 1);
+  return sinceMs > quietFor ? { reason: 'stale', secondsAgo } : null;
+}
