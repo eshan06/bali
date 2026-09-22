@@ -1021,6 +1021,84 @@ describe('armed taps', () => {
     });
     expect(armedConverted).toBe(0);
   });
+
+  it('a spent event id never wedges the next Start', async () => {
+    /*
+     * The worst thing in this area, and it needs no race to reach. A tap lands
+     * in a session, its response is lost, the bell ends the session, and the
+     * phone's outbox retries. Nothing of that teacher's is running, so the
+     * route ARMS the retry — `armTap` de-dupes against `armed_taps.event_id`
+     * and never against `events`, so a spent id is accepted.
+     *
+     * The next Start then converts it, `insertEvent` sees the id against a
+     * different session and refuses, and because conversion runs inside
+     * `startSession`'s transaction the whole Start rolls back with the tap
+     * still unconsumed. Waiting taps are selected by TEACHER, so this blocks
+     * every class that student is in, every period, until end of day. The
+     * teacher cannot start a lesson.
+     *
+     * The student is still standing there, so the conversion goes ahead under
+     * a fresh event id, with the spent one kept in the payload.
+     */
+    const { teacher, student, klass, school } = await seedClass('arm-spent');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'ARMSPENT2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+    const spent = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await endSession(db, {
+      sessionId: first.session.id,
+      at: new Date('2026-01-01T09:25:00Z'),
+      reason: 'expired',
+    });
+
+    // The outbox retry, arriving with nothing running: the route arms it.
+    const armed = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+    expect(armed.outcome).toBe('armed');
+
+    // Next period, and the period after, both open normally.
+    const second = await startSession(db, { classId: klass.id, ...window('2026-01-01T10:00:00Z') });
+    expect(second.armedConverted).toBe(1);
+    const third = await startSession(db, { classId: other.id, ...window('2026-01-01T11:00:00Z') });
+    expect(third.outcome).toBe('created');
+
+    // The student joined under a fresh id, and the spent one still points at
+    // the session that really recorded it.
+    const joined = one((await eventsFor(second.session.id)).filter((e) => e.type === 'tap_in'));
+    expect(joined.eventId).not.toBe(spent);
+    expect(joined.payload).toEqual({ armed_tap_event_id: spent });
+    const original = one(await db.select().from(events).where(eq(events.eventId, spent)));
+    expect(original.sessionId).toBe(first.session.id);
+
+    // And the tap is consumed, so it cannot come back tomorrow.
+    const left = await db
+      .select()
+      .from(armedTaps)
+      .where(and(eq(armedTaps.studentId, student.id), isNull(armedTaps.consumedAt)));
+    expect(left).toHaveLength(0);
+  });
 });
 
 describe('the ended-consistency check constraint', () => {
