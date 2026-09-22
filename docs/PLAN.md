@@ -344,6 +344,44 @@ under-13 parental-consent machinery.
   rival that keeps appearing and vanishing, which is transient by
   construction, so "retry" is exactly what the outbox should do.
 
+- **2026-09-22** — #31's review landed after it merged, and the best finding
+  in it was that the staleness banner **could not fire in production**, for
+  the exact scenario it was built for.
+  One clock was the bug. `lastActivity` was stamped by events, by heartbeats,
+  AND by the 15 s snapshot refresh — against a 60 s threshold. So a wedged
+  proxy or a hub that died without closing the socket, stream still `open` and
+  the API answering fine, reset that counter four times per threshold and the
+  teacher saw nothing at all. There are two clocks now: the stream's own (it
+  decides WHETHER to warn) and the grid's (it decides what "last updated"
+  says, and on a dead stream with a live poll it is the smaller, truer
+  number). Pinned by a test asserting both halves at once — warns, and reports
+  5s rather than 180s — plus its mirror, so the two cannot be quietly swapped.
+  Four more from the same review, all fair:
+  **The backoff-reset test pinned nothing.** It exercised only the first
+  connection, where `attempt` is already 0, so the reset was a no-op for it —
+  deleting the line outright left the whole file green, which I checked before
+  believing it. The replacement drives `attempt` to 4 with instant drops first
+  and then asserts the gap after one healthy stream: ~20-40 ms if the reset
+  fired, ~320-640 ms if it did not, a separation no jitter can close. Red 3 of
+  3 against the mutation.
+  **`STREAM_HEARTBEAT_MS` was hand-copied into the portal** with a comment
+  claiming the two sides could not drift. It is in `packages/shared` now, like
+  `EVENT_RESUME_OVERLAP`, and both sides import it — move the server to 30 s
+  with a copy on the client and the banner flaps on healthy classes, move it
+  to 60 s and it never fires, with nothing going red either way.
+  **An off-by-one between a constant and its own name:**
+  `STALE_AFTER_MISSED_HEARTBEATS = 2` multiplied by `n + 1`, i.e. three missed
+  heartbeats. Behaviour was the conservative one and is unchanged at 60 s; the
+  constant says 3 and is multiplied by exactly itself now.
+  **A reconnect that succeeded reported the old silence.** `onStatus('open')`
+  stamped nothing, so after a three-minute outage the banner read "gone quiet,
+  last updated 180s ago" over a connection working perfectly, until the
+  server's first heartbeat up to 20 s later. The client reports the open
+  through `onActivity` now — an open connection is a sign of life — which put
+  the fact where the connection is known and made it testable, instead of in
+  the component where it would not have been.
+
+
 - **2026-09-22** — Last of the audit's ten, and the smallest one only because
   the thing it removes is invisible. Two files had independently grown the
   same cause-chain walk — the engine's 40P01 deadlock retry and management's
