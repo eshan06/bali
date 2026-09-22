@@ -1373,15 +1373,32 @@ describe('armed taps', () => {
       at: new Date('2026-01-01T09:20:00Z'),
       reason: 'ended',
     });
-    // The stale retry, arming an id that already landed.
-    await armTap(db, {
-      studentId: student.id,
-      teacherId: teacher.id,
-      eventId: spent,
-      deviceTime: new Date('2026-01-01T09:01:00Z'),
-      expiresAt: new Date('2026-01-01T23:59:59Z'),
-      now: new Date('2026-01-01T09:30:00Z'),
-    });
+    // The stale retry's row, written directly — and that IS this test, not a
+    // shortcut around it. It used to stage through `armTap`, but the
+    // incoming-id guard added in this same PR answers that call `replay` and
+    // writes no row at all: the standing row this test is named for stopped
+    // existing, the retap below took the ordinary empty-slot path, and every
+    // assertion still passed with `rowIsStale`'s spent branch deleted.
+    // Measured, on the lane that matters — under that mutation the whole
+    // PGlite suite stayed green, so this branch had no cover there at all.
+    //
+    // Direct is also the honest staging: a row like this is one an older
+    // deploy against the same database left behind, or one armed before that
+    // guard shipped, which is the entire population the staleness rule is for.
+    // Writing `armed_taps` here is allowed — transient table, not
+    // participations or events.
+    one(
+      await db
+        .insert(armedTaps)
+        .values({
+          studentId: student.id,
+          teacherId: teacher.id,
+          eventId: spent,
+          deviceTime: new Date('2026-01-01T09:01:00Z'),
+          expiresAt: new Date('2026-01-01T23:59:59Z'),
+        })
+        .returning(),
+    );
 
     // She taps the block again, for real, well before the row would expire.
     const fresh = newUuidV7();

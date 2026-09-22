@@ -322,6 +322,18 @@ under-13 parental-consent machinery.
   is written directly instead, which is the honest framing anyway — the
   conversion's skip is defence in depth for rows that ALREADY exist, armed
   before this refusal shipped or by an older deploy against the same database.
+  **And it obsoleted a second staging I did not think to check** — found by
+  the PR's own review, after two independent reviewers had passed over it. "A
+  fresh tap takes over a standing row whose id is already spent" staged that
+  standing row the same way, so the guard answered `replay`, wrote no row, and
+  the retap took the ordinary empty-slot path: every assertion passed with
+  `rowIsStale`'s spent branch DELETED. Measured — under that mutation the whole
+  PGlite suite stayed green, so the rule this branch exists for had no cover on
+  the lane that always runs; only a REAL_PG-only race caught it, and that one
+  exercises the other branch. Re-staged with a direct insert like its sibling,
+  and it kills the mutation now. Third time in this audit a test would have
+  passed with its own bug present, and the first that two reviewers and I all
+  missed together.
   Also recorded rather than changed: the `tap_in` moved ahead of
   `endParticipationsElsewhere` (a skipped tap must leave nothing behind), so
   within one Start a converted tap's `tap_in` now carries a lower `seq` than
