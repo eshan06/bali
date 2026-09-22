@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.**_
 
 ## Now
 
@@ -65,13 +65,14 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap insert race and its event-id integrity gap (**in review**), a
-  replayed tap re-resolved to another session, extend's arithmetic outside the
-  engine transaction, the portal's reconnect backoff and staleness banner
+  the armTap insert race and its event-id integrity gap (**landed**; its
+  review follow-ups are #29), a replayed tap re-resolved to another session
+  and extend's arithmetic outside the engine transaction (**#28, which lands
+  after #29**), the portal's reconnect backoff and staleness banner
   (**landed**), and one shared SQLSTATE helper (**landed**). Block
-  re-registration by the tag's own teacher is fixed but **held for the
-  owner** — the fix answers 200 where `/v1` answers 409 today, and decision 2
-  sends behaviour changes to `/v2`.
+  re-registration by the tag's own teacher answers 200 where `/v1` answers
+  409 today; **the owner ruled that correction in (2026-09-22)**, and it ships
+  as its own PR after #29, which carries the ARCHITECTURE note allowing it.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
@@ -144,6 +145,43 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — **The owner ruled on the audit's held `/v1` questions: yes
+  to all five** ([the ask](https://github.com/eshan06/bali/pull/29#issuecomment-5774512834)).
+  One principle covers the `/v1` items, and it is written into ARCHITECTURE
+  API decision 2 now: correcting a response that told a client something
+  false is not a behaviour change, so it may change a status in place, `200`
+  to `409` included, and each correction is listed here. Where each landed:
+  - **Items 3 and 5, #29.** `POST /v1/taps` answers `409` for an `event_id`
+    that is not this caller's tap — another student's or another event
+    type's, and (item 5) one recorded as this student's `tap_in` under
+    ANOTHER teacher. `armTap`'s `events` lookup reaches `classes.teacher_id`
+    through a LEFT join on `class_id`, which is nullable: an orphan unlock
+    records with no class, and an inner join reads its id as unused and arms
+    it — "refuses an id recorded with no class at all" goes red under
+    `innerJoin`, measured. The same-teacher residual stays as the armed-tap
+    entry below writes it up: an id spent in an earlier session of the same
+    teacher still answers `replay`, because that is also exactly what the
+    honest retry of a lost 200 looks like. Tap step 9 now says what happens
+    to an id on record for a different event.
+  - **Item 4, #29.** ARCHITECTURE decision 5 carries its one exception: a
+    waiting tap whose id is already this student's own `tap_in` was honoured
+    elsewhere, so it is consumed without joining — and RECORDED, the honesty
+    half of the same decision: an `armed_tap_skipped` event (additive vocab)
+    in the session whose Start declined it, under a fresh id, payload
+    `{ armed_tap_event_id }`, stamped with the Start's clock. The grid
+    ignores it, pinned — it is history, not a join, and painting a chip from
+    it would put a student in a session they are not in. Phase 4's reports
+    must not count it as a join either.
+  - **Item 2, #28** — rule 4 and tap step 10, amended in that PR, which
+    lands second.
+  - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
+    instead of `409`; split out of #23 before it merged, now its own PR after
+    #29.
+  Not changed by the ruling, and still Phase 3: a tap `409` is kept and
+  retried but not surfaced, because no tap-side outbox disposition exists
+  yet. That is also where a "recorded, but no longer current" answer
+  belongs.
+
 - **2026-09-22** — Review follow-ups on the armed-tap work, from #23's and
   #26's own reviews. #23's found both halves of its fix incomplete,
   and one of them was a test that could pass with the bug present.
@@ -171,7 +209,8 @@ under-13 parental-consent machinery.
   the id: the `armed_taps` one to the student and the teacher, the `events`
   one to the student and the event type — not the teacher, which is the
   asymmetry recorded below, left as it is pending the ruling rather than
-  chosen. Answering `replay` for a stranger's id
+  chosen. (**Ruled 2026-09-22: scoped to the teacher too** — see the entry
+  above.) Answering `replay` for a stranger's id
   handed back their row and told this phone's outbox the tap was durably
   recorded, so it dropped a tap that was never armed and never converts —
   silently absent from the grid at Start. `insertEvent` refuses the same
@@ -182,12 +221,13 @@ under-13 parental-consent machinery.
   unlike the unlock path there is no typed disposition telling a TAP outbox
   what a permanent 409 means, so a client that hits one retries forever
   without surfacing — the same contract gap already recorded above.
-  Known and accepted: a skipped spent tap is consumed with no event and no
-  contribution to `armedConverted`, so nothing in the feed records that a
-  waiting tap was dropped. With the takeover above, the only rows that reach
-  it are stale retries for a student who never came back, and naming that in
-  the permanent log would mean new event vocabulary — worth doing with the
-  contract decision, not ahead of it.
+  Known and accepted at the time: a skipped spent tap was consumed with no
+  event and no contribution to `armedConverted`, so nothing in the feed
+  recorded that a waiting tap was dropped; naming it in the permanent log
+  meant new event vocabulary, worth doing with the contract decision rather
+  than ahead of it. **Done with the ruling:** the skip is recorded as
+  `armed_tap_skipped` — see the entry above. It still adds nothing to
+  `armedConverted`.
   The conversion-gap race test staged with a bare 12 ms sleep and asserted
   only the invariant — nothing checked that the interleaving happened. Worth
   being exact about what that is: on an idle box it does still catch the
@@ -273,7 +313,9 @@ under-13 parental-consent machinery.
   same 200 → 409 decision as (b); it narrows the gap without closing it, and
   the residual is written up below. (a) and (b) are now **BLOCKERs on the
   PR**, so it waits on the ruling rather than merging ahead of it; (c) needs
-  no separate ruling if (b) goes against the 409.
+  no separate ruling if (b) goes against the 409. **Ruled 2026-09-22: yes to
+  all three** — ARCHITECTURE decision 5 and API decision 2 are amended, and
+  (c) is done; see the entry above.
   **Third round found the half of the skip that needed no race at all.** The
   spent-id check went on the STANDING row but not on the incoming id, so the
   plain retry of a lost 200 — tap at 09:01, bell, outbox retries at 09:30 with
@@ -292,7 +334,8 @@ under-13 parental-consent machinery.
   the writing and not of the code. An id already
   recorded as this student's `tap_in` under teacher X answers `replay` on
   teacher Y's block too, so Y arms nothing and Y's Start converts nobody: the
-  same shape, one table over. Pinned by a test now rather than only described.
+  same shape, one table over. Pinned by a test at the time rather than only
+  described; since the ruling that test asserts the `409` instead.
   That lookup is LOOSER than `insertEvent`'s own replay key (type + session +
   user), so the same reuse is already answered two ways on nothing the client
   controls — 409 when Y has a session running and the tap routes to `tapIn`,
@@ -301,6 +344,7 @@ under-13 parental-consent machinery.
   teacher is the better behaviour — **recommended, and added to the owner's
   ask** rather than done here, since it is another shipped `/v1` 200 → 409,
   the category already with them, and a held PR is not the place to widen it.
+  (**Done once the owner ruled** — see the entry at the top of this log.)
   Mechanically one `leftJoin`: `events` has no teacher column, but every
   `tap_in` carries `classId`, so `classes.teacherId` is one hop — left, not
   inner, because `class_id` is nullable and an inner join would drop those
@@ -347,7 +391,8 @@ under-13 parental-consent machinery.
   passed with its own bug present, and the first that two reviewers and I all
   missed together.
   Also recorded rather than changed: the `tap_in` moved ahead of
-  `endParticipationsElsewhere` (a skipped tap must leave nothing behind), so
+  `endParticipationsElsewhere` (a skipped tap must never end a
+  participation), so
   within one Start a converted tap's `tap_in` now carries a lower `seq` than
   the `left_for_other_session` it causes. Same `occurred_at`, different
   sessions' feeds, no consumer today reads them in one stream — noted in the
@@ -385,7 +430,8 @@ under-13 parental-consent machinery.
   A later round found one more, and it is the subtle kind: the conversion-gap
   test's invariant asserted that every consumed armed tap names an event
   recorded as a `tap_in`, which this branch quietly stopped guaranteeing — a
-  SKIPPED tap is consumed and mints nothing, so the event under its id is
+  SKIPPED tap is consumed and mints nothing under its own id (its skip is
+  recorded under a fresh one, since the ruling), so the event under that id is
   whatever recorded it first. No tap in that cohort carries a spent id today,
   so it still passed; it would simply have reddened one day for a reason that
   is not a bug, with a message naming the wrong one. It asserts that the event

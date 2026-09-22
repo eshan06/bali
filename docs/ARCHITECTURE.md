@@ -35,7 +35,10 @@ middle was considered and rejected — see below.)
 8. Check the timestamp against the server's own clock; anything outside the session's
    window gets clamped to it (see rule 1).
 9. `INSERT` one row into the `taps` table. If a row with that `event_id` already exists —
-   a retry — do nothing. This makes retries safe to repeat (idempotency).
+   a retry — do nothing. This makes retries safe to repeat (idempotency). An `event_id`
+   already on record for a *different* event — another student's, or another kind of
+   event — is not a retry but a client bug, and gets `409` instead: a `200` would tell
+   the phone to delete a record the server never kept (step 10).
 10. Respond `200 OK`. Only now does the phone delete the record from local storage.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
@@ -74,8 +77,8 @@ never stored here, no screen can ever show it.
   history.
 - `armed_taps` — one row per tap made before a session was running (decision 5): saved as
   student + teacher and waiting. When the teacher presses Start, each becomes a
-  participation; it expires at the end of the school day. Transient — not the permanent
-  history that lives in `events`.
+  participation unless its tap had already landed; it expires at the end of the school
+  day. Transient — not the permanent history that lives in `events`.
 
 ### The decisions (2026-09-15)
 
@@ -113,9 +116,14 @@ session exists yet. Rejecting the tap punishes normal behavior; shielding now lo
 phone before class starts. So the server just saves "this student tapped this teacher's
 block" and the phone shows "Ready — waiting for your teacher." When the teacher presses
 Start, every waiting tap becomes a participation and those phones shield — nobody taps
-twice. It's saved as student + teacher, since one block serves all of a teacher's classes
-and the class is only knowable once a session starts. It expires at the end of the school
-day.
+twice. The one exception is a tap that was already honoured (ruled 2026-09-22): a waiting
+tap whose `event_id` is already recorded as that student's own `tap_in` is the retry of a
+tap that landed in another session, and joining it would shield the student in a class
+they never tapped into. It is consumed without joining and recorded as an
+`armed_tap_skipped` event in the session that declined it, so the history says why that
+student is not there. It's saved as student + teacher, since one block serves all of a
+teacher's classes and the class is only knowable once a session starts. It expires at the
+end of the school day.
 
 **6. Sessions end themselves.** The phone knows the session's end time, so it removes the
 shields at that moment using its own clock, even with no internet. On the server, a small
@@ -241,6 +249,11 @@ important client, which speaks Swift.
 **2. Every path starts with `/v1`, and changes are additive only.** If behavior must
 ever change, we add `/v2` endpoints alongside instead of breaking phones still calling
 `/v1`. New optional fields are allowed; renaming or removing anything shipped is not.
+Correcting a wrong answer is not a behaviour change in this sense (ruled 2026-09-22):
+this decision exists so old phones keep working, not to preserve a response that told a
+client something false — "your tap is recorded" when it was not. Such a correction may
+change a status in place, `200` to `409` included, and each one is recorded in PLAN.md's
+decision log.
 
 **3. The endpoint list — NOT final.** A working set, expected to change as the screens
 get designed; edits land here as they're decided.

@@ -226,7 +226,7 @@ export const events = pgTable(
     // orders it on its own. This read is the one place that crosses sessions,
     // and a Start converting a waiting tap gives the `tap_in` a LOWER `seq`
     // than the `left_for_other_session` it causes (convertArmedTaps must mint
-    // the event first, so a skipped tap leaves nothing behind) — so by `seq`
+    // the event first, so a skipped tap never ends a participation) — so by `seq`
     // the timeline shows the student joining period 2 before leaving period 1.
     // By `occurred_at` it orders nothing: the engine stamps ONE value on the
     // pair, so they tie, and the obvious tiebreak for a tie is `seq`, which

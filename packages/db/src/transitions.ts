@@ -431,6 +431,22 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         .update(armedTaps)
         .set({ consumedAt: session.startedAt })
         .where(eq(armedTaps.id, tap.id));
+      // And recorded, in this Start's feed. The student is enrolled here and
+      // absent; without this row the permanent history cannot say why, and
+      // from the teacher's side a tap that was honoured elsewhere looks like
+      // one that went missing. Under a fresh id — the armed id is the landed
+      // `tap_in`'s — with the payload naming it, the key the fresh-id
+      // conversion above uses. Stamped with the Start's clock, as the consume
+      // is: that is when the decision was made.
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'armed_tap_skipped',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: tap.studentId,
+        occurredAt: session.startedAt,
+        payload: { armed_tap_event_id: tap.eventId },
+      });
       continue;
     }
 
@@ -443,9 +459,9 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // change and not just a refactor: the `tap_in` is minted BEFORE this, so
     // within one Start a converted tap's `tap_in` now carries a LOWER `seq`
     // than the `left_for_other_session` it causes, where it used to carry a
-    // higher one. It has to be this way round — a skipped tap must leave
-    // nothing behind, and ending the other participation first would leave a
-    // student unshielded everywhere off a row that is then discarded. Both
+    // higher one. It has to be this way round — a skipped tap must never end
+    // the student's other participation, and ending it first would leave them
+    // unshielded everywhere off a row that is then declined. Both
     // rows still carry the same `occurred_at`, and every feed read in
     // queries.ts is scoped to one session, so nothing today sees them in one
     // stream. One thing will: `events_user_seq_idx` on (user_id, seq) exists
@@ -631,9 +647,9 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
  * this student's `tap_in` the conversion at Start SKIPS the row, because that
  * is the retry of a tap that already landed — so leaving it standing would let
  * it swallow this physical tap with `already_armed` and then convert nothing.
- * The student would be told "armed" twice and joined never, absent from the
- * grid with nothing in `events` to say why. Reproduced before this check
- * existed. An id held by any OTHER event is not skipped — the row would
+ * The student would be told "armed" twice and joined never, and the tap they
+ * just made recorded nowhere — the skip names only the stale row. Reproduced
+ * before this check existed. An id held by any OTHER event is not skipped — the row would
  * convert under a fresh id — so this check is broader than the skip. Taking
  * that slot over is harmless: it swaps the old row's fresh-id conversion for
  * the arriving tap's conversion under its own id, and the student is joined
@@ -740,44 +756,44 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // arm and the honest answer is `replay`.
     //
     // Without this, the retry of a lost 200 arms a row the next Start is
-    // guaranteed to throw away — the skip in convertArmedTaps consumes it,
-    // emits no event and counts nothing — and the phone was told `armed` on
-    // the way in. Told "ready", joined never, absent from the grid with
-    // nothing in `events` to say why. No race and no second tap needed: tap at
-    // 09:01, response lost, bell, outbox retries at 09:30 with nothing
-    // running, 10:00 Start. The standing-row branch below already refuses to
-    // let a SPENT id sit in a waiting row; this refuses to put one there.
+    // guaranteed to decline — the skip in convertArmedTaps consumes it and
+    // joins nobody — after the phone was told `armed` on the way in: told
+    // "ready", joined never. No race and no second tap needed: tap at 09:01,
+    // response lost, bell, outbox retries at 09:30 with nothing running, 10:00
+    // Start. The standing-row branch below already refuses to let a SPENT id
+    // sit in a waiting row; this refuses to put one there.
     //
-    // Scoped to the CALLER, like every other event-id lookup here. An id that
-    // belongs to someone else's tap is not this phone's replay: answering
-    // `replay` would tell this outbox the tap is durably recorded, so it drops
-    // a tap that was never armed and never converts. `insertEvent` refuses the
-    // same class of reuse for the same reason ("a student's app is an
-    // adversary here"), and this holds that line: a non-401 4xx keeps the
-    // record and retries, which loses nothing. Not "and surfaces" — that is
-    // the UNLOCK contract's `retry_and_surface`, and no tap-side disposition
-    // exists yet, which PLAN.md records as the open Phase 3 gap.
+    // Scoped to the CALLER — student, type and teacher — like every other
+    // event-id lookup here. An id on record for anything else is not this
+    // phone's replay: answering `replay` would tell this outbox the tap is
+    // durably recorded, so it drops a tap that was never armed and never
+    // converts. `insertEvent` refuses the same class of reuse for the same
+    // reason ("a student's app is an adversary here"), and this holds that
+    // line: a non-401 4xx keeps the record and retries, which loses nothing.
+    // Not "and surfaces" — that is the UNLOCK contract's `retry_and_surface`,
+    // and no tap-side disposition exists yet, which PLAN.md records as the
+    // open Phase 3 gap.
     //
-    // Caller here means the STUDENT and the TYPE, not the teacher — unlike
-    // the `armed_taps` lookup below, which is scoped to both. Nobody chose
-    // that: the code and the plan entry disagreed about it until a reader
-    // noticed. It is left as it is PENDING THE OWNER'S RULING, because
-    // closing it is another shipped `/v1` 200 -> 409 and a held PR is not the
-    // place to widen one.
+    // The TEACHER axis is the owner's 2026-09-22 ruling, a `/v1` 200 -> 409.
+    // Unscoped, an id spent under teacher A answered `replay` on teacher B's
+    // block, so B armed nothing, and the same reuse got two answers: a 409
+    // through `tapIn` when B had a session running that the student is
+    // enrolled in, a silent 200 here otherwise. `events` has no teacher
+    // column, so the scope is one hop through `class_id` — a LEFT join,
+    // because that column is nullable (an orphan unlock records with no
+    // class) and an inner join would read such an id as unused and arm it.
     //
-    // The short of it: this lookup is looser than `insertEvent`'s own replay
-    // key (type + SESSION + user), so one client mistake already gets two
-    // answers — a 409 through `tapIn` when the tapped teacher has a running
-    // session the student is enrolled in, a silent 200 here in every other
-    // shape — and the quiet one is the wrong one. What closing it would and
-    // would not fix is written up once, in docs/PLAN.md's armed-tap review
-    // entry, and pinned by "suppresses a second teacher's arming ..." in
-    // transitions.test.ts. Both carry the reasoning; this comment does not
-    // repeat it, so the three cannot drift apart.
+    // It closes the cross-teacher split only. The same teacher, an id spent in
+    // an earlier session of theirs, still answers `replay`: that is also
+    // exactly what the honest retry of a lost 200 looks like, and telling the
+    // two apart needs a session scope this call cannot have — nothing is
+    // running, which is why it reached `armTap`. Written up in docs/PLAN.md's
+    // armed-tap review entry.
     const recorded = firstOrUndefined(
       await tx
-        .select({ type: events.type, userId: events.userId })
+        .select({ type: events.type, userId: events.userId, teacherId: classes.teacherId })
         .from(events)
+        .leftJoin(classes, eq(classes.id, events.classId))
         .where(eq(events.eventId, input.eventId))
         .limit(1),
     );
@@ -788,7 +804,11 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // as this tap's replay: no armed row, no tap_in, and an outbox told the
       // tap is durably recorded, so it deletes it. Which is the silent lost
       // tap this whole check exists to stop, arrived by the other door.
-      if (recorded.type !== 'tap_in' || recorded.userId !== input.studentId) {
+      if (
+        recorded.type !== 'tap_in' ||
+        recorded.userId !== input.studentId ||
+        recorded.teacherId !== input.teacherId
+      ) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return { outcome: 'replay' };
