@@ -196,8 +196,14 @@ under-13 parental-consent machinery.
     runs of five record two skips for one tap. The `409` is pinned on the
     wire as well as in the engine, and `tapIn` refuses the same reuse
     (asserted with the first session over).
-  - **Item 2, #28** — rule 4 and tap step 10, to be amended in that PR,
-    which lands second.
+  - **Item 2, #28** — rule 4 and tap steps 9–10 amended there: a retry is
+    replayed while what it recorded is still true, and refused with `409`
+    rather than a `200` naming a session that is over. One split is left and
+    recorded in #28's entry: a spent id reused at ANOTHER teacher's block
+    while the first participation is still live is replayed on the join path
+    (the replay is keyed on student and type) and refused on the arm path
+    (item 5's teacher scope). It needs id reuse across physical taps or a
+    moved block; neither answer shields a student anywhere new.
   - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
     instead of `409`; split out of #23 before it merged, now its own PR after
     #29.
@@ -524,6 +530,13 @@ under-13 parental-consent machinery.
 
 - **2026-09-22** — Two engine idempotency holes, both from the same habit of
   deciding something outside the transaction that only holds inside it.
+  **Ruled in by the owner (2026-09-22)** and landed after #29; ARCHITECTURE
+  rule 4 and tap steps 9–10 now say what the bounded replay answers. Merging
+  #29 left one split between the two tap paths: a spent id reused at another
+  teacher's block while the first participation is still live is replayed by
+  `tapIn` (keyed on student and type, naming the first session) and refused
+  by `armTap` (teacher-scoped). Once the first session is over both refuse,
+  and "refuses an id spent under another teacher, as tapIn does" pins that.
   A retried tap was answered with `EVENT_ID_CONFLICT` whenever the server
   re-resolved it elsewhere. The phone mints one id per physical tap and retries
   until answered, but `resolveTapTarget` picks the newest running session **of

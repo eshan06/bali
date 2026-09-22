@@ -35,15 +35,24 @@ middle was considered and rejected — see below.)
 8. Check the timestamp against the server's own clock; anything outside the session's
    window gets clamped to it (see rule 1).
 9. `INSERT` one row into the `taps` table. If a row with that `event_id` already exists —
-   a retry — do nothing. This makes retries safe to repeat (idempotency). An `event_id`
-   already recorded in `events` for a *different* event — another student's, another
-   kind of event, or this student's tap under another teacher — is not a retry but a
-   client bug, and gets `409` instead: a `200` would tell the phone to delete a record
-   the server never kept (step 10). When the tap is saved as armed (decision 5), the same
-   goes for an id already held by a waiting tap that is not this student's for this
-   teacher. Blocks cannot move yet; the endpoint that lets them must revisit the
-   other-teacher case, because after a move an honest retry looks exactly like it.
-10. Respond `200 OK`. Only now does the phone delete the record from local storage.
+   a retry — do nothing, and answer it as step 10 says. This makes retries safe to repeat
+   (idempotency). An `event_id` already recorded in `events` for a *different* event —
+   another student's, or another kind of event — is not a retry but a client bug, and gets
+   `409` instead: a `200` would tell the phone to delete a record the server never kept.
+   On the arm path (decision 5, nothing joinable running) the same goes for this
+   student's tap recorded under another teacher, and for an id already held by a waiting
+   tap that is not this student's for this teacher. Blocks cannot move yet; the endpoint
+   that lets them must revisit the other-teacher case, because after a move an honest
+   retry looks exactly like it.
+10. Respond `200 OK`. Only now does the phone delete the record from local storage. The
+    retry of a tap that already landed gets that `200` with what was recorded — even when
+    the server now resolves the tag to a different running session — but only while it is
+    still true: the participation live, its session running. Once that session has ended
+    or the student has left it, a retry that reaches a running session gets `409` (ruled
+    2026-09-22), because a `200` naming the old session would keep a backgrounded phone
+    shielded to a window that is over; one that reaches nothing running is answered
+    `replay` with no session — recorded, with no window to shield to. The phone keeps a
+    `409`'s record; what it shows for it is Phase 3's tap-side outbox work.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
 **Why there's no queue between the API and the database.** A queue (usually Redis — a
@@ -503,7 +512,9 @@ Each exists because v2 broke it and shipped a real bug
    screen only claims what was verified. (v2: showed a ticking focus timer while nothing
    was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
-   safe. (v2: had no such IDs on some paths.)
+   safe. (v2: had no such IDs on some paths.) A retry is answered with what was recorded
+   while that is still true, and never with a `200` that points a phone at a session that
+   is over (tap step 10, ruled 2026-09-22).
 5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
    "Revoke link" could fail and close as if it had worked.)
 6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event

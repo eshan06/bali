@@ -1404,8 +1404,11 @@ describe('armed taps', () => {
      * user), so one reuse got two answers on nothing the client controls: a
      * 409 when B had a session running that the student is enrolled in (the
      * tap routes to `tapIn`, which refuses the spent id — asserted below), a
-     * silent 200 here in every other shape. Both answers are the 409 now, and
-     * the outbox keeps the record.
+     * silent 200 here in every other shape. Once the first session is over,
+     * as here, both answers are the 409 now and the outbox keeps the record.
+     * While it is still live, `tapIn` replays it instead (its replay is keyed
+     * on student and type — tap step 10) and this path still refuses: the one
+     * split left, recorded in PLAN.md.
      *
      * Only the cross-teacher half. The SAME teacher, an id spent in an earlier
      * session of theirs, still answers `replay` here — "does not arm an id

@@ -1408,7 +1408,10 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // physical tap into another session is answered as a replay, and that
       // join is suppressed. No privilege comes with it — the same student can
       // simply not tap, and the grid shows them absent either way — but it is
-      // given up, not preserved. insertEvent's conflict check is untouched and
+      // given up, not preserved. The arm path answers the cross-teacher shape
+      // of the same reuse with a 409 instead (armTap's teacher scope, ruled
+      // 2026-09-22), so while the first participation is live the two paths
+      // differ; recorded in PLAN.md. insertEvent's conflict check is untouched and
       // still fires for an id reused for a genuinely DIFFERENT event, which is
       // what the unlock path depends on (ISSUES #2).
       const prior = firstOrUndefined(
