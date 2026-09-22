@@ -1,6 +1,6 @@
 'use client';
 
-import { EVENT_RESUME_OVERLAP, type SessionSnapshot } from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type SessionSnapshot, STREAM_HEARTBEAT_MS } from '@bali/shared';
 import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
@@ -23,7 +23,6 @@ import { useApi, useSignOut } from '@/lib/use-api';
  * measures silence against it rather than a number of its own, so the two
  * cannot drift into a banner that flaps or one that never fires.
  */
-const STREAM_HEARTBEAT_MS = 20_000;
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
@@ -48,7 +47,11 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
   // and only nothing arriving FROM THE SERVER means the screen is guessing.
-  const lastActivity = useRef<number>(Date.now());
+  // Two clocks — see `staleness`. The stream's own, and the grid's (which the
+  // 15 s poll also feeds). One clock for both hid a dead stream behind a
+  // working poll.
+  const lastStreamActivity = useRef<number>(Date.now());
+  const lastGridActivity = useRef<number>(Date.now());
   // The newest event seq the grid has applied, so a stale in-flight snapshot
   // can't roll it backwards over a streamed unlock.
   const appliedSeq = useRef<number>(0);
@@ -63,7 +66,8 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
         appliedSeq.current = snap.latestSeq;
-        lastActivity.current = Date.now();
+        lastStreamActivity.current = Date.now();
+        lastGridActivity.current = Date.now();
         sse = createSseClient({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
           getToken: getAccessToken,
@@ -72,10 +76,12 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
-            lastActivity.current = Date.now();
+            lastStreamActivity.current = Date.now();
+            lastGridActivity.current = Date.now();
           },
           onActivity: () => {
-            lastActivity.current = Date.now();
+            lastStreamActivity.current = Date.now();
+            lastGridActivity.current = Date.now();
           },
           onStatus: setStatus,
           onUnauthorized,
@@ -106,10 +112,13 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
         (snap) => {
-          // The refresh came back, so the grid is current whether or not it
-          // changed anything — the banner must not keep counting up past a
-          // reload that worked.
-          lastActivity.current = Date.now();
+          // The refresh came back, so the GRID is current whether or not it
+          // changed anything — "last updated" must not keep counting up past a
+          // reload that worked. Deliberately not the stream's clock: this poll
+          // runs every 15 s against a 60 s threshold, so feeding it there
+          // resets the counter four times per threshold and a stream that has
+          // silently died never gets reported at all.
+          lastGridActivity.current = Date.now();
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
           setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));
@@ -127,7 +136,8 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
 
   const stale = staleness({
     status,
-    lastActivityAt: lastActivity.current,
+    lastStreamActivityAt: lastStreamActivity.current,
+    lastGridActivityAt: lastGridActivity.current,
     now: now.getTime(),
     heartbeatMs: STREAM_HEARTBEAT_MS,
   });
