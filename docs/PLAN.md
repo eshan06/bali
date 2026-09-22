@@ -72,8 +72,8 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   (**landed**), and one shared SQLSTATE helper (**landed**). Block
   re-registration by the tag's own teacher: the fix answers 200 where `/v1`
   answers 409 today; **the owner ruled that correction in (2026-09-22)**, and
-  it ships as its own PR after #29, which carries the ARCHITECTURE note
-  allowing it.
+  it lands as its own PR, after #29, which carries the ARCHITECTURE note
+  allowing it (**landing**).
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
@@ -191,8 +191,16 @@ under-13 parental-consent machinery.
   - **Item 2, #28** — rule 4 and tap step 10, to be amended in that PR,
     which lands second.
   - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
-    instead of `409`; split out of #23 before it merged, now its own PR after
-    #29.
+    instead of `409`; split out of #23 before it merged, landed as its own PR
+    after #29. `createBlock` re-reads the tag's live holder after its
+    `ON CONFLICT DO NOTHING`: the caller's own block comes back as
+    `already_registered` (the retry of a lost response), another teacher's
+    is still `tag_taken`. Pinned in the engine, on the wire, and on the
+    real-Postgres lane for a request racing its own retry. One window is
+    disclosed rather than looped over: a holder soft-removed between the
+    insert and the re-read answers `tag_taken` for a tag that is briefly
+    free — unreachable, since nothing outside tests writes
+    `blocks.removed_at`, and settled with the block-removal endpoint.
   Not changed by the ruling, and still Phase 3: a tap `409` is kept and
   retried but not surfaced, because no tap-side outbox disposition exists
   yet. That is also where a "recorded, but no longer current" answer
@@ -802,7 +810,8 @@ under-13 parental-consent machinery.
   converts them without another tap. Decision 5 says a tap is a tap, and
   end-of-day expiry bounds it.
   The third finding in this pair, `createBlock` answering `tag_taken` to the
-  teacher who already owns the tag, is **split out and waiting on the owner**:
+  teacher who already owns the tag, was **split out and waiting on the owner**
+  (ruled in 2026-09-22 and landed as its own PR — see the ruling entry):
   fixing it means `POST /v1/blocks` answering 200 where it answers 409 today,
   and ARCHITECTURE.md decision 2 sends behaviour changes on a shipped endpoint
   to `/v2`. Nothing would be renamed or removed and `BlockDetail` is
