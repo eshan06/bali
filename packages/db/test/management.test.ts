@@ -202,4 +202,25 @@ describe('createBlock', () => {
       'tag_taken',
     );
   });
+
+  it('never hands a teacher their own REMOVED block while another teacher holds the tag', async () => {
+    // The re-read after a lost insert must look at the LIVE holder only. A
+    // tag can be re-registered once its block is soft-removed, so teacher A's
+    // dead block and teacher B's live one can share it; without the
+    // `removed_at IS NULL` filter the read could pick A's dead row and answer
+    // `already_registered`, handing A a removed block and hiding B's claim.
+    // Staged by soft-removing directly: no shipped path removes a block yet.
+    const a = await makeTeacher('cb-dead-a');
+    const b = await makeTeacher('cb-dead-b');
+    const dead = await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-DEAD' });
+    if (dead.outcome !== 'registered') throw new Error(`registered, got ${dead.outcome}`);
+    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, dead.block.id));
+    expect((await createBlock(db, { teacherId: b.teacherId, tagId: 'CB-TAG-DEAD' })).outcome).toBe(
+      'registered',
+    );
+
+    expect((await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-DEAD' })).outcome).toBe(
+      'tag_taken',
+    );
+  });
 });

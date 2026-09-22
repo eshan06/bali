@@ -70,10 +70,10 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   and extend's arithmetic outside the engine transaction (**#28, which lands
   after #29**), the portal's reconnect backoff and staleness banner
   (**landed**), and one shared SQLSTATE helper (**landed**). Block
-  re-registration by the tag's own teacher: the fix answers 200 where `/v1`
-  answers 409 today; **the owner ruled that correction in (2026-09-22)**, and
-  it lands as its own PR, after #29, which carries the ARCHITECTURE note
-  allowing it (**landing**).
+  re-registration by the tag's own teacher answers 200 with their own block,
+  where `/v1` answered 409 before; **the owner ruled that correction in
+  (2026-09-22)**, and it landed as its own PR after #29, which carries the
+  ARCHITECTURE note allowing it (**landed**).
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
