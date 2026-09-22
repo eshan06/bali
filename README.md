@@ -105,8 +105,14 @@ missing rather than failing obscurely):
    _student_ with no school (`GET /v1/me`), and nothing ever assigns one — but
    `classes.school_id` is `NOT NULL`, so the role by itself is not enough:
 
+   `schools.id` has **no database default** — ids are minted in TypeScript
+   (data-model decision 2) — so the insert must supply one. Mint a UUIDv7 with
+   `node -e "console.log(require('uuid').v7())"`, or just copy the ready-made
+   statements the demo prints when it finds the account unprovisioned.
+
    ```sql
-   INSERT INTO schools (name) VALUES ('Demo School');   -- if the table is empty
+   -- if the table is empty; <uuidv7> is the id you minted above
+   INSERT INTO schools (id, name) VALUES ('<uuidv7>', 'Demo School');
    UPDATE users
    SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1)
    WHERE id = '<their id>';

@@ -1,4 +1,4 @@
-import { type Database, schools, users } from '@bali/db';
+import { type Database, newUuidV7, schools, users } from '@bali/db';
 import { backdateLastSeen, backdateSessionEnd, makeTestDb } from '@bali/db/testing';
 import { type MeResponse, type SessionSnapshot, SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
@@ -404,7 +404,10 @@ async function signInRemoteActors(
             ? 'Every first sign-in provisions a student, so the demo teacher needs the one-time ' +
               'out-of-band provisioning — the role AND a school, because classes.school_id is ' +
               'NOT NULL and no code path ever assigns it:\n' +
-              "  INSERT INTO schools (name) VALUES ('Demo School');  -- if you have none\n" +
+              // A fresh id, because schools.id has NO database default — ids are
+              // minted in TypeScript (decision 2), so raw SQL must supply one or
+              // the insert dies on the not-null constraint.
+              `  INSERT INTO schools (id, name) VALUES ('${newUuidV7()}', 'Demo School');  -- if you have none\n` +
               `  UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1) WHERE id = '${me.user.id}';`
             : 'Use a different account for this actor.'),
       );

@@ -116,6 +116,25 @@ describe('the remote world, against a real server', () => {
     expect(err?.message).toContain("UPDATE users SET role = 'teacher'");
   });
 
+  it('prints an INSERT that actually runs — schools.id has no DB default', async () => {
+    // The hint used to omit `id`, so an operator following it hit
+    // `null value in column "id" ... violates not-null constraint` — the exact
+    // trap the message exists to prevent. Pinning the column list and a real
+    // UUIDv7 keeps the instruction runnable.
+    const world = createRemoteWorld(remoteConfig(), { cognitoFetch: stubCognito() });
+
+    const err = await world.provision([TEACHER]).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('INSERT INTO schools (id, name)');
+    const minted = /VALUES \('([0-9a-f-]{36})'/.exec(err?.message ?? '')?.[1];
+    expect(minted).toBeDefined();
+    // Version nibble 7: the id must be a UUIDv7 like every other row (decision 2).
+    expect(minted?.[14]).toBe('7');
+  });
+
   it('runs the sweep itself when given the key', async () => {
     const world = createRemoteWorld(remoteConfig({ internalKey: testEnv.INTERNAL_API_KEY }), {
       cognitoFetch: stubCognito(),
