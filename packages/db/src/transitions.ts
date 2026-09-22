@@ -377,19 +377,35 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // no such window. Safe to catch inside the transaction: insertEvent's ON
     // CONFLICT DO NOTHING succeeds at the SQL level and the conflict is a
     // TransitionError raised afterwards in JS, so nothing is poisoned.
+    //
+    // "Spent" means THIS student's `tap_in`, and nothing looser. `insertEvent`
+    // raises the same code for an id held by another type or another user —
+    // this phone's own `unlock` id, or a stranger's tap — and neither says this
+    // tap landed. That is a genuine unhonoured tap whose id collided, so
+    // decision 5 holds for it: it converts under a fresh id, as it did before
+    // the skip existed. `armTap` refuses both shapes on the way in; this is
+    // for rows that already exist.
+    const tapInRow = {
+      type: 'tap_in',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: tap.studentId,
+      occurredAt,
+    } as const;
     let spent = false;
     try {
-      await insertEvent(tx, {
-        eventId: tap.eventId,
-        type: 'tap_in',
-        sessionId: session.id,
-        classId: session.classId,
-        userId: tap.studentId,
-        occurredAt,
-      });
+      await insertEvent(tx, { eventId: tap.eventId, ...tapInRow });
     } catch (err) {
       if (!(err instanceof TransitionError) || err.code !== 'EVENT_ID_CONFLICT') throw err;
-      spent = true;
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type, userId: events.userId })
+          .from(events)
+          .where(eq(events.eventId, tap.eventId))
+          .limit(1),
+      );
+      spent = prior?.type === 'tap_in' && prior.userId === tap.studentId;
+      if (!spent) await insertEvent(tx, { eventId: newUuidV7(), ...tapInRow });
     }
     if (spent) {
       // Consumed, not left standing: it is spent, and a waiting row that
@@ -594,12 +610,15 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
  * Two ways a standing waiting row is stale, and both hand its slot to the tap
  * now arriving.
  *
- * The obvious one is expiry. The other is an id already on record: the
- * conversion at Start SKIPS such a row, because a spent id can only be the
- * retry of a tap that already landed — so leaving it standing would let it
- * swallow this physical tap with `already_armed` and then convert nothing. The
- * student would be told "armed" twice and joined never, absent from the grid
- * with nothing in `events` to say why. Reproduced before this check existed.
+ * The obvious one is expiry. The other is an id already on record: when it is
+ * this student's `tap_in` the conversion at Start SKIPS the row, because that
+ * is the retry of a tap that already landed — so leaving it standing would let
+ * it swallow this physical tap with `already_armed` and then convert nothing.
+ * The student would be told "armed" twice and joined never, absent from the
+ * grid with nothing in `events` to say why. Reproduced before this check
+ * existed. An id held by any OTHER event converts under a fresh id instead,
+ * so this check is broader than the skip; taking that slot over is harmless,
+ * since the tap now arriving converts under its own id either way.
  */
 async function rowIsStale(
   tx: Database,

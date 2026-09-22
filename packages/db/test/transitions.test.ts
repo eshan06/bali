@@ -1631,6 +1631,115 @@ describe('armed taps', () => {
       .where(and(eq(armedTaps.studentId, student.id), isNull(armedTaps.consumedAt)));
     expect(left).toHaveLength(0);
   });
+
+  it.each([
+    ['an unlock of their own', 'own-unlock'],
+    ["another student's tap_in", 'other-tap'],
+  ] as const)(
+    'a waiting tap whose id is on record as %s is still converted, under a fresh id',
+    async (_label, shape) => {
+      /*
+       * The skip above is sound only when the id is on record as THIS
+       * student's `tap_in`: that is the one shape where the tap already
+       * landed. `insertEvent` also refuses an id held by another event type or
+       * another user, and neither of those means this tap was honoured. It is
+       * a genuine pre-bell tap whose id collided, so decision 5 applies: it
+       * becomes a participation, under a fresh id, exactly as `main` converts
+       * it. Skipping it would drop a real tap with nothing in `events` to say
+       * so.
+       *
+       * Written straight into `armed_taps` because `armTap` now refuses both
+       * shapes on the way in; these are rows that already exist — armed
+       * before that refusal shipped, or by an older deploy.
+       */
+      const { teacher, student, klass, school } = await seedClass(`arm-foreign-${shape}`);
+      const first = await startSession(db, {
+        classId: klass.id,
+        ...window('2026-01-01T09:00:00Z'),
+      });
+      const collided = newUuidV7();
+      if (shape === 'own-unlock') {
+        await tapIn(db, {
+          sessionId: first.session.id,
+          studentId: student.id,
+          eventId: newUuidV7(),
+          deviceTime: new Date('2026-01-01T09:01:00Z'),
+        });
+        await unlock(db, {
+          sessionId: first.session.id,
+          studentId: student.id,
+          eventId: collided,
+          deviceTime: new Date('2026-01-01T09:05:00Z'),
+        });
+      } else {
+        const other = one(
+          await db
+            .insert(users)
+            .values({ cognitoId: `student-arm-foreign-b`, role: 'student', schoolId: school.id })
+            .returning(),
+        );
+        await db.insert(enrollments).values({ classId: klass.id, studentId: other.id });
+        await tapIn(db, {
+          sessionId: first.session.id,
+          studentId: other.id,
+          eventId: collided,
+          deviceTime: new Date('2026-01-01T09:01:00Z'),
+        });
+      }
+      await endSession(db, {
+        sessionId: first.session.id,
+        at: new Date('2026-01-01T09:20:00Z'),
+        reason: 'ended',
+      });
+      const recordedBefore = one(
+        await db.select().from(events).where(eq(events.eventId, collided)),
+      );
+
+      one(
+        await db
+          .insert(armedTaps)
+          .values({
+            studentId: student.id,
+            teacherId: teacher.id,
+            eventId: collided,
+            deviceTime: new Date('2026-01-01T09:55:00Z'),
+            expiresAt: new Date('2026-01-01T23:59:59Z'),
+          })
+          .returning(),
+      );
+
+      const second = await startSession(db, {
+        classId: klass.id,
+        ...window('2026-01-01T10:00:00Z'),
+      });
+      expect(second.outcome).toBe('created');
+      expect(second.armedConverted).toBe(1);
+
+      const joined = one(
+        await db
+          .select()
+          .from(participations)
+          .where(
+            and(
+              eq(participations.sessionId, second.session.id),
+              eq(participations.studentId, student.id),
+            ),
+          ),
+      );
+      expect(joined.state).toBe('focused');
+
+      // The join is recorded, under an id of its own, and the event that
+      // really owns the collided id is untouched.
+      const tapInHere = (await eventsFor(second.session.id)).filter(
+        (e) => e.type === 'tap_in' && e.userId === student.id,
+      );
+      expect(tapInHere).toHaveLength(1);
+      expect(one(tapInHere).eventId).not.toBe(collided);
+      expect(one(await db.select().from(events).where(eq(events.eventId, collided)))).toEqual(
+        recordedBefore,
+      );
+    },
+  );
 });
 
 describe('the ended-consistency check constraint', () => {

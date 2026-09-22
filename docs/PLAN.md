@@ -647,7 +647,15 @@ under-13 parental-consent machinery.
   and SHIELDS the student in a class they never tapped into, possibly hours
   later: reproduced, a 09:00 tap whose response was lost puts them in period 5
   at 13:00, because waiting taps are selected by teacher. Skipping is the only
-  shape that is wrong in neither direction.) Nothing is weakened: the armed tap's id exists to de-dupe
+  shape that is wrong in neither direction.) **Skipped only when the id is on
+  record as this student's own `tap_in`** — a later review caught the skip
+  firing on any `EVENT_ID_CONFLICT`, which `insertEvent` also raises for an id
+  held by another type or another user (the phone's own `unlock` id, a
+  stranger's tap). Neither means this tap landed, so skipping it dropped a
+  genuine unhonoured tap with nothing in `events`. Those convert under a fresh
+  id again, as they did before the skip, and are pinned both ways ("… is
+  still converted, under a fresh id"). This narrows the skip, and so narrows
+  what item 4 of the owner's ruling covers; it does not decide that ruling. Nothing is weakened: the armed tap's id exists to de-dupe
   ARMING, and the conversion was already exactly-once, consumed in the same
   transaction. Both reviewers on the tap-replay step reproduced this
   independently and flagged it as worse than anything that step fixed; it is

@@ -618,6 +618,13 @@ async function waitForBackendOnArmedTaps(timeoutMs = 1_500): Promise<void> {
   }
 }
 
+/**
+ * Held-transaction tests that gate on `waitForBlockedBackend()`'s 5 s default
+ * carry an explicit 20 s budget, and must: this package has no vitest config,
+ * so the test budget is vitest's own 5 s, and a round that never staged died
+ * as "Test timed out" — naming nothing — before the gate could throw the error
+ * that says what went wrong. Measured, with the gate forced to miss.
+ */
 /** Fail rather than proceed if nothing ever blocks — the staging must be real. */
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -995,7 +1002,7 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     // And exactly one row owns the id — nothing was written twice.
     const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
     expect(rows).toHaveLength(1);
-  });
+  }, 20_000);
 
   it('a spent row that wins the slot late is still taken over, not reported back', async () => {
     /*
@@ -1089,7 +1096,7 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
       .where(and(eq(armedTaps.teacherId, teacherId), isNull(armedTaps.consumedAt)));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.eventId, 'the waiting row carries the fresh id now').toBe(freshId);
-  });
+  }, 20_000);
 
   it('a refresh that loses the event_id index is answered, not a raw 23505', async () => {
     /*
@@ -1195,7 +1202,7 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     expect(after.consumedAt).toBeNull();
     const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
     expect(rows).toHaveLength(1);
-  });
+  }, 20_000);
 
   it('a refresh never writes its event id onto a tap consumed under it', async () => {
     /*
@@ -1262,10 +1269,22 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     // commits first, armTap's select then sees consumed_at already set and
     // takes the plain-insert path — every assertion below still holds, with
     // the bug present. Failing to observe the block fails the test instead.
-    await waitForBlockedBackend();
-    release();
+    //
+    // Released in a finally, like the tests above: a gate that times out must
+    // not leave the holder on its row lock with `refreshing` parked behind it.
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
     await consuming;
-    const result = await refreshing;
+    const settled = await Promise.allSettled([refreshing]);
+    if (unstaged !== null) throw unstaged;
+    if (settled[0].status === 'rejected') throw settled[0].reason as Error;
+    const result = settled[0].value;
 
     // The consumed row is untouched: it still names the event its conversion
     // would have recorded, not the tap that arrived afterwards.
@@ -1282,5 +1301,5 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     );
     expect(fresh.eventId).toBe(refreshEventId);
     expect(fresh.consumedAt).toBeNull();
-  });
+  }, 20_000);
 });
