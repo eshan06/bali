@@ -108,7 +108,7 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
 | Consent preview before joining a class | 3 | small |
 | Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch |
 | Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
-| Minimal student personal history + edit own name | 3 | backs the privacy contract |
+| Minimal student personal history + edit own name | 3 | backs the privacy contract; **order it by `occurred_at`, not `seq`** — see the note on `events_user_seq_idx` |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
 | Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | |
@@ -329,13 +329,31 @@ under-13 parental-consent machinery.
   EXISTS now, which is the invariant the engine actually keeps, and the orphan
   it exists for is untouched — a refresh that slipped inside the conversion
   leaves an id in no event at all.
+  **And the fallback door into the same failure**, found a round later: the
+  insert loop's `standing` re-read answered `already_armed` about whatever
+  waiting row it found, without the staleness test the standing-row branch had
+  just been given. Reachable only against a row this build would not write — a
+  rival delivery from an older deploy holding an uncommitted waiting row under
+  a spent id, which `armTap`'s own read misses and the ON CONFLICT then loses
+  the slot to — but the outcome is identical: the fresh physical tap dropped,
+  the row skipped at Start, joined never. Both doors apply one `rowIsStale`
+  and one `takeOverStaleRow` now, which also removes the duplication that let
+  them drift; staged on the real lane with the held-transaction technique the
+  sibling races use, red 3 of 3 against the old behaviour.
   Two more recorded rather than argued with: `armTap`'s JSDoc had been
   orphaned by a helper inserted between it and the function (moved back), and
   the `seq` note now names the read that will actually see the reordering —
   `events_user_seq_idx` on `(user_id, seq)` exists for the student's own
   timeline, which is cross-session and seq-ordered by construction, so it
   would show them joining period 2 before leaving period 1. Order that one by
-  `occurred_at`, which the engine stamps identically on the pair.
+  `occurred_at`, which the engine stamps identically on the pair — carried
+  into the go-live row for student history as well, so the warning reaches the
+  phase that builds it and not only the reader of the schema.
+  `TapResponse.session`'s doc said it is null only for an armed tap, which
+  this branch makes false on the common path: every lost-200 retry after a
+  session ends now answers `replay` with no session. Corrected, and pointed at
+  the contract question, since "recorded, but no longer current" is what would
+  actually give that phone something to reconcile against.
   Caught on the way: CI's `format:check` failed a push that `typecheck` and
   `lint` both passed — a double-quoted test name. `format:check` belongs in
   the pre-push routine next to the other two.

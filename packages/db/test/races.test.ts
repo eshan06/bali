@@ -984,6 +984,100 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('a spent row that wins the slot late is still taken over, not reported back', async () => {
+    /*
+     * The fallback door into the same failure the standing-row check closes.
+     *
+     * `armTap` reads the waiting row before it inserts, and that read cannot
+     * see an uncommitted rival — so a row it missed can win the
+     * (student, teacher) partial index and turn up only in the re-read after
+     * the ON CONFLICT. If that row carries a SPENT id, answering
+     * `already_armed` about it drops this physical tap, and the conversion
+     * then skips the row at Start: told "armed", joined never. Exactly what
+     * the standing-row branch was fixed for, one door further in.
+     *
+     * Staged the way the sibling tests stage theirs: a held transaction owns
+     * the row, so `armTap`'s read misses it and its insert parks on the
+     * index; releasing the holder lets it resume into the re-read.
+     */
+    const { classId, studentId } = await seed('race-arm-late-spent');
+    const teacherId = one(
+      await db.select({ id: classes.teacherId }).from(classes).where(eq(classes.id, classId)),
+    ).id;
+
+    // A genuinely spent id: it landed as a tap_in, and that session is over.
+    const spentId = newUuidV7();
+    const past = await openSession(classId);
+    await tapIn(db, { sessionId: past.id, studentId, eventId: spentId, deviceTime: new Date() });
+    await endSession(db, { sessionId: past.id, at: new Date(), reason: 'ended' });
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let inserted!: () => void;
+    const hasRow = new Promise<void>((resolve) => {
+      inserted = resolve;
+    });
+    let rivalId = '';
+    const rival = db.transaction(async (tx) => {
+      const row = one(
+        await tx
+          .insert(armedTaps)
+          .values({
+            studentId,
+            teacherId,
+            eventId: spentId,
+            deviceTime: new Date(),
+            expiresAt: new Date(Date.now() + 3_600_000), // NOT expired: spent is the only staleness
+          })
+          .returning(),
+      );
+      rivalId = row.id;
+      inserted(); // uncommitted: invisible to armTap's waiting read
+      await held;
+    });
+
+    await hasRow;
+    const freshId = newUuidV7();
+    const arming = armTap(db, {
+      studentId,
+      teacherId,
+      eventId: freshId,
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      now: new Date(),
+    });
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await rival;
+    const settled = await Promise.allSettled([arming]);
+    if (unstaged !== null) throw unstaged;
+    if (settled[0].status === 'rejected') {
+      throw new Error(`arming rejected: ${String(settled[0].reason)}`, {
+        cause: settled[0].reason,
+      });
+    }
+    const result = settled[0].value;
+
+    // The fresh tap takes the slot. Reporting `already_armed` about the
+    // rival's spent row would lose it.
+    expect(result.outcome).toBe('armed');
+    expect(result.armedTapId).toBe(rivalId); // the row is recycled, not duplicated
+    const rows = await db
+      .select()
+      .from(armedTaps)
+      .where(and(eq(armedTaps.teacherId, teacherId), isNull(armedTaps.consumedAt)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.eventId, 'the waiting row carries the fresh id now').toBe(freshId);
+  });
+
   it('a refresh that loses the event_id index is answered, not a raw 23505', async () => {
     /*
      * The sibling of the test above, on the OTHER write. `armTap` has two ways
