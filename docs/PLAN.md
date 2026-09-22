@@ -136,6 +136,37 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
+  reviewer disproved. The stream route's `'error'` listener logged at `debug`
+  while production runs at `info`, so the fix that stopped the crash would also
+  have hidden anything unexpected that reached it; it now logs the one code
+  that actually arrives (`ERR_STREAM_WRITE_AFTER_END`) at `debug` and anything
+  else at `warn`. Measured while correcting a wrong rationale: a peer reset
+  reaches the socket and the server's `'clientError'`, never a hijacked
+  response, and a write after destroy is routed to the write callback rather
+  than emitted — so `warn` here means "we have never seen this", not "a proxy
+  is resetting connections". The `streamFailed` disjunct after `subscribe` is
+  removed: nothing between the hijack and that check is asynchronous, so it had
+  never fired (a reviewer instrumented it across the whole suite on both lanes
+  to confirm).
+  I had also recorded that two of the route's guards could not be pinned by a
+  test, having written three that all passed against the broken version. That
+  was wrong, and the counterexample was one entry above it in this same file:
+  under backpressure `'finish'` never fires, so the request's `'close'` never
+  arrives, the subscription stays live, and the hub's next read hands a frame
+  to a write on an ended response. The technique is to **stall the flush** —
+  a client that never reads holds the window open — and with it the guard is
+  observably load-bearing: softened to a silent `return`, the per-teacher slot
+  leaks and the teacher sits permanently at their cap. That test now ships.
+  Its reach is exact and worth knowing: softening the guard turns it red, but
+  deleting the guard outright leaves the suite green, because the route's own
+  'error' listener then releases the slot a tick later. The guard is the
+  synchronous path; the listener is the net. That is written above the guard
+  so a green run is not read as permission to remove it.
+  The reusable lesson is not "this cannot be tested" but "the obvious
+  end-to-end reproduction is rescued by another guard; hold the window open
+  yourself".
+
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not
   throw — it returns false and emits `'error'` a tick later, so the hub's
