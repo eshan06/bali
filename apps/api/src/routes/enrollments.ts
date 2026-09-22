@@ -14,11 +14,12 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
+import { DeviceTime } from './schemas.js';
 
 const JoinBody = z.object({
   joinCode: z.string().min(1),
   eventId: z.string().uuid(),
-  deviceTime: z.string().datetime(),
+  deviceTime: DeviceTime,
 });
 const Params = z.object({ id: z.string().uuid() });
 

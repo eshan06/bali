@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-21 — exit demo wired for deployed environments (remote mode, real Cognito) and extended to assert live SSE delivery + self-expiry (#13), plus review follow-ups (#14 and this one). Real Cognito auth is proven against dev; the run stops on one-time dev provisioning — see **Now**._
+_Last updated: 2026-09-22 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs. Exit demo remains blocked on the one-time dev provisioning in **Now**._
 
 ## Now
 
@@ -69,8 +69,18 @@ _Last updated: 2026-09-21 — exit demo wired for deployed environments (remote 
   passwords (a temporary one parks the account in `NEW_PASSWORD_REQUIRED`) and
   `ALLOW_USER_PASSWORD_AUTH` on the app client. The demo names whichever is
   missing; the README lists them with the school step.
-- **Next up:** finish the exit demo vs dev (two SQL statements away) → retroactive
-  audit of pre-gates Phase 1 code → start Phase 3 (iOS student app).
+- **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
+  reviewed against `apps/` + `packages/`; nine reproduced and are landing as
+  small gated PRs, one PR per finding or related pair: offset timestamps
+  (**landed**), an SSE write-after-end that kills the API process (**landed**),
+  the armTap
+  insert race, a replayed tap re-resolved to another session, block
+  re-registration by the tag's own teacher, extend's arithmetic outside the
+  engine transaction, the portal's reconnect backoff, the portal's staleness
+  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
+  missing idempotency key, was re-examined and the deferral stands.
+- **Next up:** finish the exit demo vs dev (two SQL statements away) → finish the
+  audit series → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -152,7 +162,22 @@ under-13 parental-consent machinery.
   The audit reported this as a crash and it was twice written off as
   theoretical here; it was real, and the lesson is that a probe which attaches
   its own listener can only ever observe the emission, never the crash.
-
+- **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads
+  checked against the code, nine reproduced and are being fixed as a series of
+  gated PRs (status in **Now**; this entry records what the audit decided, not
+  work already on `main`). Four of the nine are idempotency or race holes on
+  paths whose *happy* case was already tested — the shape of what the gates
+  miss, and the argument for keeping the real-Postgres lane required.
+  `POST /v1/classes`'s missing idempotency key (below) was the one lead
+  rejected: re-examined and deliberately left as it stands.
+- **2026-09-20** — The offset-timestamp fix closes a spelling, not a class. Any
+  4xx on an unlock body still means the outbox keeps the record and retries
+  forever — a malformed `eventId` would do it too. That is the contract working
+  as written (`retry_and_surface` also requires the client to *surface* it, so
+  it is never silent), and the exposure it leaves is a server that refuses a
+  well-formed client. Removing that for timestamps is the fix; the general
+  guard — never let validation be the reason an unlock is unrecordable — is a
+  standing constraint on anything added to the unlock body.
 - **2026-09-20** — The exit demo runs in two worlds behind one seam
   (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
   issuer all local, time compressed by backdating rows) and remote
@@ -174,7 +199,14 @@ under-13 parental-consent machinery.
   environment's setup-script field (it ran outside the repo root and broke
   every web session at startup; the field stays empty). Tracked hook means
   checking out a branch runs that branch's hook — accepted for a
-  single-owner repo; revisit before adding outside contributors.
+  single-owner repo; revisit before adding outside contributors. The hook's
+  drift guard deliberately tolerates a session's own uncommitted dependency
+  work: it hashes the lockfile immediately before and after its own install and
+  compares those two, rather than comparing against the git index, so only what
+  that install changed counts as drift. Both the hash and an install run on
+  every web SessionStart (`npm ci` on a fresh container, `npm install` on a cached
+  one); CI's `npm ci` remains the backstop that catches a lockfile genuinely
+  out of step with the manifests.
 - **2026-09-20** — CI reviewer billing: Claude Review and `@claude` authenticate
   with the owner's Max subscription (`CLAUDE_CODE_OAUTH_TOKEN`), replacing
   prepaid API credits; reviewer model unchanged. The token also lives in the

@@ -6,11 +6,12 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
+import { DeviceTime } from './schemas.js';
 
 const TapBody = z.object({
   tagId: z.string().min(1),
   eventId: z.string().uuid(),
-  deviceTime: z.string().datetime(),
+  deviceTime: DeviceTime,
 });
 
 /**
