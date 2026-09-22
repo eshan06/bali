@@ -43,14 +43,16 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   review rounds each found a new class of leak in it, and measured across 25
   channels × 7 encodings × 6 passwords the password was still recoverable in 398
   of 1,050 combinations (662 on `main` before it). The sign-in's errors are now
-  fixed wording, the operator's own configuration, and identifier-shaped tokens
-  (HTTP status, error codes, Cognito's error type, a challenge name, a media
-  type), each withheld if it repeats four consecutive characters of the
-  password. No caught error is attached as a `cause`, and a redirect is refused
-  rather than followed, since a 307 re-sends the body. 0 of 1,050 now, and a
-  second matrix pins the tokens against echoes of the password itself. The cost
-  is every message and body from outside; the error type (with fixed words for
-  the common ones), the status, the media type and the error codes stand in.
+  fixed wording, the operator's own configuration, the HTTP status, and tokens
+  (error codes, Cognito's error type, a challenge name, a media type): a word
+  from the module's own lists, unless it and the password contain one another,
+  or an unknown identifier that repeats no four characters of the password once
+  both are folded. No caught error is attached as a `cause`,
+  and a redirect is refused rather than followed, since a 307 re-sends the
+  body. 0 of 1,050 now, and a second matrix pins the tokens against echoes of
+  the password itself. The cost is every message and body from outside; the
+  error type (with fixed words for the common ones), the status, the media type
+  and the error codes stand in.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
   `claims.name`, but Cognito puts profile attributes in the ID token and every
   client here sends an **access** token — the portal stores `access_token`
@@ -182,40 +184,55 @@ under-13 parental-consent machinery.
   an object can print differently later than it did when checked; three review
   rounds found a new class of leak each time. The thrown error is now a plain
   `Error`: fixed wording, the caller's configuration (username, endpoint,
-  timeout), and tokens read from outside — HTTP status, error codes, Cognito's
-  error type, a challenge name, a media type — each accepted only in a strict
-  identifier shape and withheld when it repeats any four consecutive
-  characters of the password, compared in both case mappings. Two fixed
-  messages of Node's fetch are recognised by exact match and never copied: a
-  proxy refusing the tunnel (its three-digit status is kept) and a refused
+  timeout), the HTTP status (an integer from 100 to 599), and tokens read from
+  outside — error codes, Cognito's error type, a challenge name, a media type.
+  A token that is one of the module's own known words (network and TLS codes,
+  the error types InitiateAuth documents, Cognito's challenge names, common
+  media types) prints as that word, unless it and the password contain one
+  another once folded — the only way an echo can produce one. Any other token
+  must have a strict identifier shape and repeat no four consecutive characters
+  of the password, both folded: decomposed (compatibility forms and accents
+  split off), upper-cased, and stripped to letters and digits in any script.
+  The known words exist because an ordinary password shares four characters
+  with real tokens — "tion" with every "...Exception" — and holding them to the
+  run rule hid the one thing the operator needed. A withheld code, error type or
+  media type reads the same as an absent one, so the message does not say the
+  password overlaps a token the reader could guess. Two fixed messages of
+  Node's fetch are recognised by exact match and never copied: a proxy refusing
+  the tunnel (its status is kept, when it is from 100 to 599) and a refused
   redirect. Nothing is attached as a `cause`, and redirects are refused
   (`redirect: 'error'`) — measured, a 307 re-POSTs the body, password and all,
   to its target. The boundary is an echo — quoted, escaped, truncated,
-  case-changed — not a party deliberately encoding the password into a token's
-  alphabet, which already holds it. Pinned by: a leak matrix asserting that
-  neither the password — raw, or with JS/JSON escapes, percent-encoding and HTML
-  entities undone, stacked, ignoring case — nor a canary placed beside it
-  arrives (the canary covers encodings no decoder there undoes, such as base64);
-  a second matrix echoing the password itself into each token field (verbatim,
-  case-changed, NFKC-normalised, cut at either end), which must print no
-  four-character run of it; an exact-message test on every exit path; and a
-  mutation pass — 53 mutations of the module, each of which turns at
-  least one test red. Cost, accepted: no message or body from outside is shown —
-  Cognito's message text, a proxy page, the fetch layer's own descriptions; the
-  error type (with fixed words for the common ones), the status, the media type
-  and the error codes are. Not taken: `USER_SRP_AUTH`
-  would never send the password at all, but it changes an AWS-side
-  prerequisite, so it is the owner's call.
+  case-changed, normalised, separators swapped — not a party deliberately
+  encoding the password into a token's alphabet, which already holds it.
+  Pinned by: a leak matrix asserting that neither the password — raw, or with
+  JS/JSON escapes, percent-encoding and HTML entities undone, stacked, compared
+  after NFKC and case folding — nor a canary placed beside it arrives (the
+  canary covers encodings no decoder there undoes, such as base64); a second
+  matrix echoing the password itself — fullwidth, mathematical-bold, accented
+  and separator-dense passwords among them — into each token field (verbatim,
+  case-changed, NFKC-normalised, accent-stripped, separators swapped, cut at
+  either end, cut to one word), which must print no four-character run of it;
+  an exact-message test on every exit path; a test of one word from each known
+  list beside a password it overlaps; and a mutation pass — 84 mutations of the
+  module, each of which turns at least one test red. Cost, accepted: no message
+  or body from outside is shown — Cognito's message text, a proxy page, the
+  fetch layer's own descriptions; the error type (with fixed words for the
+  common ones), the status, the media type and the error codes are. Not taken:
+  `USER_SRP_AUTH` would never send the password at all, but it changes an
+  AWS-side prerequisite, so it is the owner's call.
 
 - **2026-09-22** — Display names come from the token's own claims — a real name
   first (`name`, `preferred_username`), then the pool's identifier
   (`cognito:username`, `username`) but only when it is readable — and are
-  **filled, never synced**. The value is stripped of invisible and
-  line-breaking characters (lone surrogate halves included, which Postgres would
-  store as U+FFFD for good) and clamped to 64 code points, and a name with
-  nothing visible left in it — only joiners, a Hangul filler, a blank braille
-  cell — counts as no name, because `name` is an attribute the student can set
-  on themselves and it lands in a teacher's grid. A machine-made identifier is
+  **filled, never synced**. The value is stripped of control and format
+  characters (bar the ZWJ/ZWNJ joiners names need), line and paragraph
+  separators, and lone surrogate halves (which Postgres would store as U+FFFD
+  for good), trimmed, and clamped to 64 code points; a name with nothing
+  visible left in it — only joiners, a Hangul filler, a blank braille cell —
+  counts as no name. Invisible letters INSIDE a visible name are kept. All of
+  this because `name` is an attribute the student can set on themselves and it
+  lands in a teacher's grid. A machine-made identifier is
   **not** stored, since it would print worse than the grid's own
   eight-character fallback and the fill would make it permanent: a dashed UUID
   (what a pool signing in by email gives every user), or a federated username —

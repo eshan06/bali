@@ -574,11 +574,12 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
   /*
-   * A warm pool, for the reason the armed-tap block below gives: a cold second
-   * connection spends its handshake while the first call runs to completion,
-   * so the pair serialises and never races. Measured: run on its own without
-   * this, removing the fill's NULL re-check or the loser's re-read left these
-   * tests green — they only caught it after earlier blocks had warmed the pool.
+   * Rounds, because one pair of calls can simply fail to race. As first
+   * written, each race ran once, and with the block run on its own, removing
+   * the fill's NULL re-check or the loser's re-read left it green. With fifteen
+   * rounds, removing either — or the fill on the insert path, or on an existing
+   * row — turns it red in 3 runs of 3. The warm-up is the file's usual one (see
+   * the armed-tap block below): a cold second connection serialises round 0.
    */
   beforeAll(async () => {
     await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));

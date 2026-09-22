@@ -56,12 +56,16 @@ function printedForms(err: Error): string[] {
   ];
 }
 
-/** Could a reader of anything printed about `err` recover `secret`? */
+/**
+ * Could a reader of anything printed about `err` recover `secret`? Compared
+ * after folding compatibility forms and case: an echo that normalised a
+ * fullwidth password, or changed its case, has leaked it.
+ */
 function exposes(err: Error, secret: string): boolean {
-  // Case-insensitive: an echo that changed the password's case has leaked it.
-  const wanted = secret.toLowerCase();
+  const canonical = (text: string) => text.normalize('NFKC').toUpperCase();
+  const wanted = canonical(secret);
   return printedForms(err).some((text) =>
-    readableForms(text).some((form) => form.toLowerCase().includes(wanted)),
+    readableForms(text).some((form) => canonical(form).includes(wanted)),
   );
 }
 
@@ -113,7 +117,8 @@ describe('fetchCognitoAccessToken', () => {
 
     expect(err.message).toBe(
       'Cognito sign-in failed for demo-ana@example.test — NotAuthorizedException (HTTP 400): ' +
-        'a wrong password, a disabled or locked-out user, or an app client that requires a secret',
+        'a wrong username or password, a disabled or locked-out user, or an app client that ' +
+        'requires a secret',
     );
     expectNothingAttached(err);
   });
@@ -167,7 +172,10 @@ describe('fetchCognitoAccessToken', () => {
   it.each([
     [
       'NotAuthorizedException',
-      'a wrong password, a disabled or locked-out user, or an app client that requires a secret',
+      // With PreventUserExistenceErrors on — the console's default — a user
+      // that does not exist is reported this way too.
+      'a wrong username or password, a disabled or locked-out user, or an app client that ' +
+        'requires a secret',
     ],
     [
       'InvalidParameterException',
@@ -200,10 +208,14 @@ describe('fetchCognitoAccessToken', () => {
     );
   });
 
-  it('reads an empty error type as none, not as one it withheld', async () => {
+  it('reads an empty error type as none', async () => {
     const err = await thrownBy(() => Promise.resolve(jsonResponse(400, { __type: '' })));
 
-    expect(err.message).toContain('— HTTP 400 (text/plain), not a Cognito error;');
+    expect(err.message).toBe(
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 400 (text/plain), with no ' +
+        'Cognito error type that can be shown; its body is withheld, since a proxy can quote ' +
+        'the request it refused',
+    );
   });
 
   it('reports a body that is not a Cognito error by its status and media type only', async () => {
@@ -217,9 +229,48 @@ describe('fetchCognitoAccessToken', () => {
     );
 
     expect(err.message).toBe(
-      'Cognito sign-in failed for demo-ana@example.test — HTTP 502 (text/html), not a ' +
-        'Cognito error; its body is withheld, since a proxy can quote the request it refused',
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 502 (text/html), with no ' +
+        'Cognito error type that can be shown; its body is withheld, since a proxy can quote ' +
+        'the request it refused',
     );
+  });
+
+  it('says an empty body is empty, rather than withheld', async () => {
+    // A real 413 from Cognito arrives with content-length 0.
+    const err = await thrownBy(() => Promise.resolve(new Response('', { status: 413 })));
+
+    expect(err.message).toBe(
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 413 (text/plain), with no ' +
+        'Cognito error type that can be shown and an empty body',
+    );
+  });
+
+  it('reads a media type in any case, with spaces and parameters around it', async () => {
+    const err = await thrownBy(
+      resolve(
+        fakeResponse({
+          ok: false,
+          status: 403,
+          contentType: ' Text/HTML ; Charset=UTF-8',
+          text: () => Promise.resolve('<html>blocked</html>'),
+        }),
+      ),
+    );
+
+    expect(err.message).toContain('— HTTP 403 (text/html), with no Cognito error type');
+  });
+
+  it.each([
+    ['a fraction', 400.5],
+    ['one that carries digits from outside', 100.20262026],
+    ['one below the range', 42],
+    ['one above it', 600],
+  ])('reads a status that is %s as invalid', async (_label, status) => {
+    const err = await thrownBy(
+      resolve(fakeResponse({ ok: false, status, text: () => Promise.resolve('') })),
+    );
+
+    expect(err.message).toContain('— an invalid HTTP status, with no Cognito error type');
   });
 
   it('prints no part of an error body, not even the start of one', async () => {
@@ -246,6 +297,19 @@ describe('fetchCognitoAccessToken', () => {
         'finish it once in the AWS console (a temporary password must be reset before the ' +
         'account can be used unattended), then re-run.',
     );
+  });
+
+  it.each([
+    [
+      'a name it does not know, in the shape of one',
+      'PASSKEY_REGISTRATION',
+      'challenge PASSKEY_REGISTRATION',
+    ],
+    ['a name in another shape', 'PasskeyRegistration', 'a challenge (its name is withheld)'],
+  ])('reads a challenge with %s', async (_label, name, shown) => {
+    const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: name })));
+
+    expect(err.message).toContain(`demo-ana@example.test needs ${shown} — finish it once`);
   });
 
   it.each([
@@ -346,9 +410,27 @@ describe('fetchCognitoAccessToken', () => {
     const err = await thrownBy(() => Promise.reject(new Error('something went wrong')));
 
     expect(err.message).toBe(
-      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: no error code, ` +
-        "and the fetch layer's own text is withheld — it can quote the request, which holds " +
-        'the password',
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: no error code ` +
+        "that can be shown, and the fetch layer's own text is withheld — it can quote the " +
+        'request, which holds the password',
+    );
+  });
+
+  it('reports a timeout of the fetch layer’s own by its code, not as the deadline', async () => {
+    // Only AbortSignal.timeout's TimeoutError means the deadline set here
+    // passed; undici's connect timeout is a failure with a code of its own.
+    const err = await thrownBy(
+      reject(
+        Object.assign(new Error('Connect Timeout Error'), {
+          name: 'ConnectTimeoutError',
+          code: 'UND_ERR_CONNECT_TIMEOUT',
+        }),
+      ),
+    );
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
+        'UND_ERR_CONNECT_TIMEOUT',
     );
   });
 
@@ -638,6 +720,21 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     );
   });
 
+  it('gives the status to the code it explains, not to a neighbour', async () => {
+    const err = await thrownBy(
+      reject(
+        Object.assign(tunnelRefused('Proxy response (502) !== 200 when HTTP Tunneling'), {
+          code: 'ECONNRESET',
+        }),
+      ),
+    );
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
+        'ECONNRESET, UND_ERR_ABORTED (the HTTPS proxy refused the tunnel with HTTP 502)',
+    );
+  });
+
   it('names a refused redirect', async () => {
     // What `redirect: 'error'` produces (measured): no code, a fixed message.
     const err = await thrownBy(
@@ -645,8 +742,8 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     );
 
     expect(err.message).toBe(
-      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
-        'the endpoint answered with a redirect, refused so the password is not sent on',
+      `Cognito sign-in for demo-ana@example.test got a redirect from ${ENDPOINT}, refused so ` +
+        'the password is not sent on',
     );
   });
 
@@ -659,7 +756,7 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
       ),
     );
 
-    expect(err.message).toMatch(/: no error code, and the fetch layer's own text is withheld/);
+    expect(err.message).toMatch(/: no error code that can be shown, and the fetch layer's own/);
   });
 });
 
@@ -688,11 +785,14 @@ describe('what it throws carries no text from outside', () => {
  * Echoes shaped like tokens. Every text in the matrix above has spaces and a
  * hyphenated canary in it, so none ever fits a token's shape: that matrix
  * cannot see a token check that is too loose. Here each token channel gets the
- * password as its whole value — verbatim, case-changed, NFKC-normalised, cut at
- * either end — and must print no more of it than a control run through the
- * same path does (the fixed wording can share a run with a password: "password"
- * itself is in it). Passwords with '#', ':', ';' and '/' matter because the
- * type and the media type are cut at those before they are checked.
+ * password as its whole value — verbatim, case-changed, NFKC-normalised,
+ * accent-stripped, with its separators swapped, cut at either end, or cut down
+ * to one of its words — and must print no more of it than a control run through
+ * the same path does, both read as the threat model reads text (the fixed
+ * wording can share a run with a password: "password" itself is in it).
+ * Passwords with '#', ':', ';' and '/' matter because the type and the media
+ * type are cut at those before they are checked; fullwidth, bold and accented
+ * ones because only a normalising echo prints them as a token.
  */
 const TOKEN_CHANNELS: [string, (value: string) => FetchImpl][] = [
   [
@@ -734,8 +834,23 @@ const TOKEN_PASSWORDS = [
   'Correct#Horse#Battery9',
   'HUNTER2_NOT_REAL',
   'NEW_PASSWORD_HORSE_9',
-  '\u212Aelvin2026Horse',
+  'Kelvin2026Horse',
+  // Fullwidth, as typed with an IME in full-width mode, and mathematical bold:
+  // a normalising echo prints them as plain ASCII.
+  'ＳＵＭＭＥＲ＿２０２６',
+  'Ｂａｌｉ＃Ｓｕｍｍｅｒ２０２６',
+  '\u{1D40F}\u{1D41A}\u{1D42C}\u{1D42C}\u{1D430}\u{1D428}\u{1D42B}\u{1D41D}\u{1D7D0}\u{1D7CE}\u{1D7D0}\u{1D7D4}',
+  // Every run of four holds an accent, or a separator: only an echo that
+  // strips accents, or swaps separators, can print these as a token.
+  'Pässwörd',
+  'q-7-z-k-2-w-x',
+  // Known words inside a password: an echo cut at the separator is exactly one.
+  'Bali#NotAuthorizedException',
+  'ENOTFOUND_2026',
 ];
+
+/** A password's words, split at anything that is not a letter or a digit. */
+const wordsOf = (p: string) => p.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== '');
 
 const ECHOES: [string, (password: string) => string][] = [
   ['verbatim', (p) => p],
@@ -744,21 +859,54 @@ const ECHOES: [string, (password: string) => string][] = [
   ['NFKC-normalised', (p) => p.normalize('NFKC')],
   ['cut short', (p) => p.slice(0, -2)],
   ['cut at the front', (p) => p.slice(2)],
+  [
+    'ASCII-folded, separators swapped, upper-cased',
+    (p) =>
+      p
+        .normalize('NFKD')
+        .replace(/\p{M}/gu, '')
+        .replace(/[^\p{L}\p{N}]/gu, '_')
+        .toUpperCase(),
+  ],
+  [
+    'accents stripped, upper-cased',
+    (p) => p.normalize('NFKD').replace(/\p{M}/gu, '').toUpperCase(),
+  ],
+  ['its first word', (p) => wordsOf(p)[0] ?? p],
+  ['its last word', (p) => wordsOf(p).at(-1) ?? p],
 ];
 
 /**
- * How many times each four-character run of `secret` occurs in `text`, ignoring
- * case — outside stack frames, which are V8's rendering of code locations and
- * differ in depth between two call sites. They hold file paths, and a checkout
- * path such as /home/user/bali shares a run with a password such as Bali#….
+ * Text as the threat model reads it — compatibility forms and accents gone,
+ * case folded upward, only letters and digits left — written out here on its
+ * own, a character at a time, rather than borrowed from the module it checks.
+ */
+function echoFold(text: string): string {
+  let out = '';
+  for (const char of text.normalize('NFKD')) {
+    if (/\p{M}/u.test(char)) continue;
+    for (const upper of char.toUpperCase()) {
+      if (/[\p{L}\p{N}]/u.test(upper)) out += upper;
+    }
+  }
+  return out;
+}
+
+/**
+ * How many times each four-character run of `secret` occurs in `text`, both
+ * folded as the threat model reads them — outside stack frames, which are V8's
+ * rendering of code locations and differ in depth between two call sites. They
+ * hold file paths, and a checkout path such as /home/user/bali shares a run with
+ * a password such as Bali#….
  */
 function runCounts(text: string, secret: string): Map<string, number> {
-  const haystack = text
-    .split('\n')
-    .filter((line) => !/^\s+at /.test(line))
-    .join('\n')
-    .toLowerCase();
-  const needle = secret.toLowerCase();
+  const haystack = echoFold(
+    text
+      .split('\n')
+      .filter((line) => !/^\s+at /.test(line))
+      .join('\n'),
+  );
+  const needle = echoFold(secret);
   const counts = new Map<string, number>();
   for (let start = 0; start + 4 <= needle.length; start++) {
     const run = needle.slice(start, start + 4);
@@ -815,9 +963,11 @@ describe('echoes shaped like tokens', () => {
 
 describe('tokens read from outside', () => {
   // The tokens that DO reach the message — an error code, Cognito's error type,
-  // a challenge name, a media type — are accepted only in a strict identifier
-  // shape, and withheld when they contain the password, whatever the case: a
-  // password shaped like an identifier fits the shape as easily as a real one.
+  // a challenge name, a media type. An unknown one is accepted only in a strict
+  // identifier shape, and withheld when it repeats four characters of the
+  // password, folded: a password shaped like an identifier fits the shape as
+  // easily as a real one. A known word is shown unless it and the password
+  // contain one another.
   it('withholds an error code that spells the password', async () => {
     const password = 'HUNTER2_NOT_REAL';
     const err = await thrownBy(
@@ -828,10 +978,7 @@ describe('tokens read from outside', () => {
     );
 
     expect(exposes(err, password)).toBe(false);
-    // Withheld, and said to be: "no error code" would be false.
-    expect(err.message).toMatch(
-      /could not reach .*: an error code that is withheld \(not an identifier, or it repeats part of the password\)$/,
-    );
+    expect(err.message).toMatch(/could not reach .*: no error code that can be shown,/);
   });
 
   it('withholds an error code that spells the password in another case', async () => {
@@ -857,8 +1004,9 @@ describe('tokens read from outside', () => {
 
     expect(exposes(err, password)).toBe(false);
     expect(err.message).toBe(
-      'Cognito sign-in failed for demo-ana@example.test — HTTP 400, with an error type that ' +
-        'is withheld (not an identifier, or it repeats part of the password)',
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 400 (text/plain), with no ' +
+        'Cognito error type that can be shown; its body is withheld, since a proxy can quote ' +
+        'the request it refused',
     );
   });
 
@@ -888,12 +1036,12 @@ describe('tokens read from outside', () => {
     );
 
     expect(exposes(err, password)).toBe(false);
-    expect(err.message).toContain('— HTTP 400, not a Cognito error;');
+    expect(err.message).toContain('— HTTP 400, with no Cognito error type that can be shown');
   });
 
-  it('withholds a code that spells the password upper-cased, even where lower-casing misses it', async () => {
-    // 'ſ' (long s) upper-cases to 'S' but does not lower-case to 's', so an echo
-    // that upper-cased this password is only caught by comparing in upper case.
+  it('withholds a code echoing a password written with a compatibility form (long s)', async () => {
+    // 'ſ' is a compatibility form of 's': an echo that upper-cased or
+    // normalised this password prints it in plain ASCII.
     const password = 'ſecret_code';
     const err = await thrownBy(
       reject(
@@ -911,32 +1059,78 @@ describe('tokens read from outside', () => {
     const err = await thrownBy(
       reject(
         new TypeError('fetch failed', {
-          cause: Object.assign(new Error('x'), { code: 'ECONNRESET' }),
+          cause: Object.assign(new Error('x'), {
+            code: 'ECONNRESET',
+            cause: Object.assign(new Error('y'), { code: 'EQRSTUV_FAILURE' }),
+          }),
         }),
       ),
       { username: creds.username, password: '' },
     );
 
-    expect(err.message).toMatch(/: ECONNRESET$/);
+    expect(err.message).toMatch(/: ECONNRESET, EQRSTUV_FAILURE$/);
+  });
+
+  it('hides no token for a password written in another script', async () => {
+    // The fold keeps every script's letters: a password with no Latin letter in
+    // it is compared as itself, not as an empty string that every token holds.
+    const password = 'Пароль-секрет';
+    const unknown = await thrownBy(
+      reject(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('x'), { code: 'EQRSTUV_FAILURE' }),
+        }),
+      ),
+      { username: creds.username, password },
+    );
+    const known = await thrownBy(resolve(jsonResponse(400, { __type: 'NotAuthorizedException' })), {
+      username: creds.username,
+      password,
+    });
+
+    expect(unknown.message).toMatch(/: EQRSTUV_FAILURE$/);
+    expect(known.message).toContain('NotAuthorizedException (HTTP 400)');
+  });
+
+  it('takes a known word only as it is spelled', async () => {
+    // A lower-cased 'notauthorizedexception' is neither the known word nor an
+    // error type's shape.
+    const err = await thrownBy(resolve(jsonResponse(400, { __type: 'notauthorizedexception' })));
+
+    expect(err.message).not.toMatch(/exception/i);
+    expect(err.message).toContain('with no Cognito error type that can be shown');
   });
 
   it.each([
-    ['three characters', 'xy-ECO-zw', 'ECONNREFUSED'],
-    ['four characters', 'xy-ECON-zw', undefined],
-  ])('shares a run of %s with the password: that decides', async (_label, password, shown) => {
-    // A token is withheld when it repeats a run of four characters of the
-    // password; three is below the threshold.
+    ['three characters', 'xy-QRS-zw', true],
+    ['four characters', 'xy-QRST-zw', false],
+  ])('an unknown code sharing a run of %s with the password', async (_label, password, shown) => {
+    // An unknown token is withheld when it repeats a run of four characters of
+    // the password; three is below the threshold.
     const err = await thrownBy(
       reject(
         new TypeError('fetch failed', {
-          cause: Object.assign(new Error('x'), { code: 'ECONNREFUSED' }),
+          cause: Object.assign(new Error('x'), { code: 'EQRSTUV_FAILURE' }),
         }),
       ),
       { username: creds.username, password },
     );
 
-    if (shown) expect(err.message).toMatch(/: ECONNREFUSED$/);
-    else expect(err.message).toMatch(/: an error code that is withheld/);
+    if (shown) expect(err.message).toMatch(/: EQRSTUV_FAILURE$/);
+    else expect(err.message).toMatch(/: no error code that can be shown,/);
+  });
+
+  it('holds a password shorter than the run to the whole of it', async () => {
+    const err = await thrownBy(
+      reject(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('x'), { code: 'EXQ9_FAILURE' }),
+        }),
+      ),
+      { username: creds.username, password: 'xq9' },
+    );
+
+    expect(err.message).not.toContain('EXQ9_FAILURE');
   });
 
   it('withholds a code echoing a truncated password', async () => {
@@ -954,9 +1148,9 @@ describe('tokens read from outside', () => {
     expect(err.message).not.toMatch(/BALI_SUMMER/i);
   });
 
-  it('withholds a token whose echo only folds one way (the Kelvin sign)', async () => {
-    // U+212A lower-cases to 'k' but upper-cases to itself, so an echo that
-    // normalised it to 'K' is only caught by comparing in lower case.
+  it('withholds a token echoing a password written with the Kelvin sign', async () => {
+    // U+212A is a compatibility form of 'K': a normalising echo prints it as
+    // the ASCII letter.
     const password = '\u212Aelvin2026Horse';
     const err = await thrownBy(resolve(jsonResponse(400, { __type: 'Kelvin2026Horse' })), {
       username: creds.username,
@@ -967,11 +1161,13 @@ describe('tokens read from outside', () => {
   });
 
   it.each([
-    // Every run of these passwords holds a character that folds one way only,
-    // so each echo is caught only if case is folded in the right direction.
+    // Every run of these passwords holds a character that folds one way only.
+    // 'ß' upper-cases to 'SS' but lower-cases to itself, so an upper-cased
+    // echo is caught only by folding case upward.
+    ['sharp s, echoed upper-cased', '\u00df\u00df\u00df\u00df', 'SSSSSSSS'],
     ['long s, echoed upper-cased', '\u017f\u017f\u017f\u017f', 'SSSS'],
     ['the Kelvin sign, echoed as K', '\u212A\u212A\u212A\u212A', 'Kkkk'],
-  ])('folds case both ways — %s', async (_label, password, echo) => {
+  ])('folds case and compatibility forms — %s', async (_label, password, echo) => {
     const err = await thrownBy(
       reject(
         new TypeError('fetch failed', {
@@ -989,31 +1185,94 @@ describe('tokens read from outside', () => {
     expect(typed.message).not.toMatch(/SSSS|KKKK/i);
   });
 
-  it('says a real code or type was withheld, rather than that there was none', async () => {
-    // A weak password can repeat part of a genuine token. Withholding it is
-    // right; calling it absent would point the operator away from the cause.
-    const code = await thrownBy(
+  it('reads the same whether a token was withheld or was never there', async () => {
+    // Saying which would tell a reader that the password shares characters with
+    // whatever token they guess was due.
+    const noCode = await thrownBy(reject(new TypeError('fetch failed')), {
+      username: creds.username,
+      password: 'quux-2026!',
+    });
+    const withheldCode = await thrownBy(
       reject(
         new TypeError('fetch failed', {
-          cause: Object.assign(new Error('x'), { code: 'ENOTFOUND' }),
+          cause: Object.assign(new Error('x'), { code: 'EQUUX_FAILURE' }),
         }),
       ),
-      { username: creds.username, password: 'notfound' },
+      { username: creds.username, password: 'quux-2026!' },
     );
-    expect(code.message).toContain('an error code that is withheld');
-    expect(code.message).not.toContain('no error code');
+    expect(withheldCode.message).toBe(noCode.message);
 
-    const type = await thrownBy(
+    const typeResponse = (body: unknown) =>
       resolve(
-        new Response(JSON.stringify({ __type: 'PasswordResetRequiredException' }), {
+        new Response(JSON.stringify(body), {
           status: 400,
           headers: { 'content-type': 'application/x-amz-json-1.1' },
         }),
+      );
+    const noType = await thrownBy(typeResponse({ x: 1 }), {
+      username: creds.username,
+      password: 'quux-2026!',
+    });
+    const withheldType = await thrownBy(typeResponse({ __type: 'QuuxFailure' }), {
+      username: creds.username,
+      password: 'quux-2026!',
+    });
+    expect(withheldType.message).toBe(noType.message);
+  });
+
+  it.each([
+    // An ordinary password shares four characters with a real token: "tion"
+    // with every "...Exception", "ound" with ENOTFOUND, "abor" with
+    // UND_ERR_ABORTED, "word" with NEW_PASSWORD_REQUIRED. What prints for a
+    // known word is this module's own word, so none of them is withheld for it.
+    ['NotAuthorizedException', 'Education2026!', 'NotAuthorizedException (HTTP 400)'],
+    ['PasswordResetRequiredException', 'Password123!', 'PasswordResetRequiredException'],
+    ['ENOTFOUND', 'Playground2026!', ': ENOTFOUND (the host does not resolve'],
+    ['UND_ERR_ABORTED', 'Aborted-trip-2026', ': UND_ERR_ABORTED (the request was cancelled'],
+    ['ECONNREFUSED', 'Connecticut#1', ': ECONNREFUSED'],
+    ['NEW_PASSWORD_REQUIRED', 'Password123!', 'needs challenge NEW_PASSWORD_REQUIRED'],
+  ])('shows the known word %s beside the password %s', async (word, password, shown) => {
+    const carrier = word.endsWith('Exception')
+      ? resolve(jsonResponse(400, { __type: word }))
+      : word === 'NEW_PASSWORD_REQUIRED'
+        ? resolve(jsonResponse(200, { ChallengeName: word }))
+        : reject(
+            new TypeError('fetch failed', { cause: Object.assign(new Error('x'), { code: word }) }),
+          );
+
+    const err = await thrownBy(carrier, { username: creds.username, password });
+
+    expect(err.message).toContain(shown);
+  });
+
+  it('shows a known media type beside a password that shares four characters with it', async () => {
+    const err = await thrownBy(
+      resolve(
+        new Response('<html>blocked</html>', {
+          status: 403,
+          headers: { 'content-type': 'text/html' },
+        }),
       ),
-      { username: creds.username, password: 'password' },
+      { username: creds.username, password: 'Textbook-2026' },
     );
-    expect(type.message).toContain('with an error type that is withheld');
-    expect(type.message).not.toContain('not a Cognito error');
+
+    expect(err.message).toContain('— HTTP 403 (text/html), with no Cognito error type');
+  });
+
+  it.each([
+    // An echo can produce a known word only as a folded piece of the password:
+    // cut out of a longer one, or a password that is itself part of the word.
+    ['cut out of the password', 'Bali#NotAuthorizedException', 'Bali#NotAuthorizedException'],
+    ['that holds the whole password', 'PASSWORD', 'NotAuthorizedException'],
+  ])('withholds a known word %s', async (_label, password, type) => {
+    const known = password === 'PASSWORD' ? 'PasswordResetRequiredException' : type;
+    const err = await thrownBy(resolve(jsonResponse(400, { __type: known })), {
+      username: creds.username,
+      password,
+    });
+
+    expect(err.message).not.toMatch(/Exception/);
+    expect(err.message).toContain('with no Cognito error type that can be shown');
   });
 
   it('refuses a status that is not an HTTP status', async () => {
@@ -1168,8 +1427,8 @@ describe('hostile objects never cost the operator’s one actionable line', () =
   });
 
   it('a cause chain that loops back on itself is walked once', async () => {
-    // Two errors, each the other's cause. The depth bound alone would end the
-    // walk, but only after reading both nodes over again at every level.
+    // Two errors, each the other's cause. The node budget counts distinct nodes,
+    // so without the visited-once rule this walk would never end.
     const reads = new Map<string, number>();
     const node = (name: string): Error =>
       Object.defineProperty(new TypeError(name), 'code', {
@@ -1298,8 +1557,25 @@ describe('hostile objects never cost the operator’s one actionable line', () =
     const err = await thrownBy(resolve(response));
 
     expect(err.message).toBe(
-      'Cognito sign-in failed for demo-ana@example.test — an invalid HTTP status, not a ' +
-        'Cognito error; its body is withheld, since a proxy can quote the request it refused',
+      'Cognito sign-in failed for demo-ana@example.test — an invalid HTTP status, with no ' +
+        'Cognito error type that can be shown and an empty body',
+    );
+  });
+
+  it('a response whose `ok` is truthy but not `true` is not a success', async () => {
+    const lookalike = {
+      ok: 'true',
+      status: 200,
+      headers: { get: () => null },
+      text: () => Promise.resolve(JSON.stringify({ AuthenticationResult: { AccessToken: 't' } })),
+    };
+
+    const err = await thrownBy(resolve(lookalike));
+
+    expect(err.message).toBe(
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 200, with no Cognito error ' +
+        'type that can be shown; its body is withheld, since a proxy can quote the request it ' +
+        'refused',
     );
   });
 
