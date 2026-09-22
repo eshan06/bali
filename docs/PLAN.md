@@ -17,28 +17,18 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
 - **Owner actions from the Phase 2 merge: done** — "Integration + race tests
   (real Postgres)" is now a required check, and the Claude workflows bill the
   owner's subscription (see decision log).
-- **Phase 2 exit demo: PASSED against dev** (2026-09-22). `DEMO_API_URL=… npm run
-  demo` drove the deployed API end to end with real Cognito sign-ins, and every
-  incident self-asserted green: tap → session (four phones focused), emergency
-  unlock applied and **delivered live on the teacher's SSE stream**, refocus,
-  a real 90-second silence episode opened by the sweep and closed by Ben's own
-  check-in (exactly one `went_silent` / `came_back`), a removed student's unlock
-  still **recorded** as `no_live_participation`, the full event log with no
-  heartbeat noise, and a second session that **expired by itself at the bell**
-  with the phone learning it from its own next check-in. Nothing was
-  time-compressed: the run waited out the real 90-second threshold and the real
-  session end rather than backdating rows, and the stream carried six keep-alive
-  frames across those waits. The sweeps themselves were real calls to the
-  deployment's `/internal/sweep` that this run made with the sweep key — without
-  the key the per-minute cron does the identical, idempotent job and the run
-  simply waits for it, so which of the two acts is a coin flip and neither is
-  asserted on. The README documents how to re-run it.
-- **Dev provisioning that made it possible** (one-time, owner-run): a `schools`
-  row plus `school_id` on the dev test teacher. `users.school_id` is never
-  assigned by any code path while `classes.school_id` is `NOT NULL`, so a teacher
-  provisioned by role alone gets as far as class creation and no further. Note
-  for the next environment: `schools.id` has **no database default** — ids are
-  minted in TypeScript (data-model decision 2), so raw SQL must supply a UUIDv7.
+- **Phase 2 exit demo: PASSED against dev** (2026-09-22) — every incident green
+  against the deployed API with real Cognito: tap → session, unlock **delivered
+  live on the SSE stream**, refocus, one real 90-second silence episode and one
+  `came_back`, a removed student's unlock still **recorded**, and a session that
+  **expired by itself at the bell**. The waits were real, not backdated; the
+  sweep was a real `/internal/sweep` call (the cron does the same job when no key
+  is set — the demo asserts on the event, not the caller). Re-run it via the
+  README, "Running it against a deployed API".
+- **Dev provisioning it needed** (one-time, owner-run): a `schools` row plus
+  `school_id` on the test teacher — see the teacher-gating row under Go-live.
+  Gotcha for the next environment: `schools.id` has no DB default, so raw SQL
+  must supply a UUIDv7 (ids are minted in TypeScript, decision 2).
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path
@@ -135,13 +125,6 @@ under-13 parental-consent machinery.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log
-
-- **2026-09-22** — Phase 2's exit demo is the deployed API's acceptance test, not
-  a rehearsal of one. Remote mode gets no database handle, so the silence and
-  expiry incidents wait out the real 90-second threshold and the deployment's own
-  per-minute cron rather than backdating rows; a run therefore takes minutes and
-  proves the deployment, not the script. Local mode still backdates and stays
-  seconds long, so `npm run demo` is unchanged for everyday use.
 
 - **2026-09-20** — Retroactive audit of the pre-gates Phase 1/2 code: ten leads
   checked against the code, nine reproduced and are being fixed as a series of
