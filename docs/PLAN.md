@@ -138,6 +138,26 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — The stream route's log decision took three passes to
+  actually pin, and the last hole was one level below the last fix. #24 folded
+  the level and the line into one tested helper so the listener had no branch
+  left — but the line that CONSUMES it, `request.log[level]({ err }, msg)`, is
+  ordinary code: hardcode it to `.warn` and every tab-close goes to `warn` in
+  production while all five helper cases stay green. `buildApp` now takes an
+  optional `logStream` (tests only; production keeps pino's own destination)
+  and an integration test reads the level the route actually wrote. Hardcoding
+  the dispatch turns it red; the helper's table test does not notice.
+  Also measured, from the same review: the rewritten stall loop treated ONE
+  quiet round as proof the socket was full. Draining happens on the event
+  loop, so a round where the loop is busy for the whole sleep — this suite
+  runs with `repollMs: 5` — looks identical to a full socket. On this box the
+  kernel accepts about 3 MiB before it stops, so a false stall on round one
+  leaves ~1 MiB queued, `end()` flushes it, `'finish'` fires, and the test
+  goes red for a busy machine rather than a regression. It now takes two
+  consecutive quiet rounds; a genuinely full socket never drains again.
+  And the `'request'` listeners come off in `afterEach` rather than after the
+  `waitFor` that may throw first.
+
 - **2026-09-22** — The worst thing the audit turned up was not on its list: a
   lost tap response could stop a teacher starting any lesson for the rest of
   the day, and it needed no race to reach. A tap lands in a session, its
