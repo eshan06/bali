@@ -936,8 +936,11 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       //     grid shows them green in the one they are in. Its next check-in
       //     there answers `gone` and unshields. That is the phone/grid drift
       //     the engine exists to prevent.
-      // Declining costs an EVENT_ID_CONFLICT, which is loud: a non-401 4xx is
-      // "keep the record, retry, and surface".
+      // Declining costs a 409 — EVENT_ID_CONFLICT when the retry re-resolved
+      // somewhere new, NOT_PARTICIPATING when it came back to the session that
+      // recorded it with the student's row since ended, SESSION_NOT_RUNNING
+      // when that session has itself ended. All three are loud: a non-401 4xx
+      // is "keep the record, retry, and surface".
       //
       // Measured reach: deleting `!current.endedAt` turns "refuses to replay a
       // participation the student has since left" red. `!recorded.endedAt`
@@ -969,14 +972,25 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         prior.sessionId !== null
       ) {
         // Reuse the locked row when the tap resolved back to its own session,
-        // so the liveness check reads the authoritative copy, not a second
-        // unlocked snapshot of it. The cross-session read stays UNLOCKED on
-        // purpose: taking `for update` on another session here would order
-        // locks B-then-A against a concurrent tap's A-then-B and make a real
-        // deadlock, which withDeadlockRetry would paper over rather than fix.
-        // The window it leaves is narrow and self-healing — the recorded
-        // session can end just after both reads, and the phone's next
-        // check-in against it answers `gone`.
+        // so the liveness check reads the authoritative copy rather than a
+        // second unlocked snapshot of it. Reasoned, not pinned: replacing this
+        // with an unconditional unlocked load leaves both lanes green, because
+        // it only differs under an interleaving no test stages.
+        //
+        // The cross-session read stays UNLOCKED on purpose, and that one IS
+        // measured: with `for update` on the other session, two taps crossing
+        // in opposite directions order locks B-then-A against A-then-B and
+        // deadlock for real (40P01 at Postgres's 1s deadlock_timeout), which
+        // withDeadlockRetry would paper over rather than fix. Unlocked: no
+        // deadlock, tens of milliseconds.
+        //
+        // What that leaves is narrow and self-healing: the recorded session
+        // can end, or a concurrent tap into another session can end `current`
+        // via endParticipationsElsewhere while holding only that session's
+        // lock, just after both reads here — and the phone's next check-in
+        // answers `gone`. Reading the session BEFORE the participation is what
+        // keeps a concurrent end visible to at least the second read under
+        // READ COMMITTED (staged and confirmed: the replay is refused).
         const recorded =
           prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
         const current = await loadParticipation(tx, prior.sessionId, input.studentId);

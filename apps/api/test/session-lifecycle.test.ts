@@ -169,12 +169,15 @@ describe('POST /v1/sessions/:id/extend', () => {
 
   it('a duration the route refuses says so in words that are true', async () => {
     /*
-     * The route sends a duration, not an end time, so INVALID_EXTENSION can
-     * only ever mean "that is not a number of minutes I can use". It used to
-     * answer "new end time must be later than the current one", which after
-     * the duration rewrite describes nothing the caller sent. Zod is what
-     * actually rejects this shape, and its message is checked here too so the
-     * pair cannot drift apart unnoticed.
+     * A JOINT drift detector, and worth being precise about what it can and
+     * cannot see. `INVALID_EXTENSION` is unreachable through /v1 — the route's
+     * `int().positive().max(480)` accepts only durations the engine never
+     * refuses — so no wire test can assert the engine's message. What this
+     * pins is the pair: zod still rejects the shape, AND the message the
+     * mapper would produce no longer talks about an end time the route does
+     * not send. Measured: reverting the mapper's message alone leaves this
+     * green, relaxing `.positive()` alone leaves it green, doing both turns it
+     * red.
      */
     const { teacher, session } = await seedRunning('extend-bad-duration');
     const res = await post(

@@ -200,11 +200,19 @@ under-13 parental-consent machinery.
   replaced, and both now decline. A retry that resolves back to the session
   that recorded it, with the student's row since ended, declines through the
   `!isNew` path below the branch as `NOT_PARTICIPATING` — not a conflict, the
-  id names this very tap; what stopped being true is the participation. The lookup itself sits **ahead** of the
-  ended-session guard, the placement `extendSession` uses: `resolveTapTarget`
-  filters on `ended_at IS NULL` outside the transaction, so the session it
-  picks can end before the engine's locked read, and a tap that did land must
-  still replay against the running session that recorded it rather than 409.
+  id names this very tap; what stopped being true is the participation.
+  The lookup itself sits **ahead** of the ended-session guard, the placement
+  `extendSession` uses: `resolveTapTarget` filters on `ended_at IS NULL`
+  outside the transaction, so the session it picks can end before the engine's
+  locked read, and a tap that did land must still replay against the running
+  session that recorded it rather than 409.
+  The branch's read of the OTHER session stays unlocked, and that is measured
+  rather than assumed: with `for update` on it, two taps crossing in opposite
+  directions order locks B-then-A against A-then-B and deadlock for real
+  (40P01 at Postgres's one-second `deadlock_timeout`), which
+  `withDeadlockRetry` would paper over rather than fix. The residual window —
+  the recorded session, or the student's row in it, ending just after both
+  reads — is narrow and heals on the next check-in.
   `extendSession` now takes minutes instead of an absolute end. The route read
   the session, did the arithmetic and handed over a fixed time, so two
   simultaneous "add time" presses computed the same target from the same
@@ -212,8 +220,9 @@ under-13 parental-consent machinery.
   engine refused it as `INVALID_EXTENSION`, and the teacher's second press
   bought no time — a 400 saying the new end was not later than the current one,
   true of the value the route computed and useless to a teacher who had just
-  pressed "add 10 minutes". The arithmetic moved inside the locked read, so
-  each press adds to whatever it finds. Nothing calls the endpoint yet (no
+  pressed "add 10 minutes".
+  The arithmetic moved inside the locked read, so each press adds to whatever
+  it finds. Nothing calls the endpoint yet (no
   extend control in the portal), so this was caught before it could bite. `INVALID_EXTENSION` is kept and still
   refuses a non-positive, non-finite, or out-of-Date-range duration — the
   engine does not trust its caller. 1e15 minutes used to overflow into an

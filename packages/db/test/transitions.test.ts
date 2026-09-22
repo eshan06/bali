@@ -1137,11 +1137,14 @@ describe('a retried tap the server re-resolves elsewhere', () => {
      * is "keep the record, retry, and surface" — and the student's next
      * physical tap carries a fresh id and joins the running session normally.
      *
-     * Which condition holds this up, measured: `!current.endedAt`. Ending a
-     * session ends its live participations in the same transaction, so by the
-     * time the session is gone the row is too, and deleting `!recorded.endedAt`
-     * on its own leaves this green. That guard is kept for read-order safety,
-     * not because this test would catch its removal — see the branch comment.
+     * Measured, so the name is not read as a claim about which line holds it
+     * up: NEITHER guard is pinned by this test on its own. Ending a session
+     * ends its live participations in the same transaction, so by the time the
+     * session is gone the row is too, and each condition is independently
+     * sufficient here — delete either one alone and this stays green; delete
+     * both and it goes red. `!current.endedAt` has its own test in the two
+     * cases above; `!recorded.endedAt` is kept for read-order safety rather
+     * than because anything would catch its removal (see the branch comment).
      */
     const { klass, student, school, teacher } = await seedClass('tap-replay-ended');
     const other = one(
