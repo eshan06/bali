@@ -20,6 +20,7 @@ import {
   endEnrollment,
   endSession,
   expireDueSessions,
+  extendSession,
   markSilentParticipations,
   startSession,
   tapIn,
@@ -565,6 +566,48 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         await db.select().from(participations).where(eq(participations.sessionId, session.id)),
       );
       expect(participation.silentSince).toBeNull();
+    }
+  });
+});
+
+describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', () => {
+  it('two simultaneous +10s extends both land, and the session gains both', async () => {
+    /*
+     * Finding 7. The route reads the session, does the arithmetic, and hands
+     * the engine an absolute newEndsAt. Two taps of "add time" read the same
+     * current end, compute the same target, and the loser's value is no
+     * longer later than what the winner committed — so the engine refuses it
+     * as INVALID_EXTENSION and the teacher's second press silently does
+     * nothing. Doing the arithmetic inside the locked read fixes it: each
+     * extend adds to whatever it finds.
+     */
+    for (let round = 0; round < 8; round += 1) {
+      const { classId } = await seed(`race-extend-${round}`);
+      const session = await openSession(classId);
+      const before = session.endsAt.getTime();
+
+      const results = await Promise.allSettled([
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes: 10,
+          at: new Date(),
+          eventId: newUuidV7(),
+        }),
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes: 10,
+          at: new Date(),
+          eventId: newUuidV7(),
+        }),
+      ]);
+
+      const refused = results.filter((r) => r.status === 'rejected');
+      expect(refused.map((r) => String(r.reason))).toEqual([]);
+
+      // Two distinct presses, two distinct event ids: both must count.
+      const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(after.endsAt.getTime()).toBe(before + 20 * 60_000);
+      expect(await eventsOfType(session.id, 'session_extended')).toHaveLength(2);
     }
   });
 });

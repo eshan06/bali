@@ -531,7 +531,16 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
 
 export interface ExtendSessionInput {
   sessionId: string;
-  newEndsAt: Date;
+  /**
+   * Minutes to add. Deliberately a duration, not an absolute end: the caller
+   * used to read the session, do the arithmetic and hand over a fixed time,
+   * so two simultaneous "add time" presses computed the same target from the
+   * same starting point and the loser's value was no longer later than what
+   * the winner had already committed — refused as INVALID_EXTENSION, and the
+   * teacher's second press silently did nothing. Applied inside the locked
+   * read below, each press adds to whatever it finds.
+   */
+  durationMinutes: number;
   at: Date;
   /**
    * Client-minted id that makes the extend idempotent (rule 4). The new end is
@@ -575,17 +584,25 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
 
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    if (input.newEndsAt.getTime() <= session.endsAt.getTime()) {
+    if (!Number.isFinite(input.durationMinutes) || input.durationMinutes <= 0) {
       throw new TransitionError(
         'INVALID_EXTENSION',
-        'new end time must be later than the current one',
+        'duration must be a positive number of minutes',
       );
     }
+
+    // Add to whichever is later: the current end (extend the remaining time)
+    // or now (a session already past its end but not yet swept gets a fresh
+    // window rather than a new end still in the past). Computed HERE, under
+    // the same FOR UPDATE that loaded the session, so a concurrent extend has
+    // either already committed and is included, or is waiting behind this one.
+    const base = Math.max(input.at.getTime(), session.endsAt.getTime());
+    const newEndsAt = new Date(base + input.durationMinutes * 60_000);
 
     const updated = firstOrUndefined(
       await tx
         .update(sessions)
-        .set({ endsAt: input.newEndsAt })
+        .set({ endsAt: newEndsAt })
         .where(eq(sessions.id, session.id))
         .returning(),
     );
@@ -596,10 +613,10 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       type: 'session_extended',
       sessionId: session.id,
       classId: session.classId,
-      occurredAt: clampToWindow(input.at, session.startedAt, input.newEndsAt),
+      occurredAt: clampToWindow(input.at, session.startedAt, newEndsAt),
       payload: {
         previousEndsAt: session.endsAt.toISOString(),
-        newEndsAt: input.newEndsAt.toISOString(),
+        newEndsAt: newEndsAt.toISOString(),
       },
     });
     return updated;
@@ -800,6 +817,40 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+
+      // The phone mints one id per physical tap and retries until it gets an
+      // answer; the SERVER decides which session that tap means, picking the
+      // newest running session the student is enrolled in. So a retry after
+      // the teacher started a second session resolves somewhere new, and
+      // insertEvent would see the id against a different session and refuse
+      // it. That is backwards: the tap DID land, so rule 4 says re-read and
+      // return the truth that was recorded. insertEvent's conflict check is
+      // untouched and still fires for what it exists for — an id reused for a
+      // genuinely different event, which the unlock path depends on.
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type, sessionId: events.sessionId, userId: events.userId })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (
+        prior?.type === 'tap_in' &&
+        prior.userId === input.studentId &&
+        prior.sessionId !== null &&
+        prior.sessionId !== session.id
+      ) {
+        const recorded = await loadSession(tx, prior.sessionId);
+        const current = await loadParticipation(tx, prior.sessionId, input.studentId);
+        if (recorded && current) {
+          return {
+            outcome: 'replay',
+            state: current.state,
+            participationId: current.id,
+            session: recorded,
+          };
+        }
+      }
 
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,

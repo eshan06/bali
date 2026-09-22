@@ -136,6 +136,28 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Two engine idempotency holes, both from the same habit of
+  deciding something outside the transaction that only holds inside it.
+  A retried tap was answered with `EVENT_ID_CONFLICT` whenever the server
+  re-resolved it elsewhere. The phone mints one id per physical tap and retries
+  until answered, but `resolveTapTarget` picks the newest running session the
+  student is enrolled in — so a retry after the teacher started a second
+  session resolved somewhere new, `insertEvent` saw the id against a different
+  session, and refused. Backwards: the tap landed, so rule 4 says re-read and
+  return what was recorded. `tapIn` now does, and the conflict check is
+  untouched for what it exists for — an id reused for a genuinely different
+  event, which the unlock path depends on and which keeps its own test.
+  `extendSession` now takes minutes instead of an absolute end. The route read
+  the session, did the arithmetic and handed over a fixed time, so two
+  simultaneous "add time" presses computed the same target from the same
+  starting point; the loser's value was no longer later than the winner's, the
+  engine refused it as `INVALID_EXTENSION`, and the teacher's second press
+  silently did nothing. The arithmetic moved inside the locked read, so each
+  press adds to whatever it finds. `INVALID_EXTENSION` is kept and still
+  refuses a non-positive or non-finite duration — the engine does not trust its
+  caller — and the real-Postgres lane now covers two concurrent extends both
+  landing.
+
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not
   throw — it returns false and emits `'error'` a tick later, so the hub's

@@ -106,14 +106,11 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       const { id } = parse(SessionParams, request.params);
       const { session } = await requireSessionOwner(db, request, id);
       const { durationMinutes, eventId } = parse(ExtendBody, request.body);
-      const now = Date.now();
-      // Add time to whichever is later — the current end (extend the remaining
-      // time) or now (a session already past its end but not yet swept gets a
-      // fresh window rather than a new end still in the past).
-      const base = Math.max(now, session.endsAt.getTime());
-      const newEndsAt = new Date(base + durationMinutes * 60_000);
+      // The duration goes to the engine, not a computed end time: the
+      // arithmetic belongs inside its locked read, or two simultaneous
+      // presses compute the same target and the second is refused.
       const updated = await mapTransitionError(() =>
-        extendSession(db, { sessionId: session.id, newEndsAt, at: new Date(), eventId }),
+        extendSession(db, { sessionId: session.id, durationMinutes, at: new Date(), eventId }),
       );
       return { outcome: 'extended', session: toSessionView(updated) };
     },
