@@ -750,14 +750,26 @@ async function conversionGapRound(tag: string): Promise<boolean> {
     .from(armedTaps)
     .where(and(eq(armedTaps.teacherId, teacher.id), isNotNull(armedTaps.consumedAt)));
   expect(consumed.length).toBeGreaterThan(0);
+  // The invariant is that a consumed row names an event that EXISTS — not
+  // specifically a `tap_in`. The narrower version was true when every
+  // consumed tap was a converted one, and this branch broke that: a spent tap
+  // is consumed and SKIPPED, minting nothing, so the event under its id is
+  // whatever recorded it first. No tap in this cohort carries a spent id
+  // today, so the narrow form still passed — it would just have reddened one
+  // day for a reason that is not a bug, and the message would have lied about
+  // which one. The orphan this test exists for is unaffected: a refresh that
+  // slipped inside the conversion leaves the row naming an id that appears in
+  // NO event at all, so both forms of this assertion catch it identically —
+  // measured across the two, red 9 runs out of 10, the tenth being a round
+  // where the retry landed outside the window rather than a missed orphan.
   for (const row of consumed) {
     const recorded = await db
       .select({ eventId: events.eventId })
       .from(events)
-      .where(and(eq(events.eventId, row.eventId), eq(events.type, 'tap_in')));
+      .where(eq(events.eventId, row.eventId));
     expect(
       recorded,
-      `consumed armed tap ${row.id} names event ${row.eventId}, which no tap_in recorded`,
+      `consumed armed tap ${row.id} names event ${row.eventId}, which no event recorded`,
     ).toHaveLength(1);
   }
 

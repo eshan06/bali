@@ -319,6 +319,16 @@ under-13 parental-consent machinery.
   lost tap the guard exists to stop, through the other door. Matched on type
   and caller now, pinned by "will not launder an unlock id into an arming
   replay".
+  A later round found one more, and it is the subtle kind: the conversion-gap
+  test's invariant asserted that every consumed armed tap names an event
+  recorded as a `tap_in`, which this branch quietly stopped guaranteeing — a
+  SKIPPED tap is consumed and mints nothing, so the event under its id is
+  whatever recorded it first. No tap in that cohort carries a spent id today,
+  so it still passed; it would simply have reddened one day for a reason that
+  is not a bug, with a message naming the wrong one. It asserts that the event
+  EXISTS now, which is the invariant the engine actually keeps, and the orphan
+  it exists for is untouched — a refresh that slipped inside the conversion
+  leaves an id in no event at all.
   Two more recorded rather than argued with: `armTap`'s JSDoc had been
   orphaned by a helper inserted between it and the function (moved back), and
   the `seq` note now names the read that will actually see the reordering —
