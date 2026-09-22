@@ -222,14 +222,19 @@ export const events = pgTable(
   (t) => [
     // The catch-up read: "everything for this session after seq N".
     index('events_session_seq_idx').on(t.sessionId, t.seq),
-    // GET /v1/me/history — the student's own timeline. Order it by
-    // `occurred_at`, NOT by this index's `seq`: `seq` is per-insert and this
-    // read is the one place that crosses sessions, so a Start that converts a
-    // waiting tap gives the `tap_in` a lower seq than the
-    // `left_for_other_session` it causes (convertArmedTaps must mint the event
-    // first, so a skipped tap leaves nothing behind). Ordered by seq, the
-    // timeline shows the student joining period 2 before leaving period 1.
-    // Both rows carry the same `occurred_at`, which the engine stamps once.
+    // GET /v1/me/history — the student's own timeline, and NEITHER column
+    // orders it on its own. This read is the one place that crosses sessions,
+    // and a Start converting a waiting tap gives the `tap_in` a LOWER `seq`
+    // than the `left_for_other_session` it causes (convertArmedTaps must mint
+    // the event first, so a skipped tap leaves nothing behind) — so by `seq`
+    // the timeline shows the student joining period 2 before leaving period 1.
+    // By `occurred_at` it orders nothing: the engine stamps ONE value on the
+    // pair, so they tie, and the obvious tiebreak for a tie is `seq`, which
+    // lands straight back on the inversion. An earlier version of this comment
+    // said "order by `occurred_at`" and was wrong for exactly that reason.
+    // Whoever builds this read owes it an explicit deterministic tiebreak —
+    // leaves before joins at equal `occurred_at` is the honest one — not a
+    // column name.
     index('events_user_seq_idx').on(t.userId, t.seq),
     // GET /v1/classes/{id}/reports/… — a class's events over a date range.
     index('events_class_occurred_idx').on(t.classId, t.occurredAt),

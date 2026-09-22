@@ -1176,6 +1176,13 @@ describe('armed taps', () => {
 
   it("will not answer a tap on one teacher's block with a row held for another", async () => {
     /*
+     * Two readings, one behaviour, and this pins it for both. The benign one
+     * is a block that moved: blocks are reassignable by design, so a retry
+     * after the move is the student's OWN id for their own tap and this 409
+     * is wrong for it — unreachable today, disclosed at the call site, and
+     * fixed with the endpoint that makes blocks movable. The one it was added
+     * for follows.
+     *
      * The `armed_taps` event-id lookup was scoped to the student but not the
      * teacher. A student holding a waiting row for teacher X under id E who
      * then taps

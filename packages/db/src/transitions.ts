@@ -418,9 +418,12 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // stream. One thing will: `events_user_seq_idx` on (user_id, seq) exists
     // for the student's own timeline, which is cross-session and seq-ordered
     // by construction, and it would show them joining period 2 before leaving
-    // period 1. Order that timeline by `occurred_at` — identical on both rows,
-    // because the engine stamps one `occurredAt` for the pair — rather than by
-    // `seq`.
+    // period 1. And `occurred_at` is not the answer either, though an earlier
+    // version of this comment said it was: the engine stamps ONE value on the
+    // pair, so ordering by it is a tie, and the obvious tiebreak for a tie is
+    // `seq` — the inversion again. That read needs an explicit deterministic
+    // tiebreak, leaves before joins at equal `occurred_at`, decided when it is
+    // built. See `events_user_seq_idx`.
     await endParticipationsElsewhere(tx, tap.studentId, session.id, occurredAt);
     await tx
       .insert(participations)
@@ -751,6 +754,24 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // Scoped to the teacher as well — a row of this student's for teacher X is
     // not the answer to a tap on teacher Y's block, and handing it back would
     // arm nothing for Y while telling the outbox it was recorded.
+    //
+    // That scope also refuses a case which is NOT reuse, and it is a real cost
+    // of it. Blocks are reassignable by design (`blocks_tag_active_unique`: a
+    // tag re-registers once its block row is soft-removed) and
+    // `resolveTapTarget` resolves the teacher from the tag as it stands NOW,
+    // so a tap armed under X whose 200 was lost, retried after the block moved
+    // to Y, is this student's own id for their own physical tap — and it gets
+    // a permanent 409 that nothing surfaces, since no tap-side disposition
+    // exists. Unreachable today: nothing outside tests writes
+    // `blocks.removed_at`, so no shipped path moves a block.
+    //
+    // NOT patched here, because the obvious patch is wrong. Taking the row
+    // over for Y collides with the (student, teacher) partial index the moment
+    // the student has tapped the moved block for real, and `ownerOfEventId`
+    // reads that collision as a conflict and raises the same 409 — in a case
+    // that IS reachable. The honest fix consumes the stale X row and answers
+    // about the Y one, which is engine work with its own races, so it lands
+    // with the endpoint that makes blocks movable. Recorded in PLAN.
     const exact = firstOrUndefined(
       await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
     );
