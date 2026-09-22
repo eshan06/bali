@@ -230,6 +230,38 @@ under-13 parental-consent machinery.
   unique index the arbiter does not cover; if a third is ever added, the owner
   lookup finds nothing, the attempts burn, and the constraint name that says
   what really happened would otherwise be discarded at the throw.
+  **Second review round, and the useful find was the door this PR had just
+  closed on one write while widening the other.** `armTap` puts
+  `input.eventId` into `armed_taps` two ways — the insert, and the refresh
+  that recycles a stale standing row — and both write a column carrying its
+  own unique index after the same non-locking `exact` read. Only the insert
+  got the savepoint. Meanwhile the stale check above widened the refresh from
+  "expired rows only" to every standing row whose id is spent, so it is taken
+  far more often than before: an uncommitted rival holding that id turns the
+  refresh's 23505 into an aborted transaction and a 500 on a pre-bell tap,
+  which is precisely what the insert's savepoint exists to prevent. Both
+  writes are savepointed now and answer through one `ownerOfEventId` — replay
+  when the id is the caller's, `EVENT_ID_CONFLICT` when it is a stranger's —
+  so the two paths cannot drift again. Pinned on the real lane by a sibling of
+  the insert test: without the savepoint it fails with `25P02 current
+  transaction is aborted`; recovering replaced by a rethrow, with the raw
+  23505.
+  Also corrected: the comment above that recovery still said "Reasoned, not
+  pinned … nothing goes red if it is removed", in the very commit that added
+  the test which does. Left standing it is an invitation to delete the
+  savepoint as dead weight.
+  **Two of that round's findings are the owner's, not mine, and both are
+  recorded rather than acted on.** (a) Skipping a spent waiting tap narrows
+  ARCHITECTURE decision 5's unqualified "every waiting tap becomes a
+  participation", and ARCHITECTURE.md is law — narrowing a decision is a
+  conversation, not a doc edit I make on my own. (b) `POST /v1/taps` now
+  answers 409 where it answered 200 for an id that is not the caller's, and
+  the sibling `/v1` change (block re-registration) is already held for exactly
+  that reason. My reading is that these are not the same case — the 200 being
+  removed handed back a stranger's row and told this phone's outbox a tap was
+  durably recorded when it was not, so no honest client loses anything — but
+  that reading is the owner's to confirm, and it is a revert of one call site
+  if they rule the other way.
 
 - **2026-09-22** — CI was failing the real-Postgres lane with every test green,
   and the cause was the stream hub's own shutdown. `ensureListening()` fires

@@ -551,6 +551,30 @@ export interface ArmTapResult {
  * new tap — until the expiry sweep lands, that stale row is the only thing that
  * could otherwise swallow a fresh pre-bell tap.
  */
+/**
+ * Who holds `eventId` in `armed_taps` right now — the answer both 23505
+ * recoveries in `armTap` need, and scoped the same way the `exact` select at
+ * the top of `armTap` is.
+ *
+ * `'conflict'` rather than `'replay'` for a stranger's id: answering replay
+ * would hand this phone's outbox someone else's row and tell it the tap is
+ * durably recorded, so it drops a tap that was never armed. `'gone'` means the
+ * rival rolled back or was swept between the violation and this read, which is
+ * a retry rather than an answer.
+ */
+async function ownerOfEventId(
+  tx: Database,
+  eventId: string,
+  studentId: string,
+): Promise<{ kind: 'replay'; armedTapId: string } | { kind: 'conflict' } | { kind: 'gone' }> {
+  const owner = firstOrUndefined(
+    await tx.select().from(armedTaps).where(eq(armedTaps.eventId, eventId)).limit(1),
+  );
+  if (!owner) return { kind: 'gone' };
+  if (owner.studentId !== studentId) return { kind: 'conflict' };
+  return { kind: 'replay', armedTapId: owner.id };
+}
+
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
@@ -619,19 +643,58 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // permanent history disagree about which tap was converted. (The guard
       // is only half of it — convertArmedTaps locks the taps it reads so this
       // cannot be reached from the other side either.)
-      const refreshed = firstOrUndefined(
-        await tx
-          .update(armedTaps)
-          .set({
-            blockId: input.blockId ?? null,
-            eventId: input.eventId,
-            deviceTime: input.deviceTime,
-            expiresAt: input.expiresAt,
-          })
-          .where(and(eq(armedTaps.id, waiting.id), isNull(armedTaps.consumedAt)))
-          .returning({ id: armedTaps.id }),
-      );
+      //
+      // In a SAVEPOINT for the same reason the insert below is, and this PR is
+      // what makes it matter: the refresh writes `input.eventId` into a column
+      // carrying its OWN unique index, after a non-locking `exact` read that
+      // cannot see an uncommitted rival — and the stale check above widened
+      // this path from "expired rows only" to every standing row whose id is
+      // spent. Unguarded, that 23505 aborts the whole transaction and
+      // `POST /v1/taps` answers 500: exactly the pre-bell failure the insert's
+      // savepoint was added to remove, reached through the other write.
+      // Answered the same way too, so the two paths cannot drift.
+      let refreshed: { id: string } | undefined;
+      let consumedUnderUs = false;
+      for (let attempt = 0; attempt < ARM_TAP_ATTEMPTS; attempt += 1) {
+        try {
+          refreshed = firstOrUndefined(
+            await tx.transaction(async (sp) =>
+              sp
+                .update(armedTaps)
+                .set({
+                  blockId: input.blockId ?? null,
+                  eventId: input.eventId,
+                  deviceTime: input.deviceTime,
+                  expiresAt: input.expiresAt,
+                })
+                .where(and(eq(armedTaps.id, waiting.id), isNull(armedTaps.consumedAt)))
+                .returning({ id: armedTaps.id }),
+            ),
+          );
+          consumedUnderUs = refreshed === undefined;
+          break;
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+          const owner = await ownerOfEventId(tx, input.eventId, input.studentId);
+          if (owner.kind === 'conflict') {
+            throw new TransitionError(
+              'EVENT_ID_CONFLICT',
+              'event_id already used by another event',
+            );
+          }
+          if (owner.kind === 'replay') return { outcome: 'replay', armedTapId: owner.armedTapId };
+          // Gone again — the rival rolled back, so the id is free and the
+          // refresh can land. The attempt bound covers the chase.
+        }
+      }
       if (refreshed) return { outcome: 'armed', armedTapId: refreshed.id };
+      if (!consumedUnderUs) {
+        // Three violations and the owner gone every time. Falling through to
+        // the insert would answer `already_armed` about the very row this
+        // branch just judged stale, which is the lie the stale check exists to
+        // stop, so say what happened instead.
+        throw new Error('armTap: could not refresh a stale standing tap');
+      }
       // Consumed under us. That frees the partial index, so fall through and
       // record this tap as a fresh waiting one rather than reporting a row
       // that no longer belongs to it. Residual, accepted: the student is now
@@ -667,10 +730,14 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // this one. Unhandled, it is the 500 on a pre-bell tap that this whole
       // function is being fixed for, just reached by the other index.
       //
-      // Reasoned, not pinned: the recovery below is only reachable through an
-      // interleaving no test in this repo stages, so nothing goes red if it is
-      // removed. The savepoint itself is verified on both lanes — a caught
-      // 23505 inside `tx.transaction` leaves the outer transaction usable.
+      // Pinned, and this sentence used to say the opposite — it claimed
+      // nothing went red if the recovery were removed, in the same commit that
+      // added the test which does. Left uncorrected it is an invitation to
+      // delete the savepoint as dead weight. "a delivery that loses the
+      // event_id index is answered as a replay, not a 500" stages the
+      // interleaving with a held transaction, on the real-Postgres lane CI
+      // runs; rethrowing instead of recovering, or dropping the savepoint,
+      // each turns it red.
       let row: typeof armedTaps.$inferSelect | undefined;
       let idAlreadyTaken = false;
       try {
@@ -710,13 +777,11 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // Another delivery of THIS tap got there first — a replay, the same
         // answer the `exact` select above would have given had it seen the
         // row, and scoped the same way for the same reason.
-        const owner = firstOrUndefined(
-          await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
-        );
-        if (owner && owner.studentId !== input.studentId) {
+        const owner = await ownerOfEventId(tx, input.eventId, input.studentId);
+        if (owner.kind === 'conflict') {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
-        if (owner) return { outcome: 'replay', armedTapId: owner.id };
+        if (owner.kind === 'replay') return { outcome: 'replay', armedTapId: owner.armedTapId };
         continue; // gone again; the attempt bound covers the chase
       }
 

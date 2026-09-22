@@ -903,6 +903,112 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('a refresh that loses the event_id index is answered, not a raw 23505', async () => {
+    /*
+     * The sibling of the test above, on the OTHER write. `armTap` has two ways
+     * to put `input.eventId` into `armed_taps`: the insert below, and the
+     * refresh that recycles a stale standing row. Both write a column carrying
+     * its own unique index after the same non-locking `exact` read, so both
+     * can lose that index to an uncommitted rival — and the stale check this
+     * branch added widened the refresh path from "expired rows only" to every
+     * standing row whose id is already spent, so it is taken far more often
+     * than it used to be. Unguarded, that 23505 aborts the whole transaction
+     * and POST /v1/taps answers 500 on a pre-bell tap: the exact failure the
+     * insert's savepoint exists to remove, reached through the other write.
+     *
+     * Staged the same way: a held transaction owns the id, invisible to
+     * `exact`, so the refresh parks on the index and resumes into the
+     * conflict. The rival is inserted already-consumed so the WAITING partial
+     * index cannot be what it collides with, and the standing row is expired
+     * so the refresh path is the one taken.
+     */
+    const { classId, studentId } = await seed('race-arm-refresh-eventid');
+    const teacherId = one(
+      await db.select({ id: classes.teacherId }).from(classes).where(eq(classes.id, classId)),
+    ).id;
+    const eventId = newUuidV7();
+    const standingEventId = newUuidV7();
+
+    // The stale standing row the refresh will try to recycle.
+    const standing = one(
+      await db
+        .insert(armedTaps)
+        .values({
+          studentId,
+          teacherId,
+          eventId: standingEventId,
+          deviceTime: new Date(),
+          expiresAt: new Date(Date.now() - 1_000), // expired: stale, so it is refreshed
+        })
+        .returning(),
+    );
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let inserted!: () => void;
+    const hasRow = new Promise<void>((resolve) => {
+      inserted = resolve;
+    });
+    let rivalId = '';
+    const rival = db.transaction(async (tx) => {
+      const row = one(
+        await tx
+          .insert(armedTaps)
+          .values({
+            studentId,
+            teacherId,
+            eventId,
+            deviceTime: new Date(),
+            expiresAt: new Date(Date.now() + 3_600_000),
+            consumedAt: new Date(), // outside the waiting partial index
+          })
+          .returning(),
+      );
+      rivalId = row.id;
+      inserted(); // uncommitted: invisible to armTap's `exact` select
+      await held;
+    });
+
+    await hasRow;
+    const arming = armTap(db, {
+      studentId,
+      teacherId,
+      eventId,
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      now: new Date(),
+    });
+    // Released in a finally, for the reason the sibling test documents: a gate
+    // that times out must not leave the holder on an uncommitted row with
+    // `arming` parked behind it and never awaited.
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await rival;
+    const settled = await Promise.allSettled([arming]);
+    if (unstaged !== null) throw unstaged;
+    if (settled[0].status === 'rejected') throw settled[0].reason as Error;
+    const result = settled[0].value;
+    expect(result.outcome).toBe('replay');
+    expect(result.armedTapId).toBe(rivalId);
+
+    // The savepoint rolled back only the refresh: the standing row still
+    // carries its original id, and the outer transaction stayed usable long
+    // enough to read the owner and answer.
+    const after = one(await db.select().from(armedTaps).where(eq(armedTaps.id, standing.id)));
+    expect(after.eventId).toBe(standingEventId);
+    expect(after.consumedAt).toBeNull();
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
+    expect(rows).toHaveLength(1);
+  });
+
   it('a refresh never writes its event id onto a tap consumed under it', async () => {
     /*
      * The narrow window: a session that began just before the school-day
