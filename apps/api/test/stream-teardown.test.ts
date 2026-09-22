@@ -240,15 +240,33 @@ describe('a hijacked stream response owns its own error handling', () => {
       requestClosed = true;
     });
 
-    // Queue until the socket genuinely stops draining, rather than trusting a
-    // byte count measured on one machine: a runner with larger autotuned
-    // socket buffers would flush a fixed pad, 'finish' would fire, and this
-    // test would go red for an environment difference instead of a regression.
+    // Queue until the bytes genuinely stop leaving, rather than trusting a pad
+    // measured on one machine: a runner with larger autotuned socket buffers
+    // would swallow a fixed pad, 'finish' would fire, and this test would go
+    // red for an environment difference instead of a regression.
+    //
+    // The signal is `writableLength`, not `write()`'s return value. write()
+    // flips to false at the 64 KiB stream high-water mark — on the very first
+    // 1 MiB chunk, whatever the socket is doing — so it says nothing about
+    // whether the kernel is still accepting, and an earlier version of this
+    // loop that trusted it exited after one iteration while claiming to be
+    // adaptive. `writableLength` is what has been handed over and not yet
+    // accepted, so a round where it grows by the whole chunk is a round where
+    // nothing drained at all.
     const MB = 'x'.repeat(1024 * 1024);
+    let queued = 0;
     let stalled = false;
-    for (let i = 0; i < 64 && !stalled; i += 1) stalled = !raw.write(MB);
-    expect(stalled, 'socket never stopped draining — the window cannot be staged').toBe(true);
-    for (let i = 0; i < 4; i += 1) raw.write(MB); // headroom while the kernel catches up
+    for (let i = 0; i < 64 && !stalled; i += 1) {
+      const before = raw.writableLength;
+      raw.write(MB);
+      await sleep(20); // a chance to drain whatever it still can
+      stalled = raw.writableLength >= before + MB.length;
+      queued = raw.writableLength;
+    }
+    expect(
+      stalled,
+      `socket never stopped draining (${queued} bytes queued) — the window cannot be staged`,
+    ).toBe(true);
     raw.end();
     expect(raw.writableEnded, 'ended').toBe(true);
     expect(raw.destroyed, 'not detached — the window is open').toBe(false);
@@ -289,11 +307,13 @@ describe('a hijacked stream response owns its own error handling', () => {
     const token = await tokenFor(teacher.cognitoId);
 
     let res: ServerResponse | null = null;
-    app.server.on('request', (req, r) => {
+    const onRequest = (req: IncomingMessage, r: ServerResponse) => {
       if (req.url?.includes('/stream') === true) res = r;
-    });
+    };
+    app.server.on('request', onRequest);
 
     const sock = net.connect(port, '127.0.0.1');
+    extraSockets.push(sock); // torn down by afterEach even if a waitFor below throws
     await once(sock, 'connect');
     sock.resume(); // an ordinary, draining client — no backpressure needed
     sock.write(
@@ -302,6 +322,7 @@ describe('a hijacked stream response owns its own error handling', () => {
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
     await waitFor(() => res !== null);
+    app.server.off('request', onRequest);
     const raw = res as unknown as ServerResponse;
     await waitFor(() => raw.headersSent);
 

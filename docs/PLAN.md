@@ -163,6 +163,38 @@ under-13 parental-consent machinery.
   up. The contract question — a tap that landed but is no longer current has
   no honest `200` — is still open for the owner, but it can no longer cost a
   teacher their day.
+- **2026-09-22** — #22's own review found the same class of hole one level up
+  from the one #22 fixed. That PR extracted `streamErrorLevel` so the stream
+  route's log decision could be asserted, but the listener then RE-BRANCHED on
+  what it returned, and that branch was hand-written and unseen: swapping its
+  two bodies left the whole api suite green (verified — 244 passed) while
+  every ordinary tab-close would log at `warn` in production, which is the
+  exact noise the split existed to avoid. A pinned function with an unpinned
+  call site pins nothing. The helper now returns the level AND the line
+  together (`streamErrorLog`) and the listener dispatches on what comes back,
+  so there is no branch left outside the tested function. Inverting the helper
+  turns all five of its cases red.
+  The same lesson twice, because the review also measured the stalled-reader
+  test's own loop. It claimed to queue "until the socket genuinely stops
+  draining, rather than trusting a byte count measured on one machine" — but
+  `write()` returns false on the very first 1 MiB chunk (the stream high-water
+  mark is 64 KiB and says nothing about the socket), so the loop exited after
+  one iteration, the pad was a fixed 5 MiB, and the assertion guarding it was
+  true before the socket had done anything. It watches `writableLength` now —
+  what has been handed over and not yet accepted — so a round where it grows
+  by the whole chunk is a round where nothing drained. The magic number is
+  gone and both mutations still kill the test.
+  Also from that review: the crash-regression test's socket is registered with
+  the same `extraSockets` net its neighbour already had, and its `'request'`
+  listener is removed once it has what it needs — a `waitFor` timing out
+  before the `try` used to leave a live streaming connection attached to an
+  app the suite was about to close.
+  Worth knowing for anyone re-running CI locally: `npm test --
+  --hookTimeout=60000` at the repo root silently DROPS the flag (the root
+  script is `npm test -ws --if-present`, so npm takes the extra argument as
+  its own), and on a loaded box PGlite's `beforeEach` then reports phantom
+  "Hook timed out in 10000ms" failures. Run `npx vitest run --root <workspace>
+  --hookTimeout=120000` per workspace instead.
 
 - **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
   read-then-write where the database could have arbitrated.
