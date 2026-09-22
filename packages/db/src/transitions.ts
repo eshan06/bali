@@ -1498,11 +1498,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // Pinned by "refuses a stale retry once the student has left the
         // session that recorded it".
         //
-        // The cost is real and recorded in PLAN.md for the owner: a 409 is
-        // "keep the record, retry, and surface", so this outbox record never
-        // clears, and a later retry that finds nothing running arms the spent
-        // id. Until a tap has a "recorded, and no longer current" answer,
-        // there is no response here that is both honest and final.
+        // The cost is real, and the owner ruled it in (2026-09-22): a 409
+        // keeps the outbox record, so it retries. A later retry that finds
+        // nothing running reaches `armTap`, which refuses to arm a spent id
+        // and answers `replay` with no session, so the record clears there.
+        // Until a tap has a "recorded, and no longer current" answer (Phase
+        // 3), no response HERE is both honest and final.
         throw new TransitionError(
           'NOT_PARTICIPATING',
           // Says only what this branch knows. `loadParticipation` returning

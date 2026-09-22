@@ -78,9 +78,11 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   the deferral stands.
 - **The owner ruled on #28's held question (2026-09-22): the `409`s stand.**
   A retried tap that landed is replayed only while what it recorded is still
-  true (the participation live, its session running); otherwise it is refused
-  with `EVENT_ID_CONFLICT`, `NOT_PARTICIPATING` or `SESSION_NOT_RUNNING`, all
-  `409`, so the outbox keeps the record. None of them is final yet: that needs
+  true (the participation live, its session running). Otherwise, a retry that
+  reaches a running session is refused with `EVENT_ID_CONFLICT`,
+  `NOT_PARTICIPATING` or `SESSION_NOT_RUNNING`, all `409`, so the outbox keeps
+  the record; one that reaches nothing running is answered `replay` with no
+  session by `armTap` (tap step 10). The `409`s are not final yet: that needs
   the tap-side outbox disposition (and a "recorded, no longer current" answer),
   which is Phase 3. The spent-armed-tap skip it depended on landed first, in
   #29, so these refusals no longer feed the period-5 shield.
@@ -723,8 +725,9 @@ under-13 parental-consent machinery.
   run or be extended by" when it bounds ONE operation — N presses still move a
   session arbitrarily far, which is the intended design, and that comment is
   what an iOS client mirrors. And the silent suppression of a genuine second
-  tap is recorded next to the `TapResponse` question above, because the same
-  missing field answers both.
+  tap is recorded with the ruling (the "Item 2, #28" line and the split in
+  the entry at the top of this log), because the same missing field answers
+  both.
 
 - **2026-09-22** — #31's review landed after it merged, and the best finding
   in it was that the staleness banner **could not fire in production**, for

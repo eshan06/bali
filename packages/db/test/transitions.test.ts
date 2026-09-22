@@ -2044,10 +2044,11 @@ describe('a retried tap the server re-resolves elsewhere', () => {
      *
      * Deliberate, documented at the branch and in PLAN.md, and no privilege
      * comes with it: the same student could simply not tap, and B's grid shows
-     * them absent either way. It is pinned here because it is one of the
-     * things the owner is ruling on, and a decision nothing tests is a
-     * decision that can change by accident. If the ruling adds a "recorded,
-     * but no longer current" answer, this test is the one that should change.
+     * them absent either way. The owner ruled on it (2026-09-22) and it
+     * stays; pinned because it is the join half of the split PLAN.md records
+     * (the arm path refuses the same reuse), and a decision nothing tests can
+     * change by accident. If Phase 3 adds a "recorded, but no longer current"
+     * answer, this test is the one that should change.
      */
     const a = await seedClass('reuse-teacher-a');
     const b = await seedClass('reuse-teacher-b');
