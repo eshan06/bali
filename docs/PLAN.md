@@ -91,6 +91,15 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   Honest, but none of them is final: that outbox record retries forever.
   Candidates: an `ended` flag on `SessionView` (additive), or one code the
   outbox may clear on.
+  **The same missing field answers a second question**, which is why they
+  should be decided together. The server cannot tell a retry from a deliberate
+  reuse, so an app resending a spent id while the student physically taps
+  ANOTHER teacher's block is answered `200 replay` naming the first teacher's
+  still-running session: the phone shields to that window, that grid shows the
+  student green, and the teacher whose room they are actually standing in sees
+  them absent until the next check-in. No privilege comes with it and the code
+  says so, but the visible symptom is the drift decision 1 exists to prevent —
+  and a response that could say "recorded, no longer current" resolves both.
   (2) **Where that retrying used to end up, now fixed.** A retry that finds
   nothing of the teacher's running is ARMED — `armTap` de-dupes against
   `armed_taps.event_id` and never against `events`, so a spent id is
@@ -270,6 +279,26 @@ under-13 parental-consent machinery.
   Both blockers are the ones already with the owner: landing order behind #29
   (which this PR's own bullet now states), and ARCHITECTURE rule 4 / tap step
   10 promising the unconditional 200 that this changes.
+  **Next round found a race test that went red for the wrong reason**, which
+  is the third time this audit has turned one of those up. "Two taps crossing
+  in opposite directions never deadlock" asserts on a rejected promise's
+  `cause.code` — but `tapIn` wraps its whole transaction in
+  `withDeadlockRetry`, so a reintroduced deadlock is caught, retried, and
+  usually wins the retry; no rejection ever reaches that check. Measured with
+  `for update` added back to the cross-session read: **7 deadlocks in 8
+  rounds, every one swallowed**, and the test died on the vitest budget with
+  "Test timed out", naming nothing. It asserts on Postgres's own
+  `pg_stat_database.deadlocks` now — which counts a deadlock whether or not the
+  error escaped — and `makeTestDb` gives each suite a freshly created
+  throwaway database, so the counter starts at 0 and nothing else can
+  contribute. Red 3 of 3, naming the cause. The per-result check stays as the
+  faster signal for a deadlock that does escape.
+  Also from that round: `MAX_SESSION_MINUTES` said "the longest a session may
+  run or be extended by" when it bounds ONE operation — N presses still move a
+  session arbitrarily far, which is the intended design, and that comment is
+  what an iOS client mirrors. And the silent suppression of a genuine second
+  tap is recorded next to the `TapResponse` question above, because the same
+  missing field answers both.
 
 - **2026-09-22** — #31's review landed after it merged, and the best finding
   in it was that the staleness banner **could not fire in production**, for
@@ -307,7 +336,6 @@ under-13 parental-consent machinery.
   through `onActivity` now — an open connection is a sign of life — which put
   the fact where the connection is known and made it testable, instead of in
   the component where it would not have been.
-
 
 - **2026-09-22** — Last of the audit's ten, and the smallest one only because
   the thing it removes is invisible. Two files had independently grown the

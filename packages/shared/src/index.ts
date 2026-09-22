@@ -34,9 +34,15 @@ export const EVENT_PAGE_LIMIT = 200;
 export const STREAM_HEARTBEAT_MS = 20_000;
 
 /**
- * The longest a session may run or be extended by, in minutes. Eight hours —
- * longer than any school day, so it never refuses a real lesson, and short
- * enough that a bad value is caught as a bad value.
+ * The most minutes ONE start or ONE extension may ask for. Per operation, not
+ * per session: `extendSession` adds to whatever end it finds, so N presses
+ * still move a session arbitrarily far, and nothing enforces a total. That is
+ * the intended design — a teacher who keeps pressing "add time" means it — but
+ * the distinction belongs here, because this comment is what an iOS client
+ * mirrors.
+ *
+ * Eight hours: longer than any school day, so it never refuses a real lesson,
+ * and short enough that a bad value is caught as a bad value.
  *
  * Shared because the engine distrusts its caller here and needs a bound that
  * MEANS something: refusing only what overflows the `Date` range is a guard at

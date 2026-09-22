@@ -583,9 +583,17 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
      * deadlock, and withDeadlockRetry would paper over it rather than fix it.
      *
      * So this pins the choice from the outside. Student X's spent id lives in
-     * session B and Y's in session A; X taps A while Y taps B, repeatedly. A
-     * 40P01 here is not a flake: it is the sign that somebody added `for
-     * update` to that read.
+     * session B and Y's in session A; X taps A while Y taps B, repeatedly.
+     *
+     * TWO assertions, because the obvious one is not enough on its own, and
+     * that is the whole lesson here. `tapIn` wraps its transaction in
+     * `withDeadlockRetry`, so a reintroduced deadlock is caught, retried, and
+     * usually wins on the retry — no rejection ever reaches the loop below.
+     * Measured: with `for update` added to that read, the per-result check
+     * never fires and the test dies on the vitest budget instead, naming
+     * nothing. So the real assertion is Postgres's own counter, which records
+     * a deadlock whether or not the error escaped; the per-result check stays
+     * as the faster, clearer signal for one that does escape.
      */
     const school = one(await db.insert(schools).values({ name: 'Cross' }).returning());
     const teacher = one(
@@ -619,6 +627,7 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
     const x = await mkStudent('x');
     const y = await mkStudent('y');
 
+    const deadlocksBefore = await deadlockCount();
     for (let round = 0; round < 8; round += 1) {
       const at = new Date(Date.now() + round * 1000);
       const sa = (
@@ -667,7 +676,17 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
         reason: 'ended',
       });
     }
-  });
+
+    // The one that survives withDeadlockRetry.
+    expect(
+      (await deadlockCount()) - deadlocksBefore,
+      'Postgres broke a deadlock in this database — the cross-session read took a lock, ' +
+        'and the retry wrapper hid it',
+    ).toBe(0);
+    // Generous budget on purpose: with the lock reintroduced, every round
+    // waits out `deadlock_timeout` (1 s) before a retry wins, so a 5 s default
+    // would report "Test timed out" and bury the assertion above.
+  }, 60_000);
 
   it('two simultaneous +10s extends both land, and the session gains both', async () => {
     /*
@@ -709,6 +728,26 @@ describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', (
     }
   });
 });
+
+/**
+ * Deadlocks Postgres has broken in THIS database since it was created.
+ *
+ * The only honest way to see a deadlock that `withDeadlockRetry` handled.
+ * Postgres counts it here whether or not the loser's error escaped, and
+ * `makeTestDb` gives each suite a freshly created throwaway database, so the
+ * counter starts at 0 and nothing else can contribute to it.
+ *
+ * `pg_stat_clear_snapshot()` first: a session caches its stats snapshot for
+ * the transaction, so a plain read can return the value from before the round
+ * that is being measured.
+ */
+async function deadlockCount(): Promise<number> {
+  await db.execute(sql`select pg_stat_clear_snapshot()`);
+  const rows = (await db.execute(
+    sql`select deadlocks::int as n from pg_stat_database where datname = current_database()`,
+  )) as { n: number }[];
+  return rows[0]?.n ?? 0;
+}
 
 /** Backends currently parked on a lock in this database. */
 async function lockWaiters(): Promise<number> {
