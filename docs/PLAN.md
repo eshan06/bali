@@ -323,6 +323,18 @@ under-13 parental-consent machinery.
   (decision 3) so that is unreachable today, but it would have misdirected
   whoever first hit it. It says "you are no longer in this session" now, which
   is true of both.
+  **And the bound is only half-enforced, which the comment did not say.**
+  `extendSession` refuses a duration above `MAX_SESSION_MINUTES` in the
+  engine; `startSession` takes absolute `startedAt`/`endsAt` and applies no
+  bound at all, so the route's zod cap is the only thing holding for starts. A
+  non-`/v1` caller could open a session ending in 2028 while the same caller's
+  481-minute extend is refused — which is exactly the reasoning the extend
+  bound was added on ("`/v1` is not the only possible caller"), applied
+  inconsistently. Nothing unbounded reaches `startSession` today (the route is
+  its only caller), and closing it needs a refusal code that function does not
+  have, so **the comment is corrected now and the symmetry is a follow-up**
+  rather than another widening of a PR already held. Worth doing with the
+  ruling, since it is the same "the engine distrusts its caller" question.
   Also from that round: `MAX_SESSION_MINUTES` said "the longest a session may
   run or be extended by" when it bounds ONE operation — N presses still move a
   session arbitrarily far, which is the intended design, and that comment is
