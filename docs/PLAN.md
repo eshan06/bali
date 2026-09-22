@@ -138,6 +138,32 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — The worst thing the audit turned up was not on its list: a
+  lost tap response could stop a teacher starting any lesson for the rest of
+  the day, and it needed no race to reach. A tap lands in a session, its
+  response is lost, the bell ends the session, and the phone's outbox retries.
+  Nothing of that teacher's is running, so the route arms the retry —
+  `armTap` de-dupes against `armed_taps.event_id` and never against `events`,
+  so a SPENT id is accepted. The next Start converts it, `insertEvent` sees
+  the id against a different session and refuses, and because conversion runs
+  inside `startSession`'s transaction the whole Start rolls back with the tap
+  still unconsumed. Waiting taps are selected by TEACHER, not by class, so
+  every class that student is in is blocked, every period, until the tap
+  expires at end of day.
+  A tap is still a tap (decision 5) and the student is still standing there,
+  so the conversion now goes ahead under a fresh event id, with the spent one
+  kept in `payload.armed_tap_event_id` so the history still shows which tap it
+  came from. Nothing is weakened: the armed tap's id exists to de-dupe
+  ARMING, and the conversion was already exactly-once, consumed in the same
+  transaction. Both reviewers on the tap-replay step reproduced this
+  independently and flagged it as worse than anything that step fixed; it is
+  pre-existing on `main`, reproduced there before the fix.
+  This also removes the sharp edge under the tap path's refusals: each of them
+  is a 409 the outbox keeps retrying, and this was where that retrying ended
+  up. The contract question — a tap that landed but is no longer current has
+  no honest `200` — is still open for the owner, but it can no longer cost a
+  teacher their day.
+
 - **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
   read-then-write where the database could have arbitrated.
   (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
