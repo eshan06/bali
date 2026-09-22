@@ -1128,6 +1128,52 @@ describe('armed taps', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('will not launder an unlock id into an arming replay', async () => {
+    /*
+     * The `events` guard matches on TYPE as well as caller, which is what
+     * `insertEvent` does and what its comment ("a student's app is an
+     * adversary here") is about. On the student alone, a phone reusing one of
+     * its OWN ids across actions — an `unlock` id sent again as a tap — reads
+     * as this tap's replay: no armed row, no `tap_in`, and an outbox told the
+     * tap is durably recorded, so it deletes it. The silent lost tap this
+     * guard exists to stop, arrived by the other door.
+     */
+    const { klass, teacher, student } = await seedClass('arm-unlock-id');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const unlockId = newUuidV7();
+    await unlock(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: unlockId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+
+    await expect(
+      armTap(db, {
+        studentId: student.id,
+        teacherId: teacher.id,
+        eventId: unlockId,
+        deviceTime: new Date('2026-01-01T09:30:00Z'),
+        expiresAt: new Date('2026-01-01T23:59:59Z'),
+        now: new Date('2026-01-01T09:30:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, unlockId));
+    expect(rows).toHaveLength(0);
+  });
+
   it("will not answer a tap on one teacher's block with a row held for another", async () => {
     /*
      * The event-id lookups were scoped to the student but not the teacher. A

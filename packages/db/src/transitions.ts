@@ -413,10 +413,14 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // higher one. It has to be this way round — a skipped tap must leave
     // nothing behind, and ending the other participation first would leave a
     // student unshielded everywhere off a row that is then discarded. Both
-    // rows still carry the same `occurred_at`, and they belong to different
-    // sessions' feeds, so no consumer here reads them in one stream; a report
-    // that ever orders cross-session history by `seq` alone would see the
-    // switch-out and the switch-in swap places.
+    // rows still carry the same `occurred_at`, and every feed read in
+    // queries.ts is scoped to one session, so nothing today sees them in one
+    // stream. One thing will: `events_user_seq_idx` on (user_id, seq) exists
+    // for the student's own timeline, which is cross-session and seq-ordered
+    // by construction, and it would show them joining period 2 before leaving
+    // period 1. Order that timeline by `occurred_at` — identical on both rows,
+    // because the engine stamps one `occurredAt` for the pair — rather than by
+    // `seq`.
     await endParticipationsElsewhere(tx, tap.studentId, session.id, occurredAt);
     await tx
       .insert(participations)
@@ -539,15 +543,6 @@ export interface ArmTapResult {
 }
 
 /**
- * Save a tap that arrived before any session was running (decision 5). Stored as
- * student+teacher; it waits until the teacher presses Start. Idempotent on the
- * client's event_id, and at most one waiting tap per student+teacher stands.
- * `now` decides whether an existing waiting tap is still valid; a stale
- * (expired-but-unconsumed) one is refreshed in place rather than blocking the
- * new tap — until the expiry sweep lands, that stale row is the only thing that
- * could otherwise swallow a fresh pre-bell tap.
- */
-/**
  * Who holds `eventId` in `armed_taps` right now — the answer both 23505
  * recoveries in `armTap` need, and scoped the same way the `exact` select at
  * the top of `armTap` is.
@@ -572,6 +567,15 @@ async function ownerOfEventId(
   return { kind: 'replay', armedTapId: owner.id };
 }
 
+/**
+ * Save a tap that arrived before any session was running (decision 5). Stored as
+ * student+teacher; it waits until the teacher presses Start. Idempotent on the
+ * client's event_id, and at most one waiting tap per student+teacher stands.
+ * `now` decides whether an existing waiting tap is still valid; a stale
+ * (expired-but-unconsumed) one is refreshed in place rather than blocking the
+ * new tap — until the expiry sweep lands, that stale row is the only thing that
+ * could otherwise swallow a fresh pre-bell tap.
+ */
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
@@ -596,13 +600,19 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // record, retries, and surfaces, which loses nothing.
     const recorded = firstOrUndefined(
       await tx
-        .select({ userId: events.userId })
+        .select({ type: events.type, userId: events.userId })
         .from(events)
         .where(eq(events.eventId, input.eventId))
         .limit(1),
     );
     if (recorded) {
-      if (recorded.userId !== input.studentId) {
+      // TYPE as well as caller, which is `insertEvent`'s standard and the
+      // reason this comment invokes it. Matching on the student alone would
+      // read a phone's own reused id — an `unlock` id sent again as a tap —
+      // as this tap's replay: no armed row, no tap_in, and an outbox told the
+      // tap is durably recorded, so it deletes it. Which is the silent lost
+      // tap this whole check exists to stop, arrived by the other door.
+      if (recorded.type !== 'tap_in' || recorded.userId !== input.studentId) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return { outcome: 'replay' };

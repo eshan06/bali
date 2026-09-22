@@ -310,6 +310,25 @@ under-13 parental-consent machinery.
   versions of one staging check: a bare sleep that passed for the wrong
   reason, a gate that failed for the wrong reason, and a retry that does
   neither.
+  **Fourth round, PASS, and one finding worth having.** The new `events` guard
+  matched on the caller but not the TYPE, which is half of `insertEvent`'s
+  standard — the standard its own comment invokes. On the student alone, a
+  phone reusing one of its OWN ids across actions (an `unlock` id sent again
+  as a tap) reads as this tap's replay: no armed row, no `tap_in`, and an
+  outbox told the tap is durably recorded, so it deletes it. The same silent
+  lost tap the guard exists to stop, through the other door. Matched on type
+  and caller now, pinned by "will not launder an unlock id into an arming
+  replay".
+  Two more recorded rather than argued with: `armTap`'s JSDoc had been
+  orphaned by a helper inserted between it and the function (moved back), and
+  the `seq` note now names the read that will actually see the reordering —
+  `events_user_seq_idx` on `(user_id, seq)` exists for the student's own
+  timeline, which is cross-session and seq-ordered by construction, so it
+  would show them joining period 2 before leaving period 1. Order that one by
+  `occurred_at`, which the engine stamps identically on the pair.
+  Caught on the way: CI's `format:check` failed a push that `typecheck` and
+  `lint` both passed — a double-quoted test name. `format:check` belongs in
+  the pre-push routine next to the other two.
 
 - **2026-09-22** — Last of the audit's ten, and the smallest one only because
   the thing it removes is invisible. Two files had independently grown the
