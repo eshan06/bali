@@ -36,9 +36,10 @@ middle was considered and rejected — see below.)
    window gets clamped to it (see rule 1).
 9. `INSERT` one row into the `taps` table. If a row with that `event_id` already exists —
    a retry — do nothing. This makes retries safe to repeat (idempotency). An `event_id`
-   already on record for a *different* event — another student's, or another kind of
-   event — is not a retry but a client bug, and gets `409` instead: a `200` would tell
-   the phone to delete a record the server never kept (step 10).
+   already recorded in `events` for a *different* event — another student's, another
+   kind of event, or this student's tap under another teacher — is not a retry but a
+   client bug, and gets `409` instead: a `200` would tell the phone to delete a record
+   the server never kept (step 10).
 10. Respond `200 OK`. Only now does the phone delete the record from local storage.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
@@ -118,7 +119,7 @@ block" and the phone shows "Ready — waiting for your teacher." When the teache
 Start, every waiting tap becomes a participation and those phones shield — nobody taps
 twice. The one exception is a tap that was already honoured (ruled 2026-09-22): a waiting
 tap whose `event_id` is already recorded as that student's own `tap_in` is the retry of a
-tap that landed in another session, and joining it would shield the student in a class
+tap that landed in another session, and joining it would shield the student in a session
 they never tapped into. It is consumed without joining and recorded as an
 `armed_tap_skipped` event in the session that declined it, so the history says why that
 student is not there. It's saved as student + teacher, since one block serves all of a

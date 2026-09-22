@@ -302,9 +302,10 @@ export interface StartSessionResult {
  * student+teacher, decision 5) becomes a focused participation the moment the
  * teacher presses Start, emitting the deferred tap_in event with the armed
  * tap's original id so a later phone retry dedupes. When that id is already
- * this student's own `tap_in` the tap landed and is skipped; when any other
- * event holds it, the tap converts under a fresh id whose payload names the
- * original. Returns the count converted.
+ * this student's own `tap_in` the tap landed, so it is skipped and the skip
+ * recorded as `armed_tap_skipped`; when any other event holds it, the tap
+ * converts under a fresh id whose payload names the original. Returns the
+ * count converted.
  */
 async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
   const cls = firstOrUndefined(
@@ -383,6 +384,12 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // CONFLICT DO NOTHING succeeds at the SQL level and the conflict is a
     // TransitionError raised afterwards in JS, so nothing is poisoned.
     //
+    // Not scoped to the teacher, unlike `armTap`'s lookup of the same id: a
+    // `tap_in` of this student's under ANOTHER teacher is still a tap that
+    // landed, so it is skipped here. Reaching that needs an id reused across
+    // teachers, which `armTap` refuses once the id is on record, or a block
+    // that moved, which nothing ships yet.
+    //
     // "Spent" means THIS student's `tap_in`, and nothing looser. `insertEvent`
     // raises the same code for an id held by another type or another user —
     // this phone's own `unlock` id, or a stranger's tap — and neither says this
@@ -431,11 +438,12 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         .update(armedTaps)
         .set({ consumedAt: session.startedAt })
         .where(eq(armedTaps.id, tap.id));
-      // And recorded, in this Start's feed. The student is enrolled here and
-      // absent; without this row the permanent history cannot say why, and
-      // from the teacher's side a tap that was honoured elsewhere looks like
-      // one that went missing. Under a fresh id — the armed id is the landed
-      // `tap_in`'s — with the payload naming it, the key the fresh-id
+      // And recorded, in this Start's feed (decision 5, ruled 2026-09-22).
+      // The student is enrolled here and absent; without this row the
+      // permanent history cannot say why. The grid does not change — it
+      // shows them absent either way and ignores this type — so the record is
+      // for the feed and for reports. Under a fresh id (the armed id is the
+      // landed `tap_in`'s), with the payload naming it, the key the fresh-id
       // conversion above uses. Stamped with the Start's clock, as the consume
       // is: that is when the decision was made.
       await insertEvent(tx, {
@@ -509,8 +517,10 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
 
 /**
  * Start a focus session for a class. If one is already running, return it
- * rather than creating a duplicate (API-surface decision). Every armed tap
- * waiting for this class's teacher becomes a focused participation (decision 5).
+ * rather than creating a duplicate (API-surface decision). Every unexpired
+ * armed tap waiting for this class's teacher, from a student enrolled in the
+ * class, becomes a focused participation (decision 5) — except one whose tap
+ * had already landed, which is consumed and recorded as `armed_tap_skipped`.
  */
 export async function startSession(
   db: Database,
@@ -789,6 +799,14 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // two apart needs a session scope this call cannot have — nothing is
     // running, which is why it reached `armTap`. Written up in docs/PLAN.md's
     // armed-tap review entry.
+    //
+    // And it costs what the `armed_taps` lookup's teacher scope below costs:
+    // a block that MOVES between a tap and its retry resolves the retry to a
+    // teacher other than the one it landed under, so the honest retry of a
+    // tap that did land gets this 409 instead of `replay`. Unreachable today —
+    // nothing outside tests writes `blocks.removed_at` or changes a class's
+    // teacher — and recorded in PLAN.md with the other lookup's cost: the
+    // endpoint that makes blocks movable must settle both.
     const recorded = firstOrUndefined(
       await tx
         .select({ type: events.type, userId: events.userId, teacherId: classes.teacherId })

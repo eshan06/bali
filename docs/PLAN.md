@@ -70,9 +70,10 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   and extend's arithmetic outside the engine transaction (**#28, which lands
   after #29**), the portal's reconnect backoff and staleness banner
   (**landed**), and one shared SQLSTATE helper (**landed**). Block
-  re-registration by the tag's own teacher answers 200 where `/v1` answers
-  409 today; **the owner ruled that correction in (2026-09-22)**, and it ships
-  as its own PR after #29, which carries the ARCHITECTURE note allowing it.
+  re-registration by the tag's own teacher: the fix answers 200 where `/v1`
+  answers 409 today; **the owner ruled that correction in (2026-09-22)**, and
+  it ships as its own PR after #29, which carries the ARCHITECTURE note
+  allowing it.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
@@ -109,7 +110,7 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
 | Consent preview before joining a class | 3 | small |
 | Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch |
 | Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
-| Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx` |
+| Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx`; and `armed_tap_skipped` carries the student's id, so it shows here too — render it as a declined tap, never a join |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
 | Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | |
@@ -171,9 +172,13 @@ under-13 parental-consent machinery.
     `{ armed_tap_event_id }`, stamped with the Start's clock. The grid
     ignores it, pinned — it is history, not a join, and painting a chip from
     it would put a student in a session they are not in. Phase 4's reports
-    must not count it as a join either.
-  - **Item 2, #28** — rule 4 and tap step 10, amended in that PR, which
-    lands second.
+    must not count it as a join either. Pinned both ways: the skip's
+    history row (session, class, payload, and the Start's stamp rather than
+    a fast phone clock's claim that the clamp would keep), and its absence
+    on every tap that converts. The `409` is pinned on the wire as well as
+    in the engine.
+  - **Item 2, #28** — rule 4 and tap step 10, to be amended in that PR,
+    which lands second.
   - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
     instead of `409`; split out of #23 before it merged, now its own PR after
     #29.
@@ -360,7 +365,11 @@ under-13 parental-consent machinery.
   has tapped the moved block for real, and `ownerOfEventId` reads that as a
   conflict — the same 409, in a case that IS reachable. The fix consumes the
   stale row and answers about the new one; it must land WITH the block-removal
-  or reassignment endpoint, not before it.
+  or reassignment endpoint, not before it. **Since the ruling, the `events`
+  lookup carries the same cost**: scoped to the teacher, it answers the
+  honest retry of a tap that DID land with `409` once the block has moved,
+  where it answered `replay` before. That endpoint must settle both lookups
+  — the consume-and-answer fix above does nothing for this one.
   **It closes the cross-teacher split and no more.** The SAME teacher, an id
   spent in an earlier session of theirs, still answers 200 through `armTap`
   and 409 through `tapIn`, because the teacher matches. That residual is not
@@ -717,8 +726,10 @@ under-13 parental-consent machinery.
   This also removes the sharp edge under the tap path's refusals: each of them
   is a 409 the outbox keeps retrying, and this was where that retrying ended
   up. The contract question — a tap that landed but is no longer current has
-  no honest `200` — is still open for the owner, but it can no longer cost a
-  teacher their day.
+  no honest `200` — was open for the owner then, and it can no longer cost a
+  teacher their day. (Since the ruling the `409`s stand; the honest terminal
+  answer belongs to Phase 3's tap-side outbox disposition — see the entry at
+  the top of this log.)
 - **2026-09-22** — #22's own review found the same class of hole one level up
   from the one #22 fixed. That PR extracted `streamErrorLevel` so the stream
   route's log decision could be asserted, but the listener then RE-BRANCHED on

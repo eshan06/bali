@@ -761,8 +761,9 @@ async function conversionGapRound(tag: string): Promise<boolean> {
   // The invariant is that a consumed row names an event that EXISTS — not
   // specifically a `tap_in`. The narrower version was true when every
   // consumed tap was a converted one, and this branch broke that: a spent tap
-  // is consumed and SKIPPED, minting nothing, so the event under its id is
-  // whatever recorded it first. No tap in this cohort carries a spent id
+  // is consumed and SKIPPED, minting nothing under its own id (its skip is
+  // recorded under a fresh one), so the event under that id is whatever
+  // recorded it first. No tap in this cohort carries a spent id
   // today, so the narrow form still passed — it would just have reddened one
   // day for a reason that is not a bug, and the message would have lied about
   // which one. The orphan this test exists for is unaffected: a refresh that

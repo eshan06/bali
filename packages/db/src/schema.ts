@@ -272,7 +272,11 @@ export const armedTaps = pgTable(
     deviceTime: timestamp('device_time', { withTimezone: true }).notNull(),
     /** End of the school day; conversion skips a past-expiry tap, a sweep clears it. */
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    /** Set when this tap became a participation at session start; NULL = still waiting. */
+    /**
+     * Set at the session start that took this tap: it became a participation,
+     * or was declined because its tap had already landed (decision 5,
+     * recorded as `armed_tap_skipped`). NULL = still waiting.
+     */
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
     createdAt: createdAt(),
   },

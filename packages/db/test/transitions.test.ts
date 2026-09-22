@@ -934,6 +934,9 @@ describe('armed taps', () => {
       await db.select().from(armedTaps).where(eq(armedTaps.eventId, armEventId)),
     );
     expect(consumed.consumedAt).not.toBeNull();
+    // A tap that converts is a join, not a skip: `armed_tap_skipped` is only
+    // for a tap declined because it had already landed.
+    expect((await eventsFor(session.id)).map((e) => e.type)).not.toContain('armed_tap_skipped');
   });
 
   it('a refreshed arm replaces an expired waiting tap instead of swallowing it', async () => {
@@ -1510,11 +1513,12 @@ describe('armed taps', () => {
 
   it('a spent event id never wedges the next Start, and never joins a later one', async () => {
     /*
-     * The worst thing in this area, and it needs no race to reach. A tap lands
-     * in a session, its response is lost, the bell ends the session, and the
-     * phone's outbox retries. Nothing of that teacher's is running, so the
-     * route ARMS the retry — `armTap` de-dupes against `armed_taps.event_id`
-     * and never against `events`, so a spent id is accepted.
+     * The worst thing in this area, and it needed no race to reach. A tap
+     * lands in a session, its response is lost, the bell ends the session,
+     * and the phone's outbox retries. Nothing of that teacher's is running,
+     * so the route ARMED the retry — `armTap` de-duped only against
+     * `armed_taps.event_id`, so a spent id was accepted. It refuses one now
+     * (below), which is why the row is staged directly.
      *
      * Converting it is wrong both ways, and both were reproduced. Under the
      * spent id, `insertEvent` refuses inside `startSession`'s transaction and
@@ -1525,7 +1529,8 @@ describe('armed taps', () => {
      * tapped into: here, period 5 at 13:00 off a 09:00 tap.
      *
      * The id is spent because the tap already landed, so the waiting row is a
-     * stale retry and not a tap owed anything. It is consumed and skipped.
+     * stale retry and not a tap owed anything. It is consumed, skipped, and
+     * recorded as `armed_tap_skipped` (decision 5, ruled 2026-09-22).
      */
     const { teacher, student, klass, school } = await seedClass('arm-spent');
     const later = one(
@@ -1543,11 +1548,16 @@ describe('armed taps', () => {
 
     const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
     const spent = newUuidV7();
+    // The phone's clock runs fast: it stamps the 09:01 tap 10:10. Session 1
+    // clamps that to its own end (rule 1). It matters below, at period 2's
+    // Start: 10:10 falls INSIDE that window, so the clamp does not collapse
+    // the claim onto the Start's own time, and the skip's stamp is tested.
+    const fastClaim = new Date('2026-01-01T10:10:00Z');
     await tapIn(db, {
       sessionId: first.session.id,
       studentId: student.id,
       eventId: spent,
-      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      deviceTime: fastClaim,
     });
     await endSession(db, {
       sessionId: first.session.id,
@@ -1561,7 +1571,7 @@ describe('armed taps', () => {
       studentId: student.id,
       teacherId: teacher.id,
       eventId: spent,
-      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      deviceTime: fastClaim,
       expiresAt: new Date('2026-01-01T23:59:59Z'),
       now: new Date('2026-01-01T09:30:00Z'),
     });
@@ -1579,7 +1589,7 @@ describe('armed taps', () => {
           studentId: student.id,
           teacherId: teacher.id,
           eventId: spent,
-          deviceTime: new Date('2026-01-01T09:01:00Z'),
+          deviceTime: fastClaim,
           expiresAt: new Date('2026-01-01T23:59:59Z'),
         })
         .returning(),
@@ -1615,11 +1625,14 @@ describe('armed taps', () => {
     expect(left).toHaveLength(0);
 
     // And the skip is on the record, in the Start that made it (decision 5,
-    // ruled 2026-09-22): the student is enrolled here and absent, and the
-    // history says why rather than leaving the grid to look like a tap that
-    // went missing. Under an id of its own — the armed one is the tap_in's —
-    // naming the tap it declined, stamped with the Start's own clock. Once:
-    // the row is consumed, so period 5 has nothing left to skip.
+    // ruled 2026-09-22). The grid is unchanged by it — it shows this enrolled
+    // student as absent either way, and ignores the event (pinned in
+    // grid-state.test.ts) — but the permanent history now says WHY they are
+    // absent, for the feed and for reports. Under an id of its own (the
+    // armed one is the tap_in's), naming the tap it declined, and stamped
+    // with the Start's clock — not the device's 10:10 claim, which the clamp
+    // would have kept. Once: the row is consumed, so period 5 has nothing
+    // left to skip.
     const skipsIn = async (sessionId: string) =>
       (await eventsFor(sessionId)).filter((e) => e.type === 'armed_tap_skipped');
     const skipped = one(await skipsIn(second.session.id));
@@ -1737,6 +1750,11 @@ describe('armed taps', () => {
       expect(tapInHere).toHaveLength(1);
       expect(one(tapInHere).eventId).not.toBe(collided);
       expect(one(tapInHere).payload).toEqual({ armed_tap_event_id: collided });
+      // Converted, so not recorded as a skip — the collided id says nothing
+      // about this tap having landed.
+      expect((await eventsFor(second.session.id)).map((e) => e.type)).not.toContain(
+        'armed_tap_skipped',
+      );
       expect(one(await db.select().from(events).where(eq(events.eventId, collided)))).toEqual(
         recordedBefore,
       );
