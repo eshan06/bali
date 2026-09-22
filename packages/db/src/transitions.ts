@@ -705,6 +705,13 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
 
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
+    // Ordering, deliberate and worth saying: replay, then state, then input.
+    // An ended session plus a bad duration answers SESSION_NOT_RUNNING rather
+    // than INVALID_EXTENSION, because once the bell has rung nothing about the
+    // request can change the answer, and "session has ended" is the more
+    // useful thing to tell a teacher. Unreachable through `/v1` either way —
+    // the route's zod cap rejects a bad duration before the engine sees it.
+    //
     // Bounded at both ends, and the upper one is the same number the route's
     // zod cap uses. Refusing only what overflows the Date range is a guard at
     // the year 275760: `1e6` minutes clears it and ends the lesson in 2028,
