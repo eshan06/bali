@@ -35,8 +35,24 @@ middle was considered and rejected — see below.)
 8. Check the timestamp against the server's own clock; anything outside the session's
    window gets clamped to it (see rule 1).
 9. `INSERT` one row into the `taps` table. If a row with that `event_id` already exists —
-   a retry — do nothing. This makes retries safe to repeat (idempotency).
-10. Respond `200 OK`. Only now does the phone delete the record from local storage.
+   a retry — do nothing, and answer it as step 10 says. This makes retries safe to repeat
+   (idempotency). An `event_id` already recorded in `events` for a *different* event —
+   another student's, or another kind of event — is not a retry but a client bug, and gets
+   `409` instead: a `200` would tell the phone to delete a record the server never kept.
+   On the arm path (decision 5, nothing joinable running) the same goes for this
+   student's tap recorded under another teacher, and for an id already held by a waiting
+   tap that is not this student's for this teacher. Blocks cannot move yet; the endpoint
+   that lets them must revisit the other-teacher case, because after a move an honest
+   retry looks exactly like it.
+10. Respond `200 OK`. Only now does the phone delete the record from local storage. The
+    retry of a tap that already landed gets that `200` with what was recorded — even when
+    the server now resolves the tag to a different running session — but only while it is
+    still true: the participation live, its session running. Once that session has ended
+    or the student has left it, a retry that reaches a running session gets `409` (ruled
+    2026-09-22), because a `200` naming the old session would keep a backgrounded phone
+    shielded to a window that is over; one that reaches nothing running is answered
+    `replay` with no session — recorded, with no window to shield to. The phone keeps a
+    `409`'s record; what it shows for it is Phase 3's tap-side outbox work.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
 **Why there's no queue between the API and the database.** A queue (usually Redis — a
@@ -74,8 +90,8 @@ never stored here, no screen can ever show it.
   history.
 - `armed_taps` — one row per tap made before a session was running (decision 5): saved as
   student + teacher and waiting. When the teacher presses Start, each becomes a
-  participation; it expires at the end of the school day. Transient — not the permanent
-  history that lives in `events`.
+  participation unless its tap had already landed; it expires at the end of the school
+  day. Transient — not the permanent history that lives in `events`.
 
 ### The decisions (2026-09-15)
 
@@ -113,9 +129,14 @@ session exists yet. Rejecting the tap punishes normal behavior; shielding now lo
 phone before class starts. So the server just saves "this student tapped this teacher's
 block" and the phone shows "Ready — waiting for your teacher." When the teacher presses
 Start, every waiting tap becomes a participation and those phones shield — nobody taps
-twice. It's saved as student + teacher, since one block serves all of a teacher's classes
-and the class is only knowable once a session starts. It expires at the end of the school
-day.
+twice. The one exception is a tap that was already honoured (ruled 2026-09-22): a waiting
+tap whose `event_id` is already recorded as that student's own `tap_in` is the retry of a
+tap that landed in another session, and joining it would shield the student in a session
+they never tapped into. It is consumed without joining and recorded as an
+`armed_tap_skipped` event in the session that declined it, so the history says why that
+student is not there. It's saved as student + teacher, since one block serves all of a
+teacher's classes and the class is only knowable once a session starts. It expires at the
+end of the school day.
 
 **6. Sessions end themselves.** The phone knows the session's end time, so it removes the
 shields at that moment using its own clock, even with no internet. On the server, a small
@@ -241,6 +262,11 @@ important client, which speaks Swift.
 **2. Every path starts with `/v1`, and changes are additive only.** If behavior must
 ever change, we add `/v2` endpoints alongside instead of breaking phones still calling
 `/v1`. New optional fields are allowed; renaming or removing anything shipped is not.
+Correcting a wrong answer is not a behaviour change in this sense (ruled 2026-09-22):
+this decision exists so old phones keep working, not to preserve a response that told a
+client something false — "your tap is recorded" when it was not. Such a correction may
+change a status in place, `200` to `409` included, and each one is recorded in PLAN.md's
+decision log.
 
 **3. The endpoint list — NOT final.** A working set, expected to change as the screens
 get designed; edits land here as they're decided.
@@ -270,7 +296,9 @@ Teacher app and web portal:
 - `GET /v1/sessions/{id}/events?after={number}` — catch-up reads of the event log.
   (The live stream endpoint is decided in the live-updates section.)
 - `GET /v1/classes/{id}/reports/…` — focus minutes and unlocks.
-- `POST /v1/blocks` — register a physical block to a teacher.
+- `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
+  block holds is a `409`; re-registering one's own tag returns that block (the retry of a
+  lost response).
 
 **4. Every request is checked; every error has one shape.** No request body is trusted:
 each endpoint validates its input (right types, sane sizes) before touching the
@@ -486,7 +514,9 @@ Each exists because v2 broke it and shipped a real bug
    screen only claims what was verified. (v2: showed a ticking focus timer while nothing
    was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
-   safe. (v2: had no such IDs on some paths.)
+   safe. (v2: had no such IDs on some paths.) A retried tap is answered with what was
+   recorded while that is still true, and never with a `200` that points a phone at a
+   session that is over (tap step 10, ruled 2026-09-22) — a tap response drives a shield.
 5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
    "Revoke link" could fail and close as if it had worked.)
 6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event
