@@ -65,12 +65,26 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap
-  insert race, a replayed tap re-resolved to another session, block
-  re-registration by the tag's own teacher, extend's arithmetic outside the
-  engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
-  missing idempotency key, was re-examined and the deferral stands.
+  a replayed tap re-resolved to another session (**landed**), extend's
+  arithmetic outside the engine transaction (**landed**), the armTap insert
+  race, block re-registration by the tag's own teacher, the portal's reconnect
+  backoff, the portal's staleness banner, and one shared SQLSTATE helper. The
+  tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and the
+  deferral stands.
+- **Found while fixing the audit, for the owner to rule on** — two ways a tap's
+  event id becomes unusable, both needing a contract decision rather than a
+  fix: (1) a tap whose session has since ended has no honest `200`.
+  `TapResponse` carries `{id, classId, endsAt}` with no way to say "over", and
+  a session the teacher ended early keeps its original `endsAt`, so replaying
+  it would shield a student until a bell that already rang. The engine refuses
+  with `EVENT_ID_CONFLICT` instead, which is loud but leaves that outbox record
+  retrying forever. Candidates: an `ended` flag on `SessionView` (additive), or
+  a distinct code the outbox may clear on. (2) `convertArmedTaps` inserts the
+  armed tap's `event_id` as a `tap_in`, but `armTap` only de-dupes against
+  `armed_taps.event_id`. So a tap that landed in a session that then ended, and
+  is retried once nothing is running, arms under the same id — and the
+  teacher's next Start aborts with `EVENT_ID_CONFLICT`, blocking **every**
+  session on that class until the armed tap expires at end of day.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -140,23 +154,50 @@ under-13 parental-consent machinery.
   deciding something outside the transaction that only holds inside it.
   A retried tap was answered with `EVENT_ID_CONFLICT` whenever the server
   re-resolved it elsewhere. The phone mints one id per physical tap and retries
-  until answered, but `resolveTapTarget` picks the newest running session the
-  student is enrolled in — so a retry after the teacher started a second
-  session resolved somewhere new, `insertEvent` saw the id against a different
-  session, and refused. Backwards: the tap landed, so rule 4 says re-read and
-  return what was recorded. `tapIn` now does, and the conflict check is
-  untouched for what it exists for — an id reused for a genuinely different
-  event, which the unlock path depends on and which keeps its own test.
+  until answered, but `resolveTapTarget` picks the newest running session **of
+  the tapped block's teacher** that the student is enrolled in — so a retry
+  after that teacher started a second session the student is also in resolved
+  somewhere new, `insertEvent` saw the id against a different session, and
+  refused. Backwards: the tap landed, so rule 4 says re-read and return what
+  was recorded. `tapIn` now does. The conflict check is untouched for an id
+  reused for a genuinely different event, which is what the unlock path
+  depends on (ISSUES #2) and which keeps its own test — but on the tap path
+  something IS given up, because the server cannot tell a retry from a
+  deliberate reuse: an app resending a spent id for a second physical tap into
+  another session is now answered as a replay and that join is suppressed. No
+  privilege comes with it (the same student can simply not tap, and the grid
+  shows them absent either way).
+  The replay is **bounded to what is still true** — the recorded participation
+  is still live, in a session still running — and that bound is the whole
+  safety of it, because `TapResponse` cannot say "that one is over" or "you
+  have left it", so a stale answer here is a shield rather than a small
+  inaccuracy. Replaying an **ended** session would shield a student against a
+  bell that already rang (a teacher who ends early leaves the original
+  `endsAt` behind), in a grid no teacher is watching and no unlock can reach.
+  Replaying a participation the student **left** — they tapped into the
+  teacher's other session for real — would point the phone at the session it
+  left while the grid shows them in the one they are in; its next check-in
+  there answers `gone` and unshields. Both are worse than the 409 they
+  replaced, and both now decline. The lookup itself sits **ahead** of the
+  ended-session guard, the placement `extendSession` uses: `resolveTapTarget`
+  filters on `ended_at IS NULL` outside the transaction, so the session it
+  picks can end before the engine's locked read, and a tap that did land must
+  still replay against the running session that recorded it rather than 409.
   `extendSession` now takes minutes instead of an absolute end. The route read
   the session, did the arithmetic and handed over a fixed time, so two
   simultaneous "add time" presses computed the same target from the same
-  starting point; the loser's value was no longer later than the winner's, the
+  starting point. Nothing calls the endpoint yet — there is no extend control
+  in the portal — so this was fixed before it could bite rather than after; the loser's value was no longer later than the winner's, the
   engine refused it as `INVALID_EXTENSION`, and the teacher's second press
-  silently did nothing. The arithmetic moved inside the locked read, so each
+  bought no time — it came back a 400 saying the new end was not later than the
+  current one, which was true of the value the route computed and useless to a
+  teacher who had just pressed "add 10 minutes". The arithmetic moved inside the locked read, so each
   press adds to whatever it finds. `INVALID_EXTENSION` is kept and still
-  refuses a non-positive or non-finite duration — the engine does not trust its
-  caller — and the real-Postgres lane now covers two concurrent extends both
-  landing.
+  refuses a non-positive, non-finite, or out-of-Date-range duration — the
+  engine does not trust its caller, and 1e15 minutes used to overflow into an
+  Invalid Date and a bare `RangeError` 500. Its client-facing message no longer
+  claims the end time was not moved forward, which the duration rewrite made
+  false. The real-Postgres lane now covers two concurrent extends both landing.
 
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not

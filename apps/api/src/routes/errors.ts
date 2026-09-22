@@ -11,7 +11,10 @@ const STATUS_BY_CODE: Record<TransitionErrorCode, () => ApiError> = {
   // The session isn't accepting changes (already ended) — a state conflict, not bad input.
   SESSION_NOT_RUNNING: () => ApiError.conflict('session has ended'),
   NOT_PARTICIPATING: () => ApiError.conflict('not in this session'),
-  INVALID_EXTENSION: () => ApiError.badInput('new end time must be later than the current one'),
+  // The route never computes an end time (it sends a duration), so the engine
+  // raises this only for a duration it cannot use: non-positive, non-finite, or
+  // past the Date range.
+  INVALID_EXTENSION: () => ApiError.badInput('invalid extension duration'),
   // The client reused an event_id that already belongs to a different event, so
   // the write cannot be made idempotently — a conflict, and never silent.
   EVENT_ID_CONFLICT: () => ApiError.conflict('event_id already used by another event'),
