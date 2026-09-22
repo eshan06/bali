@@ -133,16 +133,19 @@ export function registerFeedRoutes(
       reply.hijack();
       const res = reply.raw;
       res.on('error', (err: NodeJS.ErrnoException) => {
-        // A teardown race is ordinary and says nothing an operator can act on;
-        // anything else on a hijacked response is news, and this listener is
-        // the only place it can be heard. Logging the lot at `debug` would
-        // make the fix silent in production (LOG_LEVEL defaults to `info`):
-        // a proxy resetting long-lived connections would flap every teacher's
-        // grid with nothing in the log to show for it.
-        const expected =
-          err.code === 'ERR_STREAM_WRITE_AFTER_END' || err.code === 'ERR_STREAM_DESTROYED';
-        if (expected) request.log.debug({ err }, 'live stream ended mid-write');
-        else request.log.warn({ err }, 'live stream errored');
+        // Measured: ERR_STREAM_WRITE_AFTER_END is the only code that actually
+        // reaches here. A peer reset arrives as ECONNRESET on the socket and
+        // on the server's 'clientError', never on a hijacked response, and a
+        // write after destroy is routed to the (nop) write callback rather
+        // than emitted. So the teardown race is the expected case and goes to
+        // `debug`, and `warn` is not a proxy-reset alarm — it is "something
+        // reached this listener that we have never seen", which LOG_LEVEL's
+        // `info` default would otherwise swallow entirely.
+        if (err.code === 'ERR_STREAM_WRITE_AFTER_END') {
+          request.log.debug({ err }, 'live stream ended mid-write');
+        } else {
+          request.log.warn({ err }, 'unexpected error on a live stream');
+        }
         sub?.close();
       });
       return res;

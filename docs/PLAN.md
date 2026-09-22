@@ -130,25 +130,31 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
-- **2026-09-22** — Follow-ups from #18's review, and one thing learned the hard
-  way. The stream route's `'error'` listener logged at `debug` while production
-  runs at `info`, so the fix that stopped the crash would also have hidden every
-  stream error behind it — a proxy resetting long-lived connections would flap
-  every teacher's grid with nothing in the log. It now logs the two expected
-  teardown codes at `debug` and anything else at `warn`. The `streamFailed`
-  disjunct after `subscribe` is removed: nothing between the hijack and that
-  check is asynchronous, so it had never fired, and dead defence that reads like
-  a guarantee is worse than none.
-  The harder lesson is about what can be tested. Two of that route's guards —
-  the throwing `write` and the end-to-end "resuming read" path — cannot be
-  pinned by a test: every path that ends the response also fires `'close'` on
-  the request, and the hub's per-row bail stops the write before it happens, so
-  both guards can be softened or removed with any test written for them still
-  green. Three attempts all passed against the broken version. They are kept as
-  defence in depth with that written next to them, and the one test that does
-  discriminate — driving the response directly into the ended-but-not-detached
-  window — says so at the top. A test that passes either way is worse than an
-  honest comment: it reports coverage that does not exist.
+- **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
+  reviewer disproved. The stream route's `'error'` listener logged at `debug`
+  while production runs at `info`, so the fix that stopped the crash would also
+  have hidden anything unexpected that reached it; it now logs the one code
+  that actually arrives (`ERR_STREAM_WRITE_AFTER_END`) at `debug` and anything
+  else at `warn`. Measured while correcting a wrong rationale: a peer reset
+  reaches the socket and the server's `'clientError'`, never a hijacked
+  response, and a write after destroy is routed to the write callback rather
+  than emitted — so `warn` here means "we have never seen this", not "a proxy
+  is resetting connections". The `streamFailed` disjunct after `subscribe` is
+  removed: nothing between the hijack and that check is asynchronous, so it had
+  never fired (a reviewer instrumented it across the whole suite on both lanes
+  to confirm).
+  I had also recorded that two of the route's guards could not be pinned by a
+  test, having written three that all passed against the broken version. That
+  was wrong, and the counterexample was one entry above it in this same file:
+  under backpressure `'finish'` never fires, so the request's `'close'` never
+  arrives, the subscription stays live, and the hub's next read hands a frame
+  to a write on an ended response. The technique is to **stall the flush** —
+  a client that never reads holds the window open — and with it the guard is
+  observably load-bearing: softened to a silent `return`, the per-teacher slot
+  leaks and the teacher sits permanently at their cap. That test now ships.
+  The reusable lesson is not "this cannot be tested" but "the obvious
+  end-to-end reproduction is rescued by another guard; hold the window open
+  yourself".
 
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not

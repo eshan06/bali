@@ -2,7 +2,7 @@ import { type Database, refocus, startSession, tapIn, unlock } from '@bali/db';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import net from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -156,6 +156,7 @@ describe('a hijacked stream response owns its own error handling', () => {
   let app: FastifyInstance;
   let port: number;
   let tokenFor: (sub: string) => Promise<string>;
+  const extraSockets: net.Socket[] = [];
 
   beforeEach(async () => {
     const issuer = await makeTestIssuer();
@@ -174,18 +175,93 @@ describe('a hijacked stream response owns its own error handling', () => {
   });
 
   afterEach(async () => {
+    for (const s2 of extraSockets) s2.destroy();
+    extraSockets.length = 0;
     await app.close();
   });
 
-  /*
-   * The one test that discriminates. The production route to this crash — a
-   * read resuming from an awaited getEventsSince after onClose ended the
-   * response — cannot be pinned end to end any more: the hub's per-row bail
-   * stops the write before it happens, and the request's own 'close' tears
-   * the subscription down regardless, so an end-to-end reproduction goes
-   * green with the listener removed. Driving the response directly is what
-   * actually exercises the window.
-   */
+  /** Open a stream over a raw socket and report just its status code. */
+  async function streamStatus(sessionId: string, token: string): Promise<number> {
+    const s2 = net.connect(port, '127.0.0.1');
+    extraSockets.push(s2);
+    await once(s2, 'connect');
+    let buf = '';
+    s2.on('data', (d: Buffer) => {
+      buf += d.toString('latin1');
+    });
+    s2.write(
+      `GET /v1/sessions/${sessionId}/stream HTTP/1.1\r\nHost: 127.0.0.1\r\n` +
+        `Authorization: Bearer ${token}\r\n\r\n`,
+    );
+    await waitFor(() => /^HTTP\/1\.1 \d{3}/.test(buf));
+    return Number(/^HTTP\/1\.1 (\d{3})/.exec(buf)?.[1]);
+  }
+
+  it("a resuming read into an ended response releases the teacher's slot", async () => {
+    /*
+     * The end-to-end path, and the technique that makes it reachable: STALL
+     * THE FLUSH. A client that never reads leaves output queued, so 'finish'
+     * cannot fire — and because Node emits the request's 'close' from the
+     * response's 'finish', that never arrives either. The subscription stays
+     * live with `removed` false, so neither the hub's per-row bail nor the
+     * route's request-'close' handler tears it down, and the re-poll's next
+     * read hands a frame to the route's write() on an already-ended response.
+     *
+     * That is the window the throwing guard exists for. Softened to a silent
+     * `return`, the hub keeps "delivering" into a dead response forever, the
+     * per-teacher slot is never released, and the teacher sits permanently at
+     * their cap — which is exactly what maxPerTeacher: 1 makes visible here.
+     */
+    const { session, student, teacher } = await seedRunning('stream-stalled-reader');
+    const token = await tokenFor(teacher.cognitoId);
+
+    let res: ServerResponse | null = null;
+    const onRequest = (req: IncomingMessage, r: ServerResponse) => {
+      if (req.url?.includes('/stream') === true) res = r;
+    };
+    app.server.on('request', onRequest);
+
+    const sock = net.connect(port, '127.0.0.1');
+    await once(sock, 'connect');
+    sock.pause(); // the stalled reader — a wedged phone or a stuck proxy
+    sock.write(
+      `GET /v1/sessions/${session.id}/stream HTTP/1.1\r\n` +
+        `Host: 127.0.0.1\r\n` +
+        `Authorization: Bearer ${token}\r\n\r\n`,
+    );
+    await waitFor(() => res !== null);
+    app.server.off('request', onRequest);
+    const raw = res as unknown as ServerResponse;
+    await waitFor(() => raw.headersSent);
+
+    let requestClosed = false;
+    raw.req.on('close', () => {
+      requestClosed = true;
+    });
+
+    // Queue more than the socket buffers can take, so end() cannot complete.
+    for (let i = 0; i < 16; i += 1) raw.write('x'.repeat(1024 * 1024));
+    raw.end();
+    expect(raw.writableEnded, 'ended').toBe(true);
+    expect(raw.destroyed, 'not detached — the window is open').toBe(false);
+    expect(requestClosed, "the request's close has not fired").toBe(false);
+
+    // Give the re-poll something to deliver, so it reaches write().
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+    await sleep(400);
+    expect(requestClosed, 'the window stayed open throughout').toBe(false);
+
+    // maxPerTeacher is 1: a second stream opens only if the dead one was
+    // actually torn down.
+    expect(await streamStatus(session.id, token)).toBe(200);
+    sock.destroy();
+  });
+
   it('a write after the response ended does not take the process down', async () => {
     /*
      * The bug this exists for: `write()` after `end()` returns false instead of
