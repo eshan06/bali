@@ -1,5 +1,5 @@
 import type { EventType } from '@bali/shared';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
@@ -571,12 +571,34 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
   });
 });
 
+/** Backends currently parked on a lock in this database. */
+async function lockWaiters(): Promise<number> {
+  const rows = (await db.execute(
+    sql`select count(*)::int as n from pg_stat_activity
+        where datname = current_database() and wait_event_type = 'Lock'`,
+  )) as { n: number }[];
+  return rows[0]?.n ?? 0;
+}
+
+/** Fail rather than proceed if nothing ever blocks — the staging must be real. */
+async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await lockWaiters()) > 0) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error('no backend ever blocked on the row lock — the interleaving was not staged');
+}
+
 describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
   /*
    * Both races below need a WARM pool. A cold second connection spends its TCP
    * handshake while the first transaction runs to completion, which serialises
-   * the pair and hides the race entirely — that is how the missing ON CONFLICT
-   * survived the race lane in the first place.
+   * the pair and hides the race entirely — measured: with the fix reverted and
+   * this warm-up removed, round 0 passes.
+   *
+   * That is why the warm-up is here, not why the bug survived: before these
+   * tests there was no armed-tap coverage in this file at all.
    */
   beforeAll(async () => {
     await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
@@ -614,6 +636,89 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
         .from(armedTaps)
         .where(and(eq(armedTaps.studentId, studentId), isNull(armedTaps.consumedAt)));
       expect(waiting).toHaveLength(1);
+    }
+  });
+
+  it('a refresh landing inside a conversion cannot orphan its event id', async () => {
+    /*
+     * The other half of the same invariant, and the one a row guard cannot
+     * reach. convertArmedTaps reads its waiting taps, then consumes them
+     * several statements later. A refresh landing in that gap sees consumed_at
+     * still NULL, so the guard passes, it writes its own event id onto the
+     * row — and the conversion then records tap_in with the id it read BEFORE
+     * the refresh. The armed tap is left naming an event no tap_in recorded.
+     *
+     * Closed by convertArmedTaps taking FOR UPDATE on the taps it reads, so
+     * the refresh waits and its guard then correctly fails. Staged with a
+     * large cohort so the conversion loop is long enough to land inside.
+     */
+    const school = one(await db.insert(schools).values({ name: 'Gap' }).returning());
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'gap-teacher', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const klass = one(
+      await db
+        .insert(classes)
+        .values({ teacherId: teacher.id, schoolId: school.id, name: 'Gap', joinCode: 'GAPGAP' })
+        .returning(),
+    );
+    const boundary = new Date(Date.now() + 400);
+    const students: string[] = [];
+    for (let i = 0; i < 60; i += 1) {
+      const s = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `gap-s-${i}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: klass.id, studentId: s.id });
+      await armTap(db, {
+        studentId: s.id,
+        teacherId: teacher.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: boundary,
+        now: new Date(boundary.getTime() - 60_000),
+      });
+      students.push(s.id);
+    }
+
+    await Promise.allSettled([
+      startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(boundary.getTime() - 1_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      }),
+      (async () => {
+        await new Promise((r) => setTimeout(r, 12)); // land inside the conversion loop
+        return armTap(db, {
+          studentId: students[40]!,
+          teacherId: teacher.id,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+          expiresAt: new Date(Date.now() + 3_600_000),
+          now: new Date(boundary.getTime() + 1_000),
+        });
+      })(),
+    ]);
+
+    const consumed = await db
+      .select()
+      .from(armedTaps)
+      .where(and(eq(armedTaps.teacherId, teacher.id), isNotNull(armedTaps.consumedAt)));
+    expect(consumed.length).toBeGreaterThan(0);
+    for (const row of consumed) {
+      const recorded = await db
+        .select({ eventId: events.eventId })
+        .from(events)
+        .where(and(eq(events.eventId, row.eventId), eq(events.type, 'tap_in')));
+      expect(
+        recorded,
+        `consumed armed tap ${row.id} names event ${row.eventId}, which no tap_in recorded`,
+      ).toHaveLength(1);
     }
   });
 
@@ -656,12 +761,17 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let locked!: () => void;
+    const hasLock = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
     const consuming = db.transaction(async (tx) => {
       await tx.update(armedTaps).set({ consumedAt: new Date() }).where(eq(armedTaps.id, tap.id));
-      await held; // hold the row lock open
+      locked(); // the row lock is ours now, and held until `release`
+      await held;
     });
 
-    await new Promise((r) => setTimeout(r, 50)); // let the lock settle
+    await hasLock;
     const refreshEventId = newUuidV7();
     const refreshing = armTap(db, {
       studentId,
@@ -671,7 +781,13 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
       expiresAt: new Date(Date.now() + 3_600_000),
       now: new Date(),
     });
-    await new Promise((r) => setTimeout(r, 100)); // armTap is now blocked on the update
+    // Wait for armTap to actually BLOCK on the row lock, rather than sleeping
+    // and hoping. With a fixed sleep this test has a silent false-pass: on a
+    // loaded box armTap may not have reached its update yet, the holder
+    // commits first, armTap's select then sees consumed_at already set and
+    // takes the plain-insert path — every assertion below still holds, with
+    // the bug present. Failing to observe the block fails the test instead.
+    await waitForBlockedBackend();
     release();
     await consuming;
     const result = await refreshing;

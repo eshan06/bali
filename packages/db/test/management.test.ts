@@ -182,25 +182,36 @@ describe('createBlock', () => {
     const first = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
     expect(first.outcome).toBe('registered');
 
+    if (first.outcome !== 'registered') throw new Error('unreachable');
+
     const again = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
     expect(again.outcome).toBe('already_registered');
     if (again.outcome !== 'already_registered') throw new Error('unreachable');
-    expect(again.block.id).toBe(first.outcome === 'registered' ? first.block.id : '');
+    expect(again.block.id).toBe(first.block.id);
 
     // Still exactly one active block owning the tag — the replay created none.
     const rows = await db.select().from(blocks).where(eq(blocks.tagId, 'CB-TAG-1'));
     expect(rows).toHaveLength(1);
   });
 
-  it('still refuses a tag a DIFFERENT teacher holds, even after a soft-removed block', async () => {
-    // The global-uniqueness rule the replay path must not weaken.
+  it('a soft-removed block frees its tag for anyone, including a new teacher', async () => {
+    // The replay path re-reads only ACTIVE blocks, so a retired block must not
+    // keep answering for its tag — that is what makes re-registration after a
+    // soft-remove work at all. (The plain cross-teacher rule is covered by
+    // 'a tag is owned globally, not per teacher' below.)
     const a = await makeTeacher('cb-owner');
     const b = await makeTeacher('cb-stranger');
     const mine = await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-2' });
     expect(mine.outcome).toBe('registered');
-    expect((await createBlock(db, { teacherId: b.teacherId, tagId: 'CB-TAG-2' })).outcome).toBe(
-      'tag_taken',
-    );
+    if (mine.outcome !== 'registered') throw new Error('unreachable');
+
+    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, mine.block.id));
+
+    const reclaimed = await createBlock(db, { teacherId: b.teacherId, tagId: 'CB-TAG-2' });
+    expect(reclaimed.outcome).toBe('registered');
+    if (reclaimed.outcome !== 'registered') throw new Error('unreachable');
+    expect(reclaimed.block.id).not.toBe(mine.block.id);
+    expect(reclaimed.block.teacherId).toBe(b.teacherId);
   });
 
   it('a tag is owned globally, not per teacher', async () => {

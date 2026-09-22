@@ -4,7 +4,8 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-21 — exit demo wired for deployed environments (remote mode, real Cognito) and extended to assert live SSE delivery + self-expiry (#13), plus review follow-ups (#14 and this one). Real Cognito auth is proven against dev; the run stops on one-time dev provisioning — see **Now**._
+_Last updated: 2026-09-22 — retroactive audit series landing as gated PRs: offset timestamps and the SSE write-after-end crash are on `main`; armed-tap races next._
+
 
 ## Now
 
@@ -132,36 +133,42 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
-- **2026-09-22** — Three unique-index races and replays in `packages/db`, all
-  the same mistake: a read-then-write where the index should have arbitrated.
+- **2026-09-22** — Four defects in `armTap`/`createBlock`, three of them the
+  same shape: a read-then-write where the database could have arbitrated.
   (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
   phone both passed the selects and the loser surfaced a raw 23505 as a 500 to
-  a student walking to their seat (20/20 rounds on real Postgres, once the pool
-  is warm — a cold connection serialises the race, which is how it cleared the
-  race lane). It now lets the waiting-tap index arbitrate and reads the
-  winner's tap back, like `createClass` and `insertEvent`. (2) `armTap`'s
-  expired-tap refresh had no `consumed_at IS NULL` guard, so a session
-  beginning just before the school-day boundary could consume the row between
-  the select and the update; the refresh then wrote its event id onto the
-  consumed row, which now claimed an id no `tap_in` ever recorded. Narrow
-  window, one-line guard, and the test stages the interleaving with a held row
-  lock rather than hoping a `Promise.all` produces it. (3) `createBlock`
-  answered `tag_taken` to the teacher who already owns the tag — advice they
-  cannot act on, since they cannot free a tag they hold. A replay now returns
-  their own block (`already_registered`, same `BlockDetail` on the wire), the
-  way `startSession` returns the running session. **Deliberate behaviour
-  change:** the existing "refuses the same active tag" test asserted the old
-  answer for the owning teacher; it now asserts the replay, and a separate case
-  keeps the cross-teacher `tag_taken` rule.
-- **2026-09-22** — Left open, needs a decision: `armTap` and `convertArmedTaps`
-  take no common lock, so the reverse ordering of (2) above — the refresh
-  landing first and the conversion then consuming the refreshed row — leaves
-  the phone told "armed" while the server has focused it, and the teacher's
-  grid green for a phone that never shielded. No row guard closes it; it needs
-  the two to serialise (the conversion locking the taps it reads, or `armTap`
-  taking the class lock `startSession` holds), which is an engine-locking
-  change rather than an audit fix. The window is a session starting in the last
-  seconds before the school-day expiry boundary.
+  a student walking to their seat. It now lets the waiting-tap index arbitrate
+  and reads the winner's tap back, the way `insertEvent` does. The insert and
+  its re-read are bounded-retried rather than throwing: `ON CONFLICT DO
+  NOTHING` takes no lock on the row it conflicted with, so a Start can consume
+  that row in between and leave neither a row nor a standing tap — throwing
+  there would have been the same 500 on the same path.
+  (2) A consumed armed tap could end up naming an event no `tap_in` ever
+  recorded — the transient table and the permanent history disagreeing about
+  which tap was converted. Two interleavings, both closed: the refresh guarded
+  on `consumed_at IS NULL` (for a conversion that commits before the update),
+  and `convertArmedTaps` taking `FOR UPDATE` on the taps it reads (for a
+  refresh landing inside its read→consume gap, where the guard sees NULL and
+  passes). The second was reproducing 6/6 with only the guard in place.
+  Accepted residual, unchanged by either: a student whose tap is consumed
+  under them keeps a fresh waiting tap, so the teacher's next session that day
+  converts them without another tap. Decision 5 says a tap is a tap, and
+  end-of-day expiry bounds it.
+  (3) `createBlock` answered `tag_taken` to the teacher who already owns the
+  tag — advice they cannot act on, since they cannot free a tag they hold. A
+  replay now returns their own block, the way `startSession` returns the
+  running session. **Behaviour change on a shipped endpoint:** `POST
+  /v1/blocks` answers 200 instead of 409 for that case. Nothing is renamed or
+  removed and `BlockDetail` is unchanged, but ARCHITECTURE.md decision 2 says
+  behaviour changes go via `/v2`, so this is flagged for the owner rather than
+  taken as settled. No client can break today: the only caller in the tree is
+  the demo script, the portal never calls it, and there is no iOS app yet.
+  Three existing tests asserted the old answer and now assert the replay; the
+  cross-teacher rule keeps its two untouched tests.
+  Race coverage runs on the real-Postgres lane only — PGlite is
+  single-connection and cannot contend, so the fast lane would pass either
+  way. The warm-up in the race suite is load-bearing for round 0: with a fix
+  reverted and a cold pool, the first round passes vacuously.
 
 - **2026-09-20** — The exit demo runs in two worlds behind one seam
   (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
