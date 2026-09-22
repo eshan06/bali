@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs. `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes._
 
 ## Now
 
@@ -38,6 +38,33 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   only failed at the database. The `UPDATE` half also refuses to run when there
   is no live school (`AND EXISTS`), so pasting only the second statement reports
   `UPDATE 0` rather than setting `school_id` NULL and looking like success.
+- **Exit-demo follow-ups from #16's review (done):** all three WARN findings
+  reproduced, so all three are closed. The depth-bounded walks memoized on the
+  node alone, so a node first reached at the bottom of the budget was explored
+  with nothing left for its children and that truncated visit became final — a
+  later, shallower path returned early and a password two hops under a shared
+  node printed in full; the memo now keys on the shallowest depth seen. Reads
+  that a hostile error can make throw (`Object.entries` runs every getter at
+  once; `errors` and `cause` are ordinary own properties) are guarded one at a
+  time, so nothing replaces the one message naming what the operator got wrong.
+  Map and Set contents are now scrubbed — `inspect` prints them in full — and
+  bytes are named in the docblock as the deliberate boundary rather than covered
+  by a promise that said "never".
+- **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
+  `claims.name`, but Cognito puts profile attributes in the ID token only and
+  every client here sends an **access** token — the portal stores `access_token`
+  and nothing else, the exit demo signs in for `AuthenticationResult.AccessToken`
+  — so that read found nothing on every real request, `display_name` stayed NULL,
+  and the grid fell back to eight characters of a UUID. Setting a `name`
+  attribute on the pool would not have fixed it. `/v1/me` now walks
+  `name → preferred_username → cognito:username → username`, so a real name still
+  wins wherever one exists, and `findOrCreateStudent` **fills** a NULL
+  `display_name` on a later sign-in instead of only setting it at creation —
+  otherwise every account already in dev would have kept its UUID forever. A fill,
+  never an overwrite: "edit own name" (below, phase 3) makes that field the
+  student's own once they set it. One visible knock-on: a remote exit-demo run
+  now labels its actors with their Cognito usernames, because `me.user.displayName`
+  finally answers.
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path
@@ -266,6 +293,20 @@ under-13 parental-consent machinery.
   (`recorded_as: 'not_enrolled'`, no session/class attached, the claimed id in
   the payload) — durable, but unattached. A student removed mid-session keeps
   their ended participation row, so ISSUES #2's actual case is unchanged.
+- **2026-09-22** — Display names come from the token's own claims, best-first
+  (`name`, `preferred_username`, `cognito:username`, `username`), and are
+  **filled, never synced**. The fallback means a teacher sees a Cognito username
+  — for the dev pool, an email — where no real name exists. Accepted: it is the
+  student's own teacher, who already knows them, and anything better needs a
+  name the token does not carry (a pre-token-generation Lambda, or the phone
+  sending one). Revisit when "edit own name" lands in phase 3, which is also why
+  the fill must never overwrite.
+- **2026-09-22** — The demo's password scrubber covers everything `util.inspect`
+  prints as text — messages, own enumerable properties, AggregateError members,
+  Map and Set contents — and stops at BYTES. A typed array inspects as hex rather
+  than text, and scanning every byte of every buffer on an error path costs more
+  than that is worth. Written into the docblock, because the old one promised
+  absolutely and the code did less.
 - **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
   ended-session guard and scoped to this session's own `session_extended` rows.
   An id already spent on a different event is now a 409 rather than a reported

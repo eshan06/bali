@@ -35,6 +35,80 @@ describe('GET /v1/me', () => {
     expect(await findUserByCognitoId(db, 'brand-new-cognito-sub')).toBeDefined();
   });
 
+  it('takes the display name from an access token’s username, not only `name`', async () => {
+    // Cognito puts profile attributes in the ID token only. Every client here
+    // sends an ACCESS token, which carries the username and no `name` — so
+    // reading `name` alone left display_name NULL on every real request and the
+    // live grid rendered a UUID prefix.
+    const token = await ctx.issuer.sign({
+      sub: 'access-token-sub',
+      extraClaims: { username: 'demo-ana@example.test' },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toBe('demo-ana@example.test');
+  });
+
+  it('prefers a real `name` claim when the token carries one', async () => {
+    const token = await ctx.issuer.sign({
+      sub: 'id-token-sub',
+      extraClaims: { name: 'Ana Reyes', 'cognito:username': 'demo-ana@example.test' },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toBe('Ana Reyes');
+  });
+
+  it('fills a display name the row was provisioned without', async () => {
+    // Everyone already in the dev pool was created before the name could be
+    // read, so the fix has to reach existing rows or it fixes nothing.
+    const nameless = await ctx.issuer.sign({ sub: 'already-provisioned' });
+    expect((await me(nameless)).body.user.displayName).toBeNull();
+
+    const named = await ctx.issuer.sign({
+      sub: 'already-provisioned',
+      extraClaims: { username: 'demo-ben@example.test' },
+    });
+    const { body } = await me(named);
+
+    expect(body.user.displayName).toBe('demo-ben@example.test');
+    expect((await findUserByCognitoId(db, 'already-provisioned'))?.displayName).toBe(
+      'demo-ben@example.test',
+    );
+  });
+
+  it('never overwrites a display name the row already has', async () => {
+    // It is a fill, not a sync: "edit own name" (PLAN.md phase 3) makes the
+    // stored name the student's own, and a later sign-in must not put their
+    // Cognito username back over it.
+    const first = await ctx.issuer.sign({
+      sub: 'renamed-later',
+      extraClaims: { name: 'Ana Reyes' },
+    });
+    await me(first);
+
+    const second = await ctx.issuer.sign({
+      sub: 'renamed-later',
+      extraClaims: { username: 'demo-ana@example.test' },
+    });
+    const { body } = await me(second);
+
+    expect(body.user.displayName).toBe('Ana Reyes');
+  });
+
+  it('ignores a blank name claim rather than storing whitespace', async () => {
+    const token = await ctx.issuer.sign({
+      sub: 'blank-name',
+      extraClaims: { name: '   ', username: 'demo-cal@example.test' },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toBe('demo-cal@example.test');
+  });
+
   it('is idempotent — a second call returns the same user, no duplicate', async () => {
     const token = await ctx.tokenFor('repeat-sub');
     const first = await me(token);

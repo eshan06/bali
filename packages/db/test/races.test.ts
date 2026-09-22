@@ -14,6 +14,7 @@ import {
   sessions,
   users,
 } from '../src/schema.js';
+import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import { makeTestDb } from '../src/testing.js';
 import {
   checkIn,
@@ -566,5 +567,58 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       );
       expect(participation.silentSince).toBeNull();
     }
+  });
+});
+
+describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
+  it('two sign-ins filling a missing name at once agree on the one that won', async () => {
+    // The race the fill introduces: both callers read the same NULL, both try
+    // the UPDATE, and the NULL re-check in its WHERE lets exactly one through.
+    // The loser must re-read rather than report back the NULL it started with —
+    // the portal would show a UUID prefix for a row that now has a name.
+    const cognitoId = `race-fill-${newUuidV7()}`;
+    const created = await findOrCreateStudent(db, cognitoId);
+    expect(created.displayName).toBeNull();
+
+    const [a, b] = await Promise.all([
+      findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+      findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+    ]);
+
+    const rows = await db.select().from(users).where(eq(users.cognitoId, cognitoId));
+    expect(rows).toHaveLength(1);
+    const stored = one(rows).displayName;
+    expect(stored).not.toBeNull();
+    expect(['Ana Reyes', 'demo-ana@example.test']).toContain(stored);
+    expect(a.displayName).toBe(stored);
+    expect(b.displayName).toBe(stored);
+    expect(a.id).toBe(created.id);
+    expect(b.id).toBe(created.id);
+  });
+
+  it('two first sign-ins at once still make exactly one row', async () => {
+    const cognitoId = `race-provision-${newUuidV7()}`;
+
+    const [a, b] = await Promise.all([
+      findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+      findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+    ]);
+
+    expect(await db.select().from(users).where(eq(users.cognitoId, cognitoId))).toHaveLength(1);
+    expect(a.id).toBe(b.id);
+    expect(a.displayName).toBe('Ana Reyes');
+    expect(b.displayName).toBe('Ana Reyes');
+  });
+
+  it('a name arriving beside one already stored never replaces it', async () => {
+    const cognitoId = `race-keep-${newUuidV7()}`;
+    await findOrCreateStudent(db, cognitoId, 'Ana Reyes');
+
+    await Promise.all([
+      findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+      findOrCreateStudent(db, cognitoId, 'demo-other@example.test'),
+    ]);
+
+    expect((await findUserByCognitoId(db, cognitoId))?.displayName).toBe('Ana Reyes');
   });
 });

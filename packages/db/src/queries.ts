@@ -27,10 +27,46 @@ export async function findUserByCognitoId(
 }
 
 /**
+ * Fill in a display name the row does not have — never overwrite one it does.
+ *
+ * A fill, not a sync, for two reasons. Rows provisioned before the caller could
+ * read a name off the token kept `display_name` NULL forever, because the name
+ * was only ever applied at creation; without this they would render as a UUID
+ * prefix for good. And "edit own name" (PLAN.md, phase 3) makes the stored name
+ * the student's own once they set it, so a later sign-in must not quietly put
+ * their Cognito username back.
+ */
+async function fillMissingDisplayName(
+  db: Database,
+  row: UserRow,
+  displayName: string | undefined,
+): Promise<UserRow> {
+  if (displayName === undefined || row.displayName !== null) return row;
+
+  // The NULL is re-checked in the UPDATE itself, so a concurrent sign-in that
+  // filled it first wins rather than being overwritten.
+  const updated = first(
+    await db
+      .update(users)
+      .set({ displayName })
+      .where(and(eq(users.id, row.id), isNull(users.displayName)))
+      .returning(),
+  );
+  if (updated) return updated;
+  // That concurrent call won: report what the row actually says now, not the
+  // NULL this one started with.
+  return (await findUserByCognitoId(db, row.cognitoId)) ?? row;
+}
+
+/**
  * The boot call's find-or-create (auth decision 3 / student app): the first-ever
  * /v1/me quietly creates the caller's row as a student. Race-safe via
  * ON CONFLICT on cognito_id + re-select, so two simultaneous first calls resolve
  * to one row. Teacher rows are provisioned elsewhere (out of scope here).
+ *
+ * A row that already exists still gets a missing display name filled in, so the
+ * fix for "no name on the token" reaches everyone already provisioned without
+ * anybody re-creating accounts.
  */
 export async function findOrCreateStudent(
   db: Database,
@@ -38,7 +74,7 @@ export async function findOrCreateStudent(
   displayName?: string,
 ): Promise<UserRow> {
   const existing = await findUserByCognitoId(db, cognitoId);
-  if (existing) return existing;
+  if (existing) return fillMissingDisplayName(db, existing, displayName);
 
   await db
     .insert(users)
@@ -47,7 +83,8 @@ export async function findOrCreateStudent(
 
   const row = await findUserByCognitoId(db, cognitoId);
   if (!row) throw new Error('findOrCreateStudent: row missing after insert');
-  return row;
+  // Our insert may have lost the race to one that carried no name.
+  return fillMissingDisplayName(db, row, displayName);
 }
 
 /** A student's active classes. */

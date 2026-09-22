@@ -99,6 +99,37 @@ function toAudienceList(aud: JWTPayload['aud']): string[] {
 }
 
 /**
+ * Claims that can carry something a teacher can read, best first. `name` is a
+ * profile attribute and `preferred_username` a chosen handle; the last two are
+ * the pool's own identifier under the two names Cognito gives it (`username` in
+ * an access token, `cognito:username` in an id token).
+ */
+const DISPLAY_NAME_CLAIMS = ['name', 'preferred_username', 'cognito:username', 'username'];
+
+/**
+ * The best display name the token itself carries, or undefined.
+ *
+ * Cognito puts profile attributes in the ID token ONLY. An access token — which
+ * is what every client here sends (the portal stores `access_token` and nothing
+ * else; the exit demo signs in for `AuthenticationResult.AccessToken`) — carries
+ * the username and no `name`, whatever attributes the pool holds. Reading `name`
+ * alone therefore found nothing on every real request, so every row `/v1/me`
+ * provisioned kept a NULL `display_name` and the live grid fell back to the
+ * first eight characters of a UUID. Falling through to the identifier that IS
+ * always present gets a teacher something readable; the list stays ordered so a
+ * real name still wins the moment a token carries one.
+ */
+export function displayNameFromClaims(claims: JWTPayload): string | undefined {
+  for (const claim of DISPLAY_NAME_CLAIMS) {
+    const value = claims[claim];
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+/**
  * The production verifier: a remote JWKS the pool publishes. jose caches the key
  * set and only refetches on an unknown key id, so steady-state verification
  * makes no network call (auth decision 2).
