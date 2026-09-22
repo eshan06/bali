@@ -18,6 +18,24 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
+/**
+ * Undo standard string escaping. A transcript that merely ESCAPED the password
+ * has still leaked it — anyone reading it can decode it back — so the
+ * assertions above check the decoded text too.
+ */
+function unescaped(text: string): string {
+  const named: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v' };
+  return text.replace(
+    /\\(u\{[0-9a-fA-F]{1,6}\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g,
+    (_match, escape: string) => {
+      if (escape.startsWith('u') || escape.startsWith('x')) {
+        return String.fromCodePoint(Number.parseInt(escape.replace(/^u\{?|^x|\}$/g, ''), 16));
+      }
+      return named[escape] ?? escape;
+    },
+  );
+}
+
 describe('fetchCognitoAccessToken', () => {
   it('posts an unauthenticated USER_PASSWORD_AUTH InitiateAuth and returns the access token', async () => {
     const fetchImpl = vi
@@ -488,6 +506,81 @@ describe('fetchCognitoAccessToken', () => {
     );
 
     expect(inspect(err, { depth: null })).not.toContain(creds.password);
+    expect(err?.message).toContain('403');
+  });
+
+  it.each([
+    ['a quote and a backslash', 'pa"ss\\word'],
+    ['every quote style at once', 'Bali\'"`2026!'],
+    ['a control character', 'hunt\u0007er2'],
+  ])('redacts a password the printer escaped — %s', async (_label, password) => {
+    // The secret reaches the transcript already QUOTED, and each printer
+    // escapes differently. Searching for the raw form alone found nothing and
+    // called that clean, so a password containing `"` and `\` sat in a
+    // transcript that looked redacted — recoverable by anyone who un-escapes
+    // what they are reading. The carrier here is one no property walk reaches,
+    // so the printed-text check is the only thing standing between the password
+    // and the transcript.
+    const awkward = { username: creds.username, password };
+    const fetchImpl = vi.fn().mockRejectedValue(
+      Object.assign(new TypeError('fetch failed'), {
+        query: new URLSearchParams({ PASSWORD: password }),
+      }),
+    );
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, awkward).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(password);
+    // And not as the printer wrote it either: undo the escaping and look again.
+    expect(unescaped(printed)).not.toContain(password);
+    expect(err?.message).toContain('could not reach');
+  });
+
+  it('does not leak, or go silent, when reading the response body fails', async () => {
+    // undici rejects `.text()` with `TypeError: terminated` whenever a response
+    // is cut short — an ordinary flaky network, not a hostile input. That await
+    // sat outside every guard, so the rejection bypassed all of this module:
+    // the password printed, and the operator lost the line naming Cognito.
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.reject(
+          Object.assign(new TypeError('terminated'), {
+            cause: new Error(`socket closed while replaying {"PASSWORD":"${creds.password}"}`),
+          }),
+        ),
+    });
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+    expect(err?.message).toContain('could not read the response');
+    expect(err?.message).toContain('cognito-idp.us-east-1.amazonaws.com');
+    expect(err?.message).toContain('terminated');
+  });
+
+  it('redacts a password straddling the error body’s truncation point', async () => {
+    // `describeError` keeps the first 200 characters. Redacting its OUTPUT left
+    // a password that straddled the cut printed as a prefix.
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response(`${'y'.repeat(190)}${creds.password}`, { status: 403 }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    // The prefix that used to survive, not just the whole secret.
+    expect(err?.message).not.toContain(creds.password.slice(0, 10));
     expect(err?.message).toContain('403');
   });
 

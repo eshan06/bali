@@ -111,24 +111,60 @@ const IDENTIFIER_CLAIMS = ['cognito:username', 'username'];
 /** A grid cell, not an essay; and nothing that can move the cursor around a log. */
 const MAX_DISPLAY_NAME = 64;
 
+/** A UUID in any of the shapes Cognito hands one out in. */
+const UUID_LIKE =
+  /^(?:[\w-]+:)?\{?(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})\}?$/i;
+
+/** A federated subject's opaque tail is long AND carries digits. */
+const FEDERATED_TAIL = 12;
+
 /**
- * An identifier no human would recognise: a bare UUID, which is what a pool
- * configured with `UsernameAttributes: ['email']` gives every user, or a
- * federated id like `Google_110293847566123450987`.
+ * An identifier no human would recognise: a bare UUID — which is what a pool
+ * configured with `UsernameAttributes: ['email']` gives every user — or a
+ * federated subject such as `Google_110293847566123450987`.
  *
  * Storing one of these would be a worse answer than storing nothing: the grid's
  * own fallback prints eight characters of a UUID, where this would print all
  * thirty-six — and because the fill never overwrites, it would stay.
+ *
+ * The test is deliberately narrow, because a FALSE positive costs exactly what
+ * this change exists to fix: a rejected username leaves the teacher looking at
+ * a UUID prefix. `<name>_<year>` is one of the commonest school conventions, so
+ * `ana_2011` and `jsmith_2028` have to survive it — which is why a federated
+ * tail must be long AND numeric rather than merely numeric.
  */
-const OPAQUE_IDENTIFIER =
-  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z][\w.-]*_\d+)$/i;
+function isOpaqueIdentifier(value: string): boolean {
+  if (UUID_LIKE.test(value)) return true;
+  const split = value.lastIndexOf('_');
+  if (split <= 0) return false;
+  const tail = value.slice(split + 1);
+  return tail.length >= FEDERATED_TAIL && /\d/.test(tail) && /^[\w.-]+$/.test(tail);
+}
 
-/** Trim, drop control characters, and clamp — the value is a user-settable attribute. */
+/**
+ * Trim, drop control characters, and clamp — the value is an attribute the
+ * student can set on themselves, and it lands in a teacher's grid and in logs,
+ * where a bidi override or an ANSI escape would be someone else's cursor.
+ *
+ * Zero-width joiner and non-joiner are kept: they are `\p{Cf}` too, but they
+ * carry meaning in Persian, Arabic and Indic names and inside emoji sequences.
+ *
+ * The clamp counts code POINTS, so the cut never lands inside a surrogate pair.
+ * A lone half passes TypeScript happily and then reaches Postgres, which stores
+ * it as U+FFFD — and the fill would never replace it.
+ */
 function cleanClaim(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+  const stripped = value.replace(/[\p{Cc}\p{Cf}]/gu, (char) =>
+    char === '‌' || char === '‍' ? char : '',
+  );
+  const cleaned = stripped.trim();
   if (cleaned.length === 0) return undefined;
-  return cleaned.slice(0, MAX_DISPLAY_NAME);
+  const points = [...cleaned];
+  if (points.length <= MAX_DISPLAY_NAME) return cleaned;
+  // Trim again: the cut can land just after a space.
+  const clamped = points.slice(0, MAX_DISPLAY_NAME).join('').trim();
+  return clamped.length > 0 ? clamped : undefined;
 }
 
 /**
@@ -154,7 +190,7 @@ export function displayNameFromClaims(claims: JWTPayload): string | undefined {
   }
   for (const claim of IDENTIFIER_CLAIMS) {
     const value = cleanClaim(claims[claim]);
-    if (value !== undefined && !OPAQUE_IDENTIFIER.test(value)) return value;
+    if (value !== undefined && !isOpaqueIdentifier(value)) return value;
   }
   return undefined;
 }

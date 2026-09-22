@@ -57,14 +57,23 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   into a stack string some logger materialized before the scrub ran — all still
   printed. Each is a real leak and each now has a test. The rule now is that the
   walk is **best effort and says so**, and the guarantee lives in one check:
-  before any error is attached as a `cause`, the module inspects it exactly as
-  the demo's top-level handler would and refuses to attach anything the password
-  survived in, substituting a redacted rendering. A claim about how thorough the
-  walk is was what made the gaps invisible; asking what would actually be printed
-  covers the carriers nobody has thought of yet. One more leak found in the same
-  pass and closed: a non-OK response body was quoted verbatim into the thrown
-  message, so a WAF block page echoing the rejected request would have printed
-  `DEMO_PASSWORD`.
+  before any error is attached as a `cause`, the module reads back what would
+  actually be printed — at least as thoroughly as the demo's top-level handler,
+  which stops at depth 2 where this asks for unlimited — and attaches a redacted
+  rendering instead, or nothing at all when even that still holds the password.
+
+  A second review round then found that covering carriers was only half of it.
+  The secret arrives in a rendering already QUOTED, and each printer escapes
+  differently, so a password containing `"` and `\` was sitting in a transcript
+  looking redacted while remaining perfectly recoverable by anyone who un-escapes
+  what they are reading — `<redacted>` never appeared, and no test noticed
+  because every fixture used the same plain password. The check now decodes
+  escapes before looking, and the tests assert on the decoded text. Two more
+  leaks closed in that round: an error body was truncated to 200 characters
+  BEFORE being redacted, printing the prefix of a password that straddled the
+  cut; and `await res.text()` sat outside every guard, so an ordinary truncated
+  response — undici's `TypeError: terminated` — bypassed the module entirely and
+  took the operator's one actionable line with it.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
   `claims.name`, but Cognito puts profile attributes in the ID token and every
   client here sends an **access** token — the portal stores `access_token`
@@ -323,7 +332,13 @@ under-13 parental-consent machinery.
   Consequence to know: a fallback, once stored, is not replaced by a better name
   arriving later, because nothing records where the stored value came from. The
   designed remedy is "edit own name" (phase 3), not a Cognito-side change — a
-  pre-token-generation Lambda emitting `name` would fix new rows only.
+  pre-token-generation Lambda emitting `name` would fix new rows only. A new
+  trust boundary comes with this and is worth stating rather than discovering:
+  `name` and `preferred_username` are attributes a student can set on
+  themselves, so a student now chooses the string their teacher reads in the
+  grid and beside unlock records, and nothing stops them choosing a classmate's
+  name. The field was always NULL before, so this is new surface, not a
+  regression; "edit own name" should decide what, if anything, polices it.
 - **2026-09-22** — The demo's password scrubber is **best effort, and the promise
   is kept by a check rather than by the walk**. It covers messages and stacks,
   own enumerable properties (symbols included), AggregateError members, named
@@ -334,7 +349,10 @@ under-13 parental-consent machinery.
   it, and anything the password survived in is replaced by a redacted rendering
   of itself. The bytes of a typed array remain uncovered on purpose (they print
   as hex, not text); that is now a statement about one carrier rather than a
-  claim that the walk is exhaustive.
+  claim that the walk is exhaustive. The check covers ENCODINGS as well as
+  carriers — it decodes escapes before looking, because a transcript that merely
+  escaped the password has still leaked it — and its last resort is to attach
+  nothing rather than something unproven.
 - **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
   ended-session guard and scoped to this session's own `session_extended` rows.
   An id already spent on a different event is now a 409 rather than a reported

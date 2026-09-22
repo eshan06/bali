@@ -8,10 +8,17 @@
  * signing code: one POST, one access token. The pool's app client must have
  * ALLOW_USER_PASSWORD_AUTH enabled; that is the one AWS-side prerequisite.
  *
- * Nothing here ever logs or returns a password: a failure reports Cognito's own
- * error type and message, which name the problem without echoing the secret.
- * That is enforced rather than asserted — see `safeCause`, which checks what
- * would actually be printed before anything is attached to a thrown error.
+ * A failure reports Cognito's own error type and message, which name the
+ * problem without echoing the secret. Keeping the password out of the transcript
+ * is checked rather than asserted: every error this module throws goes through
+ * `safeCause`, which reads back what would actually be printed and will drop the
+ * original error entirely rather than attach one the password survived in.
+ *
+ * Three review rounds each found a way the previous wording had been too
+ * confident — a carrier the walk did not know about, then an ENCODING the check
+ * did not recognise, then an await with no guard around it at all. So the claim
+ * here is bounded on purpose: what this module itself throws is checked. It
+ * cannot speak for an error some other layer prints on its own.
  */
 
 import { inspect } from 'node:util';
@@ -46,6 +53,9 @@ export interface CognitoCredentials {
 
 /** How many hops from the thrown error either walk below is willing to take. */
 const MAX_WALK_DEPTH = 4;
+
+/** A hostile iterator must not be followed forever; a real error graph is tiny. */
+const MAX_COLLECTION_ENTRIES = 1_000;
 
 /**
  * The memo both walks share: "have we already covered this node with at least
@@ -82,8 +92,10 @@ function newVisitMemo(): (node: object, depth: number) => boolean {
  * mistake. Returning nothing is always better than that.
  */
 function membersOf(err: Error): unknown[] {
-  if (!(err instanceof AggregateError)) return [];
   try {
+    // `instanceof` reads the prototype chain, which a Proxy can trap and throw
+    // from, so it belongs inside the guard rather than in front of it.
+    if (!(err instanceof AggregateError)) return [];
     return Array.isArray(err.errors) ? err.errors : [];
   } catch {
     return [];
@@ -164,17 +176,83 @@ function detailOf(err: unknown): string {
 }
 
 /**
- * Remove a secret from text that is about to be thrown or printed — in both the
- * raw form and the JSON-escaped one, since a client that echoes the request body
- * quotes it, and a password containing `"` or `\` would otherwise sail straight
+ * Every written form the secret can take, longest first.
+ *
+ * A secret is compared against text something has already QUOTED, and each
+ * quoter escapes differently: JSON doubles backslashes and escapes `"`, while
+ * `util.inspect` doubles backslashes and escapes whichever quote it picked —
+ * single normally, double when the string holds a single quote, a backtick when
+ * it holds both. Searching for the raw secret alone therefore misses it in any
+ * of those renderings, which is how a password containing `"` and `\` sat in a
+ * transcript looking redacted.
+ *
+ * Longest first, so a shorter form cannot eat part of a longer one.
+ */
+function secretForms(secret: string): string[] {
+  const forms = new Set<string>([secret, JSON.stringify(secret).slice(1, -1)]);
+  const backslashed = secret.split('\\').join('\\\\');
+  for (const quote of ["'", '"', '`']) {
+    forms.add(backslashed.split(quote).join(`\\${quote}`));
+  }
+  return [...forms].filter((form) => form.length > 0).sort((a, b) => b.length - a.length);
+}
+
+/** Recomputed per string otherwise, and one walk can touch thousands of them. */
+let formsFor: { secret: string; forms: string[] } | undefined;
+function formsOf(secret: string): string[] {
+  if (formsFor?.secret !== secret) formsFor = { secret, forms: secretForms(secret) };
+  return formsFor.forms;
+}
+
+/**
+ * Remove a secret from text that is about to be thrown or printed — in every
+ * form a quoter can have put it in, since a client that echoes the request body
+ * quotes it and a password containing `"` or `\` would otherwise sail straight
  * through an exact-substring match.
  */
 function redact(text: string, secret: string): string {
   if (!secret) return text;
-  let out = text.split(secret).join('<redacted>');
-  const escaped = JSON.stringify(secret).slice(1, -1);
-  if (escaped !== secret) out = out.split(escaped).join('<redacted>');
+  let out = text;
+  for (const form of formsOf(secret)) out = out.split(form).join('<redacted>');
   return out;
+}
+
+/**
+ * Undo the escaping a quoter added, so one search covers every quoting style —
+ * including styles this module does not model.
+ *
+ * `secretForms` enumerates the renderings we know how to REMOVE; this is the
+ * independent check on whether one got through anyway. Anything a reader could
+ * decode back into the secret counts as printed, because a reader is exactly
+ * who is looking at the transcript.
+ */
+function decodeEscapes(text: string): string {
+  const named: Record<string, string> = {
+    n: '\n',
+    t: '\t',
+    r: '\r',
+    b: '\b',
+    f: '\f',
+    v: '\v',
+    '0': '\0',
+  };
+  return text.replace(
+    /\\(u\{[0-9a-fA-F]{1,6}\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g,
+    (_match, escape: string) => {
+      if (escape.startsWith('u') || escape.startsWith('x')) {
+        const code = Number.parseInt(escape.replace(/^u\{?|^x|\}$/g, ''), 16);
+        return Number.isNaN(code) ? escape : String.fromCodePoint(code);
+      }
+      return named[escape] ?? escape;
+    },
+  );
+}
+
+/** Would a reader of this text end up holding the secret? */
+function printsSecret(text: string, secret: string): boolean {
+  if (!secret) return false;
+  if (text.includes(secret)) return true;
+  return decodeEscapes(text).includes(secret);
 }
 
 /**
@@ -193,15 +271,16 @@ function ownKeysOf(node: object): (string | symbol)[] {
     const keys = Reflect.ownKeys(node).filter((key) =>
       Object.prototype.propertyIsEnumerable.call(node, key),
     );
-    if (!ArrayBuffer.isView(node)) return keys;
-    return keys.filter((key) => typeof key === 'symbol' || !/^\d+$/.test(key));
+    const named = ArrayBuffer.isView(node)
+      ? keys.filter((key) => typeof key === 'symbol' || !/^\d+$/.test(key))
+      : keys;
+    // Capped like a Map or a Set: an error holding a million-element array is
+    // already a failure, and walking all of it is not worth the wall time.
+    return named.slice(0, MAX_COLLECTION_ENTRIES);
   } catch {
     return [];
   }
 }
-
-/** A hostile iterator must not be followed forever; a real error graph is tiny. */
-const MAX_COLLECTION_ENTRIES = 1_000;
 
 /**
  * Scrub a secret out of a caught error and its whole cause chain, in place.
@@ -357,29 +436,41 @@ function scrubSet(node: Set<unknown>, secret: string, scrub: Scrubber, depth: nu
  * This is where "a password never leaves this module" stops being a claim about
  * how thorough the walk is and becomes a check on the thing that actually
  * reaches a transcript. `inspect` is what Node runs when the demo's top-level
- * handler prints the failure, so asking it directly covers every carrier at
- * once — the symbol-keyed property, the `Headers` whose contents live in
- * internal slots, the stack some logger froze before we got here — including
- * the ones nobody has thought of yet.
+ * handler prints the failure — at least as thoroughly here, since this asks for
+ * unlimited depth and `console.error` stops at two — so asking it directly
+ * covers every carrier at once: the symbol-keyed property, the `Headers` whose
+ * contents live in internal slots, the stack some logger froze before we got
+ * here.
  *
- * On a miss the real error is dropped rather than attached: a string with the
- * secret taken out of it keeps everything an operator can act on and has
- * nowhere left to hide one.
+ * Carriers are only half of it. The secret arrives in the rendering already
+ * QUOTED, in whichever style the printer chose, so the check decodes escapes
+ * before looking (`printsSecret`) rather than trusting the small set of forms
+ * `redact` knows how to remove. A password containing `"` and `\` was sitting
+ * in a transcript looking redacted because those two sets were assumed equal.
+ *
+ * Three outcomes, in order: the object is attached when nothing printable
+ * survived; a redacted rendering of it is attached when redaction cleaned it;
+ * and when even that still decodes back to the secret, NOTHING is attached.
+ * Losing the error object is a cost worth paying, and it is the only branch
+ * that can honestly be called a guarantee.
  */
 function safeCause(err: unknown, secret: string): unknown {
   redactInPlace(err, secret);
   if (!secret) return err;
 
-  let printed: string;
   try {
-    printed = inspect(err, { depth: null });
+    const printed = inspect(err, { depth: null });
+    if (!printsSecret(printed, secret)) return err;
+
+    const cleaned = redact(printed, secret);
+    if (printsSecret(cleaned, secret)) {
+      return new Error('the original error still held the password, so it is not attached');
+    }
+    return new Error(cleaned);
   } catch {
+    // An error that cannot even be rendered cannot be shown to be safe.
     return new Error('the original error could not be inspected, so it is not attached');
   }
-
-  const cleaned = redact(printed, secret);
-  if (cleaned === printed) return err;
-  return new Error(cleaned);
 }
 
 /** The endpoint for a region — exported so callers can report what they called. */
@@ -459,14 +550,29 @@ export async function fetchCognitoAccessToken(
     throw new Error(message, { cause: safeCause(err, credentials.password) });
   }
 
-  const text = await res.text();
+  // Reading the body is the other await in this function, and undici rejects it
+  // with `TypeError: terminated` whenever a response is cut short — an ordinary
+  // flaky network. Left unguarded it bypassed every redaction in this module AND
+  // lost the one line naming what the operator should look at.
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    const message =
+      `Cognito sign-in for ${credentials.username} could not read the response from ` +
+      `${cognitoEndpoint(config.region)}: ${redact(detailOf(err), credentials.password)}`;
+    // eslint-disable-next-line preserve-caught-error -- see the note at the fetch above
+    throw new Error(message, { cause: safeCause(err, credentials.password) });
+  }
+
   if (!res.ok) {
-    // `describeError` may quote the body verbatim, and the body is not always
-    // Cognito's: a corporate proxy or WAF block page can echo the request it
-    // rejected, which is the one we just posted the password in.
+    // The body is redacted BEFORE `describeError` truncates it: a corporate
+    // proxy or WAF block page can echo the request it rejected — the one we
+    // just posted the password in — and a password straddling the 200-character
+    // cut would otherwise have its prefix printed in full.
     throw new Error(
       `Cognito sign-in failed for ${credentials.username} — ` +
-        redact(describeError(res.status, text), credentials.password),
+        describeError(res.status, redact(text, credentials.password)),
     );
   }
 

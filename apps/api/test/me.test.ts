@@ -141,6 +141,63 @@ describe('GET /v1/me', () => {
     expect(body.user.displayName).toMatch(/^Ana x+$/);
   });
 
+  it('keeps an ordinary school username that merely ends in digits', async () => {
+    // `<name>_<year>` is a mainstream school convention. Rejecting it as
+    // "machine-made" leaves display_name NULL and the teacher looking at a UUID
+    // prefix — the exact outcome this whole change exists to remove.
+    for (const [sub, username] of [
+      ['school-a', 'jsmith_2028'],
+      ['school-b', 'ana_2011'],
+      ['school-c', 'mrs.reyes_7'],
+      ['school-d', 'ana-reyes_2011'],
+    ]) {
+      const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
+      expect((await me(token)).body.user.displayName).toBe(username);
+    }
+  });
+
+  it('reads preferred_username when there is no name', async () => {
+    const token = await ctx.issuer.sign({
+      sub: 'preferred',
+      extraClaims: { preferred_username: 'Ana R.', username: 'demo-ana@example.test' },
+    });
+
+    expect((await me(token)).body.user.displayName).toBe('Ana R.');
+  });
+
+  it('clamps without splitting a character in half', async () => {
+    // Slicing UTF-16 units can cut a surrogate pair, and Postgres then stores
+    // the lone half as U+FFFD — permanently, since the fill never overwrites.
+    const token = await ctx.issuer.sign({
+      sub: 'emoji',
+      extraClaims: { name: `${'A'.repeat(63)}\u{1F600}` },
+    });
+
+    const stored = (await me(token)).body.user.displayName ?? '';
+
+    // No lone surrogate left behind by the cut (`isWellFormed` is ES2024 and
+    // this workspace does not target it).
+    expect(stored).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+    );
+    expect(stored).not.toContain('\uFFFD');
+    expect([...stored]).toHaveLength(64);
+    expect(stored.endsWith('\u{1F600}')).toBe(true);
+  });
+
+  it('keeps the joiners that carry meaning in a name', async () => {
+    // ZWNJ and ZWJ are \p{Cf}, like the bidi overrides worth stripping, but
+    // they are orthographic in Persian, Arabic and Indic names.
+    const token = await ctx.issuer.sign({
+      sub: 'joiners',
+      extraClaims: { name: '\u0645\u200c\u06cc\u200c\u0631\u0648\u0645' },
+    });
+
+    expect((await me(token)).body.user.displayName).toBe(
+      '\u0645\u200c\u06cc\u200c\u0631\u0648\u0645',
+    );
+  });
+
   it('is idempotent — a second call returns the same user, no duplicate', async () => {
     const token = await ctx.tokenFor('repeat-sub');
     const first = await me(token);

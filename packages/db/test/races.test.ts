@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
+import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import {
   blocks,
   classes,
@@ -14,7 +15,6 @@ import {
   sessions,
   users,
 } from '../src/schema.js';
-import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import { makeTestDb } from '../src/testing.js';
 import {
   checkIn,
