@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-21 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-22 — retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs. Exit demo remains blocked on the one-time dev provisioning in **Now**._
 
 ## Now
 
@@ -17,17 +17,69 @@ _Last updated: 2026-09-21 — retroactive audit of the pre-gates Phase 1/2 code:
 - **Owner actions from the Phase 2 merge: done** — "Integration + race tests
   (real Postgres)" is now a required check, and the Claude workflows bill the
   owner's subscription (see decision log).
-- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the Railway **dev** environment.
+- **Outstanding Phase 2 item:** run the exit demo (phone simulator) against the
+  Railway **dev** environment. The simulator is now *able* to: `DEMO_API_URL=…`
+  runs every incident against a deployed API with real Cognito sign-ins
+  (README, "Running it against a deployed API"). Its pieces are covered against
+  a real listening server — provisioning through `/v1/me`, both sweep branches,
+  the silence wait, and the SSE client including how streams die.
+- **Proven against dev so far** (2026-09-20): `/healthz` healthy on the current
+  build; five `bali-demo-*@bali.test` accounts created in the dev pool; **real
+  Cognito `USER_PASSWORD_AUTH` sign-in and `GET /v1/me` succeed against the
+  deployed API** for all five, and the teacher clears `requireTeacher`. Network
+  egress to Railway was opened, so cloud sessions can now reach dev and the
+  service variables.
+- **⛔ Blocked — owner action (one-time dev provisioning).** The dev test teacher
+  has **no school**, and `classes.school_id` is `NOT NULL` while nothing ever
+  assigns one, so `POST /v1/classes` correctly 409s and the demo stops there.
+  Two additive statements on the dev database close it:
+
+  ```sql
+  INSERT INTO schools (name) SELECT 'Demo School'
+  WHERE NOT EXISTS (SELECT 1 FROM schools);
+  UPDATE users SET school_id = (SELECT id FROM schools ORDER BY created_at LIMIT 1)
+  WHERE id = '01a0bb08-563f-7050-8d19-48b7b3150865';
+  ```
+
+  A session cannot run them itself: the dev Postgres exposes only
+  `postgres.railway.internal`, and reaching it from outside would mean enabling
+  Railway's TCP proxy — publishing the dev database, which is not worth it for
+  two statements. Teacher provisioning is deliberately out-of-band until the
+  Phase 4 invite-code work.
+- **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
+  scrubs enumerable own properties, not just messages (inspecting an error
+  prints them, so a client hanging the request body off it leaked through a path
+  no message-only scrub reached), and both the redaction and the detail walk
+  follow `AggregateError.errors` as well as `cause` — a host whose addresses all
+  refuse arrives as an AggregateError with an empty message, so the operator was
+  getting "fetch failed" and nothing else.
+- **Exit-demo follow-ups from #14's review (done):** Ben's own check-in closes
+  his silence episode with no pump running, so the incident proves his return
+  did it rather than "some check-in did"; a fetch failure reports its cause
+  chain, because Node reports every network error as a bare `fetch failed` and
+  puts ENOTFOUND on `cause`; that detail is redacted so a client echoing the
+  request body could not leak `DEMO_PASSWORD`; and a non-JSON body names the
+  status that actually came back.
+- **Exit-demo follow-ups from #13's review (done):** the second heartbeat stretch
+  now includes Ben, so a slow remote run cannot fabricate a second silence
+  episode and blame the engine for a simulation artefact; a Cognito failure that
+  is not a timeout no longer reports one (a mistyped region fails DNS instantly);
+  and a 200 that is not JSON names the request that produced it.
+- **Also needed per environment (AWS, one-time):** test users with **permanent**
+  passwords (a temporary one parks the account in `NEW_PASSWORD_REQUIRED`) and
+  `ALLOW_USER_PASSWORD_AUTH` on the app client. The demo names whichever is
+  missing; the README lists them with the school step.
 - **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process, the armTap
-  insert race, a replayed tap re-resolved to another session, block re-registration by the
-  tag's own teacher, extend's arithmetic outside the engine transaction, the
-  portal's reconnect backoff, the portal's staleness banner, and one shared
-  SQLSTATE helper. The tenth, `POST /v1/classes`'s missing idempotency key, was
-  re-examined and the deferral stands.
-- **Next up:** exit demo vs dev → start Phase 3 (iOS student app).
+  insert race, a replayed tap re-resolved to another session, block
+  re-registration by the tag's own teacher, extend's arithmetic outside the
+  engine transaction, the portal's reconnect backoff, the portal's staleness
+  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
+  missing idempotency key, was re-examined and the deferral stands.
+- **Next up:** finish the exit demo vs dev (two SQL statements away) → finish the
+  audit series → start Phase 3 (iOS student app).
 
 ## Phases
 
@@ -35,7 +87,7 @@ _Last updated: 2026-09-21 — retroactive audit of the pre-gates Phase 1/2 code:
 |---|---|---|
 | 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
-| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo |
+| 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ merged to `main` · ⏳ dev exit demo (runs against dev; auth proven; **blocked on one-time dev provisioning** — see Now) |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
 | 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
@@ -105,6 +157,22 @@ under-13 parental-consent machinery.
   well-formed client. Removing that for timestamps is the fix; the general
   guard — never let validation be the reason an unlock is unrecordable — is a
   standing constraint on anything added to the unlock body.
+- **2026-09-20** — The exit demo runs in two worlds behind one seam
+  (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
+  issuer all local, time compressed by backdating rows) and remote
+  (`DEMO_API_URL` — a deployed API with real Cognito sign-ins). Remote mode does
+  **not** get a database handle, and deliberately: with no way to backdate, the
+  silence and expiry incidents wait out the real threshold and the deployment's
+  own cron, which is what makes a dev run evidence about the deployment rather
+  than about the script. The other phones keep heartbeating through those waits,
+  so "Ben went quiet" stays about Ben. Cost: a remote run takes minutes where a
+  local one takes seconds; `npm run demo` is unchanged and still needs nothing.
+- **2026-09-20** — The demo now asserts two guarantees it previously only
+  implied: that events reach the teacher's grid **live over SSE** (the stream is
+  opened before the incidents, and every event written afterwards must arrive on
+  it), and that a session **expires by itself** — the sweep ends it, the grid
+  learns live, participations close, and the phone reconciles on its next
+  check-in. Both were named Phase 2 exit criteria with no assertion behind them.
 - **2026-09-20** — Web sessions install dependencies via a repo-tracked
   SessionStart hook (`.claude/hooks/session-start.sh`), not the cloud
   environment's setup-script field (it ran outside the repo root and broke

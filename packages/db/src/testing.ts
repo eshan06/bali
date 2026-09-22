@@ -143,11 +143,11 @@ function databaseUrl(baseUrl: string, name: string): string {
  * and unset in a bare shell, so this denies by default exactly the way
  * `apps/api/src/env.ts` does: only an explicit 'test' or 'development' passes.
  */
-function assertNotProduction(helper: string): void {
+function assertNotProduction(helper: string, writes: string): void {
   const env = process.env.NODE_ENV;
   if (env !== 'test' && env !== 'development') {
     throw new Error(
-      `${helper} is a test-only helper: it writes participations outside the transition ` +
+      `${helper} is a test-only helper: it writes ${writes} outside the transition ` +
         `engine and must not run with NODE_ENV=${env ?? '<unset>'}`,
     );
   }
@@ -167,7 +167,7 @@ export async function backdateLastSeen(
   where: { sessionId: string; studentId: string },
   at: Date,
 ): Promise<void> {
-  assertNotProduction('backdateLastSeen');
+  assertNotProduction('backdateLastSeen', 'participations');
   await db
     .update(schema.participations)
     .set({ lastSeenAt: at })
@@ -178,4 +178,24 @@ export async function backdateLastSeen(
         isNull(schema.participations.endedAt),
       ),
     );
+}
+
+/**
+ * Move a running session's end time into the past — the expiry counterpart to
+ * `backdateLastSeen`, so the demo and tests can prove a session expires without
+ * idling out a real minute of wall clock. It writes only `sessions.ends_at`;
+ * the expiry itself still happens in the sweep, through the engine, which is
+ * what the assertion is actually about. Same guard, same reason: the subpath is
+ * public and the production image runs this source directly.
+ */
+export async function backdateSessionEnd(
+  db: Database,
+  where: { sessionId: string },
+  endsAt: Date,
+): Promise<void> {
+  assertNotProduction('backdateSessionEnd', 'sessions');
+  await db
+    .update(schema.sessions)
+    .set({ endsAt })
+    .where(and(eq(schema.sessions.id, where.sessionId), isNull(schema.sessions.endedAt)));
 }
