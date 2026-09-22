@@ -31,7 +31,8 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   Two things to know next time: a session cannot run this itself (dev Postgres
   exposes only `postgres.railway.internal`, and reaching it means publishing the
   database through Railway's TCP proxy), and `schools.id` has no DB default, so
-  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2).
+  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2). The
+  demo now prints that statement with a freshly minted id, ready to paste.
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path

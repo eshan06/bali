@@ -3,10 +3,16 @@ import { backdateLastSeen } from '@bali/db/testing';
 import { SILENCE_THRESHOLD_MS } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import { createRemoteWorld, type DemoActorSpec, type RemoteConfig } from '../scripts/demo/world.js';
+import {
+  createRemoteWorld,
+  type DemoActorSpec,
+  provisioningSql,
+  type RemoteConfig,
+} from '../scripts/demo/world.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer } from './helpers/test-issuer.js';
@@ -116,6 +122,25 @@ describe('the remote world, against a real server', () => {
     expect(err?.message).toContain("UPDATE users SET role = 'teacher'");
   });
 
+  it('prints an INSERT that actually runs — schools.id has no DB default', async () => {
+    // The hint used to omit `id`, so an operator following it hit
+    // `null value in column "id" ... violates not-null constraint` — the exact
+    // trap the message exists to prevent. Pinning the column list and a real
+    // UUIDv7 keeps the instruction runnable.
+    const world = createRemoteWorld(remoteConfig(), { cognitoFetch: stubCognito() });
+
+    const err = await world.provision([TEACHER]).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('INSERT INTO schools (id, name)');
+    const minted = /SELECT '([0-9a-f-]{36})'/.exec(err?.message ?? '')?.[1];
+    expect(minted).toBeDefined();
+    // Version nibble 7: the id must be a UUIDv7 like every other row (decision 2).
+    expect(minted?.[14]).toBe('7');
+  });
+
   it('runs the sweep itself when given the key', async () => {
     const world = createRemoteWorld(remoteConfig({ internalKey: testEnv.INTERNAL_API_KEY }), {
       cognitoFetch: stubCognito(),
@@ -176,5 +201,68 @@ describe('the remote world, against a real server', () => {
     });
 
     expect(Date.now() - before).toBeLessThan(3_000);
+  });
+});
+
+describe('provisioningSql', () => {
+  const USER = '01a0bb08-563f-7050-8d19-48b7b3150865';
+
+  it('supplies an id, because schools.id has no database default', () => {
+    const sql = provisioningSql(USER, 'role-and-school');
+
+    expect(sql).toContain('INSERT INTO schools (id, name)');
+    const minted = /SELECT '([0-9a-f-]{36})'/.exec(sql)?.[1];
+    expect(minted?.[14]).toBe('7'); // UUIDv7, like every other row (decision 2)
+  });
+
+  it('guards the insert so re-running leaves an existing school alone', () => {
+    expect(provisioningSql(USER, 'school')).toContain('WHERE NOT EXISTS (SELECT 1 FROM schools');
+  });
+
+  it('never emits a bare UPDATE that would silently set NULL', () => {
+    // `SET school_id = (SELECT …)` with no INSERT reports "UPDATE 1" against an
+    // empty table and leaves the operator believing they had complied.
+    for (const what of ['role-and-school', 'school'] as const) {
+      const sql = provisioningSql(USER, what);
+      expect(sql.indexOf('INSERT INTO schools')).toBeLessThan(sql.indexOf('UPDATE users'));
+      expect(sql).toContain('ORDER BY created_at LIMIT 1');
+      expect(sql).toContain(USER);
+    }
+  });
+
+  it('skips soft-removed schools, since nothing is really deleted', () => {
+    // A database whose only school was retired would otherwise fail the guard,
+    // skip the insert, and attach the teacher to the retired school (decision 3).
+    const sql = provisioningSql(USER, 'role-and-school');
+
+    expect(sql).toContain('FROM schools WHERE removed_at IS NULL)');
+    expect(sql).toContain('WHERE removed_at IS NULL ORDER BY created_at LIMIT 1');
+  });
+
+  it('is the same recipe the README prints — the fourth copy cannot drift', async () => {
+    // Consolidating the three in-code copies left the README hand-maintained,
+    // which is the same drift this builder exists to end. This pins it.
+    const readme = await readFile(new URL('../../../README.md', import.meta.url), 'utf8');
+    const fence = [...readme.matchAll(/```sql\n([\s\S]*?)```/g)]
+      .map((m) => m[1] ?? '')
+      .find((block) => block.includes('INSERT INTO schools'));
+    expect(fence).toBeDefined();
+
+    const normalize = (sql: string) =>
+      sql
+        .replace(/--[^\n]*/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const built = provisioningSql('<their id>', 'role-and-school').replace(
+      /'[0-9a-f-]{36}'/,
+      "'<uuidv7>'",
+    );
+
+    expect(normalize(fence ?? '')).toBe(normalize(built));
+  });
+
+  it('flips the role only when the role is what is missing', () => {
+    expect(provisioningSql(USER, 'role-and-school')).toContain("role = 'teacher'");
+    expect(provisioningSql(USER, 'school')).not.toContain("role = 'teacher'");
   });
 });

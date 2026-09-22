@@ -1,4 +1,4 @@
-import { type Database, schools, users } from '@bali/db';
+import { type Database, newUuidV7, schools, users } from '@bali/db';
 import { backdateLastSeen, backdateSessionEnd, makeTestDb } from '@bali/db/testing';
 import { type MeResponse, type SessionSnapshot, SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
@@ -263,6 +263,37 @@ const REMOTE_LIVE_WAIT_MS = 45_000;
 /** Slack for clock skew between this machine and the deployment. */
 const SKEW_MARGIN_MS = 15_000;
 
+/**
+ * The one-time provisioning a demo teacher needs, as statements an operator can
+ * paste. Built in one place on purpose: this instruction previously existed in
+ * three copies and each was wrong in its own way.
+ *
+ * `INSERT … WHERE NOT EXISTS` so re-running is safe and an existing school is
+ * left alone, and the UPDATE attaches to the oldest school — which is the row
+ * just inserted when the table was empty, and the operator's own otherwise, so
+ * the two statements are one coherent recipe either way. A bare
+ * `SET school_id = (SELECT …)` against an empty table would set NULL, report
+ * `UPDATE 1`, and leave the operator believing they had complied. The insert
+ * supplies an id because `schools.id` has no database default: ids are minted
+ * in TypeScript (data-model decision 2).
+ *
+ * Both halves skip soft-removed rows. Nothing is really deleted (decision 3), so
+ * a database whose only school was retired would otherwise fail the NOT EXISTS
+ * guard, skip the insert, and quietly attach the teacher — and every class the
+ * demo creates — to the retired school.
+ */
+export function provisioningSql(userId: string, what: 'role-and-school' | 'school'): string {
+  const schoolId = newUuidV7();
+  const assignments = what === 'role-and-school' ? "role = 'teacher', school_id" : 'school_id';
+  const live = 'WHERE removed_at IS NULL';
+  return (
+    `  INSERT INTO schools (id, name)\n` +
+    `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools ${live});\n` +
+    `  UPDATE users SET ${assignments} = (SELECT id FROM schools ${live} ORDER BY created_at LIMIT 1)\n` +
+    `  WHERE id = '${userId}';`
+  );
+}
+
 /** The env var this actor's Cognito username comes from. */
 export function usernameVar(key: string): string {
   return `DEMO_USER_${key.toUpperCase()}`;
@@ -403,9 +434,7 @@ async function signInRemoteActors(
           (spec.role === 'teacher'
             ? 'Every first sign-in provisions a student, so the demo teacher needs the one-time ' +
               'out-of-band provisioning — the role AND a school, because classes.school_id is ' +
-              'NOT NULL and no code path ever assigns it:\n' +
-              "  INSERT INTO schools (name) VALUES ('Demo School');  -- if you have none\n" +
-              `  UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1) WHERE id = '${me.user.id}';`
+              `NOT NULL and no code path ever assigns it:\n${provisioningSql(me.user.id, 'role-and-school')}`
             : 'Use a different account for this actor.'),
       );
     }
