@@ -73,6 +73,11 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
+- **Found while fixing the audit, on `main` rather than in the audit's list:**
+  the SSE hub's `close()` did not wait for a LISTEN it had started, so a
+  shutdown during setup left a query on a pool being torn down — an unhandled
+  `write CONNECTION_ENDED` that failed the real-Postgres lane with every test
+  green (**landed**; see the decision log).
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -137,6 +142,29 @@ under-13 parental-consent machinery.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log
+
+- **2026-09-22** — CI was failing the real-Postgres lane with every test green,
+  and the cause was the stream hub's own shutdown. `ensureListening()` fires
+  `client.listen('bali_events', …)` without awaiting it, and `unlisten` is only
+  assigned once that RESOLVES — so `hub.close()` on a hub whose LISTEN was
+  still being established awaited nothing and returned, and whatever tore the
+  pool down next (a test's `closeDb`, the server exiting after `app.close()`)
+  did so with the query in flight. postgres.js reported `write
+  CONNECTION_ENDED` as an unhandled rejection: 5 runs out of 5 on `main`, in
+  isolation, so not a flake. It was not #29's failure — that diff is db-only —
+  and it had been read as one twice.
+  `close()` now awaits the setup promise, and the `.then` that unlistens a
+  LISTEN landing after close awaits its `stop()` instead of voiding it.
+  Isolating the two halves says plainly which does what, because the first
+  regression test I wrote for this passed with the bug present and I nearly
+  shipped it: the awaited `stop()` is what stops the rejection going unhandled
+  (voided, it has no handler; awaited, it lands in the `.catch` already there),
+  and the awaited setup is what makes `close()` mean "the LISTEN is settled and
+  unlistened" — the promise the `onClose` shutdown hook is built on. The
+  end-to-end symptom reproduced 1 run in 3 against the first half alone, so it
+  is not what the test asserts: `hub-close.test.ts` drives `listen` by hand and
+  pins the contract, red with a different message for each half removed, on
+  both lanes — where the real-pool version could not run on PGlite at all.
 
 - **2026-09-22** — Fourth pass on the same decision, and the third time I
   closed half a hole. #27 added a test that the stream route's log dispatch
