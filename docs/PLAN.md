@@ -59,11 +59,11 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap
-  insert race, a replayed tap re-resolved to another session, block
-  re-registration by the tag's own teacher, extend's arithmetic outside the
-  engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
+  the armTap insert race and its event-id integrity gap (**in review**), block
+  re-registration by the tag's own teacher (**in review**), a replayed tap
+  re-resolved to another session, extend's arithmetic outside the engine
+  transaction, the portal's reconnect backoff, the portal's staleness banner,
+  and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
   missing idempotency key, was re-examined and the deferral stands.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
