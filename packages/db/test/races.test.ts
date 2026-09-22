@@ -1,10 +1,11 @@
 import type { EventType } from '@bali/shared';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import {
+  armedTaps,
   blocks,
   classes,
   enrollments,
@@ -16,6 +17,7 @@ import {
 } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  armTap,
   checkIn,
   endEnrollment,
   endSession,
@@ -566,5 +568,125 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       );
       expect(participation.silentSince).toBeNull();
     }
+  });
+});
+
+describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
+  /*
+   * Both races below need a WARM pool. A cold second connection spends its TCP
+   * handshake while the first transaction runs to completion, which serialises
+   * the pair and hides the race entirely — that is how the missing ON CONFLICT
+   * survived the race lane in the first place.
+   */
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  it('two simultaneous pre-bell taps leave one waiting tap and no raw unique violation', async () => {
+    for (let round = 0; round < 15; round += 1) {
+      const { classId, studentId } = await seed(`race-arm-${round}`);
+      const teacherId = one(
+        await db.select({ id: classes.teacherId }).from(classes).where(eq(classes.id, classId)),
+      ).id;
+      const tap = () =>
+        armTap(db, {
+          studentId,
+          teacherId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+          expiresAt: new Date(Date.now() + 3_600_000),
+        });
+
+      const results = await Promise.allSettled([tap(), tap()]);
+
+      // The index arbitrates, so the loser reads the winner's tap back instead
+      // of surfacing 23505 as a 500 to a student's phone.
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(rejected.map((r) => String(r.reason))).toEqual([]);
+      const outcomes = results
+        .map((r) => (r.status === 'fulfilled' ? r.value.outcome : 'rejected'))
+        .sort();
+      expect(outcomes).toEqual(['already_armed', 'armed']);
+
+      // Decision 5: "nobody taps twice" — one waiting row per student+teacher.
+      const waiting = await db
+        .select()
+        .from(armedTaps)
+        .where(and(eq(armedTaps.studentId, studentId), isNull(armedTaps.consumedAt)));
+      expect(waiting).toHaveLength(1);
+    }
+  });
+
+  it('a refresh never writes its event id onto a tap consumed under it', async () => {
+    /*
+     * The narrow window: a session that began just before the school-day
+     * expiry boundary consumes a waiting tap at the same moment a fresh tap
+     * judges that tap stale and recycles it. Unguarded, the refresh writes its
+     * event id onto the row the conversion just consumed — the armed tap then
+     * claims an id no tap_in ever recorded, and the phone is told "armed"
+     * while the student is in the session.
+     *
+     * Staged rather than hoped for. The interleaving needs the consuming write
+     * to land BETWEEN the refresh's select and its update, which a plain
+     * Promise.all almost never produces (startSession does its class lock and
+     * two inserts first, so armTap finishes long before it). So a held
+     * transaction takes the row lock and releases it on cue: armTap's select
+     * sees the tap unconsumed, its update then blocks on that lock, and it
+     * resumes to find the row consumed — exactly the state the guard is for.
+     * The test writes armed_taps directly, which is allowed: it is the
+     * transient table, not participations or events.
+     */
+    const { classId, studentId } = await seed('race-arm-consumed');
+    const teacherId = one(
+      await db.select({ id: classes.teacherId }).from(classes).where(eq(classes.id, classId)),
+    ).id;
+    const expiresAt = new Date(Date.now() - 1_000); // already stale
+    const originalEventId = newUuidV7();
+    await armTap(db, {
+      studentId,
+      teacherId,
+      eventId: originalEventId,
+      deviceTime: new Date(),
+      expiresAt,
+      now: new Date(expiresAt.getTime() - 60_000),
+    });
+    const tap = one(await db.select().from(armedTaps).where(eq(armedTaps.studentId, studentId)));
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const consuming = db.transaction(async (tx) => {
+      await tx.update(armedTaps).set({ consumedAt: new Date() }).where(eq(armedTaps.id, tap.id));
+      await held; // hold the row lock open
+    });
+
+    await new Promise((r) => setTimeout(r, 50)); // let the lock settle
+    const refreshEventId = newUuidV7();
+    const refreshing = armTap(db, {
+      studentId,
+      teacherId,
+      eventId: refreshEventId,
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      now: new Date(),
+    });
+    await new Promise((r) => setTimeout(r, 100)); // armTap is now blocked on the update
+    release();
+    await consuming;
+    const result = await refreshing;
+
+    // The consumed row is untouched: it still names the event its conversion
+    // would have recorded, not the tap that arrived afterwards.
+    const after = one(await db.select().from(armedTaps).where(eq(armedTaps.id, tap.id)));
+    expect(after.consumedAt).not.toBeNull();
+    expect(after.eventId).toBe(originalEventId);
+
+    // And the late tap is recorded honestly, as its own waiting row.
+    expect(result.outcome).toBe('armed');
+    expect(result.armedTapId).not.toBe(tap.id);
+    const fresh = one(await db.select().from(armedTaps).where(eq(armedTaps.id, result.armedTapId)));
+    expect(fresh.eventId).toBe(refreshEventId);
+    expect(fresh.consumedAt).toBeNull();
   });
 });

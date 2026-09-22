@@ -33,11 +33,19 @@ describe('POST /v1/blocks', () => {
     expect(typeof body.id).toBe('string');
   });
 
-  it('registering an already-active tag is a 409 (same teacher)', async () => {
+  it('re-registering your own tag returns your block, not a 409', async () => {
+    // The ordinary way to get here is a retry of a request whose response was
+    // lost: the block exists, the teacher never saw it. A 409 would be advice
+    // they cannot act on, since they cannot free a tag they already hold.
     const { teacher } = await seedClassroom(db, 'block-dup');
     const token = await ctx.tokenFor(teacher.cognitoId);
-    expect((await register(token, 'DUP-TAG')).statusCode).toBe(200);
-    expect((await register(token, 'DUP-TAG')).statusCode).toBe(409);
+    const first = await register(token, 'DUP-TAG');
+    expect(first.statusCode).toBe(200);
+
+    const retry = await register(token, 'DUP-TAG');
+    expect(retry.statusCode).toBe(200);
+    // The same block, not a second one — the replay registered nothing.
+    expect(retry.json<BlockDetail>().id).toBe(first.json<BlockDetail>().id);
   });
 
   it("a tag is owned globally: another teacher can't claim a live one (409)", async () => {
@@ -51,10 +59,11 @@ describe('POST /v1/blocks', () => {
     );
   });
 
-  it('the seeded block reserves its tag (409 on re-register)', async () => {
+  it('re-registering a seeded tag hands its own teacher the seeded block back', async () => {
     const { teacher, block } = await seedClassroom(db, 'block-seeded');
     const res = await register(await ctx.tokenFor(teacher.cognitoId), block.tagId);
-    expect(res.statusCode).toBe(409);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<BlockDetail>().id).toBe(block.id);
   });
 
   it('a student cannot register a block (403)', async () => {

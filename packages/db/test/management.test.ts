@@ -171,17 +171,36 @@ describe('updateClass', () => {
 });
 
 describe('createBlock', () => {
-  it('registers a tag, then refuses the same active tag', async () => {
+  it('registers a tag, and hands the same teacher back their own block on a retry', async () => {
+    // A lost response is the ordinary case here: the teacher's block WAS
+    // registered, they just never saw the 200. Answering `tag_taken` to the
+    // holder of the tag is advice they cannot act on — they cannot free a tag
+    // they already own — so the retry re-reads and returns it, the way
+    // startSession hands back the running session instead of refusing a
+    // duplicate start.
     const { teacherId } = await makeTeacher('cb-basic');
     const first = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
     expect(first.outcome).toBe('registered');
 
     const again = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
-    expect(again.outcome).toBe('tag_taken');
+    expect(again.outcome).toBe('already_registered');
+    if (again.outcome !== 'already_registered') throw new Error('unreachable');
+    expect(again.block.id).toBe(first.outcome === 'registered' ? first.block.id : '');
 
-    // Exactly one active block owns the tag.
+    // Still exactly one active block owning the tag — the replay created none.
     const rows = await db.select().from(blocks).where(eq(blocks.tagId, 'CB-TAG-1'));
     expect(rows).toHaveLength(1);
+  });
+
+  it('still refuses a tag a DIFFERENT teacher holds, even after a soft-removed block', async () => {
+    // The global-uniqueness rule the replay path must not weaken.
+    const a = await makeTeacher('cb-owner');
+    const b = await makeTeacher('cb-stranger');
+    const mine = await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-2' });
+    expect(mine.outcome).toBe('registered');
+    expect((await createBlock(db, { teacherId: b.teacherId, tagId: 'CB-TAG-2' })).outcome).toBe(
+      'tag_taken',
+    );
   });
 
   it('a tag is owned globally, not per teacher', async () => {

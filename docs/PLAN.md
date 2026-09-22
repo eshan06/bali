@@ -132,6 +132,37 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Three unique-index races and replays in `packages/db`, all
+  the same mistake: a read-then-write where the index should have arbitrated.
+  (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
+  phone both passed the selects and the loser surfaced a raw 23505 as a 500 to
+  a student walking to their seat (20/20 rounds on real Postgres, once the pool
+  is warm — a cold connection serialises the race, which is how it cleared the
+  race lane). It now lets the waiting-tap index arbitrate and reads the
+  winner's tap back, like `createClass` and `insertEvent`. (2) `armTap`'s
+  expired-tap refresh had no `consumed_at IS NULL` guard, so a session
+  beginning just before the school-day boundary could consume the row between
+  the select and the update; the refresh then wrote its event id onto the
+  consumed row, which now claimed an id no `tap_in` ever recorded. Narrow
+  window, one-line guard, and the test stages the interleaving with a held row
+  lock rather than hoping a `Promise.all` produces it. (3) `createBlock`
+  answered `tag_taken` to the teacher who already owns the tag — advice they
+  cannot act on, since they cannot free a tag they hold. A replay now returns
+  their own block (`already_registered`, same `BlockDetail` on the wire), the
+  way `startSession` returns the running session. **Deliberate behaviour
+  change:** the existing "refuses the same active tag" test asserted the old
+  answer for the owning teacher; it now asserts the replay, and a separate case
+  keeps the cross-teacher `tag_taken` rule.
+- **2026-09-22** — Left open, needs a decision: `armTap` and `convertArmedTaps`
+  take no common lock, so the reverse ordering of (2) above — the refresh
+  landing first and the conversion then consuming the refreshed row — leaves
+  the phone told "armed" while the server has focused it, and the teacher's
+  grid green for a phone that never shielded. No row guard closes it; it needs
+  the two to serialise (the conversion locking the taps it reads, or `armTap`
+  taking the class lock `startSession` holds), which is an engine-locking
+  change rather than an audit fix. The window is a session starting in the last
+  seconds before the school-day expiry boundary.
+
 - **2026-09-20** — The exit demo runs in two worlds behind one seam
   (`apps/api/scripts/demo/world.ts`): in-process (default — server, Postgres and
   issuer all local, time compressed by backdating rows) and remote

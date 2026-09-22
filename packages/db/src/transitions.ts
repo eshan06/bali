@@ -499,18 +499,39 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       }
       // The existing waiting tap has expired: replace it with this fresh one
       // (the partial unique index allows only one unconsumed row per pair).
-      await tx
-        .update(armedTaps)
-        .set({
-          blockId: input.blockId ?? null,
-          eventId: input.eventId,
-          deviceTime: input.deviceTime,
-          expiresAt: input.expiresAt,
-        })
-        .where(eq(armedTaps.id, waiting.id));
-      return { outcome: 'armed', armedTapId: waiting.id };
+      //
+      // Guarded on consumed_at IS NULL, because a concurrent startSession can
+      // consume this row between the select above and here — a session that
+      // began just before the expiry boundary still converts a tap this branch
+      // has already judged stale. Unguarded, the update writes a new event id
+      // onto the consumed row while consumed_at stays set: the student is IN
+      // the session, and their phone is told "armed" and waits for a
+      // conversion that already happened. That is decision 1's drift, arriving
+      // through the one table the engine treats as transient.
+      const refreshed = firstOrUndefined(
+        await tx
+          .update(armedTaps)
+          .set({
+            blockId: input.blockId ?? null,
+            eventId: input.eventId,
+            deviceTime: input.deviceTime,
+            expiresAt: input.expiresAt,
+          })
+          .where(and(eq(armedTaps.id, waiting.id), isNull(armedTaps.consumedAt)))
+          .returning({ id: armedTaps.id }),
+      );
+      if (refreshed) return { outcome: 'armed', armedTapId: refreshed.id };
+      // Consumed under us. That frees the partial index, so fall through and
+      // record this tap as a fresh waiting one rather than reporting a row
+      // that no longer belongs to it.
     }
 
+    // ON CONFLICT on the waiting-tap index, not a bare insert: two pre-bell
+    // taps from the same phone can both pass the selects above (neither is a
+    // replay — each carries its own event id — and neither sees a waiting
+    // row), and the loser would otherwise surface a raw 23505 as a 500 to a
+    // student walking to their seat. The index arbitrates, the same way
+    // createClass, createBlock and insertEvent let it.
     const row = firstOrUndefined(
       await tx
         .insert(armedTaps)
@@ -522,10 +543,31 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
           deviceTime: input.deviceTime,
           expiresAt: input.expiresAt,
         })
+        .onConflictDoNothing({
+          target: [armedTaps.studentId, armedTaps.teacherId],
+          where: sql`${armedTaps.consumedAt} is null`,
+        })
         .returning(),
     );
-    if (!row) throw new Error('armTap: insert returned no row');
-    return { outcome: 'armed', armedTapId: row.id };
+    if (row) return { outcome: 'armed', armedTapId: row.id };
+
+    // The other tap won. Re-read what is standing and report that, which is
+    // the truth this phone needs: a tap of theirs is already waiting.
+    const standing = firstOrUndefined(
+      await tx
+        .select()
+        .from(armedTaps)
+        .where(
+          and(
+            eq(armedTaps.studentId, input.studentId),
+            eq(armedTaps.teacherId, input.teacherId),
+            isNull(armedTaps.consumedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (!standing) throw new Error('armTap: insert conflicted with no waiting tap');
+    return { outcome: 'already_armed', armedTapId: standing.id };
   });
 }
 
