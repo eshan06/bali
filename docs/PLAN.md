@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in no longer puts any text from outside into what it throws, so a password echoed back has no way into the transcript._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in builds its errors from fixed wording and checked identifier tokens, never from outside text, and refuses redirects so the password is never re-sent._
 
 ## Now
 
@@ -38,18 +38,19 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   only failed at the database. The `UPDATE` half also refuses to run when there
   is no live school (`AND EXISTS`), so pasting only the second statement reports
   `UPDATE 0` rather than setting `school_id` NULL and looking like success.
-- **The exit demo's sign-in errors carry no text from outside** (2026-09-22). The
+- **The exit demo's sign-in errors carry no outside text** (2026-09-22). The
   scrubbing #16's review asked to harden was replaced rather than patched: three
   review rounds each found a new class of leak in it, and measured across 25
   channels × 7 encodings × 6 passwords the password was still recoverable in 398
-  of 1,050 combinations (662 on `main` before it). Nothing the sign-in throws now
-  carries text from outside — its errors are fixed wording, the operator's own
-  configuration, and identifier-shaped tokens (HTTP status, error codes,
-  Cognito's error type, a challenge name, a media type), each withheld if it
-  contains the password, with no caught error attached as a `cause`: 0 of 1,050,
-  pinned by that matrix. The cost is Cognito's message text and a proxy page's
-  body; the error type, with fixed words for the common ones, stands in for the
-  first, the status and media type for the second.
+  of 1,050 combinations (662 on `main` before it). The sign-in's errors are now
+  fixed wording, the operator's own configuration, and identifier-shaped tokens
+  (HTTP status, error codes, Cognito's error type, a challenge name, a media
+  type), each withheld if it repeats four consecutive characters of the
+  password. No caught error is attached as a `cause`, and a redirect is refused
+  rather than followed, since a 307 re-sends the body. 0 of 1,050 now, and a
+  second matrix pins the tokens against echoes of the password itself. The cost
+  is every message and body from outside; the error type (with fixed words for
+  the common ones), the status, the media type and the error codes stand in.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
   `claims.name`, but Cognito puts profile attributes in the ID token and every
   client here sends an **access** token — the portal stores `access_token`
@@ -183,33 +184,45 @@ under-13 parental-consent machinery.
   `Error`: fixed wording, the caller's configuration (username, endpoint,
   timeout), and tokens read from outside — HTTP status, error codes, Cognito's
   error type, a challenge name, a media type — each accepted only in a strict
-  identifier shape and withheld when it contains the password in either case.
-  Nothing is attached as a `cause`. The boundary is an echo — quoted, escaped,
-  truncated — not a party deliberately encoding the password into a token's
-  alphabet, which already holds it. Pinned three ways: a leak matrix asserting
-  that neither the password — raw, or with JS/JSON escapes, percent-encoding
-  and HTML entities undone, stacked — nor a canary placed beside it arrives (the
-  canary covers encodings no decoder there undoes, such as base64); an
-  exact-message test on every exit path; and mutation — removing any one guard
-  turns a test red. Cost, accepted: Cognito's message text and a
-  non-Cognito body are not shown; the error type (with fixed words for the
-  common ones), the status and the media type are. Not taken: `USER_SRP_AUTH`
+  identifier shape and withheld when it repeats any four consecutive
+  characters of the password, compared in both case mappings. Two fixed
+  messages of Node's fetch are recognised by exact match and never copied: a
+  proxy refusing the tunnel (its three-digit status is kept) and a refused
+  redirect. Nothing is attached as a `cause`, and redirects are refused
+  (`redirect: 'error'`) — measured, a 307 re-POSTs the body, password and all,
+  to its target. The boundary is an echo — quoted, escaped, truncated,
+  case-changed — not a party deliberately encoding the password into a token's
+  alphabet, which already holds it. Pinned by: a leak matrix asserting that
+  neither the password — raw, or with JS/JSON escapes, percent-encoding and HTML
+  entities undone, stacked, ignoring case — nor a canary placed beside it
+  arrives (the canary covers encodings no decoder there undoes, such as base64);
+  a second matrix echoing the password itself into each token field (verbatim,
+  case-changed, NFKC-normalised, cut at either end), which must print no
+  four-character run of it; an exact-message test on every exit path; and a
+  mutation pass — 53 mutations of the module, each of which turns at
+  least one test red. Cost, accepted: no message or body from outside is shown —
+  Cognito's message text, a proxy page, the fetch layer's own descriptions; the
+  error type (with fixed words for the common ones), the status, the media type
+  and the error codes are. Not taken: `USER_SRP_AUTH`
   would never send the password at all, but it changes an AWS-side
   prerequisite, so it is the owner's call.
 
 - **2026-09-22** — Display names come from the token's own claims — a real name
   first (`name`, `preferred_username`), then the pool's identifier
   (`cognito:username`, `username`) but only when it is readable — and are
-  **filled, never synced**. The value is trimmed of invisible characters (lone
-  surrogate halves included, which Postgres would store as U+FFFD for good) and
-  clamped to 64 code points, because `name` is an attribute the student can set
+  **filled, never synced**. The value is stripped of invisible and
+  line-breaking characters (lone surrogate halves included, which Postgres would
+  store as U+FFFD for good) and clamped to 64 code points, and a name with
+  nothing visible left in it — only joiners, a Hangul filler, a blank braille
+  cell — counts as no name, because `name` is an attribute the student can set
   on themselves and it lands in a teacher's grid. A machine-made identifier is
   **not** stored, since it would print worse than the grid's own
-  eight-character fallback and the fill would make it permanent: a bare UUID
+  eight-character fallback and the fill would make it permanent: a dashed UUID
   (what a pool signing in by email gives every user), or a federated username —
   one of Cognito's built-in provider names (`Google`, `Facebook`,
   `LoginWithAmazon`, `SignInWithApple`, any case), an underscore, and that
-  provider's subject shape. It is anchored on the provider because a rule that
+  provider's subject shape (ten or more digits for Google and Facebook, so
+  `google_20290101` is a name). It is anchored on the provider because a rule that
   read any long tail with a digit as a subject threw away `ana_rodriguez2029`
   and `p_kowalski1987`. A custom SAML/OIDC provider's names are the pool
   owner's choice, cannot be recognised by shape, and are stored as the pool

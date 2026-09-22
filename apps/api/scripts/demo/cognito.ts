@@ -13,29 +13,36 @@
  * messages quote request values back ("Value 'x' at 'clientId' failed to
  * satisfy constraint"), a proxy or WAF page can quote the request it refused,
  * and a fetch wrapper can hang the request off the error it raises — escaped,
- * encoded or truncated in whatever way that layer prints. So none of that text
- * is used at all, rather than scrubbed: scrubbing has to know every place the
- * password can hide and every way it can be written down, and it did not.
+ * encoded or truncated in whatever way that layer prints. So that text is not
+ * scrubbed; it is not used. Scrubbing has to know every place the password can
+ * hide and every way it can be written down, and it did not.
  *
- * What this module throws is a plain Error built only from:
+ * What this module throws is a plain Error whose message is built from:
  *   - its own fixed wording;
  *   - the caller's configuration: the username, the endpoint, the timeout;
  *   - TOKENS read from outside — the HTTP status, the error codes on a failure
  *     and its causes, Cognito's error type, a challenge name, the response's
- *     media type — each accepted only in a strict identifier shape and only
- *     when it does not contain the password (see `token`).
+ *     media type — each accepted only in a strict identifier shape, and only
+ *     when it repeats no run of four characters of the password (see `token`);
+ *   - two fixed messages of Node's fetch, recognised by exact match and never
+ *     copied: a proxy refusing the tunnel (only its three-digit status is kept)
+ *     and a refused redirect.
  * No error from outside is attached as its `cause`: an object can print
  * differently from the way it looked when it was checked, and a string cannot.
+ * And a redirect is refused rather than followed, since following a 307 would
+ * send the body — the password — to wherever it pointed.
  *
  * The boundary, stated rather than implied: this defends against the password
- * being ECHOED — quoted, escaped, truncated — by something downstream. It does
- * not defend against a party that deliberately encodes it into a token's
- * alphabet (unpadded base32 is a valid error code); such a party already holds
- * the password and has better ways to publish it than a demo's transcript.
+ * being ECHOED — quoted, escaped, truncated, case-changed — by something
+ * downstream. It does not defend against a party that deliberately encodes it
+ * into a token's alphabet (unpadded base32 is a valid error code); such a party
+ * already holds the password and has better ways to publish it than a demo's
+ * transcript.
  *
- * The cost is Cognito's message text and a proxy page's body. The error type,
- * with fixed words for the common ones, stands in for the first; the status and
- * media type for the second.
+ * The cost is every message and body from outside: Cognito's message text, a
+ * proxy page, the fetch layer's own descriptions. The error type with fixed
+ * words for the common ones, the status, the media type and the error codes
+ * stand in for them.
  */
 
 /** The fields of InitiateAuth's answer that are read. */
@@ -62,8 +69,8 @@ export interface CognitoCredentials {
 
 /*
  * The shapes a token from outside must have. None of them has any quoting or
- * escape syntax, so there is nothing to decode: a token that held the password
- * would hold it in plain characters, where the containment check sees it.
+ * escape syntax, so there is nothing to decode: whatever a token holds of the
+ * password, it holds in plain characters, where the check in `token` sees it.
  */
 /** An error code or a challenge name: `ENOTFOUND`, `NEW_PASSWORD_REQUIRED`. */
 const CONSTANT_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
@@ -72,29 +79,53 @@ const ERROR_TYPE = /^[A-Z][A-Za-z0-9]{1,63}$/;
 /** A media type without its parameters: `text/html`. */
 const MEDIA_TYPE = /^[a-z0-9][a-z0-9.+-]{0,62}\/[a-z0-9][a-z0-9.+-]{0,62}$/;
 
+/** A token repeating this many consecutive characters of the password is withheld. */
+const SHARED_RUN = 4;
+
 /**
- * `value` when it is a string of the expected shape that does not contain the
- * password; otherwise undefined.
- *
- * The shape keeps out everything that is not an identifier — a body, a
- * message, anything with a quote or a space in it. The containment check covers
- * what the shape cannot: a password that is itself identifier-shaped fits as
- * easily as a real code. It compares in both cases, because an echo that
- * changed the password's case still prints it.
+ * Case, folded so that an echo in any case compares equal: upper-cased first,
+ * then lower-cased, because some characters fold one way only — 'ſ' upper-cases
+ * to 'S' and the Kelvin sign lower-cases to 'k', and each ends up plain ASCII.
  */
-function token(value: unknown, shape: RegExp, password: string): string | undefined {
-  if (typeof value !== 'string' || !shape.test(value)) return undefined;
-  if (password === '') return value;
-  const echoed =
-    value.toLowerCase().includes(password.toLowerCase()) ||
-    value.toUpperCase().includes(password.toUpperCase());
-  return echoed ? undefined : value;
+function fold(text: string): string {
+  return text.toUpperCase().toLowerCase();
 }
 
 /**
- * `node[key]`, or undefined when reading it throws. Everything read from outside
- * goes through this: a getter or a Proxy trap on a lookalike must never replace
- * the operator's one actionable line with an unrelated exception.
+ * Does `value` repeat any run of SHARED_RUN characters of the password (the
+ * whole of a shorter one), ignoring case? A truncated echo still prints most of
+ * the password, and an echo that changed its case still prints it.
+ */
+function repeatsPassword(value: string, password: string): boolean {
+  const text = fold(value);
+  const secret = fold(password);
+  const run = Math.min(SHARED_RUN, secret.length);
+  for (let start = 0; start + run <= secret.length; start++) {
+    if (text.includes(secret.slice(start, start + run))) return true;
+  }
+  return false;
+}
+
+/**
+ * `value` when it is a string of the expected shape that repeats nothing of the
+ * password; otherwise undefined. Callers check the text they will print — a
+ * fragment cut out of a longer value is checked as the fragment, since that is
+ * what a reader would see.
+ *
+ * The shape keeps out everything that is not an identifier: a body, a message,
+ * anything with a quote or a space in it. The run check covers what the shape
+ * cannot, a password that is itself identifier-shaped, whole or in part.
+ */
+function token(value: unknown, shape: RegExp, password: string): string | undefined {
+  if (typeof value !== 'string' || !shape.test(value)) return undefined;
+  return password !== '' && repeatsPassword(value, password) ? undefined : value;
+}
+
+/**
+ * `node[key]`, or undefined when reading it throws. Every property of an
+ * outside object is read through this or inside a try of its own: a getter or a
+ * Proxy trap on a lookalike must never replace the operator's one actionable
+ * line with an unrelated exception.
  */
 function read(node: unknown, key: string): unknown {
   try {
@@ -104,69 +135,126 @@ function read(node: unknown, key: string): unknown {
   }
 }
 
-/** How far below a failure its codes are looked for, and how many nodes at most. */
-const MAX_DEPTH = 4;
+/** How many nodes of a failure's graph are looked at, at most. */
 const MAX_NODES = 32;
 
+/** undici's own words when an HTTPS proxy refuses the CONNECT for the tunnel. */
+const PROXY_REFUSED = /^Proxy response \((\d{3})\) !== 200 when HTTP Tunneling$/;
+/** undici's own words when `redirect: 'error'` meets a redirect. */
+const REDIRECT_REFUSED = 'unexpected redirect';
+
+/** What a fetch-layer failure's graph says, in forms that cannot quote anything. */
+interface FailureFacts {
+  /** Codes that passed `token`, nearest first, without repeats. */
+  codes: string[];
+  /** String codes that did not, so the message can say one was withheld. */
+  withheld: number;
+  /** The proxy's status, from an exact match of PROXY_REFUSED. */
+  proxyStatus?: number;
+  /** An exact match of REDIRECT_REFUSED somewhere in the graph. */
+  redirected: boolean;
+}
+
 /**
- * The error codes on a failure and on everything under it, nearest first,
- * without repeats: `ENOTFOUND`, `ECONNREFUSED`, `UND_ERR_SOCKET`.
+ * Read a failure and everything under it, breadth first.
  *
  * Node's fetch reports every network failure as a bare `TypeError: fetch
  * failed` with the part worth reading on `cause` — and on an AggregateError's
  * `errors`, with an empty message, when a host's addresses all refuse — so the
- * codes are gathered from that whole graph, breadth first. The messages beside
- * them are never read. The walk is bounded and every read guarded, so a graph
- * that cycles, or a node that throws, costs its own codes and nothing else.
+ * whole graph is read: its codes, and its messages ONLY to compare them with
+ * the two fixed messages above. No other text is kept.
+ *
+ * Bounded by MAX_NODES, and each node is visited once — which is also what ends
+ * the walk on a graph that cycles. A node's properties are
+ * read through `read`, and its members are copied out by index (`membersOf`),
+ * so no getter, Proxy trap or iterator of its own runs outside a guard: a node
+ * that throws costs what it would have said and nothing else.
  */
-function errorCodes(err: unknown, password: string): string[] {
-  const codes: string[] = [];
+function examineFailure(err: unknown, password: string): FailureFacts {
+  const facts: FailureFacts = { codes: [], withheld: 0, redirected: false };
   const seen = new Set<unknown>();
   let level: unknown[] = [err];
-  for (let depth = 0; depth <= MAX_DEPTH && level.length > 0; depth++) {
+  while (level.length > 0) {
     const next: unknown[] = [];
     for (const node of level) {
-      if (node === null || typeof node !== 'object' || seen.has(node)) continue;
       if (seen.size >= MAX_NODES) break;
+      if (node === null || typeof node !== 'object' || seen.has(node)) continue;
       seen.add(node);
-      const code = token(read(node, 'code'), CONSTANT_NAME, password);
-      if (code !== undefined && !codes.includes(code)) codes.push(code);
+
+      const rawCode = read(node, 'code');
+      if (typeof rawCode === 'string') {
+        const code = token(rawCode, CONSTANT_NAME, password);
+        if (code === undefined) facts.withheld++;
+        else if (!facts.codes.includes(code)) facts.codes.push(code);
+      }
+
+      const message = read(node, 'message');
+      if (typeof message === 'string') {
+        const status = Number(PROXY_REFUSED.exec(message)?.[1]);
+        if (status >= 100 && status <= 599) facts.proxyStatus ??= status;
+        if (message === REDIRECT_REFUSED) facts.redirected = true;
+      }
+
       next.push(read(node, 'cause'), ...membersOf(node));
     }
     level = next;
   }
-  return codes;
+  return facts;
 }
 
-/** A node's `errors` when it is a real array (an AggregateError's), else none. */
+/**
+ * A node's `errors`, copied out by index when it is a real array (an
+ * AggregateError's), else none. Copied rather than sliced or iterated: an
+ * array can carry its own `slice`, a species constructor or an iterator, and
+ * any of them would run outside code unguarded, whatever it returned.
+ */
 function membersOf(node: object): unknown[] {
   const members = read(node, 'errors');
   try {
-    return Array.isArray(members) ? members.slice(0, MAX_NODES) : [];
+    if (!Array.isArray(members)) return [];
   } catch {
     // A revoked Proxy throws from Array.isArray itself.
     return [];
   }
+  const length = read(members, 'length');
+  const count = typeof length === 'number' && length > 0 ? Math.min(length, MAX_NODES) : 0;
+  const copy: unknown[] = [];
+  for (let index = 0; index < count; index++) copy.push(read(members, String(index)));
+  return copy;
 }
 
 /** Fixed words for the codes an operator most needs explained. */
-const CODE_HINTS = new Map([['ENOTFOUND', 'the host does not resolve — check the region']]);
+const CODE_HINTS = new Map([
+  ['ENOTFOUND', 'the host does not resolve — check the region'],
+  [
+    'UND_ERR_ABORTED',
+    'the request was cancelled before an answer — most often an HTTPS proxy refusing the tunnel',
+  ],
+]);
 
 /** What an operator can act on in a failure from the fetch layer. */
 function describeFailure(err: unknown, password: string): string {
-  const codes = errorCodes(err, password);
-  if (codes.length === 0) {
-    return (
-      "no error code, and the fetch layer's own text is withheld — it can quote the " +
-      'request, which holds the password'
+  const facts = examineFailure(err, password);
+  const parts = facts.codes.map((code) => {
+    const hint =
+      code === 'UND_ERR_ABORTED' && facts.proxyStatus !== undefined
+        ? `the HTTPS proxy refused the tunnel with HTTP ${facts.proxyStatus}`
+        : CODE_HINTS.get(code);
+    return hint === undefined ? code : `${code} (${hint})`;
+  });
+  if (facts.redirected) {
+    parts.push('the endpoint answered with a redirect, refused so the password is not sent on');
+  }
+  if (facts.withheld > 0) {
+    parts.push(
+      'an error code that is withheld (not an identifier, or it repeats part of the password)',
     );
   }
-  return codes
-    .map((code) => {
-      const hint = CODE_HINTS.get(code);
-      return hint === undefined ? code : `${code} (${hint})`;
-    })
-    .join(', ');
+  if (parts.length > 0) return parts.join(', ');
+  return (
+    "no error code, and the fetch layer's own text is withheld — it can quote the " +
+    'request, which holds the password'
+  );
 }
 
 /** `AbortSignal.timeout` rejects with a DOMException named TimeoutError, headers or body. */
@@ -193,10 +281,11 @@ const TYPE_HINTS = new Map([
 ]);
 
 /**
- * Cognito's `__type`, without the namespace (`ns#Name`) or the suffix
- * (`Name:detail`) the AWS JSON protocols allow around it. Not yet a token.
+ * Cognito's `__type` when the body carries one, without the namespace
+ * (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols allow around
+ * it. Not yet a token: the cut is what gets checked, since it is what prints.
  */
-function errorTypeOf(text: string): unknown {
+function errorTypeOf(text: string): string | undefined {
   let body: unknown;
   try {
     body = JSON.parse(text);
@@ -204,8 +293,8 @@ function errorTypeOf(text: string): unknown {
     return undefined;
   }
   const raw = read(body, '__type');
-  if (typeof raw !== 'string') return undefined;
-  return raw.split(':')[0]?.split('#').pop();
+  if (typeof raw !== 'string' || raw === '') return undefined;
+  return raw.split(':')[0]?.split('#').pop() ?? '';
 }
 
 /** The response's media type, lowercased and without parameters. Not yet a token. */
@@ -225,8 +314,15 @@ function describeResponse(res: unknown, text: string, password: string): string 
     typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599
       ? `HTTP ${status}`
       : 'an invalid HTTP status';
-  const type = token(errorTypeOf(text), ERROR_TYPE, password);
-  if (type !== undefined) {
+  const rawType = errorTypeOf(text);
+  if (rawType !== undefined) {
+    const type = token(rawType, ERROR_TYPE, password);
+    if (type === undefined) {
+      return (
+        `${statusLine}, with an error type that is withheld (not an identifier, or it ` +
+        'repeats part of the password)'
+      );
+    }
     const hint = TYPE_HINTS.get(type);
     return hint === undefined ? `${type} (${statusLine})` : `${type} (${statusLine}): ${hint}`;
   }
@@ -275,6 +371,9 @@ export async function fetchCognitoAccessToken(
         ClientId: config.clientId,
         AuthParameters: { USERNAME: username, PASSWORD: password },
       }),
+      // A 307 or 308 would re-send this body, password and all, to wherever it
+      // pointed. Cognito never redirects, so a redirect is refused.
+      redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {

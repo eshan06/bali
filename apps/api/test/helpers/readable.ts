@@ -1,10 +1,14 @@
 /*
- * Every text a reader can decode a printed string back into.
+ * The texts a printed string decodes back into under three renderings — JS and
+ * JSON string escapes, percent-encoding, and HTML character references —
+ * applied in any order and stacked. Not every encoding there is: '+' for a
+ * space and base64 are not undone, which is why the leak tests also plant a
+ * canary beside the password.
  *
  * A transcript that merely ESCAPED a password has still leaked it — whoever
- * reads it can undo the escaping — so a leak assertion has to look through
- * every rendering a printer or a proxy might have applied, and through several
- * stacked: a JSON body quoted by `util.inspect` is escaped twice.
+ * reads it can undo the escaping — so a leak assertion has to look through the
+ * renderings a printer or a proxy applies, and through several stacked: a JSON
+ * body quoted by `util.inspect` is escaped twice.
  *
  * The decoders are range-checked. An escape naming a code point that does not
  * exist (`\u{FFFFFF}`) is left as written rather than thrown on: a helper that

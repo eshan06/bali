@@ -111,9 +111,17 @@ const IDENTIFIER_CLAIMS = ['cognito:username', 'username'];
 /** A grid cell, not an essay; and nothing that can move the cursor around a log. */
 const MAX_DISPLAY_NAME = 64;
 
-/** A UUID in any of the shapes Cognito hands one out in. */
-const UUID_LIKE =
-  /^(?:[\w-]+:)?\{?(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})\}?$/i;
+/**
+ * Nothing a reader would see: whitespace, default-ignorable characters (the
+ * joiners, Hangul fillers, variation selectors) and the blank braille cell.
+ */
+const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
+
+/**
+ * A dashed UUID, in either case: what a pool configured with
+ * `UsernameAttributes: ['email']` (or phone) gives every user as a username.
+ */
+const UUID_USERNAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Cognito's built-in social providers, by the name it puts in front of a
@@ -122,8 +130,11 @@ const UUID_LIKE =
  * can spell the prefix either way.
  */
 const FEDERATED_SUBJECTS = new Map([
-  ['google', /^\d{6,}$/],
-  ['facebook', /^\d{6,}$/],
+  // Google's `sub` and Facebook's app-scoped id are long decimal numbers (21
+  // and 15-17 digits); requiring ten keeps a name that ends in a date, such as
+  // google_20290101.
+  ['google', /^\d{10,}$/],
+  ['facebook', /^\d{10,}$/],
   ['loginwithamazon', /^amzn1\.account\.[a-z0-9]+$/i],
   ['signinwithapple', /^\d+\.[0-9a-f]+\.\d+$/i],
 ]);
@@ -160,7 +171,7 @@ function isFederatedUsername(value: string): boolean {
  * `ana_rodriguez2029` and `p_kowalski1987` — a surname and a year.
  */
 function isOpaqueIdentifier(value: string): boolean {
-  return UUID_LIKE.test(value) || isFederatedUsername(value);
+  return UUID_USERNAME.test(value) || isFederatedUsername(value);
 }
 
 /**
@@ -171,23 +182,26 @@ function isOpaqueIdentifier(value: string): boolean {
  * Zero-width joiner and non-joiner are kept: they are `\p{Cf}` too, but they
  * carry meaning in Persian, Arabic and Indic names and inside emoji sequences.
  *
+ * Line and paragraph separators (U+2028, U+2029) go too: a log viewer can
+ * break a line on them.
+ *
  * A lone surrogate half passes TypeScript happily and then reaches Postgres,
  * which stores it as U+FFFD — and the fill would never replace it. So lone
  * halves in the claim are dropped (`\p{Cs}`; a proper pair is one code point
  * and is kept), and the clamp counts code POINTS, so its cut never makes one.
+ *
+ * A name with nothing a reader would see — only joiners, a Hangul filler, a
+ * blank braille cell — counts as no name at all. Stored, it would blank the
+ * student's cell in the grid for good, and outrank the readable username.
  */
 function cleanClaim(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const stripped = value.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (char) =>
+  const stripped = value.replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu, (char) =>
     char === '\u200c' || char === '\u200d' ? char : '',
   );
-  const cleaned = stripped.trim();
-  if (cleaned.length === 0) return undefined;
-  const points = [...cleaned];
-  if (points.length <= MAX_DISPLAY_NAME) return cleaned;
-  // Trim again: the cut can land just after a space.
-  const clamped = points.slice(0, MAX_DISPLAY_NAME).join('').trim();
-  return clamped.length > 0 ? clamped : undefined;
+  // Trimmed again after the cut, which can land just after a space.
+  const clamped = [...stripped.trim()].slice(0, MAX_DISPLAY_NAME).join('').trim();
+  return INVISIBLE.test(clamped) ? undefined : clamped;
 }
 
 /**

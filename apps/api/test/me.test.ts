@@ -119,6 +119,11 @@ describe('GET /v1/me', () => {
       extraClaims: { username: '8f14e45f-ceea-467a-9b9c-1c1e6a4e7b3d' },
     });
     expect((await me(uuidUser)).body.user.displayName).toBeNull();
+    const upperUuid = await ctx.issuer.sign({
+      sub: 'uuid-username-upper',
+      extraClaims: { username: '8F14E45F-CEEA-467A-9B9C-1C1E6A4E7B3D' },
+    });
+    expect((await me(upperUuid)).body.user.displayName).toBeNull();
 
     // Cognito names a federated user `<provider>_<subject>`; one per built-in
     // provider, in the subject shape that provider hands out, plus the
@@ -179,6 +184,9 @@ describe('GET /v1/me', () => {
       ['prefix-a', 'google_fan_2029'],
       ['prefix-b', 'facebook_ana'],
       ['prefix-c', 'Google_Ana_Reyes'],
+      // Numeric like Google's subject, but eight digits — a date, not a `sub`.
+      ['prefix-d', 'google_20290101'],
+      ['prefix-e', 'facebook_20290101'],
     ]) {
       const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
       expect((await me(token)).body.user.displayName, username).toBe(username);
@@ -212,9 +220,11 @@ describe('GET /v1/me', () => {
   it('clamps without splitting a character in half', async () => {
     // Slicing UTF-16 units can cut a surrogate pair, and Postgres then stores
     // the lone half as U+FFFD — permanently, since the fill never overwrites.
+    // 65 code points, so the cut really happens — and lands right after the
+    // pair: a UTF-16 slice to 64 would keep only its first half.
     const token = await ctx.issuer.sign({
       sub: 'emoji',
-      extraClaims: { name: `${'A'.repeat(63)}\u{1F600}` },
+      extraClaims: { name: `${'A'.repeat(63)}\u{1F600}B` },
     });
 
     const stored = (await me(token)).body.user.displayName ?? '';
@@ -227,6 +237,41 @@ describe('GET /v1/me', () => {
     expect(stored).not.toContain('\uFFFD');
     expect([...stored]).toHaveLength(64);
     expect(stored.endsWith('\u{1F600}')).toBe(true);
+  });
+
+  it('trims again after the clamp, when the cut lands just after a space', async () => {
+    const token = await ctx.issuer.sign({
+      sub: 'cut-at-space',
+      extraClaims: { name: `${'A'.repeat(63)} ${'B'.repeat(5)}` },
+    });
+
+    expect((await me(token)).body.user.displayName).toBe('A'.repeat(63));
+  });
+
+  it('treats a name with nothing visible in it as no name', async () => {
+    // Joiners only, a Hangul filler, blank braille cells: stored, any of these
+    // would blank the student's cell in the grid for good and outrank the
+    // readable username behind it.
+    for (const [sub, name] of [
+      ['invisible-joiners', '\u200d\u200c'],
+      ['invisible-hangul', '\u3164'],
+      ['invisible-braille', '\u2800\u2800'],
+    ]) {
+      const token = await ctx.issuer.sign({
+        sub,
+        extraClaims: { name, username: 'demo-eve@example.test' },
+      });
+      expect((await me(token)).body.user.displayName, sub).toBe('demo-eve@example.test');
+    }
+  });
+
+  it('drops line and paragraph separators', async () => {
+    const token = await ctx.issuer.sign({
+      sub: 'separators',
+      extraClaims: { name: 'Ana\u2028Reyes\u2029' },
+    });
+
+    expect((await me(token)).body.user.displayName).toBe('AnaReyes');
   });
 
   it('keeps the joiners that carry meaning in a name', async () => {
