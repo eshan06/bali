@@ -12,10 +12,18 @@ import {
   gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
+  staleness,
   type Students,
 } from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
+
+/**
+ * The server's own heartbeat interval (`apps/api/src/sse/hub.ts`). The grid
+ * measures silence against it rather than a number of its own, so the two
+ * cannot drift into a banner that flaps or one that never fires.
+ */
+const STREAM_HEARTBEAT_MS = 20_000;
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
@@ -36,7 +44,11 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
-  const lastUpdate = useRef<number>(Date.now());
+  // Any sign of life from the server: an event, a heartbeat comment, or a
+  // snapshot refresh that came back. A heartbeat is freshness and not just
+  // liveness — a quiet class emits no events, so nothing arriving is normal
+  // and only nothing arriving FROM THE SERVER means the screen is guessing.
+  const lastActivity = useRef<number>(Date.now());
   // The newest event seq the grid has applied, so a stale in-flight snapshot
   // can't roll it backwards over a streamed unlock.
   const appliedSeq = useRef<number>(0);
@@ -51,7 +63,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
         appliedSeq.current = snap.latestSeq;
-        lastUpdate.current = Date.now();
+        lastActivity.current = Date.now();
         sse = createSseClient({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
           getToken: getAccessToken,
@@ -60,7 +72,10 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
-            lastUpdate.current = Date.now();
+            lastActivity.current = Date.now();
+          },
+          onActivity: () => {
+            lastActivity.current = Date.now();
           },
           onStatus: setStatus,
           onUnauthorized,
@@ -91,6 +106,10 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
         (snap) => {
+          // The refresh came back, so the grid is current whether or not it
+          // changed anything — the banner must not keep counting up past a
+          // reload that worked.
+          lastActivity.current = Date.now();
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
           setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));
@@ -106,14 +125,20 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
 
-  const staleSec = Math.round((now.getTime() - lastUpdate.current) / 1000);
+  const stale = staleness({
+    status,
+    lastActivityAt: lastActivity.current,
+    now: now.getTime(),
+    heartbeatMs: STREAM_HEARTBEAT_MS,
+  });
   const rows = Object.values(students);
 
   return (
     <div className="space-y-3">
-      {status !== 'open' ? (
+      {stale ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Reconnecting — last updated {staleSec}s ago
+          {stale.reason === 'reconnecting' ? 'Reconnecting' : 'Live feed has gone quiet'} — last
+          updated {stale.secondsAgo}s ago
         </p>
       ) : null}
       {rows.length === 0 ? (

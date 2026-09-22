@@ -138,6 +138,37 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — The portal's two audit findings, and both were subtler than
+  "missing": the reconnect backoff and the staleness banner already existed,
+  and both were wrong in the case that matters.
+  **The backoff reset on the 200, not on the connection lasting.** A server
+  that accepts and immediately drops — a session that has ended, a hub
+  draining on deploy — answers 200 every time, so every retry went back to the
+  base delay. Measured: 16 attempts in 600 ms with a 50 ms base and no growth
+  at all, which at the shipped 500 ms default is a browser knocking twice a
+  second, per open tab, indefinitely. It resets only once a connection has
+  lasted `stableAfterMs` (5 s) now; the same measurement gives 5 attempts,
+  doubling. A genuine blip after a healthy stream still reconnects at the base
+  delay, which has its own test.
+  **The banner only appeared when the client already knew it was
+  disconnected** — the one case it can see. The dangerous shape showed
+  nothing: a stream that stays open and stops delivering (a wedged proxy, a
+  hub that died without closing the socket) left a fully green grid ageing
+  silently, every chip claiming a freshness nothing had checked, which is rule
+  3 exactly. The decision is a pure `staleness()` in `grid-state.ts` — the
+  shape `gridDisplay` already uses, so it is unit-testable without pulling a
+  DOM harness into `apps/web` — and it now also fires on an open-but-silent
+  stream, worded differently so the two are not confused.
+  Liveness had to come from the SERVER's heartbeat, not from events: a quiet
+  class emits none for minutes (decision 7), so event traffic would have
+  marked a healthy stream stale. The SSE client reports every frame through
+  `onActivity`, comments included, and a heartbeat counts as freshness rather
+  than mere liveness — nothing arriving means nothing changed. The 15 s
+  snapshot refresh feeds it too, so a reload that worked stops the counter.
+  Caught in my own mutation pass before pushing: `onActivity` was load-bearing
+  and unpinned — deleting it left the suite green while a quiet class would
+  have shown the stale banner after a minute. It has its own test now.
+
 - **2026-09-22** — Fourth pass on the same decision, and the third time I
   closed half a hole. #27 added a test that the stream route's log dispatch
   really writes `debug` for the teardown race — and asserted only that
