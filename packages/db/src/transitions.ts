@@ -706,7 +706,26 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // a tap that was never armed and never converts. `insertEvent` refuses the
     // same class of reuse for the same reason ("a student's app is an
     // adversary here"), and this holds that line: a non-401 4xx keeps the
-    // record, retries, and surfaces, which loses nothing.
+    // record and retries, which loses nothing. Not "and surfaces" — that is
+    // the UNLOCK contract's `retry_and_surface`, and no tap-side disposition
+    // exists yet, which PLAN.md records as the open Phase 3 gap.
+    //
+    // Caller here means the STUDENT and the TYPE, not the teacher — unlike
+    // the `armed_taps` lookup below, which is scoped to both. Nobody chose
+    // that: the code and the plan entry disagreed about it until a reader
+    // noticed. It is left as it is PENDING THE OWNER'S RULING, because
+    // closing it is another shipped `/v1` 200 -> 409 and a held PR is not the
+    // place to widen one.
+    //
+    // The short of it: this lookup is looser than `insertEvent`'s own replay
+    // key (type + SESSION + user), so one client mistake already gets two
+    // answers — a 409 through `tapIn` when the tapped teacher has a running
+    // session the student is enrolled in, a silent 200 here in every other
+    // shape — and the quiet one is the wrong one. What closing it would and
+    // would not fix is written up once, in docs/PLAN.md's armed-tap review
+    // entry, and pinned by "suppresses a second teacher's arming ..." in
+    // transitions.test.ts. Both carry the reasoning; this comment does not
+    // repeat it, so the three cannot drift apart.
     const recorded = firstOrUndefined(
       await tx
         .select({ type: events.type, userId: events.userId })

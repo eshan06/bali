@@ -168,10 +168,14 @@ under-13 parental-consent machinery.
   index; releasing the holder lets it resume into the conflict. Rethrowing
   instead of recovering, or dropping the savepoint, each turns it red.
   Both of `armTap`'s event-id lookups are scoped to the CALLER now, not just
-  the id. Answering `replay` for a stranger's id handed back their row and
-  told this phone's outbox the tap was durably recorded, so it dropped a tap
-  that was never armed and never converts — silently absent from the grid at
-  Start. `insertEvent` refuses the same class of reuse for the same reason;
+  the id: the `armed_taps` one to the student and the teacher, the `events`
+  one to the student and the event type — not the teacher, which is the
+  asymmetry recorded below, left as it is pending the ruling rather than
+  chosen. Answering `replay` for a stranger's id
+  handed back their row and told this phone's outbox the tap was durably
+  recorded, so it dropped a tap that was never armed and never converts —
+  silently absent from the grid at Start. `insertEvent` refuses the same
+  class of reuse for the same reason;
   arming holds the same line and raises `EVENT_ID_CONFLICT`. **Behaviour
   change on a path that previously answered `replay`**, but only for an id
   that is not the caller's, which no honest client sends. Open for Phase 3:
@@ -262,8 +266,14 @@ under-13 parental-consent machinery.
   removed handed back a stranger's row and told this phone's outbox a tap was
   durably recorded when it was not, so no honest client loses anything — but
   that reading is the owner's to confirm, and it is a revert of one call site
-  if they rule the other way. Both are now **BLOCKERs on the PR**, so it waits
-  on the ruling rather than merging ahead of it.
+  if they rule the other way. (c) **A recommendation, not a blocker**, added
+  after the fact: `armTap`'s `events` lookup is not scoped to the teacher, so
+  an id spent under one teacher answers `replay` on another's block and arms
+  nothing — a rule 5 silent drop. Scoping it is one `leftJoin` and rides the
+  same 200 → 409 decision as (b); it narrows the gap without closing it, and
+  the residual is written up below. (a) and (b) are now **BLOCKERs on the
+  PR**, so it waits on the ruling rather than merging ahead of it; (c) needs
+  no separate ruling if (b) goes against the 409.
   **Third round found the half of the skip that needed no race at all.** The
   spent-id check went on the STANDING row but not on the incoming id, so the
   plain retry of a lost 200 — tap at 09:01, bell, outbox retries at 09:30 with
@@ -273,11 +283,40 @@ under-13 parental-consent machinery.
   genuinely landed; an id on record for a DIFFERENT student is the same
   `EVENT_ID_CONFLICT` the armed-tap lookup already raises. `armedTapId` is
   optional for that one answer — it is the only `replay` with no row behind
-  it. Both event-id lookups are scoped to the teacher as well as the student
+  it. The ARMED-TAP lookup is scoped to the teacher as well as the student
   now: a row of this student's for teacher X was being handed back as the
   answer to a tap on teacher Y's block, arming nothing for Y while telling the
   outbox it was recorded — the same failure the student scoping closed, one
-  axis over.
+  axis over. **The `events` lookup is not, and an earlier version of this
+  entry claimed both were** — found by review: another claim that was true of
+  the writing and not of the code. An id already
+  recorded as this student's `tap_in` under teacher X answers `replay` on
+  teacher Y's block too, so Y arms nothing and Y's Start converts nobody: the
+  same shape, one table over. Pinned by a test now rather than only described.
+  That lookup is LOOSER than `insertEvent`'s own replay key (type + session +
+  user), so the same reuse is already answered two ways on nothing the client
+  controls — 409 when Y has a session running and the tap routes to `tapIn`,
+  a silent 200 `replay` when Y has nothing running and it routes to `armTap`.
+  The quiet answer is a rule 5 silent drop, so scoping this lookup to the
+  teacher is the better behaviour — **recommended, and added to the owner's
+  ask** rather than done here, since it is another shipped `/v1` 200 → 409,
+  the category already with them, and a held PR is not the place to widen it.
+  Mechanically one `leftJoin`: `events` has no teacher column, but every
+  `tap_in` carries `classId`, so `classes.teacherId` is one hop — left, not
+  inner, because `class_id` is nullable and an inner join would drop those
+  rows into "id unused".
+  **It closes the cross-teacher split and no more.** The SAME teacher, an id
+  spent in an earlier session of theirs, still answers 200 through `armTap`
+  and 409 through `tapIn`, because the teacher matches. That residual is not
+  a tidiness point but the same rule 5 silent drop: a real second physical
+  tap at that teacher's own block, with nothing running, dropped without a
+  trace, and their next Start converting nobody. So the join narrows the gap;
+  it does not close rule 5 on this path. Closing that needs a session scope,
+  and `armTap` has none to scope to. Named here because the ruling should not be made on half
+  the shape. Two earlier drafts of this entry got it wrong in the other
+  direction: the first argued tightening would SPLIT `armTap` from `tapIn`,
+  which had it backwards, and the second claimed it would unify them
+  outright, which is true only of the axis the join covers.
   That obsoleted the staging of "a spent event id never wedges the next
   Start": it armed the spent id through `armTap`, which now refuses. The row
   is written directly instead, which is the honest framing anyway — the

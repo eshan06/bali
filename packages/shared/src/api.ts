@@ -45,10 +45,10 @@ export interface TapResponse {
    * null on one `replay` too: an id already recorded in `events` with nothing
    * waiting for it, where the tap landed in a session that has since ended.
    *
-   * That last case is the open contract question (PLAN.md, "Found while
-   * fixing the audit, for the owner to rule on"): a phone told `replay` with
-   * no session has nothing to reconcile against, which is exactly what a
-   * "recorded, but no longer current" answer would give it.
+   * That last case is one of the open `/v1` contract questions with the
+   * owner: a phone told `replay` with no session has nothing to reconcile
+   * against, which is exactly what a "recorded, but no longer current" answer
+   * would give it.
    */
   session: SessionView | null;
   /** The resulting stored state when joined; null when armed. */

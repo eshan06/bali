@@ -891,6 +891,19 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     // Explicit budget: up to three rounds, each seeding 60 students, starting a
     // session and staging a race inside it. The default 5 s leaves no room for
     // the assertion above to report, which is the failure worth reading.
+    //
+    // 20 s and not more, which review has now read as tight twice — so here
+    // is the measurement rather than the arithmetic. Both waits above are
+    // polling loops that return on first success, not sleeps, so their 1.5 s
+    // and 2 s are CEILINGS paid only by a round that misses. Seven passing
+    // runs on the real lane: 459 ms in a full suite, then 636/677/680/703/742
+    // ms isolated — and one at 2949 ms, which is what a retried round costs.
+    // So a pass is usually one round under a second, and sometimes two under
+    // three. The worst case, all three rounds missing, was staged by
+    // poisoning both poll predicates and measured at 7.2 s, ending on the
+    // assertion above rather than on the clock — the property that matters.
+    // (Adding the ceilings up gives ~12 s. That is derived and wrong: the two
+    // waits overlap in wall clock. The numbers above are not derived.)
   }, 20_000);
 
   it('a delivery that loses the event_id index is answered as a replay, not a 500', async () => {

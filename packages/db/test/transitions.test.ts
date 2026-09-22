@@ -1176,8 +1176,9 @@ describe('armed taps', () => {
 
   it("will not answer a tap on one teacher's block with a row held for another", async () => {
     /*
-     * The event-id lookups were scoped to the student but not the teacher. A
-     * student holding a waiting row for teacher X under id E who then taps
+     * The `armed_taps` event-id lookup was scoped to the student but not the
+     * teacher. A student holding a waiting row for teacher X under id E who
+     * then taps
      * teacher Y's block carrying E was handed X's row back as `replay`: the
      * outbox is told the tap is durably recorded, nothing is armed for Y, and
      * Y's Start converts nothing. Same "hand back a row that is not this tap"
@@ -1213,6 +1214,120 @@ describe('armed taps', () => {
     const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.teacherId).toBe(teacher.id);
+  });
+
+  it("suppresses a second teacher's arming when the phone reuses an id spent on the first", async () => {
+    /*
+     * The axis the lookup above does NOT cover, pinned rather than left to be
+     * rediscovered — a decision nothing tests is a decision that can change by
+     * accident. Review found the code and the plan entry disagreeing about it.
+     *
+     * `armTap`'s `armed_taps` lookup is scoped to the student AND the teacher.
+     * The `events` lookup above it is scoped to the student and the event
+     * TYPE and not to the teacher — so an id already recorded as this
+     * student's `tap_in` under teacher A reads as this phone's replay
+     * whoever's block it arrives on. Teacher B arms nothing, the outbox is
+     * told the tap is durably recorded, and B's Start converts nobody, while
+     * the student is standing at B's block for real.
+     *
+     * Which makes it looser than `insertEvent`'s replay key (type + session +
+     * user), so the same reuse is already answered two ways on nothing the
+     * client controls. `resolveTapTarget` sends a tap to `tapIn` only when
+     * the tapped teacher has a running session THE STUDENT IS ENROLLED IN,
+     * and there `insertEvent` refuses the spent id: 409, so the outbox keeps
+     * the record. Every other shape — nothing running, or a session running
+     * in a class they are not in — comes here and is a silent 200.
+     *
+     * Scoping this lookup to the teacher would close that split, but only its
+     * cross-teacher half. The SAME teacher, an id spent in an earlier session
+     * of theirs, still answers 200 here and 409 through `tapIn`, because the
+     * teacher matches. That residual is not a tidiness point: it is the same
+     * rule 5 silent drop — a real second physical tap at that teacher's own
+     * block, with nothing running, dropped without a trace, and their next
+     * Start converting nobody. Closing it needs a SESSION scope, and `armTap`
+     * has no session to scope to.
+     *
+     * Not done here either way: it is another shipped `/v1` 200 -> 409, the
+     * category the owner is already being asked to rule on, and a held PR is
+     * not the place to widen it. This test pins what the code does MEANWHILE,
+     * so the ruling lands on a known quantity.
+     *
+     * No privilege in it: the server-side outcome is exactly not tapping.
+     * What the student does get is the LOOK of a tap made in front of the
+     * teacher while the grid records nothing — the phone/grid drift decision
+     * 1 exists to prevent. It needs a client that reuses one id across two
+     * PHYSICAL taps, which is the adversary `insertEvent`'s comment names.
+     */
+    const { student, klass, school } = await seedClass('arm-spent-cross');
+    const otherTeacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'teacher-arm-spent-cross-2', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const otherClass = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: otherTeacher.id,
+          schoolId: school.id,
+          name: 'Class arm-spent-cross-2',
+          joinCode: 'JOIN-ARMX2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: otherClass.id, studentId: student.id });
+
+    // 09:01, the tap lands in teacher A's period and the 200 is lost.
+    const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+    const spent = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await endSession(db, {
+      sessionId: first.session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+
+    // 09:55, a real second physical tap — teacher B's block, nothing of B's
+    // running — sent under the id the phone never got a 200 for.
+    const armed = await armTap(db, {
+      studentId: student.id,
+      teacherId: otherTeacher.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:55:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:55:00Z'),
+    });
+
+    // Answered about teacher A's tap, and nothing is waiting for B.
+    expect(armed.outcome).toBe('replay');
+    expect(armed.armedTapId).toBeUndefined();
+    const waiting = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
+    expect(waiting).toHaveLength(0);
+
+    // So B's Start joins nobody. This is the drift being pinned: the student
+    // is at B's block, and B's grid will show them absent until they tap
+    // again with an id the phone has not already spent.
+    const second = await startSession(db, {
+      classId: otherClass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    expect(second.armedConverted).toBe(0);
+    const joined = await db
+      .select()
+      .from(participations)
+      .where(
+        and(
+          eq(participations.sessionId, second.session.id),
+          eq(participations.studentId, student.id),
+        ),
+      );
+    expect(joined).toHaveLength(0);
   });
 
   it('a fresh tap takes over a standing row whose id is already spent', async () => {
