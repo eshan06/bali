@@ -27,6 +27,12 @@
  * No error from outside is attached as its `cause`: an object can print
  * differently from the way it looked when it was checked, and a string cannot.
  *
+ * The boundary, stated rather than implied: this defends against the password
+ * being ECHOED — quoted, escaped, truncated — by something downstream. It does
+ * not defend against a party that deliberately encodes it into a token's
+ * alphabet (unpadded base32 is a valid error code); such a party already holds
+ * the password and has better ways to publish it than a demo's transcript.
+ *
  * The cost is Cognito's message text and a proxy page's body. The error type,
  * with fixed words for the common ones, stands in for the first; the status and
  * media type for the second.
@@ -56,8 +62,8 @@ export interface CognitoCredentials {
 
 /*
  * The shapes a token from outside must have. None of them has any quoting or
- * escape syntax, so there is nothing to decode: a token either shows characters
- * of the password plainly or holds none of them.
+ * escape syntax, so there is nothing to decode: a token that held the password
+ * would hold it in plain characters, where the containment check sees it.
  */
 /** An error code or a challenge name: `ENOTFOUND`, `NEW_PASSWORD_REQUIRED`. */
 const CONSTANT_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;

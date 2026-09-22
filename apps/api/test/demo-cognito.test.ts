@@ -11,12 +11,12 @@ import { readableForms } from './helpers/readable.js';
  * path throws something an operator can act on rather than returning a
  * token-shaped nothing.
  *
- * And none of them can print the password. The module's rule is that nothing it
+ * And none of them may carry the password. The module's rule is that nothing it
  * throws carries text from outside — the response, the fetch layer — beyond a
- * few identifier-shaped tokens, so the tests below load every outside channel
- * with text and assert that none of it arrives: not the password, in any
- * readable encoding, and not a canary sitting beside it, which catches the
- * encodings no decoder here knows.
+ * few identifier-shaped tokens, so the tests below load each channel listed in
+ * CHANNELS with text and assert that none of it arrives: not the password — raw,
+ * or with JS/JSON escapes, percent-encoding and HTML entities undone — and not a
+ * canary sitting beside it, which catches the encodings no decoder here undoes.
  */
 
 const config = { region: 'us-east-1', clientId: 'app-client-id' };
@@ -367,8 +367,8 @@ describe('fetchCognitoAccessToken', () => {
  * The leak matrix. Each channel is a place outside text can arrive; each is
  * loaded with a canary, then the password in some encoding, then the canary
  * again. For every password and every encoding the thrown error must show
- * neither: the password under any decoding a reader could apply, nor the canary
- * — which also covers the encodings (base64) that no decoder here undoes.
+ * neither: the password under any of the decodings `readableForms` applies, nor
+ * the canary — which also covers the encodings (base64) no decoder here undoes.
  */
 const CANARY = 'outside-text-q7z';
 

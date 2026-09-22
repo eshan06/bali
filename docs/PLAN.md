@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in no longer puts any text from outside into what it throws, so a password echoed back has no way into the transcript._
 
 ## Now
 
@@ -38,42 +38,18 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   only failed at the database. The `UPDATE` half also refuses to run when there
   is no live school (`AND EXISTS`), so pasting only the second statement reports
   `UPDATE 0` rather than setting `school_id` NULL and looking like success.
-- **Exit-demo follow-ups from #16's review (done):** all three WARN findings
-  reproduced, so all three are closed. The depth-bounded walks memoized on the
-  node alone, so a node first reached at the bottom of the budget was explored
-  with nothing left for its children and that truncated visit became final — a
-  later, shallower path returned early and a password two hops under a shared
-  node printed in full; the memo now keys on the shallowest depth seen. Reads
-  that a hostile error can make throw are guarded per node — `Object.entries`
-  runs every getter at once, `errors`, `cause` and `name` are ordinary own
-  properties, and `instanceof` itself reads a prototype chain a Proxy can trap —
-  so one hostile object costs its own subtree rather than the operator's one
-  actionable message.
-
-  The third warning is closed differently, and the review round that followed is
-  why. Scrubbing carriers one kind at a time kept missing them: a password on a
-  symbol-keyed property, on a named property hung off a Buffer, inside a
-  `Headers` or `URLSearchParams` whose contents live in internal slots, or frozen
-  into a stack string some logger materialized before the scrub ran — all still
-  printed. Each is a real leak and each now has a test. The rule now is that the
-  walk is **best effort and says so**, and the guarantee lives in one check:
-  before any error is attached as a `cause`, the module reads back what would
-  actually be printed — at least as thoroughly as the demo's top-level handler,
-  which stops at depth 2 where this asks for unlimited — and attaches a redacted
-  rendering instead, or nothing at all when even that still holds the password.
-
-  A second review round then found that covering carriers was only half of it.
-  The secret arrives in a rendering already QUOTED, and each printer escapes
-  differently, so a password containing `"` and `\` was sitting in a transcript
-  looking redacted while remaining perfectly recoverable by anyone who un-escapes
-  what they are reading — `<redacted>` never appeared, and no test noticed
-  because every fixture used the same plain password. The check now decodes
-  escapes before looking, and the tests assert on the decoded text. Two more
-  leaks closed in that round: an error body was truncated to 200 characters
-  BEFORE being redacted, printing the prefix of a password that straddled the
-  cut; and `await res.text()` sat outside every guard, so an ordinary truncated
-  response — undici's `TypeError: terminated` — bypassed the module entirely and
-  took the operator's one actionable line with it.
+- **The exit demo's sign-in errors carry no text from outside** (2026-09-22). The
+  scrubbing #16's review asked to harden was replaced rather than patched: three
+  review rounds each found a new class of leak in it, and measured across 25
+  channels × 7 encodings × 6 passwords the password was still recoverable in 398
+  of 1,050 combinations (662 on `main` before it). Nothing the sign-in throws now
+  carries text from outside — its errors are fixed wording, the operator's own
+  configuration, and identifier-shaped tokens (HTTP status, error codes,
+  Cognito's error type, a challenge name, a media type), each withheld if it
+  contains the password, with no caught error attached as a `cause`: 0 of 1,050,
+  pinned by that matrix. The cost is Cognito's message text and a proxy page's
+  body; the error type, with fixed words for the common ones, stands in for the
+  first, the status and media type for the second.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
   `claims.name`, but Cognito puts profile attributes in the ID token and every
   client here sends an **access** token — the portal stores `access_token`
@@ -90,20 +66,18 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   student's own once they set it. One visible knock-on: a remote exit-demo run
   now labels its actors with their Cognito usernames, because `me.user.displayName`
   finally answers.
-- **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
-  scrubs enumerable own properties, not just messages (inspecting an error
-  prints them, so a client hanging the request body off it leaked through a path
-  no message-only scrub reached), and both the redaction and the detail walk
-  follow `AggregateError.errors` as well as `cause` — a host whose addresses all
-  refuse arrives as an AggregateError with an empty message, so the operator was
-  getting "fetch failed" and nothing else.
+- **Exit-demo follow-ups from #15's review (done):** the sign-in reads
+  `AggregateError.errors` as well as `cause` — a host whose addresses all refuse
+  arrives as an AggregateError with an empty message, so the operator was getting
+  "fetch failed" and nothing else. (Its scrubbing of own properties is
+  superseded: the errors carry no outside text at all — see above.)
 - **Exit-demo follow-ups from #14's review (done):** Ben's own check-in closes
   his silence episode with no pump running, so the incident proves his return
-  did it rather than "some check-in did"; a fetch failure reports its cause
-  chain, because Node reports every network error as a bare `fetch failed` and
-  puts ENOTFOUND on `cause`; that detail is redacted so a client echoing the
-  request body could not leak `DEMO_PASSWORD`; and a non-JSON body names the
-  status that actually came back.
+  did it rather than "some check-in did"; a fetch failure reports the error
+  codes on its cause chain, because Node reports every network error as a bare
+  `fetch failed` and puts ENOTFOUND on `cause` (the messages beside them are not
+  read — see above); and a non-JSON body names the status that actually came
+  back.
 - **Exit-demo follow-ups from #13's review (done):** the second heartbeat stretch
   now includes Ben, so a slow remote run cannot fabricate a second silence
   episode and blame the engine for a simulation artefact; a Cognito failure that
@@ -195,6 +169,62 @@ under-13 parental-consent machinery.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log
+
+- **2026-09-22** — The exit demo's Cognito sign-in puts **no text from outside
+  into what it throws**, rather than scrubbing the password out of that text.
+  The password leaves the process in the request body, and everything that comes
+  back has been downstream of it: Cognito's validation messages quote request
+  values back (probed against the real service), a proxy page can quote the
+  request it refused, a fetch wrapper can hang the request off its error — in
+  whatever escaping that layer prints. Scrubbing had to enumerate every carrier
+  and every encoding, and it checked a live object and then attached it, though
+  an object can print differently later than it did when checked; three review
+  rounds found a new class of leak each time. The thrown error is now a plain
+  `Error`: fixed wording, the caller's configuration (username, endpoint,
+  timeout), and tokens read from outside — HTTP status, error codes, Cognito's
+  error type, a challenge name, a media type — each accepted only in a strict
+  identifier shape and withheld when it contains the password in either case.
+  Nothing is attached as a `cause`. The boundary is an echo — quoted, escaped,
+  truncated — not a party deliberately encoding the password into a token's
+  alphabet, which already holds it. Pinned three ways: a leak matrix asserting
+  that neither the password — raw, or with JS/JSON escapes, percent-encoding
+  and HTML entities undone, stacked — nor a canary placed beside it arrives (the
+  canary covers encodings no decoder there undoes, such as base64); an
+  exact-message test on every exit path; and mutation — removing any one guard
+  turns a test red. Cost, accepted: Cognito's message text and a
+  non-Cognito body are not shown; the error type (with fixed words for the
+  common ones), the status and the media type are. Not taken: `USER_SRP_AUTH`
+  would never send the password at all, but it changes an AWS-side
+  prerequisite, so it is the owner's call.
+
+- **2026-09-22** — Display names come from the token's own claims — a real name
+  first (`name`, `preferred_username`), then the pool's identifier
+  (`cognito:username`, `username`) but only when it is readable — and are
+  **filled, never synced**. The value is trimmed of invisible characters (lone
+  surrogate halves included, which Postgres would store as U+FFFD for good) and
+  clamped to 64 code points, because `name` is an attribute the student can set
+  on themselves and it lands in a teacher's grid. A machine-made identifier is
+  **not** stored, since it would print worse than the grid's own
+  eight-character fallback and the fill would make it permanent: a bare UUID
+  (what a pool signing in by email gives every user), or a federated username —
+  one of Cognito's built-in provider names (`Google`, `Facebook`,
+  `LoginWithAmazon`, `SignInWithApple`, any case), an underscore, and that
+  provider's subject shape. It is anchored on the provider because a rule that
+  read any long tail with a digit as a subject threw away `ana_rodriguez2029`
+  and `p_kowalski1987`. A custom SAML/OIDC provider's names are the pool
+  owner's choice, cannot be recognised by shape, and are stored as the pool
+  spells them. Where the identifier IS readable the teacher sees it — for the
+  dev pool, an email — which is accepted: it is the student's own teacher.
+  Consequence to know: a fallback, once stored, is not replaced by a better name
+  arriving later, because nothing records where the stored value came from. The
+  designed remedy is "edit own name" (phase 3), not a Cognito-side change — a
+  pre-token-generation Lambda emitting `name` would fix new rows only. A new
+  trust boundary comes with this and is worth stating rather than discovering:
+  `name` and `preferred_username` are attributes a student can set on
+  themselves, so a student now chooses the string their teacher reads in the
+  grid and beside unlock records, and nothing stops them choosing a classmate's
+  name. The field was always NULL before, so this is new surface, not a
+  regression; "edit own name" should decide what, if anything, polices it.
 
 - **2026-09-22** — #31's review landed after it merged, and the best finding
   in it was that the staleness banner **could not fire in production**, for
@@ -585,41 +615,6 @@ under-13 parental-consent machinery.
   (`recorded_as: 'not_enrolled'`, no session/class attached, the claimed id in
   the payload) — durable, but unattached. A student removed mid-session keeps
   their ended participation row, so ISSUES #2's actual case is unchanged.
-- **2026-09-22** — Display names come from the token's own claims — a real name
-  first (`name`, `preferred_username`), then the pool's identifier
-  (`cognito:username`, `username`) but only when it is readable — and are
-  **filled, never synced**. The value is trimmed of control characters and
-  clamped to 64 characters, because `name` is an attribute the student can set on
-  themselves and it lands in a teacher's grid. An identifier that is plainly
-  machine-made (a bare UUID, which is what a pool signing in by email gives every
-  user, or a federated `Google_1102…`) is **not** stored: it would print worse
-  than the grid's own eight-character fallback, and the fill would make it
-  permanent. Where the identifier IS readable the teacher sees it — for the dev
-  pool, an email — which is accepted: it is the student's own teacher.
-  Consequence to know: a fallback, once stored, is not replaced by a better name
-  arriving later, because nothing records where the stored value came from. The
-  designed remedy is "edit own name" (phase 3), not a Cognito-side change — a
-  pre-token-generation Lambda emitting `name` would fix new rows only. A new
-  trust boundary comes with this and is worth stating rather than discovering:
-  `name` and `preferred_username` are attributes a student can set on
-  themselves, so a student now chooses the string their teacher reads in the
-  grid and beside unlock records, and nothing stops them choosing a classmate's
-  name. The field was always NULL before, so this is new surface, not a
-  regression; "edit own name" should decide what, if anything, polices it.
-- **2026-09-22** — The demo's password scrubber is **best effort, and the promise
-  is kept by a check rather than by the walk**. It covers messages and stacks,
-  own enumerable properties (symbols included), AggregateError members, named
-  properties on a typed array, and Map/Set contents — but a property walk cannot
-  reach a `Headers`' internal slots or someone's custom `inspect`, and two review
-  rounds found a new missed carrier each time. So before an error is attached as
-  a `cause` it is inspected exactly as the demo's top-level handler would inspect
-  it, and anything the password survived in is replaced by a redacted rendering
-  of itself. The bytes of a typed array remain uncovered on purpose (they print
-  as hex, not text); that is now a statement about one carrier rather than a
-  claim that the walk is exhaustive. The check covers ENCODINGS as well as
-  carriers — it decodes escapes before looking, because a transcript that merely
-  escaped the password has still leaked it — and its last resort is to attach
-  nothing rather than something unproven.
 - **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
   ended-session guard and scoped to this session's own `session_extended` rows.
   An id already spent on a different event is now a 409 rather than a reported
