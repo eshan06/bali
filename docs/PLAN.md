@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`._
 
 ## Now
 
@@ -65,12 +65,14 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap
-  insert race, a replayed tap re-resolved to another session, block
-  re-registration by the tag's own teacher, extend's arithmetic outside the
+  the armTap insert race and its event-id integrity gap (**in review**), a
+  replayed tap re-resolved to another session, extend's arithmetic outside the
   engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
-  missing idempotency key, was re-examined and the deferral stands.
+  banner, and one shared SQLSTATE helper. Block re-registration by the tag's
+  own teacher is fixed but **held for the owner** — the fix answers 200 where
+  `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
+  The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
+  the deferral stands.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -153,6 +155,40 @@ under-13 parental-consent machinery.
   before the `try` used to leave a live streaming connection attached to an
   app the suite was about to close.
 
+- **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
+  read-then-write where the database could have arbitrated.
+  (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
+  phone both passed the selects and the loser surfaced a raw 23505 as a 500 to
+  a student walking to their seat. It now lets the waiting-tap index arbitrate
+  and reads the winner's tap back, the way `insertEvent` does. The insert and
+  its re-read are bounded-retried rather than throwing: `ON CONFLICT DO
+  NOTHING` takes no lock on the row it conflicted with, so a Start can consume
+  that row in between and leave neither a row nor a standing tap — throwing
+  there would have been the same 500 on the same path.
+  (2) A consumed armed tap could end up naming an event no `tap_in` ever
+  recorded — the transient table and the permanent history disagreeing about
+  which tap was converted. Two interleavings, both closed: the refresh guarded
+  on `consumed_at IS NULL` (for a conversion that commits before the update),
+  and `convertArmedTaps` taking `FOR UPDATE` on the taps it reads (for a
+  refresh landing inside its read→consume gap, where the guard sees NULL and
+  passes). The second was reproducing 6/6 with only the guard in place.
+  Accepted residual, unchanged by either: a student whose tap is consumed
+  under them keeps a fresh waiting tap, so the teacher's next session that day
+  converts them without another tap. Decision 5 says a tap is a tap, and
+  end-of-day expiry bounds it.
+  The third finding in this pair, `createBlock` answering `tag_taken` to the
+  teacher who already owns the tag, is **split out and waiting on the owner**:
+  fixing it means `POST /v1/blocks` answering 200 where it answers 409 today,
+  and ARCHITECTURE.md decision 2 sends behaviour changes on a shipped endpoint
+  to `/v2`. Nothing would be renamed or removed and `BlockDetail` is
+  unchanged, and no client can break today (the portal never calls it, the
+  only caller in the tree is the demo script, and there is no iOS app yet) —
+  but that is the owner's call, not a code-review one, so the rest ships
+  without it rather than waiting.
+  Race coverage runs on the real-Postgres lane only — PGlite is
+  single-connection and cannot contend, so the fast lane would pass either
+  way. The warm-up in the race suite is load-bearing for round 0: with a fix
+  reverted and a cold pool, the first round passes vacuously.
 - **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
   reviewer disproved. The stream route's `'error'` listener logged at `debug`
   while production runs at `info`, so the fix that stopped the crash would also
