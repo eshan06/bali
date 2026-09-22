@@ -239,6 +239,113 @@ describe('fetchCognitoAccessToken', () => {
     expect(inspect(err, { depth: null })).not.toContain(creds.password);
   });
 
+  it('redacts a shared node the walk reached at the bottom of its budget first', async () => {
+    // The walk is depth-bounded AND memoized. `b` is enumerated first
+    // (insertion order), reaching `shared` with no budget left for its
+    // children; a memo that only remembered *that* `shared` was seen then made
+    // that truncated visit final, so the shallow `a` path — which had the
+    // budget — returned early and the password below it was never scrubbed.
+    // Shared nodes are ordinary in undici's error graphs.
+    const shared = { deep: { leak: `{"PASSWORD":"${creds.password}"}` } };
+    const err = Object.assign(new TypeError('fetch failed'), {
+      b: { b1: { b2: { b3: shared } } },
+      a: shared,
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(err);
+
+    const caught = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(caught, { depth: null })).not.toContain(creds.password);
+  });
+
+  it('still names the real failure when an own getter on the error throws', async () => {
+    // The scrub runs from inside the catch that builds the one message naming
+    // what the operator got wrong. Reading properties through
+    // `Object.entries` ran every getter at once, so one that threw replaced
+    // that message with an unrelated exception.
+    const hostile = new TypeError('fetch failed');
+    Object.defineProperty(hostile, 'request', {
+      enumerable: true,
+      get() {
+        throw new Error('getter exploded');
+      },
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(hostile);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('could not reach');
+    expect(err?.message).toContain('cognito-idp.us-east-1.amazonaws.com');
+    expect(err?.message).not.toContain('getter exploded');
+  });
+
+  it('still names the real failure when `errors` is not iterable', async () => {
+    // `AggregateError.errors` is an ordinary writable own property, so both
+    // walks iterating it unguarded could throw out of the catch block.
+    const aggregate = new AggregateError([new Error('connect ECONNREFUSED 10.0.0.1:443')], '');
+    (aggregate as unknown as { errors: unknown }).errors = 42;
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause: aggregate }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('could not reach');
+    expect(err?.message).not.toMatch(/not iterable/);
+  });
+
+  it('still names the real failure when `cause` itself throws on read', async () => {
+    // `cause` is an ordinary own property, forgeable exactly like `errors` —
+    // and `detailOf` walks it with no try above it.
+    const hostile = new TypeError('fetch failed');
+    Object.defineProperty(hostile, 'cause', {
+      enumerable: false,
+      get() {
+        throw new Error('cause exploded');
+      },
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(hostile);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('could not reach');
+    expect(err?.message).not.toContain('cause exploded');
+  });
+
+  it('redacts a password carried in a Map or a Set, not just a string property', async () => {
+    // `inspect` prints both in full, so a body parked in one reaches a
+    // transcript exactly as a property would.
+    const fetchImpl = vi.fn().mockRejectedValue(
+      Object.assign(new TypeError('fetch failed'), {
+        cause: Object.assign(new Error('socket hang up'), {
+          request: new Map([['body', `{"PASSWORD":"${creds.password}"}`]]),
+          tried: new Set([`auth as ${creds.password}`]),
+        }),
+      }),
+    );
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(creds.password);
+    expect(printed).toContain('<redacted>');
+  });
+
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {
     const fetchImpl = vi
       .fn()
