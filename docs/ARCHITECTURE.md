@@ -296,7 +296,9 @@ Teacher app and web portal:
 - `GET /v1/sessions/{id}/events?after={number}` — catch-up reads of the event log.
   (The live stream endpoint is decided in the live-updates section.)
 - `GET /v1/classes/{id}/reports/…` — focus minutes and unlocks.
-- `POST /v1/blocks` — register a physical block to a teacher.
+- `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
+  block holds is a `409`; re-registering one's own tag returns that block (the retry of a
+  lost response).
 
 **4. Every request is checked; every error has one shape.** No request body is trusted:
 each endpoint validates its input (right types, sane sizes) before touching the

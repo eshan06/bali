@@ -430,6 +430,40 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 
+  it('a registration racing its own retry answers both with the one block', async () => {
+    // The same teacher twice at once — a request and the retry of its lost
+    // response, crossing. The index arbitrates which insert wins; the loser
+    // must re-read and hand back the winner's block, not a 409 about a tag
+    // the caller already holds.
+    for (let round = 0; round < 20; round += 1) {
+      const tag = `race-block-own-${round}`;
+      const teacher = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `t-${tag}`, role: 'teacher' })
+          .returning(),
+      );
+      const tagId = `TAG-RACE-${tag}`;
+
+      const results = await Promise.all([
+        createBlock(db, { teacherId: teacher.id, tagId }),
+        createBlock(db, { teacherId: teacher.id, tagId }),
+      ]);
+      expect(results.map((r) => r.outcome).sort()).toEqual(['already_registered', 'registered']);
+
+      const live = one(
+        await db
+          .select()
+          .from(blocks)
+          .where(and(eq(blocks.tagId, tagId), isNull(blocks.removedAt))),
+      );
+      for (const r of results) {
+        if (r.outcome === 'tag_taken') throw new Error('unreachable');
+        expect(r.block.id).toBe(live.id);
+      }
+    }
+  });
+
   // The silence sweep's exactly-once guarantee (decision 3) under real
   // contention: two minute-sweeps firing at once must open one episode per phone
   // — never two went_silent for the same student, never a missed one. The
