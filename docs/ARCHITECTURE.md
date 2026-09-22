@@ -512,9 +512,9 @@ Each exists because v2 broke it and shipped a real bug
    screen only claims what was verified. (v2: showed a ticking focus timer while nothing
    was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
-   safe. (v2: had no such IDs on some paths.) A retry is answered with what was recorded
-   while that is still true, and never with a `200` that points a phone at a session that
-   is over (tap step 10, ruled 2026-09-22).
+   safe. (v2: had no such IDs on some paths.) A retried tap is answered with what was
+   recorded while that is still true, and never with a `200` that points a phone at a
+   session that is over (tap step 10, ruled 2026-09-22) — a tap response drives a shield.
 5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
    "Revoke link" could fail and close as if it had worked.)
 6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event
