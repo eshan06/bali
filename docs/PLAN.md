@@ -26,9 +26,13 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   still **recorded** as `no_live_participation`, the full event log with no
   heartbeat noise, and a second session that **expired by itself at the bell**
   with the phone learning it from its own next check-in. Nothing was
-  time-compressed: the run waited out the real threshold and the deployment's
-  own per-minute cron, and the stream carried six keep-alive frames across those
-  waits. The README documents how to re-run it.
+  time-compressed: the run waited out the real 90-second threshold and the real
+  session end rather than backdating rows, and the stream carried six keep-alive
+  frames across those waits. The sweeps themselves were real calls to the
+  deployment's `/internal/sweep` that this run made with the sweep key — without
+  the key the per-minute cron does the identical, idempotent job and the run
+  simply waits for it, so which of the two acts is a coin flip and neither is
+  asserted on. The README documents how to re-run it.
 - **Dev provisioning that made it possible** (one-time, owner-run): a `schools`
   row plus `school_id` on the dev test teacher. `users.school_id` is never
   assigned by any code path while `classes.school_id` is `NOT NULL`, so a teacher
@@ -100,7 +104,7 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
 | Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | |
-| Teacher signup gating (invite code) | 4 | today: manual role flip |
+| Teacher signup gating (invite code) | 4 | today: manual role flip **and school assignment** — nothing assigns `users.school_id`, and `classes.school_id` is NOT NULL |
 | Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch |
 | Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |
 
