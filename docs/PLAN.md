@@ -99,10 +99,22 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   `EVENT_ID_CONFLICT` (#26 before it landed: every class of that teacher the
   student is in, blocked until end of day), and then, converted under a fresh
   id, joined and SHIELDED the student in a class they never tapped into hours
-  later (a 09:00 tap in period 5 at 13:00). Both reproduced. A spent armed tap
-  is consumed and skipped now, so neither happens — the refusals in (1) cost a
-  stuck outbox record and nothing else. That is what makes (1) a contract
-  question rather than an incident.
+  later (a 09:00 tap in period 5 at 13:00). Both reproduced.
+  **Read the tense carefully, because an earlier draft of this bullet got it
+  wrong and the mistake pointed the wrong way.** It said a spent armed tap "is
+  consumed and skipped now", which would have meant the refusals in (1) cost a
+  stuck outbox record and nothing else. On `main` today that is false: #26
+  fixed only the first harm (the `EVENT_ID_CONFLICT` that wedged the next
+  Start) and still converts a spent tap under a FRESH id, so the second — a
+  student joined and SHIELDED in a class they never tapped into, hours later —
+  is live behaviour. The skip is in #29, which is held for the owner too.
+  So the honest statement of the tradeoff, which is the one to rule on: **this
+  PR must not land before #29.** With the skip, the refusals in (1) cost a
+  stuck outbox record and nothing else, and (1) is a contract question. Without
+  it, this PR makes the period-5 shield MORE reachable, because a refusal that
+  used to be a 200 now keeps the outbox record alive to be armed later. Caught
+  by review; the claim was load-bearing for a decision the owner was being
+  asked to make on it.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
   the SSE hub's `close()` did not wait for a LISTEN it had started, so a
   shutdown during setup left a query on a pool being torn down — an unhandled

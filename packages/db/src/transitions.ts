@@ -669,10 +669,12 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
 
     // Replay first — ahead of BOTH guards below. A retry carries the same event
-    // id but a newEndsAt recomputed from the already-extended end, so it would
-    // otherwise read as a fresh, valid extension; and once the session has
-    // ended, a retry of an extend that did commit must still re-read and return
-    // the current truth (rule 4) rather than 409.
+    // id and the same DURATION (the route stopped computing an end time when
+    // the arithmetic moved in here), and a duration is always valid, so without
+    // this the retry would read as a fresh extension and add the time twice —
+    // shielding the class past a bell the teacher only pushed once. And once
+    // the session has ended, a retry of an extend that did commit must still
+    // re-read and return the current truth (rule 4) rather than 409.
     if (input.eventId) {
       const prior = firstOrUndefined(
         await tx
