@@ -1006,6 +1006,77 @@ describe('armed taps', () => {
     expect(partA.endedReason).toBe('left_for_other_session');
   });
 
+  it('mints a converted tap_in BEFORE the leave it causes, and both at one stamp', async () => {
+    /*
+     * Written down in four places and asserted in none, until this. Inside one
+     * Start, `convertArmedTaps` mints the `tap_in` before
+     * `endParticipationsElsewhere`, so the join carries a LOWER `seq` than the
+     * `left_for_other_session` it causes. That order is forced rather than
+     * incidental — a skipped tap must leave nothing behind, so the event is
+     * minted first and the skip decided on it.
+     *
+     * It is also the whole reason the student's cross-session timeline cannot
+     * be ordered by either column alone: `seq` is inverted here, and
+     * `occurred_at` ties, because the engine stamps ONE value on the pair.
+     * Both halves are asserted below, since the second is what makes the first
+     * unfixable by the obvious tiebreak.
+     *
+     * Unpinned, this shape could have drifted back before `GET /v1/me/history`
+     * is built, and the note on `events_user_seq_idx` would have been
+     * describing an ordering that no longer held — which is how every other
+     * stale claim in this audit happened.
+     */
+    const a = await seedClass('seq-order-a');
+    const b = await seedClass('seq-order-b');
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+    await armTap(db, {
+      studentId: a.student.id,
+      teacherId: b.teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T08:58:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+    const sessionA = (
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    await tapIn(db, {
+      sessionId: sessionA.id,
+      studentId: a.student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    const startB = await startSession(db, {
+      classId: b.klass.id,
+      ...window('2026-01-01T09:05:00Z'),
+    });
+    expect(startB.armedConverted).toBe(1);
+
+    const rows = await db
+      .select()
+      .from(events)
+      .where(eq(events.userId, a.student.id))
+      .orderBy(asc(events.seq));
+    const joined = one(
+      rows.filter((e) => e.type === 'tap_in' && e.sessionId === startB.session.id),
+    );
+    const left = one(rows.filter((e) => e.type === 'left_for_other_session'));
+
+    expect(
+      joined.seq,
+      'the converted tap_in must carry a LOWER seq than the left_for_other_session it ' +
+        'causes: convertArmedTaps mints the event first so a skipped tap leaves nothing ' +
+        'behind. If this flipped, the note on events_user_seq_idx is describing the wrong ' +
+        'shape and GET /v1/me/history would tiebreak against it',
+    ).toBeLessThan(left.seq);
+
+    expect(
+      joined.occurredAt.toISOString(),
+      'the pair must share one occurred_at — that tie is why seq cannot simply be the ' +
+        'tiebreak for the cross-session timeline',
+    ).toBe(left.occurredAt.toISOString());
+  });
+
   it("refuses to arm under another student's event id", async () => {
     /*
      * The id identifies one tap by one student. Answering `replay` for a

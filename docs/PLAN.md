@@ -413,7 +413,14 @@ under-13 parental-consent machinery.
   engine stamps one value on the pair, so they tie, and the obvious tiebreak
   for a tie is `seq`, which is the inversion again. Neither column works
   alone; the read needs an explicit deterministic tiebreak (leaves before
-  joins at equal `occurred_at`), decided when it is built. Carried into the
+  joins at equal `occurred_at`), decided when it is built. **And the shape is
+  pinned now rather than only written down** — review's point was that four
+  notes described an ordering no test held, so it could drift back before the
+  read exists and leave every note describing the wrong shape. A test asserts
+  both halves: the converted `tap_in` carries a lower `seq` than the leave it
+  causes, and the pair shares one `occurred_at`. Restoring the old order
+  reddens the first (`expected 5 to be less than 4`), stamping the leave
+  separately reddens the second. Carried into the
   go-live row for student history as well, so the warning reaches the phase
   that builds it and not only the reader of the schema.
   `TapResponse.session`'s doc said it is null only for an armed tap, which

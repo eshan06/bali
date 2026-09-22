@@ -520,6 +520,13 @@ export async function startSession(
  * How many times armTap will re-try its insert/re-read pair before giving up.
  * Each pass costs two statements and only repeats when a Start consumed the
  * conflicting tap in between, so two spare passes is generous.
+ *
+ * Do not lower it below 3 without covering what that exposes. Both give-up
+ * paths it bounds — this loop's and `takeOverStaleRow`'s — are disclosed
+ * survivors: no test reddens if either throw is deleted, because staging one
+ * needs a rival to commit and vanish on every pass. At 3 that takes three
+ * consecutive losses and is why the throws are unreachable in practice; at 1
+ * it is a single lost race, a 500 on a pre-bell tap, and still nothing red.
  */
 const ARM_TAP_ATTEMPTS = 3;
 
