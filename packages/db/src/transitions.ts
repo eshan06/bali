@@ -301,8 +301,9 @@ export interface StartSessionResult {
  * start transaction: a tap the student made before the bell (saved as
  * student+teacher, decision 5) becomes a focused participation the moment the
  * teacher presses Start, emitting the deferred tap_in event with the armed
- * tap's original id so a later phone retry dedupes — or, when that id is
- * already held by some other event, under a fresh id whose payload names the
+ * tap's original id so a later phone retry dedupes. When that id is already
+ * this student's own `tap_in` the tap landed and is skipped; when any other
+ * event holds it, the tap converts under a fresh id whose payload names the
  * original. Returns the count converted.
  */
 async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
@@ -952,9 +953,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // The same staleness test the waiting branch applies, because this is
         // the same question one door further in. The read at the top of armTap
         // cannot see an uncommitted rival, so a row it missed can win the
-        // (student, teacher) slot and turn up here — and if that row carries a
-        // spent id, answering `already_armed` drops this physical tap and the
-        // conversion then skips the row at Start. Joined never, which is the
+        // (student, teacher) slot and turn up here — and if that row's id is
+        // already this student's own `tap_in`, answering `already_armed` drops
+        // this physical tap and the conversion then skips the row at Start. Joined never, which is the
         // exact failure the waiting branch was fixed for, through the fallback
         // door. Only reachable against a row this build would not have
         // written (an older deploy, or one armed before that fix), which is

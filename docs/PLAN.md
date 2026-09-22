@@ -633,8 +633,11 @@ under-13 parental-consent machinery.
   who then physically tapped again, had that fresh tap dropped on the floor
   and was skipped at Start: told "armed" twice, joined never, absent from the
   grid with nothing in `events` to say why. Reproduced. A standing row whose
-  id is already on record is stale for the same reason an expired one is —
-  the conversion will not honour it — so the fresh tap takes the slot. The phone mints one id per
+  id is already on record is stale, so the fresh tap takes the slot. For an
+  id that is this student's own `tap_in` that is the same reason an expired
+  row is stale — the conversion will not honour it. The check is broader than
+  the skip (an id held by any other event would convert under a fresh id),
+  and taking such a row over is harmless: the student is joined either way. The phone mints one id per
   physical tap, so a spent id can only be a retry of one that already landed:
   the tap was honoured, in the session that recorded it, and the waiting row
   is a stale retry rather than a tap owed anything. Decision 5's "a tap is a
