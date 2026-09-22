@@ -7,7 +7,12 @@ import { EVENT_RESUME_OVERLAP, type FeedEvent } from '@bali/shared';
  *   - resumes with `?after=lastSeq − overlap` and de-dupes by `event_id`, so a
  *     reconnect (or the server's own late-committer re-read) never double-applies
  *     an event and never misses the boundary (decision 2);
- *   - reconnects with exponential backoff on any drop, resetting on a clean open;
+ *   - reconnects with exponential backoff on any drop, resetting only once a
+ *     connection has LASTED (`stableAfterMs`) — a server that accepts and
+ *     immediately drops answers 200 every time, so resetting on the status
+ *     alone pins every retry at the base delay;
+ *   - reports every frame through `onActivity`, heartbeats included, because a
+ *     quiet class emits no events and the grid must still tell alive from dead;
  *   - treats only a 401 as a sign-out (like the API client), reconnecting on
  *     everything else so a blip shows "reconnecting", not "signed out".
  */
@@ -21,12 +26,27 @@ export interface SseClientOptions {
   after: number;
   onEvent: (event: FeedEvent) => void;
   onStatus?: (status: SseStatus) => void;
+  /**
+   * Any frame arrived — a heartbeat comment as much as an event.
+   *
+   * The grid needs this to tell "alive and quiet" from "open and dead". A
+   * class with nothing happening emits no events for minutes at a time
+   * (decision 7: a heartbeat that changes nothing writes no history), so
+   * event traffic is not a liveness signal; the server's own heartbeat is.
+   * And a heartbeat means the grid IS current — nothing happened.
+   */
+  onActivity?: () => void;
   /** A 401 on the stream — the one sign-out trigger. */
   onUnauthorized?: () => void;
   fetchImpl?: typeof fetch;
   overlap?: number;
   baseBackoffMs?: number;
   maxBackoffMs?: number;
+  /**
+   * How long a connection must last before it counts as healthy enough to
+   * reset the backoff. See `connect`.
+   */
+  stableAfterMs?: number;
 }
 
 export interface SseClient {
@@ -38,6 +58,7 @@ export function createSseClient(opts: SseClientOptions): SseClient {
   const overlap = opts.overlap ?? EVENT_RESUME_OVERLAP;
   const baseBackoff = opts.baseBackoffMs ?? 500;
   const maxBackoff = opts.maxBackoffMs ?? 10_000;
+  const stableAfter = opts.stableAfterMs ?? 5_000;
 
   let lastSeq = opts.after;
   const delivered = new Map<string, number>(); // eventId -> seq, pruned to the window
@@ -65,13 +86,14 @@ export function createSseClient(opts: SseClientOptions): SseClient {
   }
 
   function parseFrame(frame: string): void {
+    opts.onActivity?.(); // a frame arrived at all — that is the liveness signal
     let data: string | null = null;
     for (const line of frame.split('\n')) {
       if (line.startsWith('data:')) data = line.slice(line.startsWith('data: ') ? 6 : 5);
       // `id:` and comment (`:`) lines carry no payload; the event_id inside
       // `data` is the dedupe key, so they need no handling.
     }
-    if (data === null) return; // a comment/heartbeat frame
+    if (data === null) return; // a comment/heartbeat frame — liveness, no payload
     let event: FeedEvent;
     try {
       event = JSON.parse(data) as FeedEvent;
@@ -126,13 +148,20 @@ export function createSseClient(opts: SseClientOptions): SseClient {
       return;
     }
 
-    attempt = 0; // a clean open resets the backoff
     opts.onStatus?.('open');
+    const openedAt = Date.now();
     try {
       await readStream(res.body);
     } catch {
       // aborted or errored mid-stream — fall through to reconnect
     }
+    // Reset the backoff on a connection that LASTED, not on one that opened.
+    // A server accepting and immediately dropping — a session that has ended,
+    // a hub draining on deploy — answers 200 every time, so resetting here on
+    // the status alone pins every retry at the base delay: measured, 16
+    // attempts in 600ms with nothing backing off, which at the shipped default
+    // is a browser knocking twice a second, per open tab, forever.
+    if (Date.now() - openedAt >= stableAfter) attempt = 0;
     if (!closed) scheduleReconnect(); // the stream ended; resume from lastSeq − overlap
   }
 

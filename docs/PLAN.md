@@ -67,12 +67,17 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
   the armTap insert race and its event-id integrity gap (**in review**), a
   replayed tap re-resolved to another session, extend's arithmetic outside the
-  engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. Block re-registration by the tag's
+  engine transaction, the portal's reconnect backoff and staleness banner
+  (**landed**), and one shared SQLSTATE helper. Block re-registration by the tag's
   own teacher is fixed but **held for the owner** — the fix answers 200 where
   `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
+- **Found while fixing the audit, on `main` rather than in the audit's list:**
+  the SSE hub's `close()` did not wait for a LISTEN it had started, so a
+  shutdown during setup left a query on a pool being torn down — an unhandled
+  `write CONNECTION_ENDED` that failed the real-Postgres lane with every test
+  green (**landed**; see the decision log).
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -225,6 +230,61 @@ under-13 parental-consent machinery.
   unique index the arbiter does not cover; if a third is ever added, the owner
   lookup finds nothing, the attempts burn, and the constraint name that says
   what really happened would otherwise be discarded at the throw.
+
+- **2026-09-22** — CI was failing the real-Postgres lane with every test green,
+  and the cause was the stream hub's own shutdown. `ensureListening()` fires
+  `client.listen('bali_events', …)` without awaiting it, and `unlisten` is only
+  assigned once that RESOLVES — so `hub.close()` on a hub whose LISTEN was
+  still being established awaited nothing and returned, and whatever tore the
+  pool down next (a test's `closeDb`, the server exiting after `app.close()`)
+  did so with the query in flight. postgres.js reported `write
+  CONNECTION_ENDED` as an unhandled rejection: 5 runs out of 5 on `main`, in
+  isolation, so not a flake. It was not #29's failure — that diff is db-only —
+  and it had been read as one twice.
+  `close()` now awaits the setup promise, and the `.then` that unlistens a
+  LISTEN landing after close awaits its `stop()` instead of voiding it.
+  Isolating the two halves says plainly which does what, because the first
+  regression test I wrote for this passed with the bug present and I nearly
+  shipped it: the awaited `stop()` is what stops the rejection going unhandled
+  (voided, it has no handler; awaited, it lands in the `.catch` already there),
+  and the awaited setup is what makes `close()` mean "the LISTEN is settled and
+  unlistened" — the promise the `onClose` shutdown hook is built on. The
+  end-to-end symptom reproduced 1 run in 3 against the first half alone, so it
+  is not what the test asserts: `hub-close.test.ts` drives `listen` by hand and
+  pins the contract, red with a different message for each half removed, on
+  both lanes — where the real-pool version could not run on PGlite at all.
+
+- **2026-09-22** — The portal's two audit findings, and both were subtler than
+  "missing": the reconnect backoff and the staleness banner already existed,
+  and both were wrong in the case that matters.
+  **The backoff reset on the 200, not on the connection lasting.** A server
+  that accepts and immediately drops — a session that has ended, a hub
+  draining on deploy — answers 200 every time, so every retry went back to the
+  base delay. Measured: 16 attempts in 600 ms with a 50 ms base and no growth
+  at all, which at the shipped 500 ms default is a browser knocking twice a
+  second, per open tab, indefinitely. It resets only once a connection has
+  lasted `stableAfterMs` (5 s) now; the same measurement gives 5 attempts,
+  doubling. A genuine blip after a healthy stream still reconnects at the base
+  delay, which has its own test.
+  **The banner only appeared when the client already knew it was
+  disconnected** — the one case it can see. The dangerous shape showed
+  nothing: a stream that stays open and stops delivering (a wedged proxy, a
+  hub that died without closing the socket) left a fully green grid ageing
+  silently, every chip claiming a freshness nothing had checked, which is rule
+  3 exactly. The decision is a pure `staleness()` in `grid-state.ts` — the
+  shape `gridDisplay` already uses, so it is unit-testable without pulling a
+  DOM harness into `apps/web` — and it now also fires on an open-but-silent
+  stream, worded differently so the two are not confused.
+  Liveness had to come from the SERVER's heartbeat, not from events: a quiet
+  class emits none for minutes (decision 7), so event traffic would have
+  marked a healthy stream stale. The SSE client reports every frame through
+  `onActivity`, comments included, and a heartbeat counts as freshness rather
+  than mere liveness — nothing arriving means nothing changed. The 15 s
+  snapshot refresh feeds it too, so a reload that worked stops the counter.
+  Caught in my own mutation pass before pushing: `onActivity` was load-bearing
+  and unpinned — deleting it left the suite green while a quiet class would
+  have shown the stale banner after a minute. It has its own test now.
+
 - **2026-09-22** — Fourth pass on the same decision, and the third time I
   closed half a hole. #27 added a test that the stream route's log dispatch
   really writes `debug` for the teardown race — and asserted only that
