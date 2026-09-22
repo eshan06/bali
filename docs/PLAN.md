@@ -130,6 +130,26 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Follow-ups from #18's review, and one thing learned the hard
+  way. The stream route's `'error'` listener logged at `debug` while production
+  runs at `info`, so the fix that stopped the crash would also have hidden every
+  stream error behind it — a proxy resetting long-lived connections would flap
+  every teacher's grid with nothing in the log. It now logs the two expected
+  teardown codes at `debug` and anything else at `warn`. The `streamFailed`
+  disjunct after `subscribe` is removed: nothing between the hijack and that
+  check is asynchronous, so it had never fired, and dead defence that reads like
+  a guarantee is worse than none.
+  The harder lesson is about what can be tested. Two of that route's guards —
+  the throwing `write` and the end-to-end "resuming read" path — cannot be
+  pinned by a test: every path that ends the response also fires `'close'` on
+  the request, and the hub's per-row bail stops the write before it happens, so
+  both guards can be softened or removed with any test written for them still
+  green. Three attempts all passed against the broken version. They are kept as
+  defence in depth with that written next to them, and the one test that does
+  discriminate — driving the response directly into the ended-but-not-detached
+  window — says so at the top. A test that passes either way is worse than an
+  honest comment: it reports coverage that does not exist.
+
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not
   throw — it returns false and emits `'error'` a tick later, so the hub's

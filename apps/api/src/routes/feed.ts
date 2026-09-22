@@ -102,7 +102,6 @@ export function registerFeedRoutes(
     // throwing, so the hub never notices either) — the teacher ends up
     // permanently 429'd by the cap.
     let clientGone = false;
-    let streamFailed = false;
     let sub: { close: () => void } | null = null;
     request.raw.on('close', () => {
       clientGone = true;
@@ -133,9 +132,17 @@ export function registerFeedRoutes(
     const hijack = (): typeof reply.raw => {
       reply.hijack();
       const res = reply.raw;
-      res.on('error', (err) => {
-        streamFailed = true;
-        request.log.debug({ err }, 'live stream ended with an error');
+      res.on('error', (err: NodeJS.ErrnoException) => {
+        // A teardown race is ordinary and says nothing an operator can act on;
+        // anything else on a hijacked response is news, and this listener is
+        // the only place it can be heard. Logging the lot at `debug` would
+        // make the fix silent in production (LOG_LEVEL defaults to `info`):
+        // a proxy resetting long-lived connections would flap every teacher's
+        // grid with nothing in the log to show for it.
+        const expected =
+          err.code === 'ERR_STREAM_WRITE_AFTER_END' || err.code === 'ERR_STREAM_DESTROYED';
+        if (expected) request.log.debug({ err }, 'live stream ended mid-write');
+        else request.log.warn({ err }, 'live stream errored');
         sub?.close();
       });
       return res;
@@ -172,10 +179,14 @@ export function registerFeedRoutes(
       sessionId: session.id,
       teacherId: teacher.id,
       after,
-      // Throw rather than write into a response onClose already ended: the hub
-      // reads a throwing write as "this stream is gone" and tears the
-      // subscription down, which is what we want. Silently returning would
-      // leave its timers running against a dead socket.
+      // Defence in depth, deliberately untested: throw rather than write into
+      // a response onClose already ended, so the write-after-end error is
+      // never raised in the first place rather than caught above. Its effect
+      // is not independently observable — every path that ends this response
+      // also fires 'close' on the request, which tears the subscription down
+      // by itself — so softening it to a silent `return` passes any test that
+      // can be written for it. Two attempts at pinning it both went green
+      // against the softened version; the note is more honest than the test.
       write: (chunk) => {
         if (raw.writableEnded) throw new Error('stream already ended');
         raw.write(chunk);
@@ -187,6 +198,11 @@ export function registerFeedRoutes(
 
     // The disconnect may have landed between the check above and subscribe, in
     // which case the handler ran while `sub` was still null — release it here.
-    if (clientGone || streamFailed || request.raw.destroyed) sub.close();
+    // A stream error needs no term here: everything from hijack() to this line
+    // is synchronous, and 'error' cannot be emitted before a later tick, so
+    // the listener's own sub?.close() is what covers it. A dead disjunct that
+    // reads like a guarantee is worse than none — the next reader adds an
+    // await above and trusts a net that has never fired.
+    if (clientGone || request.raw.destroyed) sub.close();
   });
 }

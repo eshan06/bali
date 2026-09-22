@@ -17,10 +17,11 @@ import { makeTestIssuer } from './helpers/test-issuer.js';
  *
  * `close()` is not a request the hub gets to finish its sentence after: the
  * route's onClose ends the HTTP response the moment it runs, so every frame a
- * read keeps handing over lands on a response that is already finished. Fastify
- * still holds an 'error' listener on the hijacked response, so today those
- * writes are absorbed rather than fatal — but they are writes into a closed
- * stream, and nothing about that is the hub's to keep doing.
+ * read keeps handing over lands on a response that is already finished. Those
+ * writes are not benign: Fastify's own 'error' listener removes itself on the
+ * first 'finish', so a late write emits an 'error' nobody is listening for and
+ * the process dies. That is why the route now owns a listener of its own — and
+ * why the hub should not be writing there in the first place.
  *
  * No NOTIFY here, so this runs on both lanes (stream.test.ts covers the
  * real-Postgres fan-out).
@@ -162,7 +163,9 @@ describe('a hijacked stream response owns its own error handling', () => {
     app = buildApp(testEnv, {
       db,
       verifyToken: issuer.verifier,
-      stream: { repollMs: 60_000, heartbeatMs: 60_000, maxPerTeacher: 2 },
+      // Short re-poll: these tests need the hub actually mid-read, not idle.
+      // One stream per teacher, so a leaked slot is a single clean assertion.
+      stream: { repollMs: 5, heartbeatMs: 60_000, maxPerTeacher: 1 },
     });
     await app.listen({ port: 0, host: '127.0.0.1' });
     const address = app.server.address();
@@ -174,6 +177,15 @@ describe('a hijacked stream response owns its own error handling', () => {
     await app.close();
   });
 
+  /*
+   * The one test that discriminates. The production route to this crash — a
+   * read resuming from an awaited getEventsSince after onClose ended the
+   * response — cannot be pinned end to end any more: the hub's per-row bail
+   * stops the write before it happens, and the request's own 'close' tears
+   * the subscription down regardless, so an end-to-end reproduction goes
+   * green with the listener removed. Driving the response directly is what
+   * actually exercises the window.
+   */
   it('a write after the response ended does not take the process down', async () => {
     /*
      * The bug this exists for: `write()` after `end()` returns false instead of
@@ -215,6 +227,12 @@ describe('a hijacked stream response owns its own error handling', () => {
     try {
       // Exactly what onClose does, then exactly what a resuming read does.
       raw.end();
+      // The window this test exists for: ended, but not yet detached. Asserted
+      // rather than assumed — once the response detaches, a late write is a
+      // silent no-op and `uncaught` stays empty whether the fix is present or
+      // not. Without this the test would pass for the wrong reason.
+      expect(raw.writableEnded, 'response should be ended').toBe(true);
+      expect(raw.destroyed, 'response should not be detached yet').toBe(false);
       raw.write('id: 1\ndata: {}\n\n');
       await sleep(250);
     } finally {
