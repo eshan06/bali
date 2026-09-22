@@ -21,14 +21,17 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   against the deployed API with real Cognito: tap → session, unlock **delivered
   live on the SSE stream**, refocus, one real 90-second silence episode and one
   `came_back`, a removed student's unlock still **recorded**, and a session that
-  **expired by itself at the bell**. The waits were real, not backdated; the
-  sweep was a real `/internal/sweep` call (the cron does the same job when no key
-  is set — the demo asserts on the event, not the caller). Re-run it via the
-  README, "Running it against a deployed API".
+  **expired by itself at the bell**. The waits were real, not backdated. This run
+  carried the sweep key, so its own `/internal/sweep` call opened the episode and
+  expired the session; without the key the per-minute cron does the identical
+  job, which is why the demo asserts on the event and not the caller. Re-run it
+  via the README, "Running it against a deployed API".
 - **Dev provisioning it needed** (one-time, owner-run): a `schools` row plus
   `school_id` on the test teacher — see the teacher-gating row under Go-live.
-  Gotcha for the next environment: `schools.id` has no DB default, so raw SQL
-  must supply a UUIDv7 (ids are minted in TypeScript, decision 2).
+  Two things to know next time: a session cannot run this itself (dev Postgres
+  exposes only `postgres.railway.internal`, and reaching it means publishing the
+  database through Railway's TCP proxy), and `schools.id` has no DB default, so
+  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2).
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path
