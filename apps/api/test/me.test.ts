@@ -109,6 +109,38 @@ describe('GET /v1/me', () => {
     expect(body.user.displayName).toBe('demo-cal@example.test');
   });
 
+  it('stores nothing rather than an identifier no teacher could read', async () => {
+    // A pool that signs users in by email gives every one of them a UUID as
+    // `username`; a federated sign-in gives `Google_1102938…`. Storing either
+    // would print worse than the grid's own eight-character fallback, and the
+    // fill never overwrites, so it would stay.
+    const uuidUser = await ctx.issuer.sign({
+      sub: 'uuid-username',
+      extraClaims: { username: '8f14e45f-ceea-467a-9b9c-1c1e6a4e7b3d' },
+    });
+    expect((await me(uuidUser)).body.user.displayName).toBeNull();
+
+    const federated = await ctx.issuer.sign({
+      sub: 'federated-username',
+      extraClaims: { username: 'Google_110293847566123450987' },
+    });
+    expect((await me(federated)).body.user.displayName).toBeNull();
+  });
+
+  it('clamps an over-long name and strips control characters', async () => {
+    // `name` and `preferred_username` are attributes the student can set on
+    // themselves, and the value lands in a teacher's grid.
+    const token = await ctx.issuer.sign({
+      sub: 'shouty',
+      extraClaims: { name: `Ana\u0007\u200b ${'x'.repeat(200)}` },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toHaveLength(64);
+    expect(body.user.displayName).toMatch(/^Ana x+$/);
+  });
+
   it('is idempotent — a second call returns the same user, no duplicate', async () => {
     const token = await ctx.tokenFor('repeat-sub');
     const first = await me(token);

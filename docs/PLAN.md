@@ -44,19 +44,35 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   with nothing left for its children and that truncated visit became final — a
   later, shallower path returned early and a password two hops under a shared
   node printed in full; the memo now keys on the shallowest depth seen. Reads
-  that a hostile error can make throw (`Object.entries` runs every getter at
-  once; `errors` and `cause` are ordinary own properties) are guarded one at a
-  time, so nothing replaces the one message naming what the operator got wrong.
-  Map and Set contents are now scrubbed — `inspect` prints them in full — and
-  bytes are named in the docblock as the deliberate boundary rather than covered
-  by a promise that said "never".
+  that a hostile error can make throw are guarded per node — `Object.entries`
+  runs every getter at once, `errors`, `cause` and `name` are ordinary own
+  properties, and `instanceof` itself reads a prototype chain a Proxy can trap —
+  so one hostile object costs its own subtree rather than the operator's one
+  actionable message.
+
+  The third warning is closed differently, and the review round that followed is
+  why. Scrubbing carriers one kind at a time kept missing them: a password on a
+  symbol-keyed property, on a named property hung off a Buffer, inside a
+  `Headers` or `URLSearchParams` whose contents live in internal slots, or frozen
+  into a stack string some logger materialized before the scrub ran — all still
+  printed. Each is a real leak and each now has a test. The rule now is that the
+  walk is **best effort and says so**, and the guarantee lives in one check:
+  before any error is attached as a `cause`, the module inspects it exactly as
+  the demo's top-level handler would and refuses to attach anything the password
+  survived in, substituting a redacted rendering. A claim about how thorough the
+  walk is was what made the gaps invisible; asking what would actually be printed
+  covers the carriers nobody has thought of yet. One more leak found in the same
+  pass and closed: a non-OK response body was quoted verbatim into the thrown
+  message, so a WAF block page echoing the rejected request would have printed
+  `DEMO_PASSWORD`.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
-  `claims.name`, but Cognito puts profile attributes in the ID token only and
-  every client here sends an **access** token — the portal stores `access_token`
+  `claims.name`, but Cognito puts profile attributes in the ID token and every
+  client here sends an **access** token — the portal stores `access_token`
   and nothing else, the exit demo signs in for `AuthenticationResult.AccessToken`
   — so that read found nothing on every real request, `display_name` stayed NULL,
   and the grid fell back to eight characters of a UUID. Setting a `name`
-  attribute on the pool would not have fixed it. `/v1/me` now walks
+  attribute on the pool would not have fixed it — only a pre-token-generation
+  Lambda adds claims to an access token, and nothing here has one. `/v1/me` now walks
   `name → preferred_username → cognito:username → username`, so a real name still
   wins wherever one exists, and `findOrCreateStudent` **fills** a NULL
   `display_name` on a later sign-in instead of only setting it at creation —
@@ -293,20 +309,32 @@ under-13 parental-consent machinery.
   (`recorded_as: 'not_enrolled'`, no session/class attached, the claimed id in
   the payload) — durable, but unattached. A student removed mid-session keeps
   their ended participation row, so ISSUES #2's actual case is unchanged.
-- **2026-09-22** — Display names come from the token's own claims, best-first
-  (`name`, `preferred_username`, `cognito:username`, `username`), and are
-  **filled, never synced**. The fallback means a teacher sees a Cognito username
-  — for the dev pool, an email — where no real name exists. Accepted: it is the
-  student's own teacher, who already knows them, and anything better needs a
-  name the token does not carry (a pre-token-generation Lambda, or the phone
-  sending one). Revisit when "edit own name" lands in phase 3, which is also why
-  the fill must never overwrite.
-- **2026-09-22** — The demo's password scrubber covers everything `util.inspect`
-  prints as text — messages, own enumerable properties, AggregateError members,
-  Map and Set contents — and stops at BYTES. A typed array inspects as hex rather
-  than text, and scanning every byte of every buffer on an error path costs more
-  than that is worth. Written into the docblock, because the old one promised
-  absolutely and the code did less.
+- **2026-09-22** — Display names come from the token's own claims — a real name
+  first (`name`, `preferred_username`), then the pool's identifier
+  (`cognito:username`, `username`) but only when it is readable — and are
+  **filled, never synced**. The value is trimmed of control characters and
+  clamped to 64 characters, because `name` is an attribute the student can set on
+  themselves and it lands in a teacher's grid. An identifier that is plainly
+  machine-made (a bare UUID, which is what a pool signing in by email gives every
+  user, or a federated `Google_1102…`) is **not** stored: it would print worse
+  than the grid's own eight-character fallback, and the fill would make it
+  permanent. Where the identifier IS readable the teacher sees it — for the dev
+  pool, an email — which is accepted: it is the student's own teacher.
+  Consequence to know: a fallback, once stored, is not replaced by a better name
+  arriving later, because nothing records where the stored value came from. The
+  designed remedy is "edit own name" (phase 3), not a Cognito-side change — a
+  pre-token-generation Lambda emitting `name` would fix new rows only.
+- **2026-09-22** — The demo's password scrubber is **best effort, and the promise
+  is kept by a check rather than by the walk**. It covers messages and stacks,
+  own enumerable properties (symbols included), AggregateError members, named
+  properties on a typed array, and Map/Set contents — but a property walk cannot
+  reach a `Headers`' internal slots or someone's custom `inspect`, and two review
+  rounds found a new missed carrier each time. So before an error is attached as
+  a `cause` it is inspected exactly as the demo's top-level handler would inspect
+  it, and anything the password survived in is replaced by a redacted rendering
+  of itself. The bytes of a typed array remain uncovered on purpose (they print
+  as hex, not text); that is now a statement about one carrier rather than a
+  claim that the walk is exhaustive.
 - **2026-09-20** — `extendSession`'s idempotency key is checked ahead of the
   ended-session guard and scoped to this session's own `session_extended` rows.
   An id already spent on a different event is now a 409 rather than a reported

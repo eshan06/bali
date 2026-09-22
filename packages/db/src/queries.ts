@@ -28,6 +28,7 @@ export async function findUserByCognitoId(
 
 /**
  * Fill in a display name the row does not have — never overwrite one it does.
+ * It applies to any row the caller supplies a name for, teachers included.
  *
  * A fill, not a sync, for two reasons. Rows provisioned before the caller could
  * read a name off the token kept `display_name` NULL forever, because the name
@@ -54,8 +55,11 @@ async function fillMissingDisplayName(
   );
   if (updated) return updated;
   // That concurrent call won: report what the row actually says now, not the
-  // NULL this one started with.
-  return (await findUserByCognitoId(db, row.cognitoId)) ?? row;
+  // NULL this one started with. A row that has vanished between the two reads
+  // is not something to paper over — say so, as the insert path does.
+  const current = await findUserByCognitoId(db, row.cognitoId);
+  if (!current) throw new Error('fillMissingDisplayName: row missing after update');
+  return current;
 }
 
 /**

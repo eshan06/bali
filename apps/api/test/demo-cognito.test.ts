@@ -346,6 +346,151 @@ describe('fetchCognitoAccessToken', () => {
     expect(printed).toContain('<redacted>');
   });
 
+  it('redacts a password hung on a Buffer as a named property', async () => {
+    // Skipping typed arrays wholesale was wrong: `inspect` prints the named
+    // properties on one right beside the hex — `<Buffer 61 62, body: '…'>` —
+    // so the bytes being unreadable says nothing about what rides along with
+    // them.
+    const chunk = Object.assign(Buffer.from('abcd'), {
+      body: `{"PASSWORD":"${creds.password}"}`,
+    });
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { chunk }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+  });
+
+  it('redacts a password on a symbol-keyed property', async () => {
+    // `Object.keys` never returns symbols, but `inspect` prints them in full —
+    // and undici keys plenty of its own state with symbols.
+    const hostile = new TypeError('fetch failed');
+    (hostile as unknown as Record<symbol, string>)[Symbol('requestBody')] =
+      `{"PASSWORD":"${creds.password}"}`;
+    const fetchImpl = vi.fn().mockRejectedValue(hostile);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+  });
+
+  it('redacts a stack that was already materialized before the scrub', async () => {
+    // `inspect` prints an Error's stack, not its message. V8 formats it lazily
+    // and caches it, so anything that read `.stack` first froze the un-redacted
+    // message into it — rewriting `message` alone then changes nothing that is
+    // printed.
+    const inner = new Error(`request body {"PASSWORD":"${creds.password}"}`);
+    void inner.stack;
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause: inner }));
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+  });
+
+  it('redacts carriers no property walk reaches, via the printed-text check', async () => {
+    // A Headers and a URLSearchParams keep their contents in internal slots:
+    // `Object.keys` is empty for both, yet `inspect` prints every pair. This is
+    // what safeCause exists for — it asks what would actually be printed
+    // instead of trusting the walk to have known about them.
+    const fetchImpl = vi.fn().mockRejectedValue(
+      Object.assign(new TypeError('fetch failed'), {
+        headers: new Headers({ 'x-pw': creds.password }),
+        query: new URLSearchParams({ PASSWORD: creds.password }),
+        boxed: new String(`{"PASSWORD":"${creds.password}"}`),
+      }),
+    );
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    const printed = inspect(err, { depth: null });
+    expect(printed).not.toContain(creds.password);
+    // The operator still gets the failure, not a blank.
+    expect(err?.message).toContain('could not reach');
+  });
+
+  it('one hostile node does not stop the rest of the walk being scrubbed', async () => {
+    // A prototype trap throws out of `instanceof` itself. Abandoning the walk
+    // there left everything after it unscrubbed — worse than never having
+    // guarded it.
+    const fetchImpl = vi.fn().mockRejectedValue(
+      Object.assign(new TypeError('fetch failed'), {
+        first: new Proxy(
+          {},
+          {
+            getPrototypeOf() {
+              throw new Error('proto trap exploded');
+            },
+          },
+        ),
+        second: { pw: `{"PASSWORD":"${creds.password}"}` },
+      }),
+    );
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+    expect(err?.message).toContain('could not reach');
+    expect(err?.message).not.toContain('proto trap exploded');
+  });
+
+  it('still names the real failure when `name` throws on read', async () => {
+    // The timeout branch reads `err.name` inside the same catch everything else
+    // here is guarded for.
+    const hostile = new TypeError('fetch failed');
+    Object.defineProperty(hostile, 'name', {
+      get() {
+        throw new Error('name exploded');
+      },
+    });
+    const fetchImpl = vi.fn().mockRejectedValue(hostile);
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(err?.message).toContain('could not reach');
+    expect(err?.message).not.toContain('name exploded');
+  });
+
+  it('redacts a password echoed back inside an error response body', async () => {
+    // A corporate proxy or WAF block page can quote the request it rejected —
+    // the one this module just posted the password in.
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(`<html>blocked: {"PASSWORD":"${creds.password}"}</html>`, { status: 403 }),
+      );
+
+    const err = await fetchCognitoAccessToken({ ...config, fetchImpl }, creds).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(inspect(err, { depth: null })).not.toContain(creds.password);
+    expect(err?.message).toContain('403');
+  });
+
   it('survives a non-JSON error body (a proxy or gateway page)', async () => {
     const fetchImpl = vi
       .fn()

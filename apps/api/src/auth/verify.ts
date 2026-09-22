@@ -98,33 +98,63 @@ function toAudienceList(aud: JWTPayload['aud']): string[] {
   return [];
 }
 
+/** Claims that carry a name someone chose, best first. */
+const NAME_CLAIMS = ['name', 'preferred_username'];
+
 /**
- * Claims that can carry something a teacher can read, best first. `name` is a
- * profile attribute and `preferred_username` a chosen handle; the last two are
- * the pool's own identifier under the two names Cognito gives it (`username` in
- * an access token, `cognito:username` in an id token).
+ * Claims that carry the pool's own identifier for the user — `username` in an
+ * access token, `cognito:username` in an id token. Usable as a last resort only
+ * when the pool's usernames happen to be readable (an email, say).
  */
-const DISPLAY_NAME_CLAIMS = ['name', 'preferred_username', 'cognito:username', 'username'];
+const IDENTIFIER_CLAIMS = ['cognito:username', 'username'];
+
+/** A grid cell, not an essay; and nothing that can move the cursor around a log. */
+const MAX_DISPLAY_NAME = 64;
+
+/**
+ * An identifier no human would recognise: a bare UUID, which is what a pool
+ * configured with `UsernameAttributes: ['email']` gives every user, or a
+ * federated id like `Google_110293847566123450987`.
+ *
+ * Storing one of these would be a worse answer than storing nothing: the grid's
+ * own fallback prints eight characters of a UUID, where this would print all
+ * thirty-six — and because the fill never overwrites, it would stay.
+ */
+const OPAQUE_IDENTIFIER =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z][\w.-]*_\d+)$/i;
+
+/** Trim, drop control characters, and clamp — the value is a user-settable attribute. */
+function cleanClaim(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+  if (cleaned.length === 0) return undefined;
+  return cleaned.slice(0, MAX_DISPLAY_NAME);
+}
 
 /**
  * The best display name the token itself carries, or undefined.
  *
- * Cognito puts profile attributes in the ID token ONLY. An access token — which
- * is what every client here sends (the portal stores `access_token` and nothing
+ * Cognito puts profile attributes in the ID token, so an access token — which is
+ * what every client here sends (the portal stores `access_token` and nothing
  * else; the exit demo signs in for `AuthenticationResult.AccessToken`) — carries
- * the username and no `name`, whatever attributes the pool holds. Reading `name`
- * alone therefore found nothing on every real request, so every row `/v1/me`
- * provisioned kept a NULL `display_name` and the live grid fell back to the
- * first eight characters of a UUID. Falling through to the identifier that IS
- * always present gets a teacher something readable; the list stays ordered so a
- * real name still wins the moment a token carries one.
+ * the username and, absent a pre-token-generation Lambda that adds one, no
+ * `name`. Reading `name` alone therefore found nothing on every request this
+ * system actually makes, so every row `/v1/me` provisioned kept a NULL
+ * `display_name` and the live grid fell back to eight characters of a UUID.
+ *
+ * A real name wins wherever one exists. Failing that the pool's own identifier
+ * is used, but only when it is something a teacher could read: an opaque one
+ * would be worse than the UUID prefix it replaced, and the fill that stores it
+ * never overwrites.
  */
 export function displayNameFromClaims(claims: JWTPayload): string | undefined {
-  for (const claim of DISPLAY_NAME_CLAIMS) {
-    const value = claims[claim];
-    if (typeof value !== 'string') continue;
-    const trimmed = value.trim();
-    if (trimmed.length > 0) return trimmed;
+  for (const claim of NAME_CLAIMS) {
+    const value = cleanClaim(claims[claim]);
+    if (value !== undefined) return value;
+  }
+  for (const claim of IDENTIFIER_CLAIMS) {
+    const value = cleanClaim(claims[claim]);
+    if (value !== undefined && !OPAQUE_IDENTIFIER.test(value)) return value;
   }
   return undefined;
 }
