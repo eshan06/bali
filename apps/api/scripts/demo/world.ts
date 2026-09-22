@@ -283,6 +283,11 @@ const SKEW_MARGIN_MS = 15_000;
  * insert did run, the guard is true and costs nothing. An honest no-op is still
  * a confusing one on its own, so the recipe leads with a comment saying to run
  * both — the printed message is where most operators meet this, not the README.
+ * That comment names the *condition* rather than promising `UPDATE 0`: on the
+ * `school` path a deployment may already have a live school, and there a lone
+ * UPDATE correctly reports `UPDATE 1`. Instructions that are only true on the
+ * database you happened to test against are the bug this whole file keeps
+ * relearning.
  *
  * Both halves skip soft-removed rows. Nothing is really deleted (decision 3), so
  * a database whose only school was retired would otherwise fail the NOT EXISTS
@@ -294,7 +299,7 @@ export function provisioningSql(userId: string, what: 'role-and-school' | 'schoo
   const assignments = what === 'role-and-school' ? "role = 'teacher', school_id" : 'school_id';
   const live = 'WHERE removed_at IS NULL';
   return (
-    `  -- Run both: the UPDATE needs a live school, and alone reports "UPDATE 0".\n` +
+    `  -- Run both: with no live school the UPDATE attaches nothing and reports "UPDATE 0".\n` +
     `  INSERT INTO schools (id, name)\n` +
     `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools ${live});\n` +
     `  UPDATE users SET ${assignments} = (SELECT id FROM schools ${live} ORDER BY created_at LIMIT 1)\n` +
