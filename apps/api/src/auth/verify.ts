@@ -115,30 +115,52 @@ const MAX_DISPLAY_NAME = 64;
 const UUID_LIKE =
   /^(?:[\w-]+:)?\{?(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})\}?$/i;
 
-/** A federated subject's opaque tail is long AND carries digits. */
-const FEDERATED_TAIL = 12;
+/**
+ * Cognito's built-in social providers, by the name it puts in front of a
+ * federated user's subject (`Google_110293847566123450987`), and the shape of
+ * the subject each one hands out. Keyed in lower case: a case-insensitive pool
+ * can spell the prefix either way.
+ */
+const FEDERATED_SUBJECTS = new Map([
+  ['google', /^\d{6,}$/],
+  ['facebook', /^\d{6,}$/],
+  ['loginwithamazon', /^amzn1\.account\.[a-z0-9]+$/i],
+  ['signinwithapple', /^\d+\.[0-9a-f]+\.\d+$/i],
+]);
+
+/**
+ * A federated username: a built-in provider's name, an underscore, and a
+ * subject in that provider's shape. Both halves are required, so a student who
+ * is actually called `google_fan_2029` keeps their name.
+ *
+ * A custom SAML or OIDC provider's name is whatever the pool's owner chose, so
+ * its users cannot be told from anyone else's by shape; they are not caught
+ * here, and read as the pool spells them.
+ */
+function isFederatedUsername(value: string): boolean {
+  const split = value.indexOf('_');
+  if (split <= 0) return false;
+  const subject = FEDERATED_SUBJECTS.get(value.slice(0, split).toLowerCase());
+  return subject !== undefined && subject.test(value.slice(split + 1));
+}
 
 /**
  * An identifier no human would recognise: a bare UUID — which is what a pool
  * configured with `UsernameAttributes: ['email']` gives every user — or a
- * federated subject such as `Google_110293847566123450987`.
+ * federated username such as `Google_110293847566123450987`.
  *
  * Storing one of these would be a worse answer than storing nothing: the grid's
  * own fallback prints eight characters of a UUID, where this would print all
  * thirty-six — and because the fill never overwrites, it would stay.
  *
- * The test is deliberately narrow, because a FALSE positive costs exactly what
- * this change exists to fix: a rejected username leaves the teacher looking at
- * a UUID prefix. `<name>_<year>` is one of the commonest school conventions, so
- * `ana_2011` and `jsmith_2028` have to survive it — which is why a federated
- * tail must be long AND numeric rather than merely numeric.
+ * The test is anchored on the provider, not on what the tail looks like,
+ * because a FALSE positive costs exactly what this change exists to fix: a
+ * rejected username leaves the teacher looking at a UUID prefix. A rule that
+ * read any long tail with digits in it as a federated subject threw away
+ * `ana_rodriguez2029` and `p_kowalski1987` — a surname and a year.
  */
 function isOpaqueIdentifier(value: string): boolean {
-  if (UUID_LIKE.test(value)) return true;
-  const split = value.lastIndexOf('_');
-  if (split <= 0) return false;
-  const tail = value.slice(split + 1);
-  return tail.length >= FEDERATED_TAIL && /\d/.test(tail) && /^[\w.-]+$/.test(tail);
+  return UUID_LIKE.test(value) || isFederatedUsername(value);
 }
 
 /**
@@ -149,14 +171,15 @@ function isOpaqueIdentifier(value: string): boolean {
  * Zero-width joiner and non-joiner are kept: they are `\p{Cf}` too, but they
  * carry meaning in Persian, Arabic and Indic names and inside emoji sequences.
  *
- * The clamp counts code POINTS, so the cut never lands inside a surrogate pair.
- * A lone half passes TypeScript happily and then reaches Postgres, which stores
- * it as U+FFFD — and the fill would never replace it.
+ * A lone surrogate half passes TypeScript happily and then reaches Postgres,
+ * which stores it as U+FFFD — and the fill would never replace it. So lone
+ * halves in the claim are dropped (`\p{Cs}`; a proper pair is one code point
+ * and is kept), and the clamp counts code POINTS, so its cut never makes one.
  */
 function cleanClaim(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const stripped = value.replace(/[\p{Cc}\p{Cf}]/gu, (char) =>
-    char === '‌' || char === '‍' ? char : '',
+  const stripped = value.replace(/[\p{Cc}\p{Cf}\p{Cs}]/gu, (char) =>
+    char === '\u200c' || char === '\u200d' ? char : '',
   );
   const cleaned = stripped.trim();
   if (cleaned.length === 0) return undefined;

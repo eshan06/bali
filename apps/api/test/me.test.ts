@@ -120,11 +120,19 @@ describe('GET /v1/me', () => {
     });
     expect((await me(uuidUser)).body.user.displayName).toBeNull();
 
-    const federated = await ctx.issuer.sign({
-      sub: 'federated-username',
-      extraClaims: { username: 'Google_110293847566123450987' },
-    });
-    expect((await me(federated)).body.user.displayName).toBeNull();
+    // Cognito names a federated user `<provider>_<subject>`; one per built-in
+    // provider, in the subject shape that provider hands out, plus the
+    // lower-cased spelling a case-insensitive pool can produce.
+    for (const [sub, username] of [
+      ['federated-google', 'Google_110293847566123450987'],
+      ['federated-google-lower', 'google_110293847566123450987'],
+      ['federated-facebook', 'Facebook_10223344556677889'],
+      ['federated-amazon', 'LoginWithAmazon_amzn1.account.AEXAMPLE1234567890'],
+      ['federated-apple', 'SignInWithApple_001234.0123456789abcdef0123456789abcdef.0123'],
+    ]) {
+      const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
+      expect((await me(token)).body.user.displayName, username).toBeNull();
+    }
   });
 
   it('clamps an over-long name and strips control characters', async () => {
@@ -150,10 +158,46 @@ describe('GET /v1/me', () => {
       ['school-b', 'ana_2011'],
       ['school-c', 'mrs.reyes_7'],
       ['school-d', 'ana-reyes_2011'],
+      // A surname carrying the year: a long tail with digits in it, which is
+      // what the old tail-length rule took for a federated subject.
+      ['school-e', 'ana_rodriguez2029'],
+      ['school-f', 'ana_martinez2029'],
+      ['school-g', 'p_kowalski1987'],
+      // A name and a student number: numeric like a provider's subject, but
+      // with no provider in front of it.
+      ['school-h', 'jsmith_100234'],
     ]) {
       const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
-      expect((await me(token)).body.user.displayName).toBe(username);
+      expect((await me(token)).body.user.displayName, username).toBe(username);
     }
+  });
+
+  it('keeps a username that merely begins with a provider’s name', async () => {
+    // Only a provider prefix followed by that provider's subject shape is a
+    // federated username; a student called google_fan_2029 is a student.
+    for (const [sub, username] of [
+      ['prefix-a', 'google_fan_2029'],
+      ['prefix-b', 'facebook_ana'],
+      ['prefix-c', 'Google_Ana_Reyes'],
+    ]) {
+      const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
+      expect((await me(token)).body.user.displayName, username).toBe(username);
+    }
+  });
+
+  it('drops a lone surrogate rather than storing U+FFFD for good', async () => {
+    // A JWT's JSON can carry "\ud800" on its own. Postgres stores that as
+    // U+FFFD, and the fill never replaces a stored name — the same outcome the
+    // code-point clamp exists to prevent, arriving through the input instead.
+    const token = await ctx.issuer.sign({
+      sub: 'lone-surrogate',
+      extraClaims: { name: 'Ana\uD800 Reyes\uDC00' },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toBe('Ana Reyes');
+    expect((await findUserByCognitoId(db, 'lone-surrogate'))?.displayName).toBe('Ana Reyes');
   });
 
   it('reads preferred_username when there is no name', async () => {
