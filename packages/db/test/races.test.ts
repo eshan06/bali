@@ -573,6 +573,102 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
 });
 
 describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', () => {
+  it('two taps crossing in opposite directions never deadlock', async () => {
+    /*
+     * What the cross-session read's lock choice is worth, on the lane that can
+     * actually show it. tapIn holds FOR UPDATE on the session it resolved to,
+     * then reads the OTHER session — the one that recorded a replayed tap —
+     * WITHOUT a lock. That is deliberate: lock it and two taps crossing in
+     * opposite directions order B-then-A against A-then-B, which is a genuine
+     * deadlock, and withDeadlockRetry would paper over it rather than fix it.
+     *
+     * So this pins the choice from the outside. Student X's spent id lives in
+     * session B and Y's in session A; X taps A while Y taps B, repeatedly. A
+     * 40P01 here is not a flake: it is the sign that somebody added `for
+     * update` to that read.
+     */
+    const school = one(await db.insert(schools).values({ name: 'Cross' }).returning());
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'cross-teacher', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const mkClass = async (name: string, code: string) =>
+      one(
+        await db
+          .insert(classes)
+          .values({ teacherId: teacher.id, schoolId: school.id, name, joinCode: code })
+          .returning(),
+      );
+    const a = await mkClass('A', 'CROSSA');
+    const b = await mkClass('B', 'CROSSB');
+    const mkStudent = async (tag: string) => {
+      const u = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `cross-${tag}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      await db.insert(enrollments).values([
+        { classId: a.id, studentId: u.id },
+        { classId: b.id, studentId: u.id },
+      ]);
+      return u;
+    };
+    const x = await mkStudent('x');
+    const y = await mkStudent('y');
+
+    for (let round = 0; round < 8; round += 1) {
+      const at = new Date(Date.now() + round * 1000);
+      const sa = (
+        await startSession(db, {
+          classId: a.id,
+          startedAt: at,
+          endsAt: new Date(at.getTime() + 45 * 60_000),
+        })
+      ).session;
+      const sb = (
+        await startSession(db, {
+          classId: b.id,
+          startedAt: at,
+          endsAt: new Date(at.getTime() + 45 * 60_000),
+        })
+      ).session;
+
+      // Each student's id is spent in the session the OTHER one is tapping,
+      // so both replays have to reach across.
+      const ex = newUuidV7();
+      const ey = newUuidV7();
+      await tapIn(db, { sessionId: sb.id, studentId: x.id, eventId: ex, deviceTime: at });
+      await tapIn(db, { sessionId: sa.id, studentId: y.id, eventId: ey, deviceTime: at });
+
+      const results = await Promise.allSettled([
+        tapIn(db, { sessionId: sa.id, studentId: x.id, eventId: ex, deviceTime: at }),
+        tapIn(db, { sessionId: sb.id, studentId: y.id, eventId: ey, deviceTime: at }),
+      ]);
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          const err = r.reason as Error & { cause?: { code?: string } };
+          expect(
+            err.cause?.code,
+            `round ${round}: a tap failed with ${err.message} — a 40P01 here means the cross-session read took a lock`,
+          ).not.toBe('40P01');
+        }
+      }
+      await endSession(db, {
+        sessionId: sa.id,
+        at: new Date(at.getTime() + 1000),
+        reason: 'ended',
+      });
+      await endSession(db, {
+        sessionId: sb.id,
+        at: new Date(at.getTime() + 1000),
+        reason: 'ended',
+      });
+    }
+  });
+
   it('two simultaneous +10s extends both land, and the session gains both', async () => {
     /*
      * Finding 7. The route reads the session, does the arithmetic, and hands

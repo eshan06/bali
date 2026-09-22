@@ -90,17 +90,18 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   Honest, but none of them is final: that outbox record retries forever.
   Candidates: an `ended` flag on `SessionView` (additive), or one code the
   outbox may clear on.
-  (2) **What makes (1) urgent, and it is pre-existing on `main`.**
-  `convertArmedTaps` inserts the armed tap's `event_id` as a `tap_in`, but
-  `armTap` de-dupes only against `armed_taps.event_id`, never against
-  `events`. So a retry that finds nothing running arms an already-spent id,
-  and the teacher's next Start aborts with `EVENT_ID_CONFLICT` inside
-  `startSession`'s transaction — creating no session. `convertArmedTaps`
-  selects waiting taps by **teacher**, not by class, so this blocks every
-  class of that teacher the student is enrolled in, until the armed tap
-  expires at end of day. Reproduced end to end on `main` and on the audit
-  branches. Every refusal in (1) is a feeder into it, which is why the
-  contract decision is not cosmetic.
+  (2) **Where that retrying used to end up, now fixed.** A retry that finds
+  nothing of the teacher's running is ARMED — `armTap` de-dupes against
+  `armed_taps.event_id` and never against `events`, so a spent id is
+  accepted. That id then reached the next Start, and waiting taps are
+  selected by **teacher**, not by class. It aborted the Start with
+  `EVENT_ID_CONFLICT` (#26 before it landed: every class of that teacher the
+  student is in, blocked until end of day), and then, converted under a fresh
+  id, joined and SHIELDED the student in a class they never tapped into hours
+  later (a 09:00 tap in period 5 at 13:00). Both reproduced. A spent armed tap
+  is consumed and skipped now, so neither happens — the refusals in (1) cost a
+  stuck outbox record and nothing else. That is what makes (1) a contract
+  question rather than an incident.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the

@@ -167,7 +167,7 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('a duration the route refuses says so in words that are true', async () => {
+  it('rejects a duration outside the zod bound, and no longer says "end time"', async () => {
     /*
      * A JOINT drift detector, and worth being precise about what it can and
      * cannot see. `INVALID_EXTENSION` is unreachable through /v1 — the route's

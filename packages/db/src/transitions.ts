@@ -31,6 +31,11 @@ import type { Database } from './types.js';
  *
  * State derivation for display lives in @bali/shared (rule 2); this is the
  * write side.
+ *
+ * One cost worth knowing rather than re-deriving: `tapIn` reads `events` by
+ * event_id on every tap, before the join. `events.event_id` is uniquely
+ * indexed, so that is one index lookup — at a bell, a few hundred extra
+ * indexed reads spread over a minute.
  */
 
 export type TransitionErrorCode =
