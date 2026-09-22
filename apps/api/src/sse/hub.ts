@@ -1,5 +1,5 @@
 import { type Database, getEventsSince } from '@bali/db';
-import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP } from '@bali/shared';
+import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP, STREAM_HEARTBEAT_MS } from '@bali/shared';
 
 import { frameFor } from './frame.js';
 
@@ -52,7 +52,7 @@ interface Internal {
  */
 export function createStreamHub(db: Database, options: StreamHubOptions = {}): StreamHub {
   const repollMs = options.repollMs ?? 20_000;
-  const heartbeatMs = options.heartbeatMs ?? 20_000;
+  const heartbeatMs = options.heartbeatMs ?? STREAM_HEARTBEAT_MS;
   // The per-teacher cap is enforced at the route (before hijacking, so it returns
   // the standard 429); the hub only tracks counts via countForTeacher.
 

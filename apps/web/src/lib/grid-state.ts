@@ -171,17 +171,34 @@ export function gridDisplay(s: Student, now: Date): GridDisplay {
  * the socket) left a fully green grid ageing silently, every chip claiming a
  * freshness nothing had checked.
  *
- * `lastActivityAt` is any sign of life: an event, a heartbeat comment, or a
- * successful snapshot refresh. A heartbeat counts as freshness, not just
- * liveness — a quiet class emits no events for minutes (decision 7: a
- * heartbeat that changes nothing writes no history), so silence on the wire is
- * the normal case and only silence from the SERVER means the screen is
- * guessing.
+ * TWO clocks, not one, and the first version of this had only the second —
+ * which made the `stale` branch unreachable in production, for the exact
+ * scenario it was built for.
  *
- * The threshold is two missed heartbeats, so one dropped frame or a slow tick
- * does not flap the banner on a healthy class.
+ * `lastStreamActivityAt` is life on the STREAM: an event, or a heartbeat
+ * comment. A heartbeat counts as freshness and not just liveness — a quiet
+ * class emits no events for minutes (decision 7: a heartbeat that changes
+ * nothing writes no history), so silence on the wire is the normal case and
+ * only silence from the SERVER means the stream has stopped working.
+ *
+ * `lastGridActivityAt` is life anywhere: that, plus the 15 s snapshot refresh.
+ * It is what "last updated" honestly means to a teacher.
+ *
+ * Feeding the refresh into one shared clock is what broke it: the poll runs
+ * every 15 s and the threshold is 60 s, so a wedged proxy or a hub that died
+ * without closing the socket — stream open, API fine — reset the counter four
+ * times per threshold and showed nothing at all. The two clocks keep that
+ * visible while still telling the teacher the truth about how old the grid is.
  */
-export const STALE_AFTER_MISSED_HEARTBEATS = 2;
+
+/**
+ * How many heartbeats may go missing before the stream is called quiet. Three,
+ * so one dropped frame or a slow tick does not flap the banner on a healthy
+ * class — and the arithmetic below multiplies by exactly this, because naming
+ * it 2 and multiplying by `n + 1` is how the last reader got 60 s from a
+ * constant that said 40.
+ */
+export const STALE_AFTER_MISSED_HEARTBEATS = 3;
 
 export interface Staleness {
   /** `reconnecting` — the client knows it is disconnected. `stale` — the stream is open but silent. */
@@ -191,13 +208,20 @@ export interface Staleness {
 
 export function staleness(input: {
   status: 'connecting' | 'open' | 'reconnecting';
-  lastActivityAt: number;
+  /** Last event or heartbeat comment off the stream. */
+  lastStreamActivityAt: number;
+  /** That, or the last snapshot refresh that came back — how old the grid is. */
+  lastGridActivityAt: number;
   now: number;
   heartbeatMs: number;
 }): Staleness | null {
-  const sinceMs = Math.max(0, input.now - input.lastActivityAt);
-  const secondsAgo = Math.round(sinceMs / 1000);
+  // Always the GRID's age, for both reasons: it is the number a teacher reads
+  // as "how stale is what I am looking at", and on a dead stream with a live
+  // poll it is the smaller, truer one. The stream's own silence decides
+  // WHETHER to warn; it does not get to inflate the number.
+  const secondsAgo = Math.round(Math.max(0, input.now - input.lastGridActivityAt) / 1000);
   if (input.status !== 'open') return { reason: 'reconnecting', secondsAgo };
-  const quietFor = input.heartbeatMs * (STALE_AFTER_MISSED_HEARTBEATS + 1);
-  return sinceMs > quietFor ? { reason: 'stale', secondsAgo } : null;
+  const quietFor = input.heartbeatMs * STALE_AFTER_MISSED_HEARTBEATS;
+  const streamSilentMs = Math.max(0, input.now - input.lastStreamActivityAt);
+  return streamSilentMs > quietFor ? { reason: 'stale', secondsAgo } : null;
 }

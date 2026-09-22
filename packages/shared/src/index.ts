@@ -20,6 +20,19 @@ export const EVENT_RESUME_OVERLAP = 50;
 /** Max events one catch-up page (or one stream re-read) returns; the feed is paged. */
 export const EVENT_PAGE_LIMIT = 200;
 
+/**
+ * How often a live stream sends an SSE comment so idle connections and proxies
+ * stay open — and, on the client, what silence from the server MEANS.
+ *
+ * Shared because the portal's staleness banner is a statement about this
+ * number: it decides the stream has gone quiet once a few of these have failed
+ * to arrive. Hand-copied on the client the two drift silently — move the
+ * server to 30 s and the banner flaps on healthy classes, move it to 60 s and
+ * it never fires at all, with nothing going red either way.
+ * `EVENT_RESUME_OVERLAP` is here for the same reason.
+ */
+export const STREAM_HEARTBEAT_MS = 20_000;
+
 /** Response shape of GET /healthz. */
 export interface HealthzResponse {
   status: 'ok';

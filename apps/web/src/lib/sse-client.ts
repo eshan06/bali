@@ -34,6 +34,12 @@ export interface SseClientOptions {
    * (decision 7: a heartbeat that changes nothing writes no history), so
    * event traffic is not a liveness signal; the server's own heartbeat is.
    * And a heartbeat means the grid IS current — nothing happened.
+   *
+   * Every frame, AND the moment a connection opens. The open matters because
+   * the server's first heartbeat is a whole interval away: without it, a
+   * reconnect that succeeds after a long outage inherits the old silence and
+   * the grid reports "gone quiet, last updated 180s ago" over a connection
+   * that is working perfectly.
    */
   onActivity?: () => void;
   /** A 401 on the stream — the one sign-out trigger. */
@@ -149,6 +155,10 @@ export function createSseClient(opts: SseClientOptions): SseClient {
     }
 
     opts.onStatus?.('open');
+    // An open connection is itself a sign of life — see `onActivity`. The
+    // first heartbeat is up to a full interval away, and until it lands the
+    // only thing a caller knows is the silence from before the reconnect.
+    opts.onActivity?.();
     const openedAt = Date.now();
     try {
       await readStream(res.body);
