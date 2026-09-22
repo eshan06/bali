@@ -33,6 +33,34 @@ export const EVENT_PAGE_LIMIT = 200;
  */
 export const STREAM_HEARTBEAT_MS = 20_000;
 
+/**
+ * The most minutes ONE extension may ask for, and the cap `/v1` puts on a
+ * start. Be precise about which of those the ENGINE enforces, because the two
+ * are not the same:
+ *
+ *  - `extendSession` refuses a duration above this itself — the engine does
+ *    not trust its caller there, because refusing only what overflows the
+ *    `Date` range is a guard at the year 275760, which lets `1e6` minutes
+ *    through and ends a lesson in 2028.
+ *  - `startSession` takes absolute `startedAt`/`endsAt` and applies no bound
+ *    at all. Today the route's zod cap is the only thing holding for starts,
+ *    so a non-`/v1` caller could open a session ending in 2028 while the same
+ *    caller's 481-minute extend is refused. Nothing unbounded reaches it now
+ *    (the route is its only caller), and closing that asymmetry needs a
+ *    refusal code `startSession` does not have — recorded in PLAN.md rather
+ *    than widened into the PR that found it.
+ *
+ * Per operation either way, not per session: `extendSession` adds to whatever
+ * end it finds, so N presses still move a session arbitrarily far and nothing
+ * enforces a total. That is the intended design — a teacher who keeps pressing
+ * "add time" means it — but the distinction belongs here, because this comment
+ * is what an iOS client mirrors.
+ *
+ * Eight hours: longer than any school day, so it never refuses a real lesson,
+ * and short enough that a bad value is caught as a bad value.
+ */
+export const MAX_SESSION_MINUTES = 480;
+
 /** Response shape of GET /healthz. */
 export interface HealthzResponse {
   status: 'ok';

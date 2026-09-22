@@ -86,7 +86,10 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
         // findClassById returns only active classes, so a soft-removed class would
         // make even its own teacher hit this 403. No production path sets
         // classes.removedAt yet; when Step 4 adds class soft-delete it must end the
-        // class's enrollments (or this authz must tolerate a removed class here).
+        // class's enrollments (or this authz must tolerate a removed class here),
+        // AND end the class's running session with its participations — tapIn's
+        // replay branch is bounded on the participation being live, so a live row
+        // in a deleted class would be replayed as current truth.
         const klass = await findClassById(db, enrollment.classId);
         if (!klass || klass.teacherId !== user.id) {
           throw ApiError.forbidden('not allowed to remove this enrollment');

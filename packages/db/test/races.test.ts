@@ -22,6 +22,7 @@ import {
   endEnrollment,
   endSession,
   expireDueSessions,
+  extendSession,
   markSilentParticipations,
   startSession,
   tapIn,
@@ -604,6 +605,206 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 });
+
+describe.runIf(REAL_PG)('engine idempotency under contention (real Postgres)', () => {
+  it('two taps crossing in opposite directions never deadlock', async () => {
+    /*
+     * What the cross-session read's lock choice is worth, on the lane that can
+     * actually show it. tapIn holds FOR UPDATE on the session it resolved to,
+     * then reads the OTHER session — the one that recorded a replayed tap —
+     * WITHOUT a lock. That is deliberate: lock it and two taps crossing in
+     * opposite directions order B-then-A against A-then-B, which is a genuine
+     * deadlock, and withDeadlockRetry would paper over it rather than fix it.
+     *
+     * So this pins the choice from the outside. Student X's spent id lives in
+     * session B and Y's in session A; X taps A while Y taps B, repeatedly.
+     *
+     * TWO assertions, because the obvious one is not enough on its own, and
+     * that is the whole lesson here. `tapIn` wraps its transaction in
+     * `withDeadlockRetry`, so a reintroduced deadlock is caught, retried, and
+     * usually wins on the retry — no rejection ever reaches the loop below.
+     * Measured: with `for update` added to that read, the per-result check
+     * never fires and the test dies on the vitest budget instead, naming
+     * nothing. So the real assertion is Postgres's own counter, which records
+     * a deadlock whether or not the error escaped; the per-result check stays
+     * as the faster, clearer signal for one that does escape.
+     *
+     * On a database of its OWN, not the file's. `pg_stat_database.deadlocks`
+     * is database-wide, and the file's database is shared with "a removal
+     * racing a cross-class switch-tap", which provokes 40P01 deliberately —
+     * see `deadlockCount`. A delta almost covers that; a late stats flush from
+     * another backend defeats it.
+     */
+    const { db: iso, close: closeIso } = await makeTestDb();
+    try {
+      await crossingTapsRound(iso);
+    } finally {
+      await closeIso();
+    }
+  }, 60_000);
+});
+
+/** The body of the crossing-taps test, on a database nothing else touches. */
+async function crossingTapsRound(db: Database): Promise<void> {
+  const school = one(await db.insert(schools).values({ name: 'Cross' }).returning());
+  const teacher = one(
+    await db
+      .insert(users)
+      .values({ cognitoId: 'cross-teacher', role: 'teacher', schoolId: school.id })
+      .returning(),
+  );
+  const mkClass = async (name: string, code: string) =>
+    one(
+      await db
+        .insert(classes)
+        .values({ teacherId: teacher.id, schoolId: school.id, name, joinCode: code })
+        .returning(),
+    );
+  const a = await mkClass('A', 'CROSSA');
+  const b = await mkClass('B', 'CROSSB');
+  const mkStudent = async (tag: string) => {
+    const u = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `cross-${tag}`, role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    await db.insert(enrollments).values([
+      { classId: a.id, studentId: u.id },
+      { classId: b.id, studentId: u.id },
+    ]);
+    return u;
+  };
+  const x = await mkStudent('x');
+  const y = await mkStudent('y');
+
+  for (let round = 0; round < 8; round += 1) {
+    const at = new Date(Date.now() + round * 1000);
+    const sa = (
+      await startSession(db, {
+        classId: a.id,
+        startedAt: at,
+        endsAt: new Date(at.getTime() + 45 * 60_000),
+      })
+    ).session;
+    const sb = (
+      await startSession(db, {
+        classId: b.id,
+        startedAt: at,
+        endsAt: new Date(at.getTime() + 45 * 60_000),
+      })
+    ).session;
+
+    // Each student's id is spent in the session the OTHER one is tapping,
+    // so both replays have to reach across.
+    const ex = newUuidV7();
+    const ey = newUuidV7();
+    await tapIn(db, { sessionId: sb.id, studentId: x.id, eventId: ex, deviceTime: at });
+    await tapIn(db, { sessionId: sa.id, studentId: y.id, eventId: ey, deviceTime: at });
+
+    const results = await Promise.allSettled([
+      tapIn(db, { sessionId: sa.id, studentId: x.id, eventId: ex, deviceTime: at }),
+      tapIn(db, { sessionId: sb.id, studentId: y.id, eventId: ey, deviceTime: at }),
+    ]);
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        const err = r.reason as Error & { cause?: { code?: string } };
+        expect(
+          err.cause?.code,
+          `round ${round}: a tap failed with ${err.message} — a 40P01 here means the cross-session read took a lock`,
+        ).not.toBe('40P01');
+      }
+    }
+    await endSession(db, {
+      sessionId: sa.id,
+      at: new Date(at.getTime() + 1000),
+      reason: 'ended',
+    });
+    await endSession(db, {
+      sessionId: sb.id,
+      at: new Date(at.getTime() + 1000),
+      reason: 'ended',
+    });
+  }
+
+  // The one that survives withDeadlockRetry. Absolute, not a delta: this
+  // database is this test's alone, so anything above zero is ours.
+  expect(
+    await deadlockCount(db),
+    'Postgres broke a deadlock in this database — the cross-session read took a lock, ' +
+      'and the retry wrapper hid it',
+  ).toBe(0);
+}
+
+describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
+  it('two simultaneous +10s extends both land, and the session gains both', async () => {
+    /*
+     * Finding 7. The route reads the session, does the arithmetic, and hands
+     * the engine an absolute newEndsAt. Two taps of "add time" read the same
+     * current end, compute the same target, and the loser's value is no
+     * longer later than what the winner committed — so the engine refuses it
+     * as INVALID_EXTENSION and the teacher's second press silently does
+     * nothing. Doing the arithmetic inside the locked read fixes it: each
+     * extend adds to whatever it finds.
+     */
+    for (let round = 0; round < 8; round += 1) {
+      const { classId } = await seed(`race-extend-${round}`);
+      const session = await openSession(classId);
+      const before = session.endsAt.getTime();
+
+      const results = await Promise.allSettled([
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes: 10,
+          at: new Date(),
+          eventId: newUuidV7(),
+        }),
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes: 10,
+          at: new Date(),
+          eventId: newUuidV7(),
+        }),
+      ]);
+
+      const refused = results.filter((r) => r.status === 'rejected');
+      expect(refused.map((r) => String(r.reason))).toEqual([]);
+
+      // Two distinct presses, two distinct event ids: both must count.
+      const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      expect(after.endsAt.getTime()).toBe(before + 20 * 60_000);
+      expect(await eventsOfType(session.id, 'session_extended')).toHaveLength(2);
+    }
+  });
+});
+
+/**
+ * Deadlocks Postgres has broken in the database `on` is connected to.
+ *
+ * The only honest way to see a deadlock that `withDeadlockRetry` handled:
+ * Postgres counts it whether or not the loser's error ever escaped.
+ *
+ * MUST be given a database nothing else is using, and the first version of
+ * this was wrong about that. It read the file-level `db`, whose database is
+ * shared by all three describes here — including "a removal racing a
+ * cross-class switch-tap", which deliberately provokes 40P01 and says so. A
+ * before/after delta covers most of that, but not all: `pg_stat_clear_snapshot()`
+ * drops only the READING backend's cached snapshot, and other backends flush
+ * their pending stats on their own schedule (at transaction end, at most every
+ * PGSTAT_MIN_INTERVAL). A deadlock from an earlier test, still pending when
+ * the `before` read happens and flushed before the `after` one, lands in the
+ * delta and reddens CI over code that is correct.
+ *
+ * So the caller hands it a database of its own. Then the counter really does
+ * start at 0 and nothing else can contribute.
+ */
+async function deadlockCount(on: Database): Promise<number> {
+  await on.execute(sql`select pg_stat_clear_snapshot()`);
+  const rows = (await on.execute(
+    sql`select deadlocks::int as n from pg_stat_database where datname = current_database()`,
+  )) as { n: number }[];
+  return rows[0]?.n ?? 0;
+}
 
 /** Backends currently parked on a lock in this database. */
 async function lockWaiters(): Promise<number> {

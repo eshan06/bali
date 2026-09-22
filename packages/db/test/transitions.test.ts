@@ -1,4 +1,5 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { MAX_SESSION_MINUTES } from '@bali/shared';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
@@ -697,24 +698,113 @@ describe('extendSession', () => {
 
     const updated = await extendSession(db, {
       sessionId: session.id,
-      newEndsAt: newEnd,
+      durationMinutes: 10,
       at: new Date('2026-01-01T09:20:00Z'),
     });
     expect(updated.endsAt.toISOString()).toBe(newEnd.toISOString());
     expect((await eventsFor(session.id)).some((e) => e.type === 'session_extended')).toBe(true);
   });
 
-  it('refuses an extension that is not later than the current end', async () => {
+  it('gives a session past its end but not yet swept a window starting from now', async () => {
+    // The other half of `base = max(at, endsAt)`, which moved from the route
+    // into the locked read with this change. The expiry sweep runs once a
+    // minute, so a teacher can press "add time" on a session whose end has
+    // just passed. Adding to the stale end would hand back a new end that is
+    // STILL in the past — the shield never comes back and the press looks
+    // like it did nothing.
+    const { klass } = await seedClass('extend-late');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+
+    const at = new Date('2026-01-01T09:25:30Z'); // 30s past the 09:25 end
+    const updated = await extendSession(db, { sessionId: session.id, durationMinutes: 10, at });
+
+    expect(updated.endsAt.toISOString()).toBe(new Date(at.getTime() + 10 * 60_000).toISOString());
+    expect(updated.endsAt.getTime()).toBeGreaterThan(at.getTime());
+  });
+
+  it('refuses an extension that would not move the end forward', async () => {
+    // Taking a duration instead of an absolute end makes "not later than the
+    // current end" unreachable for any positive number of minutes, which is
+    // the point. What remains reachable is a caller passing a non-positive
+    // or non-finite duration, and the engine still refuses that rather than
+    // trusting it.
     const { klass } = await seedClass('extend-bad');
     const w = window('2026-01-01T09:00:00Z');
     const { session } = await startSession(db, { classId: klass.id, ...w });
+    // Four shapes, and the middle one is the point. 0 and -10 are not
+    // durations; NaN and Infinity are not numbers. `MAX_SESSION_MINUTES + 1`
+    // and 1e6 are both perfectly finite, positive minutes that no school could
+    // mean — 1e6 ends the lesson in 2028 — and before the engine carried the
+    // same bound as the route's zod cap, only `/v1` refused them. 1e15 used to
+    // be the shape past even that, reaching the Date-range guard; the bound
+    // now rejects it two lines earlier, so it is kept here only as the
+    // largest absurd value, and the range guard has its own test above.
+    for (const durationMinutes of [
+      0,
+      -10,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      MAX_SESSION_MINUTES + 1,
+      1e6,
+      1e15,
+    ]) {
+      await expect(
+        extendSession(db, {
+          sessionId: session.id,
+          durationMinutes,
+          at: new Date('2026-01-01T09:10:00Z'),
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+    }
+    // And the end really did not move.
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt.toISOString()).toBe(w.endsAt.toISOString());
+  });
+
+  it('refuses an extension that would push the end past the Date range', async () => {
+    /*
+     * The guard that MAX_SESSION_MINUTES made unreachable from the direction
+     * its old test came at it: `1e15` minutes used to land here, and now the
+     * duration check two lines above rejects it first. What still reaches it
+     * is the case the guard was really for — `base` is `max(at, endsAt)` and
+     * `endsAt` comes from the STORED session, so a row already near the JS
+     * `Date` boundary overflows on a perfectly legal ten-minute press.
+     * Unguarded, `newEndsAt` is an Invalid Date and `toISOString()` throws a
+     * bare `RangeError`: an unmapped 500, where the point of these checks is
+     * that the engine refuses its caller in its own vocabulary.
+     *
+     * The near-boundary end goes in through raw SQL, and it has to. A JS
+     * `Date` past year 9999 serialises as `+275760-09-12T23:59:00.000Z`, and
+     * Postgres rejects the `+`-prefixed extended year outright (22009,
+     * DateTimeParseError) — so the driver can READ such a value back as a
+     * valid Date but cannot write one. Writing `sessions` directly is fine
+     * here; the engine-only rule covers `participations` and `events`.
+     */
+    const { klass } = await seedClass('extend-overflow');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await db.execute(
+      sql`update sessions set ends_at = '275760-09-12 23:59:00+00' where id = ${session.id}`,
+    );
+    const nearMax = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    // One minute below Date's max, and still a valid Date — assert it, or a
+    // driver change that returns a string here would make the refusal below
+    // pass for the wrong reason.
+    expect(nearMax.endsAt.getTime()).toBe(8_640_000_000_000_000 - 60_000);
+
     await expect(
       extendSession(db, {
         sessionId: session.id,
-        newEndsAt: w.endsAt,
+        durationMinutes: 10, // well inside MAX_SESSION_MINUTES
         at: new Date('2026-01-01T09:10:00Z'),
       }),
     ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt.getTime()).toBe(nearMax.endsAt.getTime());
   });
 
   it('a replay after the session has ended returns current truth, not SESSION_NOT_RUNNING', async () => {
@@ -729,7 +819,7 @@ describe('extendSession', () => {
     const eventId = newUuidV7();
     await extendSession(db, {
       sessionId: session.id,
-      newEndsAt: newEnd,
+      durationMinutes: 10,
       at: new Date('2026-01-01T09:20:00Z'),
       eventId,
     });
@@ -741,7 +831,7 @@ describe('extendSession', () => {
 
     const replay = await extendSession(db, {
       sessionId: session.id,
-      newEndsAt: new Date(newEnd.getTime() + 10 * 60_000),
+      durationMinutes: 10,
       at: new Date('2026-01-01T09:36:00Z'),
       eventId,
     });
@@ -770,7 +860,7 @@ describe('extendSession', () => {
     await expect(
       extendSession(db, {
         sessionId: session.id,
-        newEndsAt: new Date(w.endsAt.getTime() + 10 * 60_000),
+        durationMinutes: 10,
         at: new Date('2026-01-01T09:20:00Z'),
         eventId,
       }),
@@ -854,7 +944,7 @@ describe('endSession & expiry', () => {
     // Give the open one a later window so it isn't due.
     await extendSession(db, {
       sessionId: sessionOpen.id,
-      newEndsAt: new Date('2026-01-01T10:00:00Z'),
+      durationMinutes: 35, // 09:25 -> 10:00
       at: new Date('2026-01-01T09:10:00Z'),
     });
 
@@ -1314,8 +1404,11 @@ describe('armed taps', () => {
      * user), so one reuse got two answers on nothing the client controls: a
      * 409 when B had a session running that the student is enrolled in (the
      * tap routes to `tapIn`, which refuses the spent id — asserted below), a
-     * silent 200 here in every other shape. Both answers are the 409 now, and
-     * the outbox keeps the record.
+     * silent 200 here in every other shape. Once the first session is over,
+     * as here, both answers are the 409 now and the outbox keeps the record.
+     * While it is still live, `tapIn` replays it instead (its replay is keyed
+     * on student and type — tap step 10) and this path still refuses: the one
+     * split left, recorded in PLAN.md.
      *
      * Only the cross-teacher half. The SAME teacher, an id spent in an earlier
      * session of theirs, still answers `replay` here — "does not arm an id
@@ -1867,6 +1960,597 @@ describe('armed taps', () => {
       );
     },
   );
+});
+
+describe('a retried tap the server re-resolves elsewhere', () => {
+  it('replays against the session it actually recorded, instead of 409ing', async () => {
+    /*
+     * Finding 4. The phone mints one event id for one physical tap and
+     * retries until it gets an answer. The SERVER, not the phone, decides
+     * which session that tap means — resolveTapTarget picks the newest
+     * running session the student is enrolled in — so a retry after the
+     * teacher has started a second session resolves somewhere new. insertEvent
+     * then sees the id attached to a different session and refuses it as
+     * EVENT_ID_CONFLICT.
+     *
+     * That is the opposite of rule 4: the tap DID land, so the retry must
+     * re-read and return the truth that was recorded, not a 409 the phone
+     * reads as "keep retrying". The id identifies one tap by one student; the
+     * conflict check is there for an id reused for a DIFFERENT event, which
+     * this is not.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-resolve');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPRE2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+    const eventId = newUuidV7();
+    const landed = await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(landed.outcome).toBe('joined');
+
+    // The same teacher starts a second session the student is also in; the
+    // phone, never having seen a response, retries the identical tap.
+    const second = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    const retry = await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    expect(retry.outcome).toBe('replay');
+    // The truth is the session the tap was actually recorded against.
+    expect(retry.session.id).toBe(first.session.id);
+    expect(retry.participationId).toBe(landed.participationId);
+
+    // And nothing was written twice.
+    const taps = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, 'tap_in'), eq(events.userId, student.id)));
+    expect(taps).toHaveLength(1);
+  });
+
+  it("suppresses a genuine join when a phone reuses its own id on ANOTHER teacher's block", async () => {
+    /*
+     * The tradeoff this branch gives up, pinned rather than only described.
+     *
+     * The replay keys on (event_id, type = 'tap_in', user_id), and the server
+     * cannot tell a retry from a deliberate reuse — the phone is supposed to
+     * mint one id per physical tap. So an app that reuses a spent id while the
+     * student physically taps a DIFFERENT teacher's block is answered
+     * `200 replay` naming the FIRST teacher's still-running session: the phone
+     * shields to that window, teacher A's grid shows the student green, and
+     * teacher B — in whose room the student is standing — sees them absent
+     * until the next check-in.
+     *
+     * Deliberate, documented at the branch and in PLAN.md, and no privilege
+     * comes with it: the same student could simply not tap, and B's grid shows
+     * them absent either way. The owner ruled on it (2026-09-22) and it
+     * stays; pinned because it is the join half of the split PLAN.md records
+     * (the arm path refuses the same reuse), and a decision nothing tests can
+     * change by accident. If Phase 3 adds a "recorded, but no longer current"
+     * answer, this test is the one that should change.
+     */
+    const a = await seedClass('reuse-teacher-a');
+    const b = await seedClass('reuse-teacher-b');
+    // One student, enrolled with both teachers.
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+
+    const sessionA = (
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    const eventId = newUuidV7();
+    const joined = await tapIn(db, {
+      sessionId: sessionA.id,
+      studentId: a.student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(joined.outcome).toBe('joined');
+
+    // A real, separate physical tap on teacher B's block — carrying the id the
+    // buggy app never retired.
+    const sessionB = (
+      await startSession(db, { classId: b.klass.id, ...window('2026-01-01T10:00:00Z') })
+    ).session;
+    const reused = await tapIn(db, {
+      sessionId: sessionB.id,
+      studentId: a.student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T10:01:00Z'),
+    });
+
+    // Answered as a replay of teacher A's tap, not as the join it really was.
+    expect(reused.outcome).toBe('replay');
+    expect(reused.session.id).toBe(sessionA.id);
+    expect(reused.participationId).toBe(joined.participationId);
+
+    // Teacher B's grid: nothing. The student is standing in that room.
+    const inB = await db
+      .select()
+      .from(participations)
+      .where(
+        and(eq(participations.sessionId, sessionB.id), eq(participations.studentId, a.student.id)),
+      );
+    expect(inB, 'teacher B has no record of a student who did tap their block').toHaveLength(0);
+
+    // And teacher A still shows them green, which is the other half of the drift.
+    const inA = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, sessionA.id),
+            eq(participations.studentId, a.student.id),
+          ),
+        ),
+    );
+    expect(inA.endedAt).toBeNull();
+    expect(inA.state).toBe('focused');
+  });
+
+  it('refuses to replay a tap recorded in a session that has ended', async () => {
+    /*
+     * The bound that makes the replay above safe. TapResponse hands the phone
+     * {id, classId, endsAt} and has no way to say "that session is over", and
+     * a session the teacher ended EARLY keeps its original endsAt — so a
+     * "replay" naming an ended session tells the phone to shield the student
+     * until a bell that already rang, in a session whose grid no teacher is
+     * watching and which no unlock can reach. Nothing would be surfaced
+     * anywhere: per ARCHITECTURE step 10 the phone deletes its outbox record
+     * on 200 and stops asking.
+     *
+     * So the engine refuses instead. EVENT_ID_CONFLICT is loud — a non-401 4xx
+     * is "keep the record, retry, and surface" — and the student's next
+     * physical tap carries a fresh id and joins the running session normally.
+     *
+     * Measured, so the name is not read as a claim about which line holds it
+     * up: NEITHER guard is pinned by this test on its own. Ending a session
+     * ends its live participations in the same transaction, so by the time the
+     * session is gone the row is too, and each condition is independently
+     * sufficient here — delete either one alone and this stays green; delete
+     * both and it goes red. `!current.endedAt` has its own test in the two
+     * cases above; `!recorded.endedAt` is kept for read-order safety rather
+     * than because anything would catch its removal (see the branch comment).
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-replay-ended');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPEND2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    // Ended EARLY: endsAt stays 09:25, so a replay would hand the phone a
+    // window that is still open on its own clock.
+    await endSession(db, {
+      sessionId: first.session.id,
+      at: new Date('2026-01-01T09:05:00Z'),
+      reason: 'ended',
+    });
+
+    const second = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: second.session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+  });
+
+  it('refuses to replay a participation the student has since left', async () => {
+    /*
+     * The other half of the same bound, and the sharper one, because BOTH
+     * sessions are running. The first tap lands in A and its response is lost;
+     * the student then taps B for real, which ends their A row as
+     * `left_for_other_session` (decision 4); the stale outbox record for the
+     * first tap finally retries and resolves to B.
+     *
+     * Answering that with "replay: focused in A" is the phone/grid drift the
+     * engine exists to prevent: the phone shields for A and its next check-in
+     * against A comes back `gone` — the unshield signal — while the teacher's
+     * grid correctly shows the student green in B. The recorded truth is no
+     * longer the current truth, so it is not a replay.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-left');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPLEFT2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const first = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const stale = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: stale,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    const second = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:05:00Z', 60),
+    });
+    const moved = await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:06:00Z'),
+    });
+    expect(moved.outcome).toBe('switched');
+
+    await expect(
+      tapIn(db, {
+        sessionId: second.session.id,
+        studentId: student.id,
+        eventId: stale,
+        deviceTime: new Date('2026-01-01T09:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // And the student is still where they actually are.
+    const left = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, first.session.id),
+            eq(participations.studentId, student.id),
+          ),
+        ),
+    );
+    expect(left.endedReason).toBe('left_for_other_session');
+    const live = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, second.session.id),
+            eq(participations.studentId, student.id),
+          ),
+        ),
+    );
+    expect(live.endedAt).toBeNull();
+  });
+
+  it('replays when the session it resolved to ended in the gap', async () => {
+    /*
+     * Why the lookup sits AHEAD of the ended-session guard. resolveTapTarget
+     * filters on isNull(endedAt) outside the transaction, so the session it
+     * picks can end before the engine's locked read — at the bell, where the
+     * per-minute expiry sweep meets a burst of taps. Behind the guard, a tap
+     * that DID land is answered 409 SESSION_NOT_RUNNING, which restarts the
+     * infinite retry loop this branch exists to end. Ahead of it, the still-
+     * running session that actually recorded the tap comes back.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-gap');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPGAP2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const recorded = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const eventId = newUuidV7();
+    const landed = await tapIn(db, {
+      sessionId: recorded.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    // The newer session resolveTapTarget would have picked, gone by the time
+    // the engine locks it.
+    const resolved = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await endSession(db, {
+      sessionId: resolved.session.id,
+      at: new Date('2026-01-01T09:11:00Z'),
+      reason: 'expired',
+    });
+
+    const retry = await tapIn(db, {
+      sessionId: resolved.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(retry.outcome).toBe('replay');
+    expect(retry.session.id).toBe(recorded.session.id);
+    expect(retry.session.endedAt).toBeNull();
+    expect(retry.participationId).toBe(landed.participationId);
+  });
+
+  it('refuses a stale retry once the student has left the session that recorded it', async () => {
+    /*
+     * The same bound seen from the other side, and the case the `!isNew`
+     * refusal below the branch actually serves. Here the retry resolves back
+     * to the session that recorded it — still running — but the student's row
+     * in it has ended, because they tapped the teacher's other session for
+     * real. main answered 200 with that ended row's stale `focused`, which is
+     * the drift this PR exists to kill.
+     *
+     * NOT_PARTICIPATING, not EVENT_ID_CONFLICT: the id is not in conflict, it
+     * names this very tap. What is no longer true is the participation.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-left-same');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPLEFTS2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const recorded = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const stale = newUuidV7();
+    await tapIn(db, {
+      sessionId: recorded.session.id,
+      studentId: student.id,
+      eventId: stale,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    const second = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:05:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:06:00Z'),
+    });
+    // Second period is over; the stale retry resolves back to the first
+    // session, which is still running.
+    await endSession(db, {
+      sessionId: second.session.id,
+      at: new Date('2026-01-01T09:30:00Z'),
+      reason: 'ended',
+    });
+
+    await expect(
+      tapIn(db, {
+        sessionId: recorded.session.id,
+        studentId: student.id,
+        eventId: stale,
+        deviceTime: new Date('2026-01-01T09:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_PARTICIPATING' });
+  });
+
+  it("refuses a tap_in carrying another student's spent id, and does not eat their join", async () => {
+    /*
+     * The identity half of the branch's guard, which nothing else pins: with
+     * `prior.userId === input.studentId` deleted, a student replaying someone
+     * else's spent id while they are themselves live in that session gets a
+     * 200 'replay' off their OWN row — and their real join into the resolved
+     * session is silently suppressed. No data crosses (loadParticipation keys
+     * on the caller), but a student who tapped would be missing from the grid
+     * with nothing surfaced.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-other-id');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-tap-other-id-2', role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPOTHER2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values([
+      { classId: klass.id, studentId: classmate.id },
+      { classId: second.id, studentId: classmate.id },
+    ]);
+
+    const first = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const theirs = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: theirs,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    // The classmate is live in that same session, so a branch that skipped the
+    // identity check would find a row of theirs to hand back.
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: classmate.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    const later = await startSession(db, {
+      classId: second.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: later.session.id,
+        studentId: classmate.id,
+        eventId: theirs,
+        deviceTime: new Date('2026-01-01T09:11:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // Refused, so nothing of theirs was written into the second session.
+    const joined = await db
+      .select()
+      .from(participations)
+      .where(
+        and(
+          eq(participations.sessionId, later.session.id),
+          eq(participations.studentId, classmate.id),
+        ),
+      );
+    expect(joined).toHaveLength(0);
+  });
+
+  it("will not launder an unlock's id into a tap replay", async () => {
+    /*
+     * The type half of the same guard, and the direction the sibling test
+     * below does not cover. With `prior?.type === 'tap_in'` dropped, a tap
+     * carrying an UNLOCK's id comes back as a 200 replay reporting the
+     * unlocked row — the tap is silently dropped, and the phone is told a
+     * join happened. ISSUES #2 runs the other way, but the same one-line
+     * change opens both.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-unlock-id');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPUNL2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+
+    const first = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const unlockId = newUuidV7();
+    await unlock(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: unlockId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    const later = await startSession(db, {
+      classId: second.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: later.session.id,
+        studentId: student.id,
+        eventId: unlockId,
+        deviceTime: new Date('2026-01-01T09:11:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+  });
+
+  it('still refuses an id reused for a genuinely different event', async () => {
+    // The guard this must not weaken: a student reusing their tap_in id for
+    // an unlock is a client bug, and calling it a replay would silently drop
+    // an unlock the phone then deletes from its outbox (ISSUES #2).
+    const { klass, student } = await seedClass('tap-reuse');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    await expect(
+      unlock(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:02:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+  });
 });
 
 describe('the ended-consistency check constraint', () => {

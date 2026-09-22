@@ -167,6 +167,30 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects a duration outside the zod bound, and no longer says "end time"', async () => {
+    /*
+     * A JOINT drift detector, and worth being precise about what it can and
+     * cannot see. `INVALID_EXTENSION` is unreachable through /v1 — the route's
+     * `int().positive().max(480)` accepts only durations the engine never
+     * refuses — so no wire test can assert the engine's message. What this
+     * pins is the pair: zod still rejects the shape, AND the message the
+     * mapper would produce no longer talks about an end time the route does
+     * not send. Measured: reverting the mapper's message alone leaves this
+     * green, relaxing `.positive()` alone leaves it green, doing both turns it
+     * red.
+     */
+    const { teacher, session } = await seedRunning('extend-bad-duration');
+    const res = await post(
+      await ctx.tokenFor(teacher.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 0, eventId: randomUUID() },
+    );
+    expect(res.statusCode).toBe(400);
+    const body = res.json<{ error: { code: string; message: string } }>();
+    expect(body.error.code).toBe('bad_input');
+    expect(body.error.message).not.toContain('end time');
+  });
+
   it('a non-owner teacher cannot extend (403)', async () => {
     const { session } = await seedRunning('extend-owner');
     const other = await seedClassroom(db, 'extend-other');

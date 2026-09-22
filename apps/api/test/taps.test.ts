@@ -1,4 +1,4 @@
-import { type Database, startSession } from '@bali/db';
+import { classes, type Database, endSession, enrollments, startSession } from '@bali/db';
 import type { TapResponse } from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -34,6 +34,12 @@ async function tap(
     },
   });
   return { status: res.statusCode, body: res.json<TapResponse>() };
+}
+
+function one<T>(rows: T[]): T {
+  const row = rows[0];
+  if (row === undefined) throw new Error('expected a row');
+  return row;
 }
 
 describe('POST /v1/taps', () => {
@@ -95,6 +101,110 @@ describe('POST /v1/taps', () => {
     const retry = await tap(token, { tagId: block.tagId, eventId });
     expect(first.body.outcome).toBe('joined');
     expect(retry.body.outcome).toBe('replay');
+  });
+
+  it('a retry the server re-resolves elsewhere replays the session it recorded', async () => {
+    /*
+     * The wire shape of the engine's cross-session replay, which the engine
+     * tests pin only as a result object. One physical tap, one event id, and
+     * the SERVER picks the session: the retry resolves at the teacher's newer
+     * session, and the answer must still be 200 naming the session that
+     * actually recorded the tap — not the 409 that used to send the phone
+     * round the retry loop forever.
+     */
+    const { student, teacher, school, klass, block } = await seedClassroom(db, 'tap-reresolve');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'JOIN-tap-reresolve-2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+
+    const token = await ctx.tokenFor(student.cognitoId);
+    const first = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const eventId = randomUUID();
+    const landed = await tap(token, { tagId: block.tagId, eventId });
+    expect(landed.body.outcome).toBe('joined');
+
+    // The same teacher starts a second session the student is also in, so
+    // resolveTapTarget (newest running session of the block's teacher) now
+    // points the retry somewhere new.
+    const later = await startSession(db, {
+      classId: second.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const retry = await tap(token, { tagId: block.tagId, eventId });
+
+    expect(retry.status).toBe(200);
+    expect(retry.body.outcome).toBe('replay');
+    expect(retry.body.session?.id).toBe(first.session.id);
+    expect(retry.body.session?.id).not.toBe(later.session.id);
+    expect(retry.body.state).toBe('focused');
+  });
+
+  it('is a 409 when the retry resolves back to a session the student has left', async () => {
+    /*
+     * The half this branch CHANGES for shipped `/v1`, and the one the whole
+     * hold turns on — `main` answers 200 here. It was pinned only at engine
+     * level, as a thrown `NOT_PARTICIPATING`; what a phone actually branches
+     * on is the status and the body that `routes/errors.ts` maps it to, and
+     * nothing asserted those. The same shape of gap that let armTap's
+     * refusals ship as 500s.
+     *
+     * The student taps into period 1, the 200 is lost, they physically tap
+     * period 2 (so decision 4 ends the period-1 row as
+     * `left_for_other_session`), period 2 ends, and the stale outbox record
+     * retries — re-resolving to period 1, which is still running.
+     */
+    const { student, teacher, school, klass, block } = await seedClassroom(db, 'tap-left');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'JOIN-tap-left-2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const eventId = randomUUID();
+    expect((await tap(token, { tagId: block.tagId, eventId })).body.outcome).toBe('joined');
+
+    // A real second tap moves them out of period 1, then period 2 ends.
+    const later = await startSession(db, {
+      classId: second.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    expect((await tap(token, { tagId: block.tagId })).body.outcome).toBe('switched');
+    await endSession(db, { sessionId: later.session.id, at: new Date(), reason: 'ended' });
+
+    // The stale retry, re-resolved back to period 1.
+    const retry = await tap(token, { tagId: block.tagId, eventId });
+    expect(retry.status).toBe(409);
+    expect(retry.body).toMatchObject({
+      error: { code: 'conflict', message: 'not in this session' },
+    });
   });
 
   it("is a 409 when the event_id belongs to another student's armed tap", async () => {
