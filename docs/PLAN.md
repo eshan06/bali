@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs._
+_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`._
 
 ## Now
 
@@ -65,12 +65,19 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap
-  insert race, a replayed tap re-resolved to another session, block
-  re-registration by the tag's own teacher, extend's arithmetic outside the
+  the armTap insert race and its event-id integrity gap (**in review**), a
+  replayed tap re-resolved to another session, extend's arithmetic outside the
   engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
-  missing idempotency key, was re-examined and the deferral stands.
+  banner, and one shared SQLSTATE helper. Block re-registration by the tag's
+  own teacher is fixed but **held for the owner** — the fix answers 200 where
+  `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
+  The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
+  the deferral stands.
+- **Found while fixing the audit, on `main` rather than in the audit's list:**
+  the SSE hub's `close()` did not wait for a LISTEN it had started, so a
+  shutdown during setup left a query on a pool being torn down — an unhandled
+  `write CONNECTION_ENDED` that failed the real-Postgres lane with every test
+  green (**landed**; see the decision log).
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -136,6 +143,207 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — CI was failing the real-Postgres lane with every test green,
+  and the cause was the stream hub's own shutdown. `ensureListening()` fires
+  `client.listen('bali_events', …)` without awaiting it, and `unlisten` is only
+  assigned once that RESOLVES — so `hub.close()` on a hub whose LISTEN was
+  still being established awaited nothing and returned, and whatever tore the
+  pool down next (a test's `closeDb`, the server exiting after `app.close()`)
+  did so with the query in flight. postgres.js reported `write
+  CONNECTION_ENDED` as an unhandled rejection: 5 runs out of 5 on `main`, in
+  isolation, so not a flake. It was not #29's failure — that diff is db-only —
+  and it had been read as one twice.
+  `close()` now awaits the setup promise, and the `.then` that unlistens a
+  LISTEN landing after close awaits its `stop()` instead of voiding it.
+  Isolating the two halves says plainly which does what, because the first
+  regression test I wrote for this passed with the bug present and I nearly
+  shipped it: the awaited `stop()` is what stops the rejection going unhandled
+  (voided, it has no handler; awaited, it lands in the `.catch` already there),
+  and the awaited setup is what makes `close()` mean "the LISTEN is settled and
+  unlistened" — the promise the `onClose` shutdown hook is built on. The
+  end-to-end symptom reproduced 1 run in 3 against the first half alone, so it
+  is not what the test asserts: `hub-close.test.ts` drives `listen` by hand and
+  pins the contract, red with a different message for each half removed, on
+  both lanes — where the real-pool version could not run on PGlite at all.
+
+- **2026-09-22** — The portal's two audit findings, and both were subtler than
+  "missing": the reconnect backoff and the staleness banner already existed,
+  and both were wrong in the case that matters.
+  **The backoff reset on the 200, not on the connection lasting.** A server
+  that accepts and immediately drops — a session that has ended, a hub
+  draining on deploy — answers 200 every time, so every retry went back to the
+  base delay. Measured: 16 attempts in 600 ms with a 50 ms base and no growth
+  at all, which at the shipped 500 ms default is a browser knocking twice a
+  second, per open tab, indefinitely. It resets only once a connection has
+  lasted `stableAfterMs` (5 s) now; the same measurement gives 5 attempts,
+  doubling. A genuine blip after a healthy stream still reconnects at the base
+  delay, which has its own test.
+  **The banner only appeared when the client already knew it was
+  disconnected** — the one case it can see. The dangerous shape showed
+  nothing: a stream that stays open and stops delivering (a wedged proxy, a
+  hub that died without closing the socket) left a fully green grid ageing
+  silently, every chip claiming a freshness nothing had checked, which is rule
+  3 exactly. The decision is a pure `staleness()` in `grid-state.ts` — the
+  shape `gridDisplay` already uses, so it is unit-testable without pulling a
+  DOM harness into `apps/web` — and it now also fires on an open-but-silent
+  stream, worded differently so the two are not confused.
+  Liveness had to come from the SERVER's heartbeat, not from events: a quiet
+  class emits none for minutes (decision 7), so event traffic would have
+  marked a healthy stream stale. The SSE client reports every frame through
+  `onActivity`, comments included, and a heartbeat counts as freshness rather
+  than mere liveness — nothing arriving means nothing changed. The 15 s
+  snapshot refresh feeds it too, so a reload that worked stops the counter.
+  Caught in my own mutation pass before pushing: `onActivity` was load-bearing
+  and unpinned — deleting it left the suite green while a quiet class would
+  have shown the stale banner after a minute. It has its own test now.
+
+- **2026-09-22** — Fourth pass on the same decision, and the third time I
+  closed half a hole. #27 added a test that the stream route's log dispatch
+  really writes `debug` for the teardown race — and asserted only that
+  direction. Measured: hardcode `request.log[level]` to `.debug` and all six
+  tests stay green, while every code the listener has never seen is logged at
+  `debug` and swallowed by `LOG_LEVEL`'s `info` default. That is the MORE
+  dangerous half — the `warn` branch exists precisely so an unheard-of code is
+  not discarded — and it was the one left unpinned. Both directions are
+  asserted now: hardcoding either way turns one case red, and inverting the
+  helper turns five.
+  The rest of #27's review, all of it fair: the new test performs a deliberate
+  write-after-end without the `uncaughtException` net its sibling documents, so
+  a regression in the route's own listener would have taken the worker down
+  instead of reporting a failure; `logStream` was spread on top of `transport`,
+  which pino refuses outright, so the injected stream wins explicitly now
+  rather than leaving a trap for the next caller; and the `'request'` listener
+  that #27 moved into `afterEach` outlived the request it captured, so
+  anything else reaching the app could reassign it — first match only now, in
+  both files, with the `cleanups` convention #27 established applied to the
+  new file too.
+  That precedence fix then shipped with nothing pinning it, which is the PR's
+  own thesis one more time: every test builds with `NODE_ENV: 'test'`, so the
+  transport branch was never taken and flipping the ternary back left the
+  suite green. There is a test now that builds in development WITH an injected
+  stream and reads the raw JSON line off it — both wrong shapes turn it red.
+  And the first version of that test failed on the real-Postgres lane with
+  every assertion green: it waited on `headersSent`, which fires at
+  `writeHead` and therefore BEFORE `hub.subscribe()`, so it ended the response
+  while the subscription's first `getEventsSince` was still in flight and the
+  pool closed under it — `write CONNECTION_ENDED`, an unhandled rejection that
+  fails the run without failing a test. It waits for the opening frame to
+  reach the client now, which is the proof that read finished. Causation
+  measured, not guessed: the old shape reproduces it 2/2 locally, the new one
+  is clean.
+
+- **2026-09-22** — The stream route's log decision took three passes to
+  actually pin, and the last hole was one level below the last fix. #24 folded
+  the level and the line into one tested helper so the listener had no branch
+  left — but the line that CONSUMES it, `request.log[level]({ err }, msg)`, is
+  ordinary code: hardcode it to `.warn` and every tab-close goes to `warn` in
+  production while all five helper cases stay green. `buildApp` now takes an
+  optional `logStream` (tests only; production keeps pino's own destination)
+  and an integration test reads the level the route actually wrote. Hardcoding
+  the dispatch turns it red; the helper's table test does not notice.
+  Also measured, from the same review: the rewritten stall loop treated ONE
+  quiet round as proof the socket was full. Draining happens on the event
+  loop, so a round where the loop is busy for the whole sleep — this suite
+  runs with `repollMs: 5` — looks identical to a full socket. On this box the
+  kernel accepts about 3 MiB before it stops, so a false stall on round one
+  leaves ~1 MiB queued, `end()` flushes it, `'finish'` fires, and the test
+  goes red for a busy machine rather than a regression. It now takes two
+  consecutive quiet rounds; a genuinely full socket never drains again.
+  And the `'request'` listeners come off in `afterEach` rather than after the
+  `waitFor` that may throw first.
+
+- **2026-09-22** — The worst thing the audit turned up was not on its list: a
+  lost tap response could stop a teacher starting any lesson for the rest of
+  the day, and it needed no race to reach. A tap lands in a session, its
+  response is lost, the bell ends the session, and the phone's outbox retries.
+  Nothing of that teacher's is running, so the route arms the retry —
+  `armTap` de-dupes against `armed_taps.event_id` and never against `events`,
+  so a SPENT id is accepted. The next Start converts it, `insertEvent` sees
+  the id against a different session and refuses, and because conversion runs
+  inside `startSession`'s transaction the whole Start rolls back with the tap
+  still unconsumed. Waiting taps are selected by TEACHER, not by class, so
+  every class that student is in is blocked, every period, until the tap
+  expires at end of day.
+  A tap is still a tap (decision 5) and the student is still standing there,
+  so the conversion now goes ahead under a fresh event id, with the spent one
+  kept in `payload.armed_tap_event_id` so the history still shows which tap it
+  came from. Nothing is weakened: the armed tap's id exists to de-dupe
+  ARMING, and the conversion was already exactly-once, consumed in the same
+  transaction. Both reviewers on the tap-replay step reproduced this
+  independently and flagged it as worse than anything that step fixed; it is
+  pre-existing on `main`, reproduced there before the fix.
+  This also removes the sharp edge under the tap path's refusals: each of them
+  is a 409 the outbox keeps retrying, and this was where that retrying ended
+  up. The contract question — a tap that landed but is no longer current has
+  no honest `200` — is still open for the owner, but it can no longer cost a
+  teacher their day.
+- **2026-09-22** — #22's own review found the same class of hole one level up
+  from the one #22 fixed. That PR extracted `streamErrorLevel` so the stream
+  route's log decision could be asserted, but the listener then RE-BRANCHED on
+  what it returned, and that branch was hand-written and unseen: swapping its
+  two bodies left the whole api suite green (verified — 244 passed) while
+  every ordinary tab-close would log at `warn` in production, which is the
+  exact noise the split existed to avoid. A pinned function with an unpinned
+  call site pins nothing. The helper now returns the level AND the line
+  together (`streamErrorLog`) and the listener dispatches on what comes back,
+  so there is no branch left outside the tested function. Inverting the helper
+  turns all five of its cases red.
+  The same lesson twice, because the review also measured the stalled-reader
+  test's own loop. It claimed to queue "until the socket genuinely stops
+  draining, rather than trusting a byte count measured on one machine" — but
+  `write()` returns false on the very first 1 MiB chunk (the stream high-water
+  mark is 64 KiB and says nothing about the socket), so the loop exited after
+  one iteration, the pad was a fixed 5 MiB, and the assertion guarding it was
+  true before the socket had done anything. It watches `writableLength` now —
+  what has been handed over and not yet accepted — so a round where it grows
+  by the whole chunk is a round where nothing drained. The magic number is
+  gone and both mutations still kill the test.
+  Also from that review: the crash-regression test's socket is registered with
+  the same `extraSockets` net its neighbour already had, and its `'request'`
+  listener is removed once it has what it needs — a `waitFor` timing out
+  before the `try` used to leave a live streaming connection attached to an
+  app the suite was about to close.
+  Worth knowing for anyone re-running CI locally: `npm test --
+  --hookTimeout=60000` at the repo root silently DROPS the flag (the root
+  script is `npm test -ws --if-present`, so npm takes the extra argument as
+  its own), and on a loaded box PGlite's `beforeEach` then reports phantom
+  "Hook timed out in 10000ms" failures. Run `npx vitest run --root <workspace>
+  --hookTimeout=120000` per workspace instead.
+
+- **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
+  read-then-write where the database could have arbitrated.
+  (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
+  phone both passed the selects and the loser surfaced a raw 23505 as a 500 to
+  a student walking to their seat. It now lets the waiting-tap index arbitrate
+  and reads the winner's tap back, the way `insertEvent` does. The insert and
+  its re-read are bounded-retried rather than throwing: `ON CONFLICT DO
+  NOTHING` takes no lock on the row it conflicted with, so a Start can consume
+  that row in between and leave neither a row nor a standing tap — throwing
+  there would have been the same 500 on the same path.
+  (2) A consumed armed tap could end up naming an event no `tap_in` ever
+  recorded — the transient table and the permanent history disagreeing about
+  which tap was converted. Two interleavings, both closed: the refresh guarded
+  on `consumed_at IS NULL` (for a conversion that commits before the update),
+  and `convertArmedTaps` taking `FOR UPDATE` on the taps it reads (for a
+  refresh landing inside its read→consume gap, where the guard sees NULL and
+  passes). The second was reproducing 6/6 with only the guard in place.
+  Accepted residual, unchanged by either: a student whose tap is consumed
+  under them keeps a fresh waiting tap, so the teacher's next session that day
+  converts them without another tap. Decision 5 says a tap is a tap, and
+  end-of-day expiry bounds it.
+  The third finding in this pair, `createBlock` answering `tag_taken` to the
+  teacher who already owns the tag, is **split out and waiting on the owner**:
+  fixing it means `POST /v1/blocks` answering 200 where it answers 409 today,
+  and ARCHITECTURE.md decision 2 sends behaviour changes on a shipped endpoint
+  to `/v2`. Nothing would be renamed or removed and `BlockDetail` is
+  unchanged, and no client can break today (the portal never calls it, the
+  only caller in the tree is the demo script, and there is no iOS app yet) —
+  but that is the owner's call, not a code-review one, so the rest ships
+  without it rather than waiting.
+  Race coverage runs on the real-Postgres lane only — PGlite is
+  single-connection and cannot contend, so the fast lane would pass either
+  way. The warm-up in the race suite is load-bearing for round 0: with a fix
+  reverted and a cold pool, the first round passes vacuously.
 - **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
   reviewer disproved. The stream route's `'error'` listener logged at `debug`
   while production runs at `info`, so the fix that stopped the crash would also

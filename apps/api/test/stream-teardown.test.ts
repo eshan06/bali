@@ -157,6 +157,8 @@ describe('a hijacked stream response owns its own error handling', () => {
   let port: number;
   let tokenFor: (sub: string) => Promise<string>;
   const extraSockets: net.Socket[] = [];
+  /** Teardown that must run even when an assertion or a waitFor throws first. */
+  const cleanups: (() => void)[] = [];
 
   beforeEach(async () => {
     const issuer = await makeTestIssuer();
@@ -175,6 +177,8 @@ describe('a hijacked stream response owns its own error handling', () => {
   });
 
   afterEach(async () => {
+    for (const undo of cleanups) undo();
+    cleanups.length = 0;
     for (const s2 of extraSockets) s2.destroy();
     extraSockets.length = 0;
     await app.close();
@@ -217,9 +221,13 @@ describe('a hijacked stream response owns its own error handling', () => {
 
     let res: ServerResponse | null = null;
     const onRequest = (req: IncomingMessage, r: ServerResponse) => {
-      if (req.url?.includes('/stream') === true) res = r;
+      // First match only. The listener now lives until afterEach, and
+      // streamStatus() below opens a second /stream on the same app — without
+      // this, `res` would silently point at that one.
+      if (res === null && req.url?.includes('/stream') === true) res = r;
     };
     app.server.on('request', onRequest);
+    cleanups.push(() => app.server.off('request', onRequest));
 
     const sock = net.connect(port, '127.0.0.1');
     extraSockets.push(sock); // torn down by afterEach even if this test fails
@@ -231,7 +239,6 @@ describe('a hijacked stream response owns its own error handling', () => {
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
     await waitFor(() => res !== null);
-    app.server.off('request', onRequest);
     const raw = res as unknown as ServerResponse;
     await waitFor(() => raw.headersSent);
 
@@ -240,15 +247,42 @@ describe('a hijacked stream response owns its own error handling', () => {
       requestClosed = true;
     });
 
-    // Queue until the socket genuinely stops draining, rather than trusting a
-    // byte count measured on one machine: a runner with larger autotuned
-    // socket buffers would flush a fixed pad, 'finish' would fire, and this
-    // test would go red for an environment difference instead of a regression.
+    // Queue until the bytes genuinely stop leaving, rather than trusting a pad
+    // measured on one machine: a runner with larger autotuned socket buffers
+    // would swallow a fixed pad, 'finish' would fire, and this test would go
+    // red for an environment difference instead of a regression.
+    //
+    // The signal is `writableLength`, not `write()`'s return value. write()
+    // flips to false at the 64 KiB stream high-water mark — on the very first
+    // 1 MiB chunk, whatever the socket is doing — so it says nothing about
+    // whether the kernel is still accepting, and an earlier version of this
+    // loop that trusted it exited after one iteration while claiming to be
+    // adaptive. `writableLength` is what has been handed over and not yet
+    // accepted, so a round where it grows by the whole chunk is a round where
+    // nothing drained at all.
+    //
+    // TWO consecutive quiet rounds, not one. Draining happens on the event
+    // loop, so a round where the loop is busy for the whole sleep — this
+    // describe runs with `repollMs: 5`, and a PGlite query or a GC pause is
+    // enough — looks identical to a full socket. Measured here: the kernel
+    // takes about 3 MiB before it stops accepting, so a false stall on round
+    // one leaves ~1 MiB queued, `end()` flushes it, 'finish' fires, and the
+    // assertions below go red for a busy machine rather than a regression.
+    // A socket that is genuinely full never drains again, so it clears two.
     const MB = 'x'.repeat(1024 * 1024);
-    let stalled = false;
-    for (let i = 0; i < 64 && !stalled; i += 1) stalled = !raw.write(MB);
-    expect(stalled, 'socket never stopped draining — the window cannot be staged').toBe(true);
-    for (let i = 0; i < 4; i += 1) raw.write(MB); // headroom while the kernel catches up
+    let queued = 0;
+    let quiet = 0;
+    for (let i = 0; i < 64 && quiet < 2; i += 1) {
+      const before = raw.writableLength;
+      raw.write(MB);
+      await sleep(20); // a chance to drain whatever it still can
+      quiet = raw.writableLength >= before + MB.length ? quiet + 1 : 0;
+      queued = raw.writableLength;
+    }
+    expect(
+      quiet,
+      `socket never stopped draining (${queued} bytes queued) — the window cannot be staged`,
+    ).toBeGreaterThanOrEqual(2);
     raw.end();
     expect(raw.writableEnded, 'ended').toBe(true);
     expect(raw.destroyed, 'not detached — the window is open').toBe(false);
@@ -289,11 +323,19 @@ describe('a hijacked stream response owns its own error handling', () => {
     const token = await tokenFor(teacher.cognitoId);
 
     let res: ServerResponse | null = null;
-    app.server.on('request', (req, r) => {
-      if (req.url?.includes('/stream') === true) res = r;
-    });
+    const onRequest = (req: IncomingMessage, r: ServerResponse) => {
+      // First match only. This test opens one /stream, but the listener now
+      // lives until afterEach, so anything else reaching the app would
+      // otherwise reassign `res` out from under it.
+      if (res === null && req.url?.includes('/stream') === true) res = r;
+    };
+    app.server.on('request', onRequest);
+    // Queued now rather than after the wait: a waitFor that times out must not
+    // leave the listener attached to an app the next test is about to build.
+    cleanups.push(() => app.server.off('request', onRequest));
 
     const sock = net.connect(port, '127.0.0.1');
+    extraSockets.push(sock); // torn down by afterEach even if a waitFor below throws
     await once(sock, 'connect');
     sock.resume(); // an ordinary, draining client — no backpressure needed
     sock.write(

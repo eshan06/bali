@@ -7,6 +7,7 @@ import {
   gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
+  staleness,
   type Students,
 } from './grid-state';
 
@@ -193,5 +194,38 @@ describe('gridDisplay', () => {
     const students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
     // T0 + 5 minutes with no contact is well past the 90s threshold.
     expect(gridDisplay(students.ana, now)).toBe('silent');
+  });
+});
+
+describe('staleness', () => {
+  const base = { lastActivityAt: 1_000_000, heartbeatMs: 20_000 };
+
+  it('says reconnecting whenever the client knows it is disconnected', () => {
+    for (const status of ['connecting', 'reconnecting'] as const) {
+      expect(staleness({ ...base, status, now: base.lastActivityAt + 4_000 })).toEqual({
+        reason: 'reconnecting',
+        secondsAgo: 4,
+      });
+    }
+  });
+
+  it('stays quiet on an open stream that is merely between events', () => {
+    // Two heartbeats' grace: a quiet class emits no events at all, so the
+    // banner must not flap on one slow tick.
+    expect(staleness({ ...base, status: 'open', now: base.lastActivityAt + 59_000 })).toBeNull();
+  });
+
+  it('says stale when the stream is open but the server has gone silent', () => {
+    // The shape the old banner could not see: open, green, and guessing.
+    expect(staleness({ ...base, status: 'open', now: base.lastActivityAt + 61_000 })).toEqual({
+      reason: 'stale',
+      secondsAgo: 61,
+    });
+  });
+
+  it('never reports a negative age when the clock steps backwards', () => {
+    expect(
+      staleness({ ...base, status: 'reconnecting', now: base.lastActivityAt - 5_000 }),
+    ).toEqual({ reason: 'reconnecting', secondsAgo: 0 });
   });
 });

@@ -327,6 +327,18 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
   const enrolledIds = enrolled.map((e) => e.studentId);
 
   // This teacher's still-waiting, unexpired taps from students in this class.
+  //
+  // Locked, not just read. The rows are read here and consumed several
+  // statements later, and `armTap`'s expired-tap refresh can land in that gap:
+  // it finds `consumed_at` still NULL, so its own guard passes, it writes its
+  // event id onto the row, and this loop then records `tap_in` with the id it
+  // read BEFORE the refresh. The armed tap is left naming an event no `tap_in`
+  // ever recorded — the same integrity break the refresh guard exists to stop,
+  // reached from the other side. FOR UPDATE makes the refresh wait; when it
+  // resumes, `consumed_at` is set, its guard fails, and it falls through to
+  // recording a fresh waiting tap instead. This is the only lock the two paths
+  // share: `armTap` is keyed on student+teacher and never learns the class, so
+  // it cannot take the class lock this transaction holds.
   const waiting = await tx
     .select()
     .from(armedTaps)
@@ -337,7 +349,42 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         gt(armedTaps.expiresAt, session.startedAt),
         inArray(armedTaps.studentId, enrolledIds),
       ),
-    );
+    )
+    .for('update');
+
+  // A waiting tap can carry an event id that is ALREADY on record as a
+  // `tap_in`: the student's tap landed in an earlier session, its response was
+  // lost, and the retry — finding nothing of this teacher's running — armed
+  // the same id, because `armTap` de-dupes against `armed_taps.event_id` and
+  // never against `events`. Converting under that id makes `insertEvent`
+  // refuse it as another event's, and since this runs inside `startSession`'s
+  // transaction the whole Start rolls back, leaving the tap unconsumed. The
+  // teacher then cannot open ANY class that student is in — `waiting` is
+  // selected by TEACHER, not by class — until the tap expires at end of day.
+  // Reproduced end to end; pinned by "a spent event id never wedges the next
+  // Start".
+  //
+  // A tap is still a tap (decision 5) and the student is still standing there,
+  // so the conversion goes ahead under a fresh id, with the spent one kept in
+  // the payload so the history still shows which tap it came from. Nothing is
+  // weakened: that id exists to de-dupe ARMING, and this conversion is already
+  // exactly-once — the row is consumed in this same transaction.
+  const spent =
+    waiting.length === 0
+      ? new Set<string>()
+      : new Set(
+          (
+            await tx
+              .select({ eventId: events.eventId })
+              .from(events)
+              .where(
+                inArray(
+                  events.eventId,
+                  waiting.map((t) => t.eventId),
+                ),
+              )
+          ).map((row) => row.eventId),
+        );
 
   let converted = 0;
   for (const tap of waiting) {
@@ -371,13 +418,15 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
           silentSince: null,
         },
       });
+    const reused = spent.has(tap.eventId);
     await insertEvent(tx, {
-      eventId: tap.eventId,
+      eventId: reused ? newUuidV7() : tap.eventId,
       type: 'tap_in',
       sessionId: session.id,
       classId: session.classId,
       userId: tap.studentId,
       occurredAt,
+      payload: reused ? { armed_tap_event_id: tap.eventId } : undefined,
     });
     await tx
       .update(armedTaps)
@@ -446,6 +495,13 @@ export async function startSession(
   );
 }
 
+/**
+ * How many times armTap will re-try its insert/re-read pair before giving up.
+ * Each pass costs two statements and only repeats when a Start consumed the
+ * conflicting tap in between, so two spare passes is generous.
+ */
+const ARM_TAP_ATTEMPTS = 3;
+
 export interface ArmTapInput {
   studentId: string;
   teacherId: string;
@@ -499,33 +555,89 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       }
       // The existing waiting tap has expired: replace it with this fresh one
       // (the partial unique index allows only one unconsumed row per pair).
-      await tx
-        .update(armedTaps)
-        .set({
-          blockId: input.blockId ?? null,
-          eventId: input.eventId,
-          deviceTime: input.deviceTime,
-          expiresAt: input.expiresAt,
-        })
-        .where(eq(armedTaps.id, waiting.id));
-      return { outcome: 'armed', armedTapId: waiting.id };
+      //
+      // Guarded on consumed_at IS NULL, because a concurrent startSession can
+      // consume this row between the select above and here — a session that
+      // began just before the expiry boundary still converts a tap this branch
+      // has already judged stale. Unguarded, the update writes a new event id
+      // onto the row the conversion just consumed, and that armed tap now
+      // names an event no tap_in ever recorded: the transient table and the
+      // permanent history disagree about which tap was converted. (The guard
+      // is only half of it — convertArmedTaps locks the taps it reads so this
+      // cannot be reached from the other side either.)
+      const refreshed = firstOrUndefined(
+        await tx
+          .update(armedTaps)
+          .set({
+            blockId: input.blockId ?? null,
+            eventId: input.eventId,
+            deviceTime: input.deviceTime,
+            expiresAt: input.expiresAt,
+          })
+          .where(and(eq(armedTaps.id, waiting.id), isNull(armedTaps.consumedAt)))
+          .returning({ id: armedTaps.id }),
+      );
+      if (refreshed) return { outcome: 'armed', armedTapId: refreshed.id };
+      // Consumed under us. That frees the partial index, so fall through and
+      // record this tap as a fresh waiting one rather than reporting a row
+      // that no longer belongs to it. Residual, accepted: the student is now
+      // focused in the session that just started AND holds a waiting tap, so
+      // the teacher's NEXT session that day converts them without a fresh tap.
+      // Decision 5 says a tap is a tap — they did physically tap the block —
+      // and end-of-day expiry bounds it.
     }
 
-    const row = firstOrUndefined(
-      await tx
-        .insert(armedTaps)
-        .values({
-          studentId: input.studentId,
-          teacherId: input.teacherId,
-          blockId: input.blockId ?? null,
-          eventId: input.eventId,
-          deviceTime: input.deviceTime,
-          expiresAt: input.expiresAt,
-        })
-        .returning(),
-    );
-    if (!row) throw new Error('armTap: insert returned no row');
-    return { outcome: 'armed', armedTapId: row.id };
+    // ON CONFLICT on the waiting-tap index, not a bare insert: two pre-bell
+    // taps from the same phone can both pass the selects above (neither is a
+    // replay — each carries its own event id — and neither sees a waiting
+    // row), and the loser would otherwise surface a raw 23505 as a 500 to a
+    // student walking to their seat. The index arbitrates, the way insertEvent
+    // lets it rather than racing a read.
+    //
+    // Bounded, because insert and re-read can chase each other: ON CONFLICT DO
+    // NOTHING takes no lock on the row it conflicted with, so a Start can
+    // consume that row before the re-read sees it, leaving neither a row from
+    // the insert nor a standing tap to report. The slot is free again by then,
+    // so another pass takes it. Looping beats throwing — a 500 on a pre-bell
+    // tap is the exact symptom this function is being fixed for.
+    for (let attempt = 0; attempt < ARM_TAP_ATTEMPTS; attempt += 1) {
+      const row = firstOrUndefined(
+        await tx
+          .insert(armedTaps)
+          .values({
+            studentId: input.studentId,
+            teacherId: input.teacherId,
+            blockId: input.blockId ?? null,
+            eventId: input.eventId,
+            deviceTime: input.deviceTime,
+            expiresAt: input.expiresAt,
+          })
+          .onConflictDoNothing({
+            target: [armedTaps.studentId, armedTaps.teacherId],
+            where: sql`${armedTaps.consumedAt} is null`,
+          })
+          .returning(),
+      );
+      if (row) return { outcome: 'armed', armedTapId: row.id };
+
+      // Another tap won the slot. Report what is standing, which is the truth
+      // this phone needs: a tap of theirs is already waiting.
+      const standing = firstOrUndefined(
+        await tx
+          .select()
+          .from(armedTaps)
+          .where(
+            and(
+              eq(armedTaps.studentId, input.studentId),
+              eq(armedTaps.teacherId, input.teacherId),
+              isNull(armedTaps.consumedAt),
+            ),
+          )
+          .limit(1),
+      );
+      if (standing) return { outcome: 'already_armed', armedTapId: standing.id };
+    }
+    throw new Error('armTap: could not arm or read a standing tap');
   });
 }
 

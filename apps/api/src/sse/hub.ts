@@ -102,9 +102,18 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
         const subs = bySession.get(sessionId);
         if (subs) for (const s of subs) s.wake();
       })
-      .then((handle) => {
+      .then(async (handle) => {
         const stop = normalizeUnlisten(handle);
-        if (closed) void stop();
+        // Awaited, not fired and forgotten. Two reasons, and the second is
+        // the one that was actually costing us runs:
+        //  - `close()` awaits this promise, so resolving it before the
+        //    unlisten lands hands the caller "safe to tear the pool down"
+        //    one query too early — the race below, reopened here.
+        //  - a floating `stop()` has no handler, and unlistening on a pool
+        //    that has just been ended rejects. Awaited, that rejection goes
+        //    to the `.catch` below; voided, it is an unhandled rejection
+        //    that fails the run with every test green.
+        if (closed) await stop();
         else unlisten = stop;
       })
       .catch(() => {
@@ -210,6 +219,31 @@ export function createStreamHub(db: Database, options: StreamHubOptions = {}): S
     closed = true;
     for (const set of [...bySession.values()]) for (const s of [...set]) s.close();
     bySession.clear();
+    // Wait for a LISTEN that is still being established. `unlisten` is only
+    // assigned once `client.listen()` RESOLVES, so closing during setup used
+    // to await nothing and return — and whatever tears the pool down next
+    // (a test's closeDb, the server's shutdown after app.close()) did so with
+    // that query still in flight. With the `.then` above voiding its stop()
+    // too, that surfaced on the real-Postgres lane as an unhandled `write
+    // CONNECTION_ENDED`, 5 runs out of 5, failing the run with every test
+    // green.
+    //
+    // Be precise about which half earned that number, because the comment
+    // above and this one do different jobs: isolating them showed the awaited
+    // stop() is what stops the rejection being unhandled, and this await is
+    // what makes `close()` mean "the LISTEN is settled and unlistened" —
+    // which is the promise the onClose shutdown hook is built on, and the one
+    // hub-close.test.ts pins. Removing either one turns that test red, with a
+    // different message for each.
+    if (listenSetup) {
+      const setup = listenSetup;
+      listenSetup = null;
+      try {
+        await setup;
+      } catch {
+        // a failed listen is non-fatal — the re-poll delivers everything
+      }
+    }
     if (unlisten) {
       const u = unlisten;
       unlisten = null;
