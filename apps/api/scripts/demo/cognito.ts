@@ -8,31 +8,34 @@
  * signing code: one POST, one access token. The pool's app client must have
  * ALLOW_USER_PASSWORD_AUTH enabled; that is the one AWS-side prerequisite.
  *
- * A failure reports Cognito's own error type and message, which name the
- * problem without echoing the secret. Keeping the password out of the transcript
- * is checked rather than asserted: every error this module throws goes through
- * `safeCause`, which reads back what would actually be printed and will drop the
- * original error entirely rather than attach one the password survived in.
+ * The password leaves this module in one place, the request body, and
+ * everything that comes back has been downstream of it. Cognito's validation
+ * messages quote request values back ("Value 'x' at 'clientId' failed to
+ * satisfy constraint"), a proxy or WAF page can quote the request it refused,
+ * and a fetch wrapper can hang the request off the error it raises — escaped,
+ * encoded or truncated in whatever way that layer prints. So none of that text
+ * is used at all, rather than scrubbed: scrubbing has to know every place the
+ * password can hide and every way it can be written down, and it did not.
  *
- * Three review rounds each found a way the previous wording had been too
- * confident — a carrier the walk did not know about, then an ENCODING the check
- * did not recognise, then an await with no guard around it at all. So the claim
- * here is bounded on purpose: what this module itself throws is checked. It
- * cannot speak for an error some other layer prints on its own.
+ * What this module throws is a plain Error built only from:
+ *   - its own fixed wording;
+ *   - the caller's configuration: the username, the endpoint, the timeout;
+ *   - TOKENS read from outside — the HTTP status, the error codes on a failure
+ *     and its causes, Cognito's error type, a challenge name, the response's
+ *     media type — each accepted only in a strict identifier shape and only
+ *     when it does not contain the password (see `token`).
+ * No error from outside is attached as its `cause`: an object can print
+ * differently from the way it looked when it was checked, and a string cannot.
+ *
+ * The cost is Cognito's message text and a proxy page's body. The error type,
+ * with fixed words for the common ones, stands in for the first; the status and
+ * media type for the second.
  */
 
-import { inspect } from 'node:util';
-
-/** Cognito's JSON-1.1 error shape, as far as we read it. */
-interface CognitoError {
-  __type?: string;
-  message?: string;
-  Message?: string;
-}
-
+/** The fields of InitiateAuth's answer that are read. */
 interface InitiateAuthResponse {
-  AuthenticationResult?: { AccessToken?: string };
-  ChallengeName?: string;
+  AuthenticationResult?: { AccessToken?: unknown };
+  ChallengeName?: unknown;
 }
 
 export interface CognitoAuthConfig {
@@ -51,426 +54,180 @@ export interface CognitoCredentials {
   password: string;
 }
 
-/** How many hops from the thrown error either walk below is willing to take. */
-const MAX_WALK_DEPTH = 4;
-
-/** A hostile iterator must not be followed forever; a real error graph is tiny. */
-const MAX_COLLECTION_ENTRIES = 1_000;
+/*
+ * The shapes a token from outside must have. None of them has any quoting or
+ * escape syntax, so there is nothing to decode: a token either shows characters
+ * of the password plainly or holds none of them.
+ */
+/** An error code or a challenge name: `ENOTFOUND`, `NEW_PASSWORD_REQUIRED`. */
+const CONSTANT_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
+/** A Cognito error type: `NotAuthorizedException`. */
+const ERROR_TYPE = /^[A-Z][A-Za-z0-9]{1,63}$/;
+/** A media type without its parameters: `text/html`. */
+const MEDIA_TYPE = /^[a-z0-9][a-z0-9.+-]{0,62}\/[a-z0-9][a-z0-9.+-]{0,62}$/;
 
 /**
- * The memo both walks share: "have we already covered this node with at least
- * this much budget left?"
+ * `value` when it is a string of the expected shape that does not contain the
+ * password; otherwise undefined.
  *
- * Remembering only *that* a node was seen is not enough when the walk is also
- * depth-bounded. A node reached first at the bottom of the budget is explored
- * with nothing left for its children; a plain seen-set then turns that
- * truncated visit into the final word, so a later, shallower path to the same
- * node — which did have the budget — returns early and its children are never
- * covered. Error graphs from undici share nodes routinely, so this is the
- * ordinary case, not an exotic one. Keying on the shallowest depth seen fixes
- * it and still terminates: a cycle re-enters strictly deeper and is refused,
- * and any node can be walked at most MAX_WALK_DEPTH + 1 times (depths 4 down to 0).
+ * The shape keeps out everything that is not an identifier — a body, a
+ * message, anything with a quote or a space in it. The containment check covers
+ * what the shape cannot: a password that is itself identifier-shaped fits as
+ * easily as a real code. It compares in both cases, because an echo that
+ * changed the password's case still prints it.
  */
-function newVisitMemo(): (node: object, depth: number) => boolean {
-  const shallowest = new Map<object, number>();
-  return (node: object, depth: number): boolean => {
-    const before = shallowest.get(node);
-    if (before !== undefined && before <= depth) return false;
-    shallowest.set(node, depth);
-    return true;
-  };
+function token(value: unknown, shape: RegExp, password: string): string | undefined {
+  if (typeof value !== 'string' || !shape.test(value)) return undefined;
+  if (password === '') return value;
+  const echoed =
+    value.toLowerCase().includes(password.toLowerCase()) ||
+    value.toUpperCase().includes(password.toUpperCase());
+  return echoed ? undefined : value;
 }
 
 /**
- * An AggregateError's members, or nothing at all.
- *
- * `errors` is an ordinary writable own property, so a lookalike or a subclass
- * can leave it non-iterable or behind a getter that throws. Both walks run from
- * inside the `catch` that produces this module's one actionable message, so a
- * throw here would replace "could not reach cognito-idp…: ENOTFOUND" with an
- * unrelated exception — the operator loses the only line that names their
- * mistake. Returning nothing is always better than that.
+ * `node[key]`, or undefined when reading it throws. Everything read from outside
+ * goes through this: a getter or a Proxy trap on a lookalike must never replace
+ * the operator's one actionable line with an unrelated exception.
  */
-function membersOf(err: Error): unknown[] {
+function read(node: unknown, key: string): unknown {
   try {
-    // `instanceof` reads the prototype chain, which a Proxy can trap and throw
-    // from, so it belongs inside the guard rather than in front of it.
-    if (!(err instanceof AggregateError)) return [];
-    return Array.isArray(err.errors) ? err.errors : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * An error's cause, or nothing when reading it throws. `cause` is an ordinary
- * own property too, so it is exactly as forgeable as `errors` above — and
- * `detailOf` runs with no net under it.
- */
-function causeOf(err: Error): unknown {
-  try {
-    return err.cause;
+    return (node as Record<string, unknown>)[key];
   } catch {
     return undefined;
   }
 }
 
-/**
- * An error's `name`, or '' when reading it throws. The timeout branch below
- * reads this inside the same catch everything else here is guarded for.
- */
-function nameOf(err: unknown): string {
-  try {
-    return err instanceof Error && typeof err.name === 'string' ? err.name : '';
-  } catch {
-    return '';
-  }
-}
-
-/** An error's message when it is readable, '' when reading it throws or it is not a string. */
-function messageOf(err: Error): string {
-  try {
-    return typeof err.message === 'string' ? err.message.trim() : '';
-  } catch {
-    return '';
-  }
-}
+/** How far below a failure its codes are looked for, and how many nodes at most. */
+const MAX_DEPTH = 4;
+const MAX_NODES = 32;
 
 /**
- * The readable detail of a failure, cause chain included. Node's fetch reports
- * every network error as a bare `TypeError: fetch failed` and puts the part
- * worth reading — ENOTFOUND, ECONNREFUSED, a TLS message — on `err.cause`, so
- * the top-level message alone says nothing an operator can act on.
+ * The error codes on a failure and on everything under it, nearest first,
+ * without repeats: `ENOTFOUND`, `ECONNREFUSED`, `UND_ERR_SOCKET`.
+ *
+ * Node's fetch reports every network failure as a bare `TypeError: fetch
+ * failed` with the part worth reading on `cause` — and on an AggregateError's
+ * `errors`, with an empty message, when a host's addresses all refuse — so the
+ * codes are gathered from that whole graph, breadth first. The messages beside
+ * them are never read. The walk is bounded and every read guarded, so a graph
+ * that cycles, or a node that throws, costs its own codes and nothing else.
  */
-function detailOf(err: unknown): string {
-  const found: string[] = [];
-  const shouldVisit = newVisitMemo();
-  const visit = (node: unknown, depth: number): void => {
-    if (depth > MAX_WALK_DEPTH) return;
-    // Even `instanceof` is a call: it reads the prototype chain, which a Proxy
-    // can trap and throw from. Guarding each node rather than the walk means a
-    // hostile one costs its own subtree and nothing else.
-    try {
-      if (!(node instanceof Error) || !shouldVisit(node, depth)) return;
-      const message = messageOf(node);
-      if (message && !found.includes(message)) found.push(message);
-      // A host resolving to several addresses that all refuse the connection
-      // arrives as an AggregateError whose own message is EMPTY, with the real
-      // per-address failures on `errors` — walking `cause` alone would report
-      // "fetch failed" and nothing else, which is what this function exists to
-      // stop.
-      for (const inner of membersOf(node)) visit(inner, depth + 1);
-      visit(causeOf(node), depth + 1);
-    } catch {
-      // This node resisted inspection; its siblings are still worth reading.
+function errorCodes(err: unknown, password: string): string[] {
+  const codes: string[] = [];
+  const seen = new Set<unknown>();
+  let level: unknown[] = [err];
+  for (let depth = 0; depth <= MAX_DEPTH && level.length > 0; depth++) {
+    const next: unknown[] = [];
+    for (const node of level) {
+      if (node === null || typeof node !== 'object' || seen.has(node)) continue;
+      if (seen.size >= MAX_NODES) break;
+      seen.add(node);
+      const code = token(read(node, 'code'), CONSTANT_NAME, password);
+      if (code !== undefined && !codes.includes(code)) codes.push(code);
+      next.push(read(node, 'cause'), ...membersOf(node));
     }
-  };
-  visit(err, 0);
-  if (found.length > 0) return found.join(' — ');
-  try {
-    return String(err);
-  } catch {
-    // A `toString` that throws leaves nothing to report but the shape.
-    return '(an error that cannot be printed)';
+    level = next;
   }
+  return codes;
 }
 
-/**
- * Every written form the secret can take, longest first.
- *
- * A secret is compared against text something has already QUOTED, and each
- * quoter escapes differently: JSON doubles backslashes and escapes `"`, while
- * `util.inspect` doubles backslashes and escapes whichever quote it picked —
- * single normally, double when the string holds a single quote, a backtick when
- * it holds both. Searching for the raw secret alone therefore misses it in any
- * of those renderings, which is how a password containing `"` and `\` sat in a
- * transcript looking redacted.
- *
- * Longest first, so a shorter form cannot eat part of a longer one.
- */
-function secretForms(secret: string): string[] {
-  const forms = new Set<string>([secret, JSON.stringify(secret).slice(1, -1)]);
-  const backslashed = secret.split('\\').join('\\\\');
-  for (const quote of ["'", '"', '`']) {
-    forms.add(backslashed.split(quote).join(`\\${quote}`));
-  }
-  return [...forms].filter((form) => form.length > 0).sort((a, b) => b.length - a.length);
-}
-
-/** Recomputed per string otherwise, and one walk can touch thousands of them. */
-let formsFor: { secret: string; forms: string[] } | undefined;
-function formsOf(secret: string): string[] {
-  if (formsFor?.secret !== secret) formsFor = { secret, forms: secretForms(secret) };
-  return formsFor.forms;
-}
-
-/**
- * Remove a secret from text that is about to be thrown or printed — in every
- * form a quoter can have put it in, since a client that echoes the request body
- * quotes it and a password containing `"` or `\` would otherwise sail straight
- * through an exact-substring match.
- */
-function redact(text: string, secret: string): string {
-  if (!secret) return text;
-  let out = text;
-  for (const form of formsOf(secret)) out = out.split(form).join('<redacted>');
-  return out;
-}
-
-/**
- * Undo the escaping a quoter added, so one search covers every quoting style —
- * including styles this module does not model.
- *
- * `secretForms` enumerates the renderings we know how to REMOVE; this is the
- * independent check on whether one got through anyway. Anything a reader could
- * decode back into the secret counts as printed, because a reader is exactly
- * who is looking at the transcript.
- */
-function decodeEscapes(text: string): string {
-  const named: Record<string, string> = {
-    n: '\n',
-    t: '\t',
-    r: '\r',
-    b: '\b',
-    f: '\f',
-    v: '\v',
-    '0': '\0',
-  };
-  return text.replace(
-    /\\(u\{[0-9a-fA-F]{1,6}\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g,
-    (_match, escape: string) => {
-      if (escape.startsWith('u') || escape.startsWith('x')) {
-        const code = Number.parseInt(escape.replace(/^u\{?|^x|\}$/g, ''), 16);
-        return Number.isNaN(code) ? escape : String.fromCodePoint(code);
-      }
-      return named[escape] ?? escape;
-    },
-  );
-}
-
-/** Would a reader of this text end up holding the secret? */
-function printsSecret(text: string, secret: string): boolean {
-  if (!secret) return false;
-  if (text.includes(secret)) return true;
-  return decodeEscapes(text).includes(secret);
-}
-
-/**
- * An object's own enumerable keys — symbols included, because `inspect` prints
- * a symbol-keyed property just as plainly as a named one. None when even asking
- * throws (a Proxy `ownKeys` trap).
- *
- * A typed array's indices are dropped: they are one key per byte and hold
- * numbers, not text. Its NAMED properties are kept, which is the whole point —
- * `inspect` prints them right beside the hex (`<Buffer 61 62, body: '…'>`), so
- * skipping the object wholesale would leak exactly what this walk exists to
- * catch.
- */
-function ownKeysOf(node: object): (string | symbol)[] {
+/** A node's `errors` when it is a real array (an AggregateError's), else none. */
+function membersOf(node: object): unknown[] {
+  const members = read(node, 'errors');
   try {
-    const keys = Reflect.ownKeys(node).filter((key) =>
-      Object.prototype.propertyIsEnumerable.call(node, key),
-    );
-    const named = ArrayBuffer.isView(node)
-      ? keys.filter((key) => typeof key === 'symbol' || !/^\d+$/.test(key))
-      : keys;
-    // Capped like a Map or a Set: an error holding a million-element array is
-    // already a failure, and walking all of it is not worth the wall time.
-    return named.slice(0, MAX_COLLECTION_ENTRIES);
+    return Array.isArray(members) ? members.slice(0, MAX_NODES) : [];
   } catch {
+    // A revoked Proxy throws from Array.isArray itself.
     return [];
   }
 }
 
-/**
- * Scrub a secret out of a caught error and its whole cause chain, in place.
- *
- * Redacting only the message we throw is not enough: the caught error rides
- * along as `cause`, and Node prints the entire chain whenever an error is
- * inspected — which is exactly what the demo's top-level handler does — so the
- * secret would land in the transcript one line below the redacted copy.
- * Scrubbing the objects themselves also covers anything else that inspects them
- * later, and keeps the real error attached as the cause rather than a lookalike.
- *
- * This is BEST EFFORT and deliberately not the guarantee. A walk can only cover
- * carriers it was told to look in, and `inspect` prints things no property walk
- * reaches — a `Headers` or `URLSearchParams` whose contents live in internal
- * slots, a `[util.inspect.custom]` of someone else's design. An earlier version
- * of this module claimed to cover "everything inspect prints"; it did not, and
- * the claim is what made the gaps invisible. `safeCause` below is where the
- * promise is actually kept: it checks the rendered text and refuses to attach
- * anything the secret survived in.
- *
- * What this walk does cover: messages and stacks, own enumerable properties
- * (symbol-keyed ones included), AggregateError members, named properties hung
- * on a typed array, and the contents of a Map or a Set.
- *
- * It never throws, and it always returns. Each node is guarded on its own, so
- * one hostile object costs its own subtree rather than the rest of the walk —
- * abandoning the walk would leave every node after it unscrubbed.
- */
-function redactInPlace(err: unknown, secret: string): void {
-  const shouldScrub = newVisitMemo();
-  const scrub = (node: unknown, depth: number): void => {
-    if (depth > MAX_WALK_DEPTH || node === null || typeof node !== 'object') return;
-    try {
-      if (!shouldScrub(node, depth)) return;
-      scrubNode(node, secret, scrub, depth);
-    } catch {
-      // A prototype trap, a hostile getter, a frozen object: this node keeps
-      // whatever it holds, and `safeCause` catches it if it mattered.
-    }
-  };
-  scrub(err, 0);
+/** Fixed words for the codes an operator most needs explained. */
+const CODE_HINTS = new Map([['ENOTFOUND', 'the host does not resolve — check the region']]);
+
+/** What an operator can act on in a failure from the fetch layer. */
+function describeFailure(err: unknown, password: string): string {
+  const codes = errorCodes(err, password);
+  if (codes.length === 0) {
+    return (
+      "no error code, and the fetch layer's own text is withheld — it can quote the " +
+      'request, which holds the password'
+    );
+  }
+  return codes
+    .map((code) => {
+      const hint = CODE_HINTS.get(code);
+      return hint === undefined ? code : `${code} (${hint})`;
+    })
+    .join(', ');
 }
 
-type Scrubber = (node: unknown, depth: number) => void;
-
-/** One node of the walk: its own text, then everything hanging off it. */
-function scrubNode(node: object, secret: string, scrub: Scrubber, depth: number): void {
-  if (node instanceof Error) {
-    try {
-      node.message = redact(node.message, secret);
-      // `inspect` prints an Error's STACK, not its message. V8 formats that
-      // string lazily and then caches it, so a stack already materialized by
-      // some logger above us keeps the pre-scrub message forever. Rewriting the
-      // message and leaving the stack alone only looked correct because nothing
-      // in the demo reads `.stack` first.
-      if (typeof node.stack === 'string') node.stack = redact(node.stack, secret);
-    } catch {
-      // A frozen error cannot be scrubbed; the message we throw is redacted
-      // regardless, and there is nothing else useful to do here.
-    }
-    for (const inner of membersOf(node)) scrub(inner, depth + 1);
-    scrub(causeOf(node), depth + 1);
-  }
-
-  // Inspect prints a Map's and a Set's contents in full, so a request body
-  // parked in one leaks exactly as a property would. Collect first, then
-  // rewrite: replacing entries under the iterator is not worth reasoning about
-  // on an error path.
-  if (node instanceof Map) scrubMap(node, secret, scrub, depth);
-  else if (node instanceof Set) scrubSet(node, secret, scrub, depth);
-
-  // Messages are not the only thing printed: inspecting an error prints its
-  // enumerable own properties too, so a client that hangs the request body off
-  // the error puts the secret there rather than in any message. Keys are read
-  // one at a time, each in its own guard — `Object.entries` runs every getter at
-  // once, so one that throws would abandon the whole node.
-  for (const key of ownKeysOf(node)) {
-    let value: unknown;
-    try {
-      value = (node as Record<string | symbol, unknown>)[key];
-    } catch {
-      // A getter that throws yields nothing to scrub and nothing to print.
-      continue;
-    }
-    if (typeof value === 'string') {
-      try {
-        (node as Record<string | symbol, unknown>)[key] = redact(value, secret);
-      } catch {
-        // Frozen or getter-only, as above.
-      }
-    } else {
-      scrub(value, depth + 1);
-    }
-  }
+/** `AbortSignal.timeout` rejects with a DOMException named TimeoutError, headers or body. */
+function isTimeout(err: unknown): boolean {
+  return read(err, 'name') === 'TimeoutError';
 }
 
-/** Redact a Map's string keys and values; recurse into the rest. */
-function scrubMap(
-  node: Map<unknown, unknown>,
-  secret: string,
-  scrub: Scrubber,
-  depth: number,
-): void {
-  const rewritten: [unknown, unknown, unknown][] = [];
-  try {
-    let seen = 0;
-    for (const [key, value] of node) {
-      if (++seen > MAX_COLLECTION_ENTRIES) break;
-      const newKey = typeof key === 'string' ? redact(key, secret) : key;
-      const newValue = typeof value === 'string' ? redact(value, secret) : value;
-      if (newKey !== key || newValue !== value) rewritten.push([key, newKey, newValue]);
-      if (typeof key !== 'string') scrub(key, depth + 1);
-      if (typeof value !== 'string') scrub(value, depth + 1);
-    }
-    // Rewriting a key moves the entry to the end, and two keys that redact to
-    // the same text collapse into one. Both are fine on an error being printed.
-    for (const [oldKey, newKey, newValue] of rewritten) {
-      if (newKey !== oldKey) node.delete(oldKey);
-      node.set(newKey, newValue);
-    }
-  } catch {
-    // A hostile Map-alike: leave it rather than lose the operator's message.
-  }
-}
-
-/** Redact a Set's string members; recurse into the rest. */
-function scrubSet(node: Set<unknown>, secret: string, scrub: Scrubber, depth: number): void {
-  const rewritten: [string, string][] = [];
-  try {
-    let seen = 0;
-    for (const member of node) {
-      if (++seen > MAX_COLLECTION_ENTRIES) break;
-      if (typeof member !== 'string') {
-        scrub(member, depth + 1);
-        continue;
-      }
-      const cleaned = redact(member, secret);
-      if (cleaned !== member) rewritten.push([member, cleaned]);
-    }
-    for (const [oldMember, cleaned] of rewritten) {
-      node.delete(oldMember);
-      node.add(cleaned);
-    }
-  } catch {
-    // As above.
-  }
-}
+/** Fixed words for the Cognito error types an operator is most likely to meet. */
+const TYPE_HINTS = new Map([
+  [
+    'NotAuthorizedException',
+    'a wrong password, a disabled or locked-out user, or an app client that requires a secret',
+  ],
+  [
+    'InvalidParameterException',
+    'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client',
+  ],
+  ['ResourceNotFoundException', 'no app client with this id in this region'],
+  ['UserNotFoundException', 'no such user in this pool'],
+  ['UserNotConfirmedException', 'the user has not been confirmed'],
+  ['PasswordResetRequiredException', 'the user must reset their password first'],
+  ['TooManyRequestsException', 'Cognito is throttling sign-ins; wait, then re-run'],
+]);
 
 /**
- * The cause to attach to a thrown error: the real one when scrubbing it
- * demonstrably worked, and a redacted rendering of it when it did not.
- *
- * This is where "a password never leaves this module" stops being a claim about
- * how thorough the walk is and becomes a check on the thing that actually
- * reaches a transcript. `inspect` is what Node runs when the demo's top-level
- * handler prints the failure — at least as thoroughly here, since this asks for
- * unlimited depth and `console.error` stops at two — so asking it directly
- * covers every carrier at once: the symbol-keyed property, the `Headers` whose
- * contents live in internal slots, the stack some logger froze before we got
- * here.
- *
- * Carriers are only half of it. The secret arrives in the rendering already
- * QUOTED, in whichever style the printer chose, so the check decodes escapes
- * before looking (`printsSecret`) rather than trusting the small set of forms
- * `redact` knows how to remove. A password containing `"` and `\` was sitting
- * in a transcript looking redacted because those two sets were assumed equal.
- *
- * Three outcomes, in order: the object is attached when nothing printable
- * survived; a redacted rendering of it is attached when redaction cleaned it;
- * and when even that still decodes back to the secret, NOTHING is attached.
- * Losing the error object is a cost worth paying, and it is the only branch
- * that can honestly be called a guarantee.
+ * Cognito's `__type`, without the namespace (`ns#Name`) or the suffix
+ * (`Name:detail`) the AWS JSON protocols allow around it. Not yet a token.
  */
-function safeCause(err: unknown, secret: string): unknown {
-  redactInPlace(err, secret);
-  if (!secret) return err;
-
+function errorTypeOf(text: string): unknown {
+  let body: unknown;
   try {
-    const printed = inspect(err, { depth: null });
-    if (!printsSecret(printed, secret)) return err;
-
-    const cleaned = redact(printed, secret);
-    if (printsSecret(cleaned, secret)) {
-      return new Error('the original error still held the password, so it is not attached');
-    }
-    return new Error(cleaned);
+    body = JSON.parse(text);
   } catch {
-    // An error that cannot even be rendered cannot be shown to be safe.
-    return new Error('the original error could not be inspected, so it is not attached');
+    return undefined;
   }
+  const raw = read(body, '__type');
+  if (typeof raw !== 'string') return undefined;
+  return raw.split(':')[0]?.split('#').pop();
+}
+
+/** The response's media type, lowercased and without parameters. Not yet a token. */
+function mediaTypeOf(res: unknown): unknown {
+  try {
+    const value = (read(res, 'headers') as Headers | undefined)?.get('content-type');
+    return typeof value === 'string' ? value.split(';')[0]?.trim().toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** What an operator can act on in a response that was not a success. */
+function describeResponse(res: unknown, text: string, password: string): string {
+  const status = read(res, 'status');
+  const statusLine =
+    typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599
+      ? `HTTP ${status}`
+      : 'an invalid HTTP status';
+  const type = token(errorTypeOf(text), ERROR_TYPE, password);
+  if (type !== undefined) {
+    const hint = TYPE_HINTS.get(type);
+    return hint === undefined ? `${type} (${statusLine})` : `${type} (${statusLine}): ${hint}`;
+  }
+  const media = token(mediaTypeOf(res), MEDIA_TYPE, password);
+  return (
+    `${statusLine}${media === undefined ? '' : ` (${media})`}, not a Cognito error; ` +
+    'its body is withheld, since a proxy can quote the request it refused'
+  );
 }
 
 /** The endpoint for a region — exported so callers can report what they called. */
@@ -478,28 +235,16 @@ export function cognitoEndpoint(region: string): string {
   return `https://cognito-idp.${region}.amazonaws.com/`;
 }
 
-function describeError(status: number, body: string): string {
-  let parsed: CognitoError | null = null;
-  try {
-    parsed = JSON.parse(body) as CognitoError;
-  } catch {
-    // Not JSON — fall through and report the raw body below.
-  }
-  const type = parsed?.__type;
-  const message = parsed?.message ?? parsed?.Message;
-  if (type ?? message) return `${type ?? 'error'}: ${message ?? '(no message)'}`;
-  return `HTTP ${status}: ${body.slice(0, 200)}`;
-}
-
 /**
  * Sign one test user in and return their access token.
  *
  * Throws with an actionable message on every failure path, so a misconfigured
  * pool fails the demo loudly rather than producing a token-shaped nothing:
- *   - a Cognito error (bad credentials, flow not enabled) reports its own type;
+ *   - a Cognito error (bad credentials, flow not enabled) reports its type;
+ *   - a network failure reports its error codes, and a timeout reports itself;
  *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) names the challenge, because an
  *     unfinished sign-in yields no token and needs an operator, not a retry;
- *   - a 200 with no AccessToken is treated as a failure, never as an empty token.
+ *   - a 200 without a string AccessToken is a failure, never an empty token.
  */
 export async function fetchCognitoAccessToken(
   config: CognitoAuthConfig,
@@ -507,9 +252,12 @@ export async function fetchCognitoAccessToken(
 ): Promise<string> {
   const doFetch = config.fetchImpl ?? fetch;
   const timeoutMs = config.timeoutMs ?? 30_000;
+  const { username, password } = credentials;
+  const endpoint = cognitoEndpoint(config.region);
+
   let res: Response;
   try {
-    res = await doFetch(cognitoEndpoint(config.region), {
+    res = await doFetch(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/x-amz-json-1.1',
@@ -518,7 +266,7 @@ export async function fetchCognitoAccessToken(
       body: JSON.stringify({
         AuthFlow: 'USER_PASSWORD_AUTH',
         ClientId: config.clientId,
-        AuthParameters: { USERNAME: credentials.username, PASSWORD: credentials.password },
+        AuthParameters: { USERNAME: username, PASSWORD: password },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -527,73 +275,65 @@ export async function fetchCognitoAccessToken(
     // and telling the operator to look at Cognito's latency would point them
     // away from the thing they actually got wrong.
     //
-    // The detail comes from the fetch layer, so it is redacted before being
-    // interpolated: this module promises a password never leaves it, and an
-    // interceptor or a future client that echoed the request body would
-    // otherwise put DEMO_PASSWORD straight into a CI transcript. Structural,
-    // not incidental.
-    const message =
-      nameOf(err) === 'TimeoutError'
-        ? `Cognito sign-in for ${credentials.username} did not answer within ${timeoutMs}ms ` +
-          `(${cognitoEndpoint(config.region)})`
-        : `Cognito sign-in for ${credentials.username} could not reach ` +
-          `${cognitoEndpoint(config.region)}: ` +
-          redact(detailOf(err), credentials.password);
-
-    // Deliberate, and the one place in this repo that overrides a lint rule.
-    // `safeCause` attaches the caught error itself in every ordinary case; it
-    // substitutes a redacted rendering of it ONLY when inspecting the real
-    // object would print the password. Keeping the object would defeat the
-    // single promise this module exists to make, and the rendering carries the
-    // same text an operator reads.
-    // eslint-disable-next-line preserve-caught-error -- see the note above
-    throw new Error(message, { cause: safeCause(err, credentials.password) });
+    // The caught error is not attached; the header says why. Its codes are in
+    // the message, which is what an operator acts on.
+    // eslint-disable-next-line preserve-caught-error -- deliberately not attached, see above
+    throw new Error(
+      isTimeout(err)
+        ? `Cognito sign-in for ${username} did not answer within ${timeoutMs}ms (${endpoint})`
+        : `Cognito sign-in for ${username} could not reach ${endpoint}: ` +
+            describeFailure(err, password),
+    );
   }
 
-  // Reading the body is the other await in this function, and undici rejects it
-  // with `TypeError: terminated` whenever a response is cut short — an ordinary
-  // flaky network. Left unguarded it bypassed every redaction in this module AND
-  // lost the one line naming what the operator should look at.
+  // Reading the body can fail on its own: undici rejects it with `TypeError:
+  // terminated` when a response is cut short, and the deadline above still
+  // applies while it streams.
   let text: string;
   try {
     text = await res.text();
   } catch (err) {
-    const message =
-      `Cognito sign-in for ${credentials.username} could not read the response from ` +
-      `${cognitoEndpoint(config.region)}: ${redact(detailOf(err), credentials.password)}`;
-    // eslint-disable-next-line preserve-caught-error -- see the note at the fetch above
-    throw new Error(message, { cause: safeCause(err, credentials.password) });
-  }
-
-  if (!res.ok) {
-    // The body is redacted BEFORE `describeError` truncates it: a corporate
-    // proxy or WAF block page can echo the request it rejected — the one we
-    // just posted the password in — and a password straddling the 200-character
-    // cut would otherwise have its prefix printed in full.
+    // eslint-disable-next-line preserve-caught-error -- deliberately not attached, as above
     throw new Error(
-      `Cognito sign-in failed for ${credentials.username} — ` +
-        describeError(res.status, redact(text, credentials.password)),
+      isTimeout(err)
+        ? `Cognito sign-in for ${username} did not finish answering within ${timeoutMs}ms ` +
+            `(${endpoint})`
+        : `Cognito sign-in for ${username} could not read the response from ${endpoint}: ` +
+            describeFailure(err, password),
     );
   }
 
-  let body: InitiateAuthResponse;
-  try {
-    body = JSON.parse(text) as InitiateAuthResponse;
-  } catch {
-    throw new Error(`Cognito sign-in for ${credentials.username} returned non-JSON body`);
+  if (read(res, 'ok') !== true) {
+    throw new Error(
+      `Cognito sign-in failed for ${username} — ${describeResponse(res, text, password)}`,
+    );
   }
 
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`Cognito sign-in for ${username} returned non-JSON body`);
+  }
+  // A JSON `null` carries no token, and reading a field off it would throw a
+  // TypeError that names no request at all.
+  const body: InitiateAuthResponse = typeof parsed === 'object' && parsed !== null ? parsed : {};
+
   if (body.ChallengeName) {
+    const challenge = token(body.ChallengeName, CONSTANT_NAME, password);
     throw new Error(
-      `Cognito sign-in for ${credentials.username} needs challenge ${body.ChallengeName} — ` +
-        'finish it once in the AWS console (a temporary password must be reset before the ' +
+      `Cognito sign-in for ${username} needs ` +
+        (challenge === undefined
+          ? 'a challenge (its name is withheld)'
+          : `challenge ${challenge}`) +
+        ' — finish it once in the AWS console (a temporary password must be reset before the ' +
         'account can be used unattended), then re-run.',
     );
   }
 
-  const token = body.AuthenticationResult?.AccessToken;
-  if (!token) {
-    throw new Error(`Cognito sign-in for ${credentials.username} returned no access token`);
+  const accessToken = body.AuthenticationResult?.AccessToken;
+  if (typeof accessToken !== 'string' || accessToken === '') {
+    throw new Error(`Cognito sign-in for ${username} returned no access token`);
   }
-  return token;
+  return accessToken;
 }
