@@ -211,6 +211,12 @@ describe('provisioningSql', () => {
   /**
    * The statements as an operator meets them: one paste at a time, which is
    * also the only way to paste just one half of the recipe.
+   *
+   * Splitting on a bare `;` is exact for what the builder emits today — the only
+   * literals are a minted UUID, `'Demo School'` and `'teacher'`. Put a semicolon
+   * inside a literal (a configurable school name) and this hands fragments to
+   * the database, and these tests fail as syntax errors instead of as the
+   * assertions they are: split on `;\n` if that day comes.
    */
   function statementsOf(recipe: string): string[] {
     return recipe
@@ -287,6 +293,14 @@ describe('provisioningSql', () => {
     );
 
     expect(normalize(fence ?? '')).toBe(normalize(built));
+  });
+
+  it('tells the operator to run both, since a lone UPDATE is now a no-op', () => {
+    // The guard made the half-paste honest but silent. Operator-facing guidance
+    // that nothing pins is how this whole line of fixes started, so: pinned.
+    for (const what of ['role-and-school', 'school'] as const) {
+      expect(provisioningSql(USER, what)).toMatch(/^\s*-- Run both/);
+    }
   });
 
   it('flips the role only when the role is what is missing', () => {
