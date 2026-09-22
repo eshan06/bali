@@ -1,6 +1,7 @@
-import { type Database, startSession, tapIn, users } from '@bali/db';
+import { type Database, schools, startSession, tapIn, users } from '@bali/db';
 import { backdateLastSeen } from '@bali/db/testing';
 import { SILENCE_THRESHOLD_MS } from '@bali/shared';
+import { eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -207,6 +208,33 @@ describe('the remote world, against a real server', () => {
 describe('provisioningSql', () => {
   const USER = '01a0bb08-563f-7050-8d19-48b7b3150865';
 
+  /**
+   * The statements as an operator meets them: one paste at a time, which is
+   * also the only way to paste just one half of the recipe.
+   */
+  function statementsOf(recipe: string): string[] {
+    return recipe
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter((statement) => statement.length > 0);
+  }
+
+  async function run(recipe: string): Promise<void> {
+    for (const statement of statementsOf(recipe)) await db.execute(sql.raw(statement));
+  }
+
+  async function makeUser(cognitoId: string, role: 'student' | 'teacher') {
+    const [row] = await db.insert(users).values({ cognitoId, role }).returning();
+    if (row === undefined) throw new Error('expected a row');
+    return row;
+  }
+
+  async function reread(id: string) {
+    const [row] = await db.select().from(users).where(eq(users.id, id));
+    if (row === undefined) throw new Error('expected a row');
+    return row;
+  }
+
   it('supplies an id, because schools.id has no database default', () => {
     const sql = provisioningSql(USER, 'role-and-school');
 
@@ -264,5 +292,120 @@ describe('provisioningSql', () => {
   it('flips the role only when the role is what is missing', () => {
     expect(provisioningSql(USER, 'role-and-school')).toContain("role = 'teacher'");
     expect(provisioningSql(USER, 'school')).not.toContain("role = 'teacher'");
+  });
+
+  /*
+   * Everything above reads the statements; everything below runs them. The
+   * premise of this builder is that a statement can look right and still fail at
+   * the database — the original hint omitted `id` and every string match passed
+   * while the operator got `null value in column "id" ... violates not-null`.
+   * These execute both halves against the real migrated schema (PGlite, or real
+   * Postgres under TEST_DATABASE_URL), so that class of bug cannot pass again.
+   */
+  describe('run against a real database', () => {
+    it('provisions the teacher: role flipped, attached to a live school', async () => {
+      const teacher = await makeUser('demo-teacher-runs', 'student');
+
+      await run(provisioningSql(teacher.id, 'role-and-school'));
+
+      const after = await reread(teacher.id);
+      const [school] = await db.select().from(schools);
+      expect(after.role).toBe('teacher');
+      expect(after.schoolId).toBe(school?.id);
+      expect(school?.removedAt).toBeNull();
+    });
+
+    it('is safe to paste twice — no second school, no re-pointing', async () => {
+      const teacher = await makeUser('demo-teacher-rerun', 'student');
+      await run(provisioningSql(teacher.id, 'role-and-school'));
+      const first = (await reread(teacher.id)).schoolId;
+
+      // A second call mints a different id, so a missing guard shows up here.
+      await run(provisioningSql(teacher.id, 'role-and-school'));
+
+      expect(await db.select().from(schools)).toHaveLength(1);
+      expect((await reread(teacher.id)).schoolId).toBe(first);
+    });
+
+    it("attaches to the operator's own school, and writes nothing else", async () => {
+      const [existing] = await db.insert(schools).values({ name: 'Real School' }).returning();
+      // A student on purpose: the `school` recipe is the one that must not touch
+      // `role`, and against a row that is already a teacher an accidental
+      // `role = 'teacher'` would be an invisible no-op.
+      const teacher = await makeUser('demo-teacher-existing', 'student');
+
+      await run(provisioningSql(teacher.id, 'school'));
+
+      const after = await reread(teacher.id);
+      expect(await db.select().from(schools)).toHaveLength(1);
+      expect(after.schoolId).toBe(existing?.id);
+      expect(after.role).toBe('student');
+    });
+
+    it('skips a retired school and creates a live one', async () => {
+      // Nothing is really deleted (decision 3). A retired school must not
+      // satisfy the guard, or the teacher — and every class the demo creates —
+      // lands on a school that is supposed to be gone.
+      const [retired] = await db
+        .insert(schools)
+        .values({ name: 'Closed School', removedAt: new Date() })
+        .returning();
+      const teacher = await makeUser('demo-teacher-retired', 'student');
+
+      await run(provisioningSql(teacher.id, 'role-and-school'));
+
+      const after = await reread(teacher.id);
+      const live = await db.select().from(schools).where(isNull(schools.removedAt));
+      expect(after.schoolId).not.toBe(retired?.id);
+      expect(live).toHaveLength(1);
+      expect(after.schoolId).toBe(live[0]?.id);
+    });
+
+    it('changes nothing when only the UPDATE half is pasted', async () => {
+      // Without the EXISTS guard this reports `UPDATE 1`, sets school_id to
+      // NULL, and the operator believes they complied — the real failure then
+      // arrives a demo run later, as a class that cannot be created.
+      const teacher = await makeUser('demo-teacher-half', 'student');
+      const statements = statementsOf(provisioningSql(teacher.id, 'role-and-school'));
+      expect(statements).toHaveLength(2);
+      expect(statements[1]).toMatch(/^UPDATE users/);
+
+      await db.execute(sql.raw(statements[1] ?? ''));
+
+      const after = await reread(teacher.id);
+      expect(after.schoolId).toBeNull();
+      expect(after.role).toBe('student'); // nothing applied at all
+    });
+
+    it('changes nothing on the UPDATE half when the only school is retired', async () => {
+      // The fixture above cannot tell a correct guard from a plausible wrong
+      // one: against an empty table `EXISTS (SELECT 1 FROM schools)` is false
+      // too. A retired school separates them — it satisfies an unscoped guard
+      // while the value subquery still finds nothing, which is the original
+      // silent-NULL failure wearing the fix's clothes. Nothing is really
+      // deleted (decision 3), so this is a database the demo really meets.
+      //
+      // Both variants run, because the guard has to be on both: for `school`
+      // the recipe never touches `role`, so a blanked `school_id` is the only
+      // trace a missing guard leaves — hence starting attached, not NULL.
+      const [retired] = await db
+        .insert(schools)
+        .values({ name: 'Closed School', removedAt: new Date() })
+        .returning();
+      const teacher = await makeUser('demo-teacher-half-retired', 'student');
+      await db.update(users).set({ schoolId: retired?.id }).where(eq(users.id, teacher.id));
+
+      for (const what of ['role-and-school', 'school'] as const) {
+        const statements = statementsOf(provisioningSql(teacher.id, what));
+        expect(statements).toHaveLength(2);
+        expect(statements[1]).toMatch(/^UPDATE users/);
+
+        await db.execute(sql.raw(statements[1] ?? ''));
+
+        const after = await reread(teacher.id);
+        expect(after.schoolId).toBe(retired?.id); // not blanked
+        expect(after.role).toBe('student'); // nothing applied at all
+      }
+    });
   });
 });
