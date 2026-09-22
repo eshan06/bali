@@ -323,6 +323,17 @@ under-13 parental-consent machinery.
   (decision 3) so that is unreachable today, but it would have misdirected
   whoever first hit it. It says "you are no longer in this session" now, which
   is true of both.
+  **The mapped `INVALID_EXTENSION` message had no test that reached it**, and
+  it took three rounds to see why. Every route that can raise it caps
+  `durationMinutes` with zod first, so a wire test sending `0` is rejected
+  before the mapper runs and asserts against zod's message instead — each
+  round I made the test's NAME more honest about that without ever making it
+  reach the thing it was supposed to cover. The answer was to stop going
+  through the wire: `apps/api/test/transition-errors.test.ts` exercises
+  `mapTransitionError` directly, over a `Record<TransitionErrorCode, …>` so a
+  new engine code without an expectation fails typecheck rather than slipping
+  through. Reverting the message, or mapping it to `conflict`, each turns it
+  red; the wire test stays green for both, which is the point.
   **And the bound is only half-enforced, which the comment did not say.**
   `extendSession` refuses a duration above `MAX_SESSION_MINUTES` in the
   engine; `startSession` takes absolute `startedAt`/`endsAt` and applies no
