@@ -24,6 +24,13 @@ export interface AppDeps {
   verifyToken?: TokenVerifier;
   /** Live-stream tuning; tests shorten the re-poll/heartbeat for deterministic delivery. */
   stream?: StreamHubOptions;
+  /**
+   * Where the logger writes. Injected only by tests that need to ASSERT on a
+   * log line — the stream route's teardown level is a decision, not a detail,
+   * and it has twice been broken by an unpinned call site. Unset everywhere
+   * else, so production keeps pino's own default destination.
+   */
+  logStream?: NodeJS.WritableStream;
 }
 
 /**
@@ -36,6 +43,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       level: env.LOG_LEVEL,
       // Pretty lines for a human terminal in dev; raw JSON everywhere else.
       ...(env.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
+      ...(deps.logStream ? { stream: deps.logStream } : {}),
     },
   });
 

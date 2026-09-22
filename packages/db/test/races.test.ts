@@ -651,6 +651,18 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
      * Closed by convertArmedTaps taking FOR UPDATE on the taps it reads, so
      * the refresh waits and its guard then correctly fails. Staged with a
      * large cohort so the conversion loop is long enough to land inside.
+     *
+     * The staging is checked, not hoped for — and the check's reach is worth
+     * stating, because it is narrower than it looks. An earlier version fired
+     * both sides with a bare 12 ms sleep and asserted only the invariant: on a
+     * loaded runner the refresh lands after the conversion has committed, the
+     * plain-insert path is taken, every consumed row still names its original
+     * id, and the whole thing passes with FOR UPDATE removed. The gate below
+     * closes THAT — a run with no contention at all now fails loudly instead
+     * of reading as a pass. It does not prove WHICH lock was contended: with
+     * FOR UPDATE removed the refresh can still block on the row lock the
+     * conversion takes when it writes consumed_at. So this is a better test,
+     * not a proof by construction.
      */
     const school = one(await db.insert(schools).values({ name: 'Gap' }).returning());
     const teacher = one(
@@ -667,6 +679,7 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     );
     const boundary = new Date(Date.now() + 400);
     const students: string[] = [];
+    const armedIds: string[] = [];
     for (let i = 0; i < 60; i += 1) {
       const s = one(
         await db
@@ -675,7 +688,7 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
           .returning(),
       );
       await db.insert(enrollments).values({ classId: klass.id, studentId: s.id });
-      await armTap(db, {
+      const armed = await armTap(db, {
         studentId: s.id,
         teacherId: teacher.id,
         eventId: newUuidV7(),
@@ -684,26 +697,46 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
         now: new Date(boundary.getTime() - 60_000),
       });
       students.push(s.id);
+      armedIds.push(armed.armedTapId);
     }
 
-    await Promise.allSettled([
-      startSession(db, {
-        classId: klass.id,
-        startedAt: new Date(boundary.getTime() - 1_000),
-        endsAt: new Date(Date.now() + 25 * 60_000),
-      }),
-      (async () => {
-        await new Promise((r) => setTimeout(r, 12)); // land inside the conversion loop
-        return armTap(db, {
-          studentId: students[40]!,
-          teacherId: teacher.id,
-          eventId: newUuidV7(),
-          deviceTime: new Date(),
-          expiresAt: new Date(Date.now() + 3_600_000),
-          now: new Date(boundary.getTime() + 1_000),
-        });
-      })(),
-    ]);
+    const conversion = startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(boundary.getTime() - 1_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const refresh = (async () => {
+      await new Promise((r) => setTimeout(r, 12)); // land inside the conversion loop
+      return armTap(db, {
+        studentId: students[40]!,
+        teacherId: teacher.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+        now: new Date(boundary.getTime() + 1_000),
+      });
+    })();
+
+    // Prove SOMETHING contended before believing the invariant below, so a
+    // run where the two never met cannot read as a pass. Honest about its
+    // reach: this observes that a backend parked on a lock, not WHICH lock —
+    // with FOR UPDATE removed the refresh can still block on the row lock the
+    // conversion takes when it writes consumed_at, and the gate is satisfied.
+    // What it does close is the case the gate was added for, a run with no
+    // contention at all, which is how this degraded under load.
+    //
+    // Settled first, so a rejection from either side is observed while the
+    // gate runs rather than surfacing as an unhandled rejection.
+    const settled = Promise.allSettled([conversion, refresh]);
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    }
+    const [, refreshed] = await settled;
+    if (unstaged !== null) throw unstaged;
+    expect(refreshed.status).toBe('fulfilled');
 
     const consumed = await db
       .select()
@@ -720,6 +753,106 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
         `consumed armed tap ${row.id} names event ${row.eventId}, which no tap_in recorded`,
       ).toHaveLength(1);
     }
+
+    // Conditional on purpose: whether the conversion or the refresh reached
+    // row 40 first is a race, and BOTH orders are correct. Asserting one of
+    // them unconditionally would turn a sound engine red on a slow runner.
+    // What is not negotiable is the pairing — if the conversion took the row,
+    // the refresh must have started a fresh one rather than recycling it.
+    if (consumed.some((row) => row.id === armedIds[40]) && refreshed.status === 'fulfilled') {
+      expect(refreshed.value.armedTapId).not.toBe(armedIds[40]);
+    }
+  });
+
+  it('a delivery that loses the event_id index is answered as a replay, not a 500', async () => {
+    /*
+     * `armed_taps` has TWO unique indexes and `armTap`'s ON CONFLICT names
+     * only one of them. The arbiter is (student, teacher) WHERE consumed_at
+     * IS NULL; `event_id` carries its own, and that one is reachable: a
+     * concurrent delivery of the SAME tap can be invisible to the `exact`
+     * select (uncommitted) and yet already CONSUMED by the time the insert
+     * runs — so it is outside the partial index, the arbiter finds nothing to
+     * arbitrate, and the insert lands on armed_taps_event_id_unique. Escaping,
+     * that is a raw 23505 out of POST /v1/taps: the same 500 on a pre-bell tap
+     * the ON CONFLICT was added to remove, through the other index.
+     *
+     * Staged, not hoped for, and the holder is what makes the `exact` select
+     * miss: an open transaction inserts the rival row and sits on it, so
+     * armTap sees nothing, reaches its insert, and parks on the unique index.
+     * Releasing the holder lets it resume into the conflict this test is about.
+     * The row is inserted already-consumed so the partial index cannot be what
+     * it collides with.
+     */
+    const { classId, studentId } = await seed('race-arm-eventid');
+    const teacherId = one(
+      await db.select({ id: classes.teacherId }).from(classes).where(eq(classes.id, classId)),
+    ).id;
+    const eventId = newUuidV7();
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let inserted!: () => void;
+    const hasRow = new Promise<void>((resolve) => {
+      inserted = resolve;
+    });
+    let rivalId = '';
+    const rival = db.transaction(async (tx) => {
+      const row = one(
+        await tx
+          .insert(armedTaps)
+          .values({
+            studentId,
+            teacherId,
+            eventId,
+            deviceTime: new Date(),
+            expiresAt: new Date(Date.now() + 3_600_000),
+            // Consumed, so the waiting partial index is NOT what collides.
+            consumedAt: new Date(),
+          })
+          .returning(),
+      );
+      rivalId = row.id;
+      inserted(); // uncommitted: invisible to armTap's `exact` select
+      await held;
+    });
+
+    await hasRow;
+    const arming = armTap(db, {
+      studentId,
+      teacherId,
+      eventId,
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      now: new Date(),
+    });
+    // It must genuinely park on the index, not merely be slow: without the
+    // block, armTap's insert would have succeeded and this would be testing
+    // the ordinary arming path.
+    //
+    // Released in a finally: a gate that times out must not leave the holder
+    // sitting on an uncommitted row forever, with `arming` parked behind it,
+    // never awaited and never settled — that wedges the whole real-PG suite
+    // rather than failing this one test.
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await rival;
+    const settled = await Promise.allSettled([arming]);
+    if (unstaged !== null) throw unstaged;
+    if (settled[0].status === 'rejected') throw settled[0].reason as Error;
+    const result = settled[0].value;
+    expect(result.outcome).toBe('replay');
+    expect(result.armedTapId).toBe(rivalId);
+    // And exactly one row owns the id — nothing was written twice.
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
+    expect(rows).toHaveLength(1);
   });
 
   it('a refresh never writes its event id onto a tap consumed under it', async () => {

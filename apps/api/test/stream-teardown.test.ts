@@ -157,6 +157,8 @@ describe('a hijacked stream response owns its own error handling', () => {
   let port: number;
   let tokenFor: (sub: string) => Promise<string>;
   const extraSockets: net.Socket[] = [];
+  /** Teardown that must run even when an assertion or a waitFor throws first. */
+  const cleanups: (() => void)[] = [];
 
   beforeEach(async () => {
     const issuer = await makeTestIssuer();
@@ -175,6 +177,8 @@ describe('a hijacked stream response owns its own error handling', () => {
   });
 
   afterEach(async () => {
+    for (const undo of cleanups) undo();
+    cleanups.length = 0;
     for (const s2 of extraSockets) s2.destroy();
     extraSockets.length = 0;
     await app.close();
@@ -220,6 +224,7 @@ describe('a hijacked stream response owns its own error handling', () => {
       if (req.url?.includes('/stream') === true) res = r;
     };
     app.server.on('request', onRequest);
+    cleanups.push(() => app.server.off('request', onRequest));
 
     const sock = net.connect(port, '127.0.0.1');
     extraSockets.push(sock); // torn down by afterEach even if this test fails
@@ -231,7 +236,6 @@ describe('a hijacked stream response owns its own error handling', () => {
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
     await waitFor(() => res !== null);
-    app.server.off('request', onRequest);
     const raw = res as unknown as ServerResponse;
     await waitFor(() => raw.headersSent);
 
@@ -253,20 +257,29 @@ describe('a hijacked stream response owns its own error handling', () => {
     // adaptive. `writableLength` is what has been handed over and not yet
     // accepted, so a round where it grows by the whole chunk is a round where
     // nothing drained at all.
+    //
+    // TWO consecutive quiet rounds, not one. Draining happens on the event
+    // loop, so a round where the loop is busy for the whole sleep — this
+    // describe runs with `repollMs: 5`, and a PGlite query or a GC pause is
+    // enough — looks identical to a full socket. Measured here: the kernel
+    // takes about 3 MiB before it stops accepting, so a false stall on round
+    // one leaves ~1 MiB queued, `end()` flushes it, 'finish' fires, and the
+    // assertions below go red for a busy machine rather than a regression.
+    // A socket that is genuinely full never drains again, so it clears two.
     const MB = 'x'.repeat(1024 * 1024);
     let queued = 0;
-    let stalled = false;
-    for (let i = 0; i < 64 && !stalled; i += 1) {
+    let quiet = 0;
+    for (let i = 0; i < 64 && quiet < 2; i += 1) {
       const before = raw.writableLength;
       raw.write(MB);
       await sleep(20); // a chance to drain whatever it still can
-      stalled = raw.writableLength >= before + MB.length;
+      quiet = raw.writableLength >= before + MB.length ? quiet + 1 : 0;
       queued = raw.writableLength;
     }
     expect(
-      stalled,
+      quiet,
       `socket never stopped draining (${queued} bytes queued) — the window cannot be staged`,
-    ).toBe(true);
+    ).toBeGreaterThanOrEqual(2);
     raw.end();
     expect(raw.writableEnded, 'ended').toBe(true);
     expect(raw.destroyed, 'not detached — the window is open').toBe(false);
@@ -311,6 +324,9 @@ describe('a hijacked stream response owns its own error handling', () => {
       if (req.url?.includes('/stream') === true) res = r;
     };
     app.server.on('request', onRequest);
+    // Queued now rather than after the wait: a waitFor that times out must not
+    // leave the listener attached to an app the next test is about to build.
+    cleanups.push(() => app.server.off('request', onRequest));
 
     const sock = net.connect(port, '127.0.0.1');
     extraSockets.push(sock); // torn down by afterEach even if a waitFor below throws
@@ -322,7 +338,6 @@ describe('a hijacked stream response owns its own error handling', () => {
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
     await waitFor(() => res !== null);
-    app.server.off('request', onRequest);
     const raw = res as unknown as ServerResponse;
     await waitFor(() => raw.headersSent);
 

@@ -138,6 +138,82 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-22** — Review follow-ups on the armed-tap work, from #23's and
+  #26's own reviews. #23's found both halves of its fix incomplete,
+  and one of them was a test that could pass with the bug present.
+  The `ON CONFLICT` that #23 added names the waiting partial index, but
+  `armed_taps` has a SECOND unique index — `event_id` — and it is reachable:
+  the `exact` select at the top of `armTap` can miss a concurrent delivery of
+  the same tap that has not committed yet, and by the time the insert runs
+  that row can be committed AND consumed by a Start, so it sits outside the
+  waiting index, the arbiter does not match, and the insert lands on
+  `armed_taps_event_id_unique`. Measured: a raw 23505 from a statement built
+  exactly like `armTap`'s — the same 500 on a pre-bell tap that #23 existed to
+  remove, reached by the other index. The insert now runs in a SAVEPOINT
+  (verified on both lanes: a caught 23505 inside `tx.transaction` leaves the
+  outer transaction usable) and a 23505 is answered as what it is — another
+  delivery of this tap won the id, so `replay`. Reasoned, not pinned: the
+  recovery is only reachable through an interleaving nothing here stages.
+  A shared `hasSqlState` walks the cause chain for both codes now, because
+  drizzle wraps the driver error and a plain `err.code` check silently never
+  matches — measured while getting this wrong once. That recovery is no longer
+  unpinned either: a held transaction inserts the rival row and sits on it, so
+  `armTap`'s `exact` select misses it and the insert parks on the event-id
+  index; releasing the holder lets it resume into the conflict. Rethrowing
+  instead of recovering, or dropping the savepoint, each turns it red.
+  Both of `armTap`'s event-id lookups are scoped to the CALLER now, not just
+  the id. Answering `replay` for a stranger's id handed back their row and
+  told this phone's outbox the tap was durably recorded, so it dropped a tap
+  that was never armed and never converts — silently absent from the grid at
+  Start. `insertEvent` refuses the same class of reuse for the same reason;
+  arming holds the same line and raises `EVENT_ID_CONFLICT`. **Behaviour
+  change on a path that previously answered `replay`**, but only for an id
+  that is not the caller's, which no honest client sends. Open for Phase 3:
+  unlike the unlock path there is no typed disposition telling a TAP outbox
+  what a permanent 409 means, so a client that hits one retries forever
+  without surfacing — the same contract gap already recorded above.
+  Known and accepted: a skipped spent tap is consumed with no event and no
+  contribution to `armedConverted`, so nothing in the feed records that a
+  waiting tap was dropped. With the takeover above, the only rows that reach
+  it are stale retries for a student who never came back, and naming that in
+  the permanent log would mean new event vocabulary — worth doing with the
+  contract decision, not ahead of it.
+  The conversion-gap race test staged with a bare 12 ms sleep and asserted
+  only the invariant — nothing checked that the interleaving happened. Worth
+  being exact about what that is: on an idle box it does still catch the
+  mutation (`FOR UPDATE` removed, test red in 425 ms, measured), so it was not
+  unconditionally vacuous. What it lacked was anything KEEPING the window hit,
+  so under load the refresh lands after the conversion has committed, the
+  plain-insert path is taken, every consumed row still names its original id,
+  and it degrades to a pass with nothing going red. It now fails loudly when
+  nothing contended at all, which is how it degraded. Its reach is narrower
+  than "by construction", and the test says so: the gate observes that a
+  backend parked on a lock, not WHICH lock, and with `FOR UPDATE` removed the
+  refresh can still block on the row lock the conversion takes writing
+  `consumed_at`. Better, not proof. The order-dependent assertion is
+  conditional now — whether the conversion or the refresh reaches the row
+  first is itself a race and both orders are correct, so asserting one
+  unconditionally would redden a sound engine on a slow runner.
+- **2026-09-22** — The stream route's log decision took three passes to
+  actually pin, and the last hole was one level below the last fix. #24 folded
+  the level and the line into one tested helper so the listener had no branch
+  left — but the line that CONSUMES it, `request.log[level]({ err }, msg)`, is
+  ordinary code: hardcode it to `.warn` and every tab-close goes to `warn` in
+  production while all five helper cases stay green. `buildApp` now takes an
+  optional `logStream` (tests only; production keeps pino's own destination)
+  and an integration test reads the level the route actually wrote. Hardcoding
+  the dispatch turns it red; the helper's table test does not notice.
+  Also measured, from the same review: the rewritten stall loop treated ONE
+  quiet round as proof the socket was full. Draining happens on the event
+  loop, so a round where the loop is busy for the whole sleep — this suite
+  runs with `repollMs: 5` — looks identical to a full socket. On this box the
+  kernel accepts about 3 MiB before it stops, so a false stall on round one
+  leaves ~1 MiB queued, `end()` flushes it, `'finish'` fires, and the test
+  goes red for a busy machine rather than a regression. It now takes two
+  consecutive quiet rounds; a genuinely full socket never drains again.
+  And the `'request'` listeners come off in `afterEach` rather than after the
+  `waitFor` that may throw first.
+
 - **2026-09-22** — The worst thing the audit turned up was not on its list: a
   lost tap response could stop a teacher starting any lesson for the rest of
   the day, and it needed no race to reach. A tap lands in a session, its
@@ -150,10 +226,28 @@ under-13 parental-consent machinery.
   still unconsumed. Waiting taps are selected by TEACHER, not by class, so
   every class that student is in is blocked, every period, until the tap
   expires at end of day.
-  A tap is still a tap (decision 5) and the student is still standing there,
-  so the conversion now goes ahead under a fresh event id, with the spent one
-  kept in `payload.armed_tap_event_id` so the history still shows which tap it
-  came from. Nothing is weakened: the armed tap's id exists to de-dupe
+  The waiting tap is consumed and SKIPPED instead — and the skip needs its
+  other half, which the first version of this fix did not have. `armTap`'s
+  standing-row branch answered `already_armed` for any unexpired row without
+  touching its id, so a student whose spent id was armed between periods, and
+  who then physically tapped again, had that fresh tap dropped on the floor
+  and was skipped at Start: told "armed" twice, joined never, absent from the
+  grid with nothing in `events` to say why. Reproduced. A standing row whose
+  id is already on record is stale for the same reason an expired one is —
+  the conversion will not honour it — so the fresh tap takes the slot. The phone mints one id per
+  physical tap, so a spent id can only be a retry of one that already landed:
+  the tap was honoured, in the session that recorded it, and the waiting row
+  is a stale retry rather than a tap owed anything. Decision 5's "a tap is a
+  tap" is about a tap not yet honoured.
+  (#26 shipped this differently, twice over, and both were wrong. First as a
+  pre-read of `events` — but a read is not a lock, so an id can become spent
+  between the read and the insert and roll the Start back anyway, through a
+  narrower door; the refusal has no such window, so it is caught instead.
+  Then as a conversion under a FRESH id, which survives the Start but joins
+  and SHIELDS the student in a class they never tapped into, possibly hours
+  later: reproduced, a 09:00 tap whose response was lost puts them in period 5
+  at 13:00, because waiting taps are selected by teacher. Skipping is the only
+  shape that is wrong in neither direction.) Nothing is weakened: the armed tap's id exists to de-dupe
   ARMING, and the conversion was already exactly-once, consumed in the same
   transaction. Both reviewers on the tap-replay step reproduced this
   independently and flagged it as worse than anything that step fixed; it is

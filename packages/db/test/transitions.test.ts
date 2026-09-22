@@ -1006,6 +1006,130 @@ describe('armed taps', () => {
     expect(partA.endedReason).toBe('left_for_other_session');
   });
 
+  it("refuses to arm under another student's event id", async () => {
+    /*
+     * The id identifies one tap by one student. Answering `replay` for a
+     * stranger's id would hand back their row and tell this phone's outbox the
+     * tap is durably recorded — so it drops a tap that was never armed, never
+     * converts, and the student is silently absent from the grid at Start.
+     * `insertEvent` refuses the same class of reuse ("a student's app is an
+     * adversary here"); arming holds the same line.
+     */
+    const { teacher, student, school } = await seedClass('arm-other-id');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-arm-other-id-2', role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    const theirs = newUuidV7();
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: theirs,
+      deviceTime: new Date('2026-01-01T08:50:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+
+    await expect(
+      armTap(db, {
+        studentId: classmate.id,
+        teacherId: teacher.id,
+        eventId: theirs,
+        deviceTime: new Date('2026-01-01T08:51:00Z'),
+        expiresAt: new Date('2026-01-01T23:59:59Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // And nothing of the classmate's was written.
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, classmate.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('a fresh tap takes over a standing row whose id is already spent', async () => {
+    /*
+     * The other half of skipping a spent armed tap, and without it the skip is
+     * a silent failure on the path decision 5 exists to protect.
+     *
+     * Alice taps into period 1; the 200 is lost, so her outbox keeps the id.
+     * Between periods the retry arms that spent id. She then physically taps
+     * again for period 2 with a fresh id — and the standing row swallowed it:
+     * `already_armed`, the new id dropped on the floor, and at Start the
+     * conversion skipped the spent row. Told "armed" twice, joined never,
+     * absent from the grid with nothing in `events` to say why. Reproduced.
+     *
+     * A standing row whose id is spent is stale for the same reason an expired
+     * one is — the conversion will not honour it — so the fresh tap takes the
+     * slot.
+     */
+    const { teacher, student, klass, school } = await seedClass('arm-superseded');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Period 2',
+          joinCode: 'ARMSUP2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+
+    const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+    const spent = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await endSession(db, {
+      sessionId: first.session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+    // The stale retry, arming an id that already landed.
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:30:00Z'),
+    });
+
+    // She taps the block again, for real, well before the row would expire.
+    const fresh = newUuidV7();
+    const retap = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: fresh,
+      deviceTime: new Date('2026-01-01T09:55:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:55:00Z'),
+    });
+    expect(retap.outcome).toBe('armed');
+
+    const next = await startSession(db, { classId: second.id, ...window('2026-01-01T10:00:00Z') });
+    expect(next.armedConverted).toBe(1);
+    const joined = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, next.session.id),
+            eq(participations.studentId, student.id),
+          ),
+        ),
+    );
+    expect(joined.state).toBe('focused');
+    // Joined under the tap she actually made, not the spent one.
+    const tapIns = (await eventsFor(next.session.id)).filter((e) => e.type === 'tap_in');
+    expect(tapIns.map((e) => e.eventId)).toEqual([fresh]);
+  });
+
   it('does not convert an expired armed tap', async () => {
     const { teacher, student, klass } = await seedClass('arm-expired');
     await armTap(db, {
@@ -1022,7 +1146,7 @@ describe('armed taps', () => {
     expect(armedConverted).toBe(0);
   });
 
-  it('a spent event id never wedges the next Start', async () => {
+  it('a spent event id never wedges the next Start, and never joins a later one', async () => {
     /*
      * The worst thing in this area, and it needs no race to reach. A tap lands
      * in a session, its response is lost, the bell ends the session, and the
@@ -1030,29 +1154,30 @@ describe('armed taps', () => {
      * route ARMS the retry — `armTap` de-dupes against `armed_taps.event_id`
      * and never against `events`, so a spent id is accepted.
      *
-     * The next Start then converts it, `insertEvent` sees the id against a
-     * different session and refuses, and because conversion runs inside
-     * `startSession`'s transaction the whole Start rolls back with the tap
-     * still unconsumed. Waiting taps are selected by TEACHER, so this blocks
-     * every class that student is in, every period, until end of day. The
-     * teacher cannot start a lesson.
+     * Converting it is wrong both ways, and both were reproduced. Under the
+     * spent id, `insertEvent` refuses inside `startSession`'s transaction and
+     * the whole Start rolls back; waiting taps are selected by TEACHER, so
+     * every class that student is in is blocked, every period, until end of
+     * day. Under a FRESH id — the first shape of this fix — the Start
+     * survives, but the student is joined and shielded in a class they never
+     * tapped into: here, period 5 at 13:00 off a 09:00 tap.
      *
-     * The student is still standing there, so the conversion goes ahead under
-     * a fresh event id, with the spent one kept in the payload.
+     * The id is spent because the tap already landed, so the waiting row is a
+     * stale retry and not a tap owed anything. It is consumed and skipped.
      */
     const { teacher, student, klass, school } = await seedClass('arm-spent');
-    const other = one(
+    const later = one(
       await db
         .insert(classes)
         .values({
           teacherId: teacher.id,
           schoolId: school.id,
-          name: 'Second period',
+          name: 'Period 5',
           joinCode: 'ARMSPENT2',
         })
         .returning(),
     );
-    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+    await db.insert(enrollments).values({ classId: later.id, studentId: student.id });
 
     const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
     const spent = newUuidV7();
@@ -1064,8 +1189,8 @@ describe('armed taps', () => {
     });
     await endSession(db, {
       sessionId: first.session.id,
-      at: new Date('2026-01-01T09:25:00Z'),
-      reason: 'expired',
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
     });
 
     // The outbox retry, arriving with nothing running: the route arms it.
@@ -1075,24 +1200,33 @@ describe('armed taps', () => {
       eventId: spent,
       deviceTime: new Date('2026-01-01T09:01:00Z'),
       expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:30:00Z'),
     });
     expect(armed.outcome).toBe('armed');
 
-    // Next period, and the period after, both open normally.
+    // Next period, and a different class hours later, both open normally...
     const second = await startSession(db, { classId: klass.id, ...window('2026-01-01T10:00:00Z') });
-    expect(second.armedConverted).toBe(1);
-    const third = await startSession(db, { classId: other.id, ...window('2026-01-01T11:00:00Z') });
-    expect(third.outcome).toBe('created');
+    expect(second.outcome).toBe('created');
+    const fifth = await startSession(db, { classId: later.id, ...window('2026-01-01T13:00:00Z') });
+    expect(fifth.outcome).toBe('created');
 
-    // The student joined under a fresh id, and the spent one still points at
-    // the session that really recorded it.
-    const joined = one((await eventsFor(second.session.id)).filter((e) => e.type === 'tap_in'));
-    expect(joined.eventId).not.toBe(spent);
-    expect(joined.payload).toEqual({ armed_tap_event_id: spent });
+    // ...and neither joined the student off a tap that had already landed.
+    expect(second.armedConverted).toBe(0);
+    expect(fifth.armedConverted).toBe(0);
+    for (const s of [second, fifth]) {
+      const joined = await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, s.session.id), eq(participations.studentId, student.id)),
+        );
+      expect(joined).toHaveLength(0);
+    }
+
+    // The original tap still points at the session that really recorded it,
+    // and the armed row is consumed, so it cannot come back tomorrow.
     const original = one(await db.select().from(events).where(eq(events.eventId, spent)));
     expect(original.sessionId).toBe(first.session.id);
-
-    // And the tap is consumed, so it cannot come back tomorrow.
     const left = await db
       .select()
       .from(armedTaps)
