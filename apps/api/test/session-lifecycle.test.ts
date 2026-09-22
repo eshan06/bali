@@ -167,6 +167,27 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('a duration the route refuses says so in words that are true', async () => {
+    /*
+     * The route sends a duration, not an end time, so INVALID_EXTENSION can
+     * only ever mean "that is not a number of minutes I can use". It used to
+     * answer "new end time must be later than the current one", which after
+     * the duration rewrite describes nothing the caller sent. Zod is what
+     * actually rejects this shape, and its message is checked here too so the
+     * pair cannot drift apart unnoticed.
+     */
+    const { teacher, session } = await seedRunning('extend-bad-duration');
+    const res = await post(
+      await ctx.tokenFor(teacher.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 0, eventId: randomUUID() },
+    );
+    expect(res.statusCode).toBe(400);
+    const body = res.json<{ error: { code: string; message: string } }>();
+    expect(body.error.code).toBe('bad_input');
+    expect(body.error.message).not.toContain('end time');
+  });
+
   it('a non-owner teacher cannot extend (403)', async () => {
     const { session } = await seedRunning('extend-owner');
     const other = await seedClassroom(db, 'extend-other');

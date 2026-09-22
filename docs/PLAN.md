@@ -73,20 +73,34 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   owner** — the fix answers 200 where `/v1` answers 409 today, and decision 2
   sends behaviour changes to `/v2`. The tenth, `POST /v1/classes`'s missing
   idempotency key, was re-examined and the deferral stands.
-- **Found while fixing the audit, for the owner to rule on** — two ways a tap's
-  event id becomes unusable, both needing a contract decision rather than a
-  fix: (1) a tap whose session has since ended has no honest `200`.
-  `TapResponse` carries `{id, classId, endsAt}` with no way to say "over", and
-  a session the teacher ended early keeps its original `endsAt`, so replaying
-  it would shield a student until a bell that already rang. The engine refuses
-  with `EVENT_ID_CONFLICT` instead, which is loud but leaves that outbox record
-  retrying forever. Candidates: an `ended` flag on `SessionView` (additive), or
-  a distinct code the outbox may clear on. (2) `convertArmedTaps` inserts the
-  armed tap's `event_id` as a `tap_in`, but `armTap` only de-dupes against
-  `armed_taps.event_id`. So a tap that landed in a session that then ended, and
-  is retried once nothing is running, arms under the same id — and the
-  teacher's next Start aborts with `EVENT_ID_CONFLICT`, blocking **every**
-  session on that class until the armed tap expires at end of day.
+- **Found while fixing the audit, for the owner to rule on — one decision, and
+  the bug that makes it urgent.**
+  (1) **A tap that landed but is no longer current has no honest `200`.**
+  `TapResponse` carries `{id, classId, endsAt}` with no way to say "over" or
+  "you have left it", and a session the teacher ended early keeps its original
+  `endsAt` — so replaying one would point a phone at a window that has not
+  closed. A foregrounded app heals inside one ~30s check-in (it answers
+  `gone`), but enforcement deliberately does not need the network, so a
+  backgrounded phone stays shielded to the stale window. The engine therefore
+  refuses, in **three** different vocabularies depending on shape, all of them
+  409 and all "keep the record, retry, and surface": `EVENT_ID_CONFLICT` when
+  the retry re-resolved to another session, `NOT_PARTICIPATING` when it
+  resolved back to the session that recorded it but the student has left or
+  been removed, and `SESSION_NOT_RUNNING` when that session has itself ended.
+  Honest, but none of them is final: that outbox record retries forever.
+  Candidates: an `ended` flag on `SessionView` (additive), or one code the
+  outbox may clear on.
+  (2) **What makes (1) urgent, and it is pre-existing on `main`.**
+  `convertArmedTaps` inserts the armed tap's `event_id` as a `tap_in`, but
+  `armTap` de-dupes only against `armed_taps.event_id`, never against
+  `events`. So a retry that finds nothing running arms an already-spent id,
+  and the teacher's next Start aborts with `EVENT_ID_CONFLICT` inside
+  `startSession`'s transaction — creating no session. `convertArmedTaps`
+  selects waiting taps by **teacher**, not by class, so this blocks every
+  class of that teacher the student is enrolled in, until the armed tap
+  expires at end of day. Reproduced end to end on `main` and on the audit
+  branches. Every refusal in (1) is a feeder into it, which is why the
+  contract decision is not cosmetic.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -173,14 +187,20 @@ under-13 parental-consent machinery.
   is still live, in a session still running — and that bound is the whole
   safety of it, because `TapResponse` cannot say "that one is over" or "you
   have left it", so a stale answer here is a shield rather than a small
-  inaccuracy. Replaying an **ended** session would shield a student against a
-  bell that already rang (a teacher who ends early leaves the original
-  `endsAt` behind), in a grid no teacher is watching and no unlock can reach.
+  inaccuracy. Replaying an **ended** session points the phone at a window that
+  has not closed (a teacher who ends early leaves the original `endsAt`
+  behind): a foregrounded app heals inside one ~30s check-in, but enforcement
+  deliberately does not need the network, so a backgrounded phone stays locked
+  to a bell that already rang, in a grid no teacher is watching and no unlock
+  can reach.
   Replaying a participation the student **left** — they tapped into the
   teacher's other session for real — would point the phone at the session it
   left while the grid shows them in the one they are in; its next check-in
   there answers `gone` and unshields. Both are worse than the 409 they
-  replaced, and both now decline. The lookup itself sits **ahead** of the
+  replaced, and both now decline. A retry that resolves back to the session
+  that recorded it, with the student's row since ended, declines through the
+  `!isNew` path below the branch as `NOT_PARTICIPATING` — not a conflict, the
+  id names this very tap; what stopped being true is the participation. The lookup itself sits **ahead** of the
   ended-session guard, the placement `extendSession` uses: `resolveTapTarget`
   filters on `ended_at IS NULL` outside the transaction, so the session it
   picks can end before the engine's locked read, and a tap that did land must
@@ -196,8 +216,10 @@ under-13 parental-consent machinery.
   each press adds to whatever it finds. Nothing calls the endpoint yet (no
   extend control in the portal), so this was caught before it could bite. `INVALID_EXTENSION` is kept and still
   refuses a non-positive, non-finite, or out-of-Date-range duration — the
-  engine does not trust its caller, and 1e15 minutes used to overflow into an
-  Invalid Date and a bare `RangeError` 500. Its client-facing message no longer
+  engine does not trust its caller. 1e15 minutes used to overflow into an
+  Invalid Date and a bare `RangeError`; the route's zod cap
+  (`int().positive().max(480)`) means no `/v1` caller could reach it, so this
+  is defence-in-depth for a direct engine caller rather than a live 500. Its client-facing message no longer
   claims the end time was not moved forward, which the duration rewrite made
   false. The real-Postgres lane now covers two concurrent extends both landing.
 - **2026-09-22** — Three defects in `armTap`, two of them the same shape: a

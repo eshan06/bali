@@ -21,7 +21,11 @@ import type { Database } from './types.js';
  *   - runs in a single transaction (both writes land, or neither);
  *   - is idempotent on the client's event_id, so a retried tap counts once
  *     (rule 4) — the events unique constraint is the dedupe, and a replay
- *     re-reads and returns the current truth without re-applying;
+ *     re-reads and returns the current truth without re-applying. "Current"
+ *     is the operative word on the tap path: a retry answers 200 only while
+ *     what it recorded is still true, and refuses when it is not, because a
+ *     tap response drives a shield and a stale one would lock a student into
+ *     a session that is over or that they have left (see `tapIn`);
  *   - clamps any device timestamp into the session window (rule 1);
  *   - returns the resulting state, which is the phone's reconciliation channel.
  *
@@ -919,9 +923,13 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // say "that one is over" or "you have left it", so a stale answer here
       // is not a small inaccuracy — it is a shield:
       //   - an ENDED session keeps its original endsAt when the teacher ends
-      //     it early, so replaying one shields the student until a bell that
-      //     already rang, in a grid no teacher is watching and which no
-      //     unlock can reach;
+      //     it early, so replaying one points the phone at a window that has
+      //     not closed yet. A foregrounded app heals inside one ~30s
+      //     check-in (it answers `gone`), but enforcement deliberately does
+      //     not need the network: the DeviceActivity monitor holds the shield
+      //     to the window it was given, so a backgrounded phone stays locked
+      //     to a bell that already rang, in a grid no teacher is watching and
+      //     which no unlock can reach;
       //   - a participation the student LEFT (they tapped into the teacher's
       //     other session for real, decision 4) still reads `focused`, so
       //     replaying it points the phone at the session it left while the
@@ -962,7 +970,13 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       ) {
         // Reuse the locked row when the tap resolved back to its own session,
         // so the liveness check reads the authoritative copy, not a second
-        // unlocked snapshot of it.
+        // unlocked snapshot of it. The cross-session read stays UNLOCKED on
+        // purpose: taking `for update` on another session here would order
+        // locks B-then-A against a concurrent tap's A-then-B and make a real
+        // deadlock, which withDeadlockRetry would paper over rather than fix.
+        // The window it leaves is narrow and self-healing — the recorded
+        // session can end just after both reads, and the phone's next
+        // check-in against it answers `gone`.
         const recorded =
           prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
         const current = await loadParticipation(tx, prior.sessionId, input.studentId);
@@ -989,14 +1003,31 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         occurredAt,
       });
       if (!isNew) {
-        // Every live replay was already served above, so reaching here is not a
-        // replay: insertEvent reports "not new" only for an exact match (same
-        // type, session and student), the session is running by this line, and
-        // the branch above returns whenever the participation row exists. What
-        // is left is a tap_in event with no participation behind it, which the
-        // engine never writes. Refuse rather than answer 200 for a join that
-        // is not in the table.
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no participation');
+        // The tap is on record for exactly this session and student —
+        // insertEvent reports "not new" only for that — but the branch above
+        // declined to replay it, and by this line the session is running, so
+        // what it declined on was the PARTICIPATION: the row exists and has
+        // ended. The engine writes that routinely (the student left for the
+        // teacher's other session, or their enrollment was removed), so this
+        // is an ordinary case and not the "event with no row behind it" it
+        // may look like.
+        //
+        // Re-joining them here would be a fresh join wearing a spent id, and
+        // answering 200 would tell the phone it is focused where it is not —
+        // main did exactly that, reporting the stale `focused` off an ended
+        // row. Refuse, and say the true thing: they are not in this session.
+        // Pinned by "refuses a stale retry once the student has left the
+        // session that recorded it".
+        //
+        // The cost is real and recorded in PLAN.md for the owner: a 409 is
+        // "keep the record, retry, and surface", so this outbox record never
+        // clears, and a later retry that finds nothing running arms the spent
+        // id. Until a tap has a "recorded, and no longer current" answer,
+        // there is no response here that is both honest and final.
+        throw new TransitionError(
+          'NOT_PARTICIPATING',
+          'this tap is on record, but the participation has ended',
+        );
       }
 
       // Decision 4: end any live participation in a DIFFERENT session first, so

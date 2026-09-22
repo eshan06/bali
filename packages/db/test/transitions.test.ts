@@ -1136,6 +1136,12 @@ describe('a retried tap the server re-resolves elsewhere', () => {
      * So the engine refuses instead. EVENT_ID_CONFLICT is loud — a non-401 4xx
      * is "keep the record, retry, and surface" — and the student's next
      * physical tap carries a fresh id and joins the running session normally.
+     *
+     * Which condition holds this up, measured: `!current.endedAt`. Ending a
+     * session ends its live participations in the same transaction, so by the
+     * time the session is gone the row is too, and deleting `!recorded.endedAt`
+     * on its own leaves this green. That guard is kept for read-order safety,
+     * not because this test would catch its removal — see the branch comment.
      */
     const { klass, student, school, teacher } = await seedClass('tap-replay-ended');
     const other = one(
@@ -1327,6 +1333,206 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     expect(retry.session.id).toBe(recorded.session.id);
     expect(retry.session.endedAt).toBeNull();
     expect(retry.participationId).toBe(landed.participationId);
+  });
+
+  it('refuses a stale retry once the student has left the session that recorded it', async () => {
+    /*
+     * The same bound seen from the other side, and the case the `!isNew`
+     * refusal below the branch actually serves. Here the retry resolves back
+     * to the session that recorded it — still running — but the student's row
+     * in it has ended, because they tapped the teacher's other session for
+     * real. main answered 200 with that ended row's stale `focused`, which is
+     * the drift this PR exists to kill.
+     *
+     * NOT_PARTICIPATING, not EVENT_ID_CONFLICT: the id is not in conflict, it
+     * names this very tap. What is no longer true is the participation.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-left-same');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPLEFTS2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const recorded = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const stale = newUuidV7();
+    await tapIn(db, {
+      sessionId: recorded.session.id,
+      studentId: student.id,
+      eventId: stale,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    const second = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:05:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:06:00Z'),
+    });
+    // Second period is over; the stale retry resolves back to the first
+    // session, which is still running.
+    await endSession(db, {
+      sessionId: second.session.id,
+      at: new Date('2026-01-01T09:30:00Z'),
+      reason: 'ended',
+    });
+
+    await expect(
+      tapIn(db, {
+        sessionId: recorded.session.id,
+        studentId: student.id,
+        eventId: stale,
+        deviceTime: new Date('2026-01-01T09:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_PARTICIPATING' });
+  });
+
+  it("refuses a tap_in carrying another student's spent id, and does not eat their join", async () => {
+    /*
+     * The identity half of the branch's guard, which nothing else pins: with
+     * `prior.userId === input.studentId` deleted, a student replaying someone
+     * else's spent id while they are themselves live in that session gets a
+     * 200 'replay' off their OWN row — and their real join into the resolved
+     * session is silently suppressed. No data crosses (loadParticipation keys
+     * on the caller), but a student who tapped would be missing from the grid
+     * with nothing surfaced.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-other-id');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-tap-other-id-2', role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPOTHER2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values([
+      { classId: klass.id, studentId: classmate.id },
+      { classId: second.id, studentId: classmate.id },
+    ]);
+
+    const first = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    const theirs = newUuidV7();
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: theirs,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    // The classmate is live in that same session, so a branch that skipped the
+    // identity check would find a row of theirs to hand back.
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: classmate.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    const later = await startSession(db, {
+      classId: second.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: later.session.id,
+        studentId: classmate.id,
+        eventId: theirs,
+        deviceTime: new Date('2026-01-01T09:11:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // Refused, so nothing of theirs was written into the second session.
+    const joined = await db
+      .select()
+      .from(participations)
+      .where(
+        and(
+          eq(participations.sessionId, later.session.id),
+          eq(participations.studentId, classmate.id),
+        ),
+      );
+    expect(joined).toHaveLength(0);
+  });
+
+  it("will not launder an unlock's id into a tap replay", async () => {
+    /*
+     * The type half of the same guard, and the direction the sibling test
+     * below does not cover. With `prior?.type === 'tap_in'` dropped, a tap
+     * carrying an UNLOCK's id comes back as a 200 replay reporting the
+     * unlocked row — the tap is silently dropped, and the phone is told a
+     * join happened. ISSUES #2 runs the other way, but the same one-line
+     * change opens both.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-unlock-id');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPUNL2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+
+    const first = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z', 60),
+    });
+    await tapIn(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const unlockId = newUuidV7();
+    await unlock(db, {
+      sessionId: first.session.id,
+      studentId: student.id,
+      eventId: unlockId,
+      deviceTime: new Date('2026-01-01T09:02:00Z'),
+    });
+
+    const later = await startSession(db, {
+      classId: second.id,
+      ...window('2026-01-01T09:10:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: later.session.id,
+        studentId: student.id,
+        eventId: unlockId,
+        deviceTime: new Date('2026-01-01T09:11:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
   });
 
   it('still refuses an id reused for a genuinely different event', async () => {
