@@ -97,6 +97,34 @@ describe('POST /v1/taps', () => {
     expect(retry.body.outcome).toBe('replay');
   });
 
+  it("is a 409 when the event_id belongs to another student's armed tap", async () => {
+    // The status a phone actually sees, which no engine test can assert. The
+    // engine refuses a stranger's id with EVENT_ID_CONFLICT, and that has to
+    // reach the client as a 409 — a 500 reads to any outbox as a transient
+    // server fault (`unlockDisposition`'s rule: non-401 4xx retries AND
+    // surfaces), so the phone would retry the same poisoned id forever with
+    // nothing ever shown. The route gets this right for `tapIn` and got it
+    // wrong for `armTap`, which is the half with no session running.
+    const a = await seedClassroom(db, 'tap-conflict-a');
+    const b = await seedClassroom(db, 'tap-conflict-b');
+    const eventId = randomUUID();
+
+    // Nothing running, so both of these arm rather than join.
+    const mine = await tap(await ctx.tokenFor(a.student.cognitoId), {
+      tagId: a.block.tagId,
+      eventId,
+    });
+    expect(mine.status).toBe(200);
+    expect(mine.body.outcome).toBe('armed');
+
+    const stranger = await tap(await ctx.tokenFor(b.student.cognitoId), {
+      tagId: a.block.tagId,
+      eventId,
+    });
+    expect(stranger.status).toBe(409);
+    expect(stranger.body).toMatchObject({ error: { code: 'conflict' } });
+  });
+
   it('is a 404 for an unknown tag', async () => {
     const { student } = await seedClassroom(db, 'tap-unknown');
     const res = await authedInject(ctx.app, await ctx.tokenFor(student.cognitoId), {

@@ -654,6 +654,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // the insert nor a standing tap to report. The slot is free again by then,
     // so another pass takes it. Looping beats throwing — a 500 on a pre-bell
     // tap is the exact symptom this function is being fixed for.
+    let lastUniqueViolation: unknown;
     for (let attempt = 0; attempt < ARM_TAP_ATTEMPTS; attempt += 1) {
       // In a SAVEPOINT, because the arbiter above covers only ONE of this
       // table's two unique indexes. `event_id` carries its own, and it is
@@ -694,6 +695,13 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         );
       } catch (err) {
         if (!isUniqueViolation(err)) throw err;
+        // A 23505 here is read as `event_id`, because that is the only unique
+        // index on this table the arbiter above does not cover. Keep the
+        // driver's own error anyway: if a third one is ever added, the owner
+        // lookup below finds nothing, the attempts burn, and the throw at the
+        // end of this loop would otherwise discard the constraint name that
+        // says what actually happened.
+        lastUniqueViolation = err;
         idAlreadyTaken = true;
       }
       if (row) return { outcome: 'armed', armedTapId: row.id };
@@ -729,7 +737,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       );
       if (standing) return { outcome: 'already_armed', armedTapId: standing.id };
     }
-    throw new Error('armTap: could not arm or read a standing tap');
+    throw new Error('armTap: could not arm or read a standing tap', {
+      cause: lastUniqueViolation,
+    });
   });
 }
 

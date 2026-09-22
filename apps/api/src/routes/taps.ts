@@ -62,14 +62,25 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
       };
     }
 
-    const armed = await armTap(db, {
-      studentId: student.id,
-      teacherId: target.teacherId,
-      blockId: target.blockId,
-      eventId: body.eventId,
-      deviceTime,
-      expiresAt: endOfDay(new Date()),
-    });
+    // Mapped, exactly like the tapIn call above. `armTap` refuses an event_id
+    // that belongs to another student, and a TransitionError carries no
+    // statusCode — so unmapped it falls through every branch of the handler in
+    // errors.ts to the catch-all and ships as `500 internal`. A 500 reads to
+    // any outbox as a transient server fault, so the phone retries the same
+    // poisoned id forever and nothing ever surfaces (rule 5); the 409 this
+    // maps to is permanent and visible. Pinned by "is a 409 when the event_id
+    // belongs to another student's armed tap" — an engine test cannot catch
+    // this, because the throw is right and only the status is wrong.
+    const armed = await mapTransitionError(() =>
+      armTap(db, {
+        studentId: student.id,
+        teacherId: target.teacherId,
+        blockId: target.blockId,
+        eventId: body.eventId,
+        deviceTime,
+        expiresAt: endOfDay(new Date()),
+      }),
+    );
     return { outcome: armed.outcome, session: null, state: null };
   });
 }

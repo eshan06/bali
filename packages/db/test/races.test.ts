@@ -580,6 +580,39 @@ async function lockWaiters(): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
+/**
+ * Wait until some OTHER backend is actively running a statement against
+ * `armed_taps` — i.e. the conversion has reached its armed-tap stage.
+ *
+ * Aims a racing call at that window by observation rather than by clock. A
+ * fixed sleep is a guess about how long `startSession`'s preamble takes on the
+ * runner of the day (a class-row lock, the running-session lookup, the session
+ * insert, its event, the class read, the enrollment read), and both ways of
+ * guessing wrong are bad: too short and the racer lands before the conversion
+ * takes any armed-tap lock, too long and the conversion has already committed
+ * — and THAT one makes the gate below fail a sound engine, which is a red
+ * real-Postgres lane with no bug under it.
+ *
+ * `state = 'active'` is load-bearing: pg_stat_activity keeps the last query
+ * text on idle backends too, and the pool ran plenty of armed-tap statements
+ * during setup.
+ */
+async function waitForBackendOnArmedTaps(timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const rows = (await db.execute(
+      sql`select count(*)::int as n from pg_stat_activity
+          where datname = current_database()
+            and pid <> pg_backend_pid()
+            and state = 'active'
+            and query like ${'%armed_taps%'}`,
+    )) as { n: number }[];
+    if ((rows[0]?.n ?? 0) > 0) return;
+    await new Promise((r) => setTimeout(r, 2));
+  }
+  throw new Error('the conversion never reached armed_taps — the interleaving was not staged');
+}
+
 /** Fail rather than proceed if nothing ever blocks — the staging must be real. */
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -706,7 +739,9 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
       endsAt: new Date(Date.now() + 25 * 60_000),
     });
     const refresh = (async () => {
-      await new Promise((r) => setTimeout(r, 12)); // land inside the conversion loop
+      // Land inside the conversion loop, aimed by watching for it rather than
+      // by sleeping a fixed 12 ms and hoping.
+      await waitForBackendOnArmedTaps();
       return armTap(db, {
         studentId: students[40]!,
         teacherId: teacher.id,
@@ -717,25 +752,35 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
       });
     })();
 
-    // Prove SOMETHING contended before believing the invariant below, so a
-    // run where the two never met cannot read as a pass. Honest about its
-    // reach: this observes that a backend parked on a lock, not WHICH lock —
-    // with FOR UPDATE removed the refresh can still block on the row lock the
-    // conversion takes when it writes consumed_at, and the gate is satisfied.
-    // What it does close is the case the gate was added for, a run with no
-    // contention at all, which is how this degraded under load.
+    // Prove SOMETHING contended before believing the invariant below, so a run
+    // where the two never met cannot read as a pass. This is a staging check,
+    // NOT a mutation kill, and the difference is worth writing down because
+    // the aim above makes it tempting to overclaim: with the FOR UPDATE at
+    // transitions.ts:364 removed this went red 2 runs out of 3, not 3 — the
+    // third time the refresh parked on the row lock the conversion takes
+    // writing consumed_at instead, which satisfies the gate. It observes that
+    // a backend parked, not WHICH lock it parked on. What the invariant below
+    // catches is the orphaned event id itself; what this catches is a run with
+    // no contention at all, which is how this test degraded under load.
+    //
+    // 2 s, not the helper's 5 s default: a gate that outlives the test budget
+    // reports "Test timed out" and says nothing about what went wrong.
     //
     // Settled first, so a rejection from either side is observed while the
     // gate runs rather than surfacing as an unhandled rejection.
     const settled = Promise.allSettled([conversion, refresh]);
-    let unstaged: Error | null = null;
+    let contended = true;
     try {
-      await waitForBlockedBackend();
-    } catch (err) {
-      unstaged = err instanceof Error ? err : new Error(String(err));
+      await waitForBlockedBackend(2_000);
+    } catch {
+      contended = false;
     }
     const [, refreshed] = await settled;
-    if (unstaged !== null) throw unstaged;
+    expect(
+      contended,
+      'the refresh ran while the conversion was inside its armed-tap work and still never ' +
+        'waited on a lock — the conversion is not holding the rows it converts',
+    ).toBe(true);
     expect(refreshed.status).toBe('fulfilled');
 
     const consumed = await db
@@ -762,7 +807,10 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     if (consumed.some((row) => row.id === armedIds[40]) && refreshed.status === 'fulfilled') {
       expect(refreshed.value.armedTapId).not.toBe(armedIds[40]);
     }
-  });
+    // Explicit budget: 60 students seeded, a session started and a race staged
+    // inside it. The default 5 s leaves no room for the gate above to report
+    // its own failure, which is the failure worth reading.
+  }, 20_000);
 
   it('a delivery that loses the event_id index is answered as a replay, not a 500', async () => {
     /*

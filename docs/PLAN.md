@@ -194,6 +194,37 @@ under-13 parental-consent machinery.
   conditional now — whether the conversion or the refresh reaches the row
   first is itself a race and both orders are correct, so asserting one
   unconditionally would redden a sound engine on a slow runner.
+  **Review round: one blocker, and it was an engine fix that never reached the
+  client.** `armTap` throws `EVENT_ID_CONFLICT` as of this PR, but the
+  `armTap` call in `POST /v1/taps` was not wrapped in `mapTransitionError` —
+  unlike the `tapIn` call fifteen lines above it. A `TransitionError` carries
+  no numeric `statusCode`, so it fell through every branch of the error
+  handler to the catch-all and shipped as `500 internal` where `routes/errors`
+  already defines a 409 for that code. That is rule 5 inverted: a 500 reads to
+  any outbox as a transient server fault, so the phone retries the poisoned id
+  forever and nothing ever surfaces, while the permanent 409 retries AND
+  shows. Harmless on `main` (nothing in `armTap` threw a `TransitionError`
+  before), which is why it slipped. An engine test cannot catch this — the
+  throw is right and only the status is wrong — so the pin is an API test that
+  asserts the 409 a phone actually sees.
+  The race test's 12 ms sleep is gone too, for the reason the review gave: it
+  is a guess about how long `startSession`'s preamble takes on the runner of
+  the day, and guessing long means the conversion has already committed, so
+  the gate fails a sound engine — a red real-Postgres lane with no bug under
+  it. The refresh is aimed by watching `pg_stat_activity` for the conversion
+  actually reaching `armed_taps` instead. Measured after the change: green 3
+  runs out of 3 on sound code, red 2 out of 3 with `FOR UPDATE` removed. That
+  second number is written down on purpose — the aim makes it tempting to call
+  the gate a mutation kill, and it is not one; the third run parked on the row
+  lock the conversion takes writing `consumed_at`, exactly the reach the test
+  already admits to. The gate's job is that a run with no contention cannot
+  read as a pass, and that it now reports under its own name rather than as a
+  vitest timeout.
+  Last, `armTap`'s exhausted-attempts throw keeps the driver's error as
+  `cause`. A 23505 in that loop is read as `event_id` because it is the only
+  unique index the arbiter does not cover; if a third is ever added, the owner
+  lookup finds nothing, the attempts burn, and the constraint name that says
+  what really happened would otherwise be discarded at the throw.
 - **2026-09-22** — Fourth pass on the same decision, and the third time I
   closed half a hole. #27 added a test that the stream route's log dispatch
   really writes `debug` for the teardown race — and asserted only that
