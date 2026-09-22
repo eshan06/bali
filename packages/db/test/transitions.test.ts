@@ -1094,7 +1094,7 @@ describe('armed taps', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("refuses to arm under an id already recorded for another student", async () => {
+  it('refuses to arm under an id already recorded for another student', async () => {
     // Same rule as the armed_taps lookup, one table over: an id on record
     // against someone else is not this phone's replay, and answering one would
     // tell this outbox a tap it never made is durably recorded.

@@ -10,6 +10,7 @@ import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-o
 
 import { newUuidV7 } from './ids.js';
 import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
+import { isDeadlock, isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
@@ -77,28 +78,6 @@ function firstOrUndefined<T>(rows: T[]): T | undefined {
  */
 function heardNow(): Date {
   return new Date();
-}
-
-/**
- * Walk an error's cause chain for a Postgres SQLSTATE. Drizzle wraps the driver
- * error, so the code sits on a nested `cause` rather than on the error itself —
- * a plain `err.code` check silently never matches (measured).
- */
-function hasSqlState(err: unknown, state: string): boolean {
-  for (let e: unknown = err; e instanceof Error; e = e.cause) {
-    if ((e as { code?: string }).code === state) return true;
-  }
-  return false;
-}
-
-/** Postgres aborted this transaction to break a deadlock. */
-function isDeadlock(err: unknown): boolean {
-  return hasSqlState(err, '40P01');
-}
-
-/** A unique constraint refused the write. */
-function isUniqueViolation(err: unknown): boolean {
-  return hasSqlState(err, '23505');
 }
 
 /**
