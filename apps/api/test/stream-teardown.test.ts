@@ -221,7 +221,10 @@ describe('a hijacked stream response owns its own error handling', () => {
 
     let res: ServerResponse | null = null;
     const onRequest = (req: IncomingMessage, r: ServerResponse) => {
-      if (req.url?.includes('/stream') === true) res = r;
+      // First match only. The listener now lives until afterEach, and
+      // streamStatus() below opens a second /stream on the same app — without
+      // this, `res` would silently point at that one.
+      if (res === null && req.url?.includes('/stream') === true) res = r;
     };
     app.server.on('request', onRequest);
     cleanups.push(() => app.server.off('request', onRequest));
@@ -321,7 +324,10 @@ describe('a hijacked stream response owns its own error handling', () => {
 
     let res: ServerResponse | null = null;
     const onRequest = (req: IncomingMessage, r: ServerResponse) => {
-      if (req.url?.includes('/stream') === true) res = r;
+      // First match only. This test opens one /stream, but the listener now
+      // lives until afterEach, so anything else reaching the app would
+      // otherwise reassign `res` out from under it.
+      if (res === null && req.url?.includes('/stream') === true) res = r;
     };
     app.server.on('request', onRequest);
     // Queued now rather than after the wait: a waitFor that times out must not

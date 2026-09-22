@@ -41,9 +41,17 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
-      // Pretty lines for a human terminal in dev; raw JSON everywhere else.
-      ...(env.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
-      ...(deps.logStream ? { stream: deps.logStream } : {}),
+      // pino refuses both at once ("only one of option.transport or
+      // option.stream can be specified"), so an injected stream wins outright
+      // rather than being spread on top of a transport and throwing an opaque
+      // construction error. Pretty lines for a human terminal in dev; raw JSON
+      // everywhere else; a captured stream only where a test is asserting on
+      // what was logged.
+      ...(deps.logStream
+        ? { stream: deps.logStream }
+        : env.NODE_ENV === 'development'
+          ? { transport: { target: 'pino-pretty' } }
+          : {}),
     },
   });
 
