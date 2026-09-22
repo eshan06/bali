@@ -1,5 +1,5 @@
 import { MAX_SESSION_MINUTES } from '@bali/shared';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
@@ -736,10 +736,10 @@ describe('extendSession', () => {
     // durations; NaN and Infinity are not numbers. `MAX_SESSION_MINUTES + 1`
     // and 1e6 are both perfectly finite, positive minutes that no school could
     // mean — 1e6 ends the lesson in 2028 — and before the engine carried the
-    // same bound as the route's zod cap, only `/v1` refused them. 1e15 is the
-    // shape beyond that: it overflows the Date range, so without the range
-    // guard the engine hands an Invalid Date to toISOString() and the caller
-    // gets a bare RangeError, a 500, instead of a refusal it can read.
+    // same bound as the route's zod cap, only `/v1` refused them. 1e15 used to
+    // be the shape past even that, reaching the Date-range guard; the bound
+    // now rejects it two lines earlier, so it is kept here only as the
+    // largest absurd value, and the range guard has its own test above.
     for (const durationMinutes of [
       0,
       -10,
@@ -760,6 +760,51 @@ describe('extendSession', () => {
     // And the end really did not move.
     const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
     expect(after.endsAt.toISOString()).toBe(w.endsAt.toISOString());
+  });
+
+  it('refuses an extension that would push the end past the Date range', async () => {
+    /*
+     * The guard that MAX_SESSION_MINUTES made unreachable from the direction
+     * its old test came at it: `1e15` minutes used to land here, and now the
+     * duration check two lines above rejects it first. What still reaches it
+     * is the case the guard was really for — `base` is `max(at, endsAt)` and
+     * `endsAt` comes from the STORED session, so a row already near the JS
+     * `Date` boundary overflows on a perfectly legal ten-minute press.
+     * Unguarded, `newEndsAt` is an Invalid Date and `toISOString()` throws a
+     * bare `RangeError`: an unmapped 500, where the point of these checks is
+     * that the engine refuses its caller in its own vocabulary.
+     *
+     * The near-boundary end goes in through raw SQL, and it has to. A JS
+     * `Date` past year 9999 serialises as `+275760-09-12T23:59:00.000Z`, and
+     * Postgres rejects the `+`-prefixed extended year outright (22009,
+     * DateTimeParseError) — so the driver can READ such a value back as a
+     * valid Date but cannot write one. Writing `sessions` directly is fine
+     * here; the engine-only rule covers `participations` and `events`.
+     */
+    const { klass } = await seedClass('extend-overflow');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await db.execute(
+      sql`update sessions set ends_at = '275760-09-12 23:59:00+00' where id = ${session.id}`,
+    );
+    const nearMax = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    // One minute below Date's max, and still a valid Date — assert it, or a
+    // driver change that returns a string here would make the refusal below
+    // pass for the wrong reason.
+    expect(nearMax.endsAt.getTime()).toBe(8_640_000_000_000_000 - 60_000);
+
+    await expect(
+      extendSession(db, {
+        sessionId: session.id,
+        durationMinutes: 10, // well inside MAX_SESSION_MINUTES
+        at: new Date('2026-01-01T09:10:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt.getTime()).toBe(nearMax.endsAt.getTime());
   });
 
   it('a replay after the session has ended returns current truth, not SESSION_NOT_RUNNING', async () => {

@@ -723,10 +723,15 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     const newEndsAt = new Date(base + input.durationMinutes * 60_000);
     // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
     // be reached (1e15 minutes): `base` comes from the stored session, so a row
-    // whose end is already near the Date boundary can still overflow on a
-    // perfectly ordinary extension. An Invalid Date turns the toISOString()
-    // below into a bare RangeError — an unmapped 500, where the point of these
-    // guards is that the engine refuses its caller in its own vocabulary.
+    // whose end is already near the Date boundary still overflows on a
+    // perfectly ordinary ten-minute press. An Invalid Date turns the
+    // toISOString() below into a bare RangeError — an unmapped 500, where the
+    // point of these guards is that the engine refuses its caller in its own
+    // vocabulary. Pinned by "refuses an extension that would push the end past
+    // the Date range", which writes that stored end through raw SQL because
+    // the driver cannot serialise one: a JS Date past year 9999 goes out as
+    // `+275760-...` and Postgres rejects the extended year (22009), though it
+    // reads the same instant back as a valid Date quite happily.
     if (Number.isNaN(newEndsAt.getTime())) {
       throw new TransitionError('INVALID_EXTENSION', 'extension is out of range');
     }

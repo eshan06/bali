@@ -293,6 +293,21 @@ under-13 parental-consent machinery.
   throwaway database, so the counter starts at 0 and nothing else can
   contribute. Red 3 of 3, naming the cause. The per-result check stays as the
   faster signal for a deadlock that does escape.
+  **And adding that bound made another guard unreachable by its own test** —
+  caught by the next round, and it is the same shape as everything else this
+  audit has turned up. `1e15` minutes used to reach the `Date`-range check;
+  the new `MAX_SESSION_MINUTES` rejects it two lines earlier, so the check had
+  no coverage while its comment read as though it did. It still has a
+  reachable case, which is the one it was always for: `base` is
+  `max(at, endsAt)` and `endsAt` comes from the STORED session, so a row near
+  the JS `Date` boundary overflows on a legal ten-minute press. Pinned on both
+  lanes now; deleting the guard produces exactly the bare `RangeError` the
+  comment warns about.
+  Worth recording because it cost a probe to find: that stored end has to be
+  written through raw SQL. A JS `Date` past year 9999 serialises as
+  `+275760-09-12T23:59:00.000Z` and Postgres rejects the `+`-prefixed extended
+  year (22009, DateTimeParseError) — so the driver can READ such an instant
+  back as a valid `Date` but cannot write one.
   Also from that round: `MAX_SESSION_MINUTES` said "the longest a session may
   run or be extended by" when it bounds ONE operation — N presses still move a
   session arbitrarily far, which is the intended design, and that comment is
