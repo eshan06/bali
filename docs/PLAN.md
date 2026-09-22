@@ -67,10 +67,11 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
   the armTap insert race and its event-id integrity gap (**in review**), a
   replayed tap re-resolved to another session, extend's arithmetic outside the
-  engine transaction, the portal's reconnect backoff, the portal's staleness
-  banner, and one shared SQLSTATE helper. Block re-registration by the tag's
-  own teacher is fixed but **held for the owner** — the fix answers 200 where
-  `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
+  engine transaction, the portal's reconnect backoff and staleness banner
+  (**landed**), and one shared SQLSTATE helper (**landed**). Block
+  re-registration by the tag's own teacher is fixed but **held for the
+  owner** — the fix answers 200 where `/v1` answers 409 today, and decision 2
+  sends behaviour changes to `/v2`.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
@@ -142,6 +143,27 @@ under-13 parental-consent machinery.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log
+
+- **2026-09-22** — Last of the audit's ten, and the smallest one only because
+  the thing it removes is invisible. Two files had independently grown the
+  same cause-chain walk — the engine's 40P01 deadlock retry and management's
+  23505 join-code retry — and both had to learn the same non-obvious thing to
+  get there: drizzle wraps the driver error, so the SQLSTATE sits on a nested
+  `cause` and a plain `err.code` check silently never matches. Silently is
+  what makes it worth a module rather than a tidy-up. Nothing throws and
+  nothing logs; the retry just stops retrying, and the failure it existed to
+  absorb surfaces as a 500 at a bell.
+  `packages/db/src/sql-errors.ts` owns `hasSqlState` plus `isDeadlock` and
+  `isUniqueViolation` now. `isJoinCodeCollision` stays as a named wrapper at
+  its call site: the reasoning that a 23505 out of THAT update is always a
+  code collision is about the unique indexes on `classes`, not about 23505,
+  and it belongs where the loop that depends on it is.
+  Pinned directly rather than left to the integration tests, and checked both
+  ways: replacing the walk with a plain `err.code` check turns the new unit
+  tests AND "regenerate retries past a taken join code" red on both lanes, and
+  `isDeadlock` answering true for a 23505 turns one red — the inverted half,
+  which matters because a deadlock retry that loops on a unique violation can
+  never resolve it.
 
 - **2026-09-22** — CI was failing the real-Postgres lane with every test green,
   and the cause was the stream hub's own shutdown. `ensureListening()` fires

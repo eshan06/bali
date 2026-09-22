@@ -10,6 +10,7 @@ import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-o
 
 import { newUuidV7 } from './ids.js';
 import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
+import { isDeadlock } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
@@ -77,17 +78,6 @@ function firstOrUndefined<T>(rows: T[]): T | undefined {
  */
 function heardNow(): Date {
   return new Date();
-}
-
-/**
- * Walk an error's cause chain for a Postgres deadlock (SQLSTATE 40P01). Drizzle
- * wraps the driver error, so the code sits on a nested `cause`.
- */
-function isDeadlock(err: unknown): boolean {
-  for (let e: unknown = err; e instanceof Error; e = e.cause) {
-    if ((e as { code?: string }).code === '40P01') return true;
-  }
-  return false;
 }
 
 /**
