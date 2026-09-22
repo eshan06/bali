@@ -1046,6 +1046,129 @@ describe('armed taps', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('does not arm an id that already landed — it says the tap was recorded', async () => {
+    /*
+     * The half the standing-row check does not reach, and it needs no race and
+     * no second tap.
+     *
+     * 09:01 the student taps into period 1; `tap_in` E commits and the 200 is
+     * lost, so the outbox keeps E. The bell ends the session. 09:30 the outbox
+     * retries, nothing of that teacher's is running, so the route arms — and
+     * before this check there was no armed row under E and no standing row, so
+     * the insert landed and the phone was answered `armed`. At the 10:00 Start
+     * the conversion skips that row (its id is spent), consumes it, emits no
+     * event and counts nothing. Told "ready", joined never, absent from the
+     * grid with nothing in `events` to say why.
+     *
+     * The tap DID land, so the honest answer is `replay` and no waiting row.
+     */
+    const { klass, teacher, student } = await seedClass('arm-spent-incoming');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+
+    const retry = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:30:00Z'),
+    });
+    expect(retry.outcome).toBe('replay');
+    expect(retry.armedTapId).toBeUndefined();
+
+    // Nothing waiting, so the next Start has nothing to throw away.
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuses to arm under an id already recorded for another student", async () => {
+    // Same rule as the armed_taps lookup, one table over: an id on record
+    // against someone else is not this phone's replay, and answering one would
+    // tell this outbox a tap it never made is durably recorded.
+    const { klass, teacher, student, school } = await seedClass('arm-spent-other');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-arm-spent-other-2', role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    await expect(
+      armTap(db, {
+        studentId: classmate.id,
+        teacherId: teacher.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:02:00Z'),
+        expiresAt: new Date('2026-01-01T23:59:59Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, classmate.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("will not answer a tap on one teacher's block with a row held for another", async () => {
+    /*
+     * The event-id lookups were scoped to the student but not the teacher. A
+     * student holding a waiting row for teacher X under id E who then taps
+     * teacher Y's block carrying E was handed X's row back as `replay`: the
+     * outbox is told the tap is durably recorded, nothing is armed for Y, and
+     * Y's Start converts nothing. Same "hand back a row that is not this tap"
+     * failure the student scoping closes, one axis over.
+     */
+    const { teacher, student, school } = await seedClass('arm-other-teacher');
+    const otherTeacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'teacher-arm-other-teacher-2', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const eventId = newUuidV7();
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T08:50:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+    });
+
+    await expect(
+      armTap(db, {
+        studentId: student.id,
+        teacherId: otherTeacher.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T08:51:00Z'),
+        expiresAt: new Date('2026-01-01T23:59:59Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+
+    // And the row that does exist still belongs to the teacher it was for.
+    const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.teacherId).toBe(teacher.id);
+  });
+
   it('a fresh tap takes over a standing row whose id is already spent', async () => {
     /*
      * The other half of skipping a spent armed tap, and without it the skip is
@@ -1193,8 +1316,9 @@ describe('armed taps', () => {
       reason: 'ended',
     });
 
-    // The outbox retry, arriving with nothing running: the route arms it.
-    const armed = await armTap(db, {
+    // The outbox retry, arriving with nothing running. `armTap` refuses to
+    // put a spent id in a waiting row at all now — it says the tap landed.
+    const retry = await armTap(db, {
       studentId: student.id,
       teacherId: teacher.id,
       eventId: spent,
@@ -1202,7 +1326,25 @@ describe('armed taps', () => {
       expiresAt: new Date('2026-01-01T23:59:59Z'),
       now: new Date('2026-01-01T09:30:00Z'),
     });
-    expect(armed.outcome).toBe('armed');
+    expect(retry.outcome).toBe('replay');
+
+    // So the row is written directly for the rest of this test, which is the
+    // honest staging: the conversion's skip is defence in depth for rows that
+    // ALREADY exist — armed before that refusal shipped, or by an older
+    // deploy still running against this database. Writing `armed_taps` here is
+    // allowed; it is the transient table, not participations or events.
+    one(
+      await db
+        .insert(armedTaps)
+        .values({
+          studentId: student.id,
+          teacherId: teacher.id,
+          eventId: spent,
+          deviceTime: new Date('2026-01-01T09:01:00Z'),
+          expiresAt: new Date('2026-01-01T23:59:59Z'),
+        })
+        .returning(),
+    );
 
     // Next period, and a different class hours later, both open normally...
     const second = await startSession(db, { classId: klass.id, ...window('2026-01-01T10:00:00Z') });

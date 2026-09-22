@@ -426,6 +426,18 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // (they tapped a different teacher's running block after arming). End that
     // first, or the insert below would violate one-live-per-student and roll
     // back the whole Start.
+    //
+    // Note the ordering the `spent` catch above forces, because it is a real
+    // change and not just a refactor: the `tap_in` is minted BEFORE this, so
+    // within one Start a converted tap's `tap_in` now carries a LOWER `seq`
+    // than the `left_for_other_session` it causes, where it used to carry a
+    // higher one. It has to be this way round — a skipped tap must leave
+    // nothing behind, and ending the other participation first would leave a
+    // student unshielded everywhere off a row that is then discarded. Both
+    // rows still carry the same `occurred_at`, and they belong to different
+    // sessions' feeds, so no consumer here reads them in one stream; a report
+    // that ever orders cross-session history by `seq` alone would see the
+    // switch-out and the switch-in swap places.
     await endParticipationsElsewhere(tx, tap.studentId, session.id, occurredAt);
     await tx
       .insert(participations)
@@ -539,7 +551,12 @@ export interface ArmTapInput {
 export interface ArmTapResult {
   /** 'armed' new/refreshed; 'already_armed' a live waiting tap stands; 'replay' this exact tap again. */
   outcome: 'armed' | 'already_armed' | 'replay';
-  armedTapId: string;
+  /**
+   * The waiting row this answer is about — absent only on the one `replay`
+   * that has no row: an id already recorded in `events`, where the tap landed
+   * in a session and nothing is waiting for it.
+   */
+  armedTapId?: string;
 }
 
 /**
@@ -566,31 +583,62 @@ async function ownerOfEventId(
   tx: Database,
   eventId: string,
   studentId: string,
+  teacherId: string,
 ): Promise<{ kind: 'replay'; armedTapId: string } | { kind: 'conflict' } | { kind: 'gone' }> {
   const owner = firstOrUndefined(
     await tx.select().from(armedTaps).where(eq(armedTaps.eventId, eventId)).limit(1),
   );
   if (!owner) return { kind: 'gone' };
-  if (owner.studentId !== studentId) return { kind: 'conflict' };
+  if (owner.studentId !== studentId || owner.teacherId !== teacherId) return { kind: 'conflict' };
   return { kind: 'replay', armedTapId: owner.id };
 }
 
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
-    // Scoped to the CALLER, not just the id. An id that belongs to someone
-    // else's tap is not this phone's replay: answering `replay` would hand
-    // back a stranger's row id and tell this outbox the tap is durably
-    // recorded, so it drops a tap that was never armed and never converts —
-    // silently absent from the grid. `insertEvent` refuses the same class of
-    // reuse for the same reason ("a student's app is an adversary here"), and
-    // this holds that line: a non-401 4xx keeps the record, retries, and
-    // surfaces, which loses nothing.
+    // An id already in `events` is a tap that LANDED, so there is nothing to
+    // arm and the honest answer is `replay`.
+    //
+    // Without this, the retry of a lost 200 arms a row the next Start is
+    // guaranteed to throw away — the skip in convertArmedTaps consumes it,
+    // emits no event and counts nothing — and the phone was told `armed` on
+    // the way in. Told "ready", joined never, absent from the grid with
+    // nothing in `events` to say why. No race and no second tap needed: tap at
+    // 09:01, response lost, bell, outbox retries at 09:30 with nothing
+    // running, 10:00 Start. The standing-row branch below already refuses to
+    // let a SPENT id sit in a waiting row; this refuses to put one there.
+    //
+    // Scoped to the CALLER, like every other event-id lookup here. An id that
+    // belongs to someone else's tap is not this phone's replay: answering
+    // `replay` would tell this outbox the tap is durably recorded, so it drops
+    // a tap that was never armed and never converts. `insertEvent` refuses the
+    // same class of reuse for the same reason ("a student's app is an
+    // adversary here"), and this holds that line: a non-401 4xx keeps the
+    // record, retries, and surfaces, which loses nothing.
+    const recorded = firstOrUndefined(
+      await tx
+        .select({ userId: events.userId })
+        .from(events)
+        .where(eq(events.eventId, input.eventId))
+        .limit(1),
+    );
+    if (recorded) {
+      if (recorded.userId !== input.studentId) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      return { outcome: 'replay' };
+    }
+
+    // Same rule, one table over: a row in `armed_taps` under this id is this
+    // phone's own waiting tap, or a stranger's and therefore not a replay.
+    // Scoped to the teacher as well — a row of this student's for teacher X is
+    // not the answer to a tap on teacher Y's block, and handing it back would
+    // arm nothing for Y while telling the outbox it was recorded.
     const exact = firstOrUndefined(
       await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
     );
     if (exact) {
-      if (exact.studentId !== input.studentId) {
+      if (exact.studentId !== input.studentId || exact.teacherId !== input.teacherId) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return { outcome: 'replay', armedTapId: exact.id };
@@ -655,6 +703,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // Answered the same way too, so the two paths cannot drift.
       let refreshed: { id: string } | undefined;
       let consumedUnderUs = false;
+      let lastRefreshViolation: unknown;
       for (let attempt = 0; attempt < ARM_TAP_ATTEMPTS; attempt += 1) {
         try {
           refreshed = firstOrUndefined(
@@ -675,7 +724,10 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
           break;
         } catch (err) {
           if (!isUniqueViolation(err)) throw err;
-          const owner = await ownerOfEventId(tx, input.eventId, input.studentId);
+          // Kept for the give-up below: a bare Error there would discard the
+          // constraint name, and it ships as a 500 on a pre-bell tap.
+          lastRefreshViolation = err;
+          const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
           if (owner.kind === 'conflict') {
             throw new TransitionError(
               'EVENT_ID_CONFLICT',
@@ -693,7 +745,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // the insert would answer `already_armed` about the very row this
         // branch just judged stale, which is the lie the stale check exists to
         // stop, so say what happened instead.
-        throw new Error('armTap: could not refresh a stale standing tap');
+        throw new Error('armTap: could not refresh a stale standing tap', {
+          cause: lastRefreshViolation,
+        });
       }
       // Consumed under us. That frees the partial index, so fall through and
       // record this tap as a fresh waiting one rather than reporting a row
@@ -777,7 +831,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // Another delivery of THIS tap got there first — a replay, the same
         // answer the `exact` select above would have given had it seen the
         // row, and scoped the same way for the same reason.
-        const owner = await ownerOfEventId(tx, input.eventId, input.studentId);
+        const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
         if (owner.kind === 'conflict') {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }

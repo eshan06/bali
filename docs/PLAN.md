@@ -261,7 +261,54 @@ under-13 parental-consent machinery.
   removed handed back a stranger's row and told this phone's outbox a tap was
   durably recorded when it was not, so no honest client loses anything — but
   that reading is the owner's to confirm, and it is a revert of one call site
-  if they rule the other way.
+  if they rule the other way. Both are now **BLOCKERs on the PR**, so it waits
+  on the ruling rather than merging ahead of it.
+  **Third round found the half of the skip that needed no race at all.** The
+  spent-id check went on the STANDING row but not on the incoming id, so the
+  plain retry of a lost 200 — tap at 09:01, bell, outbox retries at 09:30 with
+  nothing running — still armed a row the 10:00 Start was guaranteed to throw
+  away, after telling the phone `armed`. `armTap` now reads `events` for the
+  incoming id first and answers `replay` with no waiting row, because the tap
+  genuinely landed; an id on record for a DIFFERENT student is the same
+  `EVENT_ID_CONFLICT` the armed-tap lookup already raises. `armedTapId` is
+  optional for that one answer — it is the only `replay` with no row behind
+  it. Both event-id lookups are scoped to the teacher as well as the student
+  now: a row of this student's for teacher X was being handed back as the
+  answer to a tap on teacher Y's block, arming nothing for Y while telling the
+  outbox it was recorded — the same failure the student scoping closed, one
+  axis over.
+  That obsoleted the staging of "a spent event id never wedges the next
+  Start": it armed the spent id through `armTap`, which now refuses. The row
+  is written directly instead, which is the honest framing anyway — the
+  conversion's skip is defence in depth for rows that ALREADY exist, armed
+  before this refusal shipped or by an older deploy against the same database.
+  Also recorded rather than changed: the `tap_in` moved ahead of
+  `endParticipationsElsewhere` (a skipped tap must leave nothing behind), so
+  within one Start a converted tap's `tap_in` now carries a lower `seq` than
+  the `left_for_other_session` it causes. Same `occurred_at`, different
+  sessions' feeds, no consumer today reads them in one stream — noted in the
+  code so the next report that orders cross-session history by `seq` knows.
+  And the review's warning about the conversion-gap gate came true in the same
+  round, which is the cleanest lesson here. Adding that `events` lookup to the
+  front of `armTap` gave the refresh one more round-trip to make before its
+  UPDATE, the conversion committed first, nothing blocked, and the gate failed
+  a sound engine — the exact false red the reviewer named. A missed window is
+  not a bug, so the round is RETRIED now (up to three, fresh cohort each
+  time) and the gate reports rather than asserts; the invariant is asserted on
+  every round regardless, so a real regression is caught by a round that ran.
+  One more thing had to go with it, and only a full-suite loop found it: the
+  aim helper THREW when it never saw the conversion, and it runs inside the
+  racing call — so a missed aim rejected the refresh and the test went red
+  with `expected 'rejected' to be 'fulfilled'`, naming nothing. About 1 run in
+  8 under the full real-PG suite, invisible when the test ran alone. It
+  returns now, and a missed aim is simply a round to retry.
+  Measured after both: **green 10 runs out of 10** on the full real-Postgres
+  suite, and with `FOR UPDATE` removed **red 6 out of 6** — every time through
+  the invariant itself ("names event … which no tap_in recorded") rather than
+  through a gate timing out, which is a far better failure to read. Three
+  versions of one staging check: a bare sleep that passed for the wrong
+  reason, a gate that failed for the wrong reason, and a retry that does
+  neither.
 
 - **2026-09-22** — CI was failing the real-Postgres lane with every test green,
   and the cause was the stream hub's own shutdown. `ensureListening()` fires

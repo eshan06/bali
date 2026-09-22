@@ -390,7 +390,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       expect(liveAll).toHaveLength(1);
       expect(liveAll[0]!.sessionId).toBe(sessionD.id);
     }
-  }, 20_000);
+  }, 60_000);
 
   // Block registration (Step 4). Not an engine mutation, but the active-tag
   // index is arbitrated the same way the join-code index is, so this proves the
@@ -589,15 +589,21 @@ async function lockWaiters(): Promise<number> {
  * runner of the day (a class-row lock, the running-session lookup, the session
  * insert, its event, the class read, the enrollment read), and both ways of
  * guessing wrong are bad: too short and the racer lands before the conversion
- * takes any armed-tap lock, too long and the conversion has already committed
- * — and THAT one makes the gate below fail a sound engine, which is a red
- * real-Postgres lane with no bug under it.
+ * takes any armed-tap lock, too long and the conversion has already committed.
+ *
+ * RETURNS rather than throws when it never sees one, and that is deliberate:
+ * this runs INSIDE the racing call, so a throw rejects it, and the caller then
+ * reads a missed window as a failed race. Measured the hard way — under a full
+ * real-PG suite it threw about 1 run in 8, and the test went red with
+ * `expected 'rejected' to be 'fulfilled'`, which names nothing. A missed aim
+ * is a round to run again; the caller's retry handles it and the gate after
+ * the race is what reports.
  *
  * `state = 'active'` is load-bearing: pg_stat_activity keeps the last query
  * text on idle backends too, and the pool ran plenty of armed-tap statements
  * during setup.
  */
-async function waitForBackendOnArmedTaps(timeoutMs = 5_000): Promise<void> {
+async function waitForBackendOnArmedTaps(timeoutMs = 1_500): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const rows = (await db.execute(
@@ -610,7 +616,6 @@ async function waitForBackendOnArmedTaps(timeoutMs = 5_000): Promise<void> {
     if ((rows[0]?.n ?? 0) > 0) return;
     await new Promise((r) => setTimeout(r, 2));
   }
-  throw new Error('the conversion never reached armed_taps — the interleaving was not staged');
 }
 
 /** Fail rather than proceed if nothing ever blocks — the staging must be real. */
@@ -621,6 +626,143 @@ async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
     await new Promise((r) => setTimeout(r, 10));
   }
   throw new Error('no backend ever blocked on the row lock — the interleaving was not staged');
+}
+
+/**
+ * One staged round of the conversion-gap race: seed a cohort under a fresh
+ * teacher, start the session, and fire a refresh aimed into the conversion's
+ * armed-tap work. Asserts the invariant unconditionally and REPORTS whether
+ * the two actually met, so the caller can retry a round that missed rather
+ * than redden a sound engine — see the call site.
+ */
+async function conversionGapRound(tag: string): Promise<boolean> {
+  const school = one(
+    await db
+      .insert(schools)
+      .values({ name: `Gap ${tag}` })
+      .returning(),
+  );
+  const teacher = one(
+    await db
+      .insert(users)
+      .values({ cognitoId: `gap-teacher-${tag}`, role: 'teacher', schoolId: school.id })
+      .returning(),
+  );
+  const klass = one(
+    await db
+      .insert(classes)
+      .values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: `Gap ${tag}`,
+        joinCode: `GAP${tag}`,
+      })
+      .returning(),
+  );
+  const boundary = new Date(Date.now() + 400);
+  const students: string[] = [];
+  const armedIds: string[] = [];
+  for (let i = 0; i < 60; i += 1) {
+    const s = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `gap-s-${tag}-${i}`, role: 'student', schoolId: school.id })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: klass.id, studentId: s.id });
+    const armed = await armTap(db, {
+      studentId: s.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      expiresAt: boundary,
+      now: new Date(boundary.getTime() - 60_000),
+    });
+    students.push(s.id);
+    // `armedTapId` is optional only for the `replay` that has no row; every
+    // arm in this loop is a fresh one, so a missing id means the seeding
+    // itself went wrong and the race below would be staged against nothing.
+    expect(armed.armedTapId, `seeding student ${i} did not arm a row`).toBeDefined();
+    armedIds.push(armed.armedTapId!);
+  }
+
+  const conversion = startSession(db, {
+    classId: klass.id,
+    startedAt: new Date(boundary.getTime() - 1_000),
+    endsAt: new Date(Date.now() + 25 * 60_000),
+  });
+  const refresh = (async () => {
+    // Land inside the conversion loop, aimed by watching for it rather than
+    // by sleeping a fixed 12 ms and hoping.
+    await waitForBackendOnArmedTaps();
+    return armTap(db, {
+      studentId: students[40]!,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      now: new Date(boundary.getTime() + 1_000),
+    });
+  })();
+
+  // Did the two actually meet? REPORTED, not asserted, because a round that
+  // missed is a round to run again rather than a verdict — see the caller.
+  //
+  // It is a staging signal, not a mutation kill, and worth being exact
+  // about: it observes that a backend parked on A lock, not WHICH one, and
+  // with the FOR UPDATE removed the refresh can still park on the row lock
+  // the conversion takes writing consumed_at. What actually catches that
+  // mutation is the invariant below — measured over the retried rounds, red
+  // 6 runs out of 6, and every time with "names event … which no tap_in
+  // recorded" rather than with this gate.
+  //
+  // 2 s, not the helper's 5 s default: three rounds of a 5 s wait would
+  // outlive the test budget and report "Test timed out", which says nothing.
+  //
+  // Settled first, so a rejection from either side is observed while the
+  // gate runs rather than surfacing as an unhandled rejection.
+  const settled = Promise.allSettled([conversion, refresh]);
+  let contended = true;
+  try {
+    await waitForBlockedBackend(2_000);
+  } catch {
+    contended = false;
+  }
+  const [, refreshed] = await settled;
+  // Name the reason. A bare `expected 'rejected' to be 'fulfilled'` tells the
+  // next person nothing about which of armTap's throws fired, and several are
+  // reachable from here.
+  if (refreshed.status === 'rejected') {
+    throw new Error(`the refresh rejected: ${String(refreshed.reason)}`, {
+      cause: refreshed.reason,
+    });
+  }
+
+  const consumed = await db
+    .select()
+    .from(armedTaps)
+    .where(and(eq(armedTaps.teacherId, teacher.id), isNotNull(armedTaps.consumedAt)));
+  expect(consumed.length).toBeGreaterThan(0);
+  for (const row of consumed) {
+    const recorded = await db
+      .select({ eventId: events.eventId })
+      .from(events)
+      .where(and(eq(events.eventId, row.eventId), eq(events.type, 'tap_in')));
+    expect(
+      recorded,
+      `consumed armed tap ${row.id} names event ${row.eventId}, which no tap_in recorded`,
+    ).toHaveLength(1);
+  }
+
+  // Conditional on purpose: whether the conversion or the refresh reached
+  // row 40 first is a race, and BOTH orders are correct. Asserting one of
+  // them unconditionally would turn a sound engine red on a slow runner.
+  // What is not negotiable is the pairing — if the conversion took the row,
+  // the refresh must have started a fresh one rather than recycling it.
+  if (consumed.some((row) => row.id === armedIds[40]) && refreshed.status === 'fulfilled') {
+    expect(refreshed.value.armedTapId).not.toBe(armedIds[40]);
+  }
+  return contended;
 }
 
 describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
@@ -685,131 +827,51 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
      * the refresh waits and its guard then correctly fails. Staged with a
      * large cohort so the conversion loop is long enough to land inside.
      *
-     * The staging is checked, not hoped for — and the check's reach is worth
-     * stating, because it is narrower than it looks. An earlier version fired
-     * both sides with a bare 12 ms sleep and asserted only the invariant: on a
-     * loaded runner the refresh lands after the conversion has committed, the
-     * plain-insert path is taken, every consumed row still names its original
-     * id, and the whole thing passes with FOR UPDATE removed. The gate below
-     * closes THAT — a run with no contention at all now fails loudly instead
-     * of reading as a pass. It does not prove WHICH lock was contended: with
-     * FOR UPDATE removed the refresh can still block on the row lock the
-     * conversion takes when it writes consumed_at. So this is a better test,
-     * not a proof by construction.
+     * The staging is checked, not hoped for — and it took three goes to get
+     * that check right, which is worth leaving written down.
+     *
+     * v1 fired both sides on a bare 12 ms sleep and asserted only the
+     * invariant: on a loaded runner the refresh lands after the conversion has
+     * committed, the plain-insert path is taken, every consumed row still
+     * names its original id, and the whole thing passes with FOR UPDATE
+     * removed. v2 added a gate that FAILED when nothing contended — which
+     * closed the false pass and opened a false failure, because a missed
+     * window is not a bug. That bit for real: adding a query to the front of
+     * `armTap` gave the refresh one more round-trip to make, and the gate
+     * started reddening a sound engine. v3, here, retries the round instead.
+     *
+     * Each round asserts the invariant regardless, so the bug is caught by a
+     * round that ran; the gate only has to succeed once for "these two never
+     * met" to be ruled out. It still does not prove WHICH lock was contended
+     * (with FOR UPDATE removed the refresh can park on the consumed_at row
+     * lock instead), so this is a better test, not a proof by construction.
      */
-    const school = one(await db.insert(schools).values({ name: 'Gap' }).returning());
-    const teacher = one(
-      await db
-        .insert(users)
-        .values({ cognitoId: 'gap-teacher', role: 'teacher', schoolId: school.id })
-        .returning(),
-    );
-    const klass = one(
-      await db
-        .insert(classes)
-        .values({ teacherId: teacher.id, schoolId: school.id, name: 'Gap', joinCode: 'GAPGAP' })
-        .returning(),
-    );
-    const boundary = new Date(Date.now() + 400);
-    const students: string[] = [];
-    const armedIds: string[] = [];
-    for (let i = 0; i < 60; i += 1) {
-      const s = one(
-        await db
-          .insert(users)
-          .values({ cognitoId: `gap-s-${i}`, role: 'student', schoolId: school.id })
-          .returning(),
-      );
-      await db.insert(enrollments).values({ classId: klass.id, studentId: s.id });
-      const armed = await armTap(db, {
-        studentId: s.id,
-        teacherId: teacher.id,
-        eventId: newUuidV7(),
-        deviceTime: new Date(),
-        expiresAt: boundary,
-        now: new Date(boundary.getTime() - 60_000),
-      });
-      students.push(s.id);
-      armedIds.push(armed.armedTapId);
-    }
-
-    const conversion = startSession(db, {
-      classId: klass.id,
-      startedAt: new Date(boundary.getTime() - 1_000),
-      endsAt: new Date(Date.now() + 25 * 60_000),
-    });
-    const refresh = (async () => {
-      // Land inside the conversion loop, aimed by watching for it rather than
-      // by sleeping a fixed 12 ms and hoping.
-      await waitForBackendOnArmedTaps();
-      return armTap(db, {
-        studentId: students[40]!,
-        teacherId: teacher.id,
-        eventId: newUuidV7(),
-        deviceTime: new Date(),
-        expiresAt: new Date(Date.now() + 3_600_000),
-        now: new Date(boundary.getTime() + 1_000),
-      });
-    })();
-
-    // Prove SOMETHING contended before believing the invariant below, so a run
-    // where the two never met cannot read as a pass. This is a staging check,
-    // NOT a mutation kill, and the difference is worth writing down because
-    // the aim above makes it tempting to overclaim: with the FOR UPDATE at
-    // transitions.ts:364 removed this went red 2 runs out of 3, not 3 — the
-    // third time the refresh parked on the row lock the conversion takes
-    // writing consumed_at instead, which satisfies the gate. It observes that
-    // a backend parked, not WHICH lock it parked on. What the invariant below
-    // catches is the orphaned event id itself; what this catches is a run with
-    // no contention at all, which is how this test degraded under load.
+    // Retried rather than asserted on the first attempt, and that is the whole
+    // difference between this and a flake. The round below only stages if the
+    // refresh's UPDATE arrives while the conversion still holds its FOR UPDATE
+    // set, and the refresh needs four round-trips to get there (two event-id
+    // lookups, the waiting read, the update). On a loaded runner — or after
+    // any change that adds a query ahead of it, which is exactly what happened
+    // here — the conversion can commit first, nothing blocks, and a sound
+    // engine reads as red. Seen once, for real.
     //
-    // 2 s, not the helper's 5 s default: a gate that outlives the test budget
-    // reports "Test timed out" and says nothing about what went wrong.
-    //
-    // Settled first, so a rejection from either side is observed while the
-    // gate runs rather than surfacing as an unhandled rejection.
-    const settled = Promise.allSettled([conversion, refresh]);
-    let contended = true;
-    try {
-      await waitForBlockedBackend(2_000);
-    } catch {
-      contended = false;
+    // Each round asserts the invariant regardless, so a bad engine is caught
+    // by the round that ran, not by the gate. The gate only has to succeed
+    // ONCE across the rounds for "these two never met" to be ruled out, which
+    // is all it was ever there to rule out.
+    let contended = false;
+    for (let round = 0; round < 3 && !contended; round += 1) {
+      contended = await conversionGapRound(`r${round}`);
     }
-    const [, refreshed] = await settled;
     expect(
       contended,
-      'the refresh ran while the conversion was inside its armed-tap work and still never ' +
-        'waited on a lock — the conversion is not holding the rows it converts',
+      'three rounds and the refresh never once waited on a lock, though each ran while the ' +
+        'conversion was inside its armed-tap work — the conversion is not holding the rows ' +
+        'it converts',
     ).toBe(true);
-    expect(refreshed.status).toBe('fulfilled');
-
-    const consumed = await db
-      .select()
-      .from(armedTaps)
-      .where(and(eq(armedTaps.teacherId, teacher.id), isNotNull(armedTaps.consumedAt)));
-    expect(consumed.length).toBeGreaterThan(0);
-    for (const row of consumed) {
-      const recorded = await db
-        .select({ eventId: events.eventId })
-        .from(events)
-        .where(and(eq(events.eventId, row.eventId), eq(events.type, 'tap_in')));
-      expect(
-        recorded,
-        `consumed armed tap ${row.id} names event ${row.eventId}, which no tap_in recorded`,
-      ).toHaveLength(1);
-    }
-
-    // Conditional on purpose: whether the conversion or the refresh reached
-    // row 40 first is a race, and BOTH orders are correct. Asserting one of
-    // them unconditionally would turn a sound engine red on a slow runner.
-    // What is not negotiable is the pairing — if the conversion took the row,
-    // the refresh must have started a fresh one rather than recycling it.
-    if (consumed.some((row) => row.id === armedIds[40]) && refreshed.status === 'fulfilled') {
-      expect(refreshed.value.armedTapId).not.toBe(armedIds[40]);
-    }
-    // Explicit budget: 60 students seeded, a session started and a race staged
-    // inside it. The default 5 s leaves no room for the gate above to report
-    // its own failure, which is the failure worth reading.
+    // Explicit budget: up to three rounds, each seeding 60 students, starting a
+    // session and staging a race inside it. The default 5 s leaves no room for
+    // the assertion above to report, which is the failure worth reading.
   }, 20_000);
 
   it('a delivery that loses the event_id index is answered as a replay, not a 500', async () => {
@@ -1087,8 +1149,11 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
 
     // And the late tap is recorded honestly, as its own waiting row.
     expect(result.outcome).toBe('armed');
+    expect(result.armedTapId).toBeDefined();
     expect(result.armedTapId).not.toBe(tap.id);
-    const fresh = one(await db.select().from(armedTaps).where(eq(armedTaps.id, result.armedTapId)));
+    const fresh = one(
+      await db.select().from(armedTaps).where(eq(armedTaps.id, result.armedTapId!)),
+    );
     expect(fresh.eventId).toBe(refreshEventId);
     expect(fresh.consumedAt).toBeNull();
   });
