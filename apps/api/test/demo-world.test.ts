@@ -6,7 +6,12 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import { createRemoteWorld, type DemoActorSpec, type RemoteConfig } from '../scripts/demo/world.js';
+import {
+  createRemoteWorld,
+  type DemoActorSpec,
+  provisioningSql,
+  type RemoteConfig,
+} from '../scripts/demo/world.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer } from './helpers/test-issuer.js';
@@ -129,7 +134,7 @@ describe('the remote world, against a real server', () => {
     );
 
     expect(err?.message).toContain('INSERT INTO schools (id, name)');
-    const minted = /VALUES \('([0-9a-f-]{36})'/.exec(err?.message ?? '')?.[1];
+    const minted = /SELECT '([0-9a-f-]{36})'/.exec(err?.message ?? '')?.[1];
     expect(minted).toBeDefined();
     // Version nibble 7: the id must be a UUIDv7 like every other row (decision 2).
     expect(minted?.[14]).toBe('7');
@@ -195,5 +200,37 @@ describe('the remote world, against a real server', () => {
     });
 
     expect(Date.now() - before).toBeLessThan(3_000);
+  });
+});
+
+describe('provisioningSql', () => {
+  const USER = '01a0bb08-563f-7050-8d19-48b7b3150865';
+
+  it('supplies an id, because schools.id has no database default', () => {
+    const sql = provisioningSql(USER, 'role-and-school');
+
+    expect(sql).toContain('INSERT INTO schools (id, name)');
+    const minted = /SELECT '([0-9a-f-]{36})'/.exec(sql)?.[1];
+    expect(minted?.[14]).toBe('7'); // UUIDv7, like every other row (decision 2)
+  });
+
+  it('guards the insert so re-running leaves an existing school alone', () => {
+    expect(provisioningSql(USER, 'school')).toContain('WHERE NOT EXISTS (SELECT 1 FROM schools)');
+  });
+
+  it('never emits a bare UPDATE that would silently set NULL', () => {
+    // `SET school_id = (SELECT …)` with no INSERT reports "UPDATE 1" against an
+    // empty table and leaves the operator believing they had complied.
+    for (const what of ['role-and-school', 'school'] as const) {
+      const sql = provisioningSql(USER, what);
+      expect(sql.indexOf('INSERT INTO schools')).toBeLessThan(sql.indexOf('UPDATE users'));
+      expect(sql).toContain('ORDER BY created_at LIMIT 1');
+      expect(sql).toContain(USER);
+    }
+  });
+
+  it('flips the role only when the role is what is missing', () => {
+    expect(provisioningSql(USER, 'role-and-school')).toContain("role = 'teacher'");
+    expect(provisioningSql(USER, 'school')).not.toContain("role = 'teacher'");
   });
 });

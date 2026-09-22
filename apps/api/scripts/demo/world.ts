@@ -263,6 +263,31 @@ const REMOTE_LIVE_WAIT_MS = 45_000;
 /** Slack for clock skew between this machine and the deployment. */
 const SKEW_MARGIN_MS = 15_000;
 
+/**
+ * The one-time provisioning a demo teacher needs, as statements an operator can
+ * paste. Built in one place on purpose: this instruction previously existed in
+ * three copies and each was wrong in its own way.
+ *
+ * `INSERT … WHERE NOT EXISTS` so re-running is safe and an existing school is
+ * left alone, and the UPDATE attaches to the oldest school — which is the row
+ * just inserted when the table was empty, and the operator's own otherwise, so
+ * the two statements are one coherent recipe either way. A bare
+ * `SET school_id = (SELECT …)` against an empty table would set NULL, report
+ * `UPDATE 1`, and leave the operator believing they had complied. The insert
+ * supplies an id because `schools.id` has no database default: ids are minted
+ * in TypeScript (data-model decision 2).
+ */
+export function provisioningSql(userId: string, what: 'role-and-school' | 'school'): string {
+  const schoolId = newUuidV7();
+  const assignments = what === 'role-and-school' ? "role = 'teacher', school_id" : 'school_id';
+  return (
+    `  INSERT INTO schools (id, name)\n` +
+    `  SELECT '${schoolId}', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools);\n` +
+    `  UPDATE users SET ${assignments} = (SELECT id FROM schools ORDER BY created_at LIMIT 1)\n` +
+    `  WHERE id = '${userId}';`
+  );
+}
+
 /** The env var this actor's Cognito username comes from. */
 export function usernameVar(key: string): string {
   return `DEMO_USER_${key.toUpperCase()}`;
@@ -403,12 +428,7 @@ async function signInRemoteActors(
           (spec.role === 'teacher'
             ? 'Every first sign-in provisions a student, so the demo teacher needs the one-time ' +
               'out-of-band provisioning — the role AND a school, because classes.school_id is ' +
-              'NOT NULL and no code path ever assigns it:\n' +
-              // A fresh id, because schools.id has NO database default — ids are
-              // minted in TypeScript (decision 2), so raw SQL must supply one or
-              // the insert dies on the not-null constraint.
-              `  INSERT INTO schools (id, name) VALUES ('${newUuidV7()}', 'Demo School');  -- if you have none\n` +
-              `  UPDATE users SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1) WHERE id = '${me.user.id}';`
+              `NOT NULL and no code path ever assigns it:\n${provisioningSql(me.user.id, 'role-and-school')}`
             : 'Use a different account for this actor.'),
       );
     }

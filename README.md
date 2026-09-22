@@ -105,16 +105,20 @@ missing rather than failing obscurely):
    _student_ with no school (`GET /v1/me`), and nothing ever assigns one — but
    `classes.school_id` is `NOT NULL`, so the role by itself is not enough:
 
-   `schools.id` has **no database default** — ids are minted in TypeScript
-   (data-model decision 2) — so the insert must supply one. Mint a UUIDv7 with
-   `node -e "console.log(require('uuid').v7())"`, or just copy the ready-made
-   statements the demo prints when it finds the account unprovisioned.
+   Easiest path: run the demo and paste the two statements it prints — it mints
+   the id for you. `schools.id` has **no database default** (ids are minted in
+   TypeScript, data-model decision 2), so the insert has to supply one; to write
+   them by hand, mint a UUIDv7 with
+   `node --input-type=module -e "import {v7} from 'uuid'; console.log(v7())"`
+   (run from a checkout after `npm ci`, or use any UUIDv7 generator).
 
    ```sql
-   -- if the table is empty; <uuidv7> is the id you minted above
-   INSERT INTO schools (id, name) VALUES ('<uuidv7>', 'Demo School');
+   -- Creates a school only if you have none, then attaches the teacher to the
+   -- oldest one — so the pair is correct whether or not the table was empty.
+   INSERT INTO schools (id, name)
+   SELECT '<uuidv7>', 'Demo School' WHERE NOT EXISTS (SELECT 1 FROM schools);
    UPDATE users
-   SET role = 'teacher', school_id = (SELECT id FROM schools LIMIT 1)
+   SET role = 'teacher', school_id = (SELECT id FROM schools ORDER BY created_at LIMIT 1)
    WHERE id = '<their id>';
    ```
 
