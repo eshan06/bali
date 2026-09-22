@@ -68,7 +68,7 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   the armTap insert race and its event-id integrity gap (**landed**; its
   review follow-ups are #29), a replayed tap re-resolved to another session
   and extend's arithmetic outside the engine transaction (**#28, which lands
-  after #29**), the portal's reconnect backoff and staleness banner
+  after #29 — ruled in, and landing now**), the portal's reconnect backoff and staleness banner
   (**landed**), and one shared SQLSTATE helper (**landed**). Block
   re-registration by the tag's own teacher: the fix answers 200 where `/v1`
   answers 409 today; **the owner ruled that correction in (2026-09-22)**, and
@@ -76,6 +76,16 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   allowing it.
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
+- **The owner ruled on #28's held question (2026-09-22): the `409`s stand.**
+  A retried tap that landed is replayed only while what it recorded is still
+  true (the participation live, its session running). Otherwise, a retry that
+  reaches a running session is refused with `EVENT_ID_CONFLICT`,
+  `NOT_PARTICIPATING` or `SESSION_NOT_RUNNING`, all `409`, so the outbox keeps
+  the record; one that reaches nothing running is answered `replay` with no
+  session by `armTap` (tap step 10). The `409`s are not final yet: that needs
+  the tap-side outbox disposition (and a "recorded, no longer current" answer),
+  which is Phase 3. The spent-armed-tap skip it depended on landed first, in
+  #29, so these refusals no longer feed the period-5 shield.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
   the SSE hub's `close()` did not wait for a LISTEN it had started, so a
   shutdown during setup left a query on a pool being torn down — an unhandled
@@ -188,8 +198,14 @@ under-13 parental-consent machinery.
     runs of five record two skips for one tap. The `409` is pinned on the
     wire as well as in the engine, and `tapIn` refuses the same reuse
     (asserted with the first session over).
-  - **Item 2, #28** — rule 4 and tap step 10, to be amended in that PR,
-    which lands second.
+  - **Item 2, #28** — rule 4 and tap steps 9–10 amended there: a retry is
+    replayed while what it recorded is still true, and refused with `409`
+    rather than a `200` naming a session that is over. One split is left and
+    recorded in #28's entry: a spent id reused at ANOTHER teacher's block
+    while the first participation is still live is replayed on the join path
+    (the replay is keyed on student and type) and refused on the arm path
+    (item 5's teacher scope). It needs id reuse across physical taps or a
+    moved block; neither answer shields a student anywhere new.
   - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
     instead of `409`; split out of #23 before it merged, now its own PR after
     #29.
@@ -513,6 +529,205 @@ under-13 parental-consent machinery.
   answer, and the comment now says why: what was lost is a race against a
   rival that keeps appearing and vanishing, which is transient by
   construction, so "retry" is exactly what the outbox should do.
+
+- **2026-09-22** — Two engine idempotency holes, both from the same habit of
+  deciding something outside the transaction that only holds inside it.
+  **Ruled in by the owner (2026-09-22)** and landed after #29; ARCHITECTURE
+  rule 4 and tap steps 9–10 now say what the bounded replay answers. Merging
+  #29 left one split between the two tap paths: a spent id reused at another
+  teacher's block while the first participation is still live is replayed by
+  `tapIn` (keyed on student and type, naming the first session) and refused
+  by `armTap` (teacher-scoped). Once the first session is over both refuse,
+  and "refuses an id spent under another teacher, as tapIn does" pins that.
+  A retried tap was answered with `EVENT_ID_CONFLICT` whenever the server
+  re-resolved it elsewhere. The phone mints one id per physical tap and retries
+  until answered, but `resolveTapTarget` picks the newest running session **of
+  the tapped block's teacher** that the student is enrolled in — so a retry
+  after that teacher started a second session the student is also in resolved
+  somewhere new, `insertEvent` saw the id against a different session, and
+  refused. Backwards: the tap landed, so rule 4 says re-read and return what
+  was recorded. `tapIn` now does. The conflict check is untouched for an id
+  reused for a genuinely different event, which is what the unlock path
+  depends on (ISSUES #2) and which keeps its own test — but on the tap path
+  something IS given up, because the server cannot tell a retry from a
+  deliberate reuse: an app resending a spent id for a second physical tap into
+  another session is now answered as a replay and that join is suppressed. No
+  privilege comes with it (the same student can simply not tap, and the grid
+  shows them absent either way).
+  The replay is **bounded to what is still true** — the recorded participation
+  is still live, in a session still running — and that bound is the whole
+  safety of it, because `TapResponse` cannot say "that one is over" or "you
+  have left it", so a stale answer here is a shield rather than a small
+  inaccuracy. Replaying an **ended** session points the phone at a window that
+  has not closed (a teacher who ends early leaves the original `endsAt`
+  behind): a foregrounded app heals inside one ~30s check-in, but enforcement
+  deliberately does not need the network, so a backgrounded phone stays locked
+  to a bell that already rang, in a grid no teacher is watching and no unlock
+  can reach.
+  Replaying a participation the student **left** — they tapped into the
+  teacher's other session for real — would point the phone at the session it
+  left while the grid shows them in the one they are in; its next check-in
+  there answers `gone` and unshields. Both are worse than the 409 they
+  replaced, and both now decline. A retry that resolves back to the session
+  that recorded it, with the student's row since ended, declines through the
+  `!isNew` path below the branch as `NOT_PARTICIPATING` — not a conflict, the
+  id names this very tap; what stopped being true is the participation.
+  The lookup itself sits **ahead** of the ended-session guard, the placement
+  `extendSession` uses: `resolveTapTarget` filters on `ended_at IS NULL`
+  outside the transaction, so the session it picks can end before the engine's
+  locked read, and a tap that did land must still replay against the running
+  session that recorded it rather than 409.
+  The branch's read of the OTHER session stays unlocked, and that is measured
+  rather than assumed: with `for update` on it, two taps crossing in opposite
+  directions order locks B-then-A against A-then-B and deadlock for real
+  (40P01 at Postgres's one-second `deadlock_timeout`), which
+  `withDeadlockRetry` would paper over rather than fix. The residual window —
+  the recorded session, or the student's row in it, ending just after both
+  reads — is narrow and heals on the next check-in.
+  `extendSession` now takes minutes instead of an absolute end. The route read
+  the session, did the arithmetic and handed over a fixed time, so two
+  simultaneous "add time" presses computed the same target from the same
+  starting point: the loser's value was no longer later than the winner's, the
+  engine refused it as `INVALID_EXTENSION`, and the teacher's second press
+  bought no time — a 400 saying the new end was not later than the current one,
+  true of the value the route computed and useless to a teacher who had just
+  pressed "add 10 minutes".
+  The arithmetic moved inside the locked read, so each press adds to whatever
+  it finds. Nothing calls the endpoint yet (no
+  extend control in the portal), so this was caught before it could bite. `INVALID_EXTENSION` is kept and still
+  refuses a non-positive, non-finite, or out-of-Date-range duration — the
+  engine does not trust its caller. 1e15 minutes used to overflow into an
+  Invalid Date and a bare `RangeError`; the route's zod cap
+  (`int().positive().max(480)`) means no `/v1` caller could reach it, so this
+  is defence-in-depth for a direct engine caller rather than a live 500. Its
+  client-facing message no longer claims the end time was not moved forward,
+  which the duration rewrite made false. The real-Postgres lane now covers two
+  concurrent extends both landing.
+  **Review round, and the sharpest finding was a guard that guarded nothing
+  useful.** Refusing only what overflows the `Date` range is a bound at the
+  year 275760: `1e6` minutes is finite, positive, and ends the lesson in 2028,
+  and only the route's zod cap kept `/v1` honest. If the engine is going to
+  distrust its caller — and it should, since `/v1` is not the only possible
+  one — the bound has to mean something. `MAX_SESSION_MINUTES` is in
+  `packages/shared` now and both the route's cap and the engine's refusal are
+  that same number. The range check stays: `base` comes from the stored
+  session, so a row already near the `Date` boundary can still overflow on an
+  ordinary extension.
+  **And the half this PR CHANGES for `/v1` had no wire test** — only an engine
+  assertion that `NOT_PARTICIPATING` is thrown. What a phone branches on is
+  the status and body `routes/errors.ts` maps that to, and the response the
+  whole hold turns on was unpinned; the same shape of gap that let `armTap`'s
+  refusals ship as 500s in #29. There is a 409 case next to the 200 one now,
+  asserting the body as well as the status.
+  Both blockers are the ones already with the owner: landing order behind #29
+  (which this PR's own bullet now states), and ARCHITECTURE rule 4 / tap step
+  10 promising the unconditional 200 that this changes.
+  **Next round found a race test that went red for the wrong reason**, which
+  is the third time this audit has turned one of those up. "Two taps crossing
+  in opposite directions never deadlock" asserts on a rejected promise's
+  `cause.code` — but `tapIn` wraps its whole transaction in
+  `withDeadlockRetry`, so a reintroduced deadlock is caught, retried, and
+  usually wins the retry; no rejection ever reaches that check. Measured with
+  `for update` added back to the cross-session read: **7 deadlocks in 8
+  rounds, every one swallowed**, and the test died on the vitest budget with
+  "Test timed out", naming nothing. It asserts on Postgres's own
+  `pg_stat_database.deadlocks` now — which counts a deadlock whether or not the
+  error escaped — and `makeTestDb` gives each suite a freshly created
+  throwaway database, so the counter starts at 0 and nothing else can
+  contribute. Red 3 of 3, naming the cause. The per-result check stays as the
+  faster signal for a deadlock that does escape.
+  **And adding that bound made another guard unreachable by its own test** —
+  caught by the next round, and it is the same shape as everything else this
+  audit has turned up. `1e15` minutes used to reach the `Date`-range check;
+  the new `MAX_SESSION_MINUTES` rejects it two lines earlier, so the check had
+  no coverage while its comment read as though it did. It still has a
+  reachable case, which is the one it was always for: `base` is
+  `max(at, endsAt)` and `endsAt` comes from the STORED session, so a row near
+  the JS `Date` boundary overflows on a legal ten-minute press. Pinned on both
+  lanes now; deleting the guard produces exactly the bare `RangeError` the
+  comment warns about.
+  Worth recording because it cost a probe to find: that stored end has to be
+  written through raw SQL. A JS `Date` past year 9999 serialises as
+  `+275760-09-12T23:59:00.000Z` and Postgres rejects the `+`-prefixed extended
+  year (22009, DateTimeParseError) — so the driver can READ such an instant
+  back as a valid `Date` but cannot write one.
+  **A later round asked for a number instead of an adjective, and was right
+  to.** The file header budgeted `tapIn`'s `events`-by-event_id read as "a few
+  hundred extra indexed reads spread over a minute" — a total, when the read
+  sits inside the session's `FOR UPDATE` window and taps into one session
+  serialise behind it. What matters is what it adds to the HELD LOCK per tap,
+  because that is what a queue at a bell waits on. Measured on the real lane,
+  29 sequential taps into one session: ~5.0 ms per tap with the read, ~4.8 ms
+  without — about 0.2 ms, roughly 4% of the window. Fine at a school's scale,
+  and now a measurement rather than a guess.
+  The `NOT_PARTICIPATING` message also claimed more than its branch knows: it
+  read "the participation has ended", which is also the message when
+  `loadParticipation` finds no row at all. Nothing deletes a participation
+  (decision 3) so that is unreachable today, but it would have misdirected
+  whoever first hit it. It says "you are no longer in this session" now, which
+  is true of both.
+  **And the deadlock-counter test I had just added was resting on a false
+  claim about its own fixture.** Its comment said `makeTestDb` gives the suite
+  a fresh database so "nothing else can contribute to" the counter. Not true:
+  `makeTestDb` is called once in a file-scope `beforeAll` and the database is
+  shared by all three describes in `races.test.ts` — including "a removal
+  racing a cross-class switch-tap", which provokes 40P01 deliberately and says
+  so in its own comment. The before/after delta covers most of that but not
+  all: `pg_stat_clear_snapshot()` drops only the READING backend's cached
+  snapshot, and other backends flush pending stats on their own schedule, so a
+  deadlock from the earlier test arriving mid-window lands in the delta and
+  reddens CI over correct code. The crossing-taps test runs on a database of
+  its own now, which makes the claim true and lets the assertion be absolute
+  rather than a delta; green 3 of 3 on sound code, red 3 of 3 with the lock
+  reintroduced.
+  **Two more from the next round, and one of them was another overclaim of
+  mine.** The comment on `tapIn`'s replay reads said the session-before-
+  participation order was "staged and confirmed". It is not: swapping the two
+  reads leaves both lanes green, 122/122 on real Postgres, checked. It is a
+  DISCLOSED SURVIVOR now, with the reason it cannot be staged — pausing
+  between the two reads would need a seam, and neither read takes a lock
+  another connection could hold, so nothing can be timed to land between them.
+  The order costs nothing and is kept for the reasoning; the residual window
+  after both reads is reachable by no test here, only by the next check-in.
+  The other was a real coverage gap in something deliberate: the replay keys
+  on `(event_id, type, user_id)` and not on the session, so a phone reusing
+  its own spent id while the student physically taps ANOTHER teacher's block
+  is answered `200 replay` naming the first teacher's session — that join
+  suppressed, teacher B's grid empty while the student stands in the room.
+  Documented in two places and pinned in none. It has a test now, because it
+  is one of the things the owner is ruling on and a decision nothing tests is
+  a decision that can change by accident; if the ruling adds a "recorded, but
+  no longer current" answer, that test is the one that should change.
+  **The mapped `INVALID_EXTENSION` message had no test that reached it**, and
+  it took three rounds to see why. Every route that can raise it caps
+  `durationMinutes` with zod first, so a wire test sending `0` is rejected
+  before the mapper runs and asserts against zod's message instead — each
+  round I made the test's NAME more honest about that without ever making it
+  reach the thing it was supposed to cover. The answer was to stop going
+  through the wire: `apps/api/test/transition-errors.test.ts` exercises
+  `mapTransitionError` directly, over a `Record<TransitionErrorCode, …>` so a
+  new engine code without an expectation fails typecheck rather than slipping
+  through. Reverting the message, or mapping it to `conflict`, each turns it
+  red; the wire test stays green for both, which is the point.
+  **And the bound is only half-enforced, which the comment did not say.**
+  `extendSession` refuses a duration above `MAX_SESSION_MINUTES` in the
+  engine; `startSession` takes absolute `startedAt`/`endsAt` and applies no
+  bound at all, so the route's zod cap is the only thing holding for starts. A
+  non-`/v1` caller could open a session ending in 2028 while the same caller's
+  481-minute extend is refused — which is exactly the reasoning the extend
+  bound was added on ("`/v1` is not the only possible caller"), applied
+  inconsistently. Nothing unbounded reaches `startSession` today (the route is
+  its only caller), and closing it needs a refusal code that function does not
+  have, so **the comment is corrected now and the symmetry is a follow-up**
+  rather than another widening of a PR already held. Worth doing with the
+  ruling, since it is the same "the engine distrusts its caller" question.
+  Also from that round: `MAX_SESSION_MINUTES` said "the longest a session may
+  run or be extended by" when it bounds ONE operation — N presses still move a
+  session arbitrarily far, which is the intended design, and that comment is
+  what an iOS client mirrors. And the silent suppression of a genuine second
+  tap is recorded with the ruling (the "Item 2, #28" line and the split in
+  the entry at the top of this log), because the same missing field answers
+  both.
 
 - **2026-09-22** — #31's review landed after it merged, and the best finding
   in it was that the staleness banner **could not fire in production**, for

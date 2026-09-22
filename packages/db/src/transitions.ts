@@ -5,7 +5,7 @@ import type {
   UnlockRecordedAs,
   UnlockRecordedOutcome,
 } from '@bali/shared';
-import { clampToWindow, SILENCE_THRESHOLD_MS } from '@bali/shared';
+import { clampToWindow, MAX_SESSION_MINUTES, SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
@@ -22,12 +22,29 @@ import type { Database } from './types.js';
  *   - runs in a single transaction (both writes land, or neither);
  *   - is idempotent on the client's event_id, so a retried tap counts once
  *     (rule 4) — the events unique constraint is the dedupe, and a replay
- *     re-reads and returns the current truth without re-applying;
+ *     re-reads and returns the current truth without re-applying. "Current"
+ *     is the operative word on the tap path: a retry answers 200 only while
+ *     what it recorded is still true, and refuses when it is not, because a
+ *     tap response drives a shield and a stale one would lock a student into
+ *     a session that is over or that they have left (see `tapIn`);
  *   - clamps any device timestamp into the session window (rule 1);
  *   - returns the resulting state, which is the phone's reconciliation channel.
  *
  * State derivation for display lives in @bali/shared (rule 2); this is the
  * write side.
+ *
+ * One cost worth knowing rather than re-deriving, and worth stating where it
+ * LANDS rather than as a total: `tapIn` reads `events` by event_id on every
+ * tap, before the join — and that read is inside the session's `FOR UPDATE`
+ * window, so taps into one session serialise behind it. "A few hundred extra
+ * indexed reads spread over a minute" was the wrong way to describe it: the
+ * relevant number is what it adds to the held lock, per tap, because that is
+ * what a queue at a bell waits on.
+ *
+ * Measured on the real-Postgres lane, 29 sequential taps into one session:
+ * ~5.0 ms per tap with the read, ~4.8 ms without — so roughly 0.2 ms, about
+ * 4% of the window. Fine at a school's scale, and now a number rather than an
+ * adjective.
  */
 
 export type TransitionErrorCode =
@@ -1020,7 +1037,16 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
 
 export interface ExtendSessionInput {
   sessionId: string;
-  newEndsAt: Date;
+  /**
+   * Minutes to add. Deliberately a duration, not an absolute end: the caller
+   * used to read the session, do the arithmetic and hand over a fixed time,
+   * so two simultaneous "add time" presses computed the same target from the
+   * same starting point and the loser's value was no longer later than what
+   * the winner had already committed — refused as INVALID_EXTENSION, and the
+   * teacher's second press silently did nothing. Applied inside the locked
+   * read below, each press adds to whatever it finds.
+   */
+  durationMinutes: number;
   at: Date;
   /**
    * Client-minted id that makes the extend idempotent (rule 4). The new end is
@@ -1038,10 +1064,12 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
 
     // Replay first — ahead of BOTH guards below. A retry carries the same event
-    // id but a newEndsAt recomputed from the already-extended end, so it would
-    // otherwise read as a fresh, valid extension; and once the session has
-    // ended, a retry of an extend that did commit must still re-read and return
-    // the current truth (rule 4) rather than 409.
+    // id and the same DURATION (the route stopped computing an end time when
+    // the arithmetic moved in here), and a duration is always valid, so without
+    // this the retry would read as a fresh extension and add the time twice —
+    // shielding the class past a bell the teacher only pushed once. And once
+    // the session has ended, a retry of an extend that did commit must still
+    // re-read and return the current truth (rule 4) rather than 409.
     if (input.eventId) {
       const prior = firstOrUndefined(
         await tx
@@ -1064,17 +1092,56 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
 
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    if (input.newEndsAt.getTime() <= session.endsAt.getTime()) {
+    // Ordering, deliberate and worth saying: replay, then state, then input.
+    // An ended session plus a bad duration answers SESSION_NOT_RUNNING rather
+    // than INVALID_EXTENSION, because once the bell has rung nothing about the
+    // request can change the answer, and "session has ended" is the more
+    // useful thing to tell a teacher. Unreachable through `/v1` either way —
+    // the route's zod cap rejects a bad duration before the engine sees it.
+    //
+    // Bounded at both ends, and the upper one is the same number the route's
+    // zod cap uses. Refusing only what overflows the Date range is a guard at
+    // the year 275760: `1e6` minutes clears it and ends the lesson in 2028,
+    // which is not a duration any school could mean. If the engine is going to
+    // distrust its caller here — and it should, since `/v1` is not the only
+    // possible one — the bound has to be a real one.
+    if (
+      !Number.isFinite(input.durationMinutes) ||
+      input.durationMinutes <= 0 ||
+      input.durationMinutes > MAX_SESSION_MINUTES
+    ) {
       throw new TransitionError(
         'INVALID_EXTENSION',
-        'new end time must be later than the current one',
+        `duration must be a positive number of minutes, at most ${MAX_SESSION_MINUTES}`,
       );
+    }
+
+    // Add to whichever is later: the current end (extend the remaining time)
+    // or now (a session already past its end but not yet swept gets a fresh
+    // window rather than a new end still in the past). Computed HERE, under
+    // the same FOR UPDATE that loaded the session, so a concurrent extend has
+    // either already committed and is included, or is waiting behind this one.
+    const base = Math.max(input.at.getTime(), session.endsAt.getTime());
+    const newEndsAt = new Date(base + input.durationMinutes * 60_000);
+    // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
+    // be reached (1e15 minutes): `base` comes from the stored session, so a row
+    // whose end is already near the Date boundary still overflows on a
+    // perfectly ordinary ten-minute press. An Invalid Date turns the
+    // toISOString() below into a bare RangeError — an unmapped 500, where the
+    // point of these guards is that the engine refuses its caller in its own
+    // vocabulary. Pinned by "refuses an extension that would push the end past
+    // the Date range", which writes that stored end through raw SQL because
+    // the driver cannot serialise one: a JS Date past year 9999 goes out as
+    // `+275760-...` and Postgres rejects the extended year (22009), though it
+    // reads the same instant back as a valid Date quite happily.
+    if (Number.isNaN(newEndsAt.getTime())) {
+      throw new TransitionError('INVALID_EXTENSION', 'extension is out of range');
     }
 
     const updated = firstOrUndefined(
       await tx
         .update(sessions)
-        .set({ endsAt: input.newEndsAt })
+        .set({ endsAt: newEndsAt })
         .where(eq(sessions.id, session.id))
         .returning(),
     );
@@ -1085,10 +1152,10 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       type: 'session_extended',
       sessionId: session.id,
       classId: session.classId,
-      occurredAt: clampToWindow(input.at, session.startedAt, input.newEndsAt),
+      occurredAt: clampToWindow(input.at, session.startedAt, newEndsAt),
       payload: {
         previousEndsAt: session.endsAt.toISOString(),
-        newEndsAt: input.newEndsAt.toISOString(),
+        newEndsAt: newEndsAt.toISOString(),
       },
     });
     return updated;
@@ -1286,6 +1353,122 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
     db.transaction(async (tx) => {
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+
+      // Replay first — ahead of the ended-session guard, the placement
+      // extendSession uses and for the same reason: a tap that DID land must
+      // re-read and return the truth that was recorded (rule 4), never a 409
+      // the phone reads as "keep retrying".
+      //
+      // The phone mints one id per physical tap and retries until it gets an
+      // answer; the SERVER decides which session that tap means, picking the
+      // newest RUNNING session of the tapped block's teacher that the student
+      // is enrolled in. So a retry can resolve somewhere new — after that
+      // teacher started a second session the student is also in — and
+      // insertEvent would see the id against a different session and refuse
+      // it. It can also resolve at a session that ends between that unlocked
+      // lookup and this locked read, which at the bell is a burst of taps
+      // meeting the per-minute expiry sweep.
+      //
+      // BOUNDED TO WHAT IS STILL TRUE, and that bound is the whole safety of
+      // this branch: recorded truth is only a replay while it is also current
+      // truth. TapResponse hands the phone {id, classId, endsAt} and cannot
+      // say "that one is over" or "you have left it", so a stale answer here
+      // is not a small inaccuracy — it is a shield:
+      //   - an ENDED session keeps its original endsAt when the teacher ends
+      //     it early, so replaying one points the phone at a window that has
+      //     not closed yet. A foregrounded app heals inside one ~30s
+      //     check-in (it answers `gone`), but enforcement deliberately does
+      //     not need the network: the DeviceActivity monitor holds the shield
+      //     to the window it was given, so a backgrounded phone stays locked
+      //     to a bell that already rang, in a grid no teacher is watching and
+      //     which no unlock can reach;
+      //   - a participation the student LEFT (they tapped into the teacher's
+      //     other session for real, decision 4) still reads `focused`, so
+      //     replaying it points the phone at the session it left while the
+      //     grid shows them green in the one they are in. Its next check-in
+      //     there answers `gone` and unshields. That is the phone/grid drift
+      //     the engine exists to prevent.
+      // Declining costs a 409 — EVENT_ID_CONFLICT when the retry re-resolved
+      // somewhere new, NOT_PARTICIPATING when it came back to the session that
+      // recorded it with the student's row since ended, SESSION_NOT_RUNNING
+      // when that session has itself ended. All three are loud: a non-401 4xx
+      // is "keep the record, retry, and surface".
+      //
+      // Measured reach: deleting `!current.endedAt` turns "refuses to replay a
+      // participation the student has since left" red. `!recorded.endedAt`
+      // survives that check on its own, because ending a session ends every
+      // live participation in it in the same transaction (both endSession and
+      // expireDueSessions, each with its own test) — it is kept so this branch
+      // does not silently depend on reading the session BEFORE the
+      // participation, which is what makes that implication hold under READ
+      // COMMITTED.
+      //
+      // What this gives up, since the server cannot tell a retry from a
+      // deliberate reuse: a student's app resending a spent id for a second
+      // physical tap into another session is answered as a replay, and that
+      // join is suppressed. No privilege comes with it — the same student can
+      // simply not tap, and the grid shows them absent either way — but it is
+      // given up, not preserved. The arm path answers the cross-teacher shape
+      // of the same reuse with a 409 instead (armTap's teacher scope, ruled
+      // 2026-09-22), so while the first participation is live the two paths
+      // differ; recorded in PLAN.md. insertEvent's conflict check is untouched and
+      // still fires for an id reused for a genuinely DIFFERENT event, which is
+      // what the unlock path depends on (ISSUES #2).
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type, sessionId: events.sessionId, userId: events.userId })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (
+        prior?.type === 'tap_in' &&
+        prior.userId === input.studentId &&
+        prior.sessionId !== null
+      ) {
+        // Reuse the locked row when the tap resolved back to its own session,
+        // so the liveness check reads the authoritative copy rather than a
+        // second unlocked snapshot of it. Reasoned, not pinned: replacing this
+        // with an unconditional unlocked load leaves both lanes green, because
+        // it only differs under an interleaving no test stages.
+        //
+        // The cross-session read stays UNLOCKED on purpose, and that one IS
+        // measured: with `for update` on the other session, two taps crossing
+        // in opposite directions order locks B-then-A against A-then-B and
+        // deadlock for real (40P01 at Postgres's 1s deadlock_timeout), which
+        // withDeadlockRetry would paper over rather than fix. Unlocked: no
+        // deadlock, tens of milliseconds.
+        //
+        // What that leaves is narrow and self-healing: the recorded session
+        // can end, or a concurrent tap into another session can end `current`
+        // via endParticipationsElsewhere while holding only that session's
+        // lock, just after both reads here — and the phone's next check-in
+        // answers `gone`.
+        //
+        // Reading the session BEFORE the participation is meant to keep a
+        // concurrent end visible to at least the second read under READ
+        // COMMITTED. DISCLOSED SURVIVOR, and this one used to claim the
+        // opposite: the comment here said "staged and confirmed", and it was
+        // not. Swapping the two reads leaves BOTH lanes green — 122/122 on
+        // real Postgres, checked. Staging it would need a pause between them,
+        // and there is no seam inside this transaction to pause at: neither
+        // read takes a lock another connection could hold, so nothing can be
+        // timed to land between them. The order costs nothing and is kept for
+        // the reason above; the residual window after BOTH reads is not
+        // reachable by any test here at all, only by the next check-in.
+        const recorded =
+          prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
+        const current = await loadParticipation(tx, prior.sessionId, input.studentId);
+        if (recorded && !recorded.endedAt && current && !current.endedAt) {
+          return {
+            outcome: 'replay',
+            state: current.state,
+            participationId: current.id,
+            session: recorded,
+          };
+        }
+      }
+
       if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
@@ -1299,12 +1482,37 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         occurredAt,
       });
       if (!isNew) {
-        // Replay: the tap already landed. Return the current truth (the row for
-        // this session and student, even if it has since ended), never a 4xx.
-        const current = await loadParticipation(tx, session.id, input.studentId);
-        if (!current)
-          throw new TransitionError('NOT_PARTICIPATING', 'replayed tap has no participation');
-        return { outcome: 'replay', state: current.state, participationId: current.id, session };
+        // The tap is on record for exactly this session and student —
+        // insertEvent reports "not new" only for that — but the branch above
+        // declined to replay it, and by this line the session is running, so
+        // what it declined on was the PARTICIPATION: the row exists and has
+        // ended. The engine writes that routinely (the student left for the
+        // teacher's other session, or their enrollment was removed), so this
+        // is an ordinary case and not the "event with no row behind it" it
+        // may look like.
+        //
+        // Re-joining them here would be a fresh join wearing a spent id, and
+        // answering 200 would tell the phone it is focused where it is not —
+        // main did exactly that, reporting the stale `focused` off an ended
+        // row. Refuse, and say the true thing: they are not in this session.
+        // Pinned by "refuses a stale retry once the student has left the
+        // session that recorded it".
+        //
+        // The cost is real, and the owner ruled it in (2026-09-22): a 409
+        // keeps the outbox record, so it retries. A later retry that finds
+        // nothing running reaches `armTap`, which refuses to arm a spent id
+        // and answers `replay` with no session, so the record clears there.
+        // Until a tap has a "recorded, and no longer current" answer (Phase
+        // 3), no response HERE is both honest and final.
+        throw new TransitionError(
+          'NOT_PARTICIPATING',
+          // Says only what this branch knows. `loadParticipation` returning
+          // nothing lands here too, and nothing in the engine deletes a
+          // participation (decision 3), so that is unreachable today — but a
+          // message claiming the row "has ended" would misdirect the first
+          // person who ever does hit it.
+          'this tap is on record, but you are no longer in this session',
+        );
       }
 
       // Decision 4: end any live participation in a DIFFERENT session first, so
