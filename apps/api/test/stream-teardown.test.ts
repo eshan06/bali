@@ -32,13 +32,13 @@ let closeDb: () => Promise<void>;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function waitFor(pred: () => boolean, ms = 3000): Promise<void> {
+async function waitFor(pred: () => boolean, ms = 3000, what = 'condition'): Promise<void> {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     if (pred()) return;
     await sleep(10);
   }
-  throw new Error('waitFor timed out');
+  throw new Error(`waitFor timed out waiting for ${what}`);
 }
 
 beforeEach(async () => {
@@ -193,7 +193,7 @@ describe('a hijacked stream response owns its own error handling', () => {
       `GET /v1/sessions/${sessionId}/stream HTTP/1.1\r\nHost: 127.0.0.1\r\n` +
         `Authorization: Bearer ${token}\r\n\r\n`,
     );
-    await waitFor(() => /^HTTP\/1\.1 \d{3}/.test(buf));
+    await waitFor(() => /^HTTP\/1\.1 \d{3}/.test(buf), 3000, 'status line from the second stream');
     return Number(/^HTTP\/1\.1 (\d{3})/.exec(buf)?.[1]);
   }
 
@@ -222,6 +222,7 @@ describe('a hijacked stream response owns its own error handling', () => {
     app.server.on('request', onRequest);
 
     const sock = net.connect(port, '127.0.0.1');
+    extraSockets.push(sock); // torn down by afterEach even if this test fails
     await once(sock, 'connect');
     sock.pause(); // the stalled reader — a wedged phone or a stuck proxy
     sock.write(
@@ -240,6 +241,9 @@ describe('a hijacked stream response owns its own error handling', () => {
     });
 
     // Queue more than the socket buffers can take, so end() cannot complete.
+    // Measured on this box: 0-2MB drains and 'finish' fires; 4MB and up stall.
+    // 16MB is a ~4x margin, and too small fails loudly on the assertions
+    // below rather than passing for the wrong reason.
     for (let i = 0; i < 16; i += 1) raw.write('x'.repeat(1024 * 1024));
     raw.end();
     expect(raw.writableEnded, 'ended').toBe(true);

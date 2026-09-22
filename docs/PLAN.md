@@ -152,6 +152,11 @@ under-13 parental-consent machinery.
   a client that never reads holds the window open — and with it the guard is
   observably load-bearing: softened to a silent `return`, the per-teacher slot
   leaks and the teacher sits permanently at their cap. That test now ships.
+  Its reach is exact and worth knowing: softening the guard turns it red, but
+  deleting the guard outright leaves the suite green, because the route's own
+  'error' listener then releases the slot a tick later. The guard is the
+  synchronous path; the listener is the net. That is written above the guard
+  so a green run is not read as permission to remove it.
   The reusable lesson is not "this cannot be tested" but "the obvious
   end-to-end reproduction is rescued by another guard; hold the window open
   yourself".

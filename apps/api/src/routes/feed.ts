@@ -182,14 +182,20 @@ export function registerFeedRoutes(
       sessionId: session.id,
       teacherId: teacher.id,
       after,
-      // Defence in depth, deliberately untested: throw rather than write into
-      // a response onClose already ended, so the write-after-end error is
-      // never raised in the first place rather than caught above. Its effect
-      // is not independently observable — every path that ends this response
-      // also fires 'close' on the request, which tears the subscription down
-      // by itself — so softening it to a silent `return` passes any test that
-      // can be written for it. Two attempts at pinning it both went green
-      // against the softened version; the note is more honest than the test.
+      // Throw rather than write into a response onClose already ended. This
+      // is what makes teardown synchronous: the hub reads a throwing write as
+      // "this stream is gone" and closes on the spot, instead of the write
+      // landing on a dead response and the slot coming back only once the
+      // 'error' listener above fires a tick later.
+      //
+      // Pinned by "a resuming read into an ended response releases the
+      // teacher's slot" in stream-teardown.test.ts, which holds the window
+      // open by stalling the flush. Know its exact reach before editing here:
+      // softening this to a silent `return` turns that test red (the slot
+      // leaks and the teacher stays at their cap), but DELETING it leaves the
+      // suite green, because the 'error' listener then releases the slot
+      // asynchronously instead. So a green run is not permission to remove
+      // it — the guard is the synchronous path, the listener is the net.
       write: (chunk) => {
         if (raw.writableEnded) throw new Error('stream already ended');
         raw.write(chunk);
