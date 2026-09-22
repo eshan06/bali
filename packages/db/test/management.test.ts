@@ -171,15 +171,23 @@ describe('updateClass', () => {
 });
 
 describe('createBlock', () => {
-  it('registers a tag, then refuses the same active tag', async () => {
+  it('registers a tag, and hands the same teacher back their own block on a retry', async () => {
+    // A lost response is the ordinary way here: the teacher's block WAS
+    // registered, they just never saw the 200. Answering `tag_taken` to the
+    // holder of the tag is advice they cannot act on — they cannot free a tag
+    // they already own — so the retry re-reads and returns it, the way
+    // startSession hands back the running session instead of refusing a
+    // duplicate start.
     const { teacherId } = await makeTeacher('cb-basic');
     const first = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
-    expect(first.outcome).toBe('registered');
+    if (first.outcome !== 'registered') throw new Error(`registered, got ${first.outcome}`);
 
     const again = await createBlock(db, { teacherId, tagId: 'CB-TAG-1' });
-    expect(again.outcome).toBe('tag_taken');
+    expect(again.outcome).toBe('already_registered');
+    if (again.outcome !== 'already_registered') throw new Error('unreachable');
+    expect(again.block.id).toBe(first.block.id);
 
-    // Exactly one active block owns the tag.
+    // Still exactly one block owning the tag — the replay created none.
     const rows = await db.select().from(blocks).where(eq(blocks.tagId, 'CB-TAG-1'));
     expect(rows).toHaveLength(1);
   });

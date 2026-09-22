@@ -131,14 +131,26 @@ export async function updateClass(
 }
 
 export type CreateBlockResult =
-  { outcome: 'registered'; block: BlockRow } | { outcome: 'tag_taken' };
+  | { outcome: 'registered'; block: BlockRow }
+  /** A replay: the tag is already registered to THIS teacher, so their own block comes back. */
+  | { outcome: 'already_registered'; block: BlockRow }
+  | { outcome: 'tag_taken' };
 
 /**
  * Register a physical NFC tag to a teacher. One active block owns a tag at a
  * time (a tag can be re-registered only after its block is soft-removed), so a
- * tag already held by a live block returns `tag_taken` for the route to 409.
- * ON CONFLICT DO NOTHING on the active-tag index makes this race-safe: two
+ * tag held by ANOTHER teacher's live block returns `tag_taken` for the route to
+ * 409. ON CONFLICT DO NOTHING on the active-tag index makes this race-safe: two
  * simultaneous registrations of the same tag yield exactly one live block.
+ *
+ * A conflict with the caller's OWN block is not a refusal. The usual way to
+ * reach it is a retry of a request whose response was lost: the block was
+ * registered, the teacher just never saw it. `tag_taken` is advice they cannot
+ * act on — they cannot free a tag they already hold — so the second call
+ * re-reads and hands back their block, the way `startSession` hands back the
+ * running session rather than refusing a duplicate start. On `/v1` that is a
+ * 409 -> 200, ruled in by the owner on 2026-09-22 (ARCHITECTURE, API decision
+ * 2: a wrong answer may be corrected in place).
  */
 export async function createBlock(
   db: Database,
@@ -149,6 +161,21 @@ export async function createBlock(
     .values({ tagId: input.tagId, teacherId: input.teacherId })
     .onConflictDoNothing({ target: blocks.tagId, where: sql`${blocks.removedAt} is null` })
     .returning();
-  if (!row) return { outcome: 'tag_taken' };
-  return { outcome: 'registered', block: row };
+  if (row) return { outcome: 'registered', block: row };
+
+  // Read the block that won the tag. Not the caller's: the tag really is
+  // taken. Nothing at all: the winner was soft-removed between the insert and
+  // this read, so the tag is free again and `tag_taken` is briefly false —
+  // unreachable today, since nothing outside tests writes `blocks.removed_at`,
+  // and settled with the endpoint that removes blocks, next to the
+  // block-reassignment follow-up PLAN.md already records.
+  const [existing] = await db
+    .select()
+    .from(blocks)
+    .where(and(eq(blocks.tagId, input.tagId), isNull(blocks.removedAt)))
+    .limit(1);
+  if (existing && existing.teacherId === input.teacherId) {
+    return { outcome: 'already_registered', block: existing };
+  }
+  return { outcome: 'tag_taken' };
 }
