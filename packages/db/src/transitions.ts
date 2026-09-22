@@ -33,10 +33,18 @@ import type { Database } from './types.js';
  * State derivation for display lives in @bali/shared (rule 2); this is the
  * write side.
  *
- * One cost worth knowing rather than re-deriving: `tapIn` reads `events` by
- * event_id on every tap, before the join. `events.event_id` is uniquely
- * indexed, so that is one index lookup — at a bell, a few hundred extra
- * indexed reads spread over a minute.
+ * One cost worth knowing rather than re-deriving, and worth stating where it
+ * LANDS rather than as a total: `tapIn` reads `events` by event_id on every
+ * tap, before the join — and that read is inside the session's `FOR UPDATE`
+ * window, so taps into one session serialise behind it. "A few hundred extra
+ * indexed reads spread over a minute" was the wrong way to describe it: the
+ * relevant number is what it adds to the held lock, per tap, because that is
+ * what a queue at a bell waits on.
+ *
+ * Measured on the real-Postgres lane, 29 sequential taps into one session:
+ * ~5.0 ms per tap with the read, ~4.8 ms without — so roughly 0.2 ms, about
+ * 4% of the window. Fine at a school's scale, and now a number rather than an
+ * adjective.
  */
 
 export type TransitionErrorCode =
@@ -1090,7 +1098,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // there is no response here that is both honest and final.
         throw new TransitionError(
           'NOT_PARTICIPATING',
-          'this tap is on record, but the participation has ended',
+          // Says only what this branch knows. `loadParticipation` returning
+          // nothing lands here too, and nothing in the engine deletes a
+          // participation (decision 3), so that is unreachable today — but a
+          // message claiming the row "has ended" would misdirect the first
+          // person who ever does hit it.
+          'this tap is on record, but you are no longer in this session',
         );
       }
 

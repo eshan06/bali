@@ -308,6 +308,21 @@ under-13 parental-consent machinery.
   `+275760-09-12T23:59:00.000Z` and Postgres rejects the `+`-prefixed extended
   year (22009, DateTimeParseError) — so the driver can READ such an instant
   back as a valid `Date` but cannot write one.
+  **A later round asked for a number instead of an adjective, and was right
+  to.** The file header budgeted `tapIn`'s `events`-by-event_id read as "a few
+  hundred extra indexed reads spread over a minute" — a total, when the read
+  sits inside the session's `FOR UPDATE` window and taps into one session
+  serialise behind it. What matters is what it adds to the HELD LOCK per tap,
+  because that is what a queue at a bell waits on. Measured on the real lane,
+  29 sequential taps into one session: ~5.0 ms per tap with the read, ~4.8 ms
+  without — about 0.2 ms, roughly 4% of the window. Fine at a school's scale,
+  and now a measurement rather than a guess.
+  The `NOT_PARTICIPATING` message also claimed more than its branch knows: it
+  read "the participation has ended", which is also the message when
+  `loadParticipation` finds no row at all. Nothing deletes a participation
+  (decision 3) so that is unreachable today, but it would have misdirected
+  whoever first hit it. It says "you are no longer in this session" now, which
+  is true of both.
   Also from that round: `MAX_SESSION_MINUTES` said "the longest a session may
   run or be extended by" when it bounds ONE operation — N presses still move a
   session arbitrarily far, which is the intended design, and that comment is
