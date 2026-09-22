@@ -102,17 +102,49 @@ export function registerFeedRoutes(
     // throwing, so the hub never notices either) — the teacher ends up
     // permanently 429'd by the cap.
     let clientGone = false;
+    let streamFailed = false;
     let sub: { close: () => void } | null = null;
     request.raw.on('close', () => {
       clientGone = true;
       sub?.close();
     });
 
+    /**
+     * Take the response over, and put OUR OWN 'error' listener on it before the
+     * first byte — one we never remove.
+     *
+     * A write after `end()` does not throw. It returns false and emits 'error'
+     * a tick later, so the hub's try/catch never sees it; an EventEmitter that
+     * emits 'error' with no listener throws, and from an I/O callback that is
+     * an uncaughtException. Fastify does attach a listener that would absorb
+     * it, but only when a logger, an `onResponse` hook, or a handler timeout is
+     * configured (`fastify/lib/route.js`), and it removes itself from both
+     * 'finish' and 'error' the first time either fires (`lib/reply.js`).
+     *
+     * Measured on this route, as it is configured today: a late write resuming
+     * from an awaited `getEventsSince` — the hub's own path when a tab closes
+     * mid-read — lands after that removal and takes the whole process down with
+     * an uncaught ERR_STREAM_WRITE_AFTER_END. One teacher closing a tab at the
+     * wrong moment ends every other class's live grid in the process. A
+     * listener we own survives all of it (verified: borrowed -> crash, own ->
+     * survives), so the grid's crash-safety stops being a side effect of the
+     * logger being switched on.
+     */
+    const hijack = (): typeof reply.raw => {
+      reply.hijack();
+      const res = reply.raw;
+      res.on('error', (err) => {
+        streamFailed = true;
+        request.log.debug({ err }, 'live stream ended with an error');
+        sub?.close();
+      });
+      return res;
+    };
+
     const { teacher, session } = await requireSessionOwner(db, request, id);
 
     if (clientGone || request.raw.destroyed) {
-      reply.hijack();
-      reply.raw.end();
+      hijack().end();
       return;
     }
 
@@ -132,8 +164,7 @@ export function registerFeedRoutes(
         ? { ...SSE_HEADERS, 'access-control-allow-origin': acao, vary: 'Origin' }
         : { ...SSE_HEADERS };
 
-    reply.hijack();
-    const raw = reply.raw;
+    const raw = hijack();
     raw.writeHead(200, headers);
     raw.write(': open\n\n'); // flush headers and confirm the stream is live
 
@@ -141,12 +172,21 @@ export function registerFeedRoutes(
       sessionId: session.id,
       teacherId: teacher.id,
       after,
-      write: (chunk) => raw.write(chunk),
-      onClose: () => raw.end(),
+      // Throw rather than write into a response onClose already ended: the hub
+      // reads a throwing write as "this stream is gone" and tears the
+      // subscription down, which is what we want. Silently returning would
+      // leave its timers running against a dead socket.
+      write: (chunk) => {
+        if (raw.writableEnded) throw new Error('stream already ended');
+        raw.write(chunk);
+      },
+      onClose: () => {
+        if (!raw.writableEnded) raw.end();
+      },
     });
 
     // The disconnect may have landed between the check above and subscribe, in
     // which case the handler ran while `sub` was still null — release it here.
-    if (clientGone || request.raw.destroyed) sub.close();
+    if (clientGone || streamFailed || request.raw.destroyed) sub.close();
   });
 }
