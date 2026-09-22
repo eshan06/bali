@@ -604,9 +604,12 @@ export interface ArmTapResult {
   /** 'armed' new/refreshed; 'already_armed' a live waiting tap stands; 'replay' this exact tap again. */
   outcome: 'armed' | 'already_armed' | 'replay';
   /**
-   * The waiting row this answer is about — absent only on the one `replay`
-   * that has no row: an id already recorded in `events`, where the tap landed
-   * in a session and nothing is waiting for it.
+   * The `armed_taps` row holding this tap's id. Normally the one waiting, but
+   * a `replay` can name a row a Start has already consumed: a rival delivery
+   * of the same tap won the id and was converted in between, so the tap is
+   * recorded and the row is spent. Absent only on the one `replay` that has
+   * no row: an id already recorded in `events`, where the tap landed in a
+   * session and nothing is waiting for it.
    */
   armedTapId?: string;
 }
