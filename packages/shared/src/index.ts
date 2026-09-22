@@ -118,6 +118,9 @@ export const EVENT_TYPES = [
   'enrollment_joined',
   'enrollment_left',
   'enrollment_removed',
+  // Decision 5: a Start declined a waiting tap because the tap it records had
+  // already landed. Names the student, not a participation — they did not join.
+  'armed_tap_skipped',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

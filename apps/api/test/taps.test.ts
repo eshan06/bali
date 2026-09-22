@@ -207,6 +207,61 @@ describe('POST /v1/taps', () => {
     });
   });
 
+  it("is a 409 when the event_id belongs to another student's armed tap", async () => {
+    // The status a phone actually sees, which no engine test can assert. The
+    // engine refuses a stranger's id with EVENT_ID_CONFLICT, and that has to
+    // reach the client as a 409 — a 500 reads to any outbox as a transient
+    // server fault, so the phone would retry the same poisoned id forever as
+    // if the server were down. The 409 says what is actually wrong, which is
+    // what the tap-side disposition (Phase 3) needs in order to surface it.
+    // The route gets this right for `tapIn` and got it wrong for `armTap`,
+    // which is the half with no joinable session running.
+    const a = await seedClassroom(db, 'tap-conflict-a');
+    const b = await seedClassroom(db, 'tap-conflict-b');
+    const eventId = randomUUID();
+
+    // Nothing running, so both of these arm rather than join.
+    const mine = await tap(await ctx.tokenFor(a.student.cognitoId), {
+      tagId: a.block.tagId,
+      eventId,
+    });
+    expect(mine.status).toBe(200);
+    expect(mine.body.outcome).toBe('armed');
+
+    const stranger = await tap(await ctx.tokenFor(b.student.cognitoId), {
+      tagId: a.block.tagId,
+      eventId,
+    });
+    expect(stranger.status).toBe(409);
+    expect(stranger.body).toMatchObject({ error: { code: 'conflict' } });
+  });
+
+  it("is a 409 when the event_id was spent at another teacher's block", async () => {
+    // Item 5 of the owner's 2026-09-22 ruling, at the status the phone sees.
+    // An id already recorded as this student's tap_in under teacher A, sent
+    // again at teacher B's block with nothing of B's running, was answered
+    // `200 replay`: B armed nothing, and the outbox deleted a tap that was
+    // never recorded for B. A /v1 200 -> 409, allowed by API decision 2's
+    // note on correcting a wrong answer in place.
+    const a = await seedClassroom(db, 'tap-xteacher-a');
+    const b = await seedClassroom(db, 'tap-xteacher-b');
+    await startSession(db, {
+      classId: a.klass.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const token = await ctx.tokenFor(a.student.cognitoId);
+    const eventId = randomUUID();
+
+    const landed = await tap(token, { tagId: a.block.tagId, eventId });
+    expect(landed.status).toBe(200);
+    expect(landed.body.outcome).toBe('joined');
+
+    const elsewhere = await tap(token, { tagId: b.block.tagId, eventId });
+    expect(elsewhere.status).toBe(409);
+    expect(elsewhere.body).toMatchObject({ error: { code: 'conflict' } });
+  });
+
   it('is a 404 for an unknown tag', async () => {
     const { student } = await seedClassroom(db, 'tap-unknown');
     const res = await authedInject(ctx.app, await ctx.tokenFor(student.cognitoId), {
