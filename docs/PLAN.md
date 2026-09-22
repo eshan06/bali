@@ -31,7 +31,13 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   Two things to know next time: a session cannot run this itself (dev Postgres
   exposes only `postgres.railway.internal`, and reaching it means publishing the
   database through Railway's TCP proxy), and `schools.id` has no DB default, so
-  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2).
+  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2). The
+  demo now prints that statement with a freshly minted id, ready to paste — and
+  the tests now **execute** the printed recipe against a migrated database
+  instead of string-matching it, since the missing-`id` bug read perfectly and
+  only failed at the database. The `UPDATE` half also refuses to run when there
+  is no live school (`AND EXISTS`), so pasting only the second statement reports
+  `UPDATE 0` rather than setting `school_id` NULL and looking like success.
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path
@@ -59,12 +65,14 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   reviewed against `apps/` + `packages/`; nine reproduced and are landing as
   small gated PRs, one PR per finding or related pair: offset timestamps
   (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap insert race and its event-id integrity gap (**in review**), block
-  re-registration by the tag's own teacher (**in review**), a replayed tap
-  re-resolved to another session, extend's arithmetic outside the engine
-  transaction, the portal's reconnect backoff, the portal's staleness banner,
-  and one shared SQLSTATE helper. The tenth, `POST /v1/classes`'s
-  missing idempotency key, was re-examined and the deferral stands.
+  the armTap insert race and its event-id integrity gap (**in review**), a
+  replayed tap re-resolved to another session, extend's arithmetic outside the
+  engine transaction, the portal's reconnect backoff, the portal's staleness
+  banner, and one shared SQLSTATE helper. Block re-registration by the tag's
+  own teacher is fixed but **held for the owner** — the fix answers 200 where
+  `/v1` answers 409 today, and decision 2 sends behaviour changes to `/v2`.
+  The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
+  the deferral stands.
 - **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
   10 steps, plan already agreed with the owner. Phase 0's open question gates
   step 5: confirm the DeviceActivity extension fires at interval END with the
@@ -130,8 +138,8 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
-- **2026-09-22** — Four defects in `armTap`/`createBlock`, three of them the
-  same shape: a read-then-write where the database could have arbitrated.
+- **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
+  read-then-write where the database could have arbitrated.
   (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
   phone both passed the selects and the loser surfaced a raw 23505 as a 500 to
   a student walking to their seat. It now lets the waiting-tap index arbitrate
@@ -151,21 +159,50 @@ under-13 parental-consent machinery.
   under them keeps a fresh waiting tap, so the teacher's next session that day
   converts them without another tap. Decision 5 says a tap is a tap, and
   end-of-day expiry bounds it.
-  (3) `createBlock` answered `tag_taken` to the teacher who already owns the
-  tag — advice they cannot act on, since they cannot free a tag they hold. A
-  replay now returns their own block, the way `startSession` returns the
-  running session. **Behaviour change on a shipped endpoint:** `POST
-  /v1/blocks` answers 200 instead of 409 for that case. Nothing is renamed or
-  removed and `BlockDetail` is unchanged, but ARCHITECTURE.md decision 2 says
-  behaviour changes go via `/v2`, so this is flagged for the owner rather than
-  taken as settled. No client can break today: the only caller in the tree is
-  the demo script, the portal never calls it, and there is no iOS app yet.
-  Three existing tests asserted the old answer and now assert the replay; the
-  cross-teacher rule keeps its two untouched tests.
+  The third finding in this pair, `createBlock` answering `tag_taken` to the
+  teacher who already owns the tag, is **split out and waiting on the owner**:
+  fixing it means `POST /v1/blocks` answering 200 where it answers 409 today,
+  and ARCHITECTURE.md decision 2 sends behaviour changes on a shipped endpoint
+  to `/v2`. Nothing would be renamed or removed and `BlockDetail` is
+  unchanged, and no client can break today (the portal never calls it, the
+  only caller in the tree is the demo script, and there is no iOS app yet) —
+  but that is the owner's call, not a code-review one, so the rest ships
+  without it rather than waiting.
   Race coverage runs on the real-Postgres lane only — PGlite is
   single-connection and cannot contend, so the fast lane would pass either
   way. The warm-up in the race suite is load-bearing for round 0: with a fix
   reverted and a cold pool, the first round passes vacuously.
+- **2026-09-22** — Follow-ups from #18's review, and a claim of mine that a
+  reviewer disproved. The stream route's `'error'` listener logged at `debug`
+  while production runs at `info`, so the fix that stopped the crash would also
+  have hidden anything unexpected that reached it; it now logs the one code
+  that actually arrives (`ERR_STREAM_WRITE_AFTER_END`) at `debug` and anything
+  else at `warn`. Measured while correcting a wrong rationale: a peer reset
+  reaches the socket and the server's `'clientError'`, never a hijacked
+  response, and a write after destroy is routed to the write callback rather
+  than emitted — so `warn` here means "we have never seen this", not "a proxy
+  is resetting connections". The `streamFailed` disjunct after `subscribe` is
+  removed: nothing between the hijack and that check is asynchronous, so it had
+  never fired (a reviewer instrumented it across the whole suite on both lanes
+  to confirm).
+  I had also recorded that two of the route's guards could not be pinned by a
+  test, having written three that all passed against the broken version. That
+  was wrong, and the counterexample was one entry above it in this same file:
+  under backpressure `'finish'` never fires, so the request's `'close'` never
+  arrives, the subscription stays live, and the hub's next read hands a frame
+  to a write on an ended response. The technique is to **stall the flush** —
+  a client that never reads holds the window open — and with it the guard is
+  observably load-bearing: softened to a silent `return`, the per-teacher slot
+  leaks and the teacher sits permanently at their cap. That test now ships.
+  Its reach is exact and worth knowing: softening the guard turns it red, but
+  deleting the guard outright leaves the suite green, because the route's own
+  'error' listener then releases the slot a tick later. The guard is the
+  synchronous path; the listener is the net. That is written above the guard
+  so a green run is not read as permission to remove it.
+  The reusable lesson is not "this cannot be tested" but "the obvious
+  end-to-end reproduction is rescued by another guard; hold the window open
+  yourself".
+
 - **2026-09-22** — The live grid's crash-safety was borrowed; the stream route
   now owns it. A write after `end()` on the hijacked SSE response does not
   throw — it returns false and emits `'error'` a tick later, so the hub's

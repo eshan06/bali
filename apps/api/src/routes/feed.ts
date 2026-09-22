@@ -20,6 +20,19 @@ const SSE_HEADERS = {
 };
 
 /**
+ * Which level a hijacked stream's error deserves. A bare string comparison on
+ * the teardown path is easy to mistype or invert, and getting it wrong sends
+ * every ordinary tab-close to `warn` in production — the noise this split
+ * exists to avoid — with nothing going red. Named so it can be asserted.
+ *
+ * Measured: ERR_STREAM_WRITE_AFTER_END is the only code that actually reaches
+ * such a listener, so everything else means "never seen before".
+ */
+export function streamErrorLevel(code: string | undefined): 'debug' | 'warn' {
+  return code === 'ERR_STREAM_WRITE_AFTER_END' ? 'debug' : 'warn';
+}
+
+/**
  * The teacher grid's read + live sides (decision 5), all owner-only:
  * - GET /v1/sessions/:id — boot snapshot (session, roster, latest seq).
  * - GET /v1/sessions/:id/events?after=seq — catch-up page, seq-ascending.
@@ -102,7 +115,6 @@ export function registerFeedRoutes(
     // throwing, so the hub never notices either) — the teacher ends up
     // permanently 429'd by the cap.
     let clientGone = false;
-    let streamFailed = false;
     let sub: { close: () => void } | null = null;
     request.raw.on('close', () => {
       clientGone = true;
@@ -133,9 +145,20 @@ export function registerFeedRoutes(
     const hijack = (): typeof reply.raw => {
       reply.hijack();
       const res = reply.raw;
-      res.on('error', (err) => {
-        streamFailed = true;
-        request.log.debug({ err }, 'live stream ended with an error');
+      res.on('error', (err: NodeJS.ErrnoException) => {
+        // Measured: ERR_STREAM_WRITE_AFTER_END is the only code that actually
+        // reaches here. A peer reset arrives as ECONNRESET on the socket and
+        // on the server's 'clientError', never on a hijacked response, and a
+        // write after destroy is routed to the (nop) write callback rather
+        // than emitted. So the teardown race is the expected case and goes to
+        // `debug`, and `warn` is not a proxy-reset alarm — it is "something
+        // reached this listener that we have never seen", which LOG_LEVEL's
+        // `info` default would otherwise swallow entirely.
+        if (streamErrorLevel(err.code) === 'debug') {
+          request.log.debug({ err }, 'live stream ended mid-write');
+        } else {
+          request.log.warn({ err }, 'unexpected error on a live stream');
+        }
         sub?.close();
       });
       return res;
@@ -172,10 +195,20 @@ export function registerFeedRoutes(
       sessionId: session.id,
       teacherId: teacher.id,
       after,
-      // Throw rather than write into a response onClose already ended: the hub
-      // reads a throwing write as "this stream is gone" and tears the
-      // subscription down, which is what we want. Silently returning would
-      // leave its timers running against a dead socket.
+      // Throw rather than write into a response onClose already ended. This
+      // is what makes teardown synchronous: the hub reads a throwing write as
+      // "this stream is gone" and closes on the spot, instead of the write
+      // landing on a dead response and the slot coming back only once the
+      // 'error' listener above fires a tick later.
+      //
+      // Pinned by "a resuming read into an ended response releases the
+      // teacher's slot" in stream-teardown.test.ts, which holds the window
+      // open by stalling the flush. Know its exact reach before editing here:
+      // softening this to a silent `return` turns that test red (the slot
+      // leaks and the teacher stays at their cap), but DELETING it leaves the
+      // suite green, because the 'error' listener then releases the slot
+      // asynchronously instead. So a green run is not permission to remove
+      // it — the guard is the synchronous path, the listener is the net.
       write: (chunk) => {
         if (raw.writableEnded) throw new Error('stream already ended');
         raw.write(chunk);
@@ -187,6 +220,11 @@ export function registerFeedRoutes(
 
     // The disconnect may have landed between the check above and subscribe, in
     // which case the handler ran while `sub` was still null — release it here.
-    if (clientGone || streamFailed || request.raw.destroyed) sub.close();
+    // A stream error needs no term here: everything from hijack() to this line
+    // is synchronous, and 'error' cannot be emitted before a later tick, so
+    // the listener's own sub?.close() is what covers it. A dead disjunct that
+    // reads like a guarantee is worse than none — the next reader adds an
+    // await above and trusts a net that has never fired.
+    if (clientGone || request.raw.destroyed) sub.close();
   });
 }
