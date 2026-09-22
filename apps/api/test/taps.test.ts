@@ -101,10 +101,11 @@ describe('POST /v1/taps', () => {
     // The status a phone actually sees, which no engine test can assert. The
     // engine refuses a stranger's id with EVENT_ID_CONFLICT, and that has to
     // reach the client as a 409 — a 500 reads to any outbox as a transient
-    // server fault (`unlockDisposition`'s rule: non-401 4xx retries AND
-    // surfaces), so the phone would retry the same poisoned id forever with
-    // nothing ever shown. The route gets this right for `tapIn` and got it
-    // wrong for `armTap`, which is the half with no session running.
+    // server fault, so the phone would retry the same poisoned id forever as
+    // if the server were down. The 409 says what is actually wrong, which is
+    // what the tap-side disposition (Phase 3) needs in order to surface it.
+    // The route gets this right for `tapIn` and got it wrong for `armTap`,
+    // which is the half with no joinable session running.
     const a = await seedClassroom(db, 'tap-conflict-a');
     const b = await seedClassroom(db, 'tap-conflict-b');
     const eventId = randomUUID();

@@ -773,11 +773,11 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // Start. The standing-row branch below already refuses to let a SPENT id
     // sit in a waiting row; this refuses to put one there.
     //
-    // Scoped to the CALLER — student, type and teacher — like every other
-    // event-id lookup here. An id on record for anything else is not this
-    // phone's replay: answering `replay` would tell this outbox the tap is
-    // durably recorded, so it drops a tap that was never armed and never
-    // converts. `insertEvent` refuses the same class of reuse for the same
+    // Scoped to the CALLER — student, type and teacher, the axes the
+    // `armed_taps` lookups below cover too (every row there is a tap). An id
+    // on record for anything else is not this phone's replay: answering
+    // `replay` would tell this outbox the tap is durably recorded, so it drops
+    // a tap that was never armed and never converts. `insertEvent` refuses the same class of reuse for the same
     // reason ("a student's app is an adversary here"), and this holds that
     // line: a non-401 4xx keeps the record and retries, which loses nothing.
     // Not "and surfaces" — that is the UNLOCK contract's `retry_and_surface`,
@@ -796,9 +796,10 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // It closes the cross-teacher split only. The same teacher, an id spent in
     // an earlier session of theirs, still answers `replay`: that is also
     // exactly what the honest retry of a lost 200 looks like, and telling the
-    // two apart needs a session scope this call cannot have — nothing is
-    // running, which is why it reached `armTap`. Written up in docs/PLAN.md's
-    // armed-tap review entry.
+    // two apart needs a session scope this call cannot have: no session the
+    // student can join is running — nothing of that teacher's, or only one in
+    // a class they are not in — which is why it reached `armTap`. Written up
+    // in docs/PLAN.md's armed-tap review entry.
     //
     // And it costs what the `armed_taps` lookup's teacher scope below costs:
     // a block that MOVES between a tap and its retry resolves the retry to a

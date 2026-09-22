@@ -1007,6 +1007,10 @@ describe('armed taps', () => {
       await db.select().from(participations).where(eq(participations.sessionId, sessionA.id)),
     );
     expect(partA.endedReason).toBe('left_for_other_session');
+    // A switch is still a join: no `armed_tap_skipped` for a tap that converts.
+    expect((await eventsFor(startB.session.id)).map((e) => e.type)).not.toContain(
+      'armed_tap_skipped',
+    );
   });
 
   it('mints a converted tap_in BEFORE the leave it causes, and both at one stamp', async () => {
@@ -1296,7 +1300,7 @@ describe('armed taps', () => {
     expect(rows[0]?.teacherId).toBe(teacher.id);
   });
 
-  it('refuses an id spent under another teacher, the answer tapIn gives', async () => {
+  it('refuses an id spent under another teacher, as tapIn does', async () => {
     /*
      * The `events` lookup is scoped to the teacher as well as the student and
      * the type (item 5 of the 2026-09-22 ruling), like the `armed_taps` lookup
@@ -1309,16 +1313,16 @@ describe('armed taps', () => {
      * It was also looser than `insertEvent`'s replay key (type + session +
      * user), so one reuse got two answers on nothing the client controls: a
      * 409 when B had a session running that the student is enrolled in (the
-     * tap routes to `tapIn`, which refuses the spent id), a silent 200 here in
-     * every other shape. Both answers are the 409 now, and the outbox keeps
-     * the record.
+     * tap routes to `tapIn`, which refuses the spent id — asserted below), a
+     * silent 200 here in every other shape. Both answers are the 409 now, and
+     * the outbox keeps the record.
      *
      * Only the cross-teacher half. The SAME teacher, an id spent in an earlier
      * session of theirs, still answers `replay` here — "does not arm an id
      * that already landed" pins it — because that is also exactly what the
      * honest retry of a lost 200 looks like, and telling the two apart needs a
-     * session scope `armTap` does not have: nothing is running, which is why
-     * the call reached it.
+     * session scope `armTap` does not have: no session the student can join is
+     * running, which is why the call reached it.
      */
     const { student, klass, school } = await seedClass('arm-spent-cross');
     const otherTeacher = one(
@@ -1327,6 +1331,18 @@ describe('armed taps', () => {
         .values({ cognitoId: 'teacher-arm-spent-cross-2', role: 'teacher', schoolId: school.id })
         .returning(),
     );
+    const otherClass = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: otherTeacher.id,
+          schoolId: school.id,
+          name: 'Class arm-spent-cross-2',
+          joinCode: 'JOIN-ARMX2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: otherClass.id, studentId: student.id });
 
     // 09:01, the tap lands in teacher A's period and the 200 is lost.
     const first = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
@@ -1356,6 +1372,21 @@ describe('armed taps', () => {
     ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
     const waiting = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
     expect(waiting).toHaveLength(0);
+
+    // And the other door gives the same answer: at 10:00 B is running a
+    // session the student is enrolled in, so the tap routes to `tapIn`.
+    const running = await startSession(db, {
+      classId: otherClass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: running.session.id,
+        studentId: student.id,
+        eventId: spent,
+        deviceTime: new Date('2026-01-01T10:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
   });
 
   it('refuses an id recorded with no class at all, rather than arming it', async () => {
@@ -1642,6 +1673,82 @@ describe('armed taps', () => {
     expect(skipped.payload).toEqual({ armed_tap_event_id: spent });
     expect(skipped.occurredAt).toEqual(second.session.startedAt);
     expect(await skipsIn(fifth.session.id)).toHaveLength(0);
+  });
+
+  it('skips a waiting tap whose id landed under ANOTHER teacher, and leaves that session alone', async () => {
+    /*
+     * The skip is keyed on the student and the type, not the teacher, unlike
+     * `armTap`'s lookup of the same id — and on purpose: a `tap_in` of this
+     * student's under teacher A is a tap that landed, whoever's Start later
+     * finds its id waiting. Reaching it needs an id reused across teachers or
+     * a block that moved, so the row is written directly.
+     *
+     * Scoping it to the teacher, to match `armTap`, is the refactor this
+     * pins against: the row would convert under a fresh id, end the student's
+     * LIVE participation in A (decision 4), and join and shield them in B — a
+     * session they never tapped into, which is what the skip exists to stop.
+     * And the skip is recorded in the session that declined it: B's, a
+     * different class from the one the tap landed in.
+     */
+    const a = await seedClass('arm-skip-xa');
+    const b = await seedClass('arm-skip-xb');
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+
+    const sessionA = (
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    const spent = newUuidV7();
+    await tapIn(db, {
+      sessionId: sessionA.id,
+      studentId: a.student.id,
+      eventId: spent,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    one(
+      await db
+        .insert(armedTaps)
+        .values({
+          studentId: a.student.id,
+          teacherId: b.teacher.id,
+          eventId: spent,
+          deviceTime: new Date('2026-01-01T09:01:00Z'),
+          expiresAt: new Date('2026-01-01T23:59:59Z'),
+        })
+        .returning(),
+    );
+
+    const startB = await startSession(db, {
+      classId: b.klass.id,
+      ...window('2026-01-01T09:05:00Z'),
+    });
+    expect(startB.armedConverted).toBe(0);
+
+    // Still live in A, and nowhere in B.
+    const live = one(
+      await db
+        .select()
+        .from(participations)
+        .where(and(eq(participations.studentId, a.student.id), isNull(participations.endedAt))),
+    );
+    expect(live.sessionId).toBe(sessionA.id);
+    expect(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, startB.session.id),
+            eq(participations.studentId, a.student.id),
+          ),
+        ),
+    ).toHaveLength(0);
+
+    const skipped = one(
+      (await eventsFor(startB.session.id)).filter((e) => e.type === 'armed_tap_skipped'),
+    );
+    expect(skipped.userId).toBe(a.student.id);
+    expect(skipped.classId).toBe(b.klass.id);
+    expect(skipped.payload).toEqual({ armed_tap_event_id: spent });
   });
 
   it.each([

@@ -39,7 +39,10 @@ middle was considered and rejected — see below.)
    already recorded in `events` for a *different* event — another student's, another
    kind of event, or this student's tap under another teacher — is not a retry but a
    client bug, and gets `409` instead: a `200` would tell the phone to delete a record
-   the server never kept (step 10).
+   the server never kept (step 10). When the tap is saved as armed (decision 5), the same
+   goes for an id already held by a waiting tap that is not this student's for this
+   teacher. Blocks cannot move yet; the endpoint that lets them must revisit the
+   other-teacher case, because after a move an honest retry looks exactly like it.
 10. Respond `200 OK`. Only now does the phone delete the record from local storage.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 

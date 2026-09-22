@@ -842,6 +842,60 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     }
   });
 
+  it('two Starts racing over one spent waiting tap record exactly one skip', async () => {
+    /*
+     * Two classes of one teacher start at the same moment, and the student
+     * holds one waiting tap whose id already landed — so both Starts select
+     * it. `armed_tap_skipped` is history, and history must say it once: the
+     * Start that locks the row first consumes it and records the skip, and
+     * the other's FOR UPDATE waits, re-checks `consumed_at`, and drops the
+     * row. Read without the lock, both see it waiting and both record a skip
+     * for one tap.
+     */
+    for (let round = 0; round < 20; round += 1) {
+      const tag = `race-skip-${round}`;
+      const { classId, studentId } = await seed(tag);
+      const cls = one(await db.select().from(classes).where(eq(classes.id, classId)));
+      const other = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: cls.teacherId,
+            schoolId: cls.schoolId,
+            name: `Other ${tag}`,
+            joinCode: `${tag}-b`,
+          })
+          .returning(),
+      );
+      await db.insert(enrollments).values({ classId: other.id, studentId });
+
+      // The tap lands in an earlier session, which ends; its id is then left
+      // waiting — written directly, since armTap refuses a spent id.
+      const earlier = await openSession(classId);
+      const spent = newUuidV7();
+      await tapIn(db, { sessionId: earlier.id, studentId, eventId: spent, deviceTime: new Date() });
+      await endSession(db, { sessionId: earlier.id, at: new Date(), reason: 'ended' });
+      await db.insert(armedTaps).values({
+        studentId,
+        teacherId: cls.teacherId,
+        eventId: spent,
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+
+      const started = await Promise.all([openSession(classId), openSession(other.id)]);
+
+      const skips = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.type, 'armed_tap_skipped'), eq(events.userId, studentId)));
+      expect(skips, `round ${round}: one tap, one skip`).toHaveLength(1);
+      for (const s of started) expect(await liveParticipations(s.id)).toHaveLength(0);
+      const row = one(await db.select().from(armedTaps).where(eq(armedTaps.eventId, spent)));
+      expect(row.consumedAt).not.toBeNull();
+    }
+  });
+
   it('a refresh landing inside a conversion cannot orphan its event id', async () => {
     /*
      * The other half of the same invariant, and the one a row guard cannot

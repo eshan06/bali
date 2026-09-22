@@ -113,7 +113,7 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
 | Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx`; and `armed_tap_skipped` carries the student's id, so it shows here too — render it as a declined tap, never a join |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
-| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | |
+| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | `armed_tap_skipped` names a student who did NOT join — never count it as a join |
 | Teacher signup gating (invite code) | 4 | today: manual role flip **and school assignment** — nothing assigns `users.school_id`, and `classes.school_id` is NOT NULL |
 | Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch |
 | Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |
@@ -164,6 +164,12 @@ under-13 parental-consent machinery.
     teacher still answers `replay`, because that is also exactly what the
     honest retry of a lost 200 looks like. Tap step 9 now says what happens
     to an id on record for a different event.
+    The TYPE axis — a phone's own `unlock` id sent again as a tap — is not
+    literally one of the five items, so it is named here for the owner to
+    see: on `main` the arm path accepted it (`200 armed`, then converted
+    under a fresh id at Start) while the join path already refused it with
+    `409`, under 2026-09-20's "an `event_id` identifies one event". #29
+    applies that existing decision to the arm path.
   - **Item 4, #29.** ARCHITECTURE decision 5 carries its one exception: a
     waiting tap whose id is already this student's own `tap_in` was honoured
     elsewhere, so it is consumed without joining — and RECORDED, the honesty
@@ -174,9 +180,14 @@ under-13 parental-consent machinery.
     it would put a student in a session they are not in. Phase 4's reports
     must not count it as a join either. Pinned both ways: the skip's
     history row (session, class, payload, and the Start's stamp rather than
-    a fast phone clock's claim that the clamp would keep), and its absence
-    on every tap that converts. The `409` is pinned on the wire as well as
-    in the engine.
+    a fast phone clock's claim that the clamp would keep) — including a skip
+    declined by another teacher's Start, which leaves the student live where
+    they are — and its absence on each shape of conversion: a plain join, a
+    decision-4 switch, and a fresh-id conversion. Exactly once under two
+    racing Starts, on the real-Postgres lane: with `FOR UPDATE` removed, five
+    runs of five record two skips for one tap. The `409` is pinned on the
+    wire as well as in the engine, and `tapIn` refuses the same reuse
+    (asserted with the first session over).
   - **Item 2, #28** — rule 4 and tap step 10, to be amended in that PR,
     which lands second.
   - **Item 1** — `POST /v1/blocks` hands a teacher their own block back
@@ -258,7 +269,9 @@ under-13 parental-consent machinery.
   already defines a 409 for that code. That is rule 5 inverted: a 500 reads to
   any outbox as a transient server fault, so the phone retries the poisoned id
   forever and nothing ever surfaces, while the permanent 409 retries AND
-  shows. Harmless on `main` (nothing in `armTap` threw a `TransitionError`
+  shows. (**Corrected later:** a tap 409 is retried but not shown —
+  `retry_and_surface` is the unlock contract's, and the tap-side disposition
+  is Phase 3.) Harmless on `main` (nothing in `armTap` threw a `TransitionError`
   before), which is why it slipped. An engine test cannot catch this — the
   throw is right and only the status is wrong — so the pin is an API test that
   asserts the 409 a phone actually sees.
@@ -688,7 +701,9 @@ under-13 parental-consent machinery.
   touching its id, so a student whose spent id was armed between periods, and
   who then physically tapped again, had that fresh tap dropped on the floor
   and was skipped at Start: told "armed" twice, joined never, absent from the
-  grid with nothing in `events` to say why. Reproduced. A standing row whose
+  grid with nothing in `events` to say why (at the time; since the ruling the
+  skip is recorded, but the dropped fresh tap would still be recorded
+  nowhere). Reproduced. A standing row whose
   id is already on record is stale, so the fresh tap takes the slot. For an
   id that is this student's own `tap_in` that is the same reason an expired
   row is stale — the conversion will not honour it. The check is broader than
@@ -711,7 +726,9 @@ under-13 parental-consent machinery.
   firing on any `EVENT_ID_CONFLICT`, which `insertEvent` also raises for an id
   held by another type or another user (the phone's own `unlock` id, a
   stranger's tap). Neither means this tap landed, so skipping it dropped a
-  genuine unhonoured tap with nothing in `events`. Those convert under a fresh
+  genuine unhonoured tap with nothing in `events` (at the time; since the
+  ruling it would be recorded as a skip, which is worse — a tap that never
+  landed, on record as one that did). Those convert under a fresh
   id again, as they did before the skip, and are pinned both ways ("… is
   still converted, under a fresh id"), with main's `armed_tap_event_id`
   payload linking each back to its armed row. Such rows are reachable on
