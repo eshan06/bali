@@ -73,6 +73,17 @@ describe('grid-state', () => {
     expect(applyEvent(s, evt(6, 'went_silent', 'ana'))).toBe(s);
   });
 
+  it('leaves the roster untouched for armed_tap_skipped (the student it names never joined)', () => {
+    // A Start that declines a waiting tap — the tap it records had already
+    // landed elsewhere — records the skip in this session's feed, naming the
+    // student. It is history, not a join: painting a chip from it would put a
+    // student in a session they are not in. One who is enrolled already shows
+    // from the snapshot, as absent.
+    const s = fromSnapshot(snapshot(5, [{ id: 'ana', state: null }]));
+    expect(applyEvent(s, evt(6, 'armed_tap_skipped', 'ana'))).toBe(s);
+    expect(applyEvent(s, evt(7, 'armed_tap_skipped', 'zed'))).toBe(s);
+  });
+
   it('ignores an event with no user', () => {
     const s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
     expect(applyEvent(s, evt(6, 'unlock', null))).toBe(s);

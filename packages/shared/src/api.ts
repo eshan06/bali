@@ -39,7 +39,17 @@ export interface TapRequest {
 export type TapOutcome = 'joined' | 'switched' | 'armed' | 'already_armed' | 'replay';
 export interface TapResponse {
   outcome: TapOutcome;
-  /** The joined session (joined/switched/replay); null when the tap was armed. */
+  /**
+   * The joined session for `joined` / `switched`, and for the `replay` of a
+   * tap whose participation is still live. Null when the tap was armed — and
+   * null on one `replay` too: an id already recorded in `events` with nothing
+   * waiting for it, where the tap landed in a session that has since ended.
+   *
+   * That last case belongs to the tap-side contract work recorded for Phase 3
+   * in PLAN.md: a phone told `replay` with no session has nothing to
+   * reconcile against, which is exactly what a "recorded, but no longer
+   * current" answer would give it.
+   */
   session: SessionView | null;
   /** The resulting stored state when joined; null when armed. */
   state: ParticipationState | null;
