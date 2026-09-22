@@ -356,6 +356,40 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     )
     .for('update');
 
+  // A waiting tap can carry an event id that is ALREADY on record as a
+  // `tap_in`: the student's tap landed in an earlier session, its response was
+  // lost, and the retry — finding nothing of this teacher's running — armed
+  // the same id, because `armTap` de-dupes against `armed_taps.event_id` and
+  // never against `events`. Converting under that id makes `insertEvent`
+  // refuse it as another event's, and since this runs inside `startSession`'s
+  // transaction the whole Start rolls back, leaving the tap unconsumed. The
+  // teacher then cannot open ANY class that student is in — `waiting` is
+  // selected by TEACHER, not by class — until the tap expires at end of day.
+  // Reproduced end to end; pinned by "a spent event id never wedges the next
+  // Start".
+  //
+  // A tap is still a tap (decision 5) and the student is still standing there,
+  // so the conversion goes ahead under a fresh id, with the spent one kept in
+  // the payload so the history still shows which tap it came from. Nothing is
+  // weakened: that id exists to de-dupe ARMING, and this conversion is already
+  // exactly-once — the row is consumed in this same transaction.
+  const spent =
+    waiting.length === 0
+      ? new Set<string>()
+      : new Set(
+          (
+            await tx
+              .select({ eventId: events.eventId })
+              .from(events)
+              .where(
+                inArray(
+                  events.eventId,
+                  waiting.map((t) => t.eventId),
+                ),
+              )
+          ).map((row) => row.eventId),
+        );
+
   let converted = 0;
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
@@ -388,13 +422,15 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
           silentSince: null,
         },
       });
+    const reused = spent.has(tap.eventId);
     await insertEvent(tx, {
-      eventId: tap.eventId,
+      eventId: reused ? newUuidV7() : tap.eventId,
       type: 'tap_in',
       sessionId: session.id,
       classId: session.classId,
       userId: tap.studentId,
       occurredAt,
+      payload: reused ? { armed_tap_event_id: tap.eventId } : undefined,
     });
     await tx
       .update(armedTaps)

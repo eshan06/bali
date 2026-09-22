@@ -231,6 +231,64 @@ under-13 parental-consent machinery.
   is defence-in-depth for a direct engine caller rather than a live 500. Its client-facing message no longer
   claims the end time was not moved forward, which the duration rewrite made
   false. The real-Postgres lane now covers two concurrent extends both landing.
+- **2026-09-22** — The worst thing the audit turned up was not on its list: a
+  lost tap response could stop a teacher starting any lesson for the rest of
+  the day, and it needed no race to reach. A tap lands in a session, its
+  response is lost, the bell ends the session, and the phone's outbox retries.
+  Nothing of that teacher's is running, so the route arms the retry —
+  `armTap` de-dupes against `armed_taps.event_id` and never against `events`,
+  so a SPENT id is accepted. The next Start converts it, `insertEvent` sees
+  the id against a different session and refuses, and because conversion runs
+  inside `startSession`'s transaction the whole Start rolls back with the tap
+  still unconsumed. Waiting taps are selected by TEACHER, not by class, so
+  every class that student is in is blocked, every period, until the tap
+  expires at end of day.
+  A tap is still a tap (decision 5) and the student is still standing there,
+  so the conversion now goes ahead under a fresh event id, with the spent one
+  kept in `payload.armed_tap_event_id` so the history still shows which tap it
+  came from. Nothing is weakened: the armed tap's id exists to de-dupe
+  ARMING, and the conversion was already exactly-once, consumed in the same
+  transaction. Both reviewers on the tap-replay step reproduced this
+  independently and flagged it as worse than anything that step fixed; it is
+  pre-existing on `main`, reproduced there before the fix.
+  This also removes the sharp edge under the tap path's refusals: each of them
+  is a 409 the outbox keeps retrying, and this was where that retrying ended
+  up. The contract question — a tap that landed but is no longer current has
+  no honest `200` — is still open for the owner, but it can no longer cost a
+  teacher their day.
+- **2026-09-22** — #22's own review found the same class of hole one level up
+  from the one #22 fixed. That PR extracted `streamErrorLevel` so the stream
+  route's log decision could be asserted, but the listener then RE-BRANCHED on
+  what it returned, and that branch was hand-written and unseen: swapping its
+  two bodies left the whole api suite green (verified — 244 passed) while
+  every ordinary tab-close would log at `warn` in production, which is the
+  exact noise the split existed to avoid. A pinned function with an unpinned
+  call site pins nothing. The helper now returns the level AND the line
+  together (`streamErrorLog`) and the listener dispatches on what comes back,
+  so there is no branch left outside the tested function. Inverting the helper
+  turns all five of its cases red.
+  The same lesson twice, because the review also measured the stalled-reader
+  test's own loop. It claimed to queue "until the socket genuinely stops
+  draining, rather than trusting a byte count measured on one machine" — but
+  `write()` returns false on the very first 1 MiB chunk (the stream high-water
+  mark is 64 KiB and says nothing about the socket), so the loop exited after
+  one iteration, the pad was a fixed 5 MiB, and the assertion guarding it was
+  true before the socket had done anything. It watches `writableLength` now —
+  what has been handed over and not yet accepted — so a round where it grows
+  by the whole chunk is a round where nothing drained. The magic number is
+  gone and both mutations still kill the test.
+  Also from that review: the crash-regression test's socket is registered with
+  the same `extraSockets` net its neighbour already had, and its `'request'`
+  listener is removed once it has what it needs — a `waitFor` timing out
+  before the `try` used to leave a live streaming connection attached to an
+  app the suite was about to close.
+  Worth knowing for anyone re-running CI locally: `npm test --
+  --hookTimeout=60000` at the repo root silently DROPS the flag (the root
+  script is `npm test -ws --if-present`, so npm takes the extra argument as
+  its own), and on a loaded box PGlite's `beforeEach` then reports phantom
+  "Hook timed out in 10000ms" failures. Run `npx vitest run --root <workspace>
+  --hookTimeout=120000` per workspace instead.
+
 - **2026-09-22** — Three defects in `armTap`, two of them the same shape: a
   read-then-write where the database could have arbitrated.
   (1) `armTap`'s insert had no `ON CONFLICT`, so two pre-bell taps from one
