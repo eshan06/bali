@@ -1644,13 +1644,15 @@ describe('armed taps', () => {
        * landed. `insertEvent` also refuses an id held by another event type or
        * another user, and neither of those means this tap was honoured. It is
        * a genuine pre-bell tap whose id collided, so decision 5 applies: it
-       * becomes a participation, under a fresh id, exactly as `main` converts
-       * it. Skipping it would drop a real tap with nothing in `events` to say
-       * so.
+       * becomes a participation under a fresh id, with the armed id in the
+       * payload — exactly as `main` converts it. Skipping it would drop a real
+       * tap with nothing in `events` to say so.
        *
-       * Written straight into `armed_taps` because `armTap` now refuses both
-       * shapes on the way in; these are rows that already exist — armed
-       * before that refusal shipped, or by an older deploy.
+       * Written straight into `armed_taps` after the colliding event, which is
+       * the simplest honest staging of the end state. The shape is reachable
+       * in either order: `armTap` refuses an id already in `events`, but only
+       * as of arming — `tapIn` and `unlock` never consult `armed_taps`, so an
+       * id armed first can be taken by another event before the Start.
        */
       const { teacher, student, klass, school } = await seedClass(`arm-foreign-${shape}`);
       const first = await startSession(db, {
@@ -1735,6 +1737,7 @@ describe('armed taps', () => {
       );
       expect(tapInHere).toHaveLength(1);
       expect(one(tapInHere).eventId).not.toBe(collided);
+      expect(one(tapInHere).payload).toEqual({ armed_tap_event_id: collided });
       expect(one(await db.select().from(events).where(eq(events.eventId, collided)))).toEqual(
         recordedBefore,
       );

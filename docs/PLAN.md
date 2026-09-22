@@ -654,8 +654,12 @@ under-13 parental-consent machinery.
   stranger's tap). Neither means this tap landed, so skipping it dropped a
   genuine unhonoured tap with nothing in `events`. Those convert under a fresh
   id again, as they did before the skip, and are pinned both ways ("… is
-  still converted, under a fresh id"). This narrows the skip, and so narrows
-  what item 4 of the owner's ruling covers; it does not decide that ruling. Nothing is weakened: the armed tap's id exists to de-dupe
+  still converted, under a fresh id"), with main's `armed_tap_event_id`
+  payload linking each back to its armed row. Such rows are reachable on
+  current code, not only from old deploys: `armTap`'s refusal holds only as
+  of arming, and `tapIn`/`unlock` never consult `armed_taps`. This narrows the
+  skip, and so narrows what finding (a) above leaves for the owner's ruling;
+  it does not decide that ruling. Nothing is weakened: the armed tap's id exists to de-dupe
   ARMING, and the conversion was already exactly-once, consumed in the same
   transaction. Both reviewers on the tap-replay step reproduced this
   independently and flagged it as worse than anything that step fixed; it is

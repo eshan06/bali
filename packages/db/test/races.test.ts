@@ -619,13 +619,14 @@ async function waitForBackendOnArmedTaps(timeoutMs = 1_500): Promise<void> {
 }
 
 /**
- * Held-transaction tests that gate on `waitForBlockedBackend()`'s 5 s default
- * carry an explicit 20 s budget, and must: this package has no vitest config,
- * so the test budget is vitest's own 5 s, and a round that never staged died
- * as "Test timed out" — naming nothing — before the gate could throw the error
- * that says what went wrong. Measured, with the gate forced to miss.
+ * Fail rather than proceed if nothing ever blocks — the staging must be real.
+ *
+ * Held-transaction tests that gate on the 5 s default carry an explicit 20 s
+ * budget, and must: this package has no vitest config, so the test budget is
+ * vitest's own 5 s, and a round that never staged died as "Test timed out" —
+ * naming nothing — before the gate could throw the error that says what went
+ * wrong. Measured, with the gate forced to miss.
  */
-/** Fail rather than proceed if nothing ever blocks — the staging must be real. */
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

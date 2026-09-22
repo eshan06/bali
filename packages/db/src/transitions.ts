@@ -301,7 +301,9 @@ export interface StartSessionResult {
  * start transaction: a tap the student made before the bell (saved as
  * student+teacher, decision 5) becomes a focused participation the moment the
  * teacher presses Start, emitting the deferred tap_in event with the armed
- * tap's original id so a later phone retry dedupes. Returns the count converted.
+ * tap's original id so a later phone retry dedupes — or, when that id is
+ * already held by some other event, under a fresh id whose payload names the
+ * original. Returns the count converted.
  */
 async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
   const cls = firstOrUndefined(
@@ -346,10 +348,10 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
 
-    // A waiting tap can carry an event id that is ALREADY on record as a
-    // `tap_in`, and when it does the tap is not a fresh pre-bell tap at all.
-    // The phone mints one id per PHYSICAL tap, so a spent id can only be a
-    // retry of one that already landed: it went into an earlier session, the
+    // A waiting tap can carry an event id that is ALREADY on record as this
+    // student's own `tap_in`, and when it does the tap is not a fresh pre-bell
+    // tap at all. The phone mints one id per PHYSICAL tap, so such an id can
+    // only be a retry of one that already landed: it went into an earlier session, the
     // response was lost, and the retry — finding nothing of this teacher's
     // running — armed the same id, because `armTap` de-dupes against
     // `armed_taps.event_id` and never against `events`.
@@ -382,9 +384,15 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // raises the same code for an id held by another type or another user —
     // this phone's own `unlock` id, or a stranger's tap — and neither says this
     // tap landed. That is a genuine unhonoured tap whose id collided, so
-    // decision 5 holds for it: it converts under a fresh id, as it did before
-    // the skip existed. `armTap` refuses both shapes on the way in; this is
-    // for rows that already exist.
+    // decision 5 holds for it: it converts under a fresh id, with the armed
+    // id kept in the payload so the history still shows which tap it came
+    // from — exactly as it did before the skip existed. The consumed row keeps
+    // the collided id; the payload is the link back to it.
+    //
+    // Reachable on current code, not only from old rows. `armTap` refuses
+    // both shapes on the way in, but only as of arming: `tapIn` and `unlock`
+    // never consult `armed_taps`, so an id can be taken by another event
+    // after it was armed and before this Start.
     const tapInRow = {
       type: 'tap_in',
       sessionId: session.id,
@@ -405,7 +413,13 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
           .limit(1),
       );
       spent = prior?.type === 'tap_in' && prior.userId === tap.studentId;
-      if (!spent) await insertEvent(tx, { eventId: newUuidV7(), ...tapInRow });
+      if (!spent) {
+        await insertEvent(tx, {
+          eventId: newUuidV7(),
+          ...tapInRow,
+          payload: { armed_tap_event_id: tap.eventId },
+        });
+      }
     }
     if (spent) {
       // Consumed, not left standing: it is spent, and a waiting row that
@@ -616,9 +630,11 @@ async function idIsSpent(tx: Database, eventId: string): Promise<boolean> {
  * it swallow this physical tap with `already_armed` and then convert nothing.
  * The student would be told "armed" twice and joined never, absent from the
  * grid with nothing in `events` to say why. Reproduced before this check
- * existed. An id held by any OTHER event converts under a fresh id instead,
- * so this check is broader than the skip; taking that slot over is harmless,
- * since the tap now arriving converts under its own id either way.
+ * existed. An id held by any OTHER event is not skipped — the row would
+ * convert under a fresh id — so this check is broader than the skip. Taking
+ * that slot over is harmless: it swaps the old row's fresh-id conversion for
+ * the arriving tap's conversion under its own id, and the student is joined
+ * either way.
  */
 async function rowIsStale(
   tx: Database,
