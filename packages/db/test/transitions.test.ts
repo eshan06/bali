@@ -1258,6 +1258,85 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     expect(taps).toHaveLength(1);
   });
 
+  it("suppresses a genuine join when a phone reuses its own id on ANOTHER teacher's block", async () => {
+    /*
+     * The tradeoff this branch gives up, pinned rather than only described.
+     *
+     * The replay keys on (event_id, type = 'tap_in', user_id), and the server
+     * cannot tell a retry from a deliberate reuse — the phone is supposed to
+     * mint one id per physical tap. So an app that reuses a spent id while the
+     * student physically taps a DIFFERENT teacher's block is answered
+     * `200 replay` naming the FIRST teacher's still-running session: the phone
+     * shields to that window, teacher A's grid shows the student green, and
+     * teacher B — in whose room the student is standing — sees them absent
+     * until the next check-in.
+     *
+     * Deliberate, documented at the branch and in PLAN.md, and no privilege
+     * comes with it: the same student could simply not tap, and B's grid shows
+     * them absent either way. It is pinned here because it is one of the
+     * things the owner is ruling on, and a decision nothing tests is a
+     * decision that can change by accident. If the ruling adds a "recorded,
+     * but no longer current" answer, this test is the one that should change.
+     */
+    const a = await seedClass('reuse-teacher-a');
+    const b = await seedClass('reuse-teacher-b');
+    // One student, enrolled with both teachers.
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+
+    const sessionA = (
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    const eventId = newUuidV7();
+    const joined = await tapIn(db, {
+      sessionId: sessionA.id,
+      studentId: a.student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(joined.outcome).toBe('joined');
+
+    // A real, separate physical tap on teacher B's block — carrying the id the
+    // buggy app never retired.
+    const sessionB = (
+      await startSession(db, { classId: b.klass.id, ...window('2026-01-01T10:00:00Z') })
+    ).session;
+    const reused = await tapIn(db, {
+      sessionId: sessionB.id,
+      studentId: a.student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T10:01:00Z'),
+    });
+
+    // Answered as a replay of teacher A's tap, not as the join it really was.
+    expect(reused.outcome).toBe('replay');
+    expect(reused.session.id).toBe(sessionA.id);
+    expect(reused.participationId).toBe(joined.participationId);
+
+    // Teacher B's grid: nothing. The student is standing in that room.
+    const inB = await db
+      .select()
+      .from(participations)
+      .where(
+        and(eq(participations.sessionId, sessionB.id), eq(participations.studentId, a.student.id)),
+      );
+    expect(inB, 'teacher B has no record of a student who did tap their block').toHaveLength(0);
+
+    // And teacher A still shows them green, which is the other half of the drift.
+    const inA = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, sessionA.id),
+            eq(participations.studentId, a.student.id),
+          ),
+        ),
+    );
+    expect(inA.endedAt).toBeNull();
+    expect(inA.state).toBe('focused');
+  });
+
   it('refuses to replay a tap recorded in a session that has ended', async () => {
     /*
      * The bound that makes the replay above safe. TapResponse hands the phone

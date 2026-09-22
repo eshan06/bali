@@ -1046,9 +1046,19 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // can end, or a concurrent tap into another session can end `current`
         // via endParticipationsElsewhere while holding only that session's
         // lock, just after both reads here — and the phone's next check-in
-        // answers `gone`. Reading the session BEFORE the participation is what
-        // keeps a concurrent end visible to at least the second read under
-        // READ COMMITTED (staged and confirmed: the replay is refused).
+        // answers `gone`.
+        //
+        // Reading the session BEFORE the participation is meant to keep a
+        // concurrent end visible to at least the second read under READ
+        // COMMITTED. DISCLOSED SURVIVOR, and this one used to claim the
+        // opposite: the comment here said "staged and confirmed", and it was
+        // not. Swapping the two reads leaves BOTH lanes green — 122/122 on
+        // real Postgres, checked. Staging it would need a pause between them,
+        // and there is no seam inside this transaction to pause at: neither
+        // read takes a lock another connection could hold, so nothing can be
+        // timed to land between them. The order costs nothing and is kept for
+        // the reason above; the residual window after BOTH reads is not
+        // reachable by any test here at all, only by the next check-in.
         const recorded =
           prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
         const current = await loadParticipation(tx, prior.sessionId, input.studentId);

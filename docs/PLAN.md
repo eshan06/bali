@@ -323,6 +323,24 @@ under-13 parental-consent machinery.
   (decision 3) so that is unreachable today, but it would have misdirected
   whoever first hit it. It says "you are no longer in this session" now, which
   is true of both.
+  **Two more from the next round, and one of them was another overclaim of
+  mine.** The comment on `tapIn`'s replay reads said the session-before-
+  participation order was "staged and confirmed". It is not: swapping the two
+  reads leaves both lanes green, 122/122 on real Postgres, checked. It is a
+  DISCLOSED SURVIVOR now, with the reason it cannot be staged — pausing
+  between the two reads would need a seam, and neither read takes a lock
+  another connection could hold, so nothing can be timed to land between them.
+  The order costs nothing and is kept for the reasoning; the residual window
+  after both reads is reachable by no test here, only by the next check-in.
+  The other was a real coverage gap in something deliberate: the replay keys
+  on `(event_id, type, user_id)` and not on the session, so a phone reusing
+  its own spent id while the student physically taps ANOTHER teacher's block
+  is answered `200 replay` naming the first teacher's session — that join
+  suppressed, teacher B's grid empty while the student stands in the room.
+  Documented in two places and pinned in none. It has a test now, because it
+  is one of the things the owner is ruling on and a decision nothing tests is
+  a decision that can change by accident; if the ruling adds a "recorded, but
+  no longer current" answer, that test is the one that should change.
   **The mapped `INVALID_EXTENSION` message had no test that reached it**, and
   it took three rounds to see why. Every route that can raise it caps
   `durationMinutes` with zod first, so a wire test sending `0` is rejected
