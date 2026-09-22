@@ -4,6 +4,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
 import { blocks, classes } from './schema.js';
+import { isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
@@ -41,19 +42,20 @@ export function generateJoinCode(): string {
 const activeClass = sql`${classes.removedAt} is null`;
 
 /**
- * A Postgres unique violation (SQLSTATE 23505). Besides the primary key on `id`
- * (which the regenerate UPDATE never sets), the active join-code index is the
- * only unique constraint on `classes` — so a 23505 from an UPDATE that changed
- * only `name`/`join_code` is always a code collision, and the regenerate loop
- * retries with a fresh code. (INSERT uses ON CONFLICT DO NOTHING instead and
- * never throws here.) Drizzle wraps the driver error, so the code sits on a
- * nested cause.
+ * A 23505 out of the regenerate UPDATE is always a join-code collision.
+ * Besides the primary key on `id` (which that UPDATE never sets), the active
+ * join-code index is the only unique constraint on `classes`, so the loop can
+ * safely read one as "try a fresh code". (INSERT uses ON CONFLICT DO NOTHING
+ * instead and never throws here.)
+ *
+ * The cause-chain walk this used to carry is in `sql-errors.ts` now, because
+ * the engine had grown its own copy of the same loop for 40P01 and the trap it
+ * exists for had to be learned twice. Kept as a named wrapper rather than
+ * inlined: the reasoning above is about the unique indexes on `classes`, not
+ * about 23505 in general, and it belongs at the loop that depends on it.
  */
 function isJoinCodeCollision(err: unknown): boolean {
-  for (let e: unknown = err; e instanceof Error; e = e.cause) {
-    if ((e as { code?: string }).code === '23505') return true;
-  }
-  return false;
+  return isUniqueViolation(err);
 }
 
 /**

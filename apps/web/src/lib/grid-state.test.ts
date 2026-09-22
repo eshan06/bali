@@ -7,6 +7,7 @@ import {
   gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
+  staleness,
   type Students,
 } from './grid-state';
 
@@ -193,5 +194,82 @@ describe('gridDisplay', () => {
     const students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
     // T0 + 5 minutes with no contact is well past the 90s threshold.
     expect(gridDisplay(students.ana, now)).toBe('silent');
+  });
+});
+
+describe('staleness', () => {
+  const T0 = 1_000_000;
+  /** Both clocks together — the ordinary case, where the stream is the grid. */
+  const both = (at: number) => ({
+    lastStreamActivityAt: at,
+    lastGridActivityAt: at,
+    heartbeatMs: 20_000,
+  });
+
+  it('says reconnecting whenever the client knows it is disconnected', () => {
+    for (const status of ['connecting', 'reconnecting'] as const) {
+      expect(staleness({ ...both(T0), status, now: T0 + 4_000 })).toEqual({
+        reason: 'reconnecting',
+        secondsAgo: 4,
+      });
+    }
+  });
+
+  it('stays quiet on an open stream that is merely between events', () => {
+    // Three heartbeats' grace: a quiet class emits no events at all, so the
+    // banner must not flap on one slow tick.
+    expect(staleness({ ...both(T0), status: 'open', now: T0 + 59_000 })).toBeNull();
+  });
+
+  it('says stale when the stream is open but the server has gone silent', () => {
+    // The shape the old banner could not see: open, green, and guessing.
+    expect(staleness({ ...both(T0), status: 'open', now: T0 + 61_000 })).toEqual({
+      reason: 'stale',
+      secondsAgo: 61,
+    });
+  });
+
+  it('reports a dead stream even while the snapshot poll keeps the grid current', () => {
+    /*
+     * The scenario the feature exists for, and the one a single clock could
+     * not see: a wedged proxy or a hub that died without closing the socket.
+     * The stream is `open` and has delivered nothing for three minutes, while
+     * the 15 s poll keeps answering — so on one shared clock the counter was
+     * reset four times per threshold and the banner never appeared at all.
+     *
+     * Both halves matter here. It warns, AND the age it reports is the grid's
+     * (5s, true) rather than the stream's (180s, alarming and wrong).
+     */
+    expect(
+      staleness({
+        status: 'open',
+        lastStreamActivityAt: T0,
+        lastGridActivityAt: T0 + 175_000,
+        now: T0 + 180_000,
+        heartbeatMs: 20_000,
+      }),
+    ).toEqual({ reason: 'stale', secondsAgo: 5 });
+  });
+
+  it('a stream delivering into a poll that has died is not stale', () => {
+    // The mirror, so the two clocks cannot be quietly swapped: the stream is
+    // alive, only the poll has stopped. Nothing is wrong with the feed, and
+    // the age reported is still the grid's.
+    expect(
+      staleness({
+        status: 'open',
+        lastStreamActivityAt: T0 + 180_000,
+        lastGridActivityAt: T0 + 180_000,
+        now: T0 + 180_500,
+        heartbeatMs: 20_000,
+      }),
+    ).toBeNull();
+  });
+
+  it('never reports a negative age when the clock steps backwards', () => {
+    expect(staleness({ ...both(T0), status: 'reconnecting', now: T0 - 5_000 })).toEqual({
+      reason: 'reconnecting',
+      secondsAgo: 0,
+    });
   });
 });

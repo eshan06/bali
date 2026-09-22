@@ -52,6 +52,167 @@ describe('sse-client', () => {
     expect(received.map((e) => e.eventId)).toEqual(['a', 'b']); // duplicate dropped, order kept
   });
 
+  it('reports a heartbeat as activity, though it delivers no event', async () => {
+    /*
+     * The signal the grid's staleness banner runs on, and it cannot come from
+     * events: a quiet class emits none for minutes (decision 7 — a heartbeat
+     * that changes nothing writes no history), so event traffic would mark a
+     * perfectly healthy stream stale. The server's heartbeat is the liveness
+     * proof, and it arrives as a comment frame with no `data:` line.
+     */
+    const e1 = evt(5, 'a');
+    const fetchImpl = vi.fn((): Promise<Response> =>
+      Promise.resolve(streamResponse([': open\n\n', ': ping\n\n', frame(e1)])),
+    );
+    const activity: number[] = [];
+    const received: FeedEvent[] = [];
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 0,
+      onEvent: (e) => received.push(e),
+      onActivity: () => activity.push(Date.now()),
+      fetchImpl,
+      baseBackoffMs: 5_000, // do not reconnect inside this test
+    });
+
+    await wait(30);
+    client.close();
+    // One event, three frames, and the open itself — the two comments count
+    // as life, and so does a connection that has just come up (see the test
+    // below, which pins that half on its own).
+    expect(received.map((e) => e.eventId)).toEqual(['a']);
+    expect(activity.length, 'heartbeat comments must report activity').toBe(1 + 3);
+  });
+
+  it('reports the open itself, before the server has sent anything', async () => {
+    /*
+     * The server's first heartbeat is a whole interval away, so between a
+     * connection coming up and that frame landing the only thing a caller
+     * knows is the silence from BEFORE the reconnect. A reconnect that
+     * succeeds after a three-minute outage would then have the grid report
+     * "gone quiet, last updated 180s ago" over a connection working perfectly.
+     *
+     * So: a stream that opens and delivers nothing at all still reports once.
+     */
+    const body = new ReadableStream<Uint8Array>({
+      start() {
+        /* open, and silent — no frames, ever */
+      },
+    });
+    const activity: number[] = [];
+    const statuses: string[] = [];
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 0,
+      onEvent: () => {},
+      onActivity: () => activity.push(Date.now()),
+      onStatus: (s) => statuses.push(s),
+      fetchImpl: () => Promise.resolve(new Response(body, { status: 200 })),
+      baseBackoffMs: 5_000, // do not reconnect inside this test
+    });
+
+    await wait(30);
+    client.close();
+    expect(statuses, 'the stream really did open').toContain('open');
+    expect(activity.length, 'an open connection is itself a sign of life').toBe(1);
+  });
+
+  it('backs off against a server that accepts and immediately drops', async () => {
+    /*
+     * The reset used to fire on the 200, not on the connection lasting. A
+     * server that accepts and drops — a session that has ended, a hub draining
+     * on deploy — answers 200 every time, so every retry went back to the base
+     * delay and the client knocked forever at that rate. Measured before the
+     * fix: 16 attempts in 600ms with baseBackoffMs 50, no growth at all; at
+     * the shipped default that is a browser hitting the API twice a second,
+     * per open tab, indefinitely.
+     *
+     * `stableAfterMs` is what makes the difference, so it is set above the
+     * window here: nothing in this test can ever qualify as stable.
+     */
+    const at: number[] = [];
+    const fetchImpl = vi.fn((): Promise<Response> => {
+      at.push(Date.now());
+      return Promise.resolve(streamResponse([])); // accepted, then over
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 0,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 50,
+      maxBackoffMs: 5_000,
+      stableAfterMs: 60_000,
+    });
+
+    await wait(600);
+    client.close();
+
+    // Bounded rather than exact, because the delay carries jitter: unbounded
+    // retries put 16 here, a doubling one puts 5 or 6.
+    expect(at.length, `attempts in 600ms: ${at.length}`).toBeLessThanOrEqual(8);
+    expect(at.length).toBeGreaterThan(2); // it must still be retrying
+    const gaps = at.slice(1).map((t, i) => t - at[i]);
+    expect(gaps[gaps.length - 1], `gaps: ${gaps.join(', ')}`).toBeGreaterThan(gaps[0]);
+  });
+
+  it('a connection that lasts brings an ESCALATED backoff back to the base delay', async () => {
+    /*
+     * The other half of the same fix, and the first version of this test did
+     * not reach it: it exercised only the FIRST connection, where `attempt` is
+     * already 0, so `attempt = 0` was a no-op for it. Deleting the reset
+     * outright left the whole file green — checked.
+     *
+     * So drive the backoff UP first. Four instant drops take `attempt` to 4
+     * (40ms base doubling: ~20-40, ~40-80, ~80-160, ~160-320), then one
+     * stream that outlives `stableAfterMs`. The gap after THAT is the
+     * assertion: ~20-40ms if the reset fired, ~320-640ms if it did not, which
+     * is a separation no jitter can close.
+     */
+    const at: number[] = [];
+    let call = 0;
+    const fetchImpl = vi.fn((): Promise<Response> => {
+      at.push(Date.now());
+      call += 1;
+      if (call !== 5) return Promise.resolve(streamResponse([])); // accepted, then over
+      // The healthy one: stays open well past stableAfterMs, then ends.
+      const body = new ReadableStream<Uint8Array>({
+        start(ctrl) {
+          setTimeout(() => ctrl.close(), 40);
+        },
+      });
+      return Promise.resolve(new Response(body, { status: 200 }));
+    });
+    const client = createSseClient({
+      url: 'http://api/stream',
+      getToken: () => 't',
+      after: 0,
+      onEvent: () => {},
+      fetchImpl,
+      baseBackoffMs: 40,
+      maxBackoffMs: 5_000,
+      stableAfterMs: 20,
+    });
+
+    await wait(900);
+    client.close();
+
+    const gaps = at.slice(1).map((t, i) => t - at[i]);
+    expect(
+      at.length,
+      `only ${at.length} attempts in 900ms — an un-reset backoff never gets here. gaps: ${gaps.join(', ')}`,
+    ).toBeGreaterThanOrEqual(6);
+    // It really did escalate first, or the assertion below proves nothing.
+    expect(gaps[3], `gaps: ${gaps.join(', ')}`).toBeGreaterThan(120);
+    // 40ms of stream plus a BASE delay (20-40), not an escalated one (320-640).
+    expect(gaps[4], `reconnect after the stable stream. gaps: ${gaps.join(', ')}`).toBeLessThan(
+      160,
+    );
+  });
+
   it('reconnects and resumes from lastSeq minus the overlap', async () => {
     const urls: string[] = [];
     const fetchImpl = vi.fn((url: string | URL | Request): Promise<Response> => {

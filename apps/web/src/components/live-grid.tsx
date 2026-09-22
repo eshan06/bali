@@ -1,6 +1,6 @@
 'use client';
 
-import { EVENT_RESUME_OVERLAP, type SessionSnapshot } from '@bali/shared';
+import { EVENT_RESUME_OVERLAP, type SessionSnapshot, STREAM_HEARTBEAT_MS } from '@bali/shared';
 import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
@@ -12,10 +12,17 @@ import {
   gridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
+  staleness,
   type Students,
 } from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
+
+/**
+ * The server's own heartbeat interval (`apps/api/src/sse/hub.ts`). The grid
+ * measures silence against it rather than a number of its own, so the two
+ * cannot drift into a banner that flaps or one that never fires.
+ */
 
 const CHIP: Record<string, { label: string; cls: string }> = {
   focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
@@ -36,7 +43,15 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
-  const lastUpdate = useRef<number>(Date.now());
+  // Any sign of life from the server: an event, a heartbeat comment, or a
+  // snapshot refresh that came back. A heartbeat is freshness and not just
+  // liveness — a quiet class emits no events, so nothing arriving is normal
+  // and only nothing arriving FROM THE SERVER means the screen is guessing.
+  // Two clocks — see `staleness`. The stream's own, and the grid's (which the
+  // 15 s poll also feeds). One clock for both hid a dead stream behind a
+  // working poll.
+  const lastStreamActivity = useRef<number>(Date.now());
+  const lastGridActivity = useRef<number>(Date.now());
   // The newest event seq the grid has applied, so a stale in-flight snapshot
   // can't roll it backwards over a streamed unlock.
   const appliedSeq = useRef<number>(0);
@@ -51,7 +66,8 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
         appliedSeq.current = snap.latestSeq;
-        lastUpdate.current = Date.now();
+        lastStreamActivity.current = Date.now();
+        lastGridActivity.current = Date.now();
         sse = createSseClient({
           url: `${config.apiUrl}/v1/sessions/${sessionId}/stream`,
           getToken: getAccessToken,
@@ -60,7 +76,12 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           onEvent: (e) => {
             setStudents((prev) => (prev ? applyEvent(prev, e) : prev));
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
-            lastUpdate.current = Date.now();
+            lastStreamActivity.current = Date.now();
+            lastGridActivity.current = Date.now();
+          },
+          onActivity: () => {
+            lastStreamActivity.current = Date.now();
+            lastGridActivity.current = Date.now();
           },
           onStatus: setStatus,
           onUnauthorized,
@@ -91,6 +112,13 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
         (snap) => {
+          // The refresh came back, so the GRID is current whether or not it
+          // changed anything — "last updated" must not keep counting up past a
+          // reload that worked. Deliberately not the stream's clock: this poll
+          // runs every 15 s against a 60 s threshold, so feeding it there
+          // resets the counter four times per threshold and a stream that has
+          // silently died never gets reported at all.
+          lastGridActivity.current = Date.now();
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
           setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));
@@ -106,14 +134,21 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
 
-  const staleSec = Math.round((now.getTime() - lastUpdate.current) / 1000);
+  const stale = staleness({
+    status,
+    lastStreamActivityAt: lastStreamActivity.current,
+    lastGridActivityAt: lastGridActivity.current,
+    now: now.getTime(),
+    heartbeatMs: STREAM_HEARTBEAT_MS,
+  });
   const rows = Object.values(students);
 
   return (
     <div className="space-y-3">
-      {status !== 'open' ? (
+      {stale ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Reconnecting — last updated {staleSec}s ago
+          {stale.reason === 'reconnecting' ? 'Reconnecting' : 'Live feed has gone quiet'} — last
+          updated {stale.secondsAgo}s ago
         </p>
       ) : null}
       {rows.length === 0 ? (
