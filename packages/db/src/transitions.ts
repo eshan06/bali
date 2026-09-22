@@ -5,7 +5,7 @@ import type {
   UnlockRecordedAs,
   UnlockRecordedOutcome,
 } from '@bali/shared';
-import { clampToWindow, SILENCE_THRESHOLD_MS } from '@bali/shared';
+import { clampToWindow, MAX_SESSION_MINUTES, SILENCE_THRESHOLD_MS } from '@bali/shared';
 import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
@@ -697,10 +697,20 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
 
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    if (!Number.isFinite(input.durationMinutes) || input.durationMinutes <= 0) {
+    // Bounded at both ends, and the upper one is the same number the route's
+    // zod cap uses. Refusing only what overflows the Date range is a guard at
+    // the year 275760: `1e6` minutes clears it and ends the lesson in 2028,
+    // which is not a duration any school could mean. If the engine is going to
+    // distrust its caller here — and it should, since `/v1` is not the only
+    // possible one — the bound has to be a real one.
+    if (
+      !Number.isFinite(input.durationMinutes) ||
+      input.durationMinutes <= 0 ||
+      input.durationMinutes > MAX_SESSION_MINUTES
+    ) {
       throw new TransitionError(
         'INVALID_EXTENSION',
-        'duration must be a positive number of minutes',
+        `duration must be a positive number of minutes, at most ${MAX_SESSION_MINUTES}`,
       );
     }
 
@@ -711,10 +721,12 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     // either already committed and is included, or is waiting behind this one.
     const base = Math.max(input.at.getTime(), session.endsAt.getTime());
     const newEndsAt = new Date(base + input.durationMinutes * 60_000);
-    // Finite but astronomical (1e15 minutes) passes the check above and
-    // overflows the Date range, and an Invalid Date turns the toISOString()
-    // below into a bare RangeError — an unmapped 500 where the point of this
-    // guard was that the engine refuses its caller in its own vocabulary.
+    // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
+    // be reached (1e15 minutes): `base` comes from the stored session, so a row
+    // whose end is already near the Date boundary can still overflow on a
+    // perfectly ordinary extension. An Invalid Date turns the toISOString()
+    // below into a bare RangeError — an unmapped 500, where the point of these
+    // guards is that the engine refuses its caller in its own vocabulary.
     if (Number.isNaN(newEndsAt.getTime())) {
       throw new TransitionError('INVALID_EXTENSION', 'extension is out of range');
     }

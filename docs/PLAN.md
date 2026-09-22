@@ -247,9 +247,29 @@ under-13 parental-consent machinery.
   engine does not trust its caller. 1e15 minutes used to overflow into an
   Invalid Date and a bare `RangeError`; the route's zod cap
   (`int().positive().max(480)`) means no `/v1` caller could reach it, so this
-  is defence-in-depth for a direct engine caller rather than a live 500. Its client-facing message no longer
-  claims the end time was not moved forward, which the duration rewrite made
-  false. The real-Postgres lane now covers two concurrent extends both landing.
+  is defence-in-depth for a direct engine caller rather than a live 500. Its
+  client-facing message no longer claims the end time was not moved forward,
+  which the duration rewrite made false. The real-Postgres lane now covers two
+  concurrent extends both landing.
+  **Review round, and the sharpest finding was a guard that guarded nothing
+  useful.** Refusing only what overflows the `Date` range is a bound at the
+  year 275760: `1e6` minutes is finite, positive, and ends the lesson in 2028,
+  and only the route's zod cap kept `/v1` honest. If the engine is going to
+  distrust its caller — and it should, since `/v1` is not the only possible
+  one — the bound has to mean something. `MAX_SESSION_MINUTES` is in
+  `packages/shared` now and both the route's cap and the engine's refusal are
+  that same number. The range check stays: `base` comes from the stored
+  session, so a row already near the `Date` boundary can still overflow on an
+  ordinary extension.
+  **And the half this PR CHANGES for `/v1` had no wire test** — only an engine
+  assertion that `NOT_PARTICIPATING` is thrown. What a phone branches on is
+  the status and body `routes/errors.ts` maps that to, and the response the
+  whole hold turns on was unpinned; the same shape of gap that let `armTap`'s
+  refusals ship as 500s in #29. There is a 409 case next to the 200 one now,
+  asserting the body as well as the status.
+  Both blockers are the ones already with the owner: landing order behind #29
+  (which this PR's own bullet now states), and ARCHITECTURE rule 4 / tap step
+  10 promising the unconditional 200 that this changes.
 
 - **2026-09-22** — Last of the audit's ten, and the smallest one only because
   the thing it removes is invisible. Two files had independently grown the
@@ -271,7 +291,6 @@ under-13 parental-consent machinery.
   `isDeadlock` answering true for a 23505 turns one red — the inverted half,
   which matters because a deadlock retry that loops on a unique violation can
   never resolve it.
-
 
 - **2026-09-22** — CI was failing the real-Postgres lane with every test green,
   and the cause was the stream hub's own shutdown. `ensureListening()` fires

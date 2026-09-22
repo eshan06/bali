@@ -1,3 +1,4 @@
+import { MAX_SESSION_MINUTES } from '@bali/shared';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -731,11 +732,23 @@ describe('extendSession', () => {
     const { klass } = await seedClass('extend-bad');
     const w = window('2026-01-01T09:00:00Z');
     const { session } = await startSession(db, { classId: klass.id, ...w });
-    // 1e15 minutes is the third shape: finite and positive, so it clears the
-    // first check, then overflows the Date range. Without the range guard the
-    // engine hands an Invalid Date to toISOString() and the caller gets a bare
-    // RangeError — a 500 — instead of a refusal it can read.
-    for (const durationMinutes of [0, -10, Number.NaN, Number.POSITIVE_INFINITY, 1e15]) {
+    // Four shapes, and the middle one is the point. 0 and -10 are not
+    // durations; NaN and Infinity are not numbers. `MAX_SESSION_MINUTES + 1`
+    // and 1e6 are both perfectly finite, positive minutes that no school could
+    // mean — 1e6 ends the lesson in 2028 — and before the engine carried the
+    // same bound as the route's zod cap, only `/v1` refused them. 1e15 is the
+    // shape beyond that: it overflows the Date range, so without the range
+    // guard the engine hands an Invalid Date to toISOString() and the caller
+    // gets a bare RangeError, a 500, instead of a refusal it can read.
+    for (const durationMinutes of [
+      0,
+      -10,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      MAX_SESSION_MINUTES + 1,
+      1e6,
+      1e15,
+    ]) {
       await expect(
         extendSession(db, {
           sessionId: session.id,

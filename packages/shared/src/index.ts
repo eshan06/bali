@@ -20,6 +20,18 @@ export const EVENT_RESUME_OVERLAP = 50;
 /** Max events one catch-up page (or one stream re-read) returns; the feed is paged. */
 export const EVENT_PAGE_LIMIT = 200;
 
+/**
+ * The longest a session may run or be extended by, in minutes. Eight hours —
+ * longer than any school day, so it never refuses a real lesson, and short
+ * enough that a bad value is caught as a bad value.
+ *
+ * Shared because the engine distrusts its caller here and needs a bound that
+ * MEANS something: refusing only what overflows the `Date` range is a guard at
+ * the year 275760, which lets `1e6` minutes through and ends a lesson in 2028.
+ * The route's zod cap and the engine's refusal are the same number now.
+ */
+export const MAX_SESSION_MINUTES = 480;
+
 /** Response shape of GET /healthz. */
 export interface HealthzResponse {
   status: 'ok';

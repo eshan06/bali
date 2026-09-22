@@ -18,6 +18,7 @@ import type {
   StartSessionResponse,
   UnlockResponse,
 } from '@bali/shared';
+import { MAX_SESSION_MINUTES } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -29,7 +30,9 @@ import { DeviceTime } from './schemas.js';
 
 const ClassParams = z.object({ id: z.string().uuid() });
 const SessionParams = z.object({ id: z.string().uuid() });
-const DurationBody = z.object({ durationMinutes: z.number().int().positive().max(480) });
+const DurationBody = z.object({
+  durationMinutes: z.number().int().positive().max(MAX_SESSION_MINUTES),
+});
 // Extend carries an optional client-minted event id: the new end is relative to
 // the current one, so a retry without it would add the time twice (rule 4).
 const ExtendBody = DurationBody.extend({ eventId: z.string().uuid() });
