@@ -87,9 +87,13 @@ if ! "$PYTHON" -c "import graphify" 2>/dev/null; then
     # Bali repo policy: never install unattended (unpinned --upgrade defeats
     # the .graphify_version pin, and --break-system-packages writes into the
     # container's system Python). Stop and hand the owner the pinned command.
-    _PIN=$(cat "$(dirname "$0")/.graphify_version" 2>/dev/null || cat .claude/skills/graphify/.graphify_version 2>/dev/null || echo "0.9.66")
     echo "graphify is not installed — stopping (this repo never installs it unattended)."
-    echo "To install it yourself, pinned:  uv tool install \"graphifyy==${_PIN}\""
+    _PIN=$(cat .claude/skills/graphify/.graphify_version 2>/dev/null)
+    if [ -n "$_PIN" ]; then
+        echo "To install it yourself, pinned:  uv tool install \"graphifyy==${_PIN}\""
+    else
+        echo ".graphify_version is missing too — no version to suggest; ask the owner." >&2
+    fi
     echo "Then re-run /graphify."
     exit 1
 fi
@@ -646,7 +650,6 @@ Graph complete. Outputs in PATH_TO_DIR/graphify-out/
   graph.json            - raw graph data
   obsidian/             - Obsidian vault (only if --obsidian was given)
 ```
-
 
 Replace PATH_TO_DIR with the actual absolute path of the directory that was processed.
 
