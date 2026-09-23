@@ -13,41 +13,42 @@
  * messages quote request values back ("Value 'x' at 'clientId' failed to
  * satisfy constraint"), a proxy or WAF page can quote the request it refused,
  * and a fetch wrapper can hang the request off the error it raises — escaped,
- * encoded or truncated in whatever way that layer prints. So that text is not
- * scrubbed; it is not used. Scrubbing has to know every place the password can
- * hide and every way it can be written down, and it did not.
+ * encoded, truncated or transliterated in whatever way that layer prints. So no
+ * text that comes back is copied into what this module throws, and none of it
+ * is compared with the password either: every earlier attempt to recognise an
+ * echo of the password, by scrubbing it out or by checking what looked like it,
+ * missed some way an echo can be written.
  *
  * What this module throws is a plain Error whose message is built from:
  *   - its own fixed wording;
  *   - the caller's configuration: the username, the endpoint, the timeout;
  *   - the HTTP status, when it is an integer from 100 to 599;
- *   - TOKENS read from outside — the error codes on a failure and its causes,
- *     Cognito's error type, a challenge name, the response's media type —
- *     admitted by `token`: one of this module's own known words, unless it and
- *     the password contain one another, or an unknown identifier that repeats
- *     no four characters of the password;
+ *   - WORDS OF ITS OWN, chosen by what came back: an error code on a failure
+ *     or its causes, Cognito's error type, a challenge name or the response's
+ *     media type that is exactly one of the words in `KNOWN_WORDS` selects that
+ *     word. Anything else is said to be unrecognised, and is not printed;
  *   - two fixed messages of Node's fetch, recognised by exact match and never
  *     copied: a proxy refusing the tunnel (only its status is kept, on the same
  *     terms as a response's) and a refused redirect.
- * No error from outside is attached as its `cause`: an object can print
- * differently from the way it looked when it was checked, and a string cannot.
- * And a redirect is refused rather than followed, since following a 307 would
- * send the body — the password — to wherever it pointed.
+ * The password is used in the request body and nowhere else. No error from
+ * outside is attached as its `cause`: an object can print differently from the
+ * way it looked when it was read, and a string cannot. And a redirect is
+ * refused rather than followed, since following a 307 would send the body — the
+ * password — to wherever it pointed.
  *
- * The boundary, stated rather than implied: this defends against the password
- * being ECHOED — quoted, escaped, truncated, case-changed, normalised, or with
- * separators swapped — by something downstream. It does not defend against a
- * party that deliberately encodes it into a token's alphabet (unpadded base32
- * is a valid error code); such a party already holds the password and has
- * better ways to publish it than a demo's transcript.
+ * What a message can still tell a reader about what came back, stated rather
+ * than implied: which of this module's fixed outcomes happened, which of its
+ * words came back, and the status numbers. Every character of it is this
+ * module's own, the caller's configuration, or one of those numbers. If
+ * something echoes the password into a field a word is read from, and the
+ * echo, read the way that field is read, is exactly one of the words, that
+ * word prints: the same text a genuine answer prints, whatever the password
+ * is.
  *
- * The cost is every message and body from outside: Cognito's message text, a
- * proxy page, the fetch layer's own descriptions. The error type with fixed
- * words for the common ones, the status, the media type and the error codes
- * stand in for them. And whether a token is shown depends on the password: an
- * unknown one is withheld when it shares four consecutive characters with it,
- * a known word only when one of the two contains the other. A reader who could
- * guess the token learns that much.
+ * The cost is every message and body from outside — Cognito's message text, a
+ * proxy page, the fetch layer's own descriptions — and the name of any code,
+ * type or challenge that is not in the lists. The error type with fixed words
+ * for the common ones, the status, the media type and the error codes stand in.
  */
 
 /** The fields of InitiateAuth's answer that are read. */
@@ -73,23 +74,9 @@ export interface CognitoCredentials {
 }
 
 /*
- * The shapes an UNKNOWN token from outside must have. None of them has any
- * quoting or escape syntax, so there is nothing to decode: whatever a token
- * holds of the password, it holds in plain characters, where `token` sees it.
- */
-/** An error code or a challenge name: `ENOTFOUND`, `NEW_PASSWORD_REQUIRED`. */
-const CONSTANT_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
-/** A Cognito error type: `NotAuthorizedException`. */
-const ERROR_TYPE = /^[A-Z][A-Za-z0-9]{1,63}$/;
-/** A media type without its parameters: `text/html`. */
-const MEDIA_TYPE = /^[a-z0-9][a-z0-9.+-]{0,62}\/[a-z0-9][a-z0-9.+-]{0,62}$/;
-
-/*
- * Words this module knows, by exact match. When one of them prints, what
- * prints is this module's own word, the same text for every password, so they
- * are not held to the four-character rule that unknown tokens are: a password
- * with "tion" in it would otherwise hide every error type Cognito has. They are
- * held to a narrower one instead, `echoesKnownWord`.
+ * The words this module can print for what came back. Each is chosen by an
+ * exact match: a value that differs in any way — case, spacing, one character
+ * more or less — is unrecognised, and is not printed.
  */
 /** Error codes of Node's network, DNS and TLS layers, and of undici. */
 const KNOWN_CODES = new Set([
@@ -106,6 +93,7 @@ const KNOWN_CODES = new Set([
   'ENETDOWN',
   'EPIPE',
   'EPROTO',
+  'UND_ERR_ABORT',
   'UND_ERR_ABORTED',
   'UND_ERR_SOCKET',
   'UND_ERR_CLOSED',
@@ -120,6 +108,11 @@ const KNOWN_CODES = new Set([
   'UND_ERR_RES_CONTENT_LENGTH_MISMATCH',
   'UND_ERR_NOT_SUPPORTED',
   'UND_ERR_PRX_TLS',
+  'UND_ERR_RESPONSE',
+  'UND_ERR_RES_EXCEEDED_MAX_SIZE',
+  'UND_ERR_REQ_RETRY',
+  'UND_ERR_INVALID_ARG',
+  'ABORT_ERR',
   'CERT_HAS_EXPIRED',
   'CERT_NOT_YET_VALID',
   'DEPTH_ZERO_SELF_SIGNED_CERT',
@@ -128,6 +121,7 @@ const KNOWN_CODES = new Set([
   'UNABLE_TO_GET_ISSUER_CERT',
   'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
   'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ERR_TLS_HANDSHAKE_TIMEOUT',
   'ERR_SSL_WRONG_VERSION_NUMBER',
   'ERR_SSL_PACKET_LENGTH_TOO_LONG',
   'ERR_INVALID_URL',
@@ -190,75 +184,19 @@ const KNOWN_MEDIA_TYPES = new Set([
   'application/xml',
 ]);
 
-/**
- * Text reduced to what survives the ways an echo can rewrite it: decomposed,
- * which folds compatibility forms (a fullwidth 'Ｓ' is 'S', a ligature its
- * letters) and splits accents off their letters; case folded by upper-casing —
- * the direction that merges the most: 'ß' and 'SS', 'ı' and 'i' and 'I'; and
- * then stripped of everything but letters and digits, in any script — the
- * split-off accents, and the separators, so an echo that swapped them for its
- * own compares equal.
- */
-function fold(text: string): string {
-  return text
-    .normalize('NFKD')
-    .toUpperCase()
-    .replace(/[^\p{L}\p{N}]/gu, '');
-}
+/** Every word the module can print for a value from outside, by the field it is read from. */
+export const KNOWN_WORDS: Readonly<
+  Record<'codes' | 'types' | 'challenges' | 'mediaTypes', ReadonlySet<string>>
+> = {
+  codes: KNOWN_CODES,
+  types: KNOWN_TYPES,
+  challenges: KNOWN_CHALLENGES,
+  mediaTypes: KNOWN_MEDIA_TYPES,
+};
 
-/** An unknown token repeating this many consecutive characters of the password is withheld. */
-const SHARED_RUN = 4;
-
-/**
- * Does `value` repeat any run of SHARED_RUN characters of the password — the
- * whole of a shorter one — once both are folded? A truncated echo still prints
- * most of the password; an echo that changed its case, normalised it or swapped
- * its separators still prints it.
- */
-function repeatsPassword(value: string, password: string): boolean {
-  const text = fold(value);
-  const secret = fold(password);
-  const run = Math.min(SHARED_RUN, secret.length);
-  for (let start = 0; start + run <= secret.length; start++) {
-    if (text.includes(secret.slice(start, start + run))) return true;
-  }
-  return false;
-}
-
-/**
- * Could an echo of the password have produced this known word? Only if one is
- * a folded part of the other: the word cut out of a longer password
- * ('Bali#NotAuthorizedException' split at '#'), or a password that is itself
- * part of the word. Any other overlap is the word being what it is.
- */
-function echoesKnownWord(word: string, password: string): boolean {
-  const folded = fold(word);
-  const secret = fold(password);
-  return folded.includes(secret) || secret.includes(folded);
-}
-
-/**
- * The text to print for a token from outside, or undefined to withhold it.
- * Callers pass the text they will print — a fragment cut out of a longer value
- * is checked as the fragment, since that is what a reader would see.
- *
- * A known word is printed unless an echo of the password could have produced
- * it. An unknown value must have its channel's identifier shape — which keeps
- * out a body, a message, anything with a quote or a space in it — and must
- * repeat no run of four characters of the password: the shape cannot stop a
- * password that is itself identifier-shaped, whole or in part.
- */
-function token(
-  value: unknown,
-  known: ReadonlySet<string>,
-  shape: RegExp,
-  password: string,
-): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  if (known.has(value))
-    return password !== '' && echoesKnownWord(value, password) ? undefined : value;
-  if (!shape.test(value)) return undefined;
-  return password !== '' && repeatsPassword(value, password) ? undefined : value;
+/** `value` when it is exactly one of `words`; undefined for anything else. */
+function recognised(value: unknown, words: ReadonlySet<string>): string | undefined {
+  return typeof value === 'string' && words.has(value) ? value : undefined;
 }
 
 /**
@@ -285,8 +223,10 @@ const REDIRECT_REFUSED = 'unexpected redirect';
 
 /** What a fetch-layer failure's graph says, in forms that cannot quote anything. */
 interface FailureFacts {
-  /** Codes that `token` admitted, nearest first, without repeats. */
+  /** Codes in KNOWN_CODES, nearest first, without repeats. */
   codes: string[];
+  /** A code that was a string but not in KNOWN_CODES; it is not printed. */
+  unrecognised: boolean;
   /** The proxy's status, from an exact match of PROXY_REFUSED. */
   proxyStatus?: number;
   /** An exact match of REDIRECT_REFUSED somewhere in the graph. */
@@ -308,8 +248,8 @@ interface FailureFacts {
  * trap or iterator of its own runs outside a guard: a node that throws costs
  * what it would have said and nothing else.
  */
-function examineFailure(err: unknown, password: string): FailureFacts {
-  const facts: FailureFacts = { codes: [], redirected: false };
+function examineFailure(err: unknown): FailureFacts {
+  const facts: FailureFacts = { codes: [], unrecognised: false, redirected: false };
   const seen = new Set<unknown>();
   let level: unknown[] = [err];
   while (level.length > 0) {
@@ -319,8 +259,10 @@ function examineFailure(err: unknown, password: string): FailureFacts {
       if (node === null || typeof node !== 'object' || seen.has(node)) continue;
       seen.add(node);
 
-      const code = token(read(node, 'code'), KNOWN_CODES, CONSTANT_NAME, password);
-      if (code !== undefined && !facts.codes.includes(code)) facts.codes.push(code);
+      const raw = read(node, 'code');
+      const code = recognised(raw, KNOWN_CODES);
+      if (code === undefined) facts.unrecognised ||= typeof raw === 'string';
+      else if (!facts.codes.includes(code)) facts.codes.push(code);
 
       const message = read(node, 'message');
       if (typeof message === 'string') {
@@ -368,26 +310,24 @@ const CODE_HINTS = new Map([
 
 /**
  * What an operator can act on in a failure from the fetch layer: its codes,
- * with fixed words for some. Whether there were codes that were not admitted is
- * not said — saying so would tell a reader that the password shares characters
- * with whatever code they guess was there.
+ * with fixed words for some, and whether it also carried a code this module
+ * does not know. When none of its codes is known, why nothing more is said is
+ * said too.
  */
 function describeFailure(facts: FailureFacts): string {
-  if (facts.codes.length === 0) {
-    return (
-      "no error code that can be shown, and the fetch layer's own text is withheld — it can " +
-      'quote the request, which holds the password'
-    );
-  }
-  return facts.codes
-    .map((code) => {
-      const hint =
-        code === 'UND_ERR_ABORTED' && facts.proxyStatus !== undefined
-          ? `the HTTPS proxy refused the tunnel with HTTP ${facts.proxyStatus}`
-          : CODE_HINTS.get(code);
-      return hint === undefined ? code : `${code} (${hint})`;
-    })
-    .join(', ');
+  const said = facts.codes.map((code) => {
+    const hint =
+      code === 'UND_ERR_ABORTED' && facts.proxyStatus !== undefined
+        ? `the HTTPS proxy refused the tunnel with HTTP ${facts.proxyStatus}`
+        : CODE_HINTS.get(code);
+    return hint === undefined ? code : `${code} (${hint})`;
+  });
+  if (facts.unrecognised) said.push('an error code this module does not recognise');
+  if (facts.codes.length > 0) return said.join(', ');
+  return (
+    `${said[0] ?? 'no error code'}, and the fetch layer's own text is withheld — it can quote ` +
+    'the request, which holds the password'
+  );
 }
 
 /** `AbortSignal.timeout` rejects with a DOMException named TimeoutError, headers or body. */
@@ -417,9 +357,9 @@ const TYPE_HINTS = new Map([
 ]);
 
 /**
- * Cognito's `__type` when the body carries one, without the namespace
- * (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols allow around
- * it. Not yet a token: the cut is what gets checked, since it is what prints.
+ * Cognito's `__type` when the body carries a non-empty one, without the
+ * namespace (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols
+ * allow around it. Only compared with KNOWN_TYPES, never printed.
  */
 function errorTypeOf(text: string): string | undefined {
   let body: unknown;
@@ -429,11 +369,11 @@ function errorTypeOf(text: string): string | undefined {
     return undefined;
   }
   const raw = read(body, '__type');
-  if (typeof raw !== 'string') return undefined;
+  if (typeof raw !== 'string' || raw === '') return undefined;
   return raw.split(':')[0]?.split('#').pop() ?? '';
 }
 
-/** The response's media type, lowercased and without parameters. Not yet a token. */
+/** The response's media type, lowercased and without parameters. Only compared, never printed. */
 function mediaTypeOf(res: unknown): unknown {
   try {
     const value = (read(res, 'headers') as Headers | undefined)?.get('content-type');
@@ -445,24 +385,27 @@ function mediaTypeOf(res: unknown): unknown {
 
 /**
  * What an operator can act on in a response that was not a success: Cognito's
- * error type when one can be shown, otherwise the status and media type. As
- * with codes, a type that was withheld reads the same as one that was absent.
+ * error type when it is a known one, otherwise the status, the media type when
+ * it is a known one, and whether the body named an error type at all.
  */
-function describeResponse(res: unknown, text: string, password: string): string {
+function describeResponse(res: unknown, text: string): string {
   const status = read(res, 'status');
   const statusLine =
     typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599
       ? `HTTP ${status}`
       : 'an invalid HTTP status';
-  const type = token(errorTypeOf(text), KNOWN_TYPES, ERROR_TYPE, password);
+  const named = errorTypeOf(text);
+  const type = recognised(named, KNOWN_TYPES);
   if (type !== undefined) {
     const hint = TYPE_HINTS.get(type);
     return hint === undefined ? `${type} (${statusLine})` : `${type} (${statusLine}): ${hint}`;
   }
-  const media = token(mediaTypeOf(res), KNOWN_MEDIA_TYPES, MEDIA_TYPE, password);
+  const media = recognised(mediaTypeOf(res), KNOWN_MEDIA_TYPES);
   return (
-    `${statusLine}${media === undefined ? '' : ` (${media})`}, with no Cognito error type ` +
-    'that can be shown' +
+    `${statusLine}${media === undefined ? '' : ` (${media})`}, ` +
+    (named === undefined
+      ? 'with no Cognito error type'
+      : 'with an error type this module does not recognise') +
     (text === ''
       ? ' and an empty body'
       : '; its body is withheld, since a proxy can quote the request it refused')
@@ -479,14 +422,13 @@ export function cognitoEndpoint(region: string): string {
  *
  * Throws with an actionable message on every failure path, so a misconfigured
  * pool fails the demo loudly rather than producing a token-shaped nothing:
- *   - a Cognito error (bad credentials, flow not enabled) reports its type when
- *     `token` admits it — always for a known type, unless it and the password
- *     contain one another — and otherwise its status and media type;
- *   - a network failure reports its error codes on the same terms, a timeout
- *     reports itself, and a refused redirect says so;
- *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) is a failure, named when `token`
- *     admits its name, because an unfinished sign-in yields no token and needs
- *     an operator, not a retry;
+ *   - a Cognito error (bad credentials, flow not enabled) reports its type
+ *     when it is a known one, and otherwise its status and media type;
+ *   - a network failure reports its known error codes, a timeout reports
+ *     itself, and a refused redirect says so;
+ *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) is a failure, named when it is a
+ *     known one, because an unfinished sign-in yields no token and needs an
+ *     operator, not a retry;
  *   - a 200 without a string AccessToken is a failure, never an empty token.
  */
 export async function fetchCognitoAccessToken(
@@ -523,7 +465,7 @@ export async function fetchCognitoAccessToken(
     //
     // The caught error is not attached; the header says why. Its codes are in
     // the message, which is what an operator acts on.
-    const facts = examineFailure(err, password);
+    const facts = examineFailure(err);
     // eslint-disable-next-line preserve-caught-error -- deliberately not attached, see above
     throw new Error(
       isTimeout(err)
@@ -549,14 +491,12 @@ export async function fetchCognitoAccessToken(
         ? `Cognito sign-in for ${username} did not finish answering within ${timeoutMs}ms ` +
             `(${endpoint})`
         : `Cognito sign-in for ${username} could not read the response from ${endpoint}: ` +
-            describeFailure(examineFailure(err, password)),
+            describeFailure(examineFailure(err)),
     );
   }
 
   if (read(res, 'ok') !== true) {
-    throw new Error(
-      `Cognito sign-in failed for ${username} — ${describeResponse(res, text, password)}`,
-    );
+    throw new Error(`Cognito sign-in failed for ${username} — ${describeResponse(res, text)}`);
   }
 
   let parsed: unknown;
@@ -570,11 +510,11 @@ export async function fetchCognitoAccessToken(
   const body: InitiateAuthResponse = typeof parsed === 'object' && parsed !== null ? parsed : {};
 
   if (body.ChallengeName) {
-    const challenge = token(body.ChallengeName, KNOWN_CHALLENGES, CONSTANT_NAME, password);
+    const challenge = recognised(body.ChallengeName, KNOWN_CHALLENGES);
     throw new Error(
       `Cognito sign-in for ${username} needs ` +
         (challenge === undefined
-          ? 'a challenge (its name is withheld)'
+          ? 'a challenge this module does not recognise'
           : `challenge ${challenge}`) +
         ' — finish it once in the AWS console (a temporary password must be reset before the ' +
         'account can be used unattended), then re-run.',

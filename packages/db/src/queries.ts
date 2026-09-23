@@ -42,6 +42,8 @@ async function fillMissingDisplayName(
   row: UserRow,
   displayName: string | undefined,
 ): Promise<UserRow> {
+  // A named row is left as it is. The UPDATE below re-checks the NULL itself,
+  // so skipping it here only saves two round trips on every later sign-in.
   if (displayName === undefined || row.displayName !== null) return row;
 
   // The NULL is re-checked in the UPDATE itself, so a concurrent sign-in that
