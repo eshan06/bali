@@ -10,3 +10,8 @@ packages/db/migrations/
 
 # Hand-written design docs — formatter churn there is pure diff noise
 docs/
+
+# Locally patched vendored skill docs — excluded so formatter churn on
+# upstream text (and future re-vendors) never turns format:check red on an
+# unrelated PR
+.claude/skills/graphify/

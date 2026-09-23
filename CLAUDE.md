@@ -11,6 +11,9 @@ is always allowed and always recorded.
 2. `docs/PLAN.md` — phases, go-live features, live status. Check it before
    building anything: is it already done, planned for a later phase, or
    deliberately cut?
+3. `docs/GOTCHAS.md` — live traps of this environment and process (git
+   plumbing, CI, cloud sessions, dev). Skim it so known traps aren't
+   rediscovered the hard way.
 
 ## Non-negotiable conventions
 
@@ -34,7 +37,8 @@ is always allowed and always recorded.
 
 Applies to anything: a new phase, a new feature, a fix the owner asks for.
 
-1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`. Locate the
+1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`, and skim
+   `docs/GOTCHAS.md` once per session (not per task). Locate the
    task: already done? planned for a later phase? deliberately cut? For a new
    phase, its step list lives in PLAN.md / the agreed phase plans.
 2. **Plan, then go — no approval gate:** for anything non-trivial, run
@@ -66,9 +70,20 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   integration tests (happy path, authz, validation, idempotent replay). Bug
   fix → the failing regression test comes first. Engine change → PGlite tests
   plus real-Postgres race coverage where concurrency is involved.
+- **Ponytail (the account-wide minimalism/YAGNI plugin) governs
+  implementation, never the gates.** Its minimalism shapes the code you
+  write; the testing rules above, every CI check, validation at trust
+  boundaries, error handling, and security are explicit requirements —
+  YAGNI never trims them. No Ponytail on your account? The boundary still
+  reads the same: minimize implementation, never the gates.
 - **New feature?** Check `docs/PLAN.md` first. Design against ARCHITECTURE.md.
   When done, add the feature to PLAN.md with a one-line architecture note; if
   it changed a real design decision, update ARCHITECTURE.md itself.
+- **Found a critical or recurring issue?** First make it impossible to hit
+  again: a regression test, a CI check, or a rule in this file — in that
+  order. Only a trap that fits none of those (environment quirks, process
+  mechanics) goes into `docs/GOTCHAS.md`, one short entry, and the PR that
+  fixes a trap deletes its entry. GOTCHAS holds live traps only.
 - **Before ending any session that changed source code, update `docs/PLAN.md`**
   (what landed, current status, what's next). The "Plan doc updated" CI check
   blocks source PRs that skip this; a genuinely trivial fix may carry
@@ -94,3 +109,28 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 `npm ci` · `npm run typecheck` · `npm run lint` · `npm test` (PGlite — no
 database server needed) · `npm run demo` (end-to-end in memory) ·
 `npm run dev:api`
+
+## graphify (optional local tooling)
+
+graphify builds a local knowledge graph of this repo at `graphify-out/`
+(gitignored — regenerable, never committed). The CLI arrives via the owner's
+account plugin, not this repo; every rule below applies **only when the
+`graphify` CLI is installed and `graphify-out/graph.json` exists** — with
+neither, skip this section entirely and work normally.
+
+- `docs/ARCHITECTURE.md` and `docs/PLAN.md` are law and always read from
+  source — a derived graph, which is only as fresh as the last
+  `graphify update .`, never answers for them.
+- For codebase questions, first run `graphify query "<question>"`. Use
+  `graphify path "<A>" "<B>"` for relationships and `graphify explain
+"<concept>"` for focused concepts — a scoped subgraph beats raw grep output.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead
+  of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or
+  when query/path/explain do not surface enough.
+- After modifying code, run `graphify update .` to keep the graph current
+  (AST-only, no API cost).
+- Enforcement hooks (`graphify hook-guard`) are personal opt-in config for
+  `.claude/settings.local.json` (untracked) — never the shared
+  `.claude/settings.json`, which must work in every environment and must not
+  route tool inputs through third-party binaries.

@@ -185,6 +185,18 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-23** — `docs/GOTCHAS.md` added to the read order: live
+  environment/process traps only, one entry each, deleted when fixed. The
+  routing rule (CLAUDE.md working rules): a critical or recurring finding
+  becomes a regression test, a CI check, or a rule first — a GOTCHAS entry
+  only when it is none of those.
+- **2026-09-23** — Tooling adopted with review-set boundaries (#36 + follow-up):
+  graphify is **optional local tooling** — vendored skill fires only on an
+  explicit `/graphify`, never installs unattended, and its enforcement hooks
+  live in untracked `.claude/settings.local.json`, never shared config;
+  ARCHITECTURE.md and PLAN.md are always read from source, never answered
+  from the graph. Ponytail (account-wide minimalism plugin) governs
+  implementation, never the gates (CLAUDE.md working rule).
 - **2026-09-22, amended 2026-09-23** — The exit demo's Cognito sign-in puts
   **no text from outside into what it throws**, rather than scrubbing the
   password out of that text. The password leaves the process in the request
