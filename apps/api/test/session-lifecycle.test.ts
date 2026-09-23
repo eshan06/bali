@@ -1,4 +1,4 @@
-import { type Database, events, startSession, tapIn } from '@bali/db';
+import { type Database, events, participations, startSession, tapIn } from '@bali/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type {
   CheckInResponse,
@@ -556,6 +556,16 @@ describe('POST /v1/sessions/:id/protection-off', () => {
       .from(events)
       .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
     expect(recorded).toHaveLength(1);
+
+    // A replay answers the CURRENT truth, not the state it once set: after a
+    // re-tap the same retry says "focused", so a phone that tapped back in is
+    // never sent back to the tap-the-block screen by its own stale record.
+    await tap(session.id, student.id);
+    const afterRetap = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+    expect(afterRetap.json<ProtectionOffResponse>()).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+    });
   });
 
   it('a report retried after the bell replays (200); a fresh one then is a 409', async () => {
@@ -579,11 +589,28 @@ describe('POST /v1/sessions/:id/protection-off', () => {
     expect(fresh.statusCode).toBe(409);
   });
 
-  it('is a 409 for a caller with nothing live here, and records nothing', async () => {
-    // Strict like refocus: another account that merely knows the session id
-    // cannot mark anyone, and a student who never tapped has nothing to mark.
+  it('is a 409 for a student with nothing live here, and records nothing', async () => {
     const { student, session } = await seedRunning('protoff-none');
-    for (const sub of [student.cognitoId, 'outsider']) {
+    const res = await post(
+      await ctx.tokenFor(student.cognitoId),
+      `/v1/sessions/${session.id}/protection-off`,
+      { eventId: randomUUID(), deviceTime: now() },
+    );
+    expect(res.statusCode).toBe(409);
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('nobody else can mark a live student: an outsider or the teacher gets 409', async () => {
+    // The student IS live here, so a report that resolved anyone's row but
+    // the caller's would have someone to mark — this is what fails if the
+    // engine ever loads a participation that is not the caller's own.
+    const { teacher, student, session } = await seedRunning('protoff-authz');
+    await tap(session.id, student.id);
+    for (const sub of ['outsider', teacher.cognitoId]) {
       const res = await post(await ctx.tokenFor(sub), `/v1/sessions/${session.id}/protection-off`, {
         eventId: randomUUID(),
         deviceTime: now(),
@@ -595,6 +622,13 @@ describe('POST /v1/sessions/:id/protection-off', () => {
       .from(events)
       .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
     expect(recorded).toHaveLength(0);
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+    expect(row?.state).toBe('focused');
   });
 
   it('is a 404 for an unknown session', async () => {

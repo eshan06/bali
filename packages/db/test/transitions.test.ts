@@ -808,6 +808,24 @@ describe('state changes', () => {
       expect(replay).toMatchObject({ outcome: 'replay', state: 'protection_off', reason: 'nurse' });
     });
 
+    it('an unlock while protection is off still counts as contact', async () => {
+      // Nothing flips, but the phone spoke to the server, so last contact
+      // moves — the grid's "last seen" must not age over a phone that is here.
+      const { session, student } = await joined('protoff-unlock-contact');
+      await protectionOff(db, change(session, student, 5));
+      const stale = new Date('2026-01-01T09:06:00Z');
+      await db
+        .update(participations)
+        .set({ lastSeenAt: stale })
+        .where(eq(participations.sessionId, session.id));
+
+      await unlock(db, change(session, student, 7));
+      const row = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(row.lastSeenAt!.getTime()).toBeGreaterThan(stale.getTime());
+    });
+
     it('a change that landed replays after the bell; a fresh one is refused', async () => {
       // The replay is checked ahead of the ended-session guard (as tapIn and
       // extendSession do), so a lost response retried after the bell re-reads the

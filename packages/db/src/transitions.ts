@@ -1928,8 +1928,7 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
       };
     }
 
-    if (live) {
-      // Contact from the phone either way, so an open silence episode closes.
+    if (live && note === null) {
       await closeOpenSilence(
         tx,
         {
@@ -1940,20 +1939,25 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
         },
         occurredAt,
       );
-      if (note === null) {
-        await tx
-          .update(participations)
-          .set({ state: 'unlocked', lastSeenAt: heardNow() })
-          .where(eq(participations.id, live.id));
-        return {
-          outcome: 'applied',
-          recordedAs: null,
-          state: 'unlocked',
-          participationId: live.id,
-          session,
-          reason,
-        };
-      }
+      await tx
+        .update(participations)
+        .set({ state: 'unlocked', lastSeenAt: heardNow() })
+        .where(eq(participations.id, live.id));
+      return {
+        outcome: 'applied',
+        recordedAs: null,
+        state: 'unlocked',
+        participationId: live.id,
+        session,
+        reason,
+      };
+    }
+
+    if (live) {
+      // Protection off: nothing flips, but the phone made contact, so last
+      // contact moves (the grid's "last seen"). No silence episode can be open
+      // here — the sweep opens them only on focused rows, and protectionOff
+      // closes any on the way in — so there is none to close.
       await tx
         .update(participations)
         .set({ lastSeenAt: heardNow() })

@@ -116,7 +116,7 @@ _Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
   the `unlockDisposition` pattern. **A1 (unlock reason) and A2 (protection off) landed; A3 is next.** The
-  owner decisions Phase 3 needs are items 6–9 under Open product decisions;
+  owner decisions Phase 3 needs are items 6–10 under Open product decisions;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
   gates B5: confirm the DeviceActivity extension fires at interval END with
   the app force-quit.
@@ -201,6 +201,11 @@ layer → roster import (CSV / Google Classroom).
    Before A8.
 9. macOS CI minutes for the iOS build (lean: a GitHub-hosted macOS job that
    runs only on PRs touching `ios/`). Before B2.
+10. Whether a protection-off that first reaches the server after the bell is
+    recorded (like an unlock, with a note) instead of refused. Today it is
+    refused and never recorded; the teacher saw that phone as silent in the
+    meantime, never green (lean: record it, so the history says why the phone
+    went quiet). Before B3.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
@@ -238,7 +243,14 @@ under-13 parental-consent machinery.
   retrying for a write that was recorded. A fresh change after the bell is
   still refused. From the santa-loop review, which also moved the unlock
   contract's docs (ARCHITECTURE, ISSUES #2, `@bali/shared`) to say a live
-  participation can be recorded without being flipped.
+  participation can be recorded without being flipped, and made the endpoint's
+  authorization test able to fail (a live student an outsider or the teacher
+  could otherwise mark). The client half belongs to A3's outbox contract: a
+  refused refocus or protection-off is final for its id (a late retry of a
+  refused refocus, after a re-tap and a fresh unlock, would otherwise turn an
+  unlocked phone green), a refocus a later tap or unlock superseded is never
+  sent, and protection off is reported once per revocation (each report writes
+  an event).
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside
