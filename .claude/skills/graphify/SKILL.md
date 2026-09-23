@@ -1,6 +1,6 @@
 ---
 name: graphify
-description: 'Use for any question about a codebase, its architecture, file relationships, or project content — especially when graphify-out/ exists, where the question should be treated as a graphify query first. Turns any input (code, docs, papers, images, videos) into a persistent knowledge graph with god nodes, community detection, and query/path/explain tools.'
+description: 'Build, refresh, or query the graphify knowledge graph — ONLY when the user explicitly invokes /graphify or asks to build/refresh the graph. Never load this skill for an ordinary codebase question: when the graphify CLI and graphify-out/graph.json already exist, run `graphify query` directly per CLAUDE.md; with neither present, answer from source. This skill must not install anything unattended.'
 ---
 
 # /graphify
@@ -84,14 +84,14 @@ fi
 # 3. Fall back to python3
 if [ -z "$PYTHON" ]; then PYTHON="python3"; fi
 if ! "$PYTHON" -c "import graphify" 2>/dev/null; then
-    if command -v uv >/dev/null 2>&1; then
-        uv tool install --upgrade graphifyy -q 2>&1 | tail -3
-        _UV_PY=$(uv tool run --from graphifyy python -c "import sys; print(sys.executable)" 2>/dev/null)
-        if [ -n "$_UV_PY" ]; then PYTHON="$_UV_PY"; fi
-    else
-        "$PYTHON" -m pip install graphifyy -q 2>/dev/null \
-          || "$PYTHON" -m pip install graphifyy -q --break-system-packages 2>&1 | tail -3
-    fi
+    # Bali repo policy: never install unattended (unpinned --upgrade defeats
+    # the .graphify_version pin, and --break-system-packages writes into the
+    # container's system Python). Stop and hand the owner the pinned command.
+    _PIN=$(cat "$(dirname "$0")/.graphify_version" 2>/dev/null || cat .claude/skills/graphify/.graphify_version 2>/dev/null || echo "0.9.66")
+    echo "graphify is not installed — stopping (this repo never installs it unattended)."
+    echo "To install it yourself, pinned:  uv tool install \"graphifyy==${_PIN}\""
+    echo "Then re-run /graphify."
+    exit 1
 fi
 # Write interpreter path for all subsequent steps (persists across invocations)
 mkdir -p graphify-out
@@ -647,7 +647,6 @@ Graph complete. Outputs in PATH_TO_DIR/graphify-out/
   obsidian/             - Obsidian vault (only if --obsidian was given)
 ```
 
-If graphify saved you time, consider supporting it: https://github.com/sponsors/safishamsi
 
 Replace PATH_TO_DIR with the actual absolute path of the directory that was processed.
 
