@@ -66,6 +66,12 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   integration tests (happy path, authz, validation, idempotent replay). Bug
   fix → the failing regression test comes first. Engine change → PGlite tests
   plus real-Postgres race coverage where concurrency is involved.
+- **Ponytail (the account-wide minimalism/YAGNI plugin) governs
+  implementation, never the gates.** Its minimalism shapes the code you
+  write; the testing rules above, every CI check, validation at trust
+  boundaries, error handling, and security are explicit requirements —
+  YAGNI never trims them. No Ponytail on your account? The boundary still
+  reads the same: minimize implementation, never the gates.
 - **New feature?** Check `docs/PLAN.md` first. Design against ARCHITECTURE.md.
   When done, add the feature to PLAN.md with a one-line architecture note; if
   it changed a real design decision, update ARCHITECTURE.md itself.
@@ -100,6 +106,7 @@ database server needed) · `npm run demo` (end-to-end in memory) ·
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
 Rules:
+
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
