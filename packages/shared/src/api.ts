@@ -88,9 +88,10 @@ export interface UnlockResponse {
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
   /**
-   * 'unlocked' when a live participation flipped; on a replay, the participation's
-   * current stored state (which may be an ended participation's last state); null
-   * when nothing is or was participating.
+   * 'unlocked' when a live participation flipped; 'protection_off' when it was
+   * live but protection is off (recorded, not flipped); on a replay, the
+   * participation's current stored state (which may be an ended participation's
+   * last state); null when nothing is or was participating.
    */
   state: ParticipationState | null;
   /** The session for reconciliation; null only when the session id was unknown. */
@@ -160,12 +161,29 @@ export interface UnlockRequest {
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
+// Refused (409) while protection is off: only a re-tap, which re-shields, leaves that state.
 export interface RefocusRequest {
   eventId: string;
   deviceTime: string;
 }
 export interface RefocusResponse {
   outcome: 'applied' | 'replay';
+  state: ParticipationState;
+  session: SessionView;
+}
+
+// POST /v1/sessions/{id}/protection-off — the phone found its Screen Time
+// permission revoked (iOS has already dropped every shield). Strict like
+// refocus: it needs a live participation, so a 409 means there is nothing live
+// to mark. Leaving the state takes a re-tap — refocus is refused from it.
+export interface ProtectionOffRequest {
+  /** Client idempotency key for the protection_off event (rule 4). */
+  eventId: string;
+  deviceTime: string;
+}
+export interface ProtectionOffResponse {
+  outcome: 'applied' | 'replay';
+  /** 'protection_off' when applied; the current stored state on a replay. */
   state: ParticipationState;
   session: SessionView;
 }

@@ -90,7 +90,9 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       s.joinedAt ??= at;
       break;
     case 'unlock':
-      s.state = 'unlocked';
+      // Mirrors the engine (rule 2): an unlock never softens a live student's
+      // protection off into "unlocked" — it is recorded, and the chip stays.
+      if (!(s.state === 'protection_off' && s.endedAt === null)) s.state = 'unlocked';
       s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'refocus':

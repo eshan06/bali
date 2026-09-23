@@ -4,6 +4,7 @@ import type {
   CheckInResponse,
   EndSessionResponse,
   ExtendSessionResponse,
+  ProtectionOffResponse,
   RefocusResponse,
   UnlockResponse,
 } from '@bali/shared';
@@ -528,6 +529,117 @@ describe('POST /v1/sessions/:id/unlock', () => {
       payload: { eventId: randomUUID(), deviceTime: now() },
     });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('POST /v1/sessions/:id/protection-off', () => {
+  it('marks a live student as protection off, and a retry replays', async () => {
+    const { student, session } = await seedRunning('protoff-live');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const body = { eventId: randomUUID(), deviceTime: now() };
+
+    const res = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+    expect(res.statusCode).toBe(200);
+    const first = res.json<ProtectionOffResponse>();
+    expect(first.outcome).toBe('applied');
+    expect(first.state).toBe('protection_off');
+    expect(first.session.id).toBe(session.id);
+
+    const retry = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+    expect(retry.json<ProtectionOffResponse>()).toMatchObject({
+      outcome: 'replay',
+      state: 'protection_off',
+    });
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('is a 409 for a caller with nothing live here, and records nothing', async () => {
+    // Strict like refocus: another account that merely knows the session id
+    // cannot mark anyone, and a student who never tapped has nothing to mark.
+    const { student, session } = await seedRunning('protoff-none');
+    for (const sub of [student.cognitoId, 'outsider']) {
+      const res = await post(await ctx.tokenFor(sub), `/v1/sessions/${session.id}/protection-off`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+      });
+      expect(res.statusCode).toBe(409);
+    }
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+    expect(recorded).toHaveLength(0);
+  });
+
+  it('is a 404 for an unknown session', async () => {
+    await seedClassroom(db, 'protoff-404');
+    const res = await post(
+      await ctx.tokenFor('lost-student'),
+      `/v1/sessions/${randomUUID()}/protection-off`,
+      { eventId: randomUUID(), deviceTime: now() },
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects a malformed body (400)', async () => {
+    const { student, session } = await seedRunning('protoff-400');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    for (const body of [
+      { eventId: 'not-a-uuid', deviceTime: now() },
+      { eventId: randomUUID() },
+      { eventId: randomUUID(), deviceTime: '2026-09-20T09:15:00' },
+    ]) {
+      const res = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
+  it('requires authentication', async () => {
+    const { session } = await seedRunning('protoff-auth');
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/protection-off`,
+      payload: { eventId: randomUUID(), deviceTime: now() },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('afterwards, refocus is refused and an unlock is recorded without softening it', async () => {
+    const { student, session } = await seedRunning('protoff-after');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    await post(token, `/v1/sessions/${session.id}/protection-off`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+
+    const refocused = await post(token, `/v1/sessions/${session.id}/refocus`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    expect(refocused.statusCode).toBe(409);
+    expect(refocused.json<{ error: { message: string } }>().error.message).toBe(
+      'Screen Time permission is off: tap the block to rejoin',
+    );
+
+    const unlocked = await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    expect(unlocked.statusCode).toBe(200);
+    const body = unlocked.json<UnlockResponse>();
+    expect(body).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'protection_off',
+      state: 'protection_off',
+    });
+    expect(unlockDisposition(unlocked.statusCode, body)).toBe('recorded');
   });
 });
 

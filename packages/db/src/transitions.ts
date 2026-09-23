@@ -60,7 +60,8 @@ export type TransitionErrorCode =
   | 'INVALID_EXTENSION'
   | 'EVENT_ID_CONFLICT'
   | 'CLASS_NOT_FOUND'
-  | 'ENROLLMENT_NOT_FOUND';
+  | 'ENROLLMENT_NOT_FOUND'
+  | 'PROTECTION_OFF';
 
 /** A refusal the engine can produce; endpoints (step 7) map these to the error shape. */
 export class TransitionError extends Error {
@@ -1644,6 +1645,8 @@ async function changeState(
   input: StateChangeInput,
   eventType: EventType,
   nextState: ParticipationState,
+  /** A stored state this change may not move a student out of; it refuses with `code`. */
+  cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string },
 ): Promise<StateChangeResult> {
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
@@ -1673,6 +1676,11 @@ async function changeState(
     // A fresh change needs a live participation to move.
     if (!row || row.endedAt !== null) {
       throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
+    }
+    // Throwing here rolls the event insert above back with it: a refused change
+    // records nothing.
+    if (cannotLeave !== undefined && row.state === cannotLeave.state) {
+      throw new TransitionError(cannotLeave.code, cannotLeave.message);
     }
 
     await closeOpenSilence(
@@ -1786,6 +1794,9 @@ async function recordOrphanUnlock(
  * could mean "discard":
  *
  *   - a live participation flips to `unlocked` (the normal case, outcome 'applied');
+ *   - a live participation whose protection is off is NOT flipped — that state
+ *     is never softened into an unlock — but the unlock still commits, noted
+ *     `protection_off`, and returns 'recorded' with the state it left alone;
  *   - no live participation (removed mid-session, or the participation already
  *     ended) still commits the event with a `payload.recorded_as` note and
  *     returns 'recorded' — the record stands though there is no state to move;
@@ -1855,13 +1866,19 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
 
     const live = row !== undefined && row.endedAt === null ? row : undefined;
 
-    // The note when there's nothing live to flip: an ended session dominates
-    // (the whole session is over), otherwise it's a student with no live
-    // participation — removed from the class mid-session, the ISSUES #2 case.
-    const note: UnlockRecordedAs = session.endedAt ? 'after_session_end' : 'no_live_participation';
+    // Why nothing flips, when nothing does. With no live participation an ended
+    // session dominates (the whole session is over), otherwise it's a student
+    // removed from the class mid-session — the ISSUES #2 case. A live student
+    // whose protection is off is not flipped either: that state is never
+    // softened into an unlock (ARCHITECTURE, iOS rules: "never green, never an
+    // unlock") — iOS already dropped the shields, and the grid must keep saying
+    // the permission is off until a re-tap. Recorded all the same, never refused.
+    let note: UnlockRecordedAs | null = null;
+    if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
+    else if (live.state === 'protection_off') note = 'protection_off';
 
     const payload: Record<string, unknown> = {};
-    if (!live) payload.recorded_as = note;
+    if (note !== null) payload.recorded_as = note;
     if (reason !== null) payload.reason = reason;
 
     const isNew = await insertEvent(tx, {
@@ -1889,6 +1906,7 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
     }
 
     if (live) {
+      // Contact from the phone either way, so an open silence episode closes.
       await closeOpenSilence(
         tx,
         {
@@ -1899,14 +1917,28 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
         },
         occurredAt,
       );
+      if (note === null) {
+        await tx
+          .update(participations)
+          .set({ state: 'unlocked', lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        return {
+          outcome: 'applied',
+          recordedAs: null,
+          state: 'unlocked',
+          participationId: live.id,
+          session,
+          reason,
+        };
+      }
       await tx
         .update(participations)
-        .set({ state: 'unlocked', lastSeenAt: heardNow() })
+        .set({ lastSeenAt: heardNow() })
         .where(eq(participations.id, live.id));
       return {
-        outcome: 'applied',
-        recordedAs: null,
-        state: 'unlocked',
+        outcome: 'recorded',
+        recordedAs: note,
+        state: live.state,
         participationId: live.id,
         session,
         reason,
@@ -1925,9 +1957,18 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
   });
 }
 
-/** Return to focus after an unlock. */
+/**
+ * Return to focus after an unlock. Never out of protection off: iOS dropped
+ * every shield when the permission went, so claiming focus without re-shielding
+ * would put a green chip over an unshielded phone. Only a re-tap — which
+ * re-shields — leaves protection off (ARCHITECTURE, iOS rules).
+ */
 export function refocus(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
-  return changeState(db, input, 'refocus', 'focused');
+  return changeState(db, input, 'refocus', 'focused', {
+    state: 'protection_off',
+    code: 'PROTECTION_OFF',
+    message: 'protection is off; only a re-tap returns to focus',
+  });
 }
 
 /** Screen Time permission was turned off — its own state, never green, never an unlock. */

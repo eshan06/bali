@@ -737,6 +737,86 @@ describe('state changes', () => {
     });
   });
 
+  describe('protection off', () => {
+    const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+    function change(session: { id: string }, student: { id: string }, minute: number) {
+      return {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: at(minute),
+      };
+    }
+    async function stateOf(sessionId: string) {
+      return one(
+        await db.select().from(participations).where(eq(participations.sessionId, sessionId)),
+      ).state;
+    }
+
+    it('refocus cannot leave it — nothing is recorded — and a re-tap can', async () => {
+      // iOS dropped every shield when the permission went, so "focused" without a
+      // re-tap would be a green chip over an unshielded phone.
+      const { session, student } = await joined('protoff-refocus');
+      await protectionOff(db, change(session, student, 5));
+
+      await expect(refocus(db, change(session, student, 6))).rejects.toMatchObject({
+        code: 'PROTECTION_OFF',
+      });
+      expect((await eventsFor(session.id)).map((e) => e.type)).toEqual([
+        'session_started',
+        'tap_in',
+        'protection_off',
+      ]);
+      expect(await stateOf(session.id)).toBe('protection_off');
+
+      const retap = await tapIn(db, change(session, student, 7));
+      expect(retap.state).toBe('focused');
+      expect(await stateOf(session.id)).toBe('focused');
+    });
+
+    it('a refocus recorded before protection went off still replays the current truth', async () => {
+      // The refusal is for fresh changes only: a retry of a refocus that already
+      // landed must re-read and answer, never 409 its own outbox record.
+      const { session, student } = await joined('protoff-refocus-replay');
+      await unlock(db, change(session, student, 5));
+      const req = change(session, student, 6);
+      expect((await refocus(db, req)).outcome).toBe('applied');
+      await protectionOff(db, change(session, student, 7));
+
+      const retry = await refocus(db, req);
+      expect(retry.outcome).toBe('replay');
+      expect(retry.state).toBe('protection_off');
+    });
+
+    it('an unlock never softens it: recorded, noted, the state left alone', async () => {
+      const { session, student } = await joined('protoff-unlock');
+      await protectionOff(db, change(session, student, 5));
+      const req = { ...change(session, student, 6), reason: 'nurse' as const };
+
+      const u = await unlock(db, req);
+      expect(u).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'protection_off',
+        state: 'protection_off',
+        reason: 'nurse',
+      });
+      const recorded = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+      expect(recorded.payload).toEqual({ recorded_as: 'protection_off', reason: 'nurse' });
+      expect(await stateOf(session.id)).toBe('protection_off');
+
+      const replay = await unlock(db, req);
+      expect(replay).toMatchObject({ outcome: 'replay', state: 'protection_off', reason: 'nurse' });
+    });
+
+    it('takes over from an unlocked student', async () => {
+      const { session, student } = await joined('protoff-after-unlock');
+      await unlock(db, change(session, student, 5));
+      const p = await protectionOff(db, change(session, student, 6));
+      expect(p.outcome).toBe('applied');
+      expect(await stateOf(session.id)).toBe('protection_off');
+    });
+  });
+
   it('a replay of an unlock for a never-participating student returns replay, not a refusal (ISSUES #2)', async () => {
     const { klass, student } = await seedClass('unlock-norow-replay');
     const { session } = await startSession(db, {

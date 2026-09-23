@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, and A1 — the unlock's optional reason — has landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason) and A2 (protection off, end to end on the server) have landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -115,7 +115,7 @@ _Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and
 - **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
-  the `unlockDisposition` pattern. **A1 (unlock reason) landed; A2 is next.** The
+  the `unlockDisposition` pattern. **A1 (unlock reason) and A2 (protection off) landed; A3 is next.** The
   owner decisions Phase 3 needs are items 6–9 under Open product decisions;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
   gates B5: confirm the DeviceActivity extension fires at interval END with
@@ -138,7 +138,7 @@ API and shared contracts come first; Swift lives in a root `ios/` folder (the
 plan backstop already treats it as source).
 
 - **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
-- **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns)
+- **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
 - **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift
@@ -160,7 +160,7 @@ plan backstop already treats it as source).
 | Feature | Phase | Notes |
 |---|---|---|
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
-| 30s check-in that verifies shields before claiming them | 3 | rule 3 |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors both) — only a re-tap returns to focus. The phone's half is B3/B5 |
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
@@ -214,6 +214,21 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-23** — **A2: protection off, end to end on the server.**
+  `POST /v1/sessions/{id}/protection-off` wires the engine's existing
+  `protectionOff` (strict like refocus: a live participation or `409`). Two
+  rules make ARCHITECTURE's "never green, never an unlock" hold in code rather
+  than only in the grid's colours: **refocus is refused out of protection off**
+  (`PROTECTION_OFF` → `409`, "tap the block to rejoin"; the refusal rolls the
+  event back, and a replay of a refocus recorded earlier still answers the
+  current truth), because iOS dropped every shield and only a re-tap
+  re-shields; and **an unlock never softens it** — still recorded, never
+  refused, noted `recorded_as: 'protection_off'` (additive vocab), state left
+  alone — because otherwise a student who switched Screen Time off could turn
+  their red chip orange with one request. The live grid mirrors the second
+  rule (rule 2). Nothing reached protection off before this (no route called
+  `protectionOff`), so no shipped behaviour changed. Each rule is pinned by a
+  test that goes red when it is removed.
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside

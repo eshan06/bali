@@ -282,6 +282,8 @@ Student app:
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
   unlock, and coming back from one. The unlock may carry an optional reason (bathroom,
   nurse, other); one the server does not recognise is recorded as none rather than refused.
+- `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
+  (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state.
 - `POST /v1/enrollments` — join a class by code.
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record.
@@ -438,9 +440,10 @@ and data types, so the two apps can't drift out of type-agreement.
 
 - **Turning off Screen Time permission is handled by being honest, not by fighting it.** iOS
   itself drops all shields the instant the permission is revoked — we can't prevent it. So the
-  next check-in notices, the server records it as its own event, and the grid shows "turned
-  protection off" (a distinct state — never green, never an unlock). Returning to focus needs
-  an explicit re-tap. This permanently kills v2's worst bug, which was pretending to be
+  next check-in notices and reports it (`POST /v1/sessions/{id}/protection-off`), the server
+  records it as its own event, and the grid shows "turned protection off" (a distinct state —
+  never green, never an unlock: an unlock arriving then is recorded without softening it).
+  Returning to focus needs an explicit re-tap; refocus is refused out of it. This permanently kills v2's worst bug, which was pretending to be
   shielded after exactly this.
 - **A closed app still shows the truth fast.** When the app is force-quit, check-ins stop and
   within about a minute the grid shows "app closed" honestly. (What should happen to the

@@ -55,6 +55,15 @@ describe('grid-state', () => {
     expect(s.ana.state).toBe('focused');
   });
 
+  it('an unlock never softens a live protection off, and a re-tap clears it (mirrors the engine)', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(7, 'unlock', 'ana'));
+    expect(s.ana.state).toBe('protection_off');
+    s = applyEvent(s, evt(8, 'tap_in', 'ana'));
+    expect(s.ana.state).toBe('focused');
+  });
+
   it('ends every live participation on session_ended', () => {
     let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
     s = applyEvent(s, evt(9, 'session_ended', null));
