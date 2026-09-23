@@ -90,9 +90,10 @@ export interface UnlockResponse {
   recordedAs: UnlockRecordedAs | null;
   /**
    * 'unlocked' when a live participation flipped; 'protection_off' when it was
-   * live but protection is off (recorded, not flipped); on a replay, the
+   * live but protection is off (recorded, not flipped); null when no
+   * participation was live (none, or it had ended); on a replay, the
    * participation's current stored state (which may be an ended participation's
-   * last state); null when nothing is or was participating.
+   * last state), or null when there is none.
    */
   state: ParticipationState | null;
   /** The session for reconciliation; null only when the session id was unknown. */

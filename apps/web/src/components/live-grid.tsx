@@ -40,6 +40,10 @@ const CHIP: Record<GridDisplay, { label: string; cls: string }> = {
     cls: 'bg-red-100 text-red-800 border-red-400',
   },
   absent: { label: 'Not here', cls: 'bg-white text-slate-400 border-dashed border-slate-300' },
+  unknown: {
+    label: 'Unknown · refresh',
+    cls: 'bg-white text-slate-700 border-dashed border-slate-500',
+  },
 };
 
 export function LiveGrid({ sessionId }: { sessionId: string }) {

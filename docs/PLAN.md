@@ -115,7 +115,7 @@ _Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and
 - **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
-  the `unlockDisposition` pattern. **A1 (unlock reason) and A2 (protection off) landed; A3 is next.** The
+  the `unlockDisposition` pattern. **A1 (unlock reason) and A2 (protection off) landed; A2b is next, then A3.** The
   owner decisions Phase 3 needs are items 6–10 under Open product decisions;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
   gates B5: confirm the DeviceActivity extension fires at interval END with
@@ -263,8 +263,9 @@ under-13 parental-consent machinery.
   refused refocus or protection-off is final for its id (a late retry of a
   refused refocus, after a re-tap and a fresh unlock, would otherwise turn an
   unlocked phone green), a refocus a later tap or unlock superseded is never
-  sent, and protection off is reported once per revocation (each report writes
-  an event).
+  sent, and protection off is reported once per revocation — and again after
+  any tap or join made while it is still revoked, since each returns the row
+  to focused (each report writes an event).
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside

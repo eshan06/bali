@@ -194,9 +194,17 @@ describe('gridDisplay', () => {
 
   it('shows protection_off after leaving as its own loud chip, never as an unlock', () => {
     let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
-    students = applyEvent(students, evt(2, 'enrollment_removed', 'ana'));
-    students = applyEvent(students, evt(3, 'protection_off', 'ana'));
+    students = applyEvent(students, evt(2, 'protection_off', 'ana'));
+    students = applyEvent(students, evt(3, 'enrollment_removed', 'ana'));
     expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+  });
+
+  it('names a state this tab does not know rather than guessing a chip', () => {
+    // An open tab can outlive a deploy that adds a participation state.
+    const students = fromSnapshot(
+      snapshot(1, [{ id: 'ana', state: 'teleported' as ParticipationState }]),
+    );
+    expect(gridDisplay(students.ana, now)).toBe('unknown');
   });
 
   it('keeps protection off through the bell, and an unlock afterwards does not relabel it', () => {

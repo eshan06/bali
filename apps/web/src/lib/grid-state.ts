@@ -1,5 +1,5 @@
 import type { DisplayState, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
-import { deriveDisplayState } from '@bali/shared';
+import { deriveDisplayState, PARTICIPATION_STATES } from '@bali/shared';
 
 /**
  * The live grid's pure state machine, kept out of the component so it can be
@@ -138,7 +138,7 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
 }
 
 /**
- * What the grid shows for one student: `deriveDisplayState`, plus the three
+ * What the grid shows for one student: `deriveDisplayState`, plus the four
  * cases a participation snapshot alone cannot express.
  *
  * `absent` — enrolled but never tapped in, so there is no state at all.
@@ -155,11 +155,17 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
  * was off when the participation ended. Never labelled as an unlock: protection
  * off is "never green, never an unlock" (ARCHITECTURE, iOS rules), and a later
  * unlock leaves it as it is.
+ *
+ * `unknown` — a state this tab has no chip for. An open tab can be older than
+ * the server it reads (it outlives a deploy that adds a state), so it says so
+ * and asks for a refresh rather than crash the grid or guess a calm chip.
  */
-export type GridDisplay = DisplayState | 'absent' | 'left_unprotected' | 'left_protection_off';
+export type GridDisplay =
+  DisplayState | 'absent' | 'left_unprotected' | 'left_protection_off' | 'unknown';
 
 export function gridDisplay(s: Student, now: Date): GridDisplay {
   if (s.state === null) return 'absent';
+  if (!(PARTICIPATION_STATES as readonly string[]).includes(s.state)) return 'unknown';
   if (s.endedAt !== null && s.state === 'protection_off') return 'left_protection_off';
   if (s.endedAt !== null && s.state === 'unlocked') return 'left_unprotected';
   return deriveDisplayState(
