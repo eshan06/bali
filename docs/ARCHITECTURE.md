@@ -322,8 +322,9 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   bug lived exactly at this gap. The engine implements this: `unlock` always commits
   the event, tagging it `payload.recorded_as` (`no_live_participation` /
   `after_session_end` / `unknown_session` / `not_enrolled`) when there is no live
-  participation to flip; the outbox disposition (`recorded` / `retry` / `reauth`) is
-  the typed table in `@bali/shared`. "Never refuse" is not "never check": a caller
+  participation to flip, and `protection_off` when there is one but its protection is
+  off (never softened into an unlock); the outbox disposition (`recorded` / `retry` /
+  `reauth`) is the typed table in `@bali/shared`. "Never refuse" is not "never check": a caller
   with no participation row in the session **and** no active enrollment in its class
   has no standing there, so their unlock records as an orphan (`not_enrolled`, no
   session or class attached, the claimed id in the payload) rather than writing into
@@ -443,8 +444,8 @@ and data types, so the two apps can't drift out of type-agreement.
   next check-in notices and reports it (`POST /v1/sessions/{id}/protection-off`), the server
   records it as its own event, and the grid shows "turned protection off" (a distinct state —
   never green, never an unlock: an unlock arriving then is recorded without softening it).
-  Returning to focus needs an explicit re-tap; refocus is refused out of it. This permanently kills v2's worst bug, which was pretending to be
-  shielded after exactly this.
+  Returning to focus needs an explicit re-tap; refocus is refused out of it. This permanently
+  kills v2's worst bug, which was pretending to be shielded after exactly this.
 - **A closed app still shows the truth fast.** When the app is force-quit, check-ins stop and
   within about a minute the grid shows "app closed" honestly. (What should happen to the
   shields themselves in that case is in "decided later" below.)

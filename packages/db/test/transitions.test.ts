@@ -808,6 +808,31 @@ describe('state changes', () => {
       expect(replay).toMatchObject({ outcome: 'replay', state: 'protection_off', reason: 'nurse' });
     });
 
+    it('a change that landed replays after the bell; a fresh one is refused', async () => {
+      // The replay is checked ahead of the ended-session guard (as tapIn and
+      // extendSession do), so a lost response retried after the bell re-reads the
+      // truth instead of drawing a 409 the outbox would keep retrying forever.
+      const { session, student } = await joined('protoff-after-bell');
+      await unlock(db, change(session, student, 4));
+      const refocused = change(session, student, 5);
+      await refocus(db, refocused);
+      const reported = change(session, student, 6);
+      await protectionOff(db, reported);
+      await endSession(db, { sessionId: session.id, at: at(20), reason: 'ended' });
+
+      const retryReport = await protectionOff(db, reported);
+      expect(retryReport).toMatchObject({ outcome: 'replay', state: 'protection_off' });
+      const retryRefocus = await refocus(db, refocused);
+      expect(retryRefocus).toMatchObject({ outcome: 'replay', state: 'protection_off' });
+
+      await expect(protectionOff(db, change(session, student, 21))).rejects.toMatchObject({
+        code: 'SESSION_NOT_RUNNING',
+      });
+      expect((await eventsFor(session.id)).filter((e) => e.type === 'protection_off')).toHaveLength(
+        1,
+      );
+    });
+
     it('takes over from an unlocked student', async () => {
       const { session, student } = await joined('protoff-after-unlock');
       await unlock(db, change(session, student, 5));

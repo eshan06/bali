@@ -25,6 +25,8 @@ import {
   expireDueSessions,
   extendSession,
   markSilentParticipations,
+  protectionOff,
+  refocus,
   startSession,
   tapIn,
   unlock,
@@ -255,6 +257,48 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       const ended = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
       expect(ended.endedAt).not.toBeNull();
       expect(await liveParticipations(session.id)).toHaveLength(0);
+    }
+  });
+
+  it('protection off racing an unlock or a refocus always ends in protection off', async () => {
+    // Both of A2's rules rest on the session FOR UPDATE lock serialising the
+    // pair, and either order must end the same way. Unlock first flips to
+    // unlocked and protection off then takes over; protection off first and
+    // the unlock is recorded without softening it. Refocus first returns to
+    // focus and protection off takes over; protection off first and the
+    // refocus is refused. So: protection off every time, the unlock always
+    // recorded, and never a refocus after the protection_off it would undo.
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['unlock', 'refocus'] as const) {
+        const { classId, studentId } = await seed(`race-protoff-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, change());
+        if (rival === 'refocus') await unlock(db, change());
+
+        await Promise.allSettled([
+          protectionOff(db, change()),
+          rival === 'unlock' ? unlock(db, change()) : refocus(db, change()),
+        ]);
+
+        expect(one(await liveParticipations(session.id)).state).toBe('protection_off');
+        const types = (
+          await db
+            .select({ type: events.type })
+            .from(events)
+            .where(eq(events.sessionId, session.id))
+            .orderBy(asc(events.seq))
+        ).map((e) => e.type);
+        const off = types.indexOf('protection_off');
+        expect(off).toBeGreaterThan(-1);
+        expect(types.slice(off + 1)).not.toContain('refocus');
+        if (rival === 'unlock') expect(types.filter((t) => t === 'unlock')).toHaveLength(1);
+      }
     }
   });
 

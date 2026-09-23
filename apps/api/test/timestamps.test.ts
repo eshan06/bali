@@ -8,6 +8,7 @@ import {
 import type {
   CheckInResponse,
   EnrollmentJoinResponse,
+  ProtectionOffResponse,
   RefocusResponse,
   TapResponse,
   UnlockResponse,
@@ -41,7 +42,8 @@ import { makeTestDb, seedClassroom } from './helpers/db.js';
  * actually persisted from `deviceTime` and asserts it is the instant the `Z`
  * form would have produced:
  *
- *   tap / unlock / refocus  the event's `occurred_at` (clamped device time)
+ *   tap / unlock / refocus / protection-off
+ *                           the event's `occurred_at` (clamped device time)
  *   check-in                the `came_back` event's `occurred_at` — the one
  *                           place check-in uses the device clock at all, since
  *                           `last_seen_at` is server-stamped (rule 1)
@@ -95,7 +97,7 @@ function withOffset(at: Date): string {
 /** The single event of this type in the session, or unattached (`sessionId: null`). */
 async function oneEvent(
   sessionId: string | null,
-  type: 'tap_in' | 'unlock' | 'refocus' | 'came_back' | 'enrollment_joined',
+  type: 'tap_in' | 'unlock' | 'refocus' | 'protection_off' | 'came_back' | 'enrollment_joined',
 ) {
   const rows = await db
     .select()
@@ -186,6 +188,24 @@ describe('ISO 8601 timestamps with a UTC offset', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json<RefocusResponse>().state).toBe('focused');
     sameInstant((await oneEvent(session.id, 'refocus')).occurredAt, at);
+  });
+
+  it('records a protection-off at the instant its offset deviceTime names', async () => {
+    // A 400 here and the report never lands: the phone resends the identical
+    // body, and the grid keeps showing a phone whose shields iOS already dropped.
+    const { student, block, session } = await seedRunning('ts-protoff');
+    const token = await ctx.tokenFor(student.cognitoId);
+    await joinSession(token, block.tagId);
+    const at = new Date(Date.now() - 2_000);
+
+    const res = await post(token, `/v1/sessions/${session.id}/protection-off`, {
+      eventId: randomUUID(),
+      deviceTime: withOffset(at),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<ProtectionOffResponse>().state).toBe('protection_off');
+    sameInstant((await oneEvent(session.id, 'protection_off')).occurredAt, at);
   });
 
   it("records a check-in's came_back at the instant its offset deviceTime names", async () => {

@@ -27,8 +27,9 @@ export type UnlockDisposition =
 /**
  * Every outcome an unlock can have — and, because unlock always records, they
  * all mean "durably recorded", so the outbox stops retrying on any of them:
- * 'applied' flipped a live participation, 'recorded' saved the note when there
- * was none to flip, 'replay' means the event already landed. This is the single
+ * 'applied' flipped a live participation, 'recorded' saved a note and flipped
+ * nothing (no live participation, or its protection is off — never softened),
+ * 'replay' means the event already landed. This is the single
  * source of truth for the outcome union: the engine's UnlockResult.outcome and
  * the UnlockResponse DTO both derive from it, so the three cannot drift.
  */

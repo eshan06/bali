@@ -1651,6 +1651,35 @@ async function changeState(
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+
+    // Replay: return the current truth even if the participation has ended.
+    const replay = async (): Promise<StateChangeResult> => {
+      const row = await loadParticipation(tx, session.id, input.studentId);
+      if (!row)
+        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
+      return { outcome: 'replay', state: row.state, participationId: row.id, session };
+    };
+
+    // A change that already landed replays AHEAD of the ended-session guard —
+    // the placement tapIn and extendSession use — so its retry after the bell
+    // re-reads the truth it recorded (rule 4) instead of drawing a 409 the
+    // outbox would keep retrying. Keyed exactly as insertEvent keys a replay
+    // (type, session, user): any other holder of the id is left to
+    // insertEvent below, which refuses it.
+    const landed = await tx
+      .select({ id: events.id })
+      .from(events)
+      .where(
+        and(
+          eq(events.eventId, input.eventId),
+          eq(events.type, eventType),
+          eq(events.sessionId, session.id),
+          eq(events.userId, input.studentId),
+        ),
+      )
+      .limit(1);
+    if (landed.length > 0) return replay();
+
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
     const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
@@ -1663,15 +1692,9 @@ async function changeState(
       userId: input.studentId,
       occurredAt,
     });
+    if (!isNew) return replay();
 
     const row = await loadParticipation(tx, session.id, input.studentId);
-
-    if (!isNew) {
-      // Replay: return the current truth even if the participation has ended.
-      if (!row)
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
-      return { outcome: 'replay', state: row.state, participationId: row.id, session };
-    }
 
     // A fresh change needs a live participation to move.
     if (!row || row.endedAt !== null) {
@@ -1707,11 +1730,11 @@ export interface UnlockInput extends StateChangeInput {
 }
 
 export interface UnlockResult {
-  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved the note with none to flip, 'replay' the event already existed. */
+  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved a note and flipped nothing (no live participation, or its protection is off), 'replay' the event already existed. */
   outcome: UnlockRecordedOutcome;
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
-  /** 'unlocked' when a live participation flipped; the participation's current state on a replay; null when nothing is participating. */
+  /** 'unlocked' when a live participation flipped; 'protection_off' when it was live but protection is off (recorded, not flipped); the participation's current state on a replay; null when nothing is participating. */
   state: ParticipationState | null;
   participationId: string | null;
   /** The session, so the response can carry the end time for reconciliation; null only when the session id was unknown. */

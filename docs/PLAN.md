@@ -141,14 +141,14 @@ plan backstop already treats it as source).
 - **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
 - **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
-- **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift
+- **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
 - **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it)
 - **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — first pass up for review: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
 - **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
 - **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
-- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question
+- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question. Note: "only a re-tap leaves protection off" holds per participation, not per phone — an armed tap converted at another teacher's Start joins that session focused, so the phone must re-report protection off there at its next check-in
 - **B6** NFC tap → local record → shield → outbox — 📱
 - **C1–C6** Screens: onboarding · join + preview · home / waiting · focus · unlocked, protection off, session over · history + me
 - **E1** Device test gate: ISSUES #2 on hardware — 📱
@@ -160,7 +160,7 @@ plan backstop already treats it as source).
 | Feature | Phase | Notes |
 |---|---|---|
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
-| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors both) — only a re-tap returns to focus. The phone's half is B3/B5 |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus, and a retry that landed replays even after the bell. The phone's half is B3/B5 |
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
@@ -227,8 +227,18 @@ under-13 parental-consent machinery.
   alone — because otherwise a student who switched Screen Time off could turn
   their red chip orange with one request. The live grid mirrors the second
   rule (rule 2). Nothing reached protection off before this (no route called
-  `protectionOff`), so no shipped behaviour changed. Each rule is pinned by a
-  test that goes red when it is removed.
+  `protectionOff`), so neither rule changed a shipped answer. Each is pinned by
+  a test that goes red when it is removed, and by a real-Postgres race (either
+  order ends in protection off). **One `/v1` correction rides along**, under API
+  decision 2's note on wrong answers: `changeState` now looks for a landed
+  replay AHEAD of the ended-session guard, as `tapIn` and `extendSession`
+  already did, so a refocus or protection-off whose response was lost and that
+  is retried after the bell answers `200 replay` with the current truth where
+  it answered `409 session has ended` — a 409 the outbox would have kept
+  retrying for a write that was recorded. A fresh change after the bell is
+  still refused. From the santa-loop review, which also moved the unlock
+  contract's docs (ARCHITECTURE, ISSUES #2, `@bali/shared`) to say a live
+  participation can be recorded without being flipped.
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside

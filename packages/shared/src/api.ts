@@ -77,8 +77,9 @@ export interface StartSessionResponse {
 /**
  * The unlock outcome union, derived from the shared source so the DTO, the
  * engine result, and the disposition table can't drift. 'applied' flipped a live
- * participation to unlocked; 'recorded' saved the event with a note when there
- * was no live participation to flip; 'replay' means the event already landed.
+ * participation to unlocked; 'recorded' saved the event with a note and flipped
+ * nothing — there was no live participation, or its protection is off (never
+ * softened into an unlock); 'replay' means the event already landed.
  * All three mean "durably recorded" — the phone's outbox stops retrying (see
  * unlockDisposition).
  */
@@ -179,6 +180,7 @@ export interface RefocusResponse {
 export interface ProtectionOffRequest {
   /** Client idempotency key for the protection_off event (rule 4). */
   eventId: string;
+  /** Device clock, ISO 8601; clamped into the session window server-side. */
   deviceTime: string;
 }
 export interface ProtectionOffResponse {

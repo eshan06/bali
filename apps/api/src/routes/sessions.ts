@@ -59,7 +59,7 @@ function toSessionView(s: { id: string; classId: string; endsAt: Date }): Sessio
 /**
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
- * (check-in, unlock, refocus) are for the enrolled phone and resolve the caller
+ * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
  * like a tap. All are thin wrappers over the transition engine — the engine owns
  * the writes, these just authorize and shape the response.
  */

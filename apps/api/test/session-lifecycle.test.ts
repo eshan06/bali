@@ -558,6 +558,27 @@ describe('POST /v1/sessions/:id/protection-off', () => {
     expect(recorded).toHaveLength(1);
   });
 
+  it('a report retried after the bell replays (200); a fresh one then is a 409', async () => {
+    const { teacher, student, session } = await seedRunning('protoff-after-bell');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/protection-off`, body)).statusCode).toBe(
+      200,
+    );
+    await post(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}/end`);
+
+    const retry = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json<ProtectionOffResponse>().outcome).toBe('replay');
+
+    const fresh = await post(token, `/v1/sessions/${session.id}/protection-off`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    expect(fresh.statusCode).toBe(409);
+  });
+
   it('is a 409 for a caller with nothing live here, and records nothing', async () => {
     // Strict like refocus: another account that merely knows the session id
     // cannot mark anyone, and a student who never tapped has nothing to mark.
