@@ -8,6 +8,27 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-23** — **A2b: no deadlock reaches a phone as a 500.** Unlock,
+  refocus and protection-off lock the session and then the participation row;
+  the silence sweep, a tap switching the student into another session, and an
+  armed tap converting at another class's Start take the row first and then
+  this session's key-share lock (their event's foreign key). Opposite orders,
+  so Postgres aborted one side with 40P01: pre-existing for unlock, reachable
+  through protection-off once A2 wired it. A state change or unlock that lost
+  was answered with a 500, which the outbox retries, so nothing was lost, only
+  late; a sweep that lost failed its minute's cron run, leaving the phones
+  after it for the next minute. The switching side (`tapIn`,
+  `startSession`) already retried; `changeState`, `unlock` and the sweep's
+  per-phone transaction now run in `withDeadlockRetry` too, safe because each
+  is one transaction, idempotent on its event id. Two real-Postgres race tests
+  pin it — each state change against a sweep due to mark the phone silent
+  (both settle, every `went_silent` keeps its `came_back`), and unlock or
+  protection-off against a switching tap or an armed-tap conversion (both
+  settle; protection-off may be refused only as `NOT_PARTICIPATING`, when the
+  leave landed first). Both went red on the old code with a raw 40P01, and
+  removing any one retry turns one red (`changeState`: both; the sweep: the
+  sweep race; `unlock`: the switch race — against the sweep it lost none in
+  these runs, the sweep's side lost instead).
 - **2026-09-23** — **Review workflow: one fresh worker per PR; only proven
   problems block.** Santa loops were taking up to an hour on big PRs (#49 ran
   santa three times — six fix rounds — and merged `main` in three times), and
