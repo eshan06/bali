@@ -31,7 +31,10 @@ touching infra, CI, git plumbing, or the dev environment.
   `plan-check.yml`, and `dependabot-automerge.yml` reviewed normally). That
   PR's own Claude Review check is red by design and cannot be fixed by
   pushing; merging it takes the owner's one-time ruleset toggle (remove the
-  check from `protect-main`, merge, re-add it).
+  check from `protect-main`, merge, re-add it). The toggle is repo-wide and
+  owner-only: while the check is removed, any other green PR would merge
+  unreviewed — disarm other PRs' auto-merge first, and re-add the check
+  immediately after.
 - **GitHub silently disables a PR's auto-merge when a required check fails.**
   After driving the check green, re-enable auto-merge — a green PR otherwise
   just sits there.
@@ -45,10 +48,11 @@ touching infra, CI, git plumbing, or the dev environment.
   new external host a session needs (an API, a registry) must first be added
   by the owner in the environment settings. A proxy 403 is an org policy
   denial to report to the owner, never to route around.
-- **The environment's UI "setup script" field must stay empty.** It runs
-  outside the repo root and kills every session at startup. Dependency
-  install belongs to the repo's SessionStart hook
-  (`.claude/hooks/session-start.sh`), which handles it.
+- **The environment's UI "setup script" field must stay empty.** Dependency
+  install belongs to the repo's SessionStart hook; the why lives in
+  `.claude/hooks/session-start.sh`'s header comment (the source of truth for
+  this trap — this entry exists only because the field is configured outside
+  the repo, on claude.ai).
 - **Sessions on dev really expire.** The Railway cron POSTs `/internal/sweep`
   every minute (session expiry + silence detection). Timing-sensitive steps
   against dev must account for it. `/internal/sessions/expire` is a live
