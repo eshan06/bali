@@ -11,6 +11,7 @@
 !.claude/agents/
 !.claude/hooks/
 !.claude/settings.json
+!.claude/CLAUDE.md
 .DS_Store
 
 # Dependencies and build output (regenerable)
@@ -21,3 +22,6 @@ build/
 next-env.d.ts
 coverage/
 *.tsbuildinfo
+
+# graphify knowledge graph — regenerable (`graphify update .`), stays local
+graphify-out/
