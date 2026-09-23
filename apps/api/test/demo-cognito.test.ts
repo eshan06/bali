@@ -302,6 +302,10 @@ describe('fetchCognitoAccessToken', () => {
     ['one that carries digits from outside', 100.20262026],
     ['one below the range', 42],
     ['one above it', 600],
+    ['a string of digits', '400'],
+    ['a string with spaces round it', ' 400 '],
+    ['a hex string', '0x190'],
+    ['an exponent in a string', '4e2'],
   ])('reads a status that is %s as invalid', async (_label, status) => {
     const err = await thrownBy(
       resolve(fakeResponse({ ok: false, status, text: () => Promise.resolve('') })),
@@ -426,9 +430,32 @@ describe('fetchCognitoAccessToken', () => {
 
     expect(err.message).toBe(
       `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
-        'ENOTFOUND (the host does not resolve — check the region)',
+        'ENOTFOUND (a host name does not resolve — check the region, or the HTTPS proxy ' +
+        'address if one is set)',
     );
     expectNothingAttached(err);
+  });
+
+  it('names the proxy too, since behind one the name that failed is the proxy’s', async () => {
+    // Measured with HTTPS_PROXY on a name that does not resolve and
+    // NODE_USE_ENV_PROXY=1: the region is right, and the failure is the
+    // proxy's own lookup. A wrong region behind a working proxy is the proxy's
+    // 502 instead (see the tunnel tests).
+    const proxyDns = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('getaddrinfo ENOTFOUND no-such-proxy.invalid'), {
+        code: 'ENOTFOUND',
+        syscall: 'getaddrinfo',
+        hostname: 'no-such-proxy.invalid',
+      }),
+    });
+
+    const err = await thrownBy(reject(proxyDns));
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
+        'ENOTFOUND (a host name does not resolve — check the region, or the HTTPS proxy ' +
+        'address if one is set)',
+    );
   });
 
   it('reports the codes inside an AggregateError', async () => {
@@ -611,7 +638,7 @@ const ENCODINGS: [string, (password: string) => string][] = [
 /** A response a fetch layer might hand back: only what the module reads. */
 function fakeResponse(fields: {
   ok: boolean;
-  status: number;
+  status: unknown;
   contentType?: string;
   text: () => Promise<string>;
 }): unknown {
@@ -811,6 +838,11 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     ['text before it', 'hunter2-not-real Proxy response (502) !== 200 when HTTP Tunneling'],
     ['a status no HTTP response has', 'Proxy response (999) !== 200 when HTTP Tunneling'],
     ['a fourth digit', 'Proxy response (0502) !== 200 when HTTP Tunneling'],
+    ['a status of 000', 'Proxy response (000) !== 200 when HTTP Tunneling'],
+    ['a status of 099', 'Proxy response (099) !== 200 when HTTP Tunneling'],
+    ['another case', 'proxy response (502) !== 200 when http tunneling'],
+    ['a space after it', 'Proxy response (502) !== 200 when HTTP Tunneling '],
+    ['a line break after it', 'Proxy response (502) !== 200 when HTTP Tunneling\n'],
   ])('keeps only an exact match of that message — not with %s', async (_label, message) => {
     const err = await thrownBy(reject(tunnelRefused(message)));
 
@@ -899,13 +931,14 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     );
   });
 
-  it('does not take a message that merely contains those words for it', async () => {
+  it.each([
+    ['text after them', 'unexpected redirect to https://evil.example/?pw=hunter2-not-real'],
+    ['another case', 'Unexpected redirect'],
+    ['a space after them', 'unexpected redirect '],
+    ['a space before them', ' unexpected redirect'],
+  ])('does not take a message with %s for a refused redirect', async (_label, message) => {
     const err = await thrownBy(
-      reject(
-        new TypeError('fetch failed', {
-          cause: new Error('unexpected redirect to https://evil.example/?pw=hunter2-not-real'),
-        }),
-      ),
+      reject(new TypeError('fetch failed', { cause: new Error(message) })),
     );
 
     expect(err.message).toMatch(/: no error code, and the fetch layer's own/);
@@ -939,8 +972,9 @@ describe('what it throws carries no text from outside', () => {
  * module prints for a value that has nothing to do with the password: the one
  * for a value it does not recognise, or the one for a word of its own. That
  * holds by construction, since what prints is chosen from KNOWN_WORDS; these
- * tests check the construction: for every word, for echoes of passwords of
- * every kind, and for the echoes that got past the designs before this one.
+ * tests check the construction: for every word, for ten echo shapes of each
+ * password in ECHO_PASSWORDS, and for the echoes that got past the designs
+ * before this one.
  */
 const WORD_FIELDS: [string, keyof typeof KNOWN_WORDS, (value: string) => FetchImpl][] = [
   [
@@ -1437,7 +1471,7 @@ describe('what prints for a value from outside is a word of the module’s own',
       resolve(
         fakeResponse({
           ok: false,
-          status: 'hunter2-not-real' as unknown as number,
+          status: 'hunter2-not-real',
           text: () => Promise.resolve(''),
         }),
       ),
@@ -1499,7 +1533,8 @@ describe('the regressions reported against the scrubbing version', () => {
 
     expect(err.message).toBe(
       `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
-        'ENOTFOUND (the host does not resolve — check the region)',
+        'ENOTFOUND (a host name does not resolve — check the region, or the HTTPS proxy ' +
+        'address if one is set)',
     );
   });
 });
@@ -1679,6 +1714,25 @@ describe('hostile objects never cost the operator’s one actionable line', () =
         expect(exposes(err, creds.password)).toBe(false);
       }
     }
+  });
+
+  it('an `errors` member whose read throws costs that member and nothing else', async () => {
+    // The members are read by index through the same guard as any property: a
+    // getter on an index that throws — with the request in its message — is
+    // one member fewer, and the members after it are still read.
+    const errors = [new Error('m'), Object.assign(new Error('m'), { code: 'ECONNREFUSED' })];
+    Object.defineProperty(errors, '0', {
+      get() {
+        throw new Error(`request: {"PASSWORD":"${creds.password}"}`);
+      },
+    });
+
+    const err = await thrownBy(reject(Object.assign(new TypeError('fetch failed'), { errors })));
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ECONNREFUSED`,
+    );
+    expect(exposes(err, creds.password)).toBe(false);
   });
 
   it('a `message` that is not a string', async () => {

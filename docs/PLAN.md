@@ -248,11 +248,11 @@ under-13 parental-consent machinery.
   word is read from, a test that every word of its list prints as itself, that
   for every word and for values it does not know the message is the same
   whatever the password (passwords that hold the word itself, empty,
-  letterless and emoji ones, and the review's, among them), and that every echo
-  of every password —
-  verbatim, re-cased, normalised, accent-stripped, written in ASCII, cut —
-  produces a message the module prints for a value that has nothing to do with
-  the password; a parse of the module's own source, which checks that
+  letterless and emoji ones, and the review's, among them), and that ten echoes
+  of each of twenty sample passwords — verbatim, re-cased, normalised,
+  accent-stripped, written in ASCII, cut — produce a message the module prints
+  for a value that has nothing to do with the password; a parse of the
+  module's own source, which checks that
   `password` is named only where the credentials are declared and
   destructured and where the request body is built, `credentials` only as the
   parameter and in one declaration, `arguments` never, and that the body goes

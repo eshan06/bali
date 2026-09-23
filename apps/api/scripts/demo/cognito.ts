@@ -322,7 +322,13 @@ function membersOf(node: object): unknown[] {
 
 /** Fixed words for the codes an operator most needs explained. */
 const CODE_HINTS = new Map([
-  ['ENOTFOUND', 'the host does not resolve — check the region'],
+  // Behind an HTTPS proxy the proxy looks up Cognito's host itself, so an
+  // ENOTFOUND here names the proxy (measured with NODE_USE_ENV_PROXY=1);
+  // without one it names Cognito's host.
+  [
+    'ENOTFOUND',
+    'a host name does not resolve — check the region, or the HTTPS proxy address if one is set',
+  ],
   [
     'UND_ERR_ABORTED',
     'the request was cancelled before an answer — most often an HTTPS proxy refusing the tunnel',

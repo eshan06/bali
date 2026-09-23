@@ -154,6 +154,19 @@ describe('GET /v1/me', () => {
     expect(body.user.displayName).toMatch(/^Ana x+$/);
   });
 
+  it('strips bidi controls, so a name cannot reorder what the grid shows', async () => {
+    // RLO, LRE…PDF and LRI…PDI: format characters that would make a teacher's
+    // grid show one name while the row holds another.
+    const token = await ctx.issuer.sign({
+      sub: 'bidi',
+      extraClaims: { name: 'Ana\u202Eseyer \u202Ax\u202C \u2066y\u2069' },
+    });
+
+    const { body } = await me(token);
+
+    expect(body.user.displayName).toBe('Anaseyer x y');
+  });
+
   it('keeps an ordinary school username that merely ends in digits', async () => {
     // `<name>_<year>` is a mainstream school convention. Rejecting it as
     // "machine-made" leaves display_name NULL and the teacher looking at a UUID
@@ -171,6 +184,9 @@ describe('GET /v1/me', () => {
       // A name and a student number: numeric like a provider's subject, but
       // with no provider in front of it.
       ['school-h', 'jsmith_100234'],
+      // Ten digits and more, as long as a provider's subject: still no provider.
+      ['school-i', 'jsmith_2029012345'],
+      ['school-j', 'ana_1234567890'],
     ]) {
       const token = await ctx.issuer.sign({ sub, extraClaims: { username } });
       expect((await me(token)).body.user.displayName, username).toBe(username);
