@@ -138,6 +138,21 @@ export const UNLOCK_RECORDED_AS = [
 ] as const;
 export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
 
+/**
+ * Why a student unlocked, when they chose to say — the launch stand-in for real
+ * passes (PLAN.md: unlock with an optional, skippable reason). It lands in the
+ * unlock event's `payload.reason`, so it reaches the teacher with the unlock.
+ * Never a gate: an unlock with no reason, or one the server does not
+ * recognise, is recorded all the same. Additive-only like the other vocab.
+ */
+export const UNLOCK_REASONS = ['bathroom', 'nurse', 'other'] as const;
+export type UnlockReason = (typeof UNLOCK_REASONS)[number];
+
+/** True for one of the known reasons — for reading a stored payload back safely. */
+export function isUnlockReason(value: unknown): value is UnlockReason {
+  return typeof value === 'string' && (UNLOCK_REASONS as readonly string[]).includes(value);
+}
+
 export * from './api.js';
 export * from './errors.js';
 export * from './state.js';

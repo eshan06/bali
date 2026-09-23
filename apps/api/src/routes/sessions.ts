@@ -18,7 +18,7 @@ import type {
   StartSessionResponse,
   UnlockResponse,
 } from '@bali/shared';
-import { MAX_SESSION_MINUTES } from '@bali/shared';
+import { MAX_SESSION_MINUTES, UNLOCK_REASONS } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -40,6 +40,14 @@ const CheckInBody = z.object({ deviceTime: DeviceTime });
 const StateChangeBody = z.object({
   eventId: z.string().uuid(),
   deviceTime: DeviceTime,
+});
+// The unlock's optional reason can never fail validation: anything that is not
+// one of the known reasons (a future value, a wrong type, garbage) is recorded
+// as no reason. A 400 here would keep the unlock out of the record forever —
+// the outbox retries the identical body — which is ISSUES #2 through a schema
+// (docs/PLAN.md decision log, 2026-09-20).
+const UnlockBody = StateChangeBody.extend({
+  reason: z.enum(UNLOCK_REASONS).nullish().catch(null),
 });
 
 function toSessionView(s: { id: string; classId: string; endsAt: Date }): SessionView {
@@ -150,7 +158,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
     async (request): Promise<UnlockResponse> => {
       const identity = requireAuth(request);
       const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(StateChangeBody, request.body);
+      const body = parse(UnlockBody, request.body);
       const student = await findOrCreateStudent(db, identity.sub);
       // Wrapped even though unlock is built never to refuse: it can still raise
       // EVENT_ID_CONFLICT when the client reuses an id that already belongs to
@@ -163,6 +171,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           studentId: student.id,
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
+          reason: body.reason ?? null,
         }),
       );
       return {
@@ -170,6 +179,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
         recordedAs: result.recordedAs,
         state: result.state,
         session: result.session ? toSessionView(result.session) : null,
+        reason: result.reason,
       };
     },
   );

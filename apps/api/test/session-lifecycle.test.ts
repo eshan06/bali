@@ -1,5 +1,5 @@
 import { type Database, events, startSession, tapIn } from '@bali/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type {
   CheckInResponse,
   EndSessionResponse,
@@ -334,6 +334,83 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const body = res.json<UnlockResponse>();
     expect(body.outcome).toBe('applied');
     expect(body.state).toBe('unlocked');
+    expect(body).toHaveProperty('reason', null);
+  });
+
+  it('records the reason the phone sends, and says so', async () => {
+    const { student, session } = await seedRunning('unlock-reason');
+    await tap(session.id, student.id);
+    const res = await post(
+      await ctx.tokenFor(student.cognitoId),
+      `/v1/sessions/${session.id}/unlock`,
+      { eventId: randomUUID(), deviceTime: now(), reason: 'nurse' },
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UnlockResponse>()).toMatchObject({ outcome: 'applied', reason: 'nurse' });
+
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(recorded.map((e) => e.payload)).toEqual([{ reason: 'nurse' }]);
+  });
+
+  it('an unrecognised reason is recorded as none instead of refusing the unlock', async () => {
+    // The standing rule for the unlock body (docs/PLAN.md, 2026-09-20): a 400
+    // here keeps the record out forever, because the outbox retries the
+    // identical body. A newer app's reason, a wrong type or plain garbage must
+    // all still land — without a reason, and the response says none landed.
+    // (Fastify's whole-body guards — the 1 MiB limit, prototype-poisoning keys
+    // — run before any route and predate this field; no honest client trips them.)
+    const { student, session } = await seedRunning('unlock-reason-unknown');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const odd: unknown[] = [
+      'skateboard',
+      'BATHROOM',
+      '',
+      42,
+      true,
+      null,
+      { why: 'nurse' },
+      ['nurse'],
+      'x'.repeat(10_000),
+    ];
+    for (const reason of odd) {
+      const res = await post(token, `/v1/sessions/${session.id}/unlock`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+        reason,
+      });
+      expect(res.statusCode, JSON.stringify(reason).slice(0, 40)).toBe(200);
+      const body = res.json<UnlockResponse>();
+      expect(unlockDisposition(res.statusCode, body)).toBe('recorded');
+      expect(body.reason).toBeNull();
+    }
+
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(recorded.map((e) => e.payload)).toEqual(odd.map(() => null));
+  });
+
+  it('a retried unlock answers with the reason on record, not the one it carries', async () => {
+    const { student, session } = await seedRunning('unlock-reason-replay');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId,
+      deviceTime: now(),
+      reason: 'bathroom',
+    });
+    const retry = await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId,
+      deviceTime: now(),
+      reason: 'other',
+    });
+    expect(retry.json<UnlockResponse>()).toMatchObject({ outcome: 'replay', reason: 'bathroom' });
   });
 
   it('records with a note when there is no live participation (ISSUES #2)', async () => {
@@ -403,6 +480,7 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const res = await post(await ctx.tokenFor('outsider'), `/v1/sessions/${session.id}/unlock`, {
       eventId: randomUUID(),
       deviceTime: now(),
+      reason: 'nurse',
     });
 
     // Never a refusal (rule 6) — but not attached, and no session handed back.
@@ -411,6 +489,15 @@ describe('POST /v1/sessions/:id/unlock', () => {
     expect(body.outcome).toBe('recorded');
     expect(body.recordedAs).toBe('not_enrolled');
     expect(body.session).toBeNull();
+    // The orphan keeps the reason like any other unlock.
+    expect(body.reason).toBe('nurse');
+    const orphans = await db
+      .select()
+      .from(events)
+      .where(and(isNull(events.sessionId), eq(events.type, 'unlock')));
+    expect(orphans.map((e) => e.payload)).toEqual([
+      expect.objectContaining({ recorded_as: 'not_enrolled', reason: 'nurse' }),
+    ]);
 
     // The teacher's session feed never sees it.
     const attached = await db
