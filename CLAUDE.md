@@ -37,7 +37,8 @@ is always allowed and always recorded.
 
 Applies to anything: a new phase, a new feature, a fix the owner asks for.
 
-1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`. Locate the
+1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`, and skim
+   `docs/GOTCHAS.md` once per session (not per task). Locate the
    task: already done? planned for a later phase? deliberately cut? For a new
    phase, its step list lives in PLAN.md / the agreed phase plans.
 2. **Plan, then go — no approval gate:** for anything non-trivial, run

@@ -26,10 +26,12 @@ touching infra, CI, git plumbing, or the dev environment.
   cherry-pick only your new commit, `push --force-with-lease`, open a fresh
   PR.
 - **Editing `.github/workflows/claude-review.yml` or `claude.yml` trips the
-  action's tamper protection**: that PR's own Claude Review check is red by
-  design and cannot be fixed by pushing. Merging it takes the owner's
-  one-time ruleset toggle (remove the check from `protect-main`, merge,
-  re-add it).
+  action's tamper protection** — the guard covers the Claude workflow files
+  themselves, not all workflows (observed: PRs editing `ci.yml`,
+  `plan-check.yml`, and `dependabot-automerge.yml` reviewed normally). That
+  PR's own Claude Review check is red by design and cannot be fixed by
+  pushing; merging it takes the owner's one-time ruleset toggle (remove the
+  check from `protect-main`, merge, re-add it).
 - **GitHub silently disables a PR's auto-merge when a required check fails.**
   After driving the check green, re-enable auto-merge — a green PR otherwise
   just sits there.
@@ -39,9 +41,10 @@ touching infra, CI, git plumbing, or the dev environment.
 
 ## Cloud sessions / dev environment
 
-- **The cloud environment's network policy allowlists egress.** `*.railway.app`
-  had to be added before any session could reach dev; a proxy 403 is an org
-  policy denial to report to the owner, never to route around.
+- **Egress is allowlisted by the cloud environment's network policy.** Any
+  new external host a session needs (an API, a registry) must first be added
+  by the owner in the environment settings. A proxy 403 is an org policy
+  denial to report to the owner, never to route around.
 - **The environment's UI "setup script" field must stay empty.** It runs
   outside the repo root and kills every session at startup. Dependency
   install belongs to the repo's SessionStart hook
