@@ -177,8 +177,8 @@ export interface RefocusResponse {
 // permission revoked (iOS has already dropped every shield). Strict like
 // refocus: a 409 is a refusal — nothing live to mark, the session over, or an
 // id already used by another event. A retry is refused too once the student
-// has left the session (removed, or switched away) — never a replay naming a
-// session they are no longer in. Leaving the state takes a re-tap — refocus is
+// has left the session (removed, left the class, or switched away) — never a
+// replay naming a session they are no longer in. Leaving the state takes a re-tap — refocus is
 // refused from it.
 export interface ProtectionOffRequest {
   /** Client idempotency key for the protection_off event (rule 4). */

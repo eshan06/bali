@@ -2009,9 +2009,10 @@ export function refocus(db: Database, input: StateChangeInput): Promise<StateCha
 
 /**
  * Screen Time permission was turned off — its own state, never green, never an
- * unlock. A replay after the participation ended (removal, or a switch, while
- * the session runs) is refused rather than answered with the ended row's last
- * state; refocus keeps that shipped answer until the owner rules (PLAN, A4).
+ * unlock. A replay after the participation ended (removal, leaving the class,
+ * or a switch, while the session runs) is refused rather than answered with the
+ * ended row's last state; refocus keeps that shipped answer until the owner
+ * rules (PLAN, A4).
  */
 export function protectionOff(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
   return changeState(db, input, 'protection_off', 'protection_off', { replayNeedsLive: true });

@@ -824,6 +824,8 @@ describe('state changes', () => {
         await db.select().from(participations).where(eq(participations.sessionId, session.id)),
       );
       expect(row.lastSeenAt!.getTime()).toBeGreaterThan(stale.getTime());
+      // The server's clock, never the device's (rule 1): the unlock claimed 09:07.
+      expect(Math.abs(Date.now() - row.lastSeenAt!.getTime())).toBeLessThan(60_000);
     });
 
     it('an unlock while protection is off closes an open silence episode', async () => {
@@ -903,6 +905,45 @@ describe('state changes', () => {
       expect(await refocus(db, refocused)).toMatchObject({ outcome: 'replay', state: 'focused' });
       const types = (await eventsFor(session.id)).map((e) => e.type);
       expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
+    });
+
+    it('an unlock after a protection-off participation ended is noted as not live, not as protection off', async () => {
+      // `protection_off` as a note means the student was LIVE and nothing
+      // flipped; once the participation has ended the unlock is recorded like
+      // any other that found no one live here.
+      for (const ending of ['removed', 'bell'] as const) {
+        const { session, student } = await joined(`protoff-ended-unlock-${ending}`);
+        await protectionOff(db, change(session, student, 5));
+        if (ending === 'removed') {
+          const enrollment = one(
+            await db
+              .select()
+              .from(enrollments)
+              .where(
+                and(
+                  eq(enrollments.classId, session.classId),
+                  eq(enrollments.studentId, student.id),
+                ),
+              ),
+          );
+          await endEnrollment(db, {
+            enrollmentId: enrollment.id,
+            reason: 'removed_from_class',
+            at: at(6),
+          });
+        } else {
+          await endSession(db, { sessionId: session.id, at: at(6), reason: 'ended' });
+        }
+
+        const note = ending === 'removed' ? 'no_live_participation' : 'after_session_end';
+        expect(await unlock(db, change(session, student, 7))).toMatchObject({
+          outcome: 'recorded',
+          recordedAs: note,
+          state: null,
+        });
+        const recorded = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+        expect(recorded.payload).toEqual({ recorded_as: note });
+      }
     });
 
     it('takes over from an unlocked student', async () => {

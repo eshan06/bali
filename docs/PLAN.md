@@ -144,7 +144,7 @@ plan backstop already treats it as source).
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`. Settle the same case for refocus here, before a phone ships: its replay after the participation ended in a still-running session answers that row's last state (protection-off refuses it — A2's decision-log entry)
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
-- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it)
+- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it) — including an unlock recorded against a protection-off row, which today leaves the chip unchanged, so it shows only in the event log. Also: a student the snapshot no longer carries (it holds active enrollments only) whose phone unlocks after the overlap window reads "Unlocked", not "Left ·" (pre-existing)
 - **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — first pass up for review: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
 - **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
