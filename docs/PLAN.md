@@ -160,7 +160,7 @@ plan backstop already treats it as source).
 | Feature | Phase | Notes |
 |---|---|---|
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
-| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus, and a retry that landed replays even after the bell. The phone's half is B3/B5 |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus. The phone's half is B3/B5 |
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
@@ -234,14 +234,18 @@ under-13 parental-consent machinery.
   rule (rule 2). Nothing reached protection off before this (no route called
   `protectionOff`), so neither rule changed a shipped answer. Each is pinned by
   a test that goes red when it is removed, and by a real-Postgres race (either
-  order ends in protection off). **One `/v1` correction rides along**, under API
-  decision 2's note on wrong answers: `changeState` now looks for a landed
-  replay AHEAD of the ended-session guard, as `tapIn` and `extendSession`
-  already did, so a refocus or protection-off whose response was lost and that
-  is retried after the bell answers `200 replay` with the current truth where
-  it answered `409 session has ended` — a 409 the outbox would have kept
-  retrying for a write that was recorded. A fresh change after the bell is
-  still refused. From the santa-loop review, which also moved the unlock
+  order ends in protection off). **A change retried after the bell stays a
+  `409 session has ended`, on purpose** — pinned now, because round 1 of the
+  review suggested replaying it and round 2 showed why not: after an EARLY end
+  the session's `endsAt` is still ahead, so a replay would hand a phone that
+  already heard "gone" a window to shield to (a refocus answer turns shields
+  back on) — rule 4's forbidden 200. The 409 costs nothing: A3's state-change
+  table drops a refused change and re-reads the truth. Recorded rather than
+  changed, since it is a shipped answer: a refocus REPLAYED in a running
+  session whose participation has since ended answers that row's last state
+  (pre-existing); A3's "never send a superseded refocus" keeps honest clients
+  off it, and bounding it like `tapIn` would be a `/v1` 200 → 409 for the
+  owner. From the santa-loop review, which also moved the unlock
   contract's docs (ARCHITECTURE, ISSUES #2, `@bali/shared`) to say a live
   participation can be recorded without being flipped, and made the endpoint's
   authorization test able to fail (a live student an outsider or the teacher

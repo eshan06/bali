@@ -826,29 +826,46 @@ describe('state changes', () => {
       expect(row.lastSeenAt!.getTime()).toBeGreaterThan(stale.getTime());
     });
 
-    it('a change that landed replays after the bell; a fresh one is refused', async () => {
-      // The replay is checked ahead of the ended-session guard (as tapIn and
-      // extendSession do), so a lost response retried after the bell re-reads the
-      // truth instead of drawing a 409 the outbox would keep retrying forever.
+    it('an unlock while protection is off closes a silence episode the sweep opened', async () => {
+      // The sweep can mark the row while it is still focused, in the gap before
+      // protectionOff's state write commits — so contact must close it here too.
+      const { session, student } = await joined('protoff-unlock-silence');
+      await protectionOff(db, change(session, student, 5));
+      await db
+        .update(participations)
+        .set({ silentSince: at(6) })
+        .where(eq(participations.sessionId, session.id));
+
+      await unlock(db, change(session, student, 8));
+      const row = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(row.silentSince).toBeNull();
+      expect(row.state).toBe('protection_off');
+      expect((await eventsFor(session.id)).filter((e) => e.type === 'came_back')).toHaveLength(1);
+    });
+
+    it('a change retried after the bell is refused, never replayed with the ended session', async () => {
+      // A replay would carry the session's window, and the teacher ended this
+      // one EARLY, so its endsAt is still ahead: a refocus answer would tell
+      // the phone to shield to a bell that already rang (rule 4's forbidden
+      // 200). The refusal costs nothing — the phone drops a refused change and
+      // re-reads the truth.
       const { session, student } = await joined('protoff-after-bell');
       await unlock(db, change(session, student, 4));
       const refocused = change(session, student, 5);
       await refocus(db, refocused);
       const reported = change(session, student, 6);
       await protectionOff(db, reported);
-      await endSession(db, { sessionId: session.id, at: at(20), reason: 'ended' });
+      await endSession(db, { sessionId: session.id, at: at(10), reason: 'ended' });
 
-      const retryReport = await protectionOff(db, reported);
-      expect(retryReport).toMatchObject({ outcome: 'replay', state: 'protection_off' });
-      const retryRefocus = await refocus(db, refocused);
-      expect(retryRefocus).toMatchObject({ outcome: 'replay', state: 'protection_off' });
-
-      await expect(protectionOff(db, change(session, student, 21))).rejects.toMatchObject({
+      await expect(refocus(db, refocused)).rejects.toMatchObject({ code: 'SESSION_NOT_RUNNING' });
+      await expect(protectionOff(db, reported)).rejects.toMatchObject({
         code: 'SESSION_NOT_RUNNING',
       });
-      expect((await eventsFor(session.id)).filter((e) => e.type === 'protection_off')).toHaveLength(
-        1,
-      );
+      const types = (await eventsFor(session.id)).map((e) => e.type);
+      expect(types.filter((t) => t === 'refocus')).toHaveLength(1);
+      expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
     });
 
     it('takes over from an unlocked student', async () => {

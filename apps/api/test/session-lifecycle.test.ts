@@ -568,25 +568,36 @@ describe('POST /v1/sessions/:id/protection-off', () => {
     });
   });
 
-  it('a report retried after the bell replays (200); a fresh one then is a 409', async () => {
+  it('a change retried after an early end is a 409, never a replay naming the ended session', async () => {
+    // The teacher ends the lesson early, so the session's endsAt is still ahead:
+    // a 200 replay would hand a phone that already heard "gone" a window to
+    // shield to (a refocus answer turns shields back on). The phone drops the
+    // refusal and re-reads the truth instead.
     const { teacher, student, session } = await seedRunning('protoff-after-bell');
     await tap(session.id, student.id);
     const token = await ctx.tokenFor(student.cognitoId);
-    const body = { eventId: randomUUID(), deviceTime: now() };
-    expect((await post(token, `/v1/sessions/${session.id}/protection-off`, body)).statusCode).toBe(
-      200,
-    );
-    await post(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}/end`);
-
-    const retry = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
-    expect(retry.statusCode).toBe(200);
-    expect(retry.json<ProtectionOffResponse>().outcome).toBe('replay');
-
-    const fresh = await post(token, `/v1/sessions/${session.id}/protection-off`, {
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
       eventId: randomUUID(),
       deviceTime: now(),
     });
-    expect(fresh.statusCode).toBe(409);
+    const refocusBody = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/refocus`, refocusBody)).statusCode).toBe(
+      200,
+    );
+    const reportBody = { eventId: randomUUID(), deviceTime: now() };
+    expect(
+      (await post(token, `/v1/sessions/${session.id}/protection-off`, reportBody)).statusCode,
+    ).toBe(200);
+    await post(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}/end`);
+
+    for (const [route, body] of [
+      ['refocus', refocusBody],
+      ['protection-off', reportBody],
+    ] as const) {
+      const retry = await post(token, `/v1/sessions/${session.id}/${route}`, body);
+      expect(retry.statusCode).toBe(409);
+      expect(retry.json<{ error: { message: string } }>().error.message).toBe('session has ended');
+    }
   });
 
   it('is a 409 for a student with nothing live here, and records nothing', async () => {
@@ -715,6 +726,34 @@ describe('POST /v1/sessions/:id/refocus', () => {
     const body = res.json<RefocusResponse>();
     expect(body.outcome).toBe('applied');
     expect(body.state).toBe('focused');
+  });
+
+  it('nobody else can refocus a live student: an outsider or the teacher gets 409', async () => {
+    const { teacher, student, session } = await seedRunning('refocus-authz');
+    await tap(session.id, student.id);
+    await post(await ctx.tokenFor(student.cognitoId), `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    for (const sub of ['outsider', teacher.cognitoId]) {
+      const res = await post(await ctx.tokenFor(sub), `/v1/sessions/${session.id}/refocus`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+      });
+      expect(res.statusCode).toBe(409);
+    }
+    const refocuses = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'refocus')));
+    expect(refocuses).toHaveLength(0);
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+    expect(row?.state).toBe('unlocked');
   });
 
   it('is a 409 with no live participation to refocus', async () => {

@@ -1651,35 +1651,12 @@ async function changeState(
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-
-    // Replay: return the current truth even if the participation has ended.
-    const replay = async (): Promise<StateChangeResult> => {
-      const row = await loadParticipation(tx, session.id, input.studentId);
-      if (!row)
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
-      return { outcome: 'replay', state: row.state, participationId: row.id, session };
-    };
-
-    // A change that already landed replays AHEAD of the ended-session guard —
-    // the placement tapIn and extendSession use — so its retry after the bell
-    // re-reads the truth it recorded (rule 4) instead of drawing a 409 the
-    // outbox would keep retrying. Keyed exactly as insertEvent keys a replay
-    // (type, session, user): any other holder of the id is left to
-    // insertEvent below, which refuses it.
-    const landed = await tx
-      .select({ id: events.id })
-      .from(events)
-      .where(
-        and(
-          eq(events.eventId, input.eventId),
-          eq(events.type, eventType),
-          eq(events.sessionId, session.id),
-          eq(events.userId, input.studentId),
-        ),
-      )
-      .limit(1);
-    if (landed.length > 0) return replay();
-
+    // Ahead of any replay, deliberately: a change retried after the bell is
+    // refused rather than replayed, because its answer would carry this
+    // session's window and a refocus answer turns shields back on — a 200
+    // pointing the phone at a session that is over (rule 4). The refusal
+    // costs nothing: the phone drops a refused change and re-reads the truth
+    // (its outbox contract for state changes, Phase 3 A3).
     if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
     const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
@@ -1692,9 +1669,15 @@ async function changeState(
       userId: input.studentId,
       occurredAt,
     });
-    if (!isNew) return replay();
 
     const row = await loadParticipation(tx, session.id, input.studentId);
+
+    if (!isNew) {
+      // Replay: return the current truth even if the participation has ended.
+      if (!row)
+        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
+      return { outcome: 'replay', state: row.state, participationId: row.id, session };
+    }
 
     // A fresh change needs a live participation to move.
     if (!row || row.endedAt !== null) {
@@ -1954,10 +1937,20 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
     }
 
     if (live) {
-      // Protection off: nothing flips, but the phone made contact, so last
-      // contact moves (the grid's "last seen"). No silence episode can be open
-      // here — the sweep opens them only on focused rows, and protectionOff
-      // closes any on the way in — so there is none to close.
+      // Protection off: nothing flips, but the phone made contact — last
+      // contact moves (the grid's "last seen"), and an open silence episode
+      // closes. One can be open here: a sweep can mark the row while it is
+      // still focused, in the gap before protectionOff's state write commits.
+      await closeOpenSilence(
+        tx,
+        {
+          id: live.id,
+          sessionId: session.id,
+          classId: session.classId,
+          studentId: input.studentId,
+        },
+        occurredAt,
+      );
       await tx
         .update(participations)
         .set({ lastSeenAt: heardNow() })

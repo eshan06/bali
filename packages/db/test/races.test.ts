@@ -281,10 +281,22 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         await tapIn(db, change());
         if (rival === 'refocus') await unlock(db, change());
 
-        await Promise.allSettled([
+        const [reported, other] = await Promise.allSettled([
           protectionOff(db, change()),
           rival === 'unlock' ? unlock(db, change()) : refocus(db, change()),
         ]);
+
+        // Each racer ended the way one of the two orders allows — so an
+        // unrelated failure cannot pass itself off as the refusal.
+        expect(reported.status).toBe('fulfilled');
+        if (rival === 'unlock') {
+          expect(other.status).toBe('fulfilled');
+          if (other.status === 'fulfilled') {
+            expect(['applied', 'recorded']).toContain(other.value.outcome);
+          }
+        } else if (other.status === 'rejected') {
+          expect(other.reason).toMatchObject({ code: 'PROTECTION_OFF' });
+        }
 
         expect(one(await liveParticipations(session.id)).state).toBe('protection_off');
         const types = (
