@@ -8,20 +8,59 @@
  * signing code: one POST, one access token. The pool's app client must have
  * ALLOW_USER_PASSWORD_AUTH enabled; that is the one AWS-side prerequisite.
  *
- * Nothing here ever logs or returns a password: a failure reports Cognito's own
- * error type and message, which name the problem without echoing the secret.
+ * The password leaves this module in one place, the request body, and
+ * everything that comes back has been downstream of it. Cognito's validation
+ * messages quote request values back ("Value 'x' at 'clientId' failed to
+ * satisfy constraint"), a proxy or WAF page can quote the request it refused,
+ * and a fetch wrapper can hang the request off the error it raises — escaped,
+ * encoded, truncated or transliterated in whatever way that layer prints. So no
+ * text that comes back is copied into what this module throws, and none of it
+ * is compared with the password either: every earlier attempt to recognise an
+ * echo of the password, by scrubbing it out or by checking what looked like it,
+ * missed some way an echo can be written.
+ *
+ * What this module throws is a plain Error whose message is built from:
+ *   - its own fixed wording;
+ *   - the caller's configuration: the username, the endpoint, the timeout;
+ *   - the HTTP status, when it is an integer from 100 to 599;
+ *   - WORDS OF ITS OWN, chosen by what came back: an error code on a failure
+ *     or its causes, Cognito's error type, a challenge name or the response's
+ *     media type that is, read the way its field is read, exactly one of the
+ *     words in `KNOWN_WORDS` selects that word. Nothing else from those fields
+ *     prints. A code or an error type that is empty or not a string reads as
+ *     none, and any other that is not a word is said to be unrecognised; a
+ *     challenge name that is absent or falsy ('', 0, false, null) is no
+ *     challenge, and any other value that is not a word is said to be
+ *     unrecognised; a media type that is not a word is left out;
+ *   - two fixed messages of Node's fetch, recognised by exact match and never
+ *     copied: a proxy refusing the tunnel, whose status alone is kept, on the
+ *     same terms as a response's, and shown beside the UND_ERR_ABORTED code
+ *     undici gives that refusal; and a refused redirect.
+ * The password is used in the request body and nowhere else. No error from
+ * outside is attached as its `cause`: an object can print differently from the
+ * way it looked when it was read, and a string cannot. And a redirect is
+ * refused rather than followed, since following a 307 would send the body — the
+ * password — to wherever it pointed.
+ *
+ * What a message can still tell a reader about what came back, stated rather
+ * than implied: which of this module's fixed outcomes happened, which of its
+ * words came back, and the status numbers. Every character of it is this
+ * module's own, the caller's configuration, or one of those numbers. If
+ * something echoes the password into a field a word is read from, and the
+ * echo, read the way that field is read, is exactly one of the words, that
+ * word prints — as an echo that is exactly undici's tunnel message prints its
+ * status — the same text a genuine answer prints, whatever the password is.
+ *
+ * The cost is every message and body from outside — Cognito's message text, a
+ * proxy page, the fetch layer's own descriptions — and the name of any code,
+ * type or challenge that is not in the lists. The error type with fixed words
+ * for the common ones, the status, the media type and the error codes stand in.
  */
 
-/** Cognito's JSON-1.1 error shape, as far as we read it. */
-interface CognitoError {
-  __type?: string;
-  message?: string;
-  Message?: string;
-}
-
+/** The fields of InitiateAuth's answer that are read. */
 interface InitiateAuthResponse {
-  AuthenticationResult?: { AccessToken?: string };
-  ChallengeName?: string;
+  AuthenticationResult?: { AccessToken?: unknown };
+  ChallengeName?: unknown;
 }
 
 export interface CognitoAuthConfig {
@@ -40,94 +79,369 @@ export interface CognitoCredentials {
   password: string;
 }
 
-/**
- * The readable detail of a failure, cause chain included. Node's fetch reports
- * every network error as a bare `TypeError: fetch failed` and puts the part
- * worth reading — ENOTFOUND, ECONNREFUSED, a TLS message — on `err.cause`, so
- * the top-level message alone says nothing an operator can act on.
+/*
+ * The words this module can print for what came back. A value selects one only
+ * by being exactly that word as its field is read: a code or a challenge name
+ * as it arrived, an error type cut at its `ns#` namespace and `:detail` suffix,
+ * a media type lower-cased, trimmed and cut at its parameters. A value that
+ * differs in any other way — case, spacing, one character more or less — is not
+ * printed.
  */
-function detailOf(err: unknown): string {
-  const found: string[] = [];
-  const visited = new Set<unknown>();
-  const visit = (node: unknown, depth: number): void => {
-    if (depth > 4 || !(node instanceof Error) || visited.has(node)) return;
-    visited.add(node);
-    const message = node.message.trim();
-    if (message && !found.includes(message)) found.push(message);
-    // A host resolving to several addresses that all refuse the connection
-    // arrives as an AggregateError whose own message is EMPTY, with the real
-    // per-address failures on `errors` — walking `cause` alone would report
-    // "fetch failed" and nothing else, which is what this function exists to
-    // stop.
-    if (node instanceof AggregateError) {
-      for (const inner of node.errors) visit(inner, depth + 1);
-    }
-    visit(node.cause, depth + 1);
-  };
-  visit(err, 0);
-  return found.length > 0 ? found.join(' — ') : String(err);
+/** Error codes of Node's network, DNS and TLS layers, and of undici and its HTTP parser. */
+const KNOWN_CODES = new Set([
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EAI_FAIL',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'EHOSTDOWN',
+  'ENETUNREACH',
+  'ENETDOWN',
+  'EPIPE',
+  'EPROTO',
+  'EADDRNOTAVAIL',
+  'ERR_SOCKET_CONNECTION_TIMEOUT',
+  'UND_ERR_ABORT',
+  'UND_ERR_ABORTED',
+  'UND_ERR_SOCKET',
+  'UND_ERR_CLOSED',
+  'UND_ERR_DESTROYED',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_HEADERS_OVERFLOW',
+  'UND_ERR_RESPONSE_STATUS_CODE',
+  'UND_ERR_INFO',
+  'UND_ERR_REQ_CONTENT_LENGTH_MISMATCH',
+  'UND_ERR_RES_CONTENT_LENGTH_MISMATCH',
+  'UND_ERR_NOT_SUPPORTED',
+  'UND_ERR_PRX_TLS',
+  'UND_ERR_RESPONSE',
+  'UND_ERR_RES_EXCEEDED_MAX_SIZE',
+  'UND_ERR_REQ_RETRY',
+  'UND_ERR_INVALID_ARG',
+  'HPE_INVALID_STATUS',
+  'HPE_INVALID_CONSTANT',
+  'HPE_INVALID_HEADER_TOKEN',
+  'HPE_INVALID_CHUNK_SIZE',
+  'HPE_UNEXPECTED_CONTENT_LENGTH',
+  'ABORT_ERR',
+  'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_UNTRUSTED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ERR_TLS_HANDSHAKE_TIMEOUT',
+  'ERR_SSL_WRONG_VERSION_NUMBER',
+  'ERR_SSL_PACKET_LENGTH_TOO_LONG',
+  'ERR_INVALID_URL',
+]);
+/** The error types InitiateAuth documents, and the AWS-wide ones it can return. */
+const KNOWN_TYPES = new Set([
+  'NotAuthorizedException',
+  'InvalidParameterException',
+  'ResourceNotFoundException',
+  'UserNotFoundException',
+  'UserNotConfirmedException',
+  'PasswordResetRequiredException',
+  'TooManyRequestsException',
+  'InternalErrorException',
+  'InvalidUserPoolConfigurationException',
+  'InvalidLambdaResponseException',
+  'UnexpectedLambdaException',
+  'UserLambdaValidationException',
+  'InvalidSmsRoleAccessPolicyException',
+  'InvalidSmsRoleTrustRelationshipException',
+  'InvalidEmailRoleAccessPolicyException',
+  'ForbiddenException',
+  'UnsupportedOperationException',
+  'LimitExceededException',
+  'AccessDeniedException',
+  'ThrottlingException',
+  'ValidationException',
+  'SerializationException',
+  'UnrecognizedClientException',
+  'InternalFailure',
+  'ServiceUnavailable',
+]);
+/** Cognito's ChallengeNameType. */
+const KNOWN_CHALLENGES = new Set([
+  'NEW_PASSWORD_REQUIRED',
+  'SMS_MFA',
+  'EMAIL_OTP',
+  'SMS_OTP',
+  'SOFTWARE_TOKEN_MFA',
+  'SELECT_MFA_TYPE',
+  'MFA_SETUP',
+  'PASSWORD_VERIFIER',
+  'CUSTOM_CHALLENGE',
+  'SELECT_CHALLENGE',
+  'DEVICE_SRP_AUTH',
+  'DEVICE_PASSWORD_VERIFIER',
+  'ADMIN_NO_SRP_AUTH',
+  'PASSWORD',
+  'PASSWORD_SRP',
+  'WEB_AUTHN',
+]);
+/** Media types a Cognito endpoint, or something in front of it, answers with. */
+const KNOWN_MEDIA_TYPES = new Set([
+  'application/x-amz-json-1.1',
+  'application/x-amz-json-1.0',
+  'application/json',
+  'text/html',
+  'text/plain',
+  'text/xml',
+  'application/xml',
+]);
+
+/**
+ * Every word the module can print for a value from outside, by the field it is
+ * read from: frozen copies, so nothing an importer does to them changes what
+ * prints.
+ */
+export const KNOWN_WORDS: Readonly<
+  Record<'codes' | 'types' | 'challenges' | 'mediaTypes', readonly string[]>
+> = Object.freeze({
+  codes: Object.freeze([...KNOWN_CODES]),
+  types: Object.freeze([...KNOWN_TYPES]),
+  challenges: Object.freeze([...KNOWN_CHALLENGES]),
+  mediaTypes: Object.freeze([...KNOWN_MEDIA_TYPES]),
+});
+
+/** `value` when it is exactly one of `words`; undefined for anything else. */
+function recognised(value: unknown, words: ReadonlySet<string>): string | undefined {
+  return typeof value === 'string' && words.has(value) ? value : undefined;
 }
 
 /**
- * Remove a secret from text that is about to be thrown or printed — in both the
- * raw form and the JSON-escaped one, since a client that echoes the request body
- * quotes it, and a password containing `"` or `\` would otherwise sail straight
- * through an exact-substring match.
+ * `node[key]`, or undefined when reading it throws. Every property of an
+ * outside object is read through this or inside a try of its own: a getter or a
+ * Proxy trap on a lookalike must never replace the operator's one actionable
+ * line with an unrelated exception.
  */
-function redact(text: string, secret: string): string {
-  if (!secret) return text;
-  let out = text.split(secret).join('<redacted>');
-  const escaped = JSON.stringify(secret).slice(1, -1);
-  if (escaped !== secret) out = out.split(escaped).join('<redacted>');
-  return out;
+function read(node: unknown, key: string): unknown {
+  try {
+    return (node as Record<string, unknown>)[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** How many nodes of a failure's graph are looked at, at most. */
+const MAX_NODES = 32;
+
+/** undici's own words when an HTTPS proxy refuses the CONNECT for the tunnel. */
+const PROXY_REFUSED = /^Proxy response \((\d{3})\) !== 200 when HTTP Tunneling$/;
+/** undici's own words when `redirect: 'error'` meets a redirect. */
+const REDIRECT_REFUSED = 'unexpected redirect';
+
+/** What a fetch-layer failure's graph says, in forms that cannot quote anything. */
+interface FailureFacts {
+  /** Codes in KNOWN_CODES, nearest first, without repeats. */
+  codes: string[];
+  /** A code that was a non-empty string but not in KNOWN_CODES; it is not printed. */
+  unrecognised: boolean;
+  /** The nearest proxy's status, from an exact match of PROXY_REFUSED. */
+  proxyStatus?: number;
+  /** An exact match of REDIRECT_REFUSED somewhere in the graph. */
+  redirected: boolean;
 }
 
 /**
- * Scrub a secret out of a caught error and its whole cause chain, in place.
+ * Read a failure and everything under it, breadth first.
  *
- * Redacting only the message we throw is not enough: the caught error rides
- * along as `cause`, and Node prints the entire chain whenever an error is
- * inspected — which is exactly what the demo's top-level handler does — so the
- * secret would land in the transcript one line below the redacted copy.
- * Scrubbing the objects themselves also covers anything else that inspects them
- * later, and keeps the real error attached as the cause rather than a
- * lookalike.
+ * Node's fetch reports every network failure as a bare `TypeError: fetch
+ * failed` with the part worth reading on `cause` — and on an AggregateError's
+ * `errors`, with an empty message, when a host's addresses all refuse — so the
+ * whole graph is read: its codes, and its messages ONLY to compare them with
+ * the two fixed messages above. No other text is kept.
+ *
+ * Bounded by MAX_NODES, and each node is visited once — which is also what ends
+ * the walk on a graph that cycles. A node's properties are read through `read`,
+ * and its members are copied out by index (`membersOf`), so no getter, Proxy
+ * trap or iterator of its own runs outside a guard: a node that throws costs
+ * what it would have said and nothing else.
  */
-function redactInPlace(err: unknown, secret: string): void {
-  const visited = new Set<object>();
-  const scrub = (node: unknown, depth: number): void => {
-    if (depth > 4 || node === null || typeof node !== 'object' || visited.has(node)) return;
-    visited.add(node);
+function examineFailure(err: unknown): FailureFacts {
+  const facts: FailureFacts = { codes: [], unrecognised: false, redirected: false };
+  const seen = new Set<unknown>();
+  let level: unknown[] = [err];
+  while (level.length > 0) {
+    const next: unknown[] = [];
+    for (const node of level) {
+      if (seen.size >= MAX_NODES) break;
+      if (node === null || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
 
-    if (node instanceof Error) {
-      try {
-        node.message = redact(node.message, secret);
-      } catch {
-        // A frozen error cannot be scrubbed; the message we throw is redacted
-        // regardless, and there is nothing else useful to do here.
-      }
-      if (node instanceof AggregateError) {
-        for (const inner of node.errors) scrub(inner, depth + 1);
-      }
-      scrub(node.cause, depth + 1);
-    }
+      const raw = read(node, 'code');
+      const code = recognised(raw, KNOWN_CODES);
+      if (code === undefined) facts.unrecognised ||= typeof raw === 'string' && raw !== '';
+      else if (!facts.codes.includes(code)) facts.codes.push(code);
 
-    // Messages are not the only thing printed: inspecting an error prints its
-    // enumerable own properties too, so a client that hangs the request body
-    // off the error puts the secret there rather than in any message.
-    for (const [key, value] of Object.entries(node)) {
-      if (typeof value === 'string') {
-        try {
-          (node as Record<string, unknown>)[key] = redact(value, secret);
-        } catch {
-          // Frozen, as above.
-        }
-      } else {
-        scrub(value, depth + 1);
+      const message = read(node, 'message');
+      if (typeof message === 'string') {
+        const status = Number(PROXY_REFUSED.exec(message)?.[1]);
+        if (status >= 100 && status <= 599) facts.proxyStatus ??= status;
+        if (message === REDIRECT_REFUSED) facts.redirected = true;
       }
+
+      next.push(read(node, 'cause'), ...membersOf(node));
     }
-  };
-  scrub(err, 0);
+    level = next;
+  }
+  return facts;
+}
+
+/**
+ * A node's `errors`, copied out by index when it is a real array (an
+ * AggregateError's), else none. Copied rather than sliced or iterated: an
+ * array can carry its own `slice`, a species constructor or an iterator, and
+ * any of them would run outside code unguarded, whatever it returned.
+ */
+function membersOf(node: object): unknown[] {
+  const members = read(node, 'errors');
+  try {
+    if (!Array.isArray(members)) return [];
+  } catch {
+    // A revoked Proxy throws from Array.isArray itself.
+    return [];
+  }
+  const length = read(members, 'length');
+  const count = typeof length === 'number' && length > 0 ? Math.min(length, MAX_NODES) : 0;
+  const copy: unknown[] = [];
+  for (let index = 0; index < count; index++) copy.push(read(members, String(index)));
+  return copy;
+}
+
+/** Fixed words for the codes an operator most needs explained. */
+const CODE_HINTS = new Map([
+  // Behind an HTTPS proxy the proxy looks up Cognito's host itself, so an
+  // ENOTFOUND here names the proxy (measured with NODE_USE_ENV_PROXY=1);
+  // without one it names Cognito's host.
+  [
+    'ENOTFOUND',
+    'a host name does not resolve — check the region, or the HTTPS proxy address if one is set',
+  ],
+  [
+    'UND_ERR_ABORTED',
+    'the request was cancelled before an answer — most often an HTTPS proxy refusing the tunnel',
+  ],
+]);
+
+/**
+ * What an operator can act on in a failure from the fetch layer: its codes,
+ * with fixed words for some, and whether it also carried a code this module
+ * does not know. When none of its codes is known, why nothing more is said is
+ * said too.
+ */
+function describeFailure(facts: FailureFacts): string {
+  const said = facts.codes.map((code) => {
+    const hint =
+      code === 'UND_ERR_ABORTED' && facts.proxyStatus !== undefined
+        ? `the HTTPS proxy refused the tunnel with HTTP ${facts.proxyStatus}`
+        : CODE_HINTS.get(code);
+    return hint === undefined ? code : `${code} (${hint})`;
+  });
+  if (facts.unrecognised) said.push('an error code this module does not recognise');
+  if (facts.codes.length > 0) return said.join(', ');
+  return (
+    `${said[0] ?? 'no error code'}, and the fetch layer's own text is withheld — it can quote ` +
+    'the request, which holds the password'
+  );
+}
+
+/** `AbortSignal.timeout` rejects with a DOMException named TimeoutError, headers or body. */
+function isTimeout(err: unknown): boolean {
+  return read(err, 'name') === 'TimeoutError';
+}
+
+/** Fixed words for the Cognito error types an operator is most likely to meet. */
+const TYPE_HINTS = new Map([
+  [
+    'NotAuthorizedException',
+    // With PreventUserExistenceErrors on (the console's default), a user that
+    // does not exist is reported this way too.
+    'a wrong username or password, a disabled or locked-out user, or an app client that ' +
+      'requires a secret',
+  ],
+  [
+    'InvalidParameterException',
+    'most often, ALLOW_USER_PASSWORD_AUTH is not enabled on the app client, or the client ' +
+      'id is malformed',
+  ],
+  ['ResourceNotFoundException', 'no app client with this id in this region'],
+  ['UserNotFoundException', 'no such user in this pool'],
+  ['UserNotConfirmedException', 'the user has not been confirmed'],
+  ['PasswordResetRequiredException', 'the user must reset their password first'],
+  ['TooManyRequestsException', 'Cognito is throttling sign-ins; wait, then re-run'],
+]);
+
+/**
+ * Cognito's `__type` when the body carries one, without the namespace
+ * (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols allow around
+ * it — or undefined when nothing is left. Only compared with KNOWN_TYPES: what
+ * prints is the word it matches.
+ */
+function errorTypeOf(text: string): string | undefined {
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const raw = read(body, '__type');
+  if (typeof raw !== 'string') return undefined;
+  const name = raw.split(':')[0]?.split('#').pop() ?? '';
+  return name === '' ? undefined : name;
+}
+
+/**
+ * The response's media type, lowercased and without parameters. Only compared:
+ * what prints is the word it matches.
+ */
+function mediaTypeOf(res: unknown): unknown {
+  try {
+    const value = (read(res, 'headers') as Headers | undefined)?.get('content-type');
+    return typeof value === 'string' ? value.split(';')[0]?.trim().toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What an operator can act on in a response that was not a success: Cognito's
+ * error type when it is a known one, otherwise the status, the media type when
+ * it is a known one, and whether the body named an error type at all.
+ */
+function describeResponse(res: unknown, text: string): string {
+  const status = read(res, 'status');
+  const statusLine =
+    typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599
+      ? `HTTP ${status}`
+      : 'an invalid HTTP status';
+  const named = errorTypeOf(text);
+  const type = recognised(named, KNOWN_TYPES);
+  if (type !== undefined) {
+    const hint = TYPE_HINTS.get(type);
+    return hint === undefined ? `${type} (${statusLine})` : `${type} (${statusLine}): ${hint}`;
+  }
+  const media = recognised(mediaTypeOf(res), KNOWN_MEDIA_TYPES);
+  return (
+    `${statusLine}${media === undefined ? '' : ` (${media})`}, ` +
+    (named === undefined
+      ? 'with no Cognito error type'
+      : 'with an error type this module does not recognise') +
+    (text === ''
+      ? ' and an empty body'
+      : '; its body is withheld, since a proxy can quote the request it refused')
+  );
 }
 
 /** The endpoint for a region — exported so callers can report what they called. */
@@ -135,28 +449,20 @@ export function cognitoEndpoint(region: string): string {
   return `https://cognito-idp.${region}.amazonaws.com/`;
 }
 
-function describeError(status: number, body: string): string {
-  let parsed: CognitoError | null = null;
-  try {
-    parsed = JSON.parse(body) as CognitoError;
-  } catch {
-    // Not JSON — fall through and report the raw body below.
-  }
-  const type = parsed?.__type;
-  const message = parsed?.message ?? parsed?.Message;
-  if (type ?? message) return `${type ?? 'error'}: ${message ?? '(no message)'}`;
-  return `HTTP ${status}: ${body.slice(0, 200)}`;
-}
-
 /**
  * Sign one test user in and return their access token.
  *
  * Throws with an actionable message on every failure path, so a misconfigured
  * pool fails the demo loudly rather than producing a token-shaped nothing:
- *   - a Cognito error (bad credentials, flow not enabled) reports its own type;
- *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) names the challenge, because an
- *     unfinished sign-in yields no token and needs an operator, not a retry;
- *   - a 200 with no AccessToken is treated as a failure, never as an empty token.
+ *   - a Cognito error (bad credentials, flow not enabled) reports its type
+ *     when it is a known one, and otherwise its status, and its media type
+ *     when that is a known one;
+ *   - a network failure reports its known error codes; a timeout, or a
+ *     refused redirect, reports only itself;
+ *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) is a failure, named when it is a
+ *     known one, because an unfinished sign-in yields no token and needs an
+ *     operator, not a retry;
+ *   - a 200 without a string AccessToken is a failure, never an empty token.
  */
 export async function fetchCognitoAccessToken(
   config: CognitoAuthConfig,
@@ -164,9 +470,12 @@ export async function fetchCognitoAccessToken(
 ): Promise<string> {
   const doFetch = config.fetchImpl ?? fetch;
   const timeoutMs = config.timeoutMs ?? 30_000;
+  const { username, password } = credentials;
+  const endpoint = cognitoEndpoint(config.region);
+
   let res: Response;
   try {
-    res = await doFetch(cognitoEndpoint(config.region), {
+    res = await doFetch(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/x-amz-json-1.1',
@@ -175,61 +484,79 @@ export async function fetchCognitoAccessToken(
       body: JSON.stringify({
         AuthFlow: 'USER_PASSWORD_AUTH',
         ClientId: config.clientId,
-        AuthParameters: { USERNAME: credentials.username, PASSWORD: credentials.password },
+        AuthParameters: { USERNAME: username, PASSWORD: password },
       }),
+      // A 307 or 308 would re-send this body, password and all, to wherever it
+      // pointed. Cognito never redirects, so a redirect is refused.
+      redirect: 'error',
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
-    // Before anything else: the fetch layer's error may quote the request body,
-    // so scrub the secret out of it and its causes while it is still ours.
-    redactInPlace(err, credentials.password);
     // Only a timeout is reported as one: a mistyped region fails DNS instantly,
     // and telling the operator to look at Cognito's latency would point them
     // away from the thing they actually got wrong.
-    if (err instanceof Error && err.name === 'TimeoutError') {
-      throw new Error(
-        `Cognito sign-in for ${credentials.username} did not answer within ${timeoutMs}ms ` +
-          `(${cognitoEndpoint(config.region)})`,
-        { cause: err },
-      );
-    }
-    // The detail comes from the fetch layer, so redact before interpolating:
-    // this module promises a password never leaves it, and an interceptor or a
-    // future client that echoed the request body would otherwise put
-    // DEMO_PASSWORD straight into a CI transcript. Structural, not incidental.
-    const detail = detailOf(err);
+    //
+    // The caught error is not attached; the header says why. Its codes are in
+    // the message, which is what an operator acts on.
+    const facts = examineFailure(err);
+    // eslint-disable-next-line preserve-caught-error -- deliberately not attached, see above
     throw new Error(
-      `Cognito sign-in for ${credentials.username} could not reach ` +
-        `${cognitoEndpoint(config.region)}: ${redact(detail, credentials.password)}`,
-      { cause: err },
+      isTimeout(err)
+        ? `Cognito sign-in for ${username} did not answer within ${timeoutMs}ms (${endpoint})`
+        : facts.redirected
+          ? `Cognito sign-in for ${username} got a redirect from ${endpoint}, refused so the ` +
+            'password is not sent on'
+          : `Cognito sign-in for ${username} could not reach ${endpoint}: ` +
+            describeFailure(facts),
     );
   }
 
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(
-      `Cognito sign-in failed for ${credentials.username} — ${describeError(res.status, text)}`,
-    );
-  }
-
-  let body: InitiateAuthResponse;
+  // Reading the body can fail on its own: undici rejects it with `TypeError:
+  // terminated` when a response is cut short, and the deadline above still
+  // applies while it streams.
+  let text: string;
   try {
-    body = JSON.parse(text) as InitiateAuthResponse;
-  } catch {
-    throw new Error(`Cognito sign-in for ${credentials.username} returned non-JSON body`);
+    text = await res.text();
+  } catch (err) {
+    // eslint-disable-next-line preserve-caught-error -- deliberately not attached, as above
+    throw new Error(
+      isTimeout(err)
+        ? `Cognito sign-in for ${username} did not finish answering within ${timeoutMs}ms ` +
+            `(${endpoint})`
+        : `Cognito sign-in for ${username} could not read the response from ${endpoint}: ` +
+            describeFailure(examineFailure(err)),
+    );
   }
+
+  if (read(res, 'ok') !== true) {
+    throw new Error(`Cognito sign-in failed for ${username} — ${describeResponse(res, text)}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`Cognito sign-in for ${username} returned non-JSON body`);
+  }
+  // A JSON `null` carries no token, and reading a field off it would throw a
+  // TypeError that names no request at all.
+  const body: InitiateAuthResponse = typeof parsed === 'object' && parsed !== null ? parsed : {};
 
   if (body.ChallengeName) {
+    const challenge = recognised(body.ChallengeName, KNOWN_CHALLENGES);
     throw new Error(
-      `Cognito sign-in for ${credentials.username} needs challenge ${body.ChallengeName} — ` +
-        'finish it once in the AWS console (a temporary password must be reset before the ' +
+      `Cognito sign-in for ${username} needs ` +
+        (challenge === undefined
+          ? 'a challenge this module does not recognise'
+          : `challenge ${challenge}`) +
+        ' — finish it once in the AWS console (a temporary password must be reset before the ' +
         'account can be used unattended), then re-run.',
     );
   }
 
-  const token = body.AuthenticationResult?.AccessToken;
-  if (!token) {
-    throw new Error(`Cognito sign-in for ${credentials.username} returned no access token`);
+  const accessToken = body.AuthenticationResult?.AccessToken;
+  if (typeof accessToken !== 'string' || accessToken === '') {
+    throw new Error(`Cognito sign-in for ${username} returned no access token`);
   }
-  return token;
+  return accessToken;
 }

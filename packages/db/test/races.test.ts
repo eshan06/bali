@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
+import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import {
   armedTaps,
   blocks,
@@ -602,6 +603,94 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         await db.select().from(participations).where(eq(participations.sessionId, session.id)),
       );
       expect(participation.silentSince).toBeNull();
+    }
+  });
+});
+
+describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
+  /*
+   * Rounds, because one pair of calls can simply fail to race. As first
+   * written, each race ran once, and with the block run on its own, removing
+   * the fill's NULL re-check or the loser's re-read left it green. With fifteen
+   * rounds, removing either — or the fill on the insert path, or on an existing
+   * row — turns it red in 3 runs of 3. The warm-up is the file's usual one (see
+   * the armed-tap block below): a cold second connection serialises round 0.
+   */
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  it('two sign-ins filling a missing name at once agree on the one that won', async () => {
+    // The race the fill introduces: both callers read the same NULL, both try
+    // the UPDATE, and the NULL re-check in its WHERE lets exactly one through.
+    // The loser must re-read rather than report back the NULL it started with —
+    // the portal would show a UUID prefix for a row that now has a name.
+    for (let round = 0; round < 15; round += 1) {
+      const cognitoId = `race-fill-${round}-${newUuidV7()}`;
+      const created = await findOrCreateStudent(db, cognitoId);
+      expect(created.displayName).toBeNull();
+
+      const [a, b] = await Promise.all([
+        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+      ]);
+
+      const rows = await db.select().from(users).where(eq(users.cognitoId, cognitoId));
+      expect(rows).toHaveLength(1);
+      const stored = one(rows).displayName;
+      expect(stored).not.toBeNull();
+      expect(['Ana Reyes', 'demo-ana@example.test']).toContain(stored);
+      expect(a.displayName).toBe(stored);
+      expect(b.displayName).toBe(stored);
+      expect(a.id).toBe(created.id);
+      expect(b.id).toBe(created.id);
+    }
+  });
+
+  it('a nameless first sign-in racing a named one still ends with the name', async () => {
+    // The insert path's own fill. When both calls miss the row and the nameless
+    // INSERT wins, the named INSERT does nothing and its re-select finds NULL:
+    // without the fill there, the name it carried is dropped.
+    for (let round = 0; round < 15; round += 1) {
+      const cognitoId = `race-first-${round}-${newUuidV7()}`;
+
+      const [, named] = await Promise.all([
+        findOrCreateStudent(db, cognitoId),
+        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+      ]);
+
+      expect(named.displayName).toBe('Ana Reyes');
+      expect((await findUserByCognitoId(db, cognitoId))?.displayName).toBe('Ana Reyes');
+    }
+  });
+
+  it('two first sign-ins at once still make exactly one row', async () => {
+    for (let round = 0; round < 15; round += 1) {
+      const cognitoId = `race-provision-${round}-${newUuidV7()}`;
+
+      const [a, b] = await Promise.all([
+        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+        findOrCreateStudent(db, cognitoId, 'Ana Reyes'),
+      ]);
+
+      expect(await db.select().from(users).where(eq(users.cognitoId, cognitoId))).toHaveLength(1);
+      expect(a.id).toBe(b.id);
+      expect(a.displayName).toBe('Ana Reyes');
+      expect(b.displayName).toBe('Ana Reyes');
+    }
+  });
+
+  it('a name arriving beside one already stored never replaces it', async () => {
+    for (let round = 0; round < 15; round += 1) {
+      const cognitoId = `race-keep-${round}-${newUuidV7()}`;
+      await findOrCreateStudent(db, cognitoId, 'Ana Reyes');
+
+      await Promise.all([
+        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+        findOrCreateStudent(db, cognitoId, 'demo-other@example.test'),
+      ]);
+
+      expect((await findUserByCognitoId(db, cognitoId))?.displayName).toBe('Ana Reyes');
     }
   });
 });

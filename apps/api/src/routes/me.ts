@@ -9,6 +9,7 @@ import { deriveDisplayState, type MeResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 
 import { requireAuth } from '../auth/plugin.js';
+import { displayNameFromClaims } from '../auth/verify.js';
 
 /**
  * GET /v1/me — the boot call: who am I, my classes, my live session. The
@@ -18,8 +19,11 @@ import { requireAuth } from '../auth/plugin.js';
 export function registerMeRoute(app: FastifyInstance, db: Database): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
     const identity = requireAuth(request);
-    const displayName = typeof identity.claims.name === 'string' ? identity.claims.name : undefined;
-    const user = await findOrCreateStudent(db, identity.sub, displayName);
+    const user = await findOrCreateStudent(
+      db,
+      identity.sub,
+      displayNameFromClaims(identity.claims),
+    );
 
     const classes =
       user.role === 'teacher'
