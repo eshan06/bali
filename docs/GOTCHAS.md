@@ -12,6 +12,8 @@ touching infra, CI, git plumbing, or the dev environment.
   something that can't be skimmed past — a regression test, a CI check, or a
   CLAUDE.md rule. Only a trap that fits none of those (environment quirks,
   process mechanics) belongs here.
+- **Product risk is not a gotcha.** Known product issues live in
+  `docs/ISSUES.md`; this file is environment and process only.
 
 ## Git / GitHub
 
@@ -34,7 +36,10 @@ touching infra, CI, git plumbing, or the dev environment.
   check from `protect-main`, merge, re-add it). The toggle is repo-wide and
   owner-only: while the check is removed, any other green PR would merge
   unreviewed — disarm other PRs' auto-merge first, and re-add the check
-  immediately after.
+  immediately after. Sessions never request the toggle as a routine remedy
+  for a red check; it is an owner decision, proposed only for a
+  workflow-file PR where no other path exists (its own red review is the
+  designed behavior, not a bug to fix).
 - **GitHub silently disables a PR's auto-merge when a required check fails.**
   After driving the check green, re-enable auto-merge — a green PR otherwise
   just sits there.
