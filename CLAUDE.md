@@ -11,6 +11,9 @@ is always allowed and always recorded.
 2. `docs/PLAN.md` — phases, go-live features, live status. Check it before
    building anything: is it already done, planned for a later phase, or
    deliberately cut?
+3. `docs/GOTCHAS.md` — live traps of this environment and process (git
+   plumbing, CI, cloud sessions, dev). Skim it so known traps aren't
+   rediscovered the hard way.
 
 ## Non-negotiable conventions
 
@@ -34,7 +37,8 @@ is always allowed and always recorded.
 
 Applies to anything: a new phase, a new feature, a fix the owner asks for.
 
-1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`. Locate the
+1. **Orient:** read `docs/ARCHITECTURE.md`, then `docs/PLAN.md`, and skim
+   `docs/GOTCHAS.md` once per session (not per task). Locate the
    task: already done? planned for a later phase? deliberately cut? For a new
    phase, its step list lives in PLAN.md / the agreed phase plans.
 2. **Plan, then go — no approval gate:** for anything non-trivial, run
@@ -75,6 +79,11 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 - **New feature?** Check `docs/PLAN.md` first. Design against ARCHITECTURE.md.
   When done, add the feature to PLAN.md with a one-line architecture note; if
   it changed a real design decision, update ARCHITECTURE.md itself.
+- **Found a critical or recurring issue?** First make it impossible to hit
+  again: a regression test, a CI check, or a rule in this file — in that
+  order. Only a trap that fits none of those (environment quirks, process
+  mechanics) goes into `docs/GOTCHAS.md`, one short entry, and the PR that
+  fixes a trap deletes its entry. GOTCHAS holds live traps only.
 - **Before ending any session that changed source code, update `docs/PLAN.md`**
   (what landed, current status, what's next). The "Plan doc updated" CI check
   blocks source PRs that skip this; a genuinely trivial fix may carry
