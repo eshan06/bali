@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.**_
+_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -38,6 +38,27 @@ _Last updated: 2026-09-22 — **Phase 2 is complete: the exit demo ran green aga
   only failed at the database. The `UPDATE` half also refuses to run when there
   is no live school (`AND EXISTS`), so pasting only the second statement reports
   `UPDATE 0` rather than setting `school_id` NULL and looking like success.
+- **The live grid shows a readable name wherever the token carries one**
+  (2026-09-22). `/v1/me` read
+  `claims.name`, but Cognito puts profile attributes in the ID token and every
+  client here sends an **access** token — the portal stores `access_token`
+  and nothing else, the exit demo signs in for `AuthenticationResult.AccessToken`
+  — so that read found nothing on every real request, `display_name` stayed NULL,
+  and the grid fell back to eight characters of a UUID. Setting a `name`
+  attribute on the pool would not have fixed it — only a pre-token-generation
+  Lambda adds claims to an access token, and nothing here has one. `/v1/me` now walks
+  `name → preferred_username → cognito:username → username`, so a real name still
+  wins wherever one exists, and `findOrCreateStudent` **fills** a NULL
+  `display_name` on a later sign-in instead of only setting it at creation —
+  otherwise every existing account would have kept its UUID prefix forever. A
+  fill, never an overwrite: "edit own name" (below, phase 3) makes that field the
+  student's own once they set it. Where the pool's usernames are readable, a
+  remote exit-demo run labels its actors with them, because `me.user.displayName`
+  finally answers. **Not checked yet:** whether the dev pool's usernames are
+  readable. A pool that signs users in by email (`UsernameAttributes: ['email']`)
+  gives every user a UUID username, which is not stored, and its access tokens
+  carry no `name`; there the grid keeps its UUID prefix until "edit own name"
+  (phase 3) or a pre-token-generation Lambda supplies one.
 - **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
   scrubs enumerable own properties, not just messages (inspecting an error
   prints them, so a client hanging the request body off it leaked through a path
@@ -168,6 +189,42 @@ under-13 parental-consent machinery.
   ARCHITECTURE.md and PLAN.md are always read from source, never answered
   from the graph. Ponytail (account-wide minimalism plugin) governs
   implementation, never the gates (CLAUDE.md working rule).
+- **2026-09-22** — Display names come from the token's own claims — a real name
+  first (`name`, `preferred_username`), then the pool's identifier
+  (`cognito:username`, `username`) but only when it is readable — and are
+  **filled, never synced**. The value is stripped of control and format
+  characters (bar the ZWJ/ZWNJ joiners names need), line and paragraph
+  separators, and lone surrogate halves (which Postgres would store as U+FFFD
+  for good), trimmed, and clamped to 64 code points; a name with nothing
+  visible left in it — only joiners, a Hangul filler, a blank braille cell, a
+  musical null notehead — counts as no name. Invisible letters INSIDE a
+  visible name are kept. All of this because `name` is an attribute the
+  student can set on themselves and it lands in a teacher's grid. A
+  machine-made identifier is
+  **not** stored, since it would print worse than the grid's own
+  eight-character fallback and the fill would make it permanent: a dashed UUID
+  (what a pool signing in by email gives every user), or a federated username —
+  one of Cognito's built-in provider names (`Google`, `Facebook`,
+  `LoginWithAmazon`, `SignInWithApple`, any case), an underscore, and that
+  provider's subject shape (ten or more digits for Google and Facebook, so
+  `google_20290101` is a name). It is anchored on the provider because a rule that
+  read any long tail with a digit as a subject would throw away
+  `ana_rodriguez2029` and `p_kowalski1987`. A custom SAML/OIDC provider's names are the pool
+  owner's choice, cannot be recognised by shape, and are stored as the pool
+  spells them. Where the identifier IS readable the teacher sees it — an
+  email, in a pool whose usernames are emails — which is accepted: it is the
+  student's own teacher.
+  Consequence to know: a fallback, once stored, is not replaced by a better name
+  arriving later, because nothing records where the stored value came from. The
+  designed remedy is "edit own name" (phase 3), not a Cognito-side change — a
+  pre-token-generation Lambda emitting `name` would fill only rows still NULL,
+  not ones that already hold a fallback. A new
+  trust boundary comes with this and is worth stating rather than discovering:
+  `name` and `preferred_username` are attributes a student can set on
+  themselves, so a student now chooses the string their teacher reads in the
+  grid and beside unlock records, and nothing stops them choosing a classmate's
+  name. The field was always NULL before, so this is new surface, not a
+  regression; "edit own name" should decide what, if anything, polices it.
 - **2026-09-22** — **The owner ruled on the audit's held `/v1` questions: yes
   to all five** ([the ask](https://github.com/eshan06/bali/pull/29#issuecomment-5774512834)).
   One principle covers the `/v1` items, and it is written into ARCHITECTURE
