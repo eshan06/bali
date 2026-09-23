@@ -201,6 +201,8 @@ describe('fetchCognitoAccessToken', () => {
   it.each([
     ['a namespace', 'com.amazonaws.cognito.identity.idp.model#ResourceNotFoundException'],
     ['a suffix', 'ResourceNotFoundException:http://internal.amazon.com/coral/'],
+    // Cut at the suffix first: a '#' inside it is not a namespace.
+    ['a suffix that holds a #', 'ResourceNotFoundException:http://internal.amazon.com/#coral'],
   ])('reads an error type spelled with %s', async (_label, type) => {
     // Both spellings are allowed by the AWS JSON protocols.
     const err = await thrownBy(() => Promise.resolve(jsonResponse(400, { __type: type })));
@@ -255,6 +257,15 @@ describe('fetchCognitoAccessToken', () => {
     expect(err.message).toBe(
       'Cognito sign-in failed for demo-ana@example.test — HTTP 413 (text/plain), with no ' +
         'Cognito error type and an empty body',
+    );
+  });
+
+  it('calls a body empty only when it has no characters at all', async () => {
+    const err = await thrownBy(() => Promise.resolve(new Response(' \n ', { status: 502 })));
+
+    expect(err.message).toBe(
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 502 (text/plain), with no ' +
+        'Cognito error type; its body is withheld, since a proxy can quote the request it refused',
     );
   });
 
@@ -753,6 +764,7 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     ['text after it', 'Proxy response (502) !== 200 when HTTP Tunneling: hunter2-not-real'],
     ['text before it', 'hunter2-not-real Proxy response (502) !== 200 when HTTP Tunneling'],
     ['a status no HTTP response has', 'Proxy response (999) !== 200 when HTTP Tunneling'],
+    ['a fourth digit', 'Proxy response (0502) !== 200 when HTTP Tunneling'],
   ])('keeps only an exact match of that message — not with %s', async (_label, message) => {
     const err = await thrownBy(reject(tunnelRefused(message)));
 
@@ -775,6 +787,41 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     expect(err.message).toBe(
       `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
         'ECONNRESET, UND_ERR_ABORTED (the HTTPS proxy refused the tunnel with HTTP 502)',
+    );
+  });
+
+  it('gives the nearest proxy’s status when two are in the failure', async () => {
+    const err = await thrownBy(
+      reject(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('Proxy response (502) !== 200 when HTTP Tunneling'), {
+            code: 'UND_ERR_ABORTED',
+            cause: new Error('Proxy response (407) !== 200 when HTTP Tunneling'),
+          }),
+        }),
+      ),
+    );
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ` +
+        'UND_ERR_ABORTED (the HTTPS proxy refused the tunnel with HTTP 502)',
+    );
+  });
+
+  it('reports a deadline that passed as a timeout, whatever else the failure holds', async () => {
+    const err = await thrownBy(
+      reject(
+        Object.assign(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+          {
+            cause: new Error('unexpected redirect'),
+          },
+        ),
+      ),
+    );
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test did not answer within 30000ms (${ENDPOINT})`,
     );
   });
 
@@ -891,7 +938,7 @@ async function messageFor(carrying: FetchImpl, password = creds.password): Promi
  */
 async function passwordFreeMessages(
   carrying: (value: string) => FetchImpl,
-  words: ReadonlySet<string>,
+  words: readonly string[],
 ): Promise<Set<string>> {
   const messages = new Set([
     await messageFor(carrying('')),
@@ -920,8 +967,8 @@ const ECHO_PASSWORDS = [
   // letter, a capital sharp s, another script.
   'Þórður-9Æsir',
   'Łódź-Øre1',
-  'aͅbͅcͅdͅeͅ',
-  'ẞa-ẞo-ẞu-1',
+  'a\u0345b\u0345c\u0345d\u0345e\u0345',
+  '\u1E9Ea-\u1E9Eo-\u1E9Eu-1',
   'Пароль-секрет',
   // Words of the module's own inside a password, one that is one, and one with
   // no letter or digit in it at all.
@@ -951,7 +998,7 @@ const IN_ASCII: Record<string, string> = {
   Œ: 'OE',
   œ: 'oe',
   ß: 'ss',
-  ẞ: 'SS',
+  '\u1E9E': 'SS',
   // The Cyrillic letters the passwords above use, romanised.
   П: 'P',
   а: 'a',
@@ -1005,9 +1052,125 @@ describe('what prints for a value from outside is a word of the module’s own',
       mediaTypes: /^[a-z]+\/[a-z0-9.+-]+$/,
     };
     for (const [list, shape] of Object.entries(shapes) as [keyof typeof KNOWN_WORDS, RegExp][]) {
-      expect(KNOWN_WORDS[list].size, list).toBeGreaterThan(0);
+      expect(KNOWN_WORDS[list].length, list).toBeGreaterThan(0);
       for (const word of KNOWN_WORDS[list]) expect(word, list).toMatch(shape);
     }
+  });
+
+  it('holds exactly the words it was reviewed with', () => {
+    // A word added or dropped changes what an operator can be told, so the
+    // lists are spelled out here too: changing one is a decision, not a slip.
+    expect(KNOWN_WORDS).toEqual({
+      codes: [
+        'ENOTFOUND',
+        'EAI_AGAIN',
+        'EAI_FAIL',
+        'ECONNREFUSED',
+        'ECONNRESET',
+        'ECONNABORTED',
+        'ETIMEDOUT',
+        'EHOSTUNREACH',
+        'EHOSTDOWN',
+        'ENETUNREACH',
+        'ENETDOWN',
+        'EPIPE',
+        'EPROTO',
+        'EADDRNOTAVAIL',
+        'ERR_SOCKET_CONNECTION_TIMEOUT',
+        'UND_ERR_ABORT',
+        'UND_ERR_ABORTED',
+        'UND_ERR_SOCKET',
+        'UND_ERR_CLOSED',
+        'UND_ERR_DESTROYED',
+        'UND_ERR_CONNECT_TIMEOUT',
+        'UND_ERR_HEADERS_TIMEOUT',
+        'UND_ERR_BODY_TIMEOUT',
+        'UND_ERR_HEADERS_OVERFLOW',
+        'UND_ERR_RESPONSE_STATUS_CODE',
+        'UND_ERR_INFO',
+        'UND_ERR_REQ_CONTENT_LENGTH_MISMATCH',
+        'UND_ERR_RES_CONTENT_LENGTH_MISMATCH',
+        'UND_ERR_NOT_SUPPORTED',
+        'UND_ERR_PRX_TLS',
+        'UND_ERR_RESPONSE',
+        'UND_ERR_RES_EXCEEDED_MAX_SIZE',
+        'UND_ERR_REQ_RETRY',
+        'UND_ERR_INVALID_ARG',
+        'HPE_INVALID_STATUS',
+        'HPE_INVALID_CONSTANT',
+        'HPE_INVALID_HEADER_TOKEN',
+        'HPE_INVALID_CHUNK_SIZE',
+        'HPE_UNEXPECTED_CONTENT_LENGTH',
+        'ABORT_ERR',
+        'CERT_HAS_EXPIRED',
+        'CERT_NOT_YET_VALID',
+        'DEPTH_ZERO_SELF_SIGNED_CERT',
+        'SELF_SIGNED_CERT_IN_CHAIN',
+        'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+        'UNABLE_TO_GET_ISSUER_CERT',
+        'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+        'CERT_UNTRUSTED',
+        'ERR_TLS_CERT_ALTNAME_INVALID',
+        'ERR_TLS_HANDSHAKE_TIMEOUT',
+        'ERR_SSL_WRONG_VERSION_NUMBER',
+        'ERR_SSL_PACKET_LENGTH_TOO_LONG',
+        'ERR_INVALID_URL',
+      ],
+      types: [
+        'NotAuthorizedException',
+        'InvalidParameterException',
+        'ResourceNotFoundException',
+        'UserNotFoundException',
+        'UserNotConfirmedException',
+        'PasswordResetRequiredException',
+        'TooManyRequestsException',
+        'InternalErrorException',
+        'InvalidUserPoolConfigurationException',
+        'InvalidLambdaResponseException',
+        'UnexpectedLambdaException',
+        'UserLambdaValidationException',
+        'InvalidSmsRoleAccessPolicyException',
+        'InvalidSmsRoleTrustRelationshipException',
+        'InvalidEmailRoleAccessPolicyException',
+        'ForbiddenException',
+        'UnsupportedOperationException',
+        'LimitExceededException',
+        'AccessDeniedException',
+        'ThrottlingException',
+        'ValidationException',
+        'SerializationException',
+        'UnrecognizedClientException',
+        'InternalFailure',
+        'ServiceUnavailable',
+      ],
+      challenges: [
+        'NEW_PASSWORD_REQUIRED',
+        'SMS_MFA',
+        'EMAIL_OTP',
+        'SMS_OTP',
+        'SOFTWARE_TOKEN_MFA',
+        'SELECT_MFA_TYPE',
+        'MFA_SETUP',
+        'PASSWORD_VERIFIER',
+        'CUSTOM_CHALLENGE',
+        'SELECT_CHALLENGE',
+        'DEVICE_SRP_AUTH',
+        'DEVICE_PASSWORD_VERIFIER',
+        'ADMIN_NO_SRP_AUTH',
+        'PASSWORD',
+        'PASSWORD_SRP',
+        'WEB_AUTHN',
+      ],
+      mediaTypes: [
+        'application/x-amz-json-1.1',
+        'application/x-amz-json-1.0',
+        'application/json',
+        'text/html',
+        'text/plain',
+        'text/xml',
+        'application/xml',
+      ],
+    });
   });
 
   it.each(WORD_FIELDS)(
@@ -1036,24 +1199,40 @@ describe('what prints for a value from outside is a word of the module’s own',
   );
 
   it.each(WORD_FIELDS)(
-    'through %s, the message is the same whatever the password',
+    'through %s, the message is the same whatever the password, for every value',
     async (_f, list, carrying) => {
-      const [word = ''] = KNOWN_WORDS[list];
-      for (const value of [word, UNRECOGNISED]) {
-        const messages = new Set<string>();
-        for (const password of ['', 'x', '\u{1F512}\u{1F511}', ...ECHO_PASSWORDS]) {
-          messages.add(await messageFor(carrying(value), password));
+      // Every word, and values it does not know, against passwords that hold
+      // the word itself: a comparison with the password, brought back for any
+      // one word, makes that word's message differ here.
+      const failures: string[] = [];
+      for (const value of ['', UNRECOGNISED, ...KNOWN_WORDS[list]]) {
+        const expected = await messageFor(carrying(value), 'q7z-unrelated-9');
+        const passwords = [
+          '',
+          'x',
+          '\u{1F512}\u{1F511}',
+          value,
+          value.toLowerCase(),
+          `x${value}y`,
+          `${value.toLowerCase()}-2026!`,
+          ...ECHO_PASSWORDS,
+        ];
+        for (const password of passwords) {
+          const message = await messageFor(carrying(value), password);
+          if (message !== expected) failures.push(`${value} with ${JSON.stringify(password)}`);
         }
-        expect([...messages], value).toHaveLength(1);
       }
+      expect(failures).toEqual([]);
     },
   );
 
   it.each(WORD_FIELDS)(
     'through %s, a word is taken only as spelled',
     async (_f, list, carrying) => {
-      // The media type is lower-cased and trimmed before it is compared, as a
-      // header is; everything else is compared as it arrived.
+      // Each field is read before it is compared: a media type lower-cased,
+      // trimmed and cut at its parameters, as a header is; an error type cut
+      // at its namespace and suffix; a code or a challenge name as it arrived.
+      // These variants are ones that reading leaves as they are.
       const [word = ''] = KNOWN_WORDS[list];
       const unrecognised = await messageFor(carrying(UNRECOGNISED));
       const variants = [`${word}x`, `x${word}`, `${word} ${CANARY}`, `${CANARY} ${word}`];
@@ -1068,8 +1247,8 @@ describe('what prints for a value from outside is a word of the module’s own',
     ['written in ASCII', 'Þórður-9Æsir', 'THORDUR_9AESIR'],
     ['with its Polish letters written in ASCII', 'Łódź-łąka', 'LODZ_LAKA'],
     ['romanised', 'Пароль-секрет', 'PAROL_SEKRET'],
-    ['with a combining ypogegrammeni stripped', 'aͅbͅcͅdͅeͅ', 'ABCDE'],
-    ['with a capital sharp s lowered, then raised', 'ẞa-ẞo-ẞu-1', 'SSA_SSO_SSU_1'],
+    ['with a combining ypogegrammeni stripped', 'a\u0345b\u0345c\u0345d\u0345e\u0345', 'ABCDE'],
+    ['with a capital sharp s lowered, then raised', '\u1E9Ea-\u1E9Eo-\u1E9Eu-1', 'SSA_SSO_SSU_1'],
   ])('prints nothing of a password echoed %s', async (_label, password, echo) => {
     // Each printed whole through the design before this one: what it compared
     // with the password, an echo could write some other way.
@@ -1098,7 +1277,7 @@ describe('what prints for a value from outside is a word of the module’s own',
       const carrying = field(name);
       const echo = name === 'an error type' ? password : word;
       expect(await messageFor(carrying(echo), password)).toBe(
-        await messageFor(carrying(word), 'an-unrelated-password-9'),
+        await messageFor(carrying(word), 'q7z-unrelated-9'),
       );
     },
   );
@@ -1403,6 +1582,22 @@ describe('hostile objects never cost the operator’s one actionable line', () =
     expect(err.message).toBe(
       'Cognito sign-in failed for demo-ana@example.test — HTTP 200, with no Cognito error ' +
         'type; its body is withheld, since a proxy can quote the request it refused',
+    );
+  });
+
+  it('a header value that is not a string is not read as one', async () => {
+    const lookalike = {
+      ok: false,
+      status: 400,
+      headers: { get: () => ({ toString: () => 'text/html' }) },
+      text: () => Promise.resolve(''),
+    };
+
+    const err = await thrownBy(resolve(lookalike));
+
+    expect(err.message).toBe(
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 400, with no Cognito error type ' +
+        'and an empty body',
     );
   });
 

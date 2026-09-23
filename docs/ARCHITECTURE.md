@@ -273,7 +273,8 @@ get designed; edits land here as they're decided.
 
 Student app:
 - `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
-  call quietly creates the student's `users` row.
+  call quietly creates the student's `users` row; a later call fills in a display name
+  the row was created without, and never changes one it has.
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response

@@ -25,8 +25,11 @@
  *   - the HTTP status, when it is an integer from 100 to 599;
  *   - WORDS OF ITS OWN, chosen by what came back: an error code on a failure
  *     or its causes, Cognito's error type, a challenge name or the response's
- *     media type that is exactly one of the words in `KNOWN_WORDS` selects that
- *     word. Anything else is said to be unrecognised, and is not printed;
+ *     media type that is, read the way its field is read, exactly one of the
+ *     words in `KNOWN_WORDS` selects that word. Nothing else from those fields
+ *     prints: an unknown code, error type or challenge is said to be
+ *     unrecognised, an unknown media type is left out, and a code or an error
+ *     type that is not a string at all reads as none;
  *   - two fixed messages of Node's fetch, recognised by exact match and never
  *     copied: a proxy refusing the tunnel (only its status is kept, on the same
  *     terms as a response's) and a refused redirect.
@@ -42,8 +45,8 @@
  * module's own, the caller's configuration, or one of those numbers. If
  * something echoes the password into a field a word is read from, and the
  * echo, read the way that field is read, is exactly one of the words, that
- * word prints: the same text a genuine answer prints, whatever the password
- * is.
+ * word prints — as an echo that is exactly undici's tunnel message prints its
+ * status — the same text a genuine answer prints, whatever the password is.
  *
  * The cost is every message and body from outside — Cognito's message text, a
  * proxy page, the fetch layer's own descriptions — and the name of any code,
@@ -74,11 +77,14 @@ export interface CognitoCredentials {
 }
 
 /*
- * The words this module can print for what came back. Each is chosen by an
- * exact match: a value that differs in any way — case, spacing, one character
- * more or less — is unrecognised, and is not printed.
+ * The words this module can print for what came back. A value selects one only
+ * by being exactly that word as its field is read: a code or a challenge name
+ * as it arrived, an error type cut at its `ns#` namespace and `:detail` suffix,
+ * a media type lower-cased, trimmed and cut at its parameters. A value that
+ * differs in any other way — case, spacing, one character more or less — is not
+ * printed.
  */
-/** Error codes of Node's network, DNS and TLS layers, and of undici. */
+/** Error codes of Node's network, DNS and TLS layers, and of undici and its HTTP parser. */
 const KNOWN_CODES = new Set([
   'ENOTFOUND',
   'EAI_AGAIN',
@@ -93,6 +99,8 @@ const KNOWN_CODES = new Set([
   'ENETDOWN',
   'EPIPE',
   'EPROTO',
+  'EADDRNOTAVAIL',
+  'ERR_SOCKET_CONNECTION_TIMEOUT',
   'UND_ERR_ABORT',
   'UND_ERR_ABORTED',
   'UND_ERR_SOCKET',
@@ -112,6 +120,11 @@ const KNOWN_CODES = new Set([
   'UND_ERR_RES_EXCEEDED_MAX_SIZE',
   'UND_ERR_REQ_RETRY',
   'UND_ERR_INVALID_ARG',
+  'HPE_INVALID_STATUS',
+  'HPE_INVALID_CONSTANT',
+  'HPE_INVALID_HEADER_TOKEN',
+  'HPE_INVALID_CHUNK_SIZE',
+  'HPE_UNEXPECTED_CONTENT_LENGTH',
   'ABORT_ERR',
   'CERT_HAS_EXPIRED',
   'CERT_NOT_YET_VALID',
@@ -120,6 +133,7 @@ const KNOWN_CODES = new Set([
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'UNABLE_TO_GET_ISSUER_CERT',
   'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_UNTRUSTED',
   'ERR_TLS_CERT_ALTNAME_INVALID',
   'ERR_TLS_HANDSHAKE_TIMEOUT',
   'ERR_SSL_WRONG_VERSION_NUMBER',
@@ -184,15 +198,19 @@ const KNOWN_MEDIA_TYPES = new Set([
   'application/xml',
 ]);
 
-/** Every word the module can print for a value from outside, by the field it is read from. */
+/**
+ * Every word the module can print for a value from outside, by the field it is
+ * read from: frozen copies, so nothing an importer does to them changes what
+ * prints.
+ */
 export const KNOWN_WORDS: Readonly<
-  Record<'codes' | 'types' | 'challenges' | 'mediaTypes', ReadonlySet<string>>
-> = {
-  codes: KNOWN_CODES,
-  types: KNOWN_TYPES,
-  challenges: KNOWN_CHALLENGES,
-  mediaTypes: KNOWN_MEDIA_TYPES,
-};
+  Record<'codes' | 'types' | 'challenges' | 'mediaTypes', readonly string[]>
+> = Object.freeze({
+  codes: Object.freeze([...KNOWN_CODES]),
+  types: Object.freeze([...KNOWN_TYPES]),
+  challenges: Object.freeze([...KNOWN_CHALLENGES]),
+  mediaTypes: Object.freeze([...KNOWN_MEDIA_TYPES]),
+});
 
 /** `value` when it is exactly one of `words`; undefined for anything else. */
 function recognised(value: unknown, words: ReadonlySet<string>): string | undefined {
@@ -227,7 +245,7 @@ interface FailureFacts {
   codes: string[];
   /** A code that was a string but not in KNOWN_CODES; it is not printed. */
   unrecognised: boolean;
-  /** The proxy's status, from an exact match of PROXY_REFUSED. */
+  /** The nearest proxy's status, from an exact match of PROXY_REFUSED. */
   proxyStatus?: number;
   /** An exact match of REDIRECT_REFUSED somewhere in the graph. */
   redirected: boolean;
@@ -423,7 +441,8 @@ export function cognitoEndpoint(region: string): string {
  * Throws with an actionable message on every failure path, so a misconfigured
  * pool fails the demo loudly rather than producing a token-shaped nothing:
  *   - a Cognito error (bad credentials, flow not enabled) reports its type
- *     when it is a known one, and otherwise its status and media type;
+ *     when it is a known one, and otherwise its status, and its media type
+ *     when that is a known one;
  *   - a network failure reports its known error codes, a timeout reports
  *     itself, and a refused redirect says so;
  *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) is a failure, named when it is a

@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in builds its errors from fixed wording and words of its own, never from outside text, and refuses redirects so the password is never re-sent._
+_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in builds its errors only from fixed wording, words of its own and status numbers, and refuses redirects so the password is never re-sent._
 
 ## Now
 
@@ -38,16 +38,17 @@ _Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green aga
   only failed at the database. The `UPDATE` half also refuses to run when there
   is no live school (`AND EXISTS`), so pasting only the second statement reports
   `UPDATE 0` rather than setting `school_id` NULL and looking like success.
-- **The exit demo's sign-in errors carry no outside text** (2026-09-22). The
+- **The exit demo's sign-in errors carry no outside text** (2026-09-22, amended
+  2026-09-23). The
   scrubbing #16's review asked to harden was replaced rather than patched: three
   review rounds each found a new class of leak in it, and measured across 25
   channels × 7 encodings × 6 passwords the password was still recoverable in 398
   of 1,050 combinations (662 on `main` before it). The sign-in's errors are now
   fixed wording, the operator's own configuration, the HTTP status, and words
-  of the module's own, each chosen by an exact match of what came back (error
-  codes, Cognito's error type, a challenge name, a media type); anything else
-  is said to be unrecognised, never printed, and nothing is compared with the
-  password. No caught error is attached as a `cause`, and a redirect is refused
+  of the module's own, each chosen by an exact match of what came back, read
+  the way its field is read (error codes, Cognito's error type, a challenge
+  name, a media type); nothing else from those fields is printed, and nothing
+  is compared with the password. No caught error is attached as a `cause`, and a redirect is refused
   rather than followed, since a 307 re-sends the body. 0 of 1,050 now. The cost
   is every message and body from outside, and the name of any code or type not
   on the lists; the error type (with fixed words for the common ones), the
@@ -199,8 +200,12 @@ under-13 parental-consent machinery.
   integer from 100 to 599), and **words of the module's own** — its lists of
   network, TLS and undici error codes, the error types InitiateAuth documents,
   Cognito's challenge names and common media types — each chosen by an exact
-  match of a value that came back. A value that matches none is said to be
-  unrecognised and is not printed. Two fixed messages of Node's fetch are
+  match of a value that came back, read the way its field is read: a code or a
+  challenge name as it arrived, an error type without its namespace and suffix,
+  a media type lower-cased, trimmed and without its parameters. Nothing else
+  from those fields prints: an unknown code, error type or challenge is said to
+  be unrecognised, an unknown media type is left out, and a code or an error
+  type that is not a string at all reads as none. Two fixed messages of Node's fetch are
   recognised by exact match and never copied: a proxy refusing the tunnel (its
   status is kept, when it is from 100 to 599) and a refused redirect. The
   password is used in the request body and nowhere else; nothing is attached as
@@ -219,19 +224,23 @@ under-13 parental-consent machinery.
   words came back, and the status numbers. So one thing is accepted, not
   defended: an echo of the password that is exactly one of the words — cut out
   of a password that contains it, or written as one — prints that word, the
-  same text a genuine answer prints whatever the password is. Pinned by: a
+  same text a genuine answer prints whatever the password is (and an echo that
+  is exactly undici's tunnel message prints its status). Pinned by: a
   leak matrix asserting that neither the password — raw, or with JS/JSON
   escapes, percent-encoding and HTML entities undone, stacked, compared after
   NFKC and case folding — nor a canary placed beside it arrives (the canary
   covers encodings no decoder there undoes, such as base64); for each field a
   word is read from, a test that every word of its list prints as itself, that
-  the message is the same whatever the password (empty, letterless, emoji and
-  the review's passwords among them), and that every echo of every password —
+  for every word and for values it does not know the message is the same
+  whatever the password (passwords that hold the word itself, empty,
+  letterless and emoji ones, and the review's, among them), and that every echo
+  of every password —
   verbatim, re-cased, normalised, accent-stripped, written in ASCII, cut —
   produces a message the module prints for a value that has nothing to do with
-  the password; the review's echoes as named tests; an exact-message test on
-  every exit path; and a mutation pass — 68 mutations of the module, each of
-  which turns at least one test red. Cost, accepted: no message or body from
+  the password; the lists themselves, spelled out entry by entry; the review's
+  echoes as named tests; an exact-message test on every exit path; and a
+  mutation pass — 81 mutations of the module, each of which turns
+  at least one test red. Cost, accepted: no message or body from
   outside is shown, and neither is the name of a code, type or challenge that
   is not on the lists; the error type (with fixed words for the common ones),
   the status, the media type and the error codes are. Not taken:
