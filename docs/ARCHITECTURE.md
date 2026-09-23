@@ -280,7 +280,8 @@ Student app:
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
   carries the current truth (state, end time) so the phone can reconcile.
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
-  unlock, and coming back from one.
+  unlock, and coming back from one. The unlock may carry an optional reason (bathroom,
+  nurse, other); one the server does not recognise is recorded as none, never refused.
 - `POST /v1/enrollments` — join a class by code.
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record.

@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, and A1 — the unlock's optional reason — has landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -112,21 +112,45 @@ _Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green aga
   shutdown during setup left a query on a pool being torn down — an unhandled
   `write CONNECTION_ENDED` that failed the real-Postgres lane with every test
   green (**landed**; see the decision log).
-- **Next up:** finish the audit series → **start Phase 3 (iOS student app)** —
-  10 steps, plan already agreed with the owner. Phase 0's open question gates
-  step 5: confirm the DeviceActivity extension fires at interval END with the
-  app force-quit.
+- **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
+  the earlier unwritten 10-step outline. The API and shared-contract steps land
+  first, so the iOS client implements against finished, tested contracts —
+  the `unlockDisposition` pattern. **A1 (unlock reason) landed; A2 is next.** The
+  owner decisions Phase 3 needs are items 6–9 under Open product decisions;
+  steps that need the owner's iPhone are marked 📱. Phase 0's open question
+  gates B5: confirm the DeviceActivity extension fires at interval END with
+  the app force-quit.
 
 ## Phases
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step 5: DeviceActivity extension fires at interval END with the app force-quit. |
+| 0 | iOS enforcement spike | ✅ NFC → shields <1s proven on device. ⚠️ Still to confirm before Phase 3 step B5: DeviceActivity extension fires at interval END with the app force-quit. |
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
 | 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ **complete** — merged to `main` and the exit demo passed against dev (2026-09-22) |
-| 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ⬜ next — 10 steps, plan agreed with owner |
+| 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | 🔨 in progress — steps below |
 | 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
+
+### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
+
+API and shared contracts come first; Swift lives in a root `ios/` folder (the
+plan backstop already treats it as source).
+
+- **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
+- **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns)
+- **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
+- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
+- **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift
+- **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
+- **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System
+- **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
+- **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
+- **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
+- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question
+- **B6** NFC tap → local record → shield → outbox — 📱
+- **C1–C6** Screens: onboarding · join + preview · home / waiting · focus · unlocked, protection off, session over · history + me
+- **E1** Device test gate: ISSUES #2 on hardware — 📱
 
 ## Go-live features
 
@@ -139,7 +163,7 @@ _Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green aga
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
-| Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch |
+| Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch. **API ✅ (A1):** optional `reason` on unlock, stored as `payload.reason`, never a reason to refuse; the phone's picker is C5; the portal showing it is a follow-up |
 | Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
 | Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx`; and `armed_tap_skipped` carries the student's id, so it shows here too — render it as a declined tap, never a join |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
@@ -164,6 +188,18 @@ layer → roster import (CSV / Google Classroom).
 3. Minimal student history in launch scope (lean: in).
 4. Under-13: pilot with 13+ classes only at launch (lean: yes).
 5. Recap card in Phase 4 (lean: yes).
+6. How a waiting (armed) phone learns the teacher pressed Start — student
+   phones get no live feed, so nothing tells it (lean: poll `GET /v1/me` while
+   the app is open and on resume; push rides the fast-follow push work).
+   Before C3.
+7. The default end for a tap made with no signal, before the server has
+   answered (lean: shield at once with no countdown until the answer, capped
+   at a default length — the length is the owner's). Before B5.
+8. What, if anything, polices an edited display name — a student can pick a
+   classmate's (the 2026-09-22 display-name entry leaves this to edit-own-name).
+   Before A8.
+9. macOS CI minutes for the iOS build (lean: a GitHub-hosted macOS job that
+   runs only on PRs touching `ios/`). Before B2.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
@@ -177,6 +213,18 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-23** — **Phase 3 started, API and contracts first** (step list
+  under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
+  bathroom, nurse, other — additive vocab), stored as `payload.reason` beside
+  any `recorded_as` note, orphans included; a plain unlock keeps the null
+  payload it always had. The route parses it **leniently** — anything
+  unrecognised, of any type or size, is recorded as no reason, never a 400 —
+  because the unlock body's standing rule (2026-09-20) is that validation is
+  never why an unlock goes unrecorded. The response's `reason` says what
+  landed, so a phone can tell when its reason did not; a replay answers with
+  the stored reason, not the retry's (rule 4). Pinned both ways: a strict
+  parse, the reason not passed or not echoed, dropped from either payload, or
+  a replay not reading the record — each turns a test red.
 - **2026-09-23** — `docs/GOTCHAS.md` added to the read order: live
   environment/process traps only, one entry each, deleted when fixed. The
   routing rule (CLAUDE.md working rules): a critical or recurring finding

@@ -2,10 +2,16 @@ import type {
   EventType,
   ParticipationEndedReason,
   ParticipationState,
+  UnlockReason,
   UnlockRecordedAs,
   UnlockRecordedOutcome,
 } from '@bali/shared';
-import { clampToWindow, MAX_SESSION_MINUTES, SILENCE_THRESHOLD_MS } from '@bali/shared';
+import {
+  clampToWindow,
+  isUnlockReason,
+  MAX_SESSION_MINUTES,
+  SILENCE_THRESHOLD_MS,
+} from '@bali/shared';
 import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
@@ -1687,6 +1693,11 @@ async function changeState(
   });
 }
 
+/** An emergency unlock, with the reason the student chose to give, if any. */
+export interface UnlockInput extends StateChangeInput {
+  reason?: UnlockReason | null;
+}
+
 export interface UnlockResult {
   /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved the note with none to flip, 'replay' the event already existed. */
   outcome: UnlockRecordedOutcome;
@@ -1697,6 +1708,25 @@ export interface UnlockResult {
   participationId: string | null;
   /** The session, so the response can carry the end time for reconciliation; null only when the session id was unknown. */
   session: SessionRow | null;
+  /** The reason on record: this call's on a new unlock, the stored one on a replay; null when none. */
+  reason: UnlockReason | null;
+}
+
+/**
+ * The reason stored on an unlock that already landed. A replay answers with
+ * what was recorded (rule 4), not with whatever the retry carries, so a phone
+ * that changed its answer between retries learns which one the teacher sees.
+ */
+async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
+  const row = firstOrUndefined(
+    await tx
+      .select({ payload: events.payload })
+      .from(events)
+      .where(eq(events.eventId, eventId))
+      .limit(1),
+  );
+  const stored = (row?.payload as { reason?: unknown } | null | undefined)?.reason;
+  return isUnlockReason(stored) ? stored : null;
 }
 
 /**
@@ -1711,9 +1741,10 @@ export interface UnlockResult {
  */
 async function recordOrphanUnlock(
   tx: Database,
-  input: StateChangeInput,
+  input: UnlockInput,
   recordedAs: Extract<UnlockRecordedAs, 'unknown_session' | 'not_enrolled'>,
 ): Promise<UnlockResult> {
+  const reason = input.reason ?? null;
   const isNew = await insertEvent(tx, {
     eventId: input.eventId,
     type: 'unlock',
@@ -1725,6 +1756,7 @@ async function recordOrphanUnlock(
       recorded_as: recordedAs,
       claimed_session_id: input.sessionId,
       device_time: input.deviceTime.toISOString(),
+      ...(reason === null ? {} : { reason }),
     },
   });
   return {
@@ -1733,6 +1765,7 @@ async function recordOrphanUnlock(
     state: null,
     participationId: null,
     session: null,
+    reason: isNew ? reason : await recordedReason(tx, input.eventId),
   };
 }
 
@@ -1752,6 +1785,11 @@ async function recordOrphanUnlock(
  *   - even an unknown session id records an orphan event (no session/class) with
  *     `unknown_session`, so a bad id can't become a lost record either.
  *
+ * The student's optional reason rides in the event's payload beside any note;
+ * a plain unlock with neither keeps the null payload it always had. The reason
+ * is never a condition of recording — it arrives already vetted, and an absent
+ * one changes nothing about what is written.
+ *
  * Idempotent on event_id: a retried unlock re-reads and returns the current
  * truth as 'replay'. The response is the phone's signal to stop retrying
  * (@bali/shared unlockDisposition); every other result means "keep the record
@@ -1767,7 +1805,8 @@ async function recordOrphanUnlock(
  * for a session ended early, occurredAt clamps to the scheduled endsAt, which can
  * land after the real endedAt but stays inside the window.
  */
-export async function unlock(db: Database, input: StateChangeInput): Promise<UnlockResult> {
+export async function unlock(db: Database, input: UnlockInput): Promise<UnlockResult> {
+  const reason = input.reason ?? null;
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
 
@@ -1812,6 +1851,10 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
     // participation — removed from the class mid-session, the ISSUES #2 case.
     const note: UnlockRecordedAs = session.endedAt ? 'after_session_end' : 'no_live_participation';
 
+    const payload: Record<string, unknown> = {};
+    if (!live) payload.recorded_as = note;
+    if (reason !== null) payload.reason = reason;
+
     const isNew = await insertEvent(tx, {
       eventId: input.eventId,
       type: 'unlock',
@@ -1819,18 +1862,20 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
       classId: session.classId,
       userId: input.studentId,
       occurredAt,
-      payload: live ? null : { recorded_as: note },
+      payload: Object.keys(payload).length > 0 ? payload : null,
     });
 
     if (!isNew) {
       // Replay: return the current truth — the stored state if a participation
-      // row exists at all (live or since-ended), never a refusal.
+      // row exists at all (live or since-ended), never a refusal — and the
+      // reason that was recorded rather than the one this retry carries.
       return {
         outcome: 'replay',
         recordedAs: null,
         state: row?.state ?? null,
         participationId: row?.id ?? null,
         session,
+        reason: await recordedReason(tx, input.eventId),
       };
     }
 
@@ -1855,11 +1900,19 @@ export async function unlock(db: Database, input: StateChangeInput): Promise<Unl
         state: 'unlocked',
         participationId: live.id,
         session,
+        reason,
       };
     }
 
     // No live participation: the committed event is itself the record.
-    return { outcome: 'recorded', recordedAs: note, state: null, participationId: null, session };
+    return {
+      outcome: 'recorded',
+      recordedAs: note,
+      state: null,
+      participationId: null,
+      session,
+      reason,
+    };
   });
 }
 

@@ -334,6 +334,81 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const body = res.json<UnlockResponse>();
     expect(body.outcome).toBe('applied');
     expect(body.state).toBe('unlocked');
+    expect(body).toHaveProperty('reason', null);
+  });
+
+  it('records the reason the phone sends, and says so', async () => {
+    const { student, session } = await seedRunning('unlock-reason');
+    await tap(session.id, student.id);
+    const res = await post(
+      await ctx.tokenFor(student.cognitoId),
+      `/v1/sessions/${session.id}/unlock`,
+      { eventId: randomUUID(), deviceTime: now(), reason: 'nurse' },
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UnlockResponse>()).toMatchObject({ outcome: 'applied', reason: 'nurse' });
+
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(recorded.map((e) => e.payload)).toEqual([{ reason: 'nurse' }]);
+  });
+
+  it('a reason it does not recognise never refuses the unlock: it records with none', async () => {
+    // The standing rule for the unlock body (docs/PLAN.md, 2026-09-20): a 400
+    // here keeps the record out forever, because the outbox retries the
+    // identical body. A newer app's reason, a wrong type or plain garbage must
+    // all still land — without a reason, and the response says none landed.
+    const { student, session } = await seedRunning('unlock-reason-unknown');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const odd: unknown[] = [
+      'skateboard',
+      'BATHROOM',
+      '',
+      42,
+      true,
+      null,
+      { why: 'nurse' },
+      ['nurse'],
+      'x'.repeat(10_000),
+    ];
+    for (const reason of odd) {
+      const res = await post(token, `/v1/sessions/${session.id}/unlock`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+        reason,
+      });
+      expect(res.statusCode, JSON.stringify(reason).slice(0, 40)).toBe(200);
+      const body = res.json<UnlockResponse>();
+      expect(unlockDisposition(res.statusCode, body)).toBe('recorded');
+      expect(body.reason).toBeNull();
+    }
+
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'unlock')));
+    expect(recorded.map((e) => e.payload)).toEqual(odd.map(() => null));
+  });
+
+  it('a retried unlock answers with the reason on record, not the one it carries', async () => {
+    const { student, session } = await seedRunning('unlock-reason-replay');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId,
+      deviceTime: now(),
+      reason: 'bathroom',
+    });
+    const retry = await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId,
+      deviceTime: now(),
+      reason: 'other',
+    });
+    expect(retry.json<UnlockResponse>()).toMatchObject({ outcome: 'replay', reason: 'bathroom' });
   });
 
   it('records with a note when there is no live participation (ISSUES #2)', async () => {

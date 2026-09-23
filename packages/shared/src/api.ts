@@ -1,5 +1,11 @@
 import type { DisplayState } from './state.js';
-import type { EventType, ParticipationState, UnlockRecordedAs, UserRole } from './index.js';
+import type {
+  EventType,
+  ParticipationState,
+  UnlockReason,
+  UnlockRecordedAs,
+  UserRole,
+} from './index.js';
 import type { UnlockRecordedOutcome } from './unlock-contract.js';
 
 /*
@@ -89,6 +95,12 @@ export interface UnlockResponse {
   state: ParticipationState | null;
   /** The session for reconciliation; null only when the session id was unknown. */
   session: SessionView | null;
+  /**
+   * The reason on record for this unlock: the one this request carried when the
+   * unlock is new, the stored one on a replay. Null when none was given or the
+   * one sent was not recognised — so a phone can tell its reason did not land.
+   */
+  reason: UnlockReason | null;
 }
 
 // POST /v1/sessions/{id}/end — the class's teacher ends a running session.
@@ -137,6 +149,12 @@ export interface UnlockRequest {
   /** Client idempotency key for the unlock event (rule 4). */
   eventId: string;
   deviceTime: string;
+  /**
+   * Optional and skippable. A value the server does not recognise is recorded
+   * as no reason, never refused: validation must never be the reason an unlock
+   * goes unrecorded (docs/PLAN.md decision log, 2026-09-20).
+   */
+  reason?: UnlockReason | null;
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
