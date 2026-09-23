@@ -1,5 +1,5 @@
 import type { DisplayState, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
-import { deriveDisplayState } from '@bali/shared';
+import { deriveDisplayState, PARTICIPATION_STATES } from '@bali/shared';
 
 /**
  * The live grid's pure state machine, kept out of the component so it can be
@@ -90,7 +90,10 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       s.joinedAt ??= at;
       break;
     case 'unlock':
-      s.state = 'unlocked';
+      // Mirrors the engine (rule 2): an unlock never softens protection off
+      // into "unlocked" — live or ended, the engine records it and leaves the
+      // state alone, so the chip stays.
+      if (s.state !== 'protection_off') s.state = 'unlocked';
       s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'refocus':
@@ -135,26 +138,36 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
 }
 
 /**
- * What the grid shows for one student: `deriveDisplayState`, plus the two cases
- * a participation snapshot alone cannot express.
+ * What the grid shows for one student: `deriveDisplayState`, plus the four
+ * cases a participation snapshot alone cannot express.
  *
  * `absent` — enrolled but never tapped in, so there is no state at all.
  *
- * `left_unprotected` — the student's participation ended (removed mid-session,
- * or moved to another teacher's session) and their phone then reported an
- * unlock or protection_off. `deriveDisplayState` answers `ended` for anything
- * with an `endedAt`, which would put the calmest chip on the grid over exactly
- * the event ISSUES #2 exists to surface: an unshielded phone the teacher no
- * longer has in their roster. The record is durable either way; the screen has
- * to agree with it.
+ * `left_unprotected` — the student's participation ended (at the bell, on
+ * removal, on a switch to another session) while unlocked, or their phone
+ * reported an unlock after it ended. `deriveDisplayState` answers `ended` for
+ * anything with an `endedAt`, which would put the calmest chip on the grid over
+ * exactly the event ISSUES #2 exists to surface: an unshielded phone the
+ * teacher no longer has in their roster. The record is durable either way; the
+ * screen has to agree with it.
+ *
+ * `left_protection_off` — the same, for a student whose Screen Time permission
+ * was off when the participation ended. Never labelled as an unlock: protection
+ * off is "never green, never an unlock" (ARCHITECTURE, iOS rules), and a later
+ * unlock leaves it as it is.
+ *
+ * `unknown` — a state this tab has no chip for. An open tab can be older than
+ * the server it reads (it outlives a deploy that adds a state), so it says so
+ * and asks for a refresh rather than crash the grid or guess a calm chip.
  */
-export type GridDisplay = DisplayState | 'absent' | 'left_unprotected';
+export type GridDisplay =
+  DisplayState | 'absent' | 'left_unprotected' | 'left_protection_off' | 'unknown';
 
 export function gridDisplay(s: Student, now: Date): GridDisplay {
   if (s.state === null) return 'absent';
-  if (s.endedAt !== null && (s.state === 'unlocked' || s.state === 'protection_off')) {
-    return 'left_unprotected';
-  }
+  if (!(PARTICIPATION_STATES as readonly string[]).includes(s.state)) return 'unknown';
+  if (s.endedAt !== null && s.state === 'protection_off') return 'left_protection_off';
+  if (s.endedAt !== null && s.state === 'unlocked') return 'left_unprotected';
   return deriveDisplayState(
     { state: s.state, joinedAt: s.joinedAt ?? now, lastSeenAt: s.lastSeenAt, endedAt: s.endedAt },
     now,

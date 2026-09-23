@@ -31,6 +31,11 @@ const EXPECTED: Record<TransitionErrorCode, { code: string; status: number; mess
   },
   CLASS_NOT_FOUND: { code: 'not_found', status: 404, message: 'no class with that join code' },
   ENROLLMENT_NOT_FOUND: { code: 'not_found', status: 404, message: 'enrollment not found' },
+  PROTECTION_OFF: {
+    code: 'conflict',
+    status: 409,
+    message: 'Screen Time permission is off: tap the block to rejoin',
+  },
 };
 
 describe('mapTransitionError', () => {

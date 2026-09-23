@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, and A1 — the unlock's optional reason — has landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason) and A2 (protection off, end to end on the server) have landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -115,8 +115,8 @@ _Last updated: 2026-09-23 — **Phase 3 (iOS student app) has started**, API and
 - **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
-  the `unlockDisposition` pattern. **A1 (unlock reason) landed; A2 is next.** The
-  owner decisions Phase 3 needs are items 6–9 under Open product decisions;
+  the `unlockDisposition` pattern. **A1 (unlock reason) and A2 (protection off) landed; A2b is next, then A3.** The
+  owner decisions Phase 3 needs are items 6–10 under Open product decisions;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
   gates B5: confirm the DeviceActivity extension fires at interval END with
   the app force-quit.
@@ -138,17 +138,18 @@ API and shared contracts come first; Swift lives in a root `ios/` folder (the
 plan backstop already treats it as source).
 
 - **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
-- **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns)
-- **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
-- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
-- **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift
+- **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
+- **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row while the silence sweep takes the row first — an unlock racing the sweep deadlocks (40P01, measured 83/100 on real Postgres; pre-existing, now reachable through protection-off too). A tap switching the student out of the session deadlocks the same way (measured: protection-off lost 6 of 20 races, unlock 4 of 20); check armed-tap conversion too. `withDeadlockRetry` around both sides, plus the sweep and a switching tap as rivals in the race test
+- **A3** Outbox dispositions in `@bali/shared`: `tapDisposition` (the tap-side twin of `unlockDisposition`) and one for refocus / protection-off — a refused change is dropped and the truth re-read, never resent
+- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`. Settle the same case for refocus here, before a phone ships: its replay after the participation ended in a still-running session answers that row's last state (protection-off refuses it — A2's decision-log entry)
+- **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
-- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it)
+- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it) — including an unlock recorded against a protection-off row, which today leaves the chip unchanged, so it shows only in the event log. Also: a student the snapshot no longer carries (it holds active enrollments only) whose phone unlocks after the overlap window reads "Unlocked", not "Left ·" (pre-existing)
 - **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — first pass up for review: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
 - **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
 - **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
-- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question
+- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question. Note: "only a re-tap leaves protection off" holds per participation, not per phone — an armed tap converted at another teacher's Start joins that session focused, so the phone must re-report protection off there at its next check-in
 - **B6** NFC tap → local record → shield → outbox — 📱
 - **C1–C6** Screens: onboarding · join + preview · home / waiting · focus · unlocked, protection off, session over · history + me
 - **E1** Device test gate: ISSUES #2 on hardware — 📱
@@ -160,7 +161,7 @@ plan backstop already treats it as source).
 | Feature | Phase | Notes |
 |---|---|---|
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
-| 30s check-in that verifies shields before claiming them | 3 | rule 3 |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus. The phone's half is B3/B5 |
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
@@ -201,6 +202,12 @@ layer → roster import (CSV / Google Classroom).
    Before A8.
 9. macOS CI minutes for the iOS build (lean: a GitHub-hosted macOS job that
    runs only on PRs touching `ios/`). Before B2.
+10. Whether a protection-off that first reaches the server after the bell is
+    recorded (like an unlock, with a note) instead of refused. Today it is
+    refused and never recorded, so the teacher never saw protection off: the
+    grid showed that phone green until 90 s after its last contact, then
+    silent — green through the bell if the bell came first (lean: record it,
+    so the history says why the phone went quiet). Before B3.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
@@ -214,6 +221,51 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-23** — **A2: protection off, end to end on the server.**
+  `POST /v1/sessions/{id}/protection-off` wires the engine's existing
+  `protectionOff` (strict like refocus: a live participation or `409`). Two
+  rules make ARCHITECTURE's "never green, never an unlock" hold in code rather
+  than only in the grid's colours: **refocus is refused out of protection off**
+  (`PROTECTION_OFF` → `409`, "tap the block to rejoin"; the refusal rolls the
+  event back, and a replay of a refocus recorded earlier still answers the
+  current truth), because iOS dropped every shield and only a re-tap
+  re-shields; and **an unlock never softens it** — still recorded, never
+  refused, noted `recorded_as: 'protection_off'` (additive vocab), state left
+  alone — because otherwise a student who switched Screen Time off could turn
+  their red chip orange with one request. The live grid mirrors the second
+  rule (rule 2). Nothing reached protection off before this (no route called
+  `protectionOff`), so neither rule changed a shipped answer. Each is pinned by
+  a test that goes red when it is removed, and by a real-Postgres race (either
+  order ends in protection off). **A change retried after the bell stays a
+  `409 session has ended`, on purpose** — pinned now, because round 1 of the
+  review suggested replaying it and round 2 showed why not: after an EARLY end
+  the session's `endsAt` is still ahead, so a replay would hand a phone that
+  already heard "gone" a window to shield to (a refocus answer turns shields
+  back on) — rule 4's forbidden 200. The 409 costs nothing: A3's state-change
+  table drops a refused change and re-reads the truth. Recorded rather than
+  changed, since it is a shipped answer: a refocus REPLAYED in a running
+  session whose participation has since ended answers that row's last state
+  (pre-existing); A3's "never send a superseded refocus" keeps honest clients
+  off it, and bounding it like `tapIn` would be a `/v1` 200 → 409 for the
+  owner; A4 settles it. The new protection-off endpoint does not inherit it: a
+  report replayed after its participation ended while the session runs is a
+  `409 not in this session` (the phone drops it and re-reads the truth),
+  because a report is retried until answered and nothing shipped depends on
+  the other answer. The live grid gives a protection-off student whose participation
+  ends (bell, removal, switch) its own loud chip, "Left · protection off" —
+  it read "Left · unlocked", which protection off never is — and an unlock
+  never relabels a protection-off row, live or ended, as the engine never
+  changes one. From the santa-loop review, which also moved the unlock
+  contract's docs (ARCHITECTURE, ISSUES #2, `@bali/shared`) to say a live
+  participation can be recorded without being flipped, and made the endpoint's
+  authorization test able to fail (a live student an outsider or the teacher
+  could otherwise mark). The client half belongs to A3's outbox contract: a
+  refused refocus or protection-off is final for its id (a late retry of a
+  refused refocus, after a re-tap and a fresh unlock, would otherwise turn an
+  unlocked phone green), a refocus a later tap or unlock superseded is never
+  sent, and protection off is reported once per revocation — and again after
+  any tap or join made while it is still revoked, since each returns the row
+  to focused (each report writes an event).
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside

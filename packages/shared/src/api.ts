@@ -77,8 +77,9 @@ export interface StartSessionResponse {
 /**
  * The unlock outcome union, derived from the shared source so the DTO, the
  * engine result, and the disposition table can't drift. 'applied' flipped a live
- * participation to unlocked; 'recorded' saved the event with a note when there
- * was no live participation to flip; 'replay' means the event already landed.
+ * participation to unlocked; 'recorded' saved the event with a note and flipped
+ * nothing — there was no live participation, or its protection is off (never
+ * softened into an unlock); 'replay' means the event already landed.
  * All three mean "durably recorded" — the phone's outbox stops retrying (see
  * unlockDisposition).
  */
@@ -88,9 +89,11 @@ export interface UnlockResponse {
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
   /**
-   * 'unlocked' when a live participation flipped; on a replay, the participation's
-   * current stored state (which may be an ended participation's last state); null
-   * when nothing is or was participating.
+   * 'unlocked' when a live participation flipped; 'protection_off' when it was
+   * live but protection is off (recorded, not flipped); null when no
+   * participation was live (none, or it had ended); on a replay, the
+   * participation's current stored state (which may be an ended participation's
+   * last state), or null when there is none.
    */
   state: ParticipationState | null;
   /** The session for reconciliation; null only when the session id was unknown. */
@@ -160,12 +163,33 @@ export interface UnlockRequest {
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
+// Refused (409) while protection is off: only a re-tap, which re-shields, leaves that state.
 export interface RefocusRequest {
   eventId: string;
   deviceTime: string;
 }
 export interface RefocusResponse {
   outcome: 'applied' | 'replay';
+  state: ParticipationState;
+  session: SessionView;
+}
+
+// POST /v1/sessions/{id}/protection-off — the phone found its Screen Time
+// permission revoked (iOS has already dropped every shield). Strict like
+// refocus: a 409 is a refusal — nothing live to mark, the session over, or an
+// id already used by another event. A retry is refused too once the student
+// has left the session (removed, left the class, or switched away) — never a
+// replay naming a session they are no longer in. Leaving the state takes a re-tap — refocus is
+// refused from it.
+export interface ProtectionOffRequest {
+  /** Client idempotency key for the protection_off event (rule 4). */
+  eventId: string;
+  /** Device clock, ISO 8601; clamped into the session window server-side. */
+  deviceTime: string;
+}
+export interface ProtectionOffResponse {
+  outcome: 'applied' | 'replay';
+  /** 'protection_off' when applied; the current stored state on a replay. */
   state: ParticipationState;
   session: SessionView;
 }

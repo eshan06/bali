@@ -5,6 +5,7 @@ import {
   extendSession,
   findClassById,
   findOrCreateStudent,
+  protectionOff,
   refocus,
   startSession,
   unlock,
@@ -13,6 +14,7 @@ import type {
   CheckInResponse,
   EndSessionResponse,
   ExtendSessionResponse,
+  ProtectionOffResponse,
   RefocusResponse,
   SessionView,
   StartSessionResponse,
@@ -57,7 +59,7 @@ function toSessionView(s: { id: string; classId: string; endsAt: Date }): Sessio
 /**
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
- * (check-in, unlock, refocus) are for the enrolled phone and resolve the caller
+ * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
  * like a tap. All are thin wrappers over the transition engine — the engine owns
  * the writes, these just authorize and shape the response.
  */
@@ -184,8 +186,37 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
     },
   );
 
+  // POST /v1/sessions/:id/protection-off — the phone found its Screen Time
+  // permission revoked; iOS has already dropped every shield. Its own state,
+  // never green and never an unlock (ARCHITECTURE, iOS rules). Strict like
+  // refocus: it needs a live participation, so it can 409/404.
+  app.post(
+    '/v1/sessions/:id/protection-off',
+    { preHandler: app.authenticate },
+    async (request): Promise<ProtectionOffResponse> => {
+      const identity = requireAuth(request);
+      const { id: sessionId } = parse(SessionParams, request.params);
+      const body = parse(StateChangeBody, request.body);
+      const student = await findOrCreateStudent(db, identity.sub);
+      const result = await mapTransitionError(() =>
+        protectionOff(db, {
+          sessionId,
+          studentId: student.id,
+          eventId: body.eventId,
+          deviceTime: new Date(body.deviceTime),
+        }),
+      );
+      return {
+        outcome: result.outcome,
+        state: result.state,
+        session: toSessionView(result.session),
+      };
+    },
+  );
+
   // POST /v1/sessions/:id/refocus — return to focus after an unlock (strict: a
-  // live participation is required, so this can 409/404 unlike unlock).
+  // live participation is required, so this can 409/404 unlike unlock; and it
+  // is refused out of protection off, which only a re-tap leaves).
   app.post(
     '/v1/sessions/:id/refocus',
     { preHandler: app.authenticate },

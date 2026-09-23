@@ -20,6 +20,9 @@ const STATUS_BY_CODE: Record<TransitionErrorCode, () => ApiError> = {
   EVENT_ID_CONFLICT: () => ApiError.conflict('event_id already used by another event'),
   CLASS_NOT_FOUND: () => ApiError.notFound('no class with that join code'),
   ENROLLMENT_NOT_FOUND: () => ApiError.notFound('enrollment not found'),
+  // Refocus out of protection off: the shields are gone, so only a re-tap
+  // (which re-shields) may return the student to focus.
+  PROTECTION_OFF: () => ApiError.conflict('Screen Time permission is off: tap the block to rejoin'),
 };
 
 /** Run `fn`, converting any TransitionError into the matching ApiError. */

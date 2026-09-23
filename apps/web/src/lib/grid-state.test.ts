@@ -55,6 +55,15 @@ describe('grid-state', () => {
     expect(s.ana.state).toBe('focused');
   });
 
+  it('an unlock never softens a live protection off, and a re-tap clears it (mirrors the engine)', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(7, 'unlock', 'ana'));
+    expect(s.ana.state).toBe('protection_off');
+    s = applyEvent(s, evt(8, 'tap_in', 'ana'));
+    expect(s.ana.state).toBe('focused');
+  });
+
   it('ends every live participation on session_ended', () => {
     let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
     s = applyEvent(s, evt(9, 'session_ended', null));
@@ -183,11 +192,31 @@ describe('gridDisplay', () => {
     expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
   });
 
-  it('treats protection_off after leaving the same way', () => {
+  it('shows protection_off after leaving as its own loud chip, never as an unlock', () => {
     let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
-    students = applyEvent(students, evt(2, 'enrollment_removed', 'ana'));
-    students = applyEvent(students, evt(3, 'protection_off', 'ana'));
-    expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
+    students = applyEvent(students, evt(2, 'protection_off', 'ana'));
+    students = applyEvent(students, evt(3, 'enrollment_removed', 'ana'));
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+  });
+
+  it('names a state this tab does not know rather than guessing a chip', () => {
+    // An open tab can outlive a deploy that adds a participation state.
+    const students = fromSnapshot(
+      snapshot(1, [{ id: 'ana', state: 'teleported' as ParticipationState }]),
+    );
+    expect(gridDisplay(students.ana, now)).toBe('unknown');
+  });
+
+  it('keeps protection off through the bell, and an unlock afterwards does not relabel it', () => {
+    // Protection off is never an unlock: not while live, not once the
+    // participation ends — the engine leaves the stored state alone either way.
+    let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    students = applyEvent(students, evt(2, 'protection_off', 'ana'));
+    students = applyEvent(students, evt(3, 'session_expired', null));
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+    students = applyEvent(students, evt(4, 'unlock', 'ana'));
+    expect(students.ana.state).toBe('protection_off');
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
   });
 
   it('leaves the ordinary states alone', () => {
