@@ -270,12 +270,16 @@ async function main(): Promise<void> {
     const ana = byKey('ana');
     const anaUnlock = await call<UnlockResponse>('POST', `/v1/sessions/${sid}/unlock`, {
       token: ana.token,
-      body: { eventId: randomUUID(), deviceTime: iso() },
+      body: { eventId: randomUUID(), deviceTime: iso(), reason: 'bathroom' },
     });
     assert(anaUnlock.outcome === 'applied', `Ana unlock outcome ${anaUnlock.outcome}`);
     assert(
       anaUnlock.state === 'unlocked',
       `Ana should be unlocked, got ${String(anaUnlock.state)}`,
+    );
+    assert(
+      anaUnlock.reason === 'bathroom',
+      `Ana's reason should be on record, got ${String(anaUnlock.reason)}`,
     );
     // The unlock must reach the teacher's screen over the stream, not merely be
     // readable afterwards — that is the whole promise of the live grid (rule 6).
@@ -283,7 +287,15 @@ async function main(): Promise<void> {
       label: "Ana's unlock",
       timeoutMs: world.liveWaitMs,
     });
-    console.log(`  live: unlock for Ana arrived on the stream at seq ${liveUnlock.seq}.`);
+    // And the reason with it: the privacy contract says the teacher sees it.
+    const liveReason = (liveUnlock.payload as { reason?: unknown } | null)?.reason;
+    assert(
+      liveReason === 'bathroom',
+      `the stream should carry Ana's reason, got ${String(liveReason)}`,
+    );
+    console.log(
+      `  live: unlock for Ana (bathroom) arrived on the stream at seq ${liveUnlock.seq}.`,
+    );
 
     const anaRefocus = await call<RefocusResponse>('POST', `/v1/sessions/${sid}/refocus`, {
       token: ana.token,
