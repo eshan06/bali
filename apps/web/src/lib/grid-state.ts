@@ -138,22 +138,23 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
 }
 
 /**
- * What the grid shows for one student: `deriveDisplayState`, plus the two cases
- * a participation snapshot alone cannot express.
+ * What the grid shows for one student: `deriveDisplayState`, plus the three
+ * cases a participation snapshot alone cannot express.
  *
  * `absent` — enrolled but never tapped in, so there is no state at all.
  *
- * `left_unprotected` — the student's participation ended (removed mid-session,
- * or moved to another teacher's session) and their phone then reported an
- * unlock. `deriveDisplayState` answers `ended` for anything with an `endedAt`,
- * which would put the calmest chip on the grid over exactly the event ISSUES #2
- * exists to surface: an unshielded phone the teacher no longer has in their
- * roster. The record is durable either way; the screen has to agree with it.
+ * `left_unprotected` — the student's participation ended (at the bell, on
+ * removal, on a switch to another session) while unlocked, or their phone
+ * reported an unlock after it ended. `deriveDisplayState` answers `ended` for
+ * anything with an `endedAt`, which would put the calmest chip on the grid over
+ * exactly the event ISSUES #2 exists to surface: an unshielded phone the
+ * teacher no longer has in their roster. The record is durable either way; the
+ * screen has to agree with it.
  *
  * `left_protection_off` — the same, for a student whose Screen Time permission
- * was off when the participation ended (at the bell, on removal, on a switch).
- * Never labelled as an unlock: protection off is "never green, never an
- * unlock" (ARCHITECTURE, iOS rules).
+ * was off when the participation ended. Never labelled as an unlock: protection
+ * off is "never green, never an unlock" (ARCHITECTURE, iOS rules), and a later
+ * unlock leaves it as it is.
  */
 export type GridDisplay = DisplayState | 'absent' | 'left_unprotected' | 'left_protection_off';
 

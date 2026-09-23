@@ -139,9 +139,9 @@ plan backstop already treats it as source).
 
 - **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
 - **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
-- **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row while the silence sweep takes the row first — an unlock racing the sweep deadlocks (40P01, measured 83/100 on real Postgres; pre-existing, now reachable through protection-off too). `withDeadlockRetry` around both, plus the sweep as a rival in the race test
-- **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
-- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
+- **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row while the silence sweep takes the row first — an unlock racing the sweep deadlocks (40P01, measured 83/100 on real Postgres; pre-existing, now reachable through protection-off too). A tap switching the student out of the session deadlocks the same way (measured: protection-off lost 6 of 20 races, unlock 4 of 20); check armed-tap conversion too. `withDeadlockRetry` around both sides, plus the sweep and a switching tap as rivals in the race test
+- **A3** Outbox dispositions in `@bali/shared`: `tapDisposition` (the tap-side twin of `unlockDisposition`) and one for refocus / protection-off — a refused change is dropped and the truth re-read, never resent
+- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`. Settle the same case for refocus here, before a phone ships: its replay after the participation ended in a still-running session answers that row's last state (protection-off refuses it — A2's decision-log entry)
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
 - **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it)
@@ -204,9 +204,10 @@ layer → roster import (CSV / Google Classroom).
    runs only on PRs touching `ios/`). Before B2.
 10. Whether a protection-off that first reaches the server after the bell is
     recorded (like an unlock, with a note) instead of refused. Today it is
-    refused and never recorded; the teacher saw that phone as silent in the
-    meantime, never green (lean: record it, so the history says why the phone
-    went quiet). Before B3.
+    refused and never recorded, so the teacher never saw protection off: the
+    grid showed that phone green until 90 s after its last contact, then
+    silent — green through the bell if the bell came first (lean: record it,
+    so the history says why the phone went quiet). Before B3.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
@@ -246,7 +247,11 @@ under-13 parental-consent machinery.
   session whose participation has since ended answers that row's last state
   (pre-existing); A3's "never send a superseded refocus" keeps honest clients
   off it, and bounding it like `tapIn` would be a `/v1` 200 → 409 for the
-  owner. The live grid gives a protection-off student whose participation
+  owner; A4 settles it. The new protection-off endpoint does not inherit it: a
+  report replayed after its participation ended while the session runs is a
+  `409 not in this session` (the phone drops it and re-reads the truth),
+  because a report is retried until answered and nothing shipped depends on
+  the other answer. The live grid gives a protection-off student whose participation
   ends (bell, removal, switch) its own loud chip, "Left · protection off" —
   it read "Left · unlocked", which protection off never is — and an unlock
   never relabels a protection-off row, live or ended, as the engine never

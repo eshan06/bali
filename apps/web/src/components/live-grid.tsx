@@ -10,6 +10,7 @@ import {
   applyEvent,
   fromSnapshot,
   gridDisplay,
+  type GridDisplay,
   mergeSnapshot,
   snapshotIsFresh,
   staleness,
@@ -24,7 +25,7 @@ import { useApi, useSignOut } from '@/lib/use-api';
  * cannot drift into a banner that flaps or one that never fires.
  */
 
-const CHIP: Record<string, { label: string; cls: string }> = {
+const CHIP: Record<GridDisplay, { label: string; cls: string }> = {
   focused: { label: 'Focused', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   unlocked: { label: 'Unlocked', cls: 'bg-amber-100 text-amber-900 border-amber-400' },
   protection_off: { label: 'Protection off', cls: 'bg-red-100 text-red-800 border-red-400' },
@@ -162,7 +163,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {rows.map((s) => {
             const display = gridDisplay(s, now);
-            const chip = CHIP[display] ?? CHIP.absent;
+            const chip = CHIP[display];
             return (
               <li key={s.studentId} className={`rounded-lg border px-3 py-2 text-sm ${chip.cls}`}>
                 <div className="font-medium">{s.displayName ?? s.studentId.slice(0, 8)}</div>

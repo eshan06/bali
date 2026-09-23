@@ -1645,9 +1645,14 @@ async function changeState(
   input: StateChangeInput,
   eventType: EventType,
   nextState: ParticipationState,
-  /** A stored state this change may not move a student out of; it refuses with `code`. */
-  cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string },
+  rules: {
+    /** A stored state this change may not move a student out of; it refuses with `code`. */
+    cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string };
+    /** Refuse a replay whose participation has ended, rather than answer that row's last state. */
+    replayNeedsLive?: boolean;
+  } = {},
 ): Promise<StateChangeResult> {
+  const { cannotLeave, replayNeedsLive = false } = rules;
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
     if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
@@ -1676,6 +1681,13 @@ async function changeState(
       // Replay: return the current truth even if the participation has ended.
       if (!row)
         throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
+      // Unless the change opts out: an ended row's last state is not the truth
+      // for a student removed or switched away while this session runs, and a
+      // 200 naming this session would point their phone back at it. The phone
+      // drops a refused change and re-reads the truth (Phase 3 A3).
+      if (replayNeedsLive && row.endedAt !== null) {
+        throw new TransitionError('NOT_PARTICIPATING', 'replayed change: participation has ended');
+      }
       return { outcome: 'replay', state: row.state, participationId: row.id, session };
     }
 
@@ -1938,9 +1950,11 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
 
     if (live) {
       // Protection off: nothing flips, but the phone made contact — last
-      // contact moves (the grid's "last seen"), and an open silence episode
-      // closes. One can be open here: a sweep can mark the row while it is
-      // still focused, in the gap before protectionOff's state write commits.
+      // contact moves (the grid's "last seen"), and any open silence episode
+      // closes. Defensive: none can be open today — the sweep marks only
+      // focused rows, protectionOff closes any episode it finds, and a sweep
+      // racing it either queues behind it or deadlocks (Phase 3 A2b) — but
+      // contact must never leave one open.
       await closeOpenSilence(
         tx,
         {
@@ -1985,15 +1999,22 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
  */
 export function refocus(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
   return changeState(db, input, 'refocus', 'focused', {
-    state: 'protection_off',
-    code: 'PROTECTION_OFF',
-    message: 'protection is off; only a re-tap returns to focus',
+    cannotLeave: {
+      state: 'protection_off',
+      code: 'PROTECTION_OFF',
+      message: 'protection is off; only a re-tap returns to focus',
+    },
   });
 }
 
-/** Screen Time permission was turned off — its own state, never green, never an unlock. */
+/**
+ * Screen Time permission was turned off — its own state, never green, never an
+ * unlock. A replay after the participation ended (removal, or a switch, while
+ * the session runs) is refused rather than answered with the ended row's last
+ * state; refocus keeps that shipped answer until the owner rules (PLAN, A4).
+ */
 export function protectionOff(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
-  return changeState(db, input, 'protection_off', 'protection_off');
+  return changeState(db, input, 'protection_off', 'protection_off', { replayNeedsLive: true });
 }
 
 export interface CheckInInput {

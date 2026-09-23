@@ -826,9 +826,12 @@ describe('state changes', () => {
       expect(row.lastSeenAt!.getTime()).toBeGreaterThan(stale.getTime());
     });
 
-    it('an unlock while protection is off closes a silence episode the sweep opened', async () => {
-      // The sweep can mark the row while it is still focused, in the gap before
-      // protectionOff's state write commits — so contact must close it here too.
+    it('an unlock while protection is off closes an open silence episode', async () => {
+      // Defensive: nothing leaves an episode open on a protection-off row today
+      // (the sweep marks only focused rows, protectionOff closes any episode it
+      // finds, and a sweep racing it queues behind it or deadlocks — Phase 3
+      // A2b), so the test plants one. Contact must still close it if a future
+      // path does.
       const { session, student } = await joined('protoff-unlock-silence');
       await protectionOff(db, change(session, student, 5));
       await db
@@ -865,6 +868,40 @@ describe('state changes', () => {
       });
       const types = (await eventsFor(session.id)).map((e) => e.type);
       expect(types.filter((t) => t === 'refocus')).toHaveLength(1);
+      expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
+    });
+
+    it('a report replayed after the student was removed mid-session is refused, not answered as focused', async () => {
+      // The session still runs, so the bell's guard does not catch this, and
+      // the ended row's last state ("focused", after a re-tap) is not the truth
+      // for a removed student: a 200 naming this session would point their
+      // phone back at it. Refocus keeps its shipped answer here (PLAN, A4).
+      const { session, student } = await joined('protoff-removed-replay');
+      await unlock(db, change(session, student, 3));
+      const refocused = change(session, student, 4);
+      await refocus(db, refocused);
+      const reported = change(session, student, 5);
+      await protectionOff(db, reported);
+      await tapIn(db, change(session, student, 6));
+      const enrollment = one(
+        await db
+          .select()
+          .from(enrollments)
+          .where(
+            and(eq(enrollments.classId, session.classId), eq(enrollments.studentId, student.id)),
+          ),
+      );
+      await endEnrollment(db, {
+        enrollmentId: enrollment.id,
+        reason: 'removed_from_class',
+        at: at(7),
+      });
+
+      await expect(protectionOff(db, reported)).rejects.toMatchObject({
+        code: 'NOT_PARTICIPATING',
+      });
+      expect(await refocus(db, refocused)).toMatchObject({ outcome: 'replay', state: 'focused' });
+      const types = (await eventsFor(session.id)).map((e) => e.type);
       expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
     });
 

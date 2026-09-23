@@ -1,4 +1,12 @@
-import { type Database, events, participations, startSession, tapIn } from '@bali/db';
+import {
+  type Database,
+  endEnrollment,
+  enrollments,
+  events,
+  participations,
+  startSession,
+  tapIn,
+} from '@bali/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type {
   CheckInResponse,
@@ -598,6 +606,39 @@ describe('POST /v1/sessions/:id/protection-off', () => {
       expect(retry.statusCode).toBe(409);
       expect(retry.json<{ error: { message: string } }>().error.message).toBe('session has ended');
     }
+  });
+
+  it('a report retried after the student was removed mid-session is a 409, never a replay naming the session', async () => {
+    // The session still runs, so the bell's guard does not catch this, and the
+    // ended row's last state ("focused", after a re-tap) is not the truth for a
+    // removed student. The phone drops the refusal and re-reads the truth.
+    const { klass, student, session } = await seedRunning('protoff-removed');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/protection-off`, body)).statusCode).toBe(
+      200,
+    );
+    await tap(session.id, student.id);
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    if (!enrollment) throw new Error('expected an enrollment');
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+
+    const retry = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
+    expect(retry.statusCode).toBe(409);
+    expect(retry.json<{ error: { message: string } }>().error.message).toBe('not in this session');
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+    expect(recorded).toHaveLength(1);
   });
 
   it('is a 409 for a student with nothing live here, and records nothing', async () => {
