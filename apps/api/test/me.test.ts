@@ -210,6 +210,20 @@ describe('GET /v1/me', () => {
     }
   });
 
+  it('keeps a name someone chose even when it is shaped like an identifier', async () => {
+    // Only the pool's own identifiers are screened: `name` and
+    // `preferred_username` are what someone chose to be called.
+    const uuid = '8f14e45f-ceea-467a-9b9c-1c1e6a4e7b3d';
+    const federated = 'Google_110293847566123450987';
+    for (const [sub, extraClaims, expected] of [
+      ['chosen-uuid', { preferred_username: uuid, username: 'demo-eve@example.test' }, uuid],
+      ['chosen-federated', { name: federated, username: 'demo-eve@example.test' }, federated],
+    ] as const) {
+      const token = await ctx.issuer.sign({ sub, extraClaims });
+      expect((await me(token)).body.user.displayName, sub).toBe(expected);
+    }
+  });
+
   it('keeps a username that merely begins with a provider’s name', async () => {
     // Only a provider prefix followed by that provider's subject shape is a
     // federated username; a student called google_fan_2029 is a student.

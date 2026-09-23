@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in builds its errors only from fixed wording, words of its own and status numbers, and refuses redirects so the password is never re-sent._
+_Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid stops rendering UUID prefixes; the exit demo's Cognito sign-in builds its errors only from fixed wording, the operator's configuration, words of its own and status numbers, and refuses redirects so the password is never re-sent._
 
 ## Now
 
@@ -203,11 +203,13 @@ under-13 parental-consent machinery.
   match of a value that came back, read the way its field is read: a code or a
   challenge name as it arrived, an error type without its namespace and suffix,
   a media type lower-cased, trimmed and without its parameters. Nothing else
-  from those fields prints: an unknown code, error type or challenge is said to
-  be unrecognised, an unknown media type is left out, and a code or an error
-  type that is not a string at all reads as none. Two fixed messages of Node's fetch are
+  from those fields prints: a code or an error type that is empty or not a
+  string reads as none, and any other unknown one is said to be unrecognised;
+  a challenge name that is empty or absent is no challenge, and any other
+  unknown one is said to be unrecognised; an unknown media type is left out. Two fixed messages of Node's fetch are
   recognised by exact match and never copied: a proxy refusing the tunnel (its
-  status is kept, when it is from 100 to 599) and a refused redirect. The
+  status is kept, when it is from 100 to 599, and shown beside the
+  UND_ERR_ABORTED code undici gives that refusal) and a refused redirect. The
   password is used in the request body and nowhere else; nothing is attached as
   a `cause`; and redirects are refused (`redirect: 'error'`) — measured, a 307
   re-POSTs the body, password and all, to its target.
@@ -237,9 +239,14 @@ under-13 parental-consent machinery.
   of every password —
   verbatim, re-cased, normalised, accent-stripped, written in ASCII, cut —
   produces a message the module prints for a value that has nothing to do with
-  the password; the lists themselves, spelled out entry by entry; the review's
+  the password; a parse of the module's own source, in which the password is
+  named only where the credentials are declared and destructured and where the
+  request body is built, the credentials only as the parameter and its one
+  destructure, `arguments` never, and the body goes straight into the fetch
+  call — so a comparison that reaches the password by any of those routes
+  turns it red; the lists themselves, spelled out entry by entry; the review's
   echoes as named tests; an exact-message test on every exit path; and a
-  mutation pass — 81 mutations of the module, each of which turns
+  mutation pass — 90 mutations of the module, each of which turns
   at least one test red. Cost, accepted: no message or body from
   outside is shown, and neither is the name of a code, type or challenge that
   is not on the lists; the error type (with fixed words for the common ones),

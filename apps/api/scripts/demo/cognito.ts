@@ -27,12 +27,15 @@
  *     or its causes, Cognito's error type, a challenge name or the response's
  *     media type that is, read the way its field is read, exactly one of the
  *     words in `KNOWN_WORDS` selects that word. Nothing else from those fields
- *     prints: an unknown code, error type or challenge is said to be
- *     unrecognised, an unknown media type is left out, and a code or an error
- *     type that is not a string at all reads as none;
+ *     prints. A code or an error type that is empty or not a string reads as
+ *     none, and any other that is not a word is said to be unrecognised; a
+ *     challenge name that is empty or absent is no challenge, and any other
+ *     that is not a word is said to be unrecognised; a media type that is not
+ *     a word is left out;
  *   - two fixed messages of Node's fetch, recognised by exact match and never
- *     copied: a proxy refusing the tunnel (only its status is kept, on the same
- *     terms as a response's) and a refused redirect.
+ *     copied: a proxy refusing the tunnel, whose status alone is kept, on the
+ *     same terms as a response's, and shown beside the UND_ERR_ABORTED code
+ *     undici gives that refusal; and a refused redirect.
  * The password is used in the request body and nowhere else. No error from
  * outside is attached as its `cause`: an object can print differently from the
  * way it looked when it was read, and a string cannot. And a redirect is
@@ -243,7 +246,7 @@ const REDIRECT_REFUSED = 'unexpected redirect';
 interface FailureFacts {
   /** Codes in KNOWN_CODES, nearest first, without repeats. */
   codes: string[];
-  /** A code that was a string but not in KNOWN_CODES; it is not printed. */
+  /** A code that was a non-empty string but not in KNOWN_CODES; it is not printed. */
   unrecognised: boolean;
   /** The nearest proxy's status, from an exact match of PROXY_REFUSED. */
   proxyStatus?: number;
@@ -279,7 +282,7 @@ function examineFailure(err: unknown): FailureFacts {
 
       const raw = read(node, 'code');
       const code = recognised(raw, KNOWN_CODES);
-      if (code === undefined) facts.unrecognised ||= typeof raw === 'string';
+      if (code === undefined) facts.unrecognised ||= typeof raw === 'string' && raw !== '';
       else if (!facts.codes.includes(code)) facts.codes.push(code);
 
       const message = read(node, 'message');
@@ -375,9 +378,10 @@ const TYPE_HINTS = new Map([
 ]);
 
 /**
- * Cognito's `__type` when the body carries a non-empty one, without the
- * namespace (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols
- * allow around it. Only compared with KNOWN_TYPES, never printed.
+ * Cognito's `__type` when the body carries one, without the namespace
+ * (`ns#Name`) or the suffix (`Name:detail`) the AWS JSON protocols allow around
+ * it — or undefined when nothing is left. Only compared with KNOWN_TYPES: what
+ * prints is the word it matches.
  */
 function errorTypeOf(text: string): string | undefined {
   let body: unknown;
@@ -387,11 +391,15 @@ function errorTypeOf(text: string): string | undefined {
     return undefined;
   }
   const raw = read(body, '__type');
-  if (typeof raw !== 'string' || raw === '') return undefined;
-  return raw.split(':')[0]?.split('#').pop() ?? '';
+  if (typeof raw !== 'string') return undefined;
+  const name = raw.split(':')[0]?.split('#').pop() ?? '';
+  return name === '' ? undefined : name;
 }
 
-/** The response's media type, lowercased and without parameters. Only compared, never printed. */
+/**
+ * The response's media type, lowercased and without parameters. Only compared:
+ * what prints is the word it matches.
+ */
 function mediaTypeOf(res: unknown): unknown {
   try {
     const value = (read(res, 'headers') as Headers | undefined)?.get('content-type');
@@ -443,8 +451,8 @@ export function cognitoEndpoint(region: string): string {
  *   - a Cognito error (bad credentials, flow not enabled) reports its type
  *     when it is a known one, and otherwise its status, and its media type
  *     when that is a known one;
- *   - a network failure reports its known error codes, a timeout reports
- *     itself, and a refused redirect says so;
+ *   - a network failure reports its known error codes; a timeout, or a
+ *     refused redirect, reports only itself;
  *   - a challenge (NEW_PASSWORD_REQUIRED, MFA) is a failure, named when it is a
  *     known one, because an unfinished sign-in yields no token and needs an
  *     operator, not a retry;

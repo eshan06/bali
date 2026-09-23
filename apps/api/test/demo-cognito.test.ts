@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { formatWithOptions, inspect } from 'node:util';
+import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cognitoEndpoint, fetchCognitoAccessToken, KNOWN_WORDS } from '../scripts/demo/cognito.js';
@@ -213,8 +215,12 @@ describe('fetchCognitoAccessToken', () => {
     );
   });
 
-  it('reads an empty error type as none', async () => {
-    const err = await thrownBy(() => Promise.resolve(jsonResponse(400, { __type: '' })));
+  it.each([
+    ['empty', ''],
+    ['only a namespace', 'com.amazonaws.cognito.identity.idp.model#'],
+    ['only a suffix', ':http://internal.amazon.com/coral/'],
+  ])('reads an error type that is %s as none', async (_label, type) => {
+    const err = await thrownBy(() => Promise.resolve(jsonResponse(400, { __type: type })));
 
     expect(err.message).toBe(
       'Cognito sign-in failed for demo-ana@example.test — HTTP 400 (text/plain), with no ' +
@@ -251,12 +257,14 @@ describe('fetchCognitoAccessToken', () => {
   });
 
   it('says an empty body is empty, rather than withheld', async () => {
-    // A real 413 from Cognito arrives with content-length 0.
-    const err = await thrownBy(() => Promise.resolve(new Response('', { status: 413 })));
+    // A real 413 from Cognito arrives with content-length 0 and no content-type.
+    const err = await thrownBy(
+      resolve(fakeResponse({ ok: false, status: 413, text: () => Promise.resolve('') })),
+    );
 
     expect(err.message).toBe(
-      'Cognito sign-in failed for demo-ana@example.test — HTTP 413 (text/plain), with no ' +
-        'Cognito error type and an empty body',
+      'Cognito sign-in failed for demo-ana@example.test — HTTP 413, with no Cognito error type ' +
+        'and an empty body',
     );
   });
 
@@ -326,6 +334,7 @@ describe('fetchCognitoAccessToken', () => {
   it.each([
     ['a name it does not know', 'PASSKEY_REGISTRATION'],
     ['a known name in another case', 'new_password_required'],
+    ['a name that is not a string', 42],
   ])('does not print a challenge with %s', async (_label, name) => {
     const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: name })));
 
@@ -334,6 +343,22 @@ describe('fetchCognitoAccessToken', () => {
         'recognise — finish it once in the AWS console (a temporary password must be reset ' +
         'before the account can be used unattended), then re-run.',
     );
+  });
+
+  it('reads an empty challenge name as no challenge at all', async () => {
+    const token = await fetchCognitoAccessToken(
+      {
+        ...config,
+        fetchImpl: resolve(
+          jsonResponse(200, { ChallengeName: '', AuthenticationResult: { AccessToken: 't' } }),
+        ) as unknown as typeof fetch,
+      },
+      creds,
+    );
+    const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: '' })));
+
+    expect(token).toBe('t');
+    expect(err.message).toBe('Cognito sign-in for demo-ana@example.test returned no access token');
   });
 
   it.each([
@@ -460,6 +485,14 @@ describe('fetchCognitoAccessToken', () => {
       `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ECONNRESET, an ` +
         'error code this module does not recognise',
     );
+  });
+
+  it('reads an empty code as no code at all', async () => {
+    const err = await thrownBy(
+      reject(new TypeError('fetch failed', { cause: Object.assign(new Error('x'), { code: '' }) })),
+    );
+
+    expect(err.message).toMatch(/could not reach .*: no error code, and the fetch layer's own/);
   });
 
   it('takes only a string for a code: a DOMException’s numeric one is no code at all', async () => {
@@ -775,6 +808,22 @@ describe('the two fixed messages of Node’s fetch it recognises', () => {
     );
   });
 
+  it('shows the status only beside the code undici gives the refusal', async () => {
+    const err = await thrownBy(
+      reject(
+        new TypeError('fetch failed', {
+          cause: Object.assign(new Error('Proxy response (502) !== 200 when HTTP Tunneling'), {
+            code: 'ECONNRESET',
+          }),
+        }),
+      ),
+    );
+
+    expect(err.message).toBe(
+      `Cognito sign-in for demo-ana@example.test could not reach ${ENDPOINT}: ECONNRESET`,
+    );
+  });
+
   it('gives the status to the code it explains, not to a neighbour', async () => {
     const err = await thrownBy(
       reject(
@@ -1057,6 +1106,11 @@ describe('what prints for a value from outside is a word of the module’s own',
     }
   });
 
+  it('hands out its lists frozen', () => {
+    expect(Object.isFrozen(KNOWN_WORDS)).toBe(true);
+    for (const list of Object.values(KNOWN_WORDS)) expect(Object.isFrozen(list)).toBe(true);
+  });
+
   it('holds exactly the words it was reviewed with', () => {
     // A word added or dropped changes what an operator can be told, so the
     // lists are spelled out here too: changing one is a decision, not a slip.
@@ -1176,8 +1230,16 @@ describe('what prints for a value from outside is a word of the module’s own',
   it.each(WORD_FIELDS)(
     'through %s, each word of its list prints as itself',
     async (_f, list, carrying) => {
+      // Exactly the word, where its field's word goes: a longer word that
+      // starts with it (UND_ERR_ABORT, UND_ERR_ABORTED) would not match.
+      const where: Record<keyof typeof KNOWN_WORDS, (word: string) => RegExp> = {
+        codes: (word) => new RegExp(`: ${word}(?: \\(|$)`),
+        types: (word) => new RegExp(`— ${word} \\(HTTP 400\\)`),
+        challenges: (word) => new RegExp(`needs challenge ${word} —`),
+        mediaTypes: (word) => new RegExp(`HTTP 400 \\(${word.replace(/[.+]/g, '\\$&')}\\),`),
+      };
       for (const word of KNOWN_WORDS[list]) {
-        expect(await messageFor(carrying(word)), word).toContain(word);
+        expect(await messageFor(carrying(word)), word).toMatch(where[list](word));
       }
     },
   );
@@ -1201,9 +1263,12 @@ describe('what prints for a value from outside is a word of the module’s own',
   it.each(WORD_FIELDS)(
     'through %s, the message is the same whatever the password, for every value',
     async (_f, list, carrying) => {
-      // Every word, and values it does not know, against passwords that hold
-      // the word itself: a comparison with the password, brought back for any
-      // one word, makes that word's message differ here.
+      // Every word, and values it does not know, against passwords built from
+      // the word: the word itself, in another case, inside, as a prefix or a
+      // suffix either way, with digits or punctuation around it. A comparison
+      // of those shapes, brought back for any one word, makes that word's
+      // message differ here; the next test pins that there is no comparison
+      // of any shape.
       const failures: string[] = [];
       for (const value of ['', UNRECOGNISED, ...KNOWN_WORDS[list]]) {
         const expected = await messageFor(carrying(value), 'q7z-unrelated-9');
@@ -1215,6 +1280,15 @@ describe('what prints for a value from outside is a word of the module’s own',
           value.toLowerCase(),
           `x${value}y`,
           `${value.toLowerCase()}-2026!`,
+          `${value}2026`,
+          `2026${value}`,
+          `${value}!`,
+          `!${value}`,
+          `${value}_x`,
+          `x_${value}`,
+          value.slice(0, -1),
+          value.slice(1),
+          `${value}${value}`,
           ...ECHO_PASSWORDS,
         ];
         for (const password of passwords) {
@@ -1225,6 +1299,70 @@ describe('what prints for a value from outside is a word of the module’s own',
       expect(failures).toEqual([]);
     },
   );
+
+  it('reads the password in one place, the request body', () => {
+    // A comparison with the password has to reach it: by its name, through
+    // the credentials, through the body built from it, or through `arguments`.
+    // So the module's own source is parsed, and each way is checked: the
+    // password is named only where the credentials are declared and
+    // destructured and where the body is built; the credentials only as the
+    // parameter and its one destructure; the body goes straight into the
+    // fetch call, with no name of its own to be read by again; and
+    // `arguments` is never read.
+    const path = new URL('../scripts/demo/cognito.ts', import.meta.url);
+    const source = ts.createSourceFile(
+      'cognito.ts',
+      readFileSync(path, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const uses: Record<'password' | 'credentials' | 'arguments', ts.Identifier[]> = {
+      password: [],
+      credentials: [],
+      arguments: [],
+    };
+    const visit = (node: ts.Node): void => {
+      if (ts.isIdentifier(node) && Object.hasOwn(uses, node.text)) {
+        uses[node.text as keyof typeof uses].push(node);
+      }
+      node.forEachChild(visit);
+    };
+    visit(source);
+    const kinds = (nodes: ts.Identifier[]) => nodes.map((node) => ts.SyntaxKind[node.parent.kind]);
+
+    expect(kinds(uses.password)).toEqual([
+      'PropertySignature', // CognitoCredentials.password
+      'BindingElement', // const { username, password } = credentials
+      'PropertyAssignment', // PASSWORD: password
+    ]);
+    expect(kinds(uses.credentials)).toEqual(['Parameter', 'VariableDeclaration']);
+    expect(uses.arguments).toEqual([]);
+
+    // Every step from `PASSWORD: password` out to the call that sends it: a
+    // wrapper, a stored copy or an extra use anywhere on the way would show.
+    const route: string[] = [];
+    for (
+      let node: ts.Node | undefined = uses.password[2]?.parent;
+      node !== undefined && route.length < 12;
+      node = node.parent
+    ) {
+      if (ts.isPropertyAssignment(node)) route.push(`${node.name.getText(source)}:`);
+      else if (ts.isObjectLiteralExpression(node)) route.push('{}');
+      else if (ts.isCallExpression(node)) route.push(`${node.expression.getText(source)}()`);
+      else route.push(ts.SyntaxKind[node.kind]);
+      if (ts.isCallExpression(node) && node.expression.getText(source) === 'doFetch') break;
+    }
+    expect(route).toEqual([
+      'PASSWORD:',
+      '{}',
+      'AuthParameters:',
+      '{}',
+      'JSON.stringify()',
+      'body:',
+      '{}',
+      'doFetch()',
+    ]);
+  });
 
   it.each(WORD_FIELDS)(
     'through %s, a word is taken only as spelled',
@@ -1368,6 +1506,17 @@ describe('hostile objects never cost the operator’s one actionable line', () =
 
     expect(err.message).toContain(`could not reach ${ENDPOINT}`);
     expect(err.message).not.toContain('getter exploded');
+  });
+
+  it('`errors` that is only like an array is not read', async () => {
+    // Members are copied out of a real array only, as an AggregateError's are.
+    const lookalike = Object.assign(new TypeError('fetch failed'), {
+      errors: { 0: Object.assign(new Error('x'), { code: 'ECONNREFUSED' }), length: 1 },
+    });
+
+    const err = await thrownBy(reject(lookalike));
+
+    expect(err.message).toMatch(/could not reach .*: no error code, and the fetch layer's own/);
   });
 
   it('`errors` that is not an array, and `cause` that throws on read', async () => {
