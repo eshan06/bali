@@ -29,9 +29,9 @@
  *     words in `KNOWN_WORDS` selects that word. Nothing else from those fields
  *     prints. A code or an error type that is empty or not a string reads as
  *     none, and any other that is not a word is said to be unrecognised; a
- *     challenge name that is empty or absent is no challenge, and any other
- *     that is not a word is said to be unrecognised; a media type that is not
- *     a word is left out;
+ *     challenge name that is absent or falsy ('', 0, false, null) is no
+ *     challenge, and any other value that is not a word is said to be
+ *     unrecognised; a media type that is not a word is left out;
  *   - two fixed messages of Node's fetch, recognised by exact match and never
  *     copied: a proxy refusing the tunnel, whose status alone is kept, on the
  *     same terms as a response's, and shown beside the UND_ERR_ABORTED code

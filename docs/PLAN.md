@@ -50,8 +50,8 @@ _Last updated: 2026-09-23 — **Phase 2 is complete: the exit demo ran green aga
   name, a media type); nothing else from those fields is printed, and nothing
   is compared with the password. No caught error is attached as a `cause`, and a redirect is refused
   rather than followed, since a 307 re-sends the body. 0 of 1,050 now. The cost
-  is every message and body from outside, and the name of any code or type not
-  on the lists; the error type (with fixed words for the common ones), the
+  is every message and body from outside, and the name of any code, type or
+  challenge not on the lists; the error type (with fixed words for the common ones), the
   status, the media type and the error codes stand in.
 - **The live grid shows names, not UUID prefixes** (2026-09-22). `/v1/me` read
   `claims.name`, but Cognito puts profile attributes in the ID token and every
@@ -217,8 +217,9 @@ under-13 parental-consent machinery.
   a media type lower-cased, trimmed and without its parameters. Nothing else
   from those fields prints: a code or an error type that is empty or not a
   string reads as none, and any other unknown one is said to be unrecognised;
-  a challenge name that is empty or absent is no challenge, and any other
-  unknown one is said to be unrecognised; an unknown media type is left out. Two fixed messages of Node's fetch are
+  a challenge name that is absent or falsy (empty, `0`, `false`, `null`) is no
+  challenge, and any other value that is not a word is said to be
+  unrecognised; an unknown media type is left out. Two fixed messages of Node's fetch are
   recognised by exact match and never copied: a proxy refusing the tunnel (its
   status is kept, when it is from 100 to 599, and shown beside the
   UND_ERR_ABORTED code undici gives that refusal) and a refused redirect. The
@@ -251,12 +252,13 @@ under-13 parental-consent machinery.
   of every password —
   verbatim, re-cased, normalised, accent-stripped, written in ASCII, cut —
   produces a message the module prints for a value that has nothing to do with
-  the password; a parse of the module's own source, in which the password is
-  named only where the credentials are declared and destructured and where the
-  request body is built, the credentials only as the parameter and its one
-  destructure, `arguments` never, and the body goes straight into the fetch
-  call — so a comparison that reaches the password by any of those routes
-  turns it red; the lists themselves, spelled out entry by entry; the review's
+  the password; a parse of the module's own source, which checks that
+  `password` is named only where the credentials are declared and
+  destructured and where the request body is built, `credentials` only as the
+  parameter and in one declaration, `arguments` never, and that the body goes
+  straight into the fetch call — so a new use of any of those names turns it
+  red (it does not follow aliases, wrappers or a replaced global: it catches a
+  slip, not a rewrite built to get past it); the lists themselves, spelled out entry by entry; the review's
   echoes as named tests; an exact-message test on every exit path; and a
   mutation pass — 90 mutations of the module, each of which turns
   at least one test red. Cost, accepted: no message or body from

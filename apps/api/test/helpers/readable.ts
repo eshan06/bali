@@ -68,9 +68,9 @@ const DECODERS = [unescapeOnce, percentDecode, htmlDecode];
 
 /**
  * `text` itself plus what applying the decoders above in any order reaches from
- * it, up to six rounds deep and 256 forms in all: enough for the stacked
- * renderings these tests produce. A deeper stack is what the canary beside the
- * password is for.
+ * it, up to six rounds deep, starting no new round once 256 forms are known:
+ * enough for the stacked renderings these tests produce. A deeper stack is what
+ * the canary beside the password is for.
  */
 export function readableForms(text: string): string[] {
   const seen = new Set([text]);

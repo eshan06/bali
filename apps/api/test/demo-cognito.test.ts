@@ -219,6 +219,11 @@ describe('fetchCognitoAccessToken', () => {
     ['empty', ''],
     ['only a namespace', 'com.amazonaws.cognito.identity.idp.model#'],
     ['only a suffix', ':http://internal.amazon.com/coral/'],
+    ['a number', 42],
+    ['null', null],
+    ['true', true],
+    ['a word inside an array', ['NotAuthorizedException']],
+    ['a word inside an object', { name: 'NotAuthorizedException' }],
   ])('reads an error type that is %s as none', async (_label, type) => {
     const err = await thrownBy(() => Promise.resolve(jsonResponse(400, { __type: type })));
 
@@ -335,6 +340,9 @@ describe('fetchCognitoAccessToken', () => {
     ['a name it does not know', 'PASSKEY_REGISTRATION'],
     ['a known name in another case', 'new_password_required'],
     ['a name that is not a string', 42],
+    ['true for a name', true],
+    ['a known name inside an array', ['NEW_PASSWORD_REQUIRED']],
+    ['a known name inside an object', { name: 'NEW_PASSWORD_REQUIRED' }],
   ])('does not print a challenge with %s', async (_label, name) => {
     const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: name })));
 
@@ -345,17 +353,22 @@ describe('fetchCognitoAccessToken', () => {
     );
   });
 
-  it('reads an empty challenge name as no challenge at all', async () => {
+  it.each([
+    ['empty', ''],
+    ['0', 0],
+    ['false', false],
+    ['null', null],
+  ])('reads a challenge name that is %s as no challenge at all', async (_label, name) => {
     const token = await fetchCognitoAccessToken(
       {
         ...config,
         fetchImpl: resolve(
-          jsonResponse(200, { ChallengeName: '', AuthenticationResult: { AccessToken: 't' } }),
+          jsonResponse(200, { ChallengeName: name, AuthenticationResult: { AccessToken: 't' } }),
         ) as unknown as typeof fetch,
       },
       creds,
     );
-    const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: '' })));
+    const err = await thrownBy(() => Promise.resolve(jsonResponse(200, { ChallengeName: name })));
 
     expect(token).toBe('t');
     expect(err.message).toBe('Cognito sign-in for demo-ana@example.test returned no access token');
@@ -1265,10 +1278,9 @@ describe('what prints for a value from outside is a word of the module’s own',
     async (_f, list, carrying) => {
       // Every word, and values it does not know, against passwords built from
       // the word: the word itself, in another case, inside, as a prefix or a
-      // suffix either way, with digits or punctuation around it. A comparison
-      // of those shapes, brought back for any one word, makes that word's
-      // message differ here; the next test pins that there is no comparison
-      // of any shape.
+      // suffix either way, with digits or punctuation around it, and the echo
+      // passwords. Any of them changing the message turns this red. It samples
+      // passwords, so it cannot show that no comparison exists.
       const failures: string[] = [];
       for (const value of ['', UNRECOGNISED, ...KNOWN_WORDS[list]]) {
         const expected = await messageFor(carrying(value), 'q7z-unrelated-9');
@@ -1301,14 +1313,14 @@ describe('what prints for a value from outside is a word of the module’s own',
   );
 
   it('reads the password in one place, the request body', () => {
-    // A comparison with the password has to reach it: by its name, through
-    // the credentials, through the body built from it, or through `arguments`.
-    // So the module's own source is parsed, and each way is checked: the
-    // password is named only where the credentials are declared and
-    // destructured and where the body is built; the credentials only as the
-    // parameter and its one destructure; the body goes straight into the
-    // fetch call, with no name of its own to be read by again; and
-    // `arguments` is never read.
+    // Parses the module's own source and checks where the password is read by
+    // name: `password` only where the credentials are declared and
+    // destructured and where the body is built; `credentials` only as the
+    // parameter and in one declaration; `arguments` never; and the steps from
+    // the password to the fetch call exactly as below. So a new use of any of
+    // those names turns it red. It does not follow aliases, what `doFetch` or
+    // `JSON` is bound to, or other members of the objects on that route: it
+    // catches a slip, not a rewrite built to get past it.
     const path = new URL('../scripts/demo/cognito.ts', import.meta.url);
     const source = ts.createSourceFile(
       'cognito.ts',
@@ -1338,8 +1350,8 @@ describe('what prints for a value from outside is a word of the module’s own',
     expect(kinds(uses.credentials)).toEqual(['Parameter', 'VariableDeclaration']);
     expect(uses.arguments).toEqual([]);
 
-    // Every step from `PASSWORD: password` out to the call that sends it: a
-    // wrapper, a stored copy or an extra use anywhere on the way would show.
+    // Every syntax step from `PASSWORD: password` out to the `doFetch()` call:
+    // a call, an assignment or a declaration put on that path would show.
     const route: string[] = [];
     for (
       let node: ts.Node | undefined = uses.password[2]?.parent;
