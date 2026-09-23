@@ -33,6 +33,11 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   // Left the session AND unshielded — the ISSUES #2 case. Loud on purpose: it
   // must not read as the quiet "Left" chip.
   left_unprotected: { label: 'Left · unlocked', cls: 'bg-red-100 text-red-800 border-red-400' },
+  // The same, for a phone whose Screen Time permission was off: never an unlock.
+  left_protection_off: {
+    label: 'Left · protection off',
+    cls: 'bg-red-100 text-red-800 border-red-400',
+  },
   absent: { label: 'Not here', cls: 'bg-white text-slate-400 border-dashed border-slate-300' },
 };
 

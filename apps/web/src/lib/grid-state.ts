@@ -90,9 +90,10 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       s.joinedAt ??= at;
       break;
     case 'unlock':
-      // Mirrors the engine (rule 2): an unlock never softens a live student's
-      // protection off into "unlocked" — it is recorded, and the chip stays.
-      if (!(s.state === 'protection_off' && s.endedAt === null)) s.state = 'unlocked';
+      // Mirrors the engine (rule 2): an unlock never softens protection off
+      // into "unlocked" — live or ended, the engine records it and leaves the
+      // state alone, so the chip stays.
+      if (s.state !== 'protection_off') s.state = 'unlocked';
       s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'refocus':
@@ -144,19 +145,22 @@ export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
  *
  * `left_unprotected` — the student's participation ended (removed mid-session,
  * or moved to another teacher's session) and their phone then reported an
- * unlock or protection_off. `deriveDisplayState` answers `ended` for anything
- * with an `endedAt`, which would put the calmest chip on the grid over exactly
- * the event ISSUES #2 exists to surface: an unshielded phone the teacher no
- * longer has in their roster. The record is durable either way; the screen has
- * to agree with it.
+ * unlock. `deriveDisplayState` answers `ended` for anything with an `endedAt`,
+ * which would put the calmest chip on the grid over exactly the event ISSUES #2
+ * exists to surface: an unshielded phone the teacher no longer has in their
+ * roster. The record is durable either way; the screen has to agree with it.
+ *
+ * `left_protection_off` — the same, for a student whose Screen Time permission
+ * was off when the participation ended (at the bell, on removal, on a switch).
+ * Never labelled as an unlock: protection off is "never green, never an
+ * unlock" (ARCHITECTURE, iOS rules).
  */
-export type GridDisplay = DisplayState | 'absent' | 'left_unprotected';
+export type GridDisplay = DisplayState | 'absent' | 'left_unprotected' | 'left_protection_off';
 
 export function gridDisplay(s: Student, now: Date): GridDisplay {
   if (s.state === null) return 'absent';
-  if (s.endedAt !== null && (s.state === 'unlocked' || s.state === 'protection_off')) {
-    return 'left_unprotected';
-  }
+  if (s.endedAt !== null && s.state === 'protection_off') return 'left_protection_off';
+  if (s.endedAt !== null && s.state === 'unlocked') return 'left_unprotected';
   return deriveDisplayState(
     { state: s.state, joinedAt: s.joinedAt ?? now, lastSeenAt: s.lastSeenAt, endedAt: s.endedAt },
     now,

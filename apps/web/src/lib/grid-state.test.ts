@@ -192,11 +192,23 @@ describe('gridDisplay', () => {
     expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
   });
 
-  it('treats protection_off after leaving the same way', () => {
+  it('shows protection_off after leaving as its own loud chip, never as an unlock', () => {
     let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
     students = applyEvent(students, evt(2, 'enrollment_removed', 'ana'));
     students = applyEvent(students, evt(3, 'protection_off', 'ana'));
-    expect(gridDisplay(students.ana, now)).toBe('left_unprotected');
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+  });
+
+  it('keeps protection off through the bell, and an unlock afterwards does not relabel it', () => {
+    // Protection off is never an unlock: not while live, not once the
+    // participation ends — the engine leaves the stored state alone either way.
+    let students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    students = applyEvent(students, evt(2, 'protection_off', 'ana'));
+    students = applyEvent(students, evt(3, 'session_expired', null));
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+    students = applyEvent(students, evt(4, 'unlock', 'ana'));
+    expect(students.ana.state).toBe('protection_off');
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
   });
 
   it('leaves the ordinary states alone', () => {

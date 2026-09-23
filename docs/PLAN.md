@@ -139,6 +139,7 @@ plan backstop already treats it as source).
 
 - **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
 - **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
+- **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row while the silence sweep takes the row first — an unlock racing the sweep deadlocks (40P01, measured 83/100 on real Postgres; pre-existing, now reachable through protection-off too). `withDeadlockRetry` around both, plus the sweep as a rival in the race test
 - **A3** `tapDisposition` in `@bali/shared` — the tap-side twin of `unlockDisposition`
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
@@ -245,7 +246,11 @@ under-13 parental-consent machinery.
   session whose participation has since ended answers that row's last state
   (pre-existing); A3's "never send a superseded refocus" keeps honest clients
   off it, and bounding it like `tapIn` would be a `/v1` 200 → 409 for the
-  owner. From the santa-loop review, which also moved the unlock
+  owner. The live grid gives a protection-off student whose participation
+  ends (bell, removal, switch) its own loud chip, "Left · protection off" —
+  it read "Left · unlocked", which protection off never is — and an unlock
+  never relabels a protection-off row, live or ended, as the engine never
+  changes one. From the santa-loop review, which also moved the unlock
   contract's docs (ARCHITECTURE, ISSUES #2, `@bali/shared`) to say a live
   participation can be recorded without being flipped, and made the endpoint's
   authorization test able to fail (a live student an outsider or the teacher
