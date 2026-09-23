@@ -109,6 +109,9 @@ account plugin, not this repo; every rule below applies **only when the
 `graphify` CLI is installed and `graphify-out/graph.json` exists** — with
 neither, skip this section entirely and work normally.
 
+- `docs/ARCHITECTURE.md` and `docs/PLAN.md` are law and always read from
+  source — a derived graph, which is only as fresh as the last
+  `graphify update .`, never answers for them.
 - For codebase questions, first run `graphify query "<question>"`. Use
   `graphify path "<A>" "<B>"` for relationships and `graphify explain
 "<concept>"` for focused concepts — a scoped subgraph beats raw grep output.

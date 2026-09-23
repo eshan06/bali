@@ -2,6 +2,12 @@
 
 Load this when the user asked to install the post-commit hook or wire graphify into a project's CLAUDE.md.
 
+**Bali repo policy:** everything below is personal, local-only convenience.
+Never run `graphify claude install` here — this repo's `CLAUDE.md` is tracked
+governance with a hand-written graphify section already in place, not scratch
+config for tools to append to. The post-commit hook likewise belongs only in
+your own clone (untracked local config), never in shared config or CI.
+
 ## For git commit hook
 
 Install a post-commit hook that auto-rebuilds the graph after every commit. No background process needed - triggers once per commit, works with any editor.

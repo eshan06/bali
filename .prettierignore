@@ -10,3 +10,7 @@ packages/db/migrations/
 
 # Hand-written design docs — formatter churn there is pure diff noise
 docs/
+
+# Vendored third-party skill docs — kept as upstream ships them, so a
+# re-vendor never turns format:check red on an unrelated PR
+.claude/skills/graphify/

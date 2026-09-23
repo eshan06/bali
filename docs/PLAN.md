@@ -156,6 +156,13 @@ under-13 parental-consent machinery.
 
 ## Decision log
 
+- **2026-09-23** — Tooling adopted with review-set boundaries (#36 + follow-up):
+  graphify is **optional local tooling** — vendored skill fires only on an
+  explicit `/graphify`, never installs unattended, and its enforcement hooks
+  live in untracked `.claude/settings.local.json`, never shared config;
+  ARCHITECTURE.md and PLAN.md are always read from source, never answered
+  from the graph. Ponytail (account-wide minimalism plugin) governs
+  implementation, never the gates (CLAUDE.md working rule).
 - **2026-09-22** — **The owner ruled on the audit's held `/v1` questions: yes
   to all five** ([the ask](https://github.com/eshan06/bali/pull/29#issuecomment-5774512834)).
   One principle covers the `/v1` items, and it is written into ARCHITECTURE
