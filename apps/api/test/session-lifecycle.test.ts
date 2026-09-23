@@ -1,5 +1,5 @@
 import { type Database, events, startSession, tapIn } from '@bali/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type {
   CheckInResponse,
   EndSessionResponse,
@@ -355,11 +355,13 @@ describe('POST /v1/sessions/:id/unlock', () => {
     expect(recorded.map((e) => e.payload)).toEqual([{ reason: 'nurse' }]);
   });
 
-  it('a reason it does not recognise never refuses the unlock: it records with none', async () => {
+  it('an unrecognised reason is recorded as none instead of refusing the unlock', async () => {
     // The standing rule for the unlock body (docs/PLAN.md, 2026-09-20): a 400
     // here keeps the record out forever, because the outbox retries the
     // identical body. A newer app's reason, a wrong type or plain garbage must
     // all still land — without a reason, and the response says none landed.
+    // (Fastify's whole-body guards — the 1 MiB limit, prototype-poisoning keys
+    // — run before any route and predate this field; no honest client trips them.)
     const { student, session } = await seedRunning('unlock-reason-unknown');
     await tap(session.id, student.id);
     const token = await ctx.tokenFor(student.cognitoId);
@@ -478,6 +480,7 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const res = await post(await ctx.tokenFor('outsider'), `/v1/sessions/${session.id}/unlock`, {
       eventId: randomUUID(),
       deviceTime: now(),
+      reason: 'nurse',
     });
 
     // Never a refusal (rule 6) — but not attached, and no session handed back.
@@ -486,6 +489,15 @@ describe('POST /v1/sessions/:id/unlock', () => {
     expect(body.outcome).toBe('recorded');
     expect(body.recordedAs).toBe('not_enrolled');
     expect(body.session).toBeNull();
+    // The orphan keeps the reason like any other unlock.
+    expect(body.reason).toBe('nurse');
+    const orphans = await db
+      .select()
+      .from(events)
+      .where(and(isNull(events.sessionId), eq(events.type, 'unlock')));
+    expect(orphans.map((e) => e.payload)).toEqual([
+      expect.objectContaining({ recorded_as: 'not_enrolled', reason: 'nurse' }),
+    ]);
 
     // The teacher's session feed never sees it.
     const attached = await db

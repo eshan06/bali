@@ -143,7 +143,8 @@ plan backstop already treats it as source).
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
-- **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System
+- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it)
+- **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — first pass up for review: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
 - **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
 - **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
@@ -163,7 +164,7 @@ plan backstop already treats it as source).
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
-| Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch. **API ✅ (A1):** optional `reason` on unlock, stored as `payload.reason`, never a reason to refuse; the phone's picker is C5; the portal showing it is a follow-up |
+| Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch. **API ✅ (A1):** optional `reason` on unlock, stored as `payload.reason`, never a reason to refuse. It is fixed once recorded (a replay keeps the stored one), so C5 either asks before sending or holds the send until the picker is answered or skipped; the portal shows it in A9 |
 | Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
 | Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx`; and `armed_tap_skipped` carries the student's id, so it shows here too — render it as a declined tap, never a join |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
@@ -216,15 +217,19 @@ under-13 parental-consent machinery.
 - **2026-09-23** — **Phase 3 started, API and contracts first** (step list
   under Phases). A1: the unlock takes an optional reason (`UNLOCK_REASONS` —
   bathroom, nurse, other — additive vocab), stored as `payload.reason` beside
-  any `recorded_as` note, orphans included; a plain unlock keeps the null
-  payload it always had. The route parses it **leniently** — anything
-  unrecognised, of any type or size, is recorded as no reason, never a 400 —
+  any `recorded_as` note, orphans included; an unlock without one writes
+  exactly the payload it did before. The route parses it **leniently** — any
+  JSON value that is not a known reason is recorded as no reason, never a 400
+  (the only refusals left are Fastify's whole-body guards, the 1 MiB limit and
+  prototype-poisoning keys, which predate this and no honest client trips) —
   because the unlock body's standing rule (2026-09-20) is that validation is
-  never why an unlock goes unrecorded. The response's `reason` says what
+  never why an unlock goes unrecorded. The engine keeps only a known reason
+  whatever its caller passes, since it is the one writer of `events`. The response's `reason` says what
   landed, so a phone can tell when its reason did not; a replay answers with
   the stored reason, not the retry's (rule 4). Pinned both ways: a strict
   parse, the reason not passed or not echoed, dropped from either payload, or
-  a replay not reading the record — each turns a test red.
+  a replay not reading its own event — each turns a test red. Two
+  independent reviews passed it.
 - **2026-09-23** — `docs/GOTCHAS.md` added to the read order: live
   environment/process traps only, one entry each, deleted when fixed. The
   routing rule (CLAUDE.md working rules): a critical or recurring finding

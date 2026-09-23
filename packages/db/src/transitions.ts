@@ -1713,6 +1713,15 @@ export interface UnlockResult {
 }
 
 /**
+ * Only a known reason ever reaches the payload, whatever the caller hands in:
+ * the engine is the one writer of `events` and does not rely on its caller
+ * having validated (the route does; a future caller might not).
+ */
+function knownReason(reason: unknown): UnlockReason | null {
+  return isUnlockReason(reason) ? reason : null;
+}
+
+/**
  * The reason stored on an unlock that already landed. A replay answers with
  * what was recorded (rule 4), not with whatever the retry carries, so a phone
  * that changed its answer between retries learns which one the teacher sees.
@@ -1744,7 +1753,7 @@ async function recordOrphanUnlock(
   input: UnlockInput,
   recordedAs: Extract<UnlockRecordedAs, 'unknown_session' | 'not_enrolled'>,
 ): Promise<UnlockResult> {
-  const reason = input.reason ?? null;
+  const reason = knownReason(input.reason);
   const isNew = await insertEvent(tx, {
     eventId: input.eventId,
     type: 'unlock',
@@ -1786,9 +1795,9 @@ async function recordOrphanUnlock(
  *     `unknown_session`, so a bad id can't become a lost record either.
  *
  * The student's optional reason rides in the event's payload beside any note;
- * a plain unlock with neither keeps the null payload it always had. The reason
- * is never a condition of recording — it arrives already vetted, and an absent
- * one changes nothing about what is written.
+ * an unlock without one writes exactly the payload it wrote before. The reason
+ * is never a condition of recording: anything but a known reason is stored as
+ * none, and an absent one changes nothing about what is written.
  *
  * Idempotent on event_id: a retried unlock re-reads and returns the current
  * truth as 'replay'. The response is the phone's signal to stop retrying
@@ -1806,7 +1815,7 @@ async function recordOrphanUnlock(
  * land after the real endedAt but stays inside the window.
  */
 export async function unlock(db: Database, input: UnlockInput): Promise<UnlockResult> {
-  const reason = input.reason ?? null;
+  const reason = knownReason(input.reason);
   return db.transaction(async (tx) => {
     const session = await loadSession(tx, input.sessionId, { forUpdate: true });
 

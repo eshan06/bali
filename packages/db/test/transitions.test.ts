@@ -1,4 +1,4 @@
-import { MAX_SESSION_MINUTES } from '@bali/shared';
+import { MAX_SESSION_MINUTES, type UnlockReason } from '@bali/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -687,9 +687,28 @@ describe('state changes', () => {
       );
       expect(orphan.payload).toMatchObject({ recorded_as: 'unknown_session', reason: 'other' });
 
-      const replay = await unlock(db, req);
-      expect(replay.outcome).toBe('replay');
-      expect(replay.reason).toBe('other');
+      const changed = await unlock(db, { ...req, reason: 'bathroom' });
+      expect(changed.outcome).toBe('replay');
+      expect(changed.reason).toBe('other');
+      const dropped = await unlock(db, req);
+      expect(dropped.reason).toBe('other');
+    });
+
+    it('only a known reason reaches the payload, whatever the caller passes', async () => {
+      // The engine is the one writer of events and does not lean on the route
+      // having validated: a caller that hands in anything else records none.
+      const { session, student } = await joined('reason-untrusted');
+      const u = await unlock(db, {
+        sessionId: session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: at,
+        reason: 'skateboard' as unknown as UnlockReason,
+      });
+      expect(u.outcome).toBe('applied');
+      expect(u.reason).toBeNull();
+      const recorded = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+      expect(recorded.payload).toBeNull();
     });
 
     it('a replay answers with the reason on record, not the one the retry carries', async () => {
@@ -703,15 +722,18 @@ describe('state changes', () => {
         deviceTime: at,
       };
       await unlock(db, { ...req, reason: 'nurse' });
+      // A later, separate unlock by the same student with another reason: the
+      // replay below must read ITS OWN event, not this student's latest unlock.
+      await unlock(db, { ...req, eventId: newUuidV7(), reason: 'bathroom' });
 
-      const changed = await unlock(db, { ...req, reason: 'bathroom' });
+      const changed = await unlock(db, { ...req, reason: 'other' });
       expect(changed.outcome).toBe('replay');
       expect(changed.reason).toBe('nurse');
       const dropped = await unlock(db, req);
       expect(dropped.reason).toBe('nurse');
 
-      const recorded = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
-      expect(recorded.payload).toEqual({ reason: 'nurse' });
+      const unlocks = (await eventsFor(session.id)).filter((e) => e.type === 'unlock');
+      expect(unlocks.map((e) => e.payload)).toEqual([{ reason: 'nurse' }, { reason: 'bathroom' }]);
     });
   });
 

@@ -151,8 +151,10 @@ export interface UnlockRequest {
   deviceTime: string;
   /**
    * Optional and skippable. A value the server does not recognise is recorded
-   * as no reason, never refused: validation must never be the reason an unlock
-   * goes unrecorded (docs/PLAN.md decision log, 2026-09-20).
+   * as no reason rather than refused: validation must never be the reason an
+   * unlock goes unrecorded (docs/PLAN.md decision log, 2026-09-20). Fixed once
+   * recorded — a replay keeps the stored reason — so a phone that asks for one
+   * after unlocking has to hold the send until it is answered or skipped.
    */
   reason?: UnlockReason | null;
 }
