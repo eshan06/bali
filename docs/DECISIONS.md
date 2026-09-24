@@ -65,6 +65,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the default session carries the delegate too; Apple's URLSession honours the
   task's, which also covers a session passed in. The test (301, 302, 303, 307,
   308) runs on Linux in `ci.yml` and on the iOS Simulator in the macOS job.
+  **Also:** #71's socket timeout test bounded its wait at ten seconds against
+  the default session's fifteen, and on the simulator a boot still settling
+  stalled the whole test run past that. It now runs against a session of its
+  own that would wait a minute, bounded at thirty seconds, so the request's
+  own second must still end the wait — putting #71's Linux bug back makes it
+  wait the minute and fail — and the job boots its simulator before the build.
 - **2026-09-24** — **B1c: BaliCore's API client — a send's answer is a value
   the outbox tables take whole.** `APIClient` (`APIClient.swift`) has one
   method per student endpoint, typed request in, `APIResponse<Answer>` out,
