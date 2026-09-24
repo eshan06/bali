@@ -1875,12 +1875,13 @@ async function recordedReason(tx: Database, eventId: string): Promise<UnlockReas
  *
  * "After" is the server's order (rule 1): each claim clamped into the window,
  * and a return's never later than the server recorded it — a clock running
- * fast at the return cannot then outrank the real unlocks that follow it. A tie
- * is not after: a clock running behind clamps both to the window's start, and a
- * real unlock must flip. What is left to a clock is the one turned back between
- * the student's return and their unlock; that unlock is still recorded, and its
- * answer names the focus the phone then shields to — never green over an
- * unshielded phone.
+ * fast at the return cannot then outrank the real unlocks that follow it
+ * (`recorded_at` is its transaction's start, a little before it landed, so the
+ * cap only ever errs toward flipping). A tie is not after: a clock running
+ * behind clamps both to the window's start, and a real unlock must flip. What
+ * is left to a clock is the one turned back between the student's return and
+ * their unlock; that unlock is still recorded, and its answer names the focus
+ * the phone then shields to — never green over an unshielded phone.
  */
 async function returnedSince(
   tx: Database,
@@ -1893,8 +1894,11 @@ async function returnedSince(
     .from(events)
     .where(
       and(
-        eq(events.sessionId, sessionId),
         eq(events.userId, studentId),
+        // Implied by the cap below; spelled out so the read ranges over the
+        // student's own events after `at` (`events_user_occurred_idx`).
+        gt(events.occurredAt, at),
+        eq(events.sessionId, sessionId),
         inArray(events.type, ['tap_in', 'refocus']),
         sql`least(${events.occurredAt}, ${events.recordedAt}) > ${at.toISOString()}::timestamptz`,
       ),

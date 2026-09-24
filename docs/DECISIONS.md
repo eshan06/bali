@@ -56,7 +56,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   refocus and a tap lock the session too, so whichever lands first decides — the unlock
   first flips and the return then takes over; the return first, and the unlock is
   recorded as superseded. Either way it ends in the return, pinned by a real-Postgres
-  race. **A backdated clock:** the server cannot tell a stuck unlock from one made now on
+  race. **Cost:** one read per unlock that finds a live participation, over the
+  student's own events after its time (`events_user_occurred_idx`); `recorded_at` is the
+  return's transaction start, a little before it landed, so the cap errs only toward
+  flipping (santa's review). **A backdated clock:** the server cannot tell a stuck unlock from one made now on
   a clock turned back after the student's return — both arrive after the return,
   claiming an earlier time — and nothing on the wire carries the phone's own order (its
   event ids take the same clock). What that clock gets: the unlock is recorded, reason
