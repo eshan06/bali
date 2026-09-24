@@ -242,7 +242,7 @@ plan backstop already treats it as source).
 | Onboarding: privacy contract → sign-in → Screen Time grant | 3 | no allow-list step: the shield blocks every app it can (2026-09-24) |
 | Consent preview before joining a class | 3 | **API ✅ (A6):** `GET /v1/join-codes/{code}` — the class, its teacher's name, already enrolled; matched as the join matches, and refused as it refuses. The screen is C2 |
 | Unlock with optional, skippable reason (bathroom/nurse/other) | 3 | replaces full "passes" at launch. **API ✅ (A1):** optional `reason` on unlock, stored as `payload.reason`, never a reason to refuse. It is fixed once recorded (a replay keeps the stored one), so C5 either asks before sending or holds the send until the picker is answered or skipped. **Portal ✅ (A9):** the grid shows it on the chip, a protection-off one included |
-| Custom shield screen ("Focused with Bali until 9:42") | 3 | bundle ID in entitlement request |
+| Custom shield screen ("Focused with Bali until 9:42") | 3 | its extension, `com.bali.Bali.BaliShield`, has the Family Controls distribution entitlement (granted 2026-09-24); B5 draws it |
 | Minimal student personal history + edit own name | 3 | backs the privacy contract. **API ✅ (A7):** `GET /v1/me/history` — the moments a teacher sees, newest first, paged by an event-id cursor; the explicit tiebreak (`seq` inverts the converted-tap pair and `occurred_at` ties it) is a leave before anything else at one instant, then `seq` — see `events_user_occurred_idx`; `armed_tap_skipped` shows as a declined tap naming the class it counted in, never a join. **API ✅ (A8):** `PATCH /v1/me` — the student's own name, unique within each class (decision 8; serialised by class locks), recorded as a `display_name_changed` event; a join or a sign-in's fill is never refused over a name. An open grid shows it at its next 15 s snapshot (A9). The screen is C6 |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
@@ -304,14 +304,15 @@ under-13 parental-consent machinery.
 
 ## External / waiting
 
-- **Family Controls distribution entitlement** (Apple) — ✅ granted (owner,
-  2026-09-24), so TestFlight and the App Store no longer wait on Apple. Apple
-  approves it per bundle ID, and all three targets use it: `com.bali.Bali`,
-  `com.bali.Bali.BaliMonitor` and `com.bali.Bali.BaliShield` — v2's
-  identifiers, which the request used and v3 reuses (B2). In the developer
-  portal each one shows "Family Controls (Distribution)" among its
-  capabilities; one without it can't ship through TestFlight.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
+
+No longer waiting: the **Family Controls distribution entitlement** (Apple) —
+✅ granted (owner, 2026-09-24), so TestFlight and the App Store no longer wait
+on Apple. Apple approves it per bundle ID, and all three targets use it:
+`com.bali.Bali`, `com.bali.Bali.BaliMonitor` and `com.bali.Bali.BaliShield` —
+v2's identifiers, which the request used and v3 reuses (B2). In the developer
+portal each one shows "Family Controls (Distribution)" among its capabilities;
+one without it can't ship through TestFlight.
 
 ## Decision log
 
