@@ -4,8 +4,8 @@ import GRDB
 
 /// The phone's outbox: each tap, emergency unlock, refocus and protection-off report it acted on,
 /// kept until an answer lets it go. BaliCore's tables say what an answer means; this applies them,
-/// with the rules no table can express (docs/DECISIONS.md, B3a). The sync engine (B3b) sends
-/// `nextDue`'s `request` through `APIClient` and hands the answer to `settle`, each with its `now`.
+/// with the rules no table can express (docs/DECISIONS.md, B3a). The sync engine (`SyncEngine`)
+/// sends `nextDue`'s record (`send(through:)`) and hands its answer to `settle`, each with its `now`.
 public struct Outbox: Sendable {
     /// The app group the app and its extensions share (ARCHITECTURE, iOS decision 3).
     public static let appGroup = "group.com.bali.shared"
@@ -133,26 +133,24 @@ public struct Outbox: Sendable {
         return wake.map { .wait(until: $0) } ?? .idle
     }
 
-    /// Applies one send's answer (`APIClient`'s, to the record's `request`) by the record's table,
-    /// and returns the disposition for the sync engine; nil once the record is gone — superseded in
-    /// flight, so its answer is older than the phone's truth. An ending disposition deletes it; any
-    /// other keeps it, due after `backoff`, with its answer for a screen: stuck at a refusal, or at
-    /// `bound` answers that left it unsettled (any status but 401, 408 and 429, none of them this
-    /// record's). Stuck stays stuck, and never deletes: an unlock leaves only once recorded.
+    /// Applies one send's answer — `Sent`, which only the record's own send makes, so its own
+    /// kind's table has decided it — and returns the disposition; nil once the record is gone,
+    /// superseded in flight, so its answer is older than the phone's truth. An ending disposition
+    /// deletes it; any other keeps it, due after `backoff`, with its answer for a screen: stuck at a
+    /// refusal, or at `bound` answers that left it unsettled (any status but 401, 408 and 429, none
+    /// of them this record's). Stuck stays stuck, and never deletes: an unlock leaves only once
+    /// recorded.
     @discardableResult
-    public func settle<Answer>(eventId: String, with response: APIResponse<Answer>, now: Date)
-        throws -> Disposition?
-    {
+    public func settle(_ sent: Sent, now: Date) throws -> Disposition? {
         try pool.write { db in
-            guard let record = try Self.fetch(db, eventId) else { return nil }
-            let disposition = Disposition(record.change, response)
+            guard let record = try Self.fetch(db, sent.eventId) else { return nil }
+            let disposition = sent.disposition
             guard disposition.keeps else {
-                try db.execute(sql: "DELETE FROM outbox WHERE eventId = ?", arguments: [eventId])
+                try db.execute(
+                    sql: "DELETE FROM outbox WHERE eventId = ?", arguments: [sent.eventId])
                 return disposition
             }
-            var status: Int?
-            if case .status(let code) = response.result { status = code }
-            let answered = status.map { ![401, 408, 429].contains($0) } ?? false
+            let answered = sent.status.map { ![401, 408, 429].contains($0) } ?? false
             let (attempts, answers) = (record.attempts + 1, record.answers + (answered ? 1 : 0))
             try db.execute(
                 sql: """
@@ -161,10 +159,20 @@ public struct Outbox: Sendable {
                     """,
                 arguments: [
                     attempts, answers, record.stuck || disposition.refused || answers >= Self.bound,
-                    now + backoff(attempts), status, response.error?.error.reason?.rawValue,
-                    response.error?.error.message, eventId,
+                    now + backoff(attempts), sent.status, sent.error?.error.reason?.rawValue,
+                    sent.error?.error.message, sent.eventId,
                 ])
             return disposition
+        }
+    }
+
+    /// Every queued record due now, its backoff cut short: the student's retry (rule 5), or a fresh
+    /// token after a reauth. It changes nothing else — stuck stays stuck, and the order holds.
+    public func retryNow(now: Date) throws {
+        try pool.write {
+            try $0.execute(
+                sql: "UPDATE outbox SET nextAttemptAt = ? WHERE nextAttemptAt > ?",
+                arguments: [now, now])
         }
     }
 

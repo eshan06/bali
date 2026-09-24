@@ -40,7 +40,7 @@ struct SchemaTests {
         try record(outbox, .refocus(session: "s"))
         try record(outbox, .protectionOff(session: "s"))
 
-        let reopened = try Outbox(at: url)
+        let reopened = try open(url)
         #expect(try reopened.records() == outbox.records())
         #expect(try reopened.records().count == 3)
         // Protection off was reported for this session: reopening does not report it again.

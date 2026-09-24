@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B3b-1: the sync engine's drain — one client, retry-now, and the
+  waits on sign-in; a record's answer is read only by its own kind's table.**
+  `SyncEngine` (`ios/BaliOutbox/SyncEngine.swift`), an actor, is the one owner of the
+  phone's server communication (ARCHITECTURE, iOS decision 4). **One client:** it holds
+  the app's one `APIClient`, so one URLSession for the app's life (#71's review), and
+  hands it out (`engine.client`) for the screens' own calls. **The drain** (`run()`)
+  takes `nextDue(now:)`, sends the record (`OutboxRecord.send(through:)`), `settle`s the
+  answer, and goes on — or waits for the next due record, or a ring: a change recorded
+  (`record`, the only way the app queues one), a retry. Each pass answers every ring
+  made before it. **No token** (`NoAnswer.noToken`): nothing was sent, so nothing is
+  settled — no attempt counted, no backoff grown, the last real answer kept for the
+  screen — and the drain waits on sign-in: a ring (B4's `retryNow` once a sign-in gives
+  the provider a token) or, unrung, a minute. Never a sign-out, never a dropped record.
+  **No answer** (`.unreachable`) is settled as B3a backs it off. **A 401** settles as
+  `reauth` (kept, backed off), the state says sign-in, and the engine asks B4's seam —
+  `refresh: () async -> Bool`, true once a fresh token is ready — then sends everything
+  again at once. Once per rejection: a fresh token rejected too waits out the backoff (or
+  B4's `retryNow`), so a server that rejects every token never makes the phone spin;
+  refreshing again takes an answer that is not a 401 in between, while a refresh that
+  gave no token is asked again at the next 401, a backoff later. `refresh` must return
+  at once — false when only the student can give a token, whose sign-in then calls
+  `retryNow` — since the drain waits on it (santa's review). A 401 heard while a refresh
+  runs shares it: none can be yet, the drain being the only sender, and B3b-2's check-in
+  will be a second. **Retry-now** (`Outbox.retryNow(now:)`, moved here from B3a): every
+  queued record due now — the student's retry (rule 5), and the one after a reauth;
+  stuck stays stuck, and the order holds. **What the screens see** (`updates()`: the
+  state now, then at each change, newest only): the queue (a stuck record shown with its
+  last answer), the link (`reached`, `unreachable`, `signIn`, `storageFailed`), when the
+  server last answered, when the outbox sends next, and the last state change the server
+  refused — a state change's table drops a refusal for good, so the engine keeps it to
+  show (rule 5). A storage failure is shown and tried again within a minute — a failed
+  read of the queue for the screens too, which keeps the one last read. **The rider
+  (#73's review):** `settle` took an `APIResponse` of any answer type and cast it to the
+  record's, so a mismatched pairing compiled and read as `retry`. Now it takes a `Sent`,
+  which only `send(through:)` makes: that calls the record's own endpoint and reads the
+  answer by its own kind's table, and `Sent`'s initializer is private to the file — a
+  mismatch cannot happen. **Split from B3b** (over the ~400-line bound): the check-in,
+  the reconcile and GRDB's multi-process setup are B3b-2. **Not decided — open decision
+  11:** an emergency unlock made while the phone's own tap is unanswered has no session
+  to name yet, and the unlock contract cannot say which history it belongs in when the
+  tap's answer names none (armed, no longer current, refused); `record` needs a session,
+  so nothing sends one until the owner decides (before B6). **Tests** (Swift Testing,
+  Linux and the iOS Simulator): the drain against a hand-answered transport and a clock
+  the test moves — sent at once with its id and device time, the backoff honoured to the
+  second, the order, a ring made while a send is in flight, no token (nothing sent or
+  counted; a sign-in's retry sends it at once), a 401 (one refresh per rejection, none
+  while it lasts, again after another answer), a refresh that fails (asked again at the
+  next 401), an outbox that cannot be read (shown, read again within a minute, the record
+  sent once it can be), a stuck record's retry-now, and a drop shown.
 - **2026-09-24** — **B3a: the phone's outbox store, and the retry bound.**
   **The bound (#59's and #70's reviews).** A record is **stuck** at once when
   refused — `retry_and_surface`, a tap's or an unlock's 4xx but 401, 408 and

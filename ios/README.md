@@ -1,7 +1,8 @@
 # Bali for iOS
 
 The student app and its two extensions, `BaliCore`, the Swift package they share, and
-`BaliOutbox`, the student's outbox (`docs/ARCHITECTURE.md`, "iOS app structure").
+`BaliOutbox`, the student's outbox and the sync engine that drains it (`docs/ARCHITECTURE.md`,
+"iOS app structure").
 
 | Folder         | What it is                                                                                                |
 | -------------- | --------------------------------------------------------------------------------------------------------- |
@@ -10,7 +11,7 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: iOS runs it at a session's edges       |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app             |
 | `BaliCore/`    | The API's wire types, the outbox tables and the API client — `swift test` there runs its tests, Linux too |
-| `BaliOutbox/`  | The outbox store: GRDB in the app group, run by BaliCore's tables — `swift test` there too                |
+| `BaliOutbox/`  | The outbox store (GRDB in the app group) and the sync engine that drains it — `swift test` there too      |
 
 All three targets are on team `H535678UF8`, share the app group `group.com.bali.shared`, and
 carry Family Controls; the app also reads NFC tags.

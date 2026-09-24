@@ -87,21 +87,56 @@ extension OutboxRecord: FetchableRecord {
     struct UnknownKind: Error { let kind: String }
 }
 
+extension OutboxRecord {
+    /// Sends the record's request through `client`, once, and reads the answer as its own
+    /// endpoint's type by its own kind's table — the only way to make a `Sent`, so `settle` can
+    /// never read an answer by another kind's table.
+    public func send(through client: APIClient) async -> Sent {
+        switch request {
+        case .tap(let request):
+            let response = await client.tap(request)
+            return Sent(eventId, response, .tap(tapDisposition(response.result, response.answer)))
+        case .unlock(let session, let request):
+            let response = await client.unlock(session: session, request)
+            return Sent(
+                eventId, response, .unlock(unlockDisposition(response.result, response.answer)))
+        case .refocus(let session, let request):
+            let response = await client.refocus(session: session, request)
+            let disposition = stateChangeDisposition(response.result, response.answer)
+            return Sent(eventId, response, .stateChange(disposition))
+        case .protectionOff(let session, let request):
+            let response = await client.protectionOff(session: session, request)
+            let disposition = stateChangeDisposition(response.result, response.answer)
+            return Sent(eventId, response, .stateChange(disposition))
+        }
+    }
+}
+
+/// One send of a record, answered, and what its table made of the answer: `settle` takes it.
+public struct Sent: Sendable {
+    public let eventId: String
+    /// The status the server answered with, or `.networkError` and why there was none.
+    public let result: SendResult
+    public let noAnswer: NoAnswer?
+    /// Any status but a 2xx: the error body, whose `reason` a screen keys on.
+    public let error: ApiErrorBody?
+    public let disposition: Disposition
+
+    fileprivate init<Answer>(
+        _ eventId: String, _ response: APIResponse<Answer>, _ disposition: Disposition
+    ) {
+        (self.eventId, result, noAnswer, error, self.disposition) =
+            (eventId, response.result, response.noAnswer, response.error, disposition)
+    }
+
+    var status: Int? { if case .status(let status) = result { status } else { nil } }
+}
+
 /// What one answer means for a record, by its kind's table — BaliCore's, never decided here.
 public enum Disposition: Sendable, Hashable {
     case tap(TapDisposition)
     case unlock(UnlockDisposition)
     case stateChange(StateChangeDisposition)
-
-    init<Answer>(_ change: Change, _ response: APIResponse<Answer>) {
-        let (result, answer) = (response.result, response.answer)
-        switch change {
-        case .tap: self = .tap(tapDisposition(result, answer as? TapResponse))
-        case .unlock: self = .unlock(unlockDisposition(result, answer as? UnlockResponse))
-        case .refocus, .protectionOff:
-            self = .stateChange(stateChangeDisposition(result, answer as? any StateChangeAnswer))
-        }
-    }
 
     /// Whether the record stays queued: each case by name, so one BaliCore adds must be placed.
     var keeps: Bool {
