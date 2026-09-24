@@ -66,12 +66,16 @@ public actor SyncEngine {
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
     /// Whether a fresh token was already tried since the last answer that was not a 401.
     private var refreshed = false
+    /// The refresh under way, which a 401 heard while it runs shares: none can be yet, with the
+    /// drain the only sender — B3b-2's check-in will be a second.
     private var reauth: Task<Bool, Never>?
     private var running = false
     private var waiter: CheckedContinuation<Void, Never>?
     private var rung = false
 
-    /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready.
+    /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready. It
+    /// must return at once — false when only the student can give a token, whose sign-in then calls
+    /// `retryNow` — because the drain waits on it: nothing is sent until it returns.
     public init(
         outbox: Outbox, client: APIClient, clock: any SyncClock = SystemClock(),
         refresh: @escaping @Sendable () async -> Bool = { false }
@@ -162,9 +166,9 @@ public actor SyncEngine {
     private func answered(_ record: OutboxRecord, _ sent: Sent, _ disposition: Disposition?) async
     {
         await heard(sent.result, sent.noAnswer)
-        let queued = try? outbox.records()
+        let queued = queue()
         update {
-            $0.queued = queued ?? $0.queued
+            $0.queued = queued
             if disposition == .stateChange(.drop) {
                 $0.refused = Refusal(
                     change: record.change, status: sent.status,
@@ -175,7 +179,8 @@ public actor SyncEngine {
 
     /// Any answer, or none, for `link`. A 401 is sign-in's: once per rejection, B4's `refresh`
     /// giving a fresh token sends everything again at once; a fresh token rejected too waits out
-    /// the backoff, or for B4's `retryNow`.
+    /// the backoff, or for B4's `retryNow`. A refresh that gives none is asked again at the next
+    /// 401, a backoff later.
     private func heard(_ result: SendResult, _ noAnswer: NoAnswer?) async {
         guard case .status(let status) = result else {
             state.link = noAnswer == .noToken ? .signIn : .unreachable
@@ -204,8 +209,14 @@ public actor SyncEngine {
         ring()
     }
 
-    private func refreshQueue() {
-        if let queued = try? outbox.records() { state.queued = queued }
+    private func refreshQueue() { state.queued = queue() }
+
+    /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
+    private func queue() -> [OutboxRecord] {
+        do { return try outbox.records() } catch {
+            _ = failed(error)
+            return state.queued
+        }
     }
 
     /// A storage failure: shown (rule 5), and tried again within a minute.

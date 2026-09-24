@@ -134,16 +134,51 @@ struct DrainTests {
         await rig.stop()
     }
 
-    @Test("A 401 with no fresh token to be had waits out the backoff: nothing spins")
+    @Test(
+        "A 401 with no fresh token to be had waits out the backoff: nothing spins — and the next 401 asks again"
+    )
     func reauthFails() async throws {
         let rig = try Rig(refreshWorks: false)
         try await rig.engine.record(.tap(tagId: "tag"))
         try await rig.server.next().reply(401)
-        let state = await rig.until { $0.retryAt == at(2) }
+        var state = await rig.until { $0.retryAt == at(2) }
         #expect(state.link == .signIn)
         #expect(await rig.tokens.refreshes == 1)
         try await rig.sleeping([at(2)])
         #expect(await rig.server.waiting.isEmpty)
+        // A backoff later, rejected again: one more refresh, and the next backoff.
+        rig.clock.advance(by: 2)
+        try await rig.server.next(tapRoute).reply(401)
+        state = await rig.until { $0.retryAt == at(6) }
+        #expect(state.link == .signIn)
+        #expect(await rig.tokens.refreshes == 2)
+        await rig.stop()
+    }
+
+    @Test(
+        "An outbox that cannot be read is shown, and read again within a minute — the record kept, and sent once it can be"
+    )
+    func storageFails() async throws {
+        let rig = try Rig()
+        let tap = try #require(try await rig.engine.record(.tap(tagId: "tag")))
+        try await rig.server.next(tapRoute).reply(503)
+        try await rig.sleeping([at(2)])
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE outbox RENAME TO gone") }
+        rig.clock.advance(by: 2)
+        let state = await rig.until { $0.link == .storageFailed && $0.retryAt == at(62) }
+        #expect(state.queued.map(\.eventId) == [tap.eventId])
+        // The student's retry cannot read it either: still shown, the queue as last read.
+        await rig.engine.retryNow()
+        #expect(await rig.engine.state.link == .storageFailed)
+        #expect(await rig.engine.state.queued.map(\.eventId) == [tap.eventId])
+        try await rig.sleeping([at(62)])
+        #expect(await rig.server.waiting.isEmpty)
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
+        rig.clock.advance(by: 60)
+        let again = try await rig.server.next(tapRoute)
+        #expect(again.eventId == tap.eventId)
+        again.reply(200, Answer.joined())
+        await rig.until { $0.queued.isEmpty && $0.link == .reached }
         await rig.stop()
     }
 
