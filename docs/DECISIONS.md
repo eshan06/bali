@@ -58,7 +58,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   #67's review:** `renameStudent` runs in `withDeadlockRetry` like every other
   engine mutation — no cycle is known (its caller's row, then their classes in
   id order; a join or a Start holds nothing when it takes its class lock), so
-  defence in depth, with no staged race for a deadlock nothing reaches; and one
+  it is defence in depth, and as no race can stage a deadlock nothing reaches,
+  a test aborts the first attempt with an injected 40P01 to pin the retry; and one
   blank class for a stored name and the comparison (`tidyDisplayName` in
   `@bali/shared`: whitespace, the blank braille cell and the null notehead) —
   the route trimmed only `\s`, so `"⠀Bea"` was stored with its leading blank.
