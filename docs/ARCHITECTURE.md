@@ -5,9 +5,11 @@ Decisions live here. Changing one means discussing it first.
 ## What Bali is
 
 A teacher taps their Bali block (an NFC tag) to start a timed focus session for the class.
-Each student's iPhone locks itself for the session using Screen Time shields — everything
-blocked except a short allow-list the student picked once. The teacher sees a live grid of
-who's focused. Afterward: reports, including every emergency unlock.
+Each student's iPhone locks itself for the session using Screen Time shields — every app a
+third-party app can block is blocked, and there is no allow-list for the student to pick
+(ruled 2026-09-24). iOS itself keeps calls, FaceTime, Messages and Emergency SOS working.
+The teacher sees a live grid of who's focused. Afterward: reports, including every
+emergency unlock.
 
 v3 is a from-scratch rebuild. The v2 code and its bug audit live on the `v2-archive` branch.
 
@@ -492,6 +494,10 @@ and data types, so the two apps can't drift out of type-agreement.
   and it means seeing traffic on a minor's phone (a deliberate privacy call). Not in the launch
   path, but a genuine candidate for production as a layer-2 enforcement engine alongside
   Screen Time.
+- **An exception for an app a student medically needs.** The shield blocks every app it can
+  (What Bali is), so a glucose monitor or an assistive-communication app is blocked too. At
+  launch the exit is Emergency Unlock — always allowed, always recorded. Any carve-out is a
+  later product decision for the owner (2026-09-24).
 - **Applied for now:** the Family Controls distribution entitlement (longest lead time, weeks
   to months) — submitted per bundle ID including the monitor extension.
 
