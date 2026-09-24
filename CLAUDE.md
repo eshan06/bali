@@ -15,6 +15,11 @@ is always allowed and always recorded.
    plumbing, CI, cloud sessions, dev). Skim it so known traps aren't
    rediscovered the hard way.
 
+Not on the list on purpose: `docs/DECISIONS.md`, the decision log — why
+things are the way they are. Don't read it front to back. Search it for the
+area you're touching before changing how something works, and add a dated
+entry at the top when you make a real decision.
+
 ## Non-negotiable conventions
 
 - **Only the transition engine (`packages/db/src/transitions.ts`) writes
