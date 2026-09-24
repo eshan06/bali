@@ -32,6 +32,7 @@ import {
   startSession,
   tapIn,
   unlock,
+  unlockUnderTap,
 } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
@@ -366,6 +367,128 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       }
     }
   }, 120_000);
+
+  it('an unlock sent under a tap racing that tap ends unlocked, filed once, whichever lands first (decision 11)', async () => {
+    // The phone sends in order, but a tap stuck at its retry bound steps aside
+    // for the unlock behind it, and a request the phone gave up on may still
+    // be running on the server. Tap first: the unlock is filed in its session.
+    // Unlock first: it is kept unattached, and the tap then files it. Both
+    // lock the tap first (`lockTap`), so one always sees the other.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-tap-unlock-${round}`);
+      const session = await openSession(classId);
+      const tapId = newUuidV7();
+      const theTap = () =>
+        tapIn(db, { sessionId: session.id, studentId, eventId: tapId, deviceTime: ago(20) });
+      const unlockId = newUuidV7();
+      const theUnlock = () =>
+        unlockUnderTap(db, {
+          tapEventId: tapId,
+          studentId,
+          eventId: unlockId,
+          deviceTime: ago(10),
+        });
+
+      // Even rounds give the unlock a head start, so both orders get exercised.
+      const [tapped, unlocked] = await Promise.allSettled([
+        round % 2 === 0 ? new Promise((resolve) => setTimeout(resolve, 10)).then(theTap) : theTap(),
+        theUnlock(),
+      ]);
+      if (tapped.status === 'rejected') throw tapped.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+
+      expect(one(await liveParticipations(session.id)).state).toBe('unlocked');
+      const filed = one(await eventsOfType(session.id, 'unlock'));
+      if (unlocked.value.recordedAs === 'unknown_tap') {
+        expect(tapped.value.state).toBe('unlocked');
+        expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
+      } else {
+        expect(unlocked.value).toMatchObject({ outcome: 'applied', state: 'unlocked' });
+        expect(filed.eventId).toBe(unlockId);
+      }
+    }
+  }, 120_000);
+
+  it('a tap and its unlock landing at once never both miss the other (decision 11)', async () => {
+    // The interleaving `lockTap` exists for, staged: the unlock looks for its
+    // tap before the tap has committed, and the tap looks for unlocks kept
+    // under it before the unlock has. A holder owning the unlock's id parks
+    // the unlock on the index right after its look, so the tap arrives while
+    // the unlock is still uncommitted. Without the lock the tap commits
+    // focused and the unlock then commits unattached — neither filed, the
+    // grid green over a phone its student unlocked. With it the tap waits,
+    // and files the unlock once it lands.
+    const { classId, studentId } = await seed('race-tap-unlock-staged');
+    const session = await openSession(classId);
+    const tapId = newUuidV7();
+    const unlockId = newUuidV7();
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let inserted!: () => void;
+    const hasRow = new Promise<void>((resolve) => {
+      inserted = resolve;
+    });
+    const holder = db
+      .transaction(async (tx) => {
+        await tx
+          .insert(events)
+          .values({ eventId: unlockId, type: 'unlock', userId: studentId, occurredAt: new Date() });
+        inserted();
+        await held;
+        throw new Error('rolled back on purpose');
+      })
+      .catch(() => undefined);
+    await hasRow;
+
+    // Tapped at -20 s, unlocked at -10 s, as the phone did them.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    const unlocking = unlockUnderTap(db, {
+      tapEventId: tapId,
+      studentId,
+      eventId: unlockId,
+      deviceTime: ago(10),
+    });
+    let tapping: ReturnType<typeof tapIn> | undefined;
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend();
+      tapping = tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: tapId,
+        deviceTime: ago(20),
+      });
+      // Wait for the tap to park behind the unlock, or — without the lock —
+      // to finish without it.
+      let done = false;
+      const finish = () => {
+        done = true;
+      };
+      tapping.then(finish, finish);
+      const deadline = Date.now() + 5_000;
+      while (!done && (await lockWaiters()) < 2 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await holder;
+    const settled = await Promise.allSettled([unlocking, tapping ?? Promise.resolve(undefined)]);
+    if (unstaged !== null) throw unstaged;
+    for (const s of settled) if (s.status === 'rejected') throw s.reason as Error;
+
+    expect(settled[0]).toMatchObject({ value: { outcome: 'recorded', recordedAs: 'unknown_tap' } });
+    expect(settled[1]).toMatchObject({ value: { outcome: 'joined', state: 'unlocked' } });
+    expect(one(await liveParticipations(session.id)).state).toBe('unlocked');
+    const filed = one(await eventsOfType(session.id, 'unlock'));
+    expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
+  }, 20_000);
 
   it('protection off racing the end of the session is recorded exactly once, whichever lands first', async () => {
     // Owner decision 10: a report that reaches a session already over is

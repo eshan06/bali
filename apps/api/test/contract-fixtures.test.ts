@@ -87,6 +87,15 @@ const SCENARIOS: Record<string, string> = {
   'unlock/recorded-superseded':
     'A late unlock (A10), stuck on the phone while the student’s own refocus went ahead of it: recorded, the focus left alone.',
   'unlock/409-event-id-conflict': 'An unlock under an id the student’s own tap holds (a bug).',
+  'tap-unlock/applied':
+    'An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.',
+  'tap-unlock/replay': 'The retry of that unlock: the reason on record, not the retry’s.',
+  'tap-unlock/recorded-tap-armed':
+    'An unlock sent under a tap that only armed, waiting for Start: kept with no session.',
+  'tap-unlock/recorded-unknown-tap':
+    'An unlock sent under a tap the server has not heard of yet: kept with no session.',
+  'taps/joined-unlocked':
+    'A tap reaching the server after the unlock sent under it (decision 11): joined, the unlock filed there.',
   'refocus/applied': 'Back to focus after an unlock.',
   'refocus/replay': 'The retry of a refocus that landed, the student still in the session.',
   'refocus/replay-no-session':
@@ -213,7 +222,9 @@ async function capture(
 /** The route a path is for: its ids, and a join code, become their parameter's name. */
 function routeOf(path: string) {
   const ids = path.split('?')[0]!.replace(/[0-9a-f-]{36}/g, '{id}');
-  return ids.replace(/^\/v1\/join-codes\/[^/]*$/, '/v1/join-codes/{code}');
+  return ids
+    .replace(/^\/v1\/join-codes\/[^/]*$/, '/v1/join-codes/{code}')
+    .replace(/^\/v1\/taps\/\{id\}\//, '/v1/taps/{eventId}/');
 }
 
 /** A step that sets a scenario up: it must succeed, and it is no fixture. */
@@ -361,6 +372,31 @@ async function captureAll() {
   });
   const passed = { outcome: 'recorded', recordedAs: 'superseded', state: 'focused' };
   await capture('unlock/recorded-superseded', older, 200, passed);
+
+  // An unlock made while the phone's own tap was unanswered, sent under that
+  // tap (owner decision 11): filed where it landed, or kept with no session.
+  const underTap = (as: string, tapId: string, eventId: string = randomUUID(), extra = {}) =>
+    post(as, `/v1/taps/${tapId}/unlock`, { eventId, deviceTime, ...extra });
+  const offline = await seedClassroom(db, 'fx-tap-unlock');
+  await start(offline.klass.id);
+  const eli = await token(offline.student.cognitoId);
+  const itsTap = randomUUID();
+  await setup(tap(eli, offline.block.tagId, itsTap));
+  const filedUnder = randomUUID();
+  const nurseUnder = underTap(eli, itsTap, filedUnder, { reason: 'nurse' });
+  await capture('tap-unlock/applied', nurseUnder, 200, { outcome: 'applied' });
+  const otherUnder = underTap(eli, itsTap, filedUnder, { reason: 'other' });
+  await capture('tap-unlock/replay', otherUnder, 200, { outcome: 'replay', reason: 'nurse' });
+  const waits = { outcome: 'recorded', recordedAs: 'tap_armed' };
+  await capture('tap-unlock/recorded-tap-armed', underTap(armer, waiting), 200, waits);
+  const stuckTap = await seedClassroom(db, 'fx-tap-unlock-late');
+  await start(stuckTap.klass.id);
+  const fay = await token(stuckTap.student.cognitoId);
+  const notYet = randomUUID();
+  const unheard = { outcome: 'recorded', recordedAs: 'unknown_tap' };
+  await capture('tap-unlock/recorded-unknown-tap', underTap(fay, notYet), 200, unheard);
+  const filedLate = { outcome: 'joined', state: 'unlocked' };
+  await capture('taps/joined-unlocked', tap(fay, stuckTap.block.tagId, notYet), 200, filedLate);
 
   // Previewing a code, then joining and leaving by it (A6, auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');

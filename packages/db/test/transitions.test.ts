@@ -1740,6 +1740,42 @@ describe('an unlock sent under its tap (decision 11)', () => {
     expect(await unlocksOf(student.id)).toHaveLength(1);
   });
 
+  it('one kept while its tap was armed stays unattached when that tap lands by a retry', async () => {
+    // Armed, then a Start of the teacher's other class — the student joins it
+    // only afterwards, so the retry of the tap is what lands there.
+    const { teacher, student, school } = await seedClass('tap-unlock-armed-retry');
+    const tap = newUuidV7();
+    const morning = new Date('2026-01-01T08:57:00Z');
+    const expiresAt = new Date('2026-01-01T23:59:59Z');
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: tap,
+      deviceTime: morning,
+      expiresAt,
+      now: morning,
+    });
+    const sent = underTap(student.id, tap, new Date('2026-01-01T08:58:00Z'));
+    expect((await unlockUnderTap(db, sent)).recordedAs).toBe('tap_armed');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Other class',
+          joinCode: 'JOIN-tuar-2',
+        })
+        .returning(),
+    );
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: other.id, ...w });
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    expect(await tapped(session, student.id, tap, morning)).toMatchObject({ state: 'focused' });
+    expect(await unlocksOf(student.id)).toHaveLength(1);
+  });
+
   it('is kept unattached, noted, when no tap of the caller’s has that id — never in another’s session', async () => {
     const { session, student } = await lesson('tap-unlock-unknown');
     const classmate = one(

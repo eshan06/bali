@@ -462,6 +462,20 @@ describe('a late unlock turns no chip (A10)', () => {
     const s = fromSnapshot(snapshot(5, [{ id: 'ana', unlock }]));
     expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
   });
+
+  it('landing after the bell, the return ahead of it, leaves a calm Left chip (#76)', () => {
+    // Back in focus, and shielded at the bell: the engine notes the stuck
+    // unlock `superseded` there too, never "Left · unlocked" over this phone.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'unlock', 'ana', T0, { reason: 'bathroom' }));
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    s = applyEvent(s, evt(8, 'session_expired', null));
+    s = applyEvent(s, late(9, 'ana', 'nurse'));
+    expect(chip(s, 'ana')).toEqual({ display: 'ended', note: null });
+    // And the refresh, whose turn looks past it to the refocus, reads the same.
+    s = mergeSnapshot(s, snapshot(9, [{ id: 'ana', endedAt: T1 }]));
+    expect(chip(s, 'ana')).toEqual({ display: 'ended', note: null });
+  });
 });
 
 describe('a student the snapshot does not carry (A9)', () => {

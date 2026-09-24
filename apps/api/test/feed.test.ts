@@ -3,6 +3,7 @@ import {
   endEnrollment,
   endSession,
   enrollments,
+  events,
   protectionOff,
   refocus,
   renameStudent,
@@ -252,6 +253,41 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
       state: 'unlocked',
       unlock: { reason: 'other', recordedAs: null },
     });
+  });
+
+  it('never carries one landing after the bell either: shielded then, the chip stays a calm Left', async () => {
+    // #76's review: read as "nothing live", it painted "Left · unlocked".
+    const { teacher, student, session } = await seedRunning('a10-late-after-end');
+    const ago = (seconds: number) => ({
+      ...change(session.id, student.id),
+      deviceTime: new Date(Date.now() - seconds * 1000),
+    });
+    await tapIn(db, ago(50));
+    await unlock(db, { ...ago(40), reason: 'bathroom' });
+    await refocus(db, ago(30));
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    expect((await unlock(db, { ...ago(45), reason: 'nurse' })).recordedAs).toBe('superseded');
+    const after = row(await snapshotOf(teacher.cognitoId, session.id), student.id);
+    expect(after).toMatchObject({ state: 'focused', unlock: null });
+    expect(after?.endedAt).not.toBeNull();
+  });
+
+  it('looks past a late note on an unlock only: a return is never late', async () => {
+    // #76's review: the filter read `recorded_as` off every turn. No return
+    // carries that note today, so one is written here by hand.
+    const { teacher, student, session } = await seedRunning('a10-note-scope');
+    await tapIn(db, change(session.id, student.id));
+    await unlock(db, { ...change(session.id, student.id), reason: 'bathroom' });
+    await db.insert(events).values({
+      eventId: randomUUID(),
+      type: 'refocus',
+      sessionId: session.id,
+      classId: session.classId,
+      userId: student.id,
+      occurredAt: new Date(),
+      payload: { recorded_as: 'superseded' },
+    });
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)?.unlock).toBeNull();
   });
 
   it('carries the late records a session end leaves the row without', async () => {

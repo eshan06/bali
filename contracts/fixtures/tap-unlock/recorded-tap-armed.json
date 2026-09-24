@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/taps/{eventId}/unlock",
+  "scenario": "An unlock sent under a tap that only armed, waiting for Start: kept with no session.",
+  "request": {
+    "path": "/v1/taps/00000000-0000-7000-8000-000000000001/unlock",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "UnlockResponse",
+  "body": {
+    "outcome": "recorded",
+    "recordedAs": "tap_armed",
+    "state": null,
+    "session": null,
+    "reason": null
+  },
+  "disposition": "recorded"
+}

@@ -215,6 +215,7 @@ export const ENDPOINTS: Record<
   'POST /v1/taps': { type: 'TapResponse', outbox: 'tap' },
   'POST /v1/sessions/{id}/checkin': { type: 'CheckInResponse' },
   'POST /v1/sessions/{id}/unlock': { type: 'UnlockResponse', outbox: 'unlock' },
+  'POST /v1/taps/{eventId}/unlock': { type: 'UnlockResponse', outbox: 'unlock' },
   'POST /v1/sessions/{id}/refocus': { type: 'RefocusResponse', outbox: 'change' },
   'POST /v1/sessions/{id}/protection-off': { type: 'ProtectionOffResponse', outbox: 'change' },
   'POST /v1/enrollments': { type: 'EnrollmentJoinResponse' },

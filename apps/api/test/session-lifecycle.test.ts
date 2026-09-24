@@ -15,9 +15,10 @@ import type {
   ExtendSessionResponse,
   ProtectionOffResponse,
   RefocusResponse,
+  TapResponse,
   UnlockResponse,
 } from '@bali/shared';
-import { unlockDisposition } from '@bali/shared';
+import { tapDisposition, unlockDisposition } from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -584,6 +585,157 @@ describe('POST /v1/sessions/:id/unlock', () => {
     const res = await ctx.app.inject({
       method: 'POST',
       url: `/v1/sessions/${session.id}/unlock`,
+      payload: { eventId: randomUUID(), deviceTime: now() },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('POST /v1/taps/:eventId/unlock', () => {
+  // Owner decision 11: an unlock made while the phone's own tap is unanswered,
+  // sent under that tap's id — filed wherever the tap landed, or kept
+  // unattached with a note. Never refused.
+  const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+  const tapBlock = (token: string, tagId: string, eventId: string) =>
+    post(token, '/v1/taps', { tagId, eventId, deviceTime: ago(20) });
+  const underTap = (token: string, tapId: string, body: object = {}) =>
+    post(token, `/v1/taps/${tapId}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: ago(10),
+      ...body,
+    });
+  const unlocksIn = (sessionId: string) =>
+    db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, sessionId), eq(events.type, 'unlock')));
+
+  it('files the unlock in the session its tap landed in, and its retry replays', async () => {
+    const { student, block, session } = await seedRunning('tap-unlock-api');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapId = randomUUID();
+    expect((await tapBlock(token, block.tagId, tapId)).json<TapResponse>().outcome).toBe('joined');
+
+    const eventId = randomUUID();
+    const res = await underTap(token, tapId, { eventId, reason: 'bathroom' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<UnlockResponse>();
+    expect(body).toMatchObject({
+      outcome: 'applied',
+      recordedAs: null,
+      state: 'unlocked',
+      session: { id: session.id, classId: session.classId },
+      reason: 'bathroom',
+    });
+    expect(unlockDisposition(res.statusCode, body)).toBe('recorded');
+
+    const retry = await underTap(token, tapId, { eventId, reason: 'other' });
+    expect(retry.json<UnlockResponse>()).toMatchObject({
+      outcome: 'replay',
+      state: 'unlocked',
+      session: { id: session.id },
+      reason: 'bathroom',
+    });
+    expect((await unlocksIn(session.id)).map((e) => e.payload)).toEqual([
+      { tap_event_id: tapId, reason: 'bathroom' },
+    ]);
+  });
+
+  it('keeps it unattached, noted, when its tap was only armed or never arrived', async () => {
+    const { student, block } = await seedClassroom(db, 'tap-unlock-api-kept');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const armedId = randomUUID();
+    expect((await tapBlock(token, block.tagId, armedId)).json<TapResponse>().outcome).toBe('armed');
+
+    for (const [tapId, note] of [
+      [armedId, 'tap_armed'],
+      [randomUUID(), 'unknown_tap'],
+    ] as const) {
+      const res = await underTap(token, tapId, { reason: 'nurse' });
+      expect(res.statusCode, note).toBe(200);
+      expect(res.json<UnlockResponse>(), note).toEqual({
+        outcome: 'recorded',
+        recordedAs: note,
+        state: null,
+        session: null,
+        reason: 'nurse',
+      });
+      expect(unlockDisposition(res.statusCode, res.json())).toBe('recorded');
+    }
+  });
+
+  it('a tap reaching the server after its unlock answers with the unlock filed there', async () => {
+    const { student, block, session } = await seedRunning('tap-unlock-api-late-tap');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapId = randomUUID();
+    const kept = await underTap(token, tapId);
+    expect(kept.json<UnlockResponse>().recordedAs).toBe('unknown_tap');
+
+    const tapped = await tapBlock(token, block.tagId, tapId);
+    expect(tapped.json<TapResponse>()).toMatchObject({
+      outcome: 'joined',
+      state: 'unlocked',
+      session: { id: session.id },
+    });
+    // A window to reconcile to, and a state that is not focused: no shields.
+    expect(tapDisposition(tapped.statusCode, tapped.json())).toBe('apply_session');
+    expect(await unlocksIn(session.id)).toHaveLength(1);
+  });
+
+  it('files nothing under a tap that is not the caller’s: a stranger’s or a teacher’s is kept unattached', async () => {
+    const { teacher, student, block, session } = await seedRunning('tap-unlock-api-theirs');
+    const tapId = randomUUID();
+    await tapBlock(await ctx.tokenFor(student.cognitoId), block.tagId, tapId);
+
+    for (const who of ['outsider', teacher.cognitoId]) {
+      const res = await underTap(await ctx.tokenFor(who), tapId);
+      expect(res.statusCode, who).toBe(200);
+      expect(res.json<UnlockResponse>(), who).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'unknown_tap',
+        session: null,
+      });
+    }
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, session.id));
+    expect(row?.state).toBe('focused');
+    expect(await unlocksIn(session.id)).toHaveLength(0);
+  });
+
+  it('a malformed tap id or body is a 400 the outbox keeps; an unknown reason is recorded as none', async () => {
+    const { student } = await seedRunning('tap-unlock-api-400');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const badTap = await post(token, '/v1/taps/not-a-uuid/unlock', {
+      eventId: randomUUID(),
+      deviceTime: ago(10),
+    });
+    expect(badTap.statusCode).toBe(400);
+    const badBody = await underTap(token, randomUUID(), { eventId: 'x' });
+    expect(badBody.statusCode).toBe(400);
+    expect(unlockDisposition(badBody.statusCode, badBody.json())).toBe('retry_and_surface');
+
+    const odd = await underTap(token, randomUUID(), { reason: 'skateboard' });
+    expect(odd.statusCode).toBe(200);
+    expect(odd.json<UnlockResponse>()).toMatchObject({ outcome: 'recorded', reason: null });
+  });
+
+  it('an id another event holds is a 409 the outbox keeps retrying', async () => {
+    const { student, block } = await seedRunning('tap-unlock-api-409');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapId = randomUUID();
+    await tapBlock(token, block.tagId, tapId);
+    const res = await underTap(token, tapId, { eventId: tapId });
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ error: { reason: string } }>().error.reason).toBe('event_id_conflict');
+    expect(unlockDisposition(res.statusCode, res.json())).toBe('retry_and_surface');
+  });
+
+  it('requires authentication', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/v1/taps/${randomUUID()}/unlock`,
       payload: { eventId: randomUUID(), deviceTime: now() },
     });
     expect(res.statusCode).toBe(401);
