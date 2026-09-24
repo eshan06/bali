@@ -2,6 +2,7 @@ import type {
   EventType,
   ParticipationEndedReason,
   ParticipationState,
+  ProtectionOffRecordedAs,
   UnlockReason,
   UnlockRecordedAs,
   UnlockRecordedOutcome,
@@ -1649,7 +1650,7 @@ export interface StateChangeResult {
  * unlock does NOT use this — it must never refuse in a way that discards a
  * record (ISSUES.md #2), so it has its own body below.
  */
-async function changeState(
+async function changeState<Ended = never>(
   db: Database,
   input: StateChangeInput,
   eventType: EventType,
@@ -1659,9 +1660,11 @@ async function changeState(
     cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string };
     /** Refuse a replay whose participation has ended, rather than answer that row's last state. */
     replayNeedsLive?: boolean;
+    /** Answer a change that reaches an ended session instead of refusing it; runs under the session lock. */
+    afterEnd?: (tx: Database, session: SessionRow) => Promise<Ended>;
   } = {},
-): Promise<StateChangeResult> {
-  const { cannotLeave, replayNeedsLive = false } = rules;
+): Promise<StateChangeResult | Ended> {
+  const { cannotLeave, replayNeedsLive = false, afterEnd } = rules;
   // Retry on deadlock: this locks the session first and the participation row
   // second, while the silence sweep, a tap switching the student out of this
   // session, and an armed tap converting at another Start take the row first —
@@ -1675,8 +1678,12 @@ async function changeState(
       // session's window and a refocus answer turns shields back on — a 200
       // pointing the phone at a session that is over (rule 4). The refusal
       // costs nothing: the phone drops a refused change and re-reads the truth
-      // (its outbox contract for state changes, Phase 3 A3).
-      if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      // (its outbox contract for state changes, Phase 3 A3). A change that must
+      // be kept even then answers it itself (`afterEnd`: protection off).
+      if (session.endedAt) {
+        if (afterEnd) return afterEnd(tx, session);
+        throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      }
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
 
@@ -1765,12 +1772,11 @@ function knownReason(reason: unknown): UnlockReason | null {
   return isUnlockReason(reason) ? reason : null;
 }
 
-/**
- * The reason stored on an unlock that already landed. A replay answers with
- * what was recorded (rule 4), not with whatever the retry carries, so a phone
- * that changed its answer between retries learns which one the teacher sees.
- */
-async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
+/** The payload stored on an event that already landed; null when it has none. */
+async function storedPayload(
+  tx: Database,
+  eventId: string,
+): Promise<Record<string, unknown> | null> {
   const row = firstOrUndefined(
     await tx
       .select({ payload: events.payload })
@@ -1778,7 +1784,16 @@ async function recordedReason(tx: Database, eventId: string): Promise<UnlockReas
       .where(eq(events.eventId, eventId))
       .limit(1),
   );
-  const stored = (row?.payload as { reason?: unknown } | null | undefined)?.reason;
+  return (row?.payload ?? null) as Record<string, unknown> | null;
+}
+
+/**
+ * The reason stored on an unlock that already landed. A replay answers with
+ * what was recorded (rule 4), not with whatever the retry carries, so a phone
+ * that changed its answer between retries learns which one the teacher sees.
+ */
+async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
+  const stored = (await storedPayload(tx, eventId))?.reason;
   return isUnlockReason(stored) ? stored : null;
 }
 
@@ -2032,15 +2047,92 @@ export function refocus(db: Database, input: StateChangeInput): Promise<StateCha
   });
 }
 
+export interface ProtectionOffResult {
+  /** 'applied' marked a live participation; 'recorded' saved a report that first reached the server after its session ended, marking nothing (owner decision 10); 'replay' the report already landed. */
+  outcome: 'applied' | 'recorded' | 'replay';
+  /** Why nothing was marked, on a fresh 'recorded' report; null for 'applied' and 'replay', as on an unlock. */
+  recordedAs: ProtectionOffRecordedAs | null;
+  /** 'protection_off' when applied; the current stored state on a replay while the session runs; null once it has ended. */
+  state: ParticipationState | null;
+  participationId: string;
+  /** The running session, so the response carries its end time; null once it has ended — no window to hand a phone. */
+  session: SessionRow | null;
+}
+
+/**
+ * A protection-off report that reaches a session already over. Owner decision
+ * 10 (2026-09-24): saved like a late unlock — recorded, noted
+ * `after_session_end`, nothing marked — so the history says why the phone went
+ * quiet; before, it was refused and never recorded, and the grid showed that
+ * phone green and then silent. The bell and a teacher's early end are one case,
+ * as they are for a late unlock. The answer carries no session and no state:
+ * after an early end `endsAt` is still ahead, and a 200 carrying it would hand a
+ * phone that already heard "gone" a window to shield to (rule 4 — the A2
+ * entry's reason for the 409 this replaces).
+ *
+ * The ruling covers a student who was in the session when it ended; everything
+ * else keeps the answer it had, `SESSION_NOT_RUNNING`:
+ *   - a caller whose participation ended before the session did (removed, left
+ *     the class, switched away) or who has none (never tapped in, an outsider,
+ *     the teacher) — so no one writes into a session they were not in at its
+ *     end ("never refuse" is not "never check");
+ *   - the retry of a report that landed while the session ran: it is on record,
+ *     and the phone drops a refused change and re-reads the truth (A3). Only a
+ *     report recorded here, after the end, replays.
+ */
+async function recordProtectionOffAfterEnd(
+  tx: Database,
+  session: SessionRow,
+  input: StateChangeInput,
+): Promise<ProtectionOffResult> {
+  const row = await loadParticipation(tx, session.id, input.studentId);
+  // Only a row the end itself closed. Nothing reopens a participation in an
+  // ended session, so a retry always meets the same row and the same answer.
+  if (!row || (row.endedReason !== 'session_ended' && row.endedReason !== 'session_expired')) {
+    throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+  }
+  const note: ProtectionOffRecordedAs = 'after_session_end';
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId,
+    type: 'protection_off',
+    sessionId: session.id,
+    classId: session.classId,
+    userId: input.studentId,
+    // Clamped like a late unlock: after an early end this can land past the
+    // real end but stays inside the scheduled window, and the note says late.
+    occurredAt: clampToWindow(input.deviceTime, session.startedAt, session.endsAt),
+    payload: { recorded_as: note },
+  });
+  if (!isNew && (await storedPayload(tx, input.eventId))?.recorded_as !== note) {
+    throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+  }
+  return {
+    outcome: isNew ? 'recorded' : 'replay',
+    recordedAs: isNew ? note : null,
+    state: null,
+    participationId: row.id,
+    session: null,
+  };
+}
+
 /**
  * Screen Time permission was turned off — its own state, never green, never an
  * unlock. A replay after the participation ended (removal, leaving the class,
  * or a switch, while the session runs) is refused rather than answered with the
  * ended row's last state; refocus keeps that shipped answer until the owner
- * rules (PLAN, A4).
+ * rules (PLAN, A4). A report that reaches a session already over is recorded
+ * with a note instead of refused (`recordProtectionOffAfterEnd`).
  */
-export function protectionOff(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
-  return changeState(db, input, 'protection_off', 'protection_off', { replayNeedsLive: true });
+export async function protectionOff(
+  db: Database,
+  input: StateChangeInput,
+): Promise<ProtectionOffResult> {
+  const result = await changeState(db, input, 'protection_off', 'protection_off', {
+    replayNeedsLive: true,
+    afterEnd: (tx, session) => recordProtectionOffAfterEnd(tx, session, input),
+  });
+  // changeState's own answers come from a running session and carry no note.
+  return 'recordedAs' in result ? result : { ...result, recordedAs: null };
 }
 
 export interface CheckInInput {

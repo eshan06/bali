@@ -8,6 +8,79 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A2c: a protection-off that first reaches the server after
+  the bell is recorded with a note (owner decision 10).** The owner chose
+  "record it with a note": saved like a late unlock, so the history says why
+  the phone went quiet — before, it was refused and never recorded, and the
+  grid showed that phone green until 90 s after its last contact, then silent.
+  Today's `409 session has ended` becomes a `200` (`outcome: 'recorded'`,
+  `recordedAs: 'after_session_end'`), a correction API decision 2 allows. The
+  event carries `payload.recorded_as: 'after_session_end'` — the key and value
+  a late unlock carries, from its own additive list
+  (`PROTECTION_OFF_RECORDED_AS`) — and, like a late unlock, marks nothing: the
+  ended row stays as the end left it. The answer carries **no session and no
+  state** (both null only on this outcome and its replay; every answer that
+  was already a `200` keeps its shape). That is what answers the A2 entry's
+  reason for the `409` — after an EARLY end `endsAt` is still ahead, and a
+  `200` must not hand a phone that already heard "gone" a window to shield to —
+  by carrying no window rather than by refusing. Edge cases, each decided
+  conservatively: the ruling covers a student who was in the session when it
+  ended, and everything else keeps today's `409 session has ended`.
+  (1) The bell and a teacher's early end are one case, as they are for a late
+  unlock (this log's "after the bell" already meant both), and the missing
+  window is what makes the early end safe. (2) A caller whose participation
+  ended before the end (removed, left the class, switched away) or who has
+  none (never tapped in, an outsider, the teacher) is still refused — "never
+  refuse" is not "never check": nothing is written into a session the caller
+  was not in at its end. (3) A report that landed while the session ran,
+  retried after the end, is still refused: it is on record, the phone drops a
+  refused change (A3), and the ruling is about a report FIRST reaching the
+  server after the bell. The retry of one recorded after the end replays
+  (`200`, still no session), told apart by the stored note. (4) An id already
+  spent on another event is refused `EVENT_ID_CONFLICT` (a `409` as before,
+  with a truer message), never swallowed as a replay. (5) Refocus is
+  untouched: refused after the end, fresh or retried. The engine does it with
+  one optional hook where `changeState` refused (`afterEnd`, passed only by
+  protection off), inside the same session-locked transaction. The live grid
+  shows the new event as "Left · protection off", and the note marks the chip
+  ended even for a tab that never saw the end — a student the roster no
+  longer carries would otherwise read a live "Protection off". Known
+  limitation, shared with a late unlock and left to A9: the next 15 s snapshot
+  refresh reads the ended row, which a late record leaves alone, so that chip
+  reverts to "Left"; the event log keeps the record. Pinned by engine tests
+  (the recorded path goes red without the hook, and removing the standing
+  check, the note check, the missing session, the untouched row or the note
+  each turns one red), API tests (a `200 recorded` and its replay, validation,
+  and the `409`s that remain for an outsider, the teacher, a student who never
+  tapped in and one removed before the end), a grid test, and a real-Postgres
+  race of the report against `endSession` and against the expiry sweep: in
+  either order exactly one `protection_off` is recorded — applied, or noted —
+  never a refusal or a 500 (red without the hook).
+- **2026-09-24** — **Owner rulings: decisions 7, 8 and 9, D1, and the iOS
+  identifiers.** **7:** a tap made with no signal shields at once; if the phone
+  never reaches the server, the shields come off on their own after 50 minutes
+  (the owner's length; iOS can't schedule under 15 minutes). The real end time
+  replaces the cap as soon as the phone reaches the server, and Emergency
+  Unlock works throughout. **8:** an edited display name must be unique within
+  each class — refuse a name a classmate in any shared class already uses,
+  ignoring case. A8 implements it, after its screen design. **9:** the iOS
+  build's CI runs on GitHub-hosted macOS runners, only on PRs that touch
+  `ios/` — free while the repo is public. The owner plans to make the repo
+  private once the build is done; revisit then: Actions minutes start counting
+  (macOS at 10×), so the iOS job moves to the owner's Mac as a self-hosted
+  runner (safe only once the repo is private — on a public repo a fork PR
+  could run code on it), and on a personal account branch rulesets need
+  GitHub Pro to keep being enforced on a private repo. **D1:** the owner
+  approved the first pass of the student screens with changes; their comments
+  are coming on the artifact, and A6, A7 and A8 wait for them. **iOS
+  identifiers (B2):** v2's, as the Family Controls entitlement request used
+  them — Apple team `H535678UF8`; student app `com.bali.Bali`; extensions
+  `com.bali.Bali.BaliShield` (shield UI) and `com.bali.Bali.BaliMonitor`
+  (DeviceActivity monitor); app group `group.com.bali.shared`. Also recorded,
+  from #56's Claude Review (a WARN, not fixed there): the sweep's per-row
+  deadlock retry runs inside a serial loop, so its worst case is candidates ×
+  4 backoff sleeps; if the sweep grows, bound it (a shared retry budget per
+  run, or batching) — noted on PLAN's Phase 4 load-gate row.
 - **2026-09-23** — **A2b: no deadlock reaches a phone as a 500.** Unlock,
   refocus and protection-off lock the session and then the participation row;
   the silence sweep, a tap switching the student into another session, and an

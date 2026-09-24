@@ -855,7 +855,9 @@ describe('state changes', () => {
       // one EARLY, so its endsAt is still ahead: a refocus answer would tell
       // the phone to shield to a bell that already rang (rule 4's forbidden
       // 200). The refusal costs nothing — the phone drops a refused change and
-      // re-reads the truth.
+      // re-reads the truth. The report landed while the session ran, so owner
+      // decision 10 — a report FIRST reaching the server after the end is
+      // recorded — does not cover its retry: it is on record, and keeps this.
       const { session, student } = await joined('protoff-after-bell');
       await unlock(db, change(session, student, 4));
       const refocused = change(session, student, 5);
@@ -871,6 +873,159 @@ describe('state changes', () => {
       const types = (await eventsFor(session.id)).map((e) => e.type);
       expect(types.filter((t) => t === 'refocus')).toHaveLength(1);
       expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
+    });
+
+    describe('a report that first reaches the server after the session ended (owner decision 10)', () => {
+      /** The bell is the sweep's own call (expireDueSessions -> endSession 'expired'). */
+      function end(session: { id: string }, how: 'bell' | 'early') {
+        return endSession(db, {
+          sessionId: session.id,
+          at: at(10),
+          reason: how === 'bell' ? 'expired' : 'ended',
+        });
+      }
+      async function reports(sessionId: string) {
+        return (await eventsFor(sessionId)).filter((e) => e.type === 'protection_off');
+      }
+      async function rowOf(sessionId: string, studentId: string) {
+        return one(
+          await db
+            .select()
+            .from(participations)
+            .where(
+              and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)),
+            ),
+        );
+      }
+
+      it('is recorded with a note and marks nothing, at the bell or an early end', async () => {
+        for (const how of ['bell', 'early'] as const) {
+          const { session, student } = await joined(`protoff-late-${how}`);
+          await end(session, how);
+          const before = await rowOf(session.id, student.id);
+          // The phone claims 09:40, past the scheduled end: rule 1 clamps it.
+          const report = change(session, student, 40);
+
+          // Saved like a late unlock, and answered with no session and no
+          // state: after an early end endsAt is still ahead, and an answer
+          // carrying it would hand the phone a window to shield to.
+          expect(await protectionOff(db, report)).toMatchObject({
+            outcome: 'recorded',
+            recordedAs: 'after_session_end',
+            state: null,
+            session: null,
+          });
+          const [recorded] = await reports(session.id);
+          expect(recorded?.payload).toEqual({ recorded_as: 'after_session_end' });
+          expect(recorded?.occurredAt).toEqual(session.endsAt);
+          // Nothing marked: the ended row is exactly as the end left it.
+          expect(await rowOf(session.id, student.id)).toEqual(before);
+
+          // A retry replays, still with no window, and records nothing twice.
+          expect(await protectionOff(db, report)).toMatchObject({
+            outcome: 'replay',
+            recordedAs: null,
+            state: null,
+            session: null,
+          });
+          expect(await reports(session.id)).toHaveLength(1);
+
+          // Refocus is untouched: refused after the end, and records nothing.
+          await expect(refocus(db, change(session, student, 11))).rejects.toMatchObject({
+            code: 'SESSION_NOT_RUNNING',
+          });
+          expect((await eventsFor(session.id)).some((e) => e.type === 'refocus')).toBe(false);
+        }
+      });
+
+      it('an id already spent on another event is still refused, never recorded or replayed', async () => {
+        // The same hole insertEvent closes for every writer: answering this as
+        // a replay would tell the phone its report is safe while none exists.
+        const { session, student } = await joined('protoff-late-id-reuse');
+        const tapId = newUuidV7();
+        await tapIn(db, { ...change(session, student, 2), eventId: tapId });
+        await end(session, 'bell');
+
+        await expect(
+          protectionOff(db, { ...change(session, student, 11), eventId: tapId }),
+        ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+        expect(await reports(session.id)).toHaveLength(0);
+      });
+
+      it('anyone who was not in the session when it ended keeps the refusal, and nothing is recorded', async () => {
+        // The ruling covers a student who was in the session at its end.
+        // Everyone else keeps the answer they had: a participation that ended
+        // first (removed, left the class, switched away), none at all (never
+        // tapped in), or no standing here (an outsider, the teacher) — so no
+        // one writes into a session they were not in at its end.
+        const { school, teacher, student: stayed, klass } = await seedClass('protoff-late-who');
+        const { session } = await startSession(db, {
+          classId: klass.id,
+          ...window('2026-01-01T09:00:00Z'),
+        });
+        const elsewhere = await seedClass('protoff-late-who-elsewhere');
+        const next = (
+          await startSession(db, {
+            classId: elsewhere.klass.id,
+            ...window('2026-01-01T09:00:00Z'),
+          })
+        ).session;
+        const [removed, left, switched, absent] = await db
+          .insert(users)
+          .values(
+            ['removed', 'left', 'switched', 'absent'].map((who) => ({
+              cognitoId: `student-protoff-late-${who}`,
+              role: 'student' as const,
+              schoolId: school.id,
+            })),
+          )
+          .returning();
+        const enrolled = await db
+          .insert(enrollments)
+          .values(
+            [removed!, left!, switched!, absent!].map((s) => ({
+              classId: klass.id,
+              studentId: s.id,
+            })),
+          )
+          .returning();
+        await db
+          .insert(enrollments)
+          .values({ classId: elsewhere.klass.id, studentId: switched!.id });
+        for (const s of [stayed, removed!, left!, switched!])
+          await tapIn(db, change(session, s, 2));
+        const enrollmentOf = (id: string) => enrolled.find((e) => e.studentId === id)!.id;
+        await endEnrollment(db, {
+          enrollmentId: enrollmentOf(removed!.id),
+          reason: 'removed_from_class',
+          at: at(5),
+        });
+        await endEnrollment(db, {
+          enrollmentId: enrollmentOf(left!.id),
+          reason: 'left_class',
+          at: at(5),
+        });
+        await tapIn(db, change(next, switched!, 5));
+        await end(session, 'bell');
+
+        const notCovered = {
+          removed: removed!,
+          left: left!,
+          switched: switched!,
+          absent: absent!,
+          outsider: elsewhere.student,
+          teacher,
+        };
+        for (const [who, caller] of Object.entries(notCovered)) {
+          await expect(protectionOff(db, change(session, caller, 11)), who).rejects.toMatchObject({
+            code: 'SESSION_NOT_RUNNING',
+          });
+        }
+        expect(await reports(session.id)).toHaveLength(0);
+        // The control: the one student the end itself closed is recorded.
+        expect((await protectionOff(db, change(session, stayed, 11))).outcome).toBe('recorded');
+        expect(await reports(session.id)).toHaveLength(1);
+      });
     });
 
     it('a report replayed after the student was removed mid-session is refused, not answered as focused', async () => {

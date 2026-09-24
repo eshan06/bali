@@ -189,7 +189,9 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
   // POST /v1/sessions/:id/protection-off — the phone found its Screen Time
   // permission revoked; iOS has already dropped every shield. Its own state,
   // never green and never an unlock (ARCHITECTURE, iOS rules). Strict like
-  // refocus: it needs a live participation, so it can 409/404.
+  // refocus: it needs a live participation, so it can 409/404 — except that a
+  // student who was in the session when it ended is recorded with a note, and
+  // answered with no session (owner decision 10).
   app.post(
     '/v1/sessions/:id/protection-off',
     { preHandler: app.authenticate },
@@ -208,8 +210,9 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       );
       return {
         outcome: result.outcome,
+        recordedAs: result.recordedAs,
         state: result.state,
-        session: toSessionView(result.session),
+        session: result.session ? toSessionView(result.session) : null,
       };
     },
   );

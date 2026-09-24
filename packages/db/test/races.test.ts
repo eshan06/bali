@@ -314,6 +314,58 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 
+  it('protection off racing the end of the session is recorded exactly once, whichever lands first', async () => {
+    // Owner decision 10: a report that reaches a session already over is
+    // recorded with a note instead of refused, so this race has no losing
+    // order. Report first: applied, and the end then closes the row. End
+    // first: recorded after the end, with no session to shield to. Both lock
+    // the session FOR UPDATE and serialise — for a teacher's early end and for
+    // the sweep at the bell alike. Never a refusal, never a 500, never lost.
+    for (let round = 0; round < 12; round += 1) {
+      for (const via of ['end', 'sweep'] as const) {
+        const { classId, studentId } = await seed(`race-protoff-${via}-${round}`);
+        const session = await openSession(classId, { due: via === 'sweep' });
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, change());
+
+        // Odd rounds give the end a head start, so both orders get exercised:
+        // the sweep scans before it locks, and the report otherwise wins it.
+        const report = () => protectionOff(db, change());
+        const [reported, ended] = await Promise.allSettled([
+          round % 2 === 1
+            ? new Promise((resolve) => setTimeout(resolve, 10)).then(report)
+            : report(),
+          via === 'end'
+            ? endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' })
+            : expireDueSessions(db, new Date()),
+        ]);
+
+        expect(ended.status).toBe('fulfilled');
+        if (reported.status === 'rejected') throw reported.reason;
+        const recorded = await eventsOfType(session.id, 'protection_off');
+        expect(recorded).toHaveLength(1);
+        if (reported.value.outcome === 'applied') {
+          expect(recorded[0]!.payload).toBeNull();
+        } else {
+          expect(reported.value).toMatchObject({
+            outcome: 'recorded',
+            recordedAs: 'after_session_end',
+            session: null,
+          });
+          expect(recorded[0]!.payload).toEqual({ recorded_as: 'after_session_end' });
+        }
+        const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+        expect(over.endedAt).not.toBeNull();
+        expect(await liveParticipations(session.id)).toHaveLength(0);
+      }
+    }
+  }, 120_000);
+
   it('unlock, refocus and protection off racing the silence sweep never fail on a deadlock', async () => {
     // Opposite lock orders: the sweep's per-phone transaction takes the
     // participation row first (its guarded UPDATE), then the session's

@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason), A2 (protection off, end to end on the server) and A2b (no deadlock reaches a phone as a 500) have landed. **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason), A2 (protection off, end to end on the server), A2b (no deadlock reaches a phone as a 500) and A2c (a protection-off reaching the server after the bell is recorded with a note) have landed. **The owner ruled on open decisions 7–10 (2026-09-24).** **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -115,8 +115,10 @@ _Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and
 - **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
-  the `unlockDisposition` pattern. **A1 (unlock reason), A2 (protection off) and A2b (deadlock retry) landed; A3 is next.** The
-  owner decisions Phase 3 needs are items 6–10 under Open product decisions;
+  the `unlockDisposition` pattern. **A1 (unlock reason), A2 (protection off),
+  A2b (deadlock retry) and A2c (protection off after the bell, recorded) landed;
+  A3 is next.** Of the owner decisions Phase 3 needs (items 6–10 under Open
+  product decisions), 7–10 are decided (2026-09-24) and 6 is still open;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
   gates B5: confirm the DeviceActivity extension fires at interval END with
   the app force-quit.
@@ -129,7 +131,7 @@ _Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
 | 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ **complete** — merged to `main` and the exit demo passed against dev (2026-09-22) |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | 🔨 in progress — steps below |
-| 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check | ⬜ |
+| 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check. The load gate sizes the sweep too: its per-row deadlock retry runs in a serial loop, so its worst case is candidates × 4 backoff sleeps — if the sweep grows, bound it (a shared retry budget per run, or batching) (#56's review) | ⬜ |
 | 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs | ⬜ |
 
 ### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
@@ -140,16 +142,17 @@ plan backstop already treats it as source).
 - **A1** Unlock takes an optional reason (bathroom / nurse / other) — ✅
 - **A2** `POST /v1/sessions/{id}/protection-off`; refocus refused while protection is off (a re-tap returns) — ✅
 - **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row, while the silence sweep, a switching tap, an armed tap converting at Start and a check-in closing a silence episode take the row first — Postgres aborted one side (40P01) and a phone request that lost got a 500. Both sides retry now; the exit demo drives protection off end to end (live on the stream, refocus refused, a re-tap returns — not yet re-run against dev) — ✅
-- **A3** Outbox dispositions in `@bali/shared`: `tapDisposition` (the tap-side twin of `unlockDisposition`) and one for refocus / protection-off — a refused change is dropped and the truth re-read, never resent. Also: a check-in racing a state change can answer the state from before it (checkIn reads `state` before it writes — pre-existing, raised in A2b's review), so the reconcile must never let a check-in answer override a newer state-change response
+- **A2c** A protection-off that first reaches the server after the session ended is recorded with a note instead of refused (owner decision 10): `200 recorded`, noted `after_session_end` like a late unlock, marking nothing, and answered with no session and no state, so it never hands a phone a window to shield to. Only for a student who was in the session at its end; every other report after the end keeps its `409`, including the retry of one that landed while the session ran — ✅
+- **A3** Outbox dispositions in `@bali/shared`: `tapDisposition` (the tap-side twin of `unlockDisposition`) and one for refocus / protection-off — a refused change is dropped and the truth re-read, never resent. Protection-off's `recorded` (A2c) is final like `applied` and `replay`, and it and its replay carry a null `session` and `state` — pin that shape in the fixtures (A5). Also: a check-in racing a state change can answer the state from before it (checkIn reads `state` before it writes — pre-existing, raised in A2b's review), so the reconcile must never let a check-in answer override a newer state-change response
 - **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`. Settle the same case for refocus here, before a phone ships: its replay after the participation ended in a still-running session answers that row's last state (protection-off refuses it — A2's decision-log entry)
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
-- **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design; A8 after decision 8
-- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it) — including an unlock recorded against a protection-off row, which today leaves the chip unchanged, so it shows only in the event log. Also: a student the snapshot no longer carries (it holds active enrollments only) whose phone unlocks after the overlap window reads "Unlocked", not "Left ·" (pre-existing)
-- **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — first pass up for review: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
+- **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design, and all three wait for the owner's D1 comments; A8 implements decision 8 (a name unique within each class, ignoring case)
+- **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it) — including an unlock recorded against a protection-off row, which today leaves the chip unchanged, so it shows only in the event log. Also: a student the snapshot no longer carries (it holds active enrollments only) whose phone unlocks after the overlap window reads "Unlocked", not "Left ·" (pre-existing); and a late record — an unlock or (A2c) a protection off noted `after_session_end` — shows its "Left ·" chip only until the next 15 s snapshot refresh, which reads the ended row a late record leaves alone, so it reverts to "Left" (the event log keeps it)
+- **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — the owner approved the first pass with changes (2026-09-24); their comments are coming on the artifact, and A6–A8 wait for them: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
-- **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI — after decision 9
+- **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI on GitHub-hosted runners, only on PRs touching `ios/` (decision 9). Identifiers — v2's, as the Family Controls entitlement request used them: team `H535678UF8`; app `com.bali.Bali`; extensions `com.bali.Bali.BaliShield` (shield UI) and `com.bali.Bali.BaliMonitor` (DeviceActivity monitor); app group `group.com.bali.shared`
 - **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
-- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question. Note: "only a re-tap leaves protection off" holds per participation, not per phone — an armed tap converted at another teacher's Start joins that session focused, so the phone must re-report protection off there at its next check-in
+- **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question. A tap the server has not answered yet schedules the 50-minute cap of decision 7. Note: "only a re-tap leaves protection off" holds per participation, not per phone — an armed tap converted at another teacher's Start joins that session focused, so the phone must re-report protection off there at its next check-in
 - **B6** NFC tap → local record → shield → outbox — 📱
 - **C1–C6** Screens: onboarding · join + preview · home / waiting · focus · unlocked, protection off, session over · history + me
 - **E1** Device test gate: ISSUES #2 on hardware — 📱
@@ -161,7 +164,7 @@ plan backstop already treats it as source).
 | Feature | Phase | Notes |
 |---|---|---|
 | Core loop: tap→shield offline, armed taps, live grid, unlock always-recorded, refocus, join codes, roster, removal, self-expiry | 1–2 | ✅ built |
-| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus. The phone's half is B3/B5 |
+| 30s check-in that verifies shields before claiming them | 3 | rule 3. **API ✅ (A2):** a revoked permission is reported with `POST /v1/sessions/{id}/protection-off`; refocus is refused out of it and an unlock never softens it (the grid mirrors the unlock rule; a refocus is never recorded out of it, so there is none to mirror) — only a re-tap returns to focus. A report that first reaches the server after the bell is recorded with a note, like a late unlock (A2c). The phone's half is B3/B5 |
 | Shields survive force-quit; bell frees phone via extension | 3 | pending spike confirmation |
 | Onboarding: privacy contract → sign-in → Screen Time grant → allow-list | 3 | |
 | Consent preview before joining a class | 3 | small |
@@ -170,7 +173,7 @@ plan backstop already treats it as source).
 | Minimal student personal history + edit own name | 3 | backs the privacy contract; **it needs an explicit tiebreak — `seq` inverts the converted-tap pair and `occurred_at` ties it** — see the note on `events_user_seq_idx`; and `armed_tap_skipped` carries the student's id, so it shows here too — render it as a declined tap, never a join |
 | Sign in with Apple (App Review guideline 4.8) | 5 | Cognito IdP |
 | End-of-session recap card (portal) | 4 | |
-| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | `armed_tap_skipped` names a student who did NOT join — never count it as a join |
+| Reports: class focus minutes + unlock list; aggregates only, never rankings | 4 | `armed_tap_skipped` names a student who did NOT join — never count it as a join. An unlock or protection off noted `after_session_end` reached the server after the end, and its time is clamped to the scheduled window, so after an early end it can fall past `ended_at` — never count time beyond it |
 | Teacher signup gating (invite code) | 4 | today: manual role flip **and school assignment** — nothing assigns `users.school_id`, and `classes.school_id` is NOT NULL |
 | Block provisioning: pre-written tags + portal register-by-ID fallback | 5 | no teacher iOS app at launch |
 | Privacy policy, terms, pilot agreement, support/FAQ page | 5 | policy work, launch-blocking |
@@ -194,20 +197,23 @@ layer → roster import (CSV / Google Classroom).
    phones get no live feed, so nothing tells it (lean: poll `GET /v1/me` while
    the app is open and on resume; push rides the fast-follow push work).
    Before C3.
-7. The default end for a tap made with no signal, before the server has
-   answered (lean: shield at once with no countdown until the answer, capped
-   at a default length — the length is the owner's). Before B5.
-8. What, if anything, polices an edited display name — a student can pick a
-   classmate's (the 2026-09-22 display-name entry leaves this to edit-own-name).
-   Before A8.
-9. macOS CI minutes for the iOS build (lean: a GitHub-hosted macOS job that
-   runs only on PRs touching `ios/`). Before B2.
-10. Whether a protection-off that first reaches the server after the bell is
-    recorded (like an unlock, with a note) instead of refused. Today it is
-    refused and never recorded, so the teacher never saw protection off: the
-    grid showed that phone green until 90 s after its last contact, then
-    silent — green through the bell if the bell came first (lean: record it,
-    so the history says why the phone went quiet). Before B3.
+7. The default end for a tap made with no signal — **decided 2026-09-24:**
+   shield at once; if the phone never reaches the server, the shields come off
+   on their own after **50 minutes** (the owner's length; iOS can't schedule
+   under 15). The real end time replaces the cap as soon as the phone reaches
+   the server; Emergency Unlock works throughout. B5 implements it.
+8. Policing an edited display name — **decided 2026-09-24:** unique within
+   each class; a name a classmate in any shared class already uses is refused,
+   ignoring case. A8 implements it, after its screen design.
+9. macOS CI for the iOS build — **decided 2026-09-24:** GitHub-hosted macOS
+   runners, only on PRs that touch `ios/` (free while the repo is public).
+   Revisit when the owner makes the repo private: minutes then count (macOS at
+   10×), so the job moves to the owner's Mac as a self-hosted runner (safe only
+   on a private repo), and a personal account needs GitHub Pro to keep branch
+   rulesets enforced there.
+10. A protection-off that first reaches the server after the bell —
+    **decided 2026-09-24:** recorded with a note, like a late unlock, so the
+    history says why the phone went quiet (a `409` → `200` correction; A2c ✅).
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.
@@ -216,7 +222,8 @@ under-13 parental-consent machinery.
 
 - **Family Controls distribution entitlement** (Apple) — applied for; blocks
   TestFlight/App Store, not development builds. Bundle IDs incl. monitor
-  extension (and shield-UI extension) should be in the request.
+  extension (and shield-UI extension) should be in the request — it used v2's
+  identifiers, which v3 reuses (listed on B2).
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log

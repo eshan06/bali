@@ -1,4 +1,10 @@
-import type { DisplayState, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
+import type {
+  DisplayState,
+  FeedEvent,
+  ParticipationState,
+  ProtectionOffRecordedAs,
+  SessionSnapshot,
+} from '@bali/shared';
 import { deriveDisplayState, PARTICIPATION_STATES } from '@bali/shared';
 
 /**
@@ -103,6 +109,15 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
     case 'protection_off':
       s.state = 'protection_off';
       s.lastSeenAt = advance(s.lastSeenAt, at);
+      // A report recorded after the session ended (owner decision 10) is never
+      // a live chip, even for a tab that never saw the end: a student the
+      // snapshot no longer carries would otherwise read "Protection off", live.
+      if (
+        (e.payload as { recorded_as?: unknown } | null)?.recorded_as ===
+        ('after_session_end' satisfies ProtectionOffRecordedAs)
+      ) {
+        s.endedAt ??= at;
+      }
       break;
     case 'came_back':
       s.lastSeenAt = advance(s.lastSeenAt, at);
