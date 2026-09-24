@@ -1,0 +1,13 @@
+{
+  "endpoint": "GET /v1/me/history",
+  "scenario": "The history of someone signing in for the first time: nothing, and no row.",
+  "request": {
+    "path": "/v1/me/history"
+  },
+  "status": 200,
+  "type": "HistoryPage",
+  "body": {
+    "events": [],
+    "nextBefore": null
+  }
+}

@@ -1,6 +1,7 @@
+import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/db';
 import { describe, expect, it } from 'vitest';
 
-import { DeviceTime } from '../src/routes/schemas.js';
+import { DeviceTime, JoinCode } from '../src/routes/schemas.js';
 
 /*
  * The DeviceTime rule itself, pinned in milliseconds rather than through five
@@ -66,5 +67,35 @@ describe('DeviceTime', () => {
     const z = new Date('2026-09-20T12:00:00Z').getTime();
     expect(new Date('2026-09-20T14:00:00+02:00').getTime()).toBe(z);
     expect(new Date('2026-09-20T05:00:00-07:00').getTime()).toBe(z);
+  });
+});
+
+describe('JoinCode', () => {
+  const code = JOIN_CODE_ALPHABET.slice(0, JOIN_CODE_LENGTH);
+
+  it('reads a code as typed — any case, any surrounding whitespace — as the code', () => {
+    for (const typed of [code, code.toLowerCase(), `  ${code.toLowerCase()}\n`, `\t${code} `]) {
+      expect(JoinCode.parse(typed)).toBe(code);
+    }
+  });
+
+  it('leaves every minted code as it is, so a stored code is always found', () => {
+    // The routes upper-case what they are sent and match it exactly, and no
+    // CHECK constraint holds the stored codes to that: `generateJoinCode` is
+    // their only writer, so its alphabet is what keeps them findable. A
+    // lower-case symbol added to it would mint codes nobody could join.
+    for (const symbol of JOIN_CODE_ALPHABET) {
+      const minted = symbol.repeat(JOIN_CODE_LENGTH);
+      expect(JoinCode.parse(minted)).toBe(minted);
+      expect(JoinCode.parse(minted.toLowerCase())).toBe(minted);
+    }
+  });
+
+  it('refuses an empty code, and one longer than a code once trimmed', () => {
+    expect(JoinCode.safeParse('').success).toBe(false);
+    expect(JoinCode.safeParse(`${code}X`).success).toBe(false);
+    expect(JoinCode.safeParse('x'.repeat(10_000)).success).toBe(false);
+    // Blank is not empty: it trims to nothing and is the join's 404, as ever.
+    expect(JoinCode.parse('   ')).toBe('');
   });
 });

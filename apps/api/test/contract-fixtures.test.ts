@@ -1,7 +1,9 @@
-import { type Database, endSession, enrollments, startSession, users } from '@bali/db';
+import { type Database, endSession, enrollments, startSession, tapIn, users } from '@bali/db';
 import {
   API_ERROR_REASONS,
   type ApiErrorBody,
+  HISTORY_EVENT_TYPES,
+  type HistoryPage,
   STATE_CHANGE_OUTCOMES,
   TAP_OUTCOMES,
   UNLOCK_RECORDED_AS,
@@ -106,6 +108,14 @@ const SCENARIOS: Record<string, string> = {
   'join-codes/404-class-not-found': 'A preview of a join code no class has: the join’s refusal.',
   'join-codes/400-bad-input': 'A preview of an empty code.',
   'join-codes/401-unauthorized': 'A preview sent with no bearer token.',
+  'history/every-kind':
+    'A student’s own history (A7), newest first: every kind of moment it shows, one page.',
+  'history/first-page': 'The newest three moments of that history, and the cursor to the next.',
+  'history/next-page': 'The three moments after them, sent that cursor as `before`.',
+  'history/empty': 'The history of someone signing in for the first time: nothing, and no row.',
+  'history/400-bad-cursor': 'A history page before an event this history does not hold.',
+  'history/400-bad-limit': 'A history page of no moments at all.',
+  'history/401-unauthorized': 'A history asked for with no bearer token.',
 };
 
 interface Call {
@@ -186,7 +196,7 @@ async function capture(
 
 /** The route a path is for: its ids, and a join code, become their parameter's name. */
 function routeOf(path: string) {
-  const ids = path.replace(/[0-9a-f-]{36}/g, '{id}');
+  const ids = path.split('?')[0]!.replace(/[0-9a-f-]{36}/g, '{id}');
   return ids.replace(/^\/v1\/join-codes\/[^/]*$/, '/v1/join-codes/{code}');
 }
 
@@ -331,8 +341,9 @@ async function captureAll() {
   const already = { outcome: 'already_enrolled' };
   await capture('enrollments/already-enrolled', byCode(room.klass.joinCode), 200, already);
   const noClass = { reason: 'class_not_found' };
-  await capture('join-codes/404-class-not-found', preview('NO-SUCH-CODE'), 404, noClass);
-  await capture('enrollments/404-class-not-found', byCode('NO-SUCH-CODE'), 404, noClass);
+  // A code's length, but no class can hold it: an O is never minted.
+  await capture('join-codes/404-class-not-found', preview('NOCODE'), 404, noClass);
+  await capture('enrollments/404-class-not-found', byCode('NOCODE'), 404, noClass);
   await capture('join-codes/400-bad-input', preview(''), 400, { code: 'bad_input' });
   const anonymousPreview = preview(room.klass.joinCode, null);
   await capture('join-codes/401-unauthorized', anonymousPreview, 401, { code: 'unauthorized' });
@@ -354,6 +365,84 @@ async function captureAll() {
   const anonymous = { ...tap(newcomer, 'TAG-fx'), as: null };
   await capture('taps/401-unauthorized', anonymous, 401, { code: 'unauthorized' });
   await capture('taps/404-unknown-block', tap(newcomer, 'NOT-A-BLOCK'), 404, { code: 'not_found' });
+
+  // One student's day across three classes (A7), on fixed windows, so every
+  // time in the history is one this chose: every kind of moment it shows.
+  const day = (hhmm: string) => `2026-01-05T${hhmm}:00.000Z`;
+  const startAt = async (classId: string, from: string, to: string) =>
+    (await startSession(db, { classId, startedAt: new Date(day(from)), endsAt: new Date(day(to)) }))
+      .session;
+  const endAt = (sessionId: string, time: string, reason: 'ended' | 'expired') =>
+    endSession(db, { sessionId, at: new Date(day(time)), reason });
+  const p3 = await seedClassroom(db, 'fx-hist-p3');
+  const p5 = await seedClassroom(db, 'fx-hist-p5');
+  const p6 = await seedClassroom(db, 'fx-hist-p6');
+  await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, p3.teacher.id));
+  await db.update(users).set({ displayName: 'Mr. Okafor' }).where(eq(users.id, p5.teacher.id));
+  const dee = p3.student;
+  await db.insert(enrollments).values([
+    { classId: p5.klass.id, studentId: dee.id },
+    { classId: p6.klass.id, studentId: dee.id },
+  ]);
+  const her = await token(dee.cognitoId);
+  const tapAt = (tagId: string, time: string, eventId = randomUUID()) =>
+    post(her, '/v1/taps', { tagId, eventId, deviceTime: day(time) });
+  const at = (time: string) => ({ deviceTime: day(time) });
+  // Period 3: a lesson, then an unlock and a protection off that first reach
+  // the server after its bell.
+  const sA = await startAt(p3.klass.id, '09:00', '09:50');
+  await setup(tapAt(p3.block.tagId, '09:01'));
+  await setup(change(her, sA.id, 'unlock', randomUUID(), { reason: 'bathroom', ...at('09:10') }));
+  await setup(change(her, sA.id, 'refocus', randomUUID(), at('09:14')));
+  await setup(change(her, sA.id, 'protection-off', randomUUID(), at('09:20')));
+  await setup(tapAt(p3.block.tagId, '09:22'));
+  await endAt(sA.id, '09:50', 'expired');
+  await setup(change(her, sA.id, 'unlock', randomUUID(), at('09:55')));
+  await setup(change(her, sA.id, 'protection-off', randomUUID(), at('09:45')));
+  // Periods 5 and 6 at once: she switches from one to the other, and 6 ends early.
+  const sB = await startAt(p5.klass.id, '10:00', '10:50');
+  const sC = await startAt(p6.klass.id, '10:00', '10:50');
+  await setup(tapAt(p5.block.tagId, '10:05'));
+  await setup(tapAt(p6.block.tagId, '10:30'));
+  await endAt(sC.id, '10:40', 'ended');
+  await endAt(sB.id, '10:50', 'expired');
+  // A tap waiting at period 6's block whose retry lands in period 3 first:
+  // period 6's next Start declines it.
+  const retried = randomUUID();
+  await setup(tapAt(p6.block.tagId, '10:45', retried));
+  const sD = await startAt(p3.klass.id, '11:00', '11:50');
+  const deviceTime11 = new Date(day('11:01'));
+  await tapIn(db, {
+    sessionId: sD.id,
+    studentId: dee.id,
+    eventId: retried,
+    deviceTime: deviceTime11,
+  });
+  await startAt(p6.klass.id, '11:05', '11:50');
+  // She leaves period 3 mid-lesson, is removed from period 5 mid-lesson, and
+  // leaves period 6, whose lesson runs without her.
+  await setup(del(her, `/v1/enrollments/${await enrollmentOf(p3.klass.id, dee.id)}`));
+  await startAt(p5.klass.id, '12:00', '12:50');
+  await setup(tapAt(p5.block.tagId, '12:01'));
+  const okafor = await token(p5.teacher.cognitoId);
+  await setup(del(okafor, `/v1/enrollments/${await enrollmentOf(p5.klass.id, dee.id)}`));
+  await setup(del(her, `/v1/enrollments/${await enrollmentOf(p6.klass.id, dee.id)}`));
+
+  const history = (as: string | null, query = ''): Call => ({
+    as,
+    method: 'GET',
+    path: `/v1/me/history${query}`,
+  });
+  await capture('history/every-kind', history(her), 200, { nextBefore: null });
+  await capture('history/first-page', history(her, '?limit=3'), 200);
+  const cursor = bodyOf(fixtures.get('history/first-page')!).nextBefore as string;
+  await capture('history/next-page', history(her, `?limit=3&before=${cursor}`), 200);
+  const firstSignIn = await token('student-fx-hist-newcomer');
+  await capture('history/empty', history(firstSignIn), 200, { nextBefore: null });
+  const nowhere = history(her, `?before=${randomUUID()}`);
+  await capture('history/400-bad-cursor', nowhere, 400, { code: 'bad_input' });
+  await capture('history/400-bad-limit', history(her, '?limit=0'), 400, { code: 'bad_input' });
+  await capture('history/401-unauthorized', history(null), 401, { code: 'unauthorized' });
 }
 
 beforeAll(async () => {
@@ -410,6 +499,26 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       displayName: unknown;
     }[];
     expect(new Set(teachers.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
+    // Every kind of moment a history shows (A7) — the declined tap naming
+    // where it counted, both late notes — and fields BaliCore decodes as
+    // optional, present and absent; a page with a next and one without.
+    const histories = all.filter((f) => f.type === 'HistoryPage');
+    const moments = histories.flatMap((f) => (f.body as HistoryPage).events);
+    expect(new Set(moments.map((e) => e.type))).toEqual(new Set(HISTORY_EVENT_TYPES));
+    const late = moments.filter((e) => e.recordedAs === 'after_session_end').map((e) => e.type);
+    expect(new Set(late)).toEqual(new Set(['unlock', 'protection_off']));
+    const declined = moments.find((e) => e.type === 'armed_tap_skipped');
+    expect(declined?.countedIn).not.toBeNull();
+    for (const optional of [
+      (e: (typeof moments)[number]) => e.session,
+      (e: (typeof moments)[number]) => e.session?.endedAt ?? null,
+      (e: (typeof moments)[number]) => e.teacher.displayName,
+      (e: (typeof moments)[number]) => e.reason,
+    ]) {
+      expect(new Set(moments.map((e) => optional(e) === null))).toEqual(new Set([true, false]));
+    }
+    const next = new Set(histories.map((f) => bodyOf(f).nextBefore === null));
+    expect(next).toEqual(new Set([true, false]));
     // A replay, and a boot call, with a session and without: the session, not
     // the outcome, gives a phone its window (A3, A4).
     for (const type of ['TapResponse', 'RefocusResponse', 'MeResponse']) {

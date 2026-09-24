@@ -505,16 +505,13 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // the student's other participation, and ending it first would leave them
     // unshielded everywhere off a row that is then declined. Both
     // rows still carry the same `occurred_at`, and every feed read in
-    // queries.ts is scoped to one session, so nothing today sees them in one
-    // stream. One thing will: `events_user_seq_idx` on (user_id, seq) exists
-    // for the student's own timeline, which is cross-session and seq-ordered
-    // by construction, and it would show them joining period 2 before leaving
-    // period 1. And `occurred_at` is not the answer either, though an earlier
-    // version of this comment said it was: the engine stamps ONE value on the
-    // pair, so ordering by it is a tie, and the obvious tiebreak for a tie is
-    // `seq` — the inversion again. That read needs an explicit deterministic
-    // tiebreak, leaves before joins at equal `occurred_at`, decided when it is
-    // built. See `events_user_seq_idx`.
+    // queries.ts is scoped to one session, so no feed sees them in one
+    // stream. The student's own history does (`getHistoryPage`, A7): it is
+    // cross-session, and neither column orders the pair — by `seq` the
+    // student joins period 2 before leaving period 1, and `occurred_at`
+    // ties. So it orders by `occurred_at`, then a leave before anything else
+    // at the same instant, then `seq` — pinned by the history's own tests. See
+    // `events_user_occurred_idx`.
     await endParticipationsElsewhere(tx, tap.studentId, session.id, occurredAt);
     await tx
       .insert(participations)

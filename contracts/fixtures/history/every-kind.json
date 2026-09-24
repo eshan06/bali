@@ -1,0 +1,390 @@
+{
+  "endpoint": "GET /v1/me/history",
+  "scenario": "A student’s own history (A7), newest first: every kind of moment it shows, one page.",
+  "request": {
+    "path": "/v1/me/history"
+  },
+  "status": 200,
+  "type": "HistoryPage",
+  "body": {
+    "events": [
+      {
+        "eventId": "00000000-0000-7000-8000-000000000001",
+        "type": "enrollment_left",
+        "occurredAt": "2000-01-01T00:01:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000002",
+          "name": "Class fx-hist-p6"
+        },
+        "teacher": {
+          "displayName": null
+        },
+        "session": null,
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000003",
+        "type": "enrollment_removed",
+        "occurredAt": "2000-01-01T00:02:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000005",
+          "startedAt": "2000-01-01T00:03:00.000Z",
+          "endsAt": "2000-01-01T00:02:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000006",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:04:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000005",
+          "startedAt": "2000-01-01T00:03:00.000Z",
+          "endsAt": "2000-01-01T00:02:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000007",
+        "type": "enrollment_left",
+        "occurredAt": "2000-01-01T00:05:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000009",
+          "startedAt": "2000-01-01T00:06:00.000Z",
+          "endsAt": "2000-01-01T00:05:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000010",
+        "type": "armed_tap_skipped",
+        "occurredAt": "2000-01-01T00:07:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000002",
+          "name": "Class fx-hist-p6"
+        },
+        "teacher": {
+          "displayName": null
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000011",
+          "startedAt": "2000-01-01T00:07:00.000Z",
+          "endsAt": "2000-01-01T00:05:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        }
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000012",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:08:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000009",
+          "startedAt": "2000-01-01T00:06:00.000Z",
+          "endsAt": "2000-01-01T00:05:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000013",
+        "type": "session_ended",
+        "occurredAt": "2000-01-01T00:09:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000002",
+          "name": "Class fx-hist-p6"
+        },
+        "teacher": {
+          "displayName": null
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000014",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:09:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000015",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:12:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000002",
+          "name": "Class fx-hist-p6"
+        },
+        "teacher": {
+          "displayName": null
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000014",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:09:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000016",
+        "type": "left_for_other_session",
+        "occurredAt": "2000-01-01T00:12:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000017",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:11:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000018",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:13:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000017",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:11:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000019",
+        "type": "unlock",
+        "occurredAt": "2000-01-01T00:14:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": "after_session_end",
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000021",
+        "type": "session_expired",
+        "occurredAt": "2000-01-01T00:14:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000022",
+        "type": "protection_off",
+        "occurredAt": "2000-01-01T00:16:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": "after_session_end",
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000023",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:17:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000024",
+        "type": "protection_off",
+        "occurredAt": "2000-01-01T00:18:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000025",
+        "type": "refocus",
+        "occurredAt": "2000-01-01T00:19:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000026",
+        "type": "unlock",
+        "occurredAt": "2000-01-01T00:20:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": "bathroom",
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000027",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:21:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000020",
+          "startedAt": "2000-01-01T00:15:00.000Z",
+          "endsAt": "2000-01-01T00:14:00.000Z",
+          "endedAt": "2000-01-01T00:14:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      }
+    ],
+    "nextBefore": null
+  }
+}

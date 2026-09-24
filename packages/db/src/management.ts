@@ -23,9 +23,15 @@ type BlockRow = typeof blocks.$inferSelect;
  * ambiguous character: no 0/O, no 1/I/L. 31 symbols over 6 places is ~887M
  * codes — collisions are rare, and the active-unique index plus the retry below
  * make a collision a no-op rather than a failure.
+ *
+ * Upper-case only, and load-bearing: the routes upper-case the code a student
+ * types (`JoinCode`) and match it exactly, so a stored code is found only if
+ * it is upper-case — and this generator is the only thing that stores one.
+ * Pinned by a test rather than a CHECK constraint.
  */
-const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-const JOIN_CODE_LENGTH = 6;
+export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+/** Every code's length — and so the longest one a route accepts. */
+export const JOIN_CODE_LENGTH = 6;
 /** Bounded so a broken database can never spin here forever. */
 const JOIN_CODE_ATTEMPTS = 8;
 

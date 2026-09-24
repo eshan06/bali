@@ -108,7 +108,7 @@ describe('POST /v1/enrollments', () => {
   it('is a 404 for an unknown join code', async () => {
     await seedClassroom(db, 'join-bad');
     const res = await join(await ctx.tokenFor('someone'), {
-      joinCode: 'NO-SUCH-CODE',
+      joinCode: 'NOCODE',
       eventId: randomUUID(),
       deviceTime: new Date().toISOString(),
     });
@@ -189,10 +189,27 @@ describe('GET /v1/join-codes/:code', () => {
   it('refuses a code no class holds with the join’s 404, reason and all', async () => {
     await seedClassroom(db, 'preview-unknown');
     const token = await ctx.tokenFor('preview-guesser');
-    for (const res of [await preview(token, 'NO-SUCH-CODE'), await joinBy(token, 'NO-SUCH-CODE')]) {
+    // A code's length, but no class can hold it: an O is never minted.
+    for (const res of [await preview(token, 'NOCODE'), await joinBy(token, 'NOCODE')]) {
       expect(res.statusCode).toBe(404);
       expect(res.json()).toEqual(noClass);
     }
+  });
+
+  it('refuses a code longer than any code as bad input, before looking it up', async () => {
+    const { klass } = await seedClassroom(db, 'preview-long');
+    const token = await ctx.tokenFor('preview-long-typist');
+    const tooLong = `${klass.joinCode}X`;
+    for (const res of [await preview(token, tooLong), await joinBy(token, tooLong)]) {
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ error: { code: 'bad_input' } });
+    }
+    // Surrounding whitespace is still noise, not length.
+    const padded = await preview(token, `%20${klass.joinCode.toLowerCase()}%20%20`);
+    expect(padded.statusCode).toBe(200);
+    expect(padded.json<JoinCodePreviewResponse>().class.id).toBe(klass.id);
+    const joined = await joinBy(token, ` ${klass.joinCode.toLowerCase()}  `);
+    expect(joined.json<EnrollmentJoinResponse>().class.id).toBe(klass.id);
   });
 
   it('refuses an archived class’s code as the join does, and names the live class reusing it', async () => {

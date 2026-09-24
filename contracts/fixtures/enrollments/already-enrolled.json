@@ -4,7 +4,7 @@
   "request": {
     "path": "/v1/enrollments",
     "body": {
-      "joinCode": "JOIN-FX-ENROLL",
+      "joinCode": "6BVZA5",
       "eventId": "00000000-0000-7000-8000-000000000001",
       "deviceTime": "2000-01-01T00:01:00.000Z"
     }

@@ -1833,10 +1833,12 @@ describe('armed taps', () => {
      * Both halves are asserted below, since the second is what makes the first
      * unfixable by the obvious tiebreak.
      *
-     * Unpinned, this shape could have drifted back before `GET /v1/me/history`
-     * is built, and the note on `events_user_seq_idx` would have been
-     * describing an ordering that no longer held — which is how every other
-     * stale claim in this audit happened.
+     * Unpinned, this shape could have drifted, and the note on
+     * `events_user_occurred_idx` would describe an ordering that no longer
+     * held — which is how every other stale claim in this audit happened.
+     * `GET /v1/me/history` (A7) now orders the pair by an explicit tiebreak
+     * that holds whichever way `seq` runs; its tests pin the order a student
+     * sees.
      */
     const a = await seedClass('seq-order-a');
     const b = await seedClass('seq-order-b');
@@ -1878,8 +1880,8 @@ describe('armed taps', () => {
       joined.seq,
       'the converted tap_in must carry a LOWER seq than the left_for_other_session it ' +
         'causes: convertArmedTaps mints the event first so a skipped tap never ends a ' +
-        'participation. If this flipped, the note on events_user_seq_idx is describing the wrong ' +
-        'shape and GET /v1/me/history would tiebreak against it',
+        'participation. If this flipped, the note on events_user_occurred_idx is describing the ' +
+        'wrong shape',
     ).toBeLessThan(left.seq);
 
     expect(

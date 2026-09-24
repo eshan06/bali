@@ -43,6 +43,13 @@
       "when": 1789760117572,
       "tag": "0005_sloppy_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790237717189,
+      "tag": "0006_closed_bucky",
+      "breakpoints": true
     }
   ]
 }

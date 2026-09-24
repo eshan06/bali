@@ -183,6 +183,10 @@ export const participations = pgTable(
     uniqueIndex('participations_one_live_per_student')
       .on(t.studentId)
       .where(sql`${t.endedAt} IS NULL`),
+    // GET /v1/me/history — the classes that ended with the student in them,
+    // newest first: the "class ended" moments, which the session's own event
+    // records without the student's id.
+    index('participations_student_ended_idx').on(t.studentId, t.endedAt),
     // ended_at and ended_reason move together: a live row has neither, an ended
     // row has both. Reports branch on ended_reason, so an ended-but-reasonless
     // row (or the reverse) would be a silent miscount — the DB refuses it.
@@ -222,20 +226,18 @@ export const events = pgTable(
   (t) => [
     // The catch-up read: "everything for this session after seq N".
     index('events_session_seq_idx').on(t.sessionId, t.seq),
-    // GET /v1/me/history — the student's own timeline, and NEITHER column
-    // orders it on its own. This read is the one place that crosses sessions,
-    // and a Start converting a waiting tap gives the `tap_in` a LOWER `seq`
-    // than the `left_for_other_session` it causes (convertArmedTaps must mint
-    // the event first, so a skipped tap never ends a participation) — so by `seq`
-    // the timeline shows the student joining period 2 before leaving period 1.
-    // By `occurred_at` it orders nothing: the engine stamps ONE value on the
-    // pair, so they tie, and the obvious tiebreak for a tie is `seq`, which
-    // lands straight back on the inversion. An earlier version of this comment
-    // said "order by `occurred_at`" and was wrong for exactly that reason.
-    // Whoever builds this read owes it an explicit deterministic tiebreak —
-    // leaves before joins at equal `occurred_at` is the honest one — not a
-    // column name.
-    index('events_user_seq_idx').on(t.userId, t.seq),
+    // GET /v1/me/history — the student's own moments, newest first, read in
+    // `occurred_at` order a page at a time (`getHistoryPage`). NEITHER column
+    // orders that timeline on its own. It is the one read that crosses
+    // sessions, and a switch gives the `tap_in` a LOWER `seq` than the
+    // `left_for_other_session` it causes (the event is minted first, so a
+    // skipped tap never ends a participation) — by `seq` the student joins
+    // period 2 before leaving period 1 — while the engine stamps ONE
+    // `occurred_at` on the pair, so they tie. So the read orders by
+    // `occurred_at`, then a leave before anything else at the same instant,
+    // then `seq`; this index serves the first key and the sort takes the tie.
+    // It replaced `events_user_seq_idx` (user_id, seq), which no read used.
+    index('events_user_occurred_idx').on(t.userId, t.occurredAt),
     // GET /v1/classes/{id}/reports/… — a class's events over a date range.
     index('events_class_occurred_idx').on(t.classId, t.occurredAt),
   ],

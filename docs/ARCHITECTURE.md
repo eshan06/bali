@@ -306,10 +306,22 @@ Student app:
   class_not_found`, a teacher `403`. It reveals what a join to that code would, plus the
   teacher's name; per-account budgets on guessing codes arrive with ISSUES #1 (Phase 4).
 - `POST /v1/enrollments` — join a class by code, matched ignoring case and surrounding
-  whitespace (A6).
+  whitespace (A6); a code longer than every minted one is `400` before any lookup.
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record.
-- `GET /v1/me/history` — the student's own timeline screens.
+- `GET /v1/me/history` — the student's own timeline screens (A7): what was recorded about
+  them that the consent screen says a teacher sees, in every class they have been in,
+  left ones too — tapped in, back to focus, unlocked (with its reason), protection off,
+  a switch to another class, leaving or being removed, the class ending while they were
+  in it, and a tap a Start declined (`armed_tap_skipped`: it already counted in another
+  class, named — never a join). A late unlock or protection off carries its `recordedAs`
+  note. Silence, joining and an unlock kept with no class are not shown
+  (`HISTORY_EVENT_TYPES`). Newest first by `occurred_at`; at one instant a leave comes
+  before anything else, since a switch mints the join first and stamps both with one
+  time; then `seq`. Paged: at most 50 a page, and `nextBefore`, the last event's id, to
+  pass as `before` — a cursor that names a row, so a moment recorded between pages never
+  shifts one; a `before` the history does not hold is `400`. A read that creates nothing:
+  no row yet is an empty history. Only ever the caller's own; a teacher is `403`.
 
 Teacher app and web portal:
 - `GET /v1/me` — same boot call, role-aware.

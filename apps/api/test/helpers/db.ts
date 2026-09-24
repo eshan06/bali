@@ -1,4 +1,15 @@
-import { blocks, classes, type Database, enrollments, schools, users } from '@bali/db';
+import { createHash } from 'node:crypto';
+
+import {
+  blocks,
+  classes,
+  type Database,
+  enrollments,
+  JOIN_CODE_ALPHABET,
+  JOIN_CODE_LENGTH,
+  schools,
+  users,
+} from '@bali/db';
 
 /**
  * The test database factory lives in `@bali/db/testing` so the api and db suites
@@ -15,9 +26,24 @@ function one<T>(rows: T[]): T {
 }
 
 /**
+ * A join code for `tag`, shaped like every real one — `JOIN_CODE_LENGTH`
+ * symbols of the generator's alphabet, so upper-case, which the routes match
+ * exactly after upper-casing what they are sent — and the same for the same
+ * tag on every run, so a fixture naming it never drifts.
+ */
+export function joinCodeFor(tag: string): string {
+  const bytes = createHash('sha256').update(tag).digest();
+  return Array.from(
+    bytes.subarray(0, JOIN_CODE_LENGTH),
+    (byte) => JOIN_CODE_ALPHABET[byte % JOIN_CODE_ALPHABET.length],
+  ).join('');
+}
+
+/**
  * A school, a teacher (cognito id `teacher-<tag>`), an enrolled student
- * (`student-<tag>`), a class (join code `JOIN-<TAG>`), and the teacher's block
- * (tag `TAG-<tag>`). The cognito ids are what the test issuer signs tokens for.
+ * (`student-<tag>`), a class (join code `joinCodeFor(tag)`), and the teacher's
+ * block (tag `TAG-<tag>`). The cognito ids are what the test issuer signs
+ * tokens for.
  */
 export async function seedClassroom(db: Database, tag: string) {
   const school = one(
@@ -45,9 +71,7 @@ export async function seedClassroom(db: Database, tag: string) {
         teacherId: teacher.id,
         schoolId: school.id,
         name: `Class ${tag}`,
-        // Upper-case, as every real code is minted: the routes upper-case what
-        // they are sent (`JoinCode`), so a lower-case seed could never be joined.
-        joinCode: `JOIN-${tag}`.toUpperCase(),
+        joinCode: joinCodeFor(tag),
       })
       .returning(),
   );

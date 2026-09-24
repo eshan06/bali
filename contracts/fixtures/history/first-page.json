@@ -1,0 +1,72 @@
+{
+  "endpoint": "GET /v1/me/history",
+  "scenario": "The newest three moments of that history, and the cursor to the next.",
+  "request": {
+    "path": "/v1/me/history?limit=3"
+  },
+  "status": 200,
+  "type": "HistoryPage",
+  "body": {
+    "events": [
+      {
+        "eventId": "00000000-0000-7000-8000-000000000001",
+        "type": "enrollment_left",
+        "occurredAt": "2000-01-01T00:01:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000002",
+          "name": "Class fx-hist-p6"
+        },
+        "teacher": {
+          "displayName": null
+        },
+        "session": null,
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000003",
+        "type": "enrollment_removed",
+        "occurredAt": "2000-01-01T00:02:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000005",
+          "startedAt": "2000-01-01T00:03:00.000Z",
+          "endsAt": "2000-01-01T00:02:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000006",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:04:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
+        },
+        "teacher": {
+          "displayName": "Mr. Okafor"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000005",
+          "startedAt": "2000-01-01T00:03:00.000Z",
+          "endsAt": "2000-01-01T00:02:00.000Z",
+          "endedAt": null
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      }
+    ],
+    "nextBefore": "00000000-0000-7000-8000-000000000006"
+  }
+}

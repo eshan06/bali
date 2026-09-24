@@ -20,6 +20,9 @@ export const EVENT_RESUME_OVERLAP = 50;
 /** Max events one catch-up page (or one stream re-read) returns; the feed is paged. */
 export const EVENT_PAGE_LIMIT = 200;
 
+/** Moments per page of a student's history (`GET /v1/me/history`); `limit` may ask for fewer. */
+export const HISTORY_PAGE_LIMIT = 50;
+
 /**
  * How often a live stream sends an SSE comment so idle connections and proxies
  * stay open — and, on the client, what silence from the server MEANS.
@@ -123,6 +126,27 @@ export const EVENT_TYPES = [
   'armed_tap_skipped',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+/**
+ * The events a student's own history shows (`GET /v1/me/history`, A7): the
+ * moments the consent screen says a teacher sees. `armed_tap_skipped` is a tap
+ * a Start declined because it had already counted elsewhere — never a join.
+ * Silence, joining and an unlock kept with no class are not shown.
+ * Additive-only like the other vocab; a phone skips a value it does not know.
+ */
+export const HISTORY_EVENT_TYPES = [
+  'tap_in',
+  'refocus',
+  'unlock',
+  'protection_off',
+  'left_for_other_session',
+  'enrollment_left',
+  'enrollment_removed',
+  'armed_tap_skipped',
+  'session_ended',
+  'session_expired',
+] as const satisfies readonly EventType[];
+export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
 
 /**
  * Why an emergency unlock was recorded without flipping a participation to

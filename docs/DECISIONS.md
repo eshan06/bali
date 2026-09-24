@@ -8,6 +8,76 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A7: the student's own history, `GET /v1/me/history`.**
+  D1's History screen ("The same moments your teachers see — nothing more")
+  shows days of class cards — the class, its teacher, and each moment with its
+  time: tapped in, unlocked with a reason, back to focus, class ended, and a
+  tap "not used — it already counted in Period 5". **What it shows** is what
+  the consent screen says a teacher sees, from the caller's own events in
+  every class they have been in, left ones too: `tap_in`, `refocus`, `unlock`
+  (its `reason`), `protection_off`, `left_for_other_session`,
+  `enrollment_left`, `enrollment_removed`, `armed_tap_skipped`, and the class
+  ending while they were in it (`session_ended` / `session_expired`) —
+  `HISTORY_EVENT_TYPES` in `@bali/shared`, additive-only, and a phone skips a
+  value it does not know. **Not shown:** `went_silent` / `came_back` (the
+  grid's liveness, not a moment the consent screen lists, and D1 draws none),
+  `enrollment_joined`, the teacher's own session events, and an unlock kept
+  with no class (`unknown_session` / `not_enrolled`: an orphan no teacher
+  sees). Adding one later is additive. **Reads:** a declined tap names the
+  class it already counted in (`countedIn`: the class of the student's own
+  `tap_in` its payload names) and is never a join; a late unlock or
+  protection off carries `recordedAs: after_session_end`, so it never reads as
+  a change made in class. **The class ending** is the session's event, which
+  carries no student id, so it is found through the student's participation
+  the end itself closed: a student who switched away, left or was removed
+  before the bell sees their own leave instead, never the end. It is stamped
+  with that participation's `ended_at`, which the end writes with the
+  session's. **Order**, the tiebreak the note on the index owed: `seq` inverts
+  a switch (the `tap_in` is minted before the `left_for_other_session` it
+  causes, so a skipped tap never ends a participation — for a converted tap
+  and a direct switch alike) and `occurred_at` ties the pair, so the order is
+  `occurred_at`, then a `left_for_other_session` before anything else at that
+  instant, then `seq`. `seq` rather than a wider rank for every other tie,
+  because it is the order things were recorded: an unlock in class sorts
+  before the end it shares a clamped instant with, a late one after it.
+  Newest first, and a phone shows a day oldest first by reversing the page,
+  never re-sorting on `occurredAt`. **Paging:** at most `HISTORY_PAGE_LIMIT`
+  (50) a page, `limit` asks for fewer; `nextBefore` is the last moment's event
+  id, null at the end, passed back as `before`. A cursor that names a row, not
+  an offset or a time, survives new moments: a newer one waits for a reload
+  from the top, an older one (a late unlock is clamped into its class's
+  window) is read in its place; and it carries no internal `seq`. A `before`
+  the history does not hold — another student's event, one of the caller's
+  it does not show — is `400`, and the phone reloads from the top. Keys are
+  compared as microsecond UTC text from Postgres, because a JS `Date` keeps
+  milliseconds and would tie two rows Postgres orders. **Who:** signed in, or
+  `401`; only the caller's own rows, a classmate's never (the class's end is
+  the one shared row, shown to each student who was in it); a teacher is
+  `403` — a timeline is a student's, and an empty `200` would hide a portal
+  bug. A read: no row yet is an empty history, and nothing is created. **Cost:**
+  a page reads each source newest first through its own index and merges
+  them, so it costs its own size however long the history grows.
+  `events_user_seq_idx` (user_id, seq), built for this read and used by none,
+  became `events_user_occurred_idx` (user_id, occurred_at) — the order's first
+  key, so the sort takes only the tie — and `participations_student_ended_idx`
+  (student_id, ended_at) serves the class-ended moments; a test EXPLAINs both
+  reads with sequential scans priced out, on both lanes. **Rode along, from
+  #65's review:** `JoinCode` had no maximum. It now refuses a code longer than
+  `JOIN_CODE_LENGTH` once trimmed — every minted code is that long — as a
+  `400` before any lookup, for the join and the preview; the minimum still
+  runs on the code as sent, so a blank code stays the join's `404`. Codes
+  longer than six used to be `404 class_not_found` and are now `400
+  bad_input` — the size check API decision 4 asks of every endpoint before it
+  touches the database, which the join had lacked since Phase 2, rather than
+  a new behaviour. No phone sends one (the join screen takes six, and no
+  student app has shipped), and a test seed was the only other source —
+  seeds now mint six symbols of the real alphabet, stably per tag. And nothing held
+  a stored code to upper case, which the routes need, since they upper-case
+  what they are sent and match exactly: `generateJoinCode` is the only writer
+  and its alphabet is upper-case, now pinned by a test on the whole alphabet
+  and one that the route schema leaves every minted code as it is. A CHECK
+  constraint would need a migration, and this step was scoped without one: a
+  test is the cheap pin, and it fails before a lower-case symbol can ship.
 - **2026-09-24** — **A6: the join-code preview, `GET /v1/join-codes/{code}`.**
   D1's consent screen names the class and its teacher ("with Ms. Rivera",
   "What Ms. Rivera sees") before the student commits, with "Not my class" as
