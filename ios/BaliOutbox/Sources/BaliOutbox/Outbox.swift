@@ -118,12 +118,27 @@ public struct Outbox: Sendable {
                     CREATE TABLE outboxState (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                     """)
         }
+        // The phone's own order (A12), sent with every record: its `seq` is its place in what the
+        // phone did — SQLite never reuses or lowers one while the file lives — and the install,
+        // minted once here, names this file's counter. A reinstall's file starts again at 1 under
+        // an install of its own, so the server never compares the two.
+        migrator.registerMigration("v2") { db in
+            try Self.setState(db, Self.installKey, UUID().uuidString.lowercased())
+        }
         return migrator
     }
 
-    /// The session protection off was last reported for, and the latest unlock's id.
+    /// The session protection off was last reported for, the latest unlock's id, and the file's
+    /// install.
     static let reportedKey = "protectionOffReported"
     static let lastUnlockKey = "lastUnlock"
+    static let installKey = "install"
+
+    /// Every record's row, with its file's install: what each request's order is made of.
+    static let selection = """
+        SELECT outbox.*, (SELECT value FROM outboxState WHERE key = '\(installKey)') AS install
+        FROM outbox
+        """
 
     /// Queues what the phone just did under a fresh event id, due at once. A tap or an unlock
     /// supersedes every queued refocus (deleted, never sent: it could only make the truth older).
@@ -272,12 +287,12 @@ public struct Outbox: Sendable {
 
     /// Everything queued, in the order the phone acted — for a screen to show what is stuck.
     public func records() throws -> [OutboxRecord] {
-        try pool.read { try OutboxRecord.fetchAll($0, sql: "SELECT * FROM outbox ORDER BY seq") }
+        try pool.read { try OutboxRecord.fetchAll($0, sql: "\(Self.selection) ORDER BY seq") }
     }
 
     static func fetch(_ db: Database, _ eventId: String) throws -> OutboxRecord? {
         try OutboxRecord.fetchOne(
-            db, sql: "SELECT * FROM outbox WHERE eventId = ?", arguments: [eventId])
+            db, sql: "\(selection) WHERE eventId = ?", arguments: [eventId])
     }
 
     static func state(_ db: Database, _ key: String) throws -> String? {

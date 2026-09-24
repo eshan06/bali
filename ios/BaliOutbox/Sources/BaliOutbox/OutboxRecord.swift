@@ -34,6 +34,10 @@ public struct OutboxRecord: Sendable, Hashable {
     public let lastMessage: String?
     /// A refocus's: the unlock it returns from, while that is unrecorded.
     let follows: String?
+    /// Where it sits in what the phone did (A12): the file's install and the record's `seq`, sent
+    /// with every attempt. Nil only for a file with no install, which no migrated file is — the
+    /// record then goes without one, ordered by its time, rather than not at all.
+    let order: ActionOrder?
 
     public enum Request: Sendable, Hashable {
         case tap(TapRequest)
@@ -46,13 +50,17 @@ public struct OutboxRecord: Sendable, Hashable {
     public var request: Request {
         let (id, time) = (eventId, recordedAt)
         return switch change {
-        case .tap(let tagId): .tap(TapRequest(tagId: tagId, eventId: id, deviceTime: time))
+        case .tap(let tagId):
+            .tap(TapRequest(tagId: tagId, eventId: id, deviceTime: time, order: order))
         case .unlock(let session, let reason):
-            .unlock(session: session, UnlockRequest(eventId: id, deviceTime: time, reason: reason))
+            .unlock(
+                session: session,
+                UnlockRequest(eventId: id, deviceTime: time, reason: reason, order: order))
         case .refocus(let session):
-            .refocus(session: session, RefocusRequest(eventId: id, deviceTime: time))
+            .refocus(session: session, RefocusRequest(eventId: id, deviceTime: time, order: order))
         case .protectionOff(let session):
-            .protectionOff(session: session, ProtectionOffRequest(eventId: id, deviceTime: time))
+            .protectionOff(
+                session: session, ProtectionOffRequest(eventId: id, deviceTime: time, order: order))
         }
     }
 }
@@ -82,6 +90,10 @@ extension OutboxRecord: FetchableRecord {
             .flatMap(ApiErrorReason.init(rawValue:))
         lastMessage = try row.decode(forColumn: "lastMessage")
         follows = try row.decode(forColumn: "follows")
+        let seq = try row.decode(Int.self, forColumn: "seq")
+        order = try row.decode(String?.self, forColumn: "install").map {
+            ActionOrder(install: $0, seq: seq)
+        }
     }
 
     struct UnknownKind: Error { let kind: String }

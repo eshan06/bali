@@ -129,6 +129,34 @@ struct ForwardCompatibilityTests {
         #expect(known.outcome == .known(.joined))
     }
 
+    @Test(
+        "Every outbox record carries its order when it has one, and leaves the field out when not, as an old build's does (A12)"
+    )
+    func order() throws {
+        let at = Date(timeIntervalSince1970: 946_684_860)
+        let order = ActionOrder(install: "0192a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b", seq: 7)
+        let wire = #""order":{"install":"0192a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b","seq":7}"#
+        let numbered: [any Encodable] = [
+            TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: at, order: order),
+            UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse, order: order),
+            RefocusRequest(eventId: "e1", deviceTime: at, order: order),
+            ProtectionOffRequest(eventId: "e1", deviceTime: at, order: order),
+        ]
+        let bare: [any Encodable] = [
+            TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: at),
+            UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse),
+            RefocusRequest(eventId: "e1", deviceTime: at),
+            ProtectionOffRequest(eventId: "e1", deviceTime: at),
+        ]
+        let sortedKeys = BaliJSON.makeEncoder()
+        sortedKeys.outputFormatting = .sortedKeys
+        for request in numbered {
+            let json = String(decoding: try sortedKeys.encode(request), as: UTF8.self)
+            #expect(json.contains(wire), "\(json)")
+        }
+        for request in bare { #expect(try encoded(request).contains("order") == false) }
+    }
+
     @Test("An unlock sent with no reason leaves the field out, as the API expects")
     func unlockWithoutReason() throws {
         let at = Date(timeIntervalSince1970: 946_684_860)

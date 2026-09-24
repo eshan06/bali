@@ -1,7 +1,7 @@
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/db';
 import { describe, expect, it } from 'vitest';
 
-import { DeviceTime, JoinCode } from '../src/routes/schemas.js';
+import { DeviceTime, JoinCode, Order } from '../src/routes/schemas.js';
 
 /*
  * The DeviceTime rule itself, pinned in milliseconds rather than through five
@@ -97,5 +97,35 @@ describe('JoinCode', () => {
     expect(JoinCode.safeParse('x'.repeat(10_000)).success).toBe(false);
     // Blank is not empty: it trims to nothing and is the join's 404, as ever.
     expect(JoinCode.parse('   ')).toBe('');
+  });
+});
+
+describe('Order (A12)', () => {
+  const install = '0192a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b';
+
+  it('passes an order the engine can compare, and none as none', () => {
+    expect(Order.parse({ install, seq: 1 })).toEqual({ install, seq: 1 });
+    expect(Order.parse({ install, seq: Number.MAX_SAFE_INTEGER })).toEqual({
+      install,
+      seq: Number.MAX_SAFE_INTEGER,
+    });
+    expect(Order.parse(undefined)).toBeUndefined();
+    expect(Order.parse(null)).toBeNull();
+  });
+
+  it.each([
+    ['a string', 'order'],
+    ['a number', 7],
+    ['a list', [install, 1]],
+    ['no install', { seq: 1 }],
+    ['no seq', { install }],
+    ['an install that is no UUID', { install: 'phone-1', seq: 1 }],
+    ['a zero seq', { install, seq: 0 }],
+    ['a negative seq', { install, seq: -1 }],
+    ['a fractional seq', { install, seq: 2.5 }],
+    ['a seq past the safe integers', { install, seq: 2 ** 53 }],
+    ['a seq as a string', { install, seq: '1' }],
+  ])('takes %s as none, never refusing the record it rides on', (_why, value) => {
+    expect(Order.safeParse(value)).toEqual({ success: true, data: null });
   });
 });
