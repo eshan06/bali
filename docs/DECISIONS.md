@@ -8,6 +8,57 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B1a: BaliCore, the iOS apps' Swift package — its wire
+  types, checked against the contract fixtures.** `ios/BaliCore` is a SwiftPM
+  package (Swift 6 language mode; iOS 17, macOS 14) that uses Foundation only,
+  so its tests run on Linux: the apps' UIKit, SwiftUI and FamilyControls code
+  never enters it. It holds every student endpoint's request and response and
+  the vocabularies they use, mirroring `@bali/shared`; the teacher endpoints
+  wait for the teacher app. **A value this build does not know never fails a
+  decode.** `/v1` is additive-only and old apps call forever, so each closed
+  vocabulary is a plain Swift enum of the known values, carried as
+  `OrUnknown<Known>` — `.known(value)` or `.unknown(raw)`, encoding back what
+  it read — rather than each enum growing its own `unknown` case: one generic
+  implementation instead of a hand-written raw-value mapping per vocabulary,
+  and a switch over `.known(.joined)`… is still checked exhaustive, so a case
+  BaliCore adds reaches every switch. An error's `reason` BaliCore does not
+  know reads as none (A5), so a client keys on the reasons it knows and falls
+  back on the status. The contract tests decode in a strict mode instead — a
+  decoder `userInfo` flag, internal to the package — where an unknown value
+  throws, so a value the API starts sending turns them red until BaliCore has
+  it; the app never decodes strictly. **Times:** the API writes
+  `toISOString()`'s `2000-01-01T00:01:00.000Z`. `JSONDecoder`'s `.iso8601`
+  refuses those milliseconds on iOS 17 (the newer Foundation on Linux takes
+  them), so `BaliJSON`'s decoder tries ISO 8601 with fractional seconds, then
+  without — which style accepts the other's form differs by platform, and
+  trying both is right on each — and its encoder writes milliseconds, as JS
+  does, so a request carries a time the way the fixtures show the API
+  receiving one. **Ids stay strings,** as the TS types have them: Foundation's
+  `UUID` encodes upper-case and mints v4, where the API's ids are lower-case
+  v7s that the phone must mint itself (B3). **The contract test** reads
+  `contracts/fixtures/` in place, found from the test file's `#filePath` —
+  SwiftPM cannot bundle files from outside its package, and a copy could
+  drift. Every `.json` under it is its own test case, found by walking the
+  directory, never listed: its body decodes strictly as the type it names and
+  encodes back to the same JSON, null fields aside — the round trip is what
+  catches an optional field misnamed in Swift, which would otherwise decode
+  as nil forever without an error — and its request body, decoded as the
+  phone's request type, encodes back exactly as sent. A fixture of a type
+  BaliCore does not map fails, and another test requires the fixtures' types
+  and request endpoints to be exactly BaliCore's two maps, so a moved or
+  empty directory cannot pass by checking nothing. The vocabularies are also
+  read from the TypeScript itself (`packages/shared/src`, each `as const`
+  list, and `DisplayState`) and must match BaliCore's value for value, in
+  order: a value no fixture carries yet (`invalid_extension`, `rate_limited`)
+  is caught too. **CI:** a `swift` job in `ci.yml`, "BaliCore Swift tests
+  (Linux)", runs `swift test` in Swift's official `swift:6.4-noble` image
+  with SwiftPM's `.build` cached, on every PR and every push to `main`. Not
+  path-filtered: the contract spans `apps/api` (which writes the fixtures),
+  `packages/shared`, `contracts/` and `ios/`, which is most PRs anyway, and a
+  path-filtered check never reports on the PRs it skips, so it could never be
+  made required without leaving those PRs waiting. Making it required is the
+  owner's ruleset call. Not here, on purpose: the outbox tables and each
+  fixture's `disposition` (B1b), and the API client (B1c).
 - **2026-09-24** — **A9: the live grid tells the truth about unlocks and late
   records.** **The reason:** the chip shows an unlock's reason (A1) after its
   label — "Unlocked · bathroom", "Left · unlocked · nurse" — as the privacy

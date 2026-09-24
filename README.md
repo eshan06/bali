@@ -11,6 +11,7 @@ Tap a block, the phone locks into focus. This is the v3 rebuild; the design doc 
 | `apps/web`        | The teacher web portal (Next.js) — see [docs/WEB.md](docs/WEB.md) |
 | `packages/db`     | Drizzle schema, migrations, and the Postgres client               |
 | `packages/shared` | Types and constants shared by server and clients                  |
+| `ios/BaliCore`    | The iOS apps' shared Swift package (not an npm workspace)         |
 
 ## From zero
 
@@ -26,6 +27,9 @@ Configuration comes from a single `.env` at the repo root (`.env.example` lists 
 variable with notes). Every variable the API reads is declared and validated in
 `apps/api/src/env.ts`; a missing or malformed value fails the boot with a readable list
 instead of a crash somewhere downstream.
+
+`ios/BaliCore` needs Swift 6, on macOS or Linux: `swift test` there decodes every contract
+fixture in `contracts/fixtures/` with the Swift types, in place.
 
 ## The exit demo (phone simulator)
 
