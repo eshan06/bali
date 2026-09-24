@@ -576,8 +576,9 @@ and data types, so the two apps can't drift out of type-agreement.
   (What Bali is), so a glucose monitor or an assistive-communication app is blocked too. At
   launch the exit is Emergency Unlock — always allowed, always recorded. Any carve-out is a
   later product decision for the owner (2026-09-24).
-- **Applied for now:** the Family Controls distribution entitlement (longest lead time, weeks
-  to months) — submitted per bundle ID including the monitor extension.
+- **Granted (owner, 2026-09-24):** the Family Controls distribution entitlement, which Apple
+  approves per bundle ID — the app and both extensions have it (`com.bali.Bali`,
+  `com.bali.Bali.BaliMonitor`, `com.bali.Bali.BaliShield`).
 
 ## Web portal
 

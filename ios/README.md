@@ -46,8 +46,8 @@ You need Xcode 16.3 or later — GRDB's manifest needs Swift 6.1; CI builds with
 
 NFC and Screen Time shields need a real iPhone, which is why B5 and B6 are device checkpoints;
 the simulator only proves it builds. Family Controls works in development builds already —
-Apple's distribution entitlement, still pending, is only needed for TestFlight and the App
-Store.
+Apple's distribution entitlement, which TestFlight and the App Store need, was granted for
+the app and both extensions (2026-09-24).
 
 ## CI
 
