@@ -535,6 +535,50 @@ describe('POST /v1/sessions/:id/unlock', () => {
     expect(second.json<UnlockResponse>().outcome).toBe('replay');
   });
 
+  it('a late unlock — the student came back to focus after it — is recorded, never applied (A10)', async () => {
+    // Stuck on the phone while the student unlocked again and refocused: it
+    // lands last, and the refocus stands. Recorded, so the outbox deletes it,
+    // and answered with the session and the state it left alone.
+    const { student, session } = await seedRunning('unlock-late');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+    const send = (route: string, deviceTime: string, extra: object = {}, eventId = randomUUID()) =>
+      post(token, `/v1/sessions/${session.id}/${route}`, { eventId, deviceTime, ...extra });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(ago(50)),
+    });
+    expect((await send('unlock', ago(40))).json<UnlockResponse>().outcome).toBe('applied');
+    expect((await send('refocus', ago(30))).statusCode).toBe(200);
+
+    const lateId = randomUUID();
+    const res = await send('unlock', ago(45), { reason: 'nurse' }, lateId);
+    expect(res.statusCode).toBe(200);
+    const body = res.json<UnlockResponse>();
+    expect(body).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+      session: { id: session.id, classId: session.classId },
+      reason: 'nurse',
+    });
+    expect(unlockDisposition(res.statusCode, body)).toBe('recorded');
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, session.id));
+    expect(row?.state).toBe('focused');
+
+    const retry = await send('unlock', ago(45), { reason: 'other' }, lateId);
+    expect(retry.json<UnlockResponse>()).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+      reason: 'nurse',
+    });
+  });
+
   it('requires authentication', async () => {
     const { session } = await seedRunning('unlock-auth');
     const res = await ctx.app.inject({

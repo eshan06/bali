@@ -1819,11 +1819,11 @@ export interface UnlockInput extends StateChangeInput {
 }
 
 export interface UnlockResult {
-  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved a note and flipped nothing (no live participation, or its protection is off), 'replay' the event already existed. */
+  /** From @bali/shared's UNLOCK_RECORDED_OUTCOMES — all three mean the record is durably saved: 'applied' flipped a live participation, 'recorded' saved a note and flipped nothing (no live participation, its protection is off, or the student came back to focus after it), 'replay' the event already existed. */
   outcome: UnlockRecordedOutcome;
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
-  /** 'unlocked' when a live participation flipped; 'protection_off' when it was live but protection is off (recorded, not flipped); the participation's current state on a replay; null when nothing is participating. */
+  /** 'unlocked' when a live participation flipped; the live state left alone when it was recorded, not flipped ('protection_off', or after a late unlock whatever the student's later changes made it); the participation's current state on a replay; null when nothing is participating. */
   state: ParticipationState | null;
   participationId: string | null;
   /** The session, so the response can carry the end time for reconciliation; null only when the session id was unknown. */
@@ -1864,6 +1864,47 @@ async function storedPayload(
 async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
   const stored = (await storedPayload(tx, eventId))?.reason;
   return isUnlockReason(stored) ? stored : null;
+}
+
+/**
+ * Whether the student came back to focus in this session — a refocus, or a tap
+ * in, their own — after `at`: an unlock timed `at` that lands after that return
+ * is late (stuck on the phone while the return went ahead of it, B3a's bound),
+ * and flipping it would put a student the phone holds in focus back to
+ * unlocked (owner ruling, 2026-09-24).
+ *
+ * "After" is the server's order (rule 1): each claim clamped into the window,
+ * and a return's never later than the server recorded it — a clock running
+ * fast at the return cannot then outrank the real unlocks that follow it
+ * (`recorded_at` is its transaction's start, a little before it landed, so the
+ * cap only ever errs toward flipping). A tie is not after: a clock running
+ * behind clamps both to the window's start, and a real unlock must flip. What
+ * is left to a clock is the one turned back between the student's return and
+ * their unlock; that unlock is still recorded, and its answer names the focus
+ * the phone then shields to — never green over an unshielded phone.
+ */
+async function returnedSince(
+  tx: Database,
+  sessionId: string,
+  studentId: string,
+  at: Date,
+): Promise<boolean> {
+  const later = await tx
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        eq(events.userId, studentId),
+        // Implied by the cap below; spelled out so the read ranges over the
+        // student's own events after `at` (`events_user_occurred_idx`).
+        gt(events.occurredAt, at),
+        eq(events.sessionId, sessionId),
+        inArray(events.type, ['tap_in', 'refocus']),
+        sql`least(${events.occurredAt}, ${events.recordedAt}) > ${at.toISOString()}::timestamptz`,
+      ),
+    )
+    .limit(1);
+  return later.length > 0;
 }
 
 /**
@@ -1917,6 +1958,10 @@ async function recordOrphanUnlock(
  *   - a live participation whose protection is off is NOT flipped — that state
  *     is never softened into an unlock — but the unlock still commits, noted
  *     `protection_off`, and returns 'recorded' with the state it left alone;
+ *   - nor is one the student returned to focus in after the unlock — a late
+ *     unlock, stuck on the phone while their refocus or tap went ahead of it
+ *     (`returnedSince`): it commits noted `superseded` and returns 'recorded'
+ *     with the state it left alone;
  *   - no live participation (removed mid-session, or the participation already
  *     ended) still commits the event with a `payload.recorded_as` note and
  *     returns 'recorded' — the record stands though there is no state to move;
@@ -1997,10 +2042,15 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
       // whose protection is off is not flipped either: that state is never
       // softened into an unlock (ARCHITECTURE, iOS rules: "never green, never an
       // unlock") — iOS already dropped the shields, and the grid must keep saying
-      // the permission is off until a re-tap. Recorded all the same, never refused.
+      // the permission is off until a re-tap. Nor is one whose student came back
+      // to focus after this unlock: it is late, and the return stands (owner
+      // ruling, 2026-09-24). Recorded all the same, never refused.
       let note: UnlockRecordedAs | null = null;
       if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
       else if (live.state === 'protection_off') note = 'protection_off';
+      else if (await returnedSince(tx, session.id, input.studentId, occurredAt)) {
+        note = 'superseded';
+      }
 
       const payload: Record<string, unknown> = {};
       if (note !== null) payload.recorded_as = note;
@@ -2056,13 +2106,15 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
       }
 
       if (live) {
-        // Protection off: nothing flips, but the phone made contact — last
-        // contact moves (the grid's "last seen"), and any open silence episode
-        // closes. Defensive: none can be open today — the sweep marks only
-        // focused rows, protectionOff closes any episode it finds, and when the
-        // two race, the sweep queues behind it or one side loses a deadlock and
-        // retries into one of those cases — but contact must never leave one
-        // open.
+        // Protection off, or a late unlock: nothing flips, but the phone made
+        // contact — last contact moves (the grid's "last seen"), and any open
+        // silence episode closes. Under protection off that is defensive: none
+        // can be open today — the sweep marks only focused rows, protectionOff
+        // closes any episode it finds, and when the two race, the sweep queues
+        // behind it or one side loses a deadlock and retries into one of those
+        // cases — but contact must never leave one open. The answer names the
+        // state left alone, which the phone applies — after a late unlock, what
+        // the student's own later changes made it.
         await closeOpenSilence(
           tx,
           {

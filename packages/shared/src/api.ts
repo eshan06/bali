@@ -116,8 +116,9 @@ export interface StartSessionResponse {
  * The unlock outcome union, derived from the shared source so the DTO, the
  * engine result, and the disposition table can't drift. 'applied' flipped a live
  * participation to unlocked; 'recorded' saved the event with a note and flipped
- * nothing — there was no live participation, or its protection is off (never
- * softened into an unlock); 'replay' means the event already landed.
+ * nothing — there was no live participation, its protection is off (never
+ * softened into an unlock), or the student came back to focus after it (a late
+ * unlock, `superseded`); 'replay' means the event already landed.
  * All three mean "durably recorded" — the phone's outbox stops retrying (see
  * unlockDisposition).
  */
@@ -127,11 +128,12 @@ export interface UnlockResponse {
   /** Why nothing was flipped, on a fresh 'recorded' unlock; null for 'applied' and 'replay'. */
   recordedAs: UnlockRecordedAs | null;
   /**
-   * 'unlocked' when a live participation flipped; 'protection_off' when it was
-   * live but protection is off (recorded, not flipped); null when no
-   * participation was live (none, or it had ended); on a replay, the
-   * participation's current stored state (which may be an ended participation's
-   * last state), or null when there is none.
+   * 'unlocked' when a live participation flipped; the live state it left alone
+   * when it was recorded, not flipped — 'protection_off', or after a late
+   * unlock (`superseded`) what the student's own later changes made it, which
+   * the phone applies; null when no participation was live (none, or it had
+   * ended); on a replay, the participation's current stored state (which may be
+   * an ended participation's last state), or null when there is none.
    */
   state: ParticipationState | null;
   /** The session for reconciliation; null only when the session id was unknown. */
@@ -419,7 +421,11 @@ export interface EndEnrollmentResponse {
 export interface SnapshotUnlock {
   /** The reason the student gave (A1); null when none. */
   reason: UnlockReason | null;
-  /** Why it flipped nothing, when it flipped nothing (`payload.recorded_as`); null when it flipped the row. */
+  /**
+   * Why it flipped nothing, when it flipped nothing (`payload.recorded_as`); null
+   * when it flipped the row. Never `superseded`: a late unlock the student's own
+   * return to focus went ahead of is on no chip.
+   */
   recordedAs: UnlockRecordedAs | null;
   occurredAt: string;
 }
@@ -440,7 +446,8 @@ export interface SnapshotStudent {
   endedAt: string | null;
   /**
    * The student's latest emergency unlock in this session since they last
-   * tapped in or returned to focus, or null. `state` does not always show it:
+   * tapped in or returned to focus — a late one (`superseded`) never counts —
+   * or null. `state` does not always show it:
    * the engine records an unlock without flipping the row when protection is
    * off (never softened into an unlock), when no participation is live, and
    * after the end — the grid reads it here as it reads the unlock event.

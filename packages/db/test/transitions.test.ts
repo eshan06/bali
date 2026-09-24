@@ -1271,6 +1271,275 @@ describe('state changes', () => {
   });
 });
 
+describe('a late unlock: the student came back to focus after it (A10)', () => {
+  // The owner's ruling (2026-09-24): an unlock stuck on the phone (B3a's bound)
+  // while the student's own refocus or tap went ahead of it is recorded — never
+  // lost — but flips nothing: the return stands.
+  const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+  function move(session: { id: string }, student: { id: string }, deviceTime: Date) {
+    return { sessionId: session.id, studentId: student.id, eventId: newUuidV7(), deviceTime };
+  }
+  /** A student in a 09:00–09:25 lesson, tapped in at 09:01. */
+  async function lesson(tag: string) {
+    const { klass, student } = await seedClass(tag);
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, move(session, student, at(1)));
+    return { session, student };
+  }
+  async function rowOf(sessionId: string, studentId: string) {
+    return one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)),
+        ),
+    );
+  }
+  async function unlocksIn(sessionId: string) {
+    return (await eventsFor(sessionId)).filter((e) => e.type === 'unlock');
+  }
+
+  it('is recorded with a note, the focus a later refocus returned to left alone', async () => {
+    const { session, student } = await lesson('late-refocus');
+    await unlock(db, move(session, student, at(5)));
+    await refocus(db, move(session, student, at(8)));
+    const late = { ...move(session, student, at(3)), reason: 'nurse' as const };
+
+    const row = await rowOf(session.id, student.id);
+    expect(await unlock(db, late)).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+      participationId: row.id,
+      session: { id: session.id },
+      reason: 'nurse',
+    });
+    expect((await rowOf(session.id, student.id)).state).toBe('focused');
+    const recorded = (await unlocksIn(session.id)).find((e) => e.eventId === late.eventId);
+    expect(recorded?.payload).toEqual({ recorded_as: 'superseded', reason: 'nurse' });
+    expect(recorded?.occurredAt).toEqual(at(3));
+
+    // Its retry replays the truth now, and records nothing twice.
+    expect(await unlock(db, late)).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+      reason: 'nurse',
+    });
+    expect(await unlocksIn(session.id)).toHaveLength(2);
+  });
+
+  it('is recorded with a note after a re-tap too, and keeps a newer unlock as it is', async () => {
+    const { session, student } = await lesson('late-retap');
+    await tapIn(db, move(session, student, at(6)));
+    expect(await unlock(db, move(session, student, at(4)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+    });
+
+    // The student unlocked again since: the late one leaves that unlock alone.
+    await unlock(db, move(session, student, at(9)));
+    expect(await unlock(db, move(session, student, at(5)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'unlocked',
+    });
+    expect((await rowOf(session.id, student.id)).state).toBe('unlocked');
+  });
+
+  it('flips whichever lands first of the same pair, and ends in the return either way', async () => {
+    // An unlock at 09:04 and the refocus at 09:06, in both arrival orders.
+    for (const unlockFirst of [true, false]) {
+      const { session, student } = await lesson(`late-order-${unlockFirst}`);
+      const theUnlock = () => unlock(db, move(session, student, at(4)));
+      const theRefocus = () => refocus(db, move(session, student, at(6)));
+      if (unlockFirst) {
+        expect((await theUnlock()).outcome).toBe('applied');
+        expect((await theRefocus()).state).toBe('focused');
+      } else {
+        expect((await theRefocus()).state).toBe('focused');
+        expect((await theUnlock()).recordedAs).toBe('superseded');
+      }
+      expect((await rowOf(session.id, student.id)).state).toBe('focused');
+      expect(await unlocksIn(session.id)).toHaveLength(1);
+    }
+  });
+
+  it('flips an unlock after the return, or at the same instant', async () => {
+    for (const minute of [7, 6]) {
+      const { session, student } = await lesson(`late-not-${minute}`);
+      await unlock(db, move(session, student, at(4)));
+      await refocus(db, move(session, student, at(6)));
+      expect(await unlock(db, move(session, student, at(minute)))).toMatchObject({
+        outcome: 'applied',
+        recordedAs: null,
+        state: 'unlocked',
+      });
+      expect((await rowOf(session.id, student.id)).state).toBe('unlocked');
+    }
+  });
+
+  it('only counts the student’s own return: a classmate’s, or their own unlock, is none', async () => {
+    const { session, student } = await lesson('late-whose');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-late-whose-classmate', role: 'student' })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: session.classId, studentId: classmate.id });
+    await tapIn(db, move(session, classmate, at(8)));
+    await unlock(db, move(session, student, at(9)));
+
+    // Nothing of the student's own came back to focus after 09:04.
+    expect(await unlock(db, move(session, student, at(4)))).toMatchObject({
+      outcome: 'applied',
+      recordedAs: null,
+    });
+  });
+
+  it('only counts a return in the unlock’s own session', async () => {
+    // A tap into another class claiming 09:20 lands first; the tap back into
+    // this one claims 09:05. Nothing here came back to focus after 09:10.
+    const { session, student } = await lesson('late-where');
+    const elsewhere = await seedClass('late-where-elsewhere');
+    await db.insert(enrollments).values({ classId: elsewhere.klass.id, studentId: student.id });
+    const other = (
+      await startSession(db, { classId: elsewhere.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    await tapIn(db, move(other, student, at(20)));
+    await tapIn(db, move(session, student, at(5)));
+
+    expect(await unlock(db, move(session, student, at(10)))).toMatchObject({
+      outcome: 'applied',
+      state: 'unlocked',
+    });
+  });
+
+  it('counts a return in a later stint of the same session', async () => {
+    // Stuck in the first stint; the student switched away and tapped back in.
+    const { session, student } = await lesson('late-stint');
+    const elsewhere = await seedClass('late-stint-elsewhere');
+    await db.insert(enrollments).values({ classId: elsewhere.klass.id, studentId: student.id });
+    const other = (
+      await startSession(db, { classId: elsewhere.klass.id, ...window('2026-01-01T09:00:00Z') })
+    ).session;
+    await tapIn(db, move(other, student, at(5)));
+    await tapIn(db, move(session, student, at(7)));
+
+    expect(await unlock(db, move(session, student, at(3)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+    });
+  });
+
+  it('protection off comes first: the state an unlock never softens', async () => {
+    const { session, student } = await lesson('late-protoff');
+    await tapIn(db, move(session, student, at(4)));
+    await protectionOff(db, move(session, student, at(6)));
+    expect(await unlock(db, move(session, student, at(2)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'protection_off',
+      state: 'protection_off',
+    });
+  });
+
+  it('is contact: last contact moves on the server clock, and an open silence episode closes', async () => {
+    const { session, student } = await lesson('late-contact');
+    await refocus(db, move(session, student, at(6)));
+    const stale = at(7);
+    await db
+      .update(participations)
+      .set({ lastSeenAt: stale, silentSince: stale })
+      .where(eq(participations.sessionId, session.id));
+
+    expect((await unlock(db, move(session, student, at(3)))).recordedAs).toBe('superseded');
+    const row = await rowOf(session.id, student.id);
+    expect(row.silentSince).toBeNull();
+    expect(Math.abs(Date.now() - row.lastSeenAt!.getTime())).toBeLessThan(60_000);
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'came_back')).toHaveLength(1);
+  });
+
+  describe('a device clock cannot hide a real unlock', () => {
+    it('one running behind all lesson clamps every claim to the start, and a tie flips', async () => {
+      // Rule 1's v2 bug: a phone an hour behind. Every claim is before the
+      // session began, so each clamps to 09:00 — the tap, the refocus and the
+      // unlocks after them alike — and the unlock still flips every time.
+      const { klass, student } = await seedClass('late-clock-behind');
+      const { session } = await startSession(db, {
+        classId: klass.id,
+        ...window('2026-01-01T09:00:00Z'),
+      });
+      const behind = (minute: number) => new Date(at(minute).getTime() - 60 * 60_000);
+      await tapIn(db, move(session, student, behind(1)));
+      expect((await unlock(db, move(session, student, behind(5)))).outcome).toBe('applied');
+      expect((await refocus(db, move(session, student, behind(7)))).state).toBe('focused');
+      expect((await unlock(db, move(session, student, behind(10)))).outcome).toBe('applied');
+      const clamped = (await eventsFor(session.id)).filter((e) => e.type !== 'session_started');
+      expect(new Set(clamped.map((e) => e.occurredAt.getTime()))).toEqual(
+        new Set([at(0).getTime()]),
+      );
+    });
+
+    it('one running fast at the return never outranks the real unlock after it', async () => {
+      // A phone two hours fast taps in, or refocuses: its claim clamps to the
+      // bell, and without a bound every honest unlock that follows it would
+      // read as older. A return is never later than the server recorded it.
+      for (const fastAt of ['tap', 'refocus'] as const) {
+        const { klass, student } = await seedClass(`late-clock-fast-${fastAt}`);
+        const { session } = await startSession(db, {
+          classId: klass.id,
+          startedAt: new Date(Date.now() - 60_000),
+          endsAt: new Date(Date.now() + 25 * 60_000),
+        });
+        const fast = () => new Date(Date.now() + 2 * 60 * 60_000);
+        const honest = () => new Date(Date.now() + 1_000);
+        if (fastAt === 'tap') {
+          await tapIn(db, move(session, student, fast()));
+        } else {
+          await tapIn(db, move(session, student, new Date()));
+          await unlock(db, move(session, student, honest()));
+          await refocus(db, move(session, student, fast()));
+        }
+        const returned = (await eventsFor(session.id)).at(-1)!;
+        expect(returned.occurredAt).toEqual(session.endsAt);
+
+        // Its clock corrected, the phone unlocks for real a moment later.
+        expect(await unlock(db, move(session, student, honest())), fastAt).toMatchObject({
+          outcome: 'applied',
+          state: 'unlocked',
+        });
+      }
+    });
+
+    it('one turned back between the return and the unlock: recorded, and answered with the focus the phone shields to', async () => {
+      // The one case a clock decides: turned back after the tap, the unlock
+      // claims to come before it, and the server cannot tell it from a stuck
+      // one. It is still on record, reason and all — and its answer names
+      // the session and the focus, which the phone applies to its shields:
+      // the grid's green is never over an unshielded phone.
+      const { session, student } = await lesson('late-clock-back');
+      await tapIn(db, move(session, student, at(10)));
+      const turnedBack = { ...move(session, student, at(4)), reason: 'bathroom' as const };
+
+      expect(await unlock(db, turnedBack)).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'superseded',
+        state: 'focused',
+        session: { id: session.id, endsAt: session.endsAt },
+      });
+      expect((await rowOf(session.id, student.id)).state).toBe('focused');
+      const recorded = one(await unlocksIn(session.id));
+      expect(recorded.payload).toEqual({ recorded_as: 'superseded', reason: 'bathroom' });
+    });
+  });
+});
+
 describe('checkIn', () => {
   it('updates last_seen_at without adding an event (decision 7)', async () => {
     const { klass, student } = await seedClass('checkin');

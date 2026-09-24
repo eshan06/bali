@@ -55,9 +55,12 @@ const NOTHING_LIVE: readonly unknown[] = [
  *   an unlock never softens (the engine's rule, and an out-of-order report's);
  * - noted as finding nothing live, the student is not in the session (removed,
  *   left, switched away, the session over, or never tapped in) — so the chip is
- *   never live, even for a tab that did not see them go.
+ *   never live, even for a tab that did not see them go;
+ * - noted `superseded`, it is late — the student's own refocus or tap went ahead
+ *   of it — and the engine left the row as those made it: so does the chip.
  */
 function applyUnlock(s: Student, reason: unknown, note: unknown, at: Date): void {
+  if (note === ('superseded' satisfies UnlockRecordedAs)) return;
   s.unlock = { reason: isUnlockReason(reason) ? reason : null };
   s.state =
     note === ('protection_off' satisfies UnlockRecordedAs) || s.state === 'protection_off'

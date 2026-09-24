@@ -8,6 +8,85 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **Owner rulings: a late unlock is recorded, not flipped (A10);
+  ARCHITECTURE gains two clauses; decision 11 stands.** (1) **"Record it, don't flip."**
+  The case #73's Claude Review and B3a's entry left open: an unlock stuck on the phone
+  (B3a's bound — refused, or 8 unsettled answers), the student's own later refocus or tap
+  passing it, and the old unlock landing last. The engine flipped a focused row to
+  `unlocked` on any late unlock, whatever its time, so the grid read "Unlocked" and the
+  phone, applying its answer, dropped the shields over a student back in focus. The
+  owner chose: still recorded — never lost, the unlock contract — but when the student's
+  own refocus or tap in that session came after it, the live state is left alone. A10
+  builds it (next entry). (2) **ARCHITECTURE clause 1, "yes, add it":** the rule that a
+  read never overrides a newer state change of the phone's gets B3a's and B3b's
+  exception — a record stuck after repeated failures stops holding reads back, so the
+  phone can reconcile again, while an unrecorded unlock still keeps any read from turning
+  its own session's shields back on, unless the student has refocused or re-tapped there
+  since (B3b-2's narrowing). (3) **ARCHITECTURE clause 2, "yes, add it":** data-model
+  decision 3's "screens simply skip rows where `removed_at` is set" now names the
+  exception A9 made — a session's live grid keeps a student removed mid-session who was
+  in it (a participation or an unlock there), so their unlock stays visible. (4)
+  **Decision 11** stands as its entry below records it — an unlock made while the phone's
+  own tap is unanswered is filed under that tap (A11's `POST /v1/taps/{eventId}/unlock`;
+  B6 and C5 use it) — checked against PLAN's decision 11: the two agree. When A11 builds
+  that endpoint, the unlock it records goes through the same rules, A10's included.
+- **2026-09-24** — **A10: a late unlock is recorded, never applied.** **The rule:**
+  `unlock` notes an unlock `superseded` (`UNLOCK_RECORDED_AS`, additive) and flips nothing
+  when the participation is live, not protection off (that note still comes first), and
+  the student's own `refocus` or `tap_in` in that session came after it
+  (`returnedSince`) — in any stint of that session, so a return after a switch away
+  counts, and only the student's own: a classmate's return, a return in another class
+  or the student's own later unlock is none. **How "after" is judged** (rule 1: the
+  server owns the clock, and the clamp orders events): the unlock's clamped `occurred_at`
+  against each return's clamped `occurred_at`, capped at its `recorded_at` — a claim is
+  never later than when the server recorded it — and strictly: a tie is not after. The
+  cap keeps a clock that ran fast at the return (a tap clamped to the bell, the phone's
+  time corrected after) from outranking every real unlock after it, which would have
+  held Emergency Unlock off for the rest of the lesson. The tie keeps rule 1's v2 bug
+  out: a clock running behind all lesson clamps the tap, the refocus and every unlock to
+  the window's start, and each unlock still flips. So a doubt goes toward flipping —
+  the behaviour before — never toward hiding: a stuck unlock and a return that tie, or a
+  clock fast at the return by more than the unlock was stuck, still flip as they did.
+  **The answer** mirrors A2's `protection_off` note: `recorded`, the note, the session,
+  the participation and the state left alone (`focused`, or `unlocked` when a newer
+  unlock landed since); contact moves `last_seen_at` and closes an open silence episode.
+  `recorded` means delete (`unlockDisposition` and `contracts/outbox/` unchanged), and the
+  phone applies the session and state named, as B3b-2 applies any unlock's answer — a
+  phone that came back to focus stays there. **Judged under the session lock:** a
+  refocus and a tap lock the session too, so whichever lands first decides — the unlock
+  first flips and the return then takes over; the return first, and the unlock is
+  recorded as superseded. Either way it ends in the return, pinned by a real-Postgres
+  race. **Cost:** one read per unlock that finds a live participation, over the
+  student's own events after its time (`events_user_occurred_idx`); `recorded_at` is the
+  return's transaction start, a little before it landed, so the cap errs only toward
+  flipping (santa's review). **A backdated clock:** the server cannot tell a stuck unlock from one made now on
+  a clock turned back after the student's return — both arrive after the return,
+  claiming an earlier time — and nothing on the wire carries the phone's own order (its
+  event ids take the same clock). What that clock gets: the unlock is recorded, reason
+  and note, never erased (v2's bug was erasure); its answer names the session and
+  `focused`, which the phone applies to its shields at once, so the grid's green is
+  never over an unshielded phone (rule 3's v2 bug) — the student gains nothing. What it
+  costs: that student's own unlock does not take until the clock is right, and C5 says
+  why. Only a clock moved backwards between the return and the unlock reaches it: the
+  cap handles a fast clock corrected after the return, and a clock steadily fast or slow
+  keeps the order. Closing even that needs the phone to send the order it acted in with
+  the unlock (additive) — not built; the owner's call. **Readers:** the grid's
+  `applyUnlock` leaves the chip alone for a `superseded` note, from the stream and the
+  snapshot alike, and the snapshot's chip turn looks past such an unlock to the one
+  before it, so a newer unlock keeps its reason on the chip; the history (A7) shows it
+  at its own time — under the return that went ahead of it — with its `recordedAs`;
+  reports (Phase 4) must not end focus time at it (PLAN's reports row). **Rode along:**
+  `timestamps.test.ts` stamped its unlock 3 s before the student's own tap, a late
+  unlock now; its tap is stamped 10 s back. **Tests:** the engine on PGlite — after a
+  refocus and after a re-tap, a newer unlock kept, each arrival order, a later and a
+  tied unlock flipping, whose return and where, a later stint, protection off first,
+  contact, and a clock behind all lesson, fast at the return, and turned back; a
+  real-Postgres race of the late unlock against the refocus or re-tap that went ahead of
+  it; the API (the answer, its disposition and replay, the snapshot, the history); the
+  grid; BaliCore's vocabulary and a fixture (`unlock/recorded-superseded`); and
+  BaliOutbox's reconcile — a late unlock landing after a re-tap leaves the phone in
+  focus, and one answered late with no return since puts the shields back. Ten
+  mutations of the rule and its readers each turn a test red.
 - **2026-09-24** — **Owner ruling: decision 11 — an emergency unlock made while the
   phone's own tap is unanswered is filed under its tap.** The phone sends it with the
   tap's `event_id`, and the server records it in whatever session that tap landed in —

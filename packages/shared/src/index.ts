@@ -183,8 +183,11 @@ export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
  * unlock event's `payload.recorded_as`, and reports read it to explain a
  * "recorded" unlock that moved no student state. `protection_off`: the student
  * was live but their Screen Time permission is off, a state an unlock never
- * softens (ARCHITECTURE: "never green, never an unlock"). Additive-only like
- * the other vocab.
+ * softens (ARCHITECTURE: "never green, never an unlock"). `superseded`: the
+ * student was live and had come back to focus — their own refocus or tap in
+ * that session — after the unlock, which is late: stuck on the phone while the
+ * return went ahead of it (owner ruling, 2026-09-24). Additive-only like the
+ * other vocab.
  */
 export const UNLOCK_RECORDED_AS = [
   'no_live_participation',
@@ -192,6 +195,7 @@ export const UNLOCK_RECORDED_AS = [
   'unknown_session',
   'not_enrolled',
   'protection_off',
+  'superseded',
 ] as const;
 export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
 

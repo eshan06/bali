@@ -229,6 +229,31 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
     });
   });
 
+  it('never carries a late unlock (A10): the chip keeps what the student’s own changes made it', async () => {
+    const { teacher, student, session } = await seedRunning('a10-late');
+    const ago = (seconds: number) => ({
+      ...change(session.id, student.id),
+      deviceTime: new Date(Date.now() - seconds * 1000),
+    });
+    await tapIn(db, ago(50));
+    await unlock(db, { ...ago(40), reason: 'bathroom' });
+    await refocus(db, ago(30));
+    expect((await unlock(db, { ...ago(45), reason: 'nurse' })).recordedAs).toBe('superseded');
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'focused',
+      unlock: null,
+    });
+
+    // Unlocked again since: the chip carries that unlock, never the late one
+    // that landed after it.
+    await unlock(db, { ...ago(20), reason: 'other' });
+    expect((await unlock(db, { ...ago(35), reason: 'nurse' })).recordedAs).toBe('superseded');
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'unlocked',
+      unlock: { reason: 'other', recordedAs: null },
+    });
+  });
+
   it('carries the late records a session end leaves the row without', async () => {
     const { teacher, student, school, klass, session } = await seedRunning('a9-late');
     const ben = await classmate('a9-late-ben', school.id, klass.id);

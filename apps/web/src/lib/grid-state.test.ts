@@ -434,6 +434,36 @@ describe('the unlock a chip carries (A9)', () => {
   });
 });
 
+describe('a late unlock turns no chip (A10)', () => {
+  // Stuck on the phone while the student's own refocus or tap went ahead of
+  // it: the engine leaves the row as those made it, and so does the chip.
+  const late = (seq: number, id: string, reason: string) =>
+    evt(seq, 'unlock', id, T0, { recorded_as: 'superseded', reason });
+
+  it('leaves a chip back in focus as it is', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'unlock', 'ana', T1, { reason: 'bathroom' }));
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    s = applyEvent(s, late(8, 'ana', 'nurse'));
+    expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
+    expect(s.ana.lastSeenAt).toEqual(new Date(T1));
+  });
+
+  it('keeps a newer unlock on its chip, never the late one', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'tap_in', 'ana'));
+    s = applyEvent(s, evt(7, 'unlock', 'ana', T1, { reason: 'other' }));
+    s = applyEvent(s, late(8, 'ana', 'nurse'));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'other reason' });
+  });
+
+  it('reads the same from a snapshot, were one to carry it', () => {
+    const unlock: SnapshotUnlock = { reason: 'nurse', recordedAs: 'superseded', occurredAt: T0 };
+    const s = fromSnapshot(snapshot(5, [{ id: 'ana', unlock }]));
+    expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
+  });
+});
+
 describe('a student the snapshot does not carry (A9)', () => {
   it('whose phone unlocks with no live participation reads Left · unlocked, not Unlocked', () => {
     // Removed before this tab opened — outside the overlap, so it never saw

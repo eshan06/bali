@@ -326,6 +326,10 @@ enum Answer {
     static func unlockAfterEnd(_ view: SessionView = session()) -> String {
         #"{"outcome":"recorded","recordedAs":"after_session_end","state":null,"session":\#(json(view)),"reason":null}"#
     }
+    /// A late unlock (A10): recorded, and the state the student's own later return left, named.
+    static func unlockSuperseded(_ view: SessionView = session()) -> String {
+        #"{"outcome":"recorded","recordedAs":"superseded","state":"focused","session":\#(json(view)),"reason":null}"#
+    }
     static func refocused(_ view: SessionView = session()) -> String {
         #"{"outcome":"applied","state":"focused","session":\#(json(view))}"#
     }

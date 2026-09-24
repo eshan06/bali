@@ -84,6 +84,8 @@ const SCENARIOS: Record<string, string> = {
     'An unlock naming a session the server does not know: kept as an orphan record.',
   'unlock/recorded-not-enrolled':
     'An unlock from someone with no standing in the session: kept as an orphan record.',
+  'unlock/recorded-superseded':
+    'A late unlock (A10), stuck on the phone while the student’s own refocus went ahead of it: recorded, the focus left alone.',
   'unlock/409-event-id-conflict': 'An unlock under an id the student’s own tap holds (a bug).',
   'refocus/applied': 'Back to focus after an unlock.',
   'refocus/replay': 'The retry of a refocus that landed, the student still in the session.',
@@ -335,6 +337,30 @@ async function captureAll() {
   const lateReport = change(cal, lesson.id, 'protection-off');
   await capture('protection-off/recorded', lateReport, 200, { outcome: 'recorded' });
   await capture('protection-off/recorded-replay', lateReport, 200, { outcome: 'replay' });
+
+  // An unlock stuck on the phone while the student's own refocus went ahead of
+  // it (A10), on a fixed window, so the times sent are the times that order.
+  const stuck = await seedClassroom(db, 'fx-late');
+  const lessonAt = (hhmm: string) => ({ deviceTime: `2026-01-05T${hhmm}:00.000Z` });
+  const period = (
+    await startSession(db, {
+      classId: stuck.klass.id,
+      startedAt: new Date(lessonAt('13:00').deviceTime),
+      endsAt: new Date(lessonAt('13:50').deviceTime),
+    })
+  ).session;
+  const dan = await token(stuck.student.cognitoId);
+  const tapIt = { tagId: stuck.block.tagId, eventId: randomUUID(), ...lessonAt('13:01') };
+  await setup(post(dan, '/v1/taps', tapIt));
+  const newer = { reason: 'bathroom', ...lessonAt('13:05') };
+  await setup(change(dan, period.id, 'unlock', randomUUID(), newer));
+  await setup(change(dan, period.id, 'refocus', randomUUID(), lessonAt('13:08')));
+  const older = change(dan, period.id, 'unlock', randomUUID(), {
+    reason: 'nurse',
+    ...lessonAt('13:03'),
+  });
+  const passed = { outcome: 'recorded', recordedAs: 'superseded', state: 'focused' };
+  await capture('unlock/recorded-superseded', older, 200, passed);
 
   // Previewing a code, then joining and leaving by it (A6, auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');

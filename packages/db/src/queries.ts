@@ -356,6 +356,8 @@ function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null
 
 /** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */
 const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly EventType[];
+/** A late unlock, which the student's own return to focus went ahead of: it turns nothing. */
+const LATE_UNLOCK: UnlockRecordedAs = 'superseded';
 
 /**
  * The grid-boot roster for a session (decision 5): every student the session's
@@ -369,7 +371,8 @@ const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly E
  * Beside the stored slice, what it does not show (A9): the student's latest
  * unlock since they last tapped in or refocused — the engine records one
  * without flipping the row when protection is off, when nothing is live, and
- * after the end — and whether a protection-off report came after the end,
+ * after the end; a late one (A10) turns nothing, so the turn looks past it to
+ * the one before — and whether a protection-off report came after the end,
  * which leaves the ended row alone (A2c). The caller derives each display
  * state; one statement, so the row and its records are read at one instant.
  */
@@ -386,6 +389,7 @@ export async function getSessionRoster(
         eq(events.sessionId, sessionId),
         eq(events.userId, users.id),
         inArray(events.type, CHIP_TURNS),
+        sql`${events.payload}->>'recorded_as' is distinct from ${LATE_UNLOCK}`,
       ),
     )
     .orderBy(desc(events.seq))

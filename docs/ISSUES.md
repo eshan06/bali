@@ -54,7 +54,10 @@ app threw the record away. Unshielded phone, zero trace, nobody ever knew.
 **Status (Phase 2 — server half done):** the transition engine's `unlock` now
 always commits the event. A live participation flips to `unlocked` as before —
 unless its protection is off, which an unlock never softens: the unlock is then
-recorded with the note `protection_off` and the state left alone (Phase 3, A2).
+recorded with the note `protection_off` and the state left alone (Phase 3, A2) — or
+unless the student's own refocus or tap there came after it: a late unlock, stuck on the
+phone while that return went ahead of it, is recorded with the note `superseded` and
+the state left alone too (Phase 3, A10).
 With no live participation to flip, the event is still written with a
 `payload.recorded_as` note —
 `no_live_participation` (removed from the class mid-session), `after_session_end`

@@ -305,4 +305,40 @@ struct StaleReadTests {
         #expect(await rig.engine.state.standing == .inSession(session(endsAt: 4000), .focused))
         await rig.stop()
     }
+
+    @Test(
+        "A late unlock — stuck while a re-tap went ahead of it — lands recorded, not applied: the record gone, the phone in the focus it came back to (A10)"
+    )
+    func lateUnlockLands() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        try await rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+        await rig.until { $0.queued.first?.stuck == true }
+        // A stuck record holds nothing: the re-tap goes, and the phone is back in focus.
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined())
+        await rig.until { $0.standing == .inSession(session(), .focused) && $0.queued.count == 1 }
+        // Retried at the cap, it lands once the server takes it.
+        rig.clock.advance(by: 2 * Outbox.backoffCap)
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+        let state = await rig.until { $0.queued.isEmpty }
+        #expect(state.standing == .inSession(session(), .focused))
+        #expect(try !rig.outbox.holdsUnlock(session: "s"))
+        await rig.stop()
+    }
+
+    @Test(
+        "An unlock answered as late with no change of the phone's since — its clock turned back — still applies: the phone shields to the focus the server kept, never unshielded under a green chip"
+    )
+    func lateAnswerWithNoReturn() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+        let state = await rig.until { $0.queued.isEmpty }
+        #expect(state.standing == .inSession(session(), .focused))
+        await rig.stop()
+    }
 }
