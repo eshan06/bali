@@ -360,6 +360,59 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   }, 120_000);
 
+  it('a check-in closing a silence episode racing unlock, refocus or protection off never fails on a deadlock', async () => {
+    // The close side of the race above. A check-in that finds an episode open
+    // closes it in a transaction that takes the participation row first (its
+    // guarded UPDATE), then the session's key-share lock for its came_back
+    // event; a state change sent as the phone comes back — its outbox draining
+    // beside the check-in — locks the session first. Postgres aborted one side
+    // with 40P01, and it was almost always the check-in (15, 20 and 16 of 20),
+    // which reached the phone as a 500.
+    const stale = new Date(Date.now() - 5 * 60_000);
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['unlock', 'refocus', 'protection_off'] as const) {
+        const { classId, studentId } = await seed(`race-back-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, change());
+        await db
+          .update(participations)
+          .set({ lastSeenAt: stale })
+          .where(eq(participations.sessionId, session.id));
+        await markSilentParticipations(db, new Date());
+        // The premise: an episode is open, so the check-in takes its closing
+        // transaction rather than the plain heartbeat.
+        expect(one(await liveParticipations(session.id)).silentSince).not.toBeNull();
+
+        const move =
+          rival === 'unlock'
+            ? unlock(db, change())
+            : rival === 'refocus'
+              ? refocus(db, change())
+              : protectionOff(db, change());
+        const [back] = await Promise.all([
+          checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() }),
+          move,
+        ]);
+
+        expect(back.status).toBe('live');
+        const row = one(await liveParticipations(session.id));
+        expect(row.state).toBe(
+          rival === 'unlock' ? 'unlocked' : rival === 'refocus' ? 'focused' : 'protection_off',
+        );
+        // One episode, closed exactly once, by whichever contact won.
+        expect(row.silentSince).toBeNull();
+        expect(await eventsOfType(session.id, 'went_silent')).toHaveLength(1);
+        expect(await eventsOfType(session.id, 'came_back')).toHaveLength(1);
+      }
+    }
+  }, 120_000);
+
   it('unlock and protection off racing a switch away never fail on a deadlock', async () => {
     // A tap into another session, or an armed tap converting at another
     // class's Start, ends this participation while holding THAT session's

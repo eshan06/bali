@@ -28,7 +28,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   leave landed first). Both went red on the old code with a raw 40P01, and
   removing any one retry turns one red (`changeState`: both; the sweep: the
   sweep race; `unlock`: the switch race — against the sweep it lost none in
-  these runs, the sweep's side lost instead).
+  these runs, the sweep's side lost instead). **Found while finishing it: a
+  check-in closing a silence episode** takes the row first too (its guarded
+  UPDATE, then the `came_back`'s key-share), and against a state change sent
+  as the phone comes back it was nearly always the side Postgres aborted (15,
+  20 and 16 of 20 for unlock, refocus and protection-off) — a 500 on the
+  heartbeat. Its closing transaction retries as well (a re-run is safe: the
+  guarded UPDATE closes the episode only if nothing closed it meanwhile), and a
+  third race test pins it: red with a raw 40P01 without that retry.
 - **2026-09-23** — **Review workflow: one fresh worker per PR; only proven
   problems block.** Santa loops were taking up to an hour on big PRs (#49 ran
   santa three times — six fix rounds — and merged `main` in three times), and

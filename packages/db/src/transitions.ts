@@ -107,12 +107,13 @@ function heardNow(): Date {
 /**
  * Retry a transaction that Postgres aborts with a deadlock (40P01). Two engine
  * writers can reach the same participation row in opposite lock orders: a
- * session-scoped change (endEnrollment, unlock, refocus, protection-off) locks
- * the session and then the row, while a cross-session switch (tapIn or an armed
- * tap converting at Start -> endParticipationsElsewhere) and the silence sweep
- * take the row first and then this session's key-share lock for their event.
- * Postgres aborts one side, so both sides retry. Every engine mutation is
- * idempotent (event_id / removed_at), so re-running the loser is safe and
+ * session-scoped change (endEnrollment, endSession, unlock, refocus,
+ * protection-off) locks the session and then the row, while a cross-session
+ * switch (tapIn or an armed tap converting at Start -> endParticipationsElsewhere),
+ * the silence sweep and a check-in closing a silence episode take the row first
+ * and then this session's key-share lock for their event. Postgres aborts one
+ * side, so both sides retry. Every engine mutation is idempotent (event_id /
+ * removed_at / a guarded UPDATE), so re-running the loser is safe and
  * converges. PGlite is single-connection and never deadlocks, so this is a
  * no-op there.
  */
@@ -2087,38 +2088,46 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   // if two check-ins race — the loser just records its heartbeat. (If a sweep
   // opens an episode between the read above and here, the next check-in closes
   // it: a one-heartbeat lag, never a lost or duplicated `came_back`.)
-  return db.transaction(async (tx) => {
-    const closed = await tx
-      .update(participations)
-      .set({ lastSeenAt: heardNow(), silentSince: null })
-      // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
-      // participation only: a check-in racing endSession then records no
-      // came_back on the just-ended row (it falls through to the heartbeat below).
-      .where(
-        and(
-          eq(participations.id, live.id),
-          isNotNull(participations.silentSince),
-          isNull(participations.endedAt),
-        ),
-      )
-      .returning({ id: participations.id });
-    if (closed.length === 0) {
-      await tx
+  //
+  // Retry on deadlock, as the sweep does: this takes the row first and the
+  // session's key-share lock (the event's foreign key) second, while a state
+  // change or unlock sent as the phone comes back locks the session first —
+  // either side can lose. The guarded UPDATE makes a re-run safe: it closes
+  // the episode only if nothing closed it meanwhile.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const closed = await tx
         .update(participations)
-        .set({ lastSeenAt: heardNow() })
-        .where(eq(participations.id, live.id));
+        .set({ lastSeenAt: heardNow(), silentSince: null })
+        // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
+        // participation only: a check-in racing endSession then records no
+        // came_back on the just-ended row (it falls through to the heartbeat below).
+        .where(
+          and(
+            eq(participations.id, live.id),
+            isNotNull(participations.silentSince),
+            isNull(participations.endedAt),
+          ),
+        )
+        .returning({ id: participations.id });
+      if (closed.length === 0) {
+        await tx
+          .update(participations)
+          .set({ lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        return { status: 'live', state: live.state, session };
+      }
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'came_back',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: input.studentId,
+        occurredAt: seenAt,
+      });
       return { status: 'live', state: live.state, session };
-    }
-    await insertEvent(tx, {
-      eventId: newUuidV7(),
-      type: 'came_back',
-      sessionId: session.id,
-      classId: session.classId,
-      userId: input.studentId,
-      occurredAt: seenAt,
-    });
-    return { status: 'live', state: live.state, session };
-  });
+    }),
+  );
 }
 
 export interface JoinClassInput {
