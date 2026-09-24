@@ -482,9 +482,16 @@ struct URLSessionTransportTests {
     @Test("A server that never answers times out: .networkError, and the record kept")
     func timesOut() async throws {
         let server = try LocalServer(answer: nil)
+        // A session that would wait four minutes: the request's own second must end it long
+        // before.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 240
+        configuration.timeoutIntervalForResource = 240
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
-            tokens: FixedToken(token: "t"), timeout: 1)
+            tokens: FixedToken(token: "t"),
+            transport: URLSessionTransport(session: URLSession(configuration: configuration)),
+            timeout: 1)
         let started = Date()
         let response = await client.unlock(
             session: "s1", UnlockRequest(eventId: "e1", deviceTime: started))
@@ -493,10 +500,38 @@ struct URLSessionTransportTests {
         #expect(response.noAnswer == .unreachable)
         #expect(unlockDisposition(response.result, response.answer) == .retry)
         // A wait, not a refusal — the server still listens, never having read a byte — and its
-        // own second, not the session's 15: on Linux, a timeout given to URLRequest's initializer
-        // is ignored for the session's.
+        // own second, not the session's four minutes: on Linux, a timeout given to URLRequest's
+        // initializer is ignored for the session's. The bound is half the session's, not a few
+        // seconds: on GitHub's macOS runner the whole iOS Simulator has stalled for over ten
+        // seconds at a time, twice in one run, the timeout's own timer with it.
         #expect(server.head.isEmpty)
-        #expect(waited > 0.5 && waited < 10)
+        #expect(waited > 0.5 && waited < 120)
+    }
+
+    @Test(
+        "A redirect comes back as its status, followed nowhere: the token never reaches the address it names",
+        arguments: [301, 302, 303, 307, 308])
+    func refusesRedirects(status: Int) async throws {
+        // Where the redirect points: it answers anything that reaches it, and keeps what came.
+        let elsewhere = try LocalServer(
+            answer: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        let server = try LocalServer(
+            answer: "HTTP/1.1 \(status) Moved\r\nLocation: http://127.0.0.1:\(elsewhere.port)/v1/taps"
+                + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        let client = APIClient(
+            baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
+            tokens: FixedToken(token: "token-real"))
+
+        let tap = await client.tap(TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: Date()))
+        #expect(tap.result == .status(status))
+        #expect(tap.noAnswer == nil)
+        // Not a 2xx, so no outcome: the tap is kept and sent again, never deleted.
+        #expect(tapDisposition(tap.result, tap.answer) == .retry)
+        #expect(server.head.hasPrefix("POST /v1/taps HTTP/1.1\r\n"))
+        #expect(server.head.contains("\r\nAuthorization: Bearer token-real\r\n"))
+        // Followed, a 301 or 302 would resend the POST as a GET with no body — and every header,
+        // the bearer token included, to whichever host the Location names.
+        #expect(elsewhere.head.isEmpty)
     }
 
     @Test("The default session caches nothing, and bounds a request's wait and a whole exchange")
