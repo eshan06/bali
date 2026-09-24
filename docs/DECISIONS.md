@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-23** — **Review workflow: one fresh worker per PR; only proven
+  problems block.** Santa loops were taking up to an hour on big PRs (#49 ran
+  santa three times — six fix rounds — and merged `main` in three times), and
+  review notes spawned follow-up PR chains (#36 → #37 → #38). Now `/plan`
+  hands each step to a fresh worker sub-agent, one at a time, so no PR
+  inherits another's context; a PR is one change under ~400 changed lines,
+  tests excluded (that line would have split #29 at 641 and #49 at 780, and
+  passed #28, #53 and #54). `/santa-loop`: docs-only changes skip it; code
+  gets up to 2 rounds and round 2 checks only the fixes; a finding blocks
+  only if it fits the BLOCKER rules in `claude-review.yml` — the one
+  definition all three reviewers use — and survives a check (a failing test
+  for logic bugs); easy WARNs are fixed in the same PR without another round,
+  never in a follow-up PR; an unsettled step is parked as a draft PR while
+  the run goes on. The decision log itself moved here from PLAN.md, which
+  every session reads in full.
 - **2026-09-23** — **A2: protection off, end to end on the server.**
   `POST /v1/sessions/{id}/protection-off` wires the engine's existing
   `protectionOff` (strict like refocus: a live participation or `409`). Two

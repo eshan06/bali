@@ -12,7 +12,7 @@ argument-hint: '[feature description | path/to/*.prd.md]'
 
 This command creates a comprehensive implementation plan before writing any code. It accepts either free-form requirements or a PRD markdown file.
 
-Run inline by default. Do not call the Task tool or any subagent by default. This keeps `/plan` usable from plugin installs that ship commands without agent files.
+Plan inline: do not call the Task tool or any subagent to produce the plan. Executing it is different — each step goes to a fresh worker (see the last section).
 
 ## What This Command Does
 
@@ -37,7 +37,7 @@ The assistant will:
 
 1. **Analyze the request** and restate requirements in clear terms
 2. **Ground the plan** in relevant codebase patterns when the repo is available
-3. **Break down into phases** with specific, actionable steps
+3. **Break down into phases** with specific, actionable steps — each step is one PR: one change, under ~400 changed lines not counting tests
 4. **Identify dependencies** between components
 5. **Assess risks** and potential blockers
 6. **Estimate complexity** (High/Medium/Low)
@@ -141,13 +141,20 @@ After writing the artifact, report its path and proceed immediately with impleme
 
 - The upstream version of this command stops and waits for the user to type "yes" before any code is written. In this repo that gate is **removed by owner order** (CLAUDE.md, "Plan, then go"): post the plan, then execute.
 - The owner can always interrupt and redirect mid-run; the plan in chat is the record they redirect against.
-- Message the owner only for the CLAUDE.md stop conditions: `/santa-loop` escalations, device checkpoints, genuine scope/architecture decisions the docs don't answer, destructive/irreversible actions.
+- Message the owner only for the CLAUDE.md stop conditions: parked steps, device checkpoints, genuine scope/architecture decisions the docs don't answer, destructive/irreversible actions.
 
-## Integration with the Bali Working Loop
+## Integration with the Bali Working Loop — one fresh worker per step
 
-After planning, follow CLAUDE.md's loop for EACH PR-sized step from the plan:
+After posting the plan, this session is the **conductor**. It never writes code itself: it hands out steps and keeps the record, so its context holds short reports, never diffs.
 
-- Execute the step with its tests
-- Verify: deterministic checks, then `/santa-loop` until NICE
-- Ship: push, open the PR, enable auto-merge (squash), drive checks green
-- Update `docs/PLAN.md` (rides the PR)
+For EACH PR-sized step, in order, one at a time:
+
+1. Launch a worker: the Agent tool with `subagent_type: general-purpose`, `isolation: "worktree"` and the brief below. Wait for its report before launching the next one — steps build on each other, and every PR edits `docs/PLAN.md`, so two workers at once would collide.
+2. Keep only the report. A **parked** step (a draft PR) doesn't stop the run: carry on with the next step that doesn't depend on it.
+3. A device checkpoint (📱) or a scope/architecture question the docs don't answer: stop and ask the owner, per CLAUDE.md.
+
+When every step is merged or parked, report: merged PRs, parked steps and why.
+
+Worker brief (fill in the step):
+
+> You are the worker for exactly one step: <the step, with its validation command and the plan's notes for it>. Start from the latest main: `git fetch origin && git switch -c <branch> origin/main`. Read CLAUDE.md and orient per its step 1, then do its steps 3–6 for this step only — execute, verify (the checks, then `.claude/commands/santa-loop.md`), ship (PR, auto-merge, every check green) and PLAN.md. Reply in at most 10 lines: the PR link, merged or parked (and why), and anything the owner must know.
