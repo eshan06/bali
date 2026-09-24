@@ -42,6 +42,11 @@ func current(_ outbox: Outbox, _ eventId: String) throws -> OutboxRecord? {
     try outbox.pool.read { try Outbox.fetch($0, eventId) }
 }
 
+/// The install the outbox's file was given (A12).
+func installOf(_ outbox: Outbox) throws -> String? {
+    try outbox.pool.read { try Outbox.state($0, Outbox.installKey) }
+}
+
 /// Answers every request with `status` and `body`, or with no answer at all when `status` is nil.
 struct Canned: HTTPTransport {
     let status: Int?

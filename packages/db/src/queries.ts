@@ -356,7 +356,12 @@ function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null
 
 /** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */
 const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly EventType[];
-/** A late unlock, which the student's own return to focus went ahead of: it turns nothing. */
+/**
+ * A late unlock, which the student's own return to focus went ahead of: it turns nothing. The
+ * filter below looks past it on an unlock only, and that scope is deliberate, not defensive: no
+ * writer notes a return today, so only a hand-made row tests it — should one ever carry a note,
+ * a return still turns the chip, since a student's return to focus is never late.
+ */
 const LATE_UNLOCK: UnlockRecordedAs = 'superseded';
 
 /**

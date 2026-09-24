@@ -96,6 +96,15 @@ const SCENARIOS: Record<string, string> = {
     'An unlock sent under a tap the server has not heard of yet: kept with no session.',
   'taps/joined-unlocked':
     'A tap reaching the server after the unlock sent under it (decision 11): joined, the unlock filed there.',
+  'taps/joined-ordered':
+    'A tap carrying the phone’s own order (A12): its outbox file’s install, and the record’s seq.',
+  'refocus/applied-ordered': 'Back to focus after an unlock, carrying the phone’s own order (A12).',
+  'unlock/applied-ordered':
+    'A real unlock on a clock turned back since the refocus (A12): older by the times, last by the phone’s order — applied.',
+  'protection-off/applied-ordered':
+    'A protection-off report carrying the phone’s own order (A12), as every record the outbox sends does.',
+  'tap-unlock/applied-ordered':
+    'An unlock sent under a re-tap on a clock still behind (A12): older than the tap by the times, after it by the order — applied.',
   'refocus/applied': 'Back to focus after an unlock.',
   'refocus/replay': 'The retry of a refocus that landed, the student still in the session.',
   'refocus/replay-no-session':
@@ -397,6 +406,46 @@ async function captureAll() {
   await capture('tap-unlock/recorded-unknown-tap', underTap(fay, notYet), 200, unheard);
   const filedLate = { outcome: 'joined', state: 'unlocked' };
   await capture('taps/joined-unlocked', tap(fay, stuckTap.block.tagId, notYet), 200, filedLate);
+
+  // The phone's own order (A12): every record its outbox sends carries its
+  // install and the record's seq, and a student's unlock is ordered against
+  // their return by it — so a clock turned back between the two no longer
+  // makes a real unlock read as late. On a fixed window, as A10's is.
+  const numbered = await seedClassroom(db, 'fx-order');
+  const lesson14 = (
+    await startSession(db, {
+      classId: numbered.klass.id,
+      startedAt: new Date(lessonAt('14:00').deviceTime),
+      endsAt: new Date(lessonAt('14:50').deviceTime),
+    })
+  ).session;
+  const gus = await token(numbered.student.cognitoId);
+  const install = randomUUID();
+  const nth = (seq: number, hhmm: string) => ({ ...lessonAt(hhmm), order: { install, seq } });
+  const tapNth = (eventId: string, seq: number, hhmm: string) =>
+    post(gus, '/v1/taps', { tagId: numbered.block.tagId, eventId, ...nth(seq, hhmm) });
+  const joined = { outcome: 'joined' };
+  await capture('taps/joined-ordered', tapNth(randomUUID(), 1, '14:01'), 200, joined);
+  await setup(change(gus, lesson14.id, 'unlock', randomUUID(), nth(2, '14:05')));
+  const back = change(gus, lesson14.id, 'refocus', randomUUID(), nth(3, '14:08'));
+  await capture('refocus/applied-ordered', back, 200, { outcome: 'applied' });
+  // The clock goes back five minutes, and the student unlocks for real.
+  const realUnlock = change(gus, lesson14.id, 'unlock', randomUUID(), {
+    reason: 'nurse',
+    ...nth(4, '14:03'),
+  });
+  const last = { outcome: 'applied', state: 'unlocked' };
+  await capture('unlock/applied-ordered', realUnlock, 200, last);
+  const revoked = change(gus, lesson14.id, 'protection-off', randomUUID(), nth(5, '14:04'));
+  await capture('protection-off/applied-ordered', revoked, 200, { outcome: 'applied' });
+  // A re-tap, and an unlock under it on the clock still behind.
+  const retap = randomUUID();
+  await setup(tapNth(retap, 6, '14:10'));
+  const underRetap = post(gus, `/v1/taps/${retap}/unlock`, {
+    eventId: randomUUID(),
+    ...nth(7, '14:06'),
+  });
+  await capture('tap-unlock/applied-ordered', underRetap, 200, last);
 
   // Previewing a code, then joining and leaving by it (A6, auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');

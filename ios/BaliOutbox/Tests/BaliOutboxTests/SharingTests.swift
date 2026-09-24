@@ -72,7 +72,7 @@ struct SharingTests {
         let url = temporaryFile()
         let app = try open(url)
         try app.pool.write {
-            try $0.execute(sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v2')")
+            try $0.execute(sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v99')")
         }
         try app.pool.close()
         #expect(throws: Outbox.TooNew.self) { try open(url) }
