@@ -97,6 +97,8 @@ jobs:
   # On every PR, not path-filtered: the contract spans apps/api (which writes
   # the fixtures), packages/shared, contracts/ and ios/, and a filtered job
   # never reports on the PRs it skips, so it could not be made required.
+  # BaliOutbox, the student's outbox, runs here too: it settles the fixtures'
+  # answers and contracts/outbox/'s cases through BaliCore's tables.
   swift:
     name: BaliCore Swift tests (Linux)
     runs-on: ubuntu-latest
@@ -117,3 +119,12 @@ jobs:
           restore-keys: balicore-swift6.4-noble-
       - run: swift test
         working-directory: ios/BaliCore
+      # GRDB builds against the system SQLite, whose headers the image lacks.
+      - run: apt-get update -qq && apt-get install -y -qq --no-install-recommends libsqlite3-dev
+      - uses: actions/cache@v4
+        with:
+          path: ios/BaliOutbox/.build
+          key: balioutbox-swift6.4-noble-${{ hashFiles('ios/BaliOutbox/Package.*', 'ios/BaliOutbox/Sources/**', 'ios/BaliOutbox/Tests/**', 'ios/BaliCore/Sources/**') }}
+          restore-keys: balioutbox-swift6.4-noble-
+      - run: swift test
+        working-directory: ios/BaliOutbox

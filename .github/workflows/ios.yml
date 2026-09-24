@@ -1,8 +1,9 @@
 # The iOS build (decision 9): the Xcode project generated from ios/project.yml,
-# the app built for the iOS Simulator with signing off, and BaliCore's tests run
-# on it — on Apple's Foundation, which parses ISO 8601 differently from the
-# Linux one the "BaliCore Swift tests (Linux)" job in ci.yml runs on. macOS
-# minutes are the dear ones: only a PR that touches ios/ or this file builds.
+# the app built for the iOS Simulator with signing off, and BaliCore's and
+# BaliOutbox's tests run on it — on Apple's Foundation, which parses ISO 8601
+# differently from the Linux one the "BaliCore Swift tests (Linux)" job in
+# ci.yml runs on, and on iOS's own SQLite. macOS minutes are the dear ones: only
+# a PR that touches ios/ or this file builds.
 name: iOS
 
 on:
@@ -100,3 +101,7 @@ jobs:
       - name: BaliCore's tests on the simulator
         run: xcodebuild test -scheme BaliCore -destination "$SIMULATOR"
         working-directory: ios/BaliCore
+
+      - name: BaliOutbox's tests on the simulator
+        run: xcodebuild test -scheme BaliOutbox -destination "$SIMULATOR"
+        working-directory: ios/BaliOutbox
