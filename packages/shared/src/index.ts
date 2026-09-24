@@ -170,5 +170,6 @@ export function isUnlockReason(value: unknown): value is UnlockReason {
 
 export * from './api.js';
 export * from './errors.js';
+export * from './outbox-contract.js';
 export * from './state.js';
 export * from './unlock-contract.js';

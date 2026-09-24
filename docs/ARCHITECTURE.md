@@ -51,8 +51,10 @@ middle was considered and rejected — see below.)
     or the student has left it, a retry that reaches a running session gets `409` (ruled
     2026-09-22), because a `200` naming the old session would keep a backgrounded phone
     shielded to a window that is over; one that reaches nothing running is answered
-    `replay` with no session — recorded, with no window to shield to. The phone keeps a
-    `409`'s record; what it shows for it is Phase 3's tap-side outbox work.
+    `replay` with no session — recorded, with no window to shield to, so the phone deletes
+    it and re-reads the truth. The phone keeps a `409`'s record and keeps retrying it, and
+    shows it (rule 5) while re-reading the truth; the typed table is `tapDisposition` in
+    `@bali/shared`.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
 **Why there's no queue between the API and the database.** A queue (usually Redis — a
@@ -334,6 +336,14 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   session or class attached, the claimed id in the payload) rather than writing into
   a stranger's history and live grid. A student removed mid-session keeps their ended
   participation row, so the case this rule exists for is untouched.
+- **Taps and state changes have typed tables too** (`@bali/shared`). A tap record is
+  deleted only on a `2xx`, and the phone shields only to a session the answer names —
+  `armed` waits for Start, and a recorded tap naming none re-reads the truth; a refused
+  tap (a `4xx` but `401`, `408`, `429`) is kept, retried and shown (`tapDisposition`). A
+  refused refocus or protection-off report is dropped and the truth re-read, never
+  resent — final for its `event_id` (`stateChangeDisposition`). A read — a check-in,
+  `GET /v1/me` — never overrides a newer state change of the phone's
+  (`readMayReconcile`).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
 
