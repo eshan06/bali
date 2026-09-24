@@ -241,7 +241,7 @@ describe('tapIn', () => {
     await db
       .update(participations)
       .set({ endedAt: new Date('2026-01-01T09:05:00Z'), endedReason: 'left_class' })
-      .where(eq(participations.id, p1.participationId));
+      .where(eq(participations.id, p1.participationId!));
 
     const p2 = await tapIn(db, {
       sessionId: session.id,
@@ -614,6 +614,84 @@ describe('state changes', () => {
     });
     expect(replay.outcome).toBe('replay');
     expect(replay.state).toBe('unlocked');
+  });
+
+  it('a refocus replayed after its participation ended names no session, however it ended', async () => {
+    /*
+     * A4, the refocus half. The session still runs, so the bell's guard does
+     * not catch this, and the ended row's last state is not the truth for a
+     * student removed, gone from the class or switched away: answered WITH
+     * the session (as it was until A4), `stateChangeDisposition` reads it as
+     * `apply_session` and a refocus answer turns shields back on — pointing
+     * the phone at a session it is no longer in. The outbox's superseded-
+     * refocus rule keeps an honest client from sending it after a switch (a
+     * later tap), but not after a removal, and a refocus already in flight
+     * when the student switched still arrives. So the replay names no session
+     * and no state: delete it, and re-read the truth.
+     */
+    for (const ending of ['removed_from_class', 'left_class', 'switched'] as const) {
+      const { school, teacher, student, klass } = await seedClass(`refocus-replay-${ending}`);
+      const { session } = await startSession(db, {
+        classId: klass.id,
+        ...window('2026-01-01T09:00:00Z'),
+      });
+      const at = (minute: number) => ({
+        sessionId: session.id,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(`2026-01-01T09:0${minute}:00Z`),
+      });
+      await tapIn(db, at(1));
+      await unlock(db, at(2));
+      const refocused = at(3);
+      expect(await refocus(db, refocused)).toMatchObject({ outcome: 'applied', state: 'focused' });
+
+      if (ending === 'switched') {
+        const next = one(
+          await db
+            .insert(classes)
+            .values({
+              teacherId: teacher.id,
+              schoolId: school.id,
+              name: 'Next period',
+              joinCode: `REFSW-${ending}`,
+            })
+            .returning(),
+        );
+        await db.insert(enrollments).values({ classId: next.id, studentId: student.id });
+        const moved = await startSession(db, {
+          classId: next.id,
+          ...window('2026-01-01T09:00:00Z'),
+        });
+        expect((await tapIn(db, { ...at(4), sessionId: moved.session.id })).outcome).toBe(
+          'switched',
+        );
+      } else {
+        const enrollment = one(
+          await db
+            .select()
+            .from(enrollments)
+            .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
+        );
+        await endEnrollment(db, {
+          enrollmentId: enrollment.id,
+          reason: ending,
+          at: new Date('2026-01-01T09:04:00Z'),
+        });
+      }
+
+      expect(await refocus(db, refocused), ending).toMatchObject({
+        outcome: 'replay',
+        state: null,
+        session: null,
+      });
+      // Recorded once, and the ended row is exactly as its ending left it.
+      expect((await eventsFor(session.id)).filter((e) => e.type === 'refocus')).toHaveLength(1);
+      const row = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(row.endedReason).toBe(ending === 'switched' ? 'left_for_other_session' : ending);
+    }
   });
 
   describe('the optional reason', () => {
@@ -1032,7 +1110,8 @@ describe('state changes', () => {
       // The session still runs, so the bell's guard does not catch this, and
       // the ended row's last state ("focused", after a re-tap) is not the truth
       // for a removed student: a 200 naming this session would point their
-      // phone back at it. Refocus keeps its shipped answer here (PLAN, A4).
+      // phone back at it. Refocus answers the same replay with no session and
+      // no state instead (A4) — neither names the session.
       const { session, student } = await joined('protoff-removed-replay');
       await unlock(db, change(session, student, 3));
       const refocused = change(session, student, 4);
@@ -1057,7 +1136,11 @@ describe('state changes', () => {
       await expect(protectionOff(db, reported)).rejects.toMatchObject({
         code: 'NOT_PARTICIPATING',
       });
-      expect(await refocus(db, refocused)).toMatchObject({ outcome: 'replay', state: 'focused' });
+      expect(await refocus(db, refocused)).toMatchObject({
+        outcome: 'replay',
+        state: null,
+        session: null,
+      });
       const types = (await eventsFor(session.id)).map((e) => e.type);
       expect(types.filter((t) => t === 'protection_off')).toHaveLength(1);
     });
@@ -1463,7 +1546,7 @@ describe('endSession & expiry', () => {
 });
 
 describe('armed taps', () => {
-  it('arms a tap when no session is running, idempotent on eventId', async () => {
+  it('arms a tap when no session is running, and its retry says it still waits', async () => {
     const { teacher, student } = await seedClass('arm');
     const eventId = newUuidV7();
     const req = {
@@ -1476,14 +1559,38 @@ describe('armed taps', () => {
     };
     const first = await armTap(db, req);
     expect(first.outcome).toBe('armed');
+    // Idempotent, and answered as armed (A4): a phone that lost the first
+    // answer learns it waits for Start. `replay` told it only "recorded", and
+    // the truth it then re-reads (`GET /v1/me`) cannot say it is waiting.
     const retry = await armTap(db, req);
-    expect(retry.outcome).toBe('replay');
+    expect(retry.outcome).toBe('already_armed');
     expect(retry.armedTapId).toBe(first.armedTapId);
     // A different eventId for the same student+teacher doesn't pile up.
     const second = await armTap(db, { ...req, eventId: newUuidV7() });
     expect(second.outcome).toBe('already_armed');
     const rows = await db.select().from(armedTaps).where(eq(armedTaps.studentId, student.id));
     expect(rows).toHaveLength(1);
+  });
+
+  it('the retry of an armed tap past its school day is only a replay: nothing waits for it', async () => {
+    // `already_armed` is for a tap that will still convert. An expired row
+    // never does (convertArmedTaps skips it), so answering it as armed would
+    // show "waiting for your teacher" for a tap no Start will honour.
+    const { teacher, student } = await seedClass('arm-retry-expired');
+    const req = {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T07:58:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T08:00:00Z'),
+    };
+    const first = await armTap(db, req);
+    expect(first.outcome).toBe('armed');
+
+    // The phone was offline overnight; the retry arrives the next morning.
+    const retry = await armTap(db, { ...req, now: new Date('2026-01-02T08:00:00Z') });
+    expect(retry).toEqual({ outcome: 'replay', armedTapId: first.armedTapId });
   });
 
   it('a waiting tap becomes a focused participation at session start (decision 5)', async () => {
@@ -1902,7 +2009,11 @@ describe('armed taps', () => {
      * as here, both answers are the 409 now and the outbox keeps the record.
      * While it is still live, `tapIn` replays it instead (its replay is keyed
      * on student and type — tap step 10) and this path still refuses: the one
-     * split left, recorded in PLAN.md.
+     * split left, recorded in PLAN.md. A4 keeps the 409 here on both paths: a
+     * tap recorded but no longer current replays with no session only under
+     * the teacher it was recorded with. Under another it is not this tap's
+     * retry (tap step 9), and a 200 would drop a physical tap at B's block —
+     * so `tapIn`'s half goes red if its teacher check is removed.
      *
      * Only the cross-teacher half. The SAME teacher, an id spent in an earlier
      * session of theirs, still answers `replay` here — "does not arm an id
@@ -2512,7 +2623,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
 
     expect(retry.outcome).toBe('replay');
     // The truth is the session the tap was actually recorded against.
-    expect(retry.session.id).toBe(first.session.id);
+    expect(retry.session?.id).toBe(first.session.id);
     expect(retry.participationId).toBe(landed.participationId);
 
     // And nothing was written twice.
@@ -2541,8 +2652,11 @@ describe('a retried tap the server re-resolves elsewhere', () => {
      * them absent either way. The owner ruled on it (2026-09-22) and it
      * stays; pinned because it is the join half of the split PLAN.md records
      * (the arm path refuses the same reuse), and a decision nothing tests can
-     * change by accident. If Phase 3 adds a "recorded, but no longer current"
-     * answer, this test is the one that should change.
+     * change by accident. A4's "recorded, but no longer current" answer left
+     * it as it is: this tap IS current — the participation in A is live, its
+     * session running — so the replay still names A. Once it is not current,
+     * a tap recorded under another teacher is refused on both paths ("refuses
+     * an id spent under another teacher, as tapIn does").
      */
     const a = await seedClass('reuse-teacher-a');
     const b = await seedClass('reuse-teacher-b');
@@ -2575,7 +2689,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
 
     // Answered as a replay of teacher A's tap, not as the join it really was.
     expect(reused.outcome).toBe('replay');
-    expect(reused.session.id).toBe(sessionA.id);
+    expect(reused.session?.id).toBe(sessionA.id);
     expect(reused.participationId).toBe(joined.participationId);
 
     // Teacher B's grid: nothing. The student is standing in that room.
@@ -2603,29 +2717,29 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     expect(inA.state).toBe('focused');
   });
 
-  it('refuses to replay a tap recorded in a session that has ended', async () => {
+  it('replays a tap recorded in a session that has ended with no session, never naming it', async () => {
     /*
-     * The bound that makes the replay above safe. TapResponse hands the phone
-     * {id, classId, endsAt} and has no way to say "that session is over", and
-     * a session the teacher ended EARLY keeps its original endsAt — so a
-     * "replay" naming an ended session tells the phone to shield the student
-     * until a bell that already rang, in a session whose grid no teacher is
-     * watching and which no unlock can reach. Nothing would be surfaced
-     * anywhere: per ARCHITECTURE step 10 the phone deletes its outbox record
-     * on 200 and stops asking.
+     * The bound that makes the replay above safe. A session the teacher ended
+     * EARLY keeps its original endsAt, so a replay NAMING it tells the phone
+     * to shield the student until a bell that already rang, in a session whose
+     * grid no teacher is watching and which no unlock can reach — and per
+     * ARCHITECTURE step 10 the phone deletes its outbox record on 200 and
+     * stops asking.
      *
-     * So the engine refuses instead. EVENT_ID_CONFLICT is loud — a non-401 4xx
-     * is "keep the record, retry, and surface" — and the student's next
-     * physical tap carries a fresh id and joins the running session normally.
+     * So the replay names no session (A4): recorded, with no window, which
+     * `tapDisposition` reads as "delete it and re-read the truth". Until A4 it
+     * was a 409 EVENT_ID_CONFLICT, which the tap outbox keeps and retries
+     * forever — a record the server did keep, never allowed to clear. The
+     * student's next physical tap carries a fresh id and joins normally.
      *
      * Measured, so the name is not read as a claim about which line holds it
      * up: NEITHER guard is pinned by this test on its own. Ending a session
      * ends its live participations in the same transaction, so by the time the
      * session is gone the row is too, and each condition is independently
      * sufficient here — delete either one alone and this stays green; delete
-     * both and it goes red. `!current.endedAt` has its own test in the two
-     * cases above; `!recorded.endedAt` is kept for read-order safety rather
-     * than because anything would catch its removal (see the branch comment).
+     * both and it goes red. `!current.endedAt` has its own tests below;
+     * `!recorded.endedAt` is kept for read-order safety rather than because
+     * anything would catch its removal (see the branch comment).
      */
     const { klass, student, school, teacher } = await seedClass('tap-replay-ended');
     const other = one(
@@ -2661,17 +2775,29 @@ describe('a retried tap the server re-resolves elsewhere', () => {
       classId: other.id,
       ...window('2026-01-01T09:10:00Z'),
     });
-    await expect(
-      tapIn(db, {
-        sessionId: second.session.id,
-        studentId: student.id,
-        eventId,
-        deviceTime: new Date('2026-01-01T09:01:00Z'),
-      }),
-    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    const retry = await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(retry).toEqual({ outcome: 'replay', state: null, participationId: null, session: null });
+
+    // A replay writes nothing: no second tap_in, and no join into the session
+    // the retry re-resolved to.
+    const taps = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, 'tap_in'), eq(events.userId, student.id)));
+    expect(taps).toHaveLength(1);
+    const inSecond = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, second.session.id));
+    expect(inSecond).toHaveLength(0);
   });
 
-  it('refuses to replay a participation the student has since left', async () => {
+  it('replays a participation the student has since left with no session', async () => {
     /*
      * The other half of the same bound, and the sharper one, because BOTH
      * sessions are running. The first tap lands in A and its response is lost;
@@ -2683,7 +2809,8 @@ describe('a retried tap the server re-resolves elsewhere', () => {
      * engine exists to prevent: the phone shields for A and its next check-in
      * against A comes back `gone` — the unshield signal — while the teacher's
      * grid correctly shows the student green in B. The recorded truth is no
-     * longer the current truth, so it is not a replay.
+     * longer the current truth, so the replay names no session (A4, a 409
+     * before it) and the phone re-reads the truth, which is B.
      */
     const { klass, student, school, teacher } = await seedClass('tap-left');
     const other = one(
@@ -2723,14 +2850,13 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     });
     expect(moved.outcome).toBe('switched');
 
-    await expect(
-      tapIn(db, {
-        sessionId: second.session.id,
-        studentId: student.id,
-        eventId: stale,
-        deviceTime: new Date('2026-01-01T09:01:00Z'),
-      }),
-    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    const retry = await tapIn(db, {
+      sessionId: second.session.id,
+      studentId: student.id,
+      eventId: stale,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(retry).toEqual({ outcome: 'replay', state: null, participationId: null, session: null });
 
     // And the student is still where they actually are.
     const left = one(
@@ -2814,22 +2940,21 @@ describe('a retried tap the server re-resolves elsewhere', () => {
       deviceTime: new Date('2026-01-01T09:01:00Z'),
     });
     expect(retry.outcome).toBe('replay');
-    expect(retry.session.id).toBe(recorded.session.id);
-    expect(retry.session.endedAt).toBeNull();
+    expect(retry.session?.id).toBe(recorded.session.id);
+    expect(retry.session?.endedAt).toBeNull();
     expect(retry.participationId).toBe(landed.participationId);
   });
 
-  it('refuses a stale retry once the student has left the session that recorded it', async () => {
+  it('replays a stale retry with no session once the student has left the session that recorded it', async () => {
     /*
-     * The same bound seen from the other side, and the case the `!isNew`
-     * refusal below the branch actually serves. Here the retry resolves back
+     * The same bound seen from the other side. Here the retry resolves back
      * to the session that recorded it — still running — but the student's row
      * in it has ended, because they tapped the teacher's other session for
-     * real. main answered 200 with that ended row's stale `focused`, which is
-     * the drift this PR exists to kill.
-     *
-     * NOT_PARTICIPATING, not EVENT_ID_CONFLICT: the id is not in conflict, it
-     * names this very tap. What is no longer true is the participation.
+     * real. Before #28 it was answered 200 with that ended row's stale
+     * `focused`, naming this session: the drift the bound exists to kill.
+     * Then a 409 NOT_PARTICIPATING, kept and retried forever. Since A4, a
+     * replay with no session: the id is not in conflict — it names this very
+     * tap — and what is no longer true is the participation.
      */
     const { klass, student, school, teacher } = await seedClass('tap-left-same');
     const other = one(
@@ -2875,14 +3000,140 @@ describe('a retried tap the server re-resolves elsewhere', () => {
       reason: 'ended',
     });
 
-    await expect(
-      tapIn(db, {
-        sessionId: recorded.session.id,
+    const retry = await tapIn(db, {
+      sessionId: recorded.session.id,
+      studentId: student.id,
+      eventId: stale,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    expect(retry).toEqual({ outcome: 'replay', state: null, participationId: null, session: null });
+    // Not re-joined under the spent id: the row the switch ended stays ended.
+    const row = one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(
+            eq(participations.sessionId, recorded.session.id),
+            eq(participations.studentId, student.id),
+          ),
+        ),
+    );
+    expect(row.endedReason).toBe('left_for_other_session');
+  });
+
+  it('replays a retry with no session after the student was removed from, or left, the class', async () => {
+    /*
+     * The removal half of A4, and the retry that races one (see the real-
+     * Postgres race). The tap lands and its answer is lost; the teacher
+     * removes the student (or they leave the class) while the session runs;
+     * the retry, resolved before the removal, reaches the session that
+     * recorded it. The id names this very tap, so it is no conflict — but the
+     * student is no longer in this session, so no answer may name it. Before
+     * A4 this was a 409 NOT_PARTICIPATING.
+     */
+    for (const reason of ['removed_from_class', 'left_class'] as const) {
+      const { klass, student } = await seedClass(`tap-retry-${reason}`);
+      const { session } = await startSession(db, {
+        classId: klass.id,
+        ...window('2026-01-01T09:00:00Z'),
+      });
+      const tap = {
+        sessionId: session.id,
         studentId: student.id,
-        eventId: stale,
+        eventId: newUuidV7(),
         deviceTime: new Date('2026-01-01T09:01:00Z'),
-      }),
-    ).rejects.toMatchObject({ code: 'NOT_PARTICIPATING' });
+      };
+      expect((await tapIn(db, tap)).outcome).toBe('joined');
+      const enrollment = one(
+        await db
+          .select()
+          .from(enrollments)
+          .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
+      );
+      await endEnrollment(db, {
+        enrollmentId: enrollment.id,
+        reason,
+        at: new Date('2026-01-01T09:05:00Z'),
+      });
+
+      expect(await tapIn(db, tap), reason).toEqual({
+        outcome: 'replay',
+        state: null,
+        participationId: null,
+        session: null,
+      });
+      const row = one(
+        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+      );
+      expect(row.endedReason, reason).toBe(reason);
+    }
+  });
+
+  it('replays a stale retry with no session when the session it resolved to ended in the gap', async () => {
+    /*
+     * The ordering the branch relies on: the replay lookup sits AHEAD of the
+     * ended-session guard, so a stale retry whose resolved session ended
+     * between resolveTapTarget and the engine's lock (the bell, meeting a
+     * burst of retries) is still answered as the tap it is. Before A4 it fell
+     * through to that guard as a 409 SESSION_NOT_RUNNING. Both shapes: the
+     * retry resolved back to the session that recorded it, or to the
+     * teacher's other session.
+     */
+    const { klass, student, school, teacher } = await seedClass('tap-gap-stale');
+    const other = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'TAPGAPS2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: other.id, studentId: student.id });
+
+    const recorded = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const eventId = newUuidV7();
+    await tapIn(db, {
+      sessionId: recorded.session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    await endSession(db, {
+      sessionId: recorded.session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'expired',
+    });
+    const resolved = await startSession(db, {
+      classId: other.id,
+      ...window('2026-01-01T09:30:00Z'),
+    });
+    await endSession(db, {
+      sessionId: resolved.session.id,
+      at: new Date('2026-01-01T09:31:00Z'),
+      reason: 'ended',
+    });
+
+    for (const sessionId of [recorded.session.id, resolved.session.id]) {
+      const retry = await tapIn(db, {
+        sessionId,
+        studentId: student.id,
+        eventId,
+        deviceTime: new Date('2026-01-01T09:01:00Z'),
+      });
+      expect(retry).toEqual({
+        outcome: 'replay',
+        state: null,
+        participationId: null,
+        session: null,
+      });
+    }
   });
 
   it("refuses a tap_in carrying another student's spent id, and does not eat their join", async () => {
@@ -3064,7 +3315,7 @@ describe('the ended-consistency check constraint', () => {
       db
         .update(participations)
         .set({ endedAt: new Date('2026-01-01T09:05:00Z') })
-        .where(eq(participations.id, p.participationId)),
+        .where(eq(participations.id, p.participationId!)),
     ).rejects.toThrow();
   });
 });

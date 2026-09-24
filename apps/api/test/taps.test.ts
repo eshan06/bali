@@ -1,5 +1,14 @@
-import { classes, type Database, endSession, enrollments, startSession } from '@bali/db';
+import {
+  classes,
+  type Database,
+  endSession,
+  enrollments,
+  participations,
+  startSession,
+  users,
+} from '@bali/db';
 import type { TapResponse } from '@bali/shared';
+import { and, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -153,14 +162,14 @@ describe('POST /v1/taps', () => {
     expect(retry.body.state).toBe('focused');
   });
 
-  it('is a 409 when the retry resolves back to a session the student has left', async () => {
+  it('a retry that resolves back to a session the student has left is 200 replay naming no session', async () => {
     /*
-     * The half this branch CHANGES for shipped `/v1`, and the one the whole
-     * hold turns on — `main` answers 200 here. It was pinned only at engine
-     * level, as a thrown `NOT_PARTICIPATING`; what a phone actually branches
-     * on is the status and the body that `routes/errors.ts` maps it to, and
-     * nothing asserted those. The same shape of gap that let armTap's
-     * refusals ship as 500s.
+     * The wire half of A4, which corrects a shipped answer (API decision 2).
+     * Before #28 this was a 200 naming period 1 — a session the student had
+     * left; #28 made it a `409 not in this session`, which the tap outbox
+     * keeps and retries forever though the tap is on record. Now it is the
+     * true answer: recorded, and no window to shield to, so the phone deletes
+     * the record and re-reads the truth.
      *
      * The student taps into period 1, the 200 is lost, they physically tap
      * period 2 (so decision 4 ends the period-1 row as
@@ -201,10 +210,70 @@ describe('POST /v1/taps', () => {
 
     // The stale retry, re-resolved back to period 1.
     const retry = await tap(token, { tagId: block.tagId, eventId });
-    expect(retry.status).toBe(409);
-    expect(retry.body).toMatchObject({
-      error: { code: 'conflict', message: 'not in this session' },
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    // A replay, not a re-join under the spent id: nothing is live anywhere —
+    // period 2 is over, and the period-1 row stays ended.
+    const live = await db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.studentId, student.id), isNull(participations.endedAt)));
+    expect(live).toHaveLength(0);
+  });
+
+  it('the retry of a tap still armed answers already_armed, so the phone keeps waiting', async () => {
+    // A4: `replay` with no session told the phone only "recorded", and the
+    // truth it then re-reads cannot say it waits for Start.
+    const { student, block } = await seedClassroom(db, 'tap-armed-retry');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+    const first = await tap(token, { tagId: block.tagId, eventId });
+    expect(first.body).toEqual({ outcome: 'armed', session: null, state: null });
+
+    const retry = await tap(token, { tagId: block.tagId, eventId });
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual({ outcome: 'already_armed', session: null, state: null });
+  });
+
+  it('an id held by a different event is still a 409 on the join path', async () => {
+    // The genuine conflict A4 leaves alone: a classmate's tap id, or this
+    // student's own unlock id, sent as a tap into a running session. A 200
+    // would tell the phone to delete a tap the server never kept.
+    const { student, school, klass, block } = await seedClassroom(db, 'tap-join-conflict');
+    const [classmate] = await db
+      .insert(users)
+      .values({ cognitoId: 'student-tap-join-conflict-2', role: 'student', schoolId: school.id })
+      .returning();
+    if (!classmate) throw new Error('expected a classmate');
+    await db.insert(enrollments).values({ classId: klass.id, studentId: classmate.id });
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
     });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const theirs = randomUUID();
+    const joined = await tap(await ctx.tokenFor(classmate.cognitoId), {
+      tagId: block.tagId,
+      eventId: theirs,
+    });
+    expect(joined.body.outcome).toBe('joined');
+    expect((await tap(token, { tagId: block.tagId })).body.outcome).toBe('joined');
+    const unlockId = randomUUID();
+    const unlocked = await authedInject(ctx.app, token, {
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/unlock`,
+      payload: { eventId: unlockId, deviceTime: new Date().toISOString() },
+    });
+    expect(unlocked.statusCode).toBe(200);
+
+    for (const eventId of [theirs, unlockId]) {
+      const res = await tap(token, { tagId: block.tagId, eventId });
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'conflict', message: 'event_id already used by another event' },
+      });
+    }
   });
 
   it("is a 409 when the event_id belongs to another student's armed tap", async () => {

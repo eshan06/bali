@@ -30,7 +30,8 @@ function endOfDay(now: Date): Date {
  * POST /v1/taps — the tap. Resolves the block to its teacher, then either joins
  * the running session the student is enrolled in (tapIn: joined/switched) or,
  * when none is running, saves the tap as armed and waiting (decision 5). The
- * response is the phone's reconciliation channel.
+ * response is the phone's reconciliation channel: a retry names its session
+ * only while it is live there, and names none once it is not (A4).
  */
 export function registerTapsRoute(app: FastifyInstance, db: Database): void {
   app.post('/v1/taps', { preHandler: app.authenticate }, async (request): Promise<TapResponse> => {
@@ -53,7 +54,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
       );
       return {
         outcome: result.outcome,
-        session: {
+        session: result.session && {
           id: result.session.id,
           classId: result.session.classId,
           endsAt: result.session.endsAt.toISOString(),

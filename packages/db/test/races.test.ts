@@ -366,6 +366,73 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   }, 120_000);
 
+  it('a retried tap racing the end of its session or a removal never names a session it is not in', async () => {
+    // A4: the retry of a tap that landed is answered with its session only
+    // while it is still true, and `replay` with no session once it is not.
+    // The end — a teacher's early end, or the sweep at the bell — and a
+    // removal from the class each lock the session FOR UPDATE, as the retry
+    // does, so they serialise: retry first, it names the session, running and
+    // the student live in it; end or removal first, it names none. Never the
+    // 409 the second order got before A4 (SESSION_NOT_RUNNING,
+    // NOT_PARTICIPATING), never a 500, and never a session read as over.
+    for (let round = 0; round < 12; round += 1) {
+      for (const via of ['end', 'sweep', 'removal'] as const) {
+        const { classId, studentId } = await seed(`race-retry-${via}-${round}`);
+        const session = await openSession(classId, { due: via === 'sweep' });
+        const tap = {
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        };
+        expect((await tapIn(db, tap)).outcome).toBe('joined');
+        const enrollment = one(
+          await db
+            .select()
+            .from(enrollments)
+            .where(and(eq(enrollments.classId, classId), eq(enrollments.studentId, studentId))),
+        );
+
+        // Odd rounds give the rival a head start, so both orders get exercised.
+        const retry = () => tapIn(db, tap);
+        const [retried, rival] = await Promise.allSettled([
+          round % 2 === 1 ? new Promise((resolve) => setTimeout(resolve, 10)).then(retry) : retry(),
+          via === 'end'
+            ? endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' })
+            : via === 'sweep'
+              ? expireDueSessions(db, new Date())
+              : endEnrollment(db, {
+                  enrollmentId: enrollment.id,
+                  reason: 'removed_from_class',
+                  at: new Date(),
+                }),
+        ]);
+
+        expect(rival.status).toBe('fulfilled');
+        if (retried.status === 'rejected') throw retried.reason;
+        const answer = retried.value;
+        expect(answer.outcome).toBe('replay');
+        if (answer.session === null) {
+          expect(answer).toEqual({
+            outcome: 'replay',
+            state: null,
+            participationId: null,
+            session: null,
+          });
+        } else {
+          // Named only while true: the row it read under the lock was running.
+          expect(answer.session.id).toBe(session.id);
+          expect(answer.session.endedAt).toBeNull();
+          expect(answer.state).toBe('focused');
+        }
+        // A replay writes nothing, and whichever landed first, the student is
+        // live nowhere in this session now.
+        expect(await eventsOfType(session.id, 'tap_in')).toHaveLength(1);
+        expect(await liveParticipations(session.id)).toHaveLength(0);
+      }
+    }
+  }, 120_000);
+
   it('unlock, refocus and protection off racing the silence sweep never fail on a deadlock', async () => {
     // Opposite lock orders: the sweep's per-phone transaction takes the
     // participation row first (its guarded UPDATE), then the session's

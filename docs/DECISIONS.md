@@ -8,6 +8,76 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A4: a retry recorded but no longer current is answered
+  `200 replay` naming no session — a tap's and a refocus's.** A `/v1`
+  correction under API decision 2, of answers that told a phone something
+  false or kept a record it could never clear. **Taps.** #28 bounded the tap
+  replay to what is still true (the participation live, its session running)
+  and refused the rest with `409` — `EVENT_ID_CONFLICT` when the retry
+  re-resolved to another running session, `NOT_PARTICIPATING` when it came back
+  to its own with the student's row ended, `SESSION_NOT_RUNNING` when the
+  session it resolved to ended in the gap — because `TapResponse` could not
+  say "recorded, but no longer current" and the tap outbox had no table. A3
+  gave it one, in which the session an answer names decides the window: a
+  `replay` with no session is `reread` (delete, shield to nothing, re-read
+  `GET /v1/me`), while those 409s were `retry_and_surface` — a record the
+  server did keep, retried and shown forever. Each is now `200 { outcome:
+  'replay', session: null, state: null }`, the answer the arm path already gave
+  the same retry with nothing running, and rule 4's guarantee is unchanged:
+  the replay names its session only while both still hold, read under the
+  resolved session's lock. Decided with it, each conservatively: (1) **only
+  under the teacher it was recorded with.** A retry of one physical tap always
+  resolves to the tapped block's teacher, so a tap of this student's recorded
+  under another teacher and no longer current is a spent id reused at another
+  block (or a moved block, which nothing ships): it stays `409
+  EVENT_ID_CONFLICT`, as the arm path's teacher scope (2026-09-22, item 5)
+  already refuses it — a `200` would drop a physical tap at that block. While
+  it is still current it is replayed naming its session, the split #28
+  recorded; unchanged. (2) **What still 409s:** an id held by a different
+  event — another student's, another kind, this student's tap under another
+  teacher — and a fresh tap that raced its session's end, whose retry resolves
+  afresh. `NOT_PARTICIPATING` no longer reaches a tap: the `!isNew` branch
+  after `insertEvent` that threw it is unreachable now (a session's `tap_in` is
+  written only under its lock or by the Start that created it, so the lookup
+  always sees it) and answers the same no-session replay, which is always safe
+  because the phone re-reads the truth — a disclosed survivor. (3) **The
+  retry of a still-armed tap answers `already_armed`** (#59's review). It
+  answered `replay` with no session: deleting was right, since the waiting row
+  stands, but `reread` re-reads `GET /v1/me`, which cannot say "armed", so the
+  phone could not show "waiting for your teacher" for a tap that will join at
+  Start. `already_armed` already means "a waiting tap of this student's for
+  this teacher stands and covers this one" (`wait_for_start`), so this is a
+  correction within the shipped vocabulary, not a new promise. Only a row that
+  still waits (unconsumed, unexpired) answers it; expired or consumed, it stays
+  `replay`, since no Start will honour it. Every door gives it: the `exact`
+  read and both 23505 recoveries (`answerOwnArmedTap`). **Refocus.** A refocus
+  replayed after its participation ended while the session runs (removed,
+  left the class, switched away) answered that row's last state WITH the
+  session — `apply_session`, shields back on for a session the student is no
+  longer in (A2's entry). A3's superseded-refocus rule keeps an honest client
+  from sending it after a switch, but not after a removal, nor one already in
+  flight. It now answers `replay` with `session` and `state` null, which
+  `stateChangeDisposition` already read as `reread` — A2c's shape
+  (`RefocusResponse.state` and `session` nullable, on this answer only; no
+  phone has shipped). A `200` rather than protection-off's `409`, because the
+  refocus is on record: the true answer is "recorded, and you are no longer in
+  it". Left as they are, on purpose: a refocus after the end stays `409
+  session has ended` (A2), and protection-off's replay after its participation
+  ended stays `409 not in this session` (A2) — both are already dropped and
+  re-read, and neither can shield. Pinned by engine tests (each stale shape —
+  left, removed, left the class, session over, resolved session ended in the
+  gap — replays with no session, red without the change; the cross-teacher
+  `409` goes red without the teacher check; the armed retry, and an expired
+  one that stays `replay`; the refocus replay after a removal, leaving and a
+  switch), API tests of the wire answers and their dispositions (a genuine
+  conflict still `409`s on the join path; refocus replay, validation, auth),
+  and a real-Postgres race of a retry against its session's end, the sweep and
+  a removal: never a `409` or a `500`, and a session named only as read
+  running. Also from #59's review: `outbox-contract.test.ts` could start two
+  sessions of one teacher in the same millisecond, leaving which one a tap
+  resolves to (the newest by `started_at`) to chance — each start is now a
+  millisecond later than the last; and PLAN's B3 line now asks for a bound on
+  `retry_and_surface` before the outbox is built.
 - **2026-09-24** — **The no-attribution rule gets a CI check** (owner: "remove
   the generated by claude code thing. keep it out"). CLAUDE.md already banned
   Claude attribution, but the written rule did not hold: the GitHub MCP

@@ -63,13 +63,20 @@ describe('tapDisposition (the tap outbox)', () => {
   });
 
   it('a replay with no session is recorded: delete it and re-read the truth, never shield', () => {
-    // Today: the retry of a tap that landed, with nothing running. After A4:
-    // every retry recorded but no longer current. One answer for both.
+    // A4's answer to every retry recorded but no longer current — its
+    // participation ended or its session is over — with or without a
+    // session running to resolve to: `200 replay`, session and state null.
     expect(tapDisposition(200, { outcome: 'replay', session: null })).toBe('reread');
     // Only an object is a session; anything else names none.
     for (const session of ['s', 1, true]) {
       expect(tapDisposition(200, { outcome: 'replay', session })).toBe('reread');
     }
+  });
+
+  it('the retry of a tap still waiting is already_armed: it waits for the start', () => {
+    // A4: answered `replay` before, which re-read a truth that cannot say
+    // the tap waits.
+    expect(tapDisposition(200, { outcome: 'already_armed', session: null })).toBe('wait_for_start');
   });
 
   it('a 2xx without a known outcome is not treated as recorded — it retries', () => {
@@ -122,8 +129,9 @@ describe('stateChangeDisposition (refocus and protection off)', () => {
     }
   });
 
-  it("protection off's recorded, and its replay, carry no session: delete and re-read", () => {
-    // The A2c shape: `session` and `state` both null.
+  it("protection off's recorded, its replay, and a refocus replay after the student left carry no session: delete and re-read", () => {
+    // The A2c shape, which A4 gives the refocus replayed after its
+    // participation ended while the session runs: `session` and `state` null.
     expect(stateChangeDisposition(200, { outcome: 'recorded', session: null })).toBe('reread');
     expect(stateChangeDisposition(200, { outcome: 'replay', session: null })).toBe('reread');
   });

@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason), A2 (protection off, end to end on the server), A2b (no deadlock reaches a phone as a 500), A2c (a protection-off reaching the server after the bell is recorded with a note) and A3 (the tap and state-change outbox tables, in `@bali/shared`) have landed; A4 is next. **The owner ruled on open decisions 7–10 (2026-09-24).** **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason), A2 (protection off, end to end on the server), A2b (no deadlock reaches a phone as a 500), A2c (a protection-off reaching the server after the bell is recorded with a note), A3 (the tap and state-change outbox tables, in `@bali/shared`) and A4 (a retried tap or refocus recorded but no longer current is answered `200 replay` naming no session) have landed; A5 is next. **The owner ruled on open decisions 7–10 (2026-09-24).** **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
 
 ## Now
 
@@ -97,16 +97,13 @@ _Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and
   ARCHITECTURE note allowing it (**landed**).
   The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
   the deferral stands.
-- **The owner ruled on #28's held question (2026-09-22): the `409`s stand.**
-  A retried tap that landed is replayed only while what it recorded is still
-  true (the participation live, its session running). Otherwise, a retry that
-  reaches a running session is refused with `EVENT_ID_CONFLICT`,
-  `NOT_PARTICIPATING` or `SESSION_NOT_RUNNING`, all `409`, so the outbox keeps
-  the record; one that reaches nothing running is answered `replay` with no
-  session by `armTap` (tap step 10). The `409`s are not final yet: that needs
-  the tap-side outbox disposition (and a "recorded, no longer current" answer),
-  which is Phase 3. The spent-armed-tap skip it depended on landed first, in
-  #29, so these refusals no longer feed the period-5 shield.
+- **The owner ruled on #28's held question (2026-09-22): the `409`s stand** —
+  until A4 (2026-09-24) replaced them with the "recorded, no longer current"
+  answer they were waiting for. A retried tap that landed names its session
+  only while what it recorded is still true (the participation live, its
+  session running); otherwise it is answered `200 replay` with no session, so
+  the outbox deletes it and re-reads the truth (tap step 10). The
+  spent-armed-tap skip it depended on landed first, in #29.
 - **Found while fixing the audit, on `main` rather than in the audit's list:**
   the SSE hub's `close()` did not wait for a LISTEN it had started, so a
   shutdown during setup left a query on a pool being torn down — an unhandled
@@ -116,8 +113,9 @@ _Last updated: 2026-09-24 — **Phase 3 (iOS student app) has started**, API and
   the earlier unwritten 10-step outline. The API and shared-contract steps land
   first, so the iOS client implements against finished, tested contracts —
   the `unlockDisposition` pattern. **A1 (unlock reason), A2 (protection off),
-  A2b (deadlock retry), A2c (protection off after the bell, recorded) and A3
-  (the outbox tables) landed; A4 is next.** Of the owner decisions Phase 3
+  A2b (deadlock retry), A2c (protection off after the bell, recorded), A3
+  (the outbox tables) and A4 (recorded, no longer current) landed; A5 is
+  next.** Of the owner decisions Phase 3
   needs (items 6–10 under Open product decisions), 7–10 are decided
   (2026-09-24) and 6 is still open;
   steps that need the owner's iPhone are marked 📱. Phase 0's open question
@@ -145,14 +143,14 @@ plan backstop already treats it as source).
 - **A2b** Deadlock retry: unlock, refocus and protection-off take the session lock before the participation row, while the silence sweep, a switching tap, an armed tap converting at Start and a check-in closing a silence episode take the row first — Postgres aborted one side (40P01) and a phone request that lost got a 500. Both sides retry now; the exit demo drives protection off end to end (live on the stream, refocus refused, a re-tap returns — not yet re-run against dev) — ✅
 - **A2c** A protection-off that first reaches the server after the session ended is recorded with a note instead of refused (owner decision 10): `200 recorded`, noted `after_session_end` like a late unlock, marking nothing, and answered with no session and no state, so it never hands a phone a window to shield to. Only for a student who was in the session at its end; every other report after the end keeps its `409`, including the retry of one that landed while the session ran — ✅
 - **A3** Outbox dispositions in `@bali/shared`: `tapDisposition` (the tap-side twin of `unlockDisposition`) and one for refocus / protection-off — a refused change is dropped and the truth re-read, never resent. Protection-off's `recorded` (A2c) is final like `applied` and `replay`, and it and its replay carry a null `session` and `state` — pin that shape in the fixtures (A5). Also: a check-in racing a state change can answer the state from before it (checkIn reads `state` before it writes — pre-existing, raised in A2b's review), so the reconcile must never let a check-in answer override a newer state-change response — ✅ `tapDisposition`, `stateChangeDisposition` and `readMayReconcile` (`outbox-contract.ts`), bound to the server's real answers by an API test. The session an answer names, not its outcome, decides the window, so A4's `200 replay` with no session already reads as "delete, re-read the truth"; a refused tap is kept, retried and shown (tap steps 9–10, rule 5)
-- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409`. Settle the same case for refocus here, before a phone ships: its replay after the participation ended in a still-running session answers that row's last state (protection-off refuses it — A2's decision-log entry); A3's superseded-refocus rule covers a switch, not a removal or leaving the class. Also decide (A3): the retry of a still-armed tap answers `replay` with no session, the same shape as a tap recorded in a session since over, so the phone deletes it rightly but cannot show "waiting for your teacher". Update `tapDisposition`'s list of today's 409s with the change, and the API test's assertions marked for A4
+- **A4** A retried tap that is recorded but no longer current answers `200 replay` with no session instead of `409` — ✅ a retry whose participation ended (switched away, left or removed from the class) or whose session is over names no session, whichever running session it reaches: `tapDisposition` reads it as `reread`. Only under the teacher it was recorded with — under another it stays `409 EVENT_ID_CONFLICT`, as on the arm path — and an id held by a different event, or a fresh tap that raced its session's end, still 409s. A refocus replayed after its participation ended in a running session answers `replay` with no session and no state (it named the session, with the ended row's last state), which `stateChangeDisposition` reads as `reread`; protection-off keeps refusing that replay (A2). The retry of a still-armed tap answers `already_armed`, so the phone keeps showing "waiting for your teacher"
 - **A5** Contract fixtures: real response JSON per student endpoint, checked in, CI fails on drift. First decide whether errors get a machine-readable `details` code: `PROTECTION_OFF` and `NOT_PARTICIPATING` both reach the phone as `conflict`, told apart only by message
 - **A6** Join-code preview · **A7** `GET /v1/me/history` · **A8** edit own name — each after its screen design, and all three wait for the owner's D1 comments; A8 implements decision 8 (a name unique within each class, ignoring case)
 - **A9** Portal: the live grid shows an unlock's reason (the privacy contract promises the teacher sees it) — including an unlock recorded against a protection-off row, which today leaves the chip unchanged, so it shows only in the event log. Also: a student the snapshot no longer carries (it holds active enrollments only) whose phone unlocks after the overlap window reads "Unlocked", not "Left ·" (pre-existing); and a late record — an unlock or (A2c) a protection off noted `after_session_end` — shows its "Left ·" chip only until the next 15 s snapshot refresh, which reads the ended row a late record leaves alone, so it reverts to "Left" (the event log keeps it)
 - **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — the owner approved the first pass with changes (2026-09-24); their comments are coming on the artifact, and A6–A8 wait for them: [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **B1** `BaliCore` Swift package (types, API client, both dispositions, fixture contract tests) + a Linux Swift CI job
 - **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI on GitHub-hosted runners, only on PRs touching `ios/` (decision 9). Identifiers — v2's, as the Family Controls entitlement request used them: team `H535678UF8`; app `com.bali.Bali`; extensions `com.bali.Bali.BaliShield` (shield UI) and `com.bali.Bali.BaliMonitor` (DeviceActivity monitor); app group `group.com.bali.shared`
-- **B3** GRDB outbox + sync engine · **B4** Cognito PKCE sign-in
+- **B3** GRDB outbox + sync engine — first decide a bound for `retry_and_surface`: an unlock refused forever blocks every read reconcile (`readMayReconcile`), and a tap `409` that never lands retries forever (#59's review) · **B4** Cognito PKCE sign-in
 - **B5** Enforcement: shields, allow-list, session schedule, monitor extension, custom shield — 📱 settles Phase 0's open question. A tap the server has not answered yet schedules the 50-minute cap of decision 7. Note: "only a re-tap leaves protection off" holds per participation, not per phone — an armed tap converted at another teacher's Start joins that session focused, so the phone must re-report protection off there at its next check-in
 - **B6** NFC tap → local record → shield → outbox — 📱
 - **C1–C6** Screens: onboarding · join + preview · home / waiting · focus · unlocked, protection off, session over · history + me
