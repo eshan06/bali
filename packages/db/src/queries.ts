@@ -607,9 +607,11 @@ export async function getHistoryPage(
       type: row.type as HistoryEventType,
       occurredAt: row.occurredAt!,
       reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
-      recordedAs: (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
-        ? (payload.recorded_as as UnlockRecordedAs)
-        : null,
+      recordedAs:
+        (row.type === 'unlock' || row.type === 'protection_off') &&
+        (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
+          ? (payload.recorded_as as UnlockRecordedAs)
+          : null,
       countedIn:
         row.type === 'armed_tap_skipped'
           ? (counted.get(payload.armed_tap_event_id as string) ?? null)

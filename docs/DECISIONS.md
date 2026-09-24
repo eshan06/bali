@@ -66,9 +66,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `JOIN_CODE_LENGTH` once trimmed — every minted code is that long — as a
   `400` before any lookup, for the join and the preview; the minimum still
   runs on the code as sent, so a blank code stays the join's `404`. Codes
-  longer than six used to be `404 class_not_found`: no phone sends one (the
-  join screen takes six), and a test seed was the only other source — seeds
-  now mint six symbols of the real alphabet, stably per tag. And nothing held
+  longer than six used to be `404 class_not_found` and are now `400
+  bad_input` — the size check API decision 4 asks of every endpoint before it
+  touches the database, which the join had lacked since Phase 2, rather than
+  a new behaviour. No phone sends one (the join screen takes six, and no
+  student app has shipped), and a test seed was the only other source —
+  seeds now mint six symbols of the real alphabet, stably per tag. And nothing held
   a stored code to upper case, which the routes need, since they upper-case
   what they are sent and match exactly: `generateJoinCode` is the only writer
   and its alphabet is upper-case, now pinned by a test on the whole alphabet
