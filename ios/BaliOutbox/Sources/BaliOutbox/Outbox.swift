@@ -128,8 +128,7 @@ public struct Outbox: Sendable {
         case send(OutboxRecord)
         /// Nothing is due before then.
         case wait(until: Date)
-        /// Nothing to send until something changes: the outbox is empty, or what it holds waits on
-        /// an unlock to be recorded.
+        /// Nothing is queued.
         case idle
     }
 
@@ -198,7 +197,8 @@ public struct Outbox: Sendable {
     /// (ARCHITECTURE, tap step 6).
     func backoff(_ attempt: Int) -> TimeInterval {
         let wait = min(TimeInterval(1 << min(max(attempt, 1), 6)), Self.backoffCap)
-        return wait * (1 + min(max(random(), 0), 1))
+        let jitter = random()
+        return wait * (1 + ((0...1).contains(jitter) ? jitter : jitter > 1 ? 1 : 0))
     }
 
     /// Makes every record due at `now` — the student's retry (rule 5), a fresh token after
