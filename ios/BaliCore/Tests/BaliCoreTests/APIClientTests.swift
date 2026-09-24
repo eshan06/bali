@@ -501,7 +501,7 @@ struct URLSessionTransportTests {
         // A wait, not a refusal — the server still listens, never having read a byte — and its
         // own second, not the session's minute: on Linux, a timeout given to URLRequest's
         // initializer is ignored for the session's. The bound is half the session's, not a few
-        // seconds: a simulator busy booting has stalled this whole test run for over ten.
+        // seconds: on the iOS Simulator the whole test process has stalled for over ten.
         #expect(server.head.isEmpty)
         #expect(waited > 0.5 && waited < 30)
     }

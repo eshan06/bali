@@ -80,10 +80,8 @@ jobs:
         run: xcodegen generate
         working-directory: ios
 
-      # The first iPhone simulator of the iOS the selected Xcode builds for,
-      # booted now so it has settled by the time the tests run: one booting
-      # under them stalled the whole run for over ten seconds.
-      - name: Pick a simulator and boot it
+      # The first iPhone simulator of the iOS the selected Xcode builds for.
+      - name: Pick a simulator
         run: |
           runtime="com.apple.CoreSimulator.SimRuntime.iOS-$(xcrun --sdk iphonesimulator --show-sdk-version | tr . -)"
           id=$(xcrun simctl list -j devices available | jq -r --arg runtime "$runtime" \
@@ -94,7 +92,6 @@ jobs:
             exit 1
           fi
           echo "SIMULATOR=platform=iOS Simulator,id=$id" >> "$GITHUB_ENV"
-          xcrun simctl bootstatus "$id" -b
 
       - name: Build the app for the simulator, signing off
         run: xcodebuild build -quiet -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO

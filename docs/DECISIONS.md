@@ -29,15 +29,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   automatic signing; iOS 17, BaliCore's floor; iPhone only and portrait, as
   v2 had them — each target sets `TARGETED_DEVICE_FAMILY` itself, since
   XcodeGen's iOS preset sets iPhone and iPad per target over anything the
-  project sets. Swift 6 language mode, as BaliCore. The app's screen is a placeholder that shows
-  `BaliCore.APIClient`, named by the package's own type, and the build; the
-  extensions' principal classes (`SessionMonitor`, v2's name, and
-  `ShieldConfigurationExtension`) are empty, each `// B5:` note saying what
-  it will do. **The macOS job** ("iOS app + BaliCore tests (iOS Simulator)",
-  workflow `iOS`, `.github/workflows/ios.yml`) generates the project with
-  XcodeGen 2.46.0 (pinned, checksummed), builds the app for an iOS Simulator
-  with `CODE_SIGNING_ALLOWED=NO`, and runs BaliCore's tests on it — Apple's
-  Foundation rather than the Linux one, which parse ISO 8601 differently.
+  project sets. Swift 6 language mode, as BaliCore. The app's screen is a
+  placeholder that shows `BaliCore.APIClient`, named by the package's own
+  type, and the build; the extensions' principal classes (`SessionMonitor`,
+  v2's name, and `ShieldConfigurationExtension`) are empty, each `// B5:`
+  note saying what it will do. **The macOS job** ("iOS app + BaliCore tests
+  (iOS Simulator)", workflow `iOS`, `.github/workflows/ios.yml`) generates the
+  project with XcodeGen 2.46.0 (pinned, checksummed), builds the app for an
+  iOS Simulator with `CODE_SIGNING_ALLOWED=NO`, and runs BaliCore's tests on
+  it — Apple's Foundation rather than the Linux one, which parse ISO 8601
+  differently.
   **Xcode 26.6 on `macos-26`:** swift-tools-version 6.0 needs Xcode 16 or
   later, and 26.6 is the newest release on GitHub's newest image, so CI builds
   against a current iOS SDK (26.5); it is selected by `DEVELOPER_DIR` (what
@@ -47,8 +48,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   moving the job to the owner's Mac (decision 9, once the repo is private) is
   its one `runs-on` line. **The trigger:** every PR runs the workflow, and a
   small Linux job decides with `git diff --name-only` whether `ios/` or the
-  workflow changed; the macOS job runs only then (decision 9), with no
-  third-party action. Not a `paths` filter on the workflow: a workflow
+  workflow changed (a diff that fails fails the job, never reading as no
+  change); the macOS job runs only then (decision 9), with no third-party
+  action. Not a `paths` filter on the workflow: a workflow
   filtered out never reports, so a required check would wait forever, while a
   job skipped by its `if` reports success — so it can be made required, which
   is the owner's ruleset call. Not on pushes to `main`. **Redirects refused
@@ -66,11 +68,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   task's, which also covers a session passed in. The test (301, 302, 303, 307,
   308) runs on Linux in `ci.yml` and on the iOS Simulator in the macOS job.
   **Also:** #71's socket timeout test bounded its wait at ten seconds against
-  the default session's fifteen, and on the simulator a boot still settling
-  stalled the whole test run past that. It now runs against a session of its
-  own that would wait a minute, bounded at thirty seconds, so the request's
-  own second must still end the wait — putting #71's Linux bug back makes it
-  wait the minute and fail — and the job boots its simulator before the build.
+  the default session's fifteen, and on the simulator the whole test process
+  stalled for seven to twelve seconds a run (every test's time jumped by it,
+  while the timeout itself fired at a second), once past that bound. It now
+  runs against a session of its own that would wait a minute, bounded at
+  thirty seconds, so the request's own second must still end the wait —
+  putting #71's Linux bug back makes it wait the minute and fail.
 - **2026-09-24** — **B1c: BaliCore's API client — a send's answer is a value
   the outbox tables take whole.** `APIClient` (`APIClient.swift`) has one
   method per student endpoint, typed request in, `APIResponse<Answer>` out,
