@@ -138,6 +138,63 @@ describe('authenticate', () => {
 });
 
 /*
+ * The app clients a token may come from (`AUTH_AUDIENCE`, B4): the portal and the
+ * phone each have their own Cognito app client in the one pool, so the API
+ * accepts a list — and one id accepts exactly that client, as it always did.
+ */
+describe('the app clients a token may come from', () => {
+  async function accepts(clientIds: string[], token: (issuer: TestIssuer) => Promise<string>) {
+    const issuer = await makeTestIssuer();
+    const verify = createVerifier({ issuer: TEST_ISSUER, clientIds, getKey: issuer.getKey });
+    return verify(await token(issuer)).then(
+      () => true,
+      (err: unknown) => (err instanceof ApiError ? err.code : 'threw-non-api'),
+    );
+  }
+  const access = (clientId: string) => (issuer: TestIssuer) => issuer.sign({ clientId });
+  const id = (audience: string) => (issuer: TestIssuer) => issuer.sign({ audience });
+
+  it('one id accepts that client, by either token, and no other', async () => {
+    expect(await accepts(['web'], access('web'))).toBe(true);
+    expect(await accepts(['web'], id('web'))).toBe(true);
+    expect(await accepts(['web'], access('phone'))).toBe('unauthorized');
+    expect(await accepts(['web'], id('phone'))).toBe('unauthorized');
+  });
+
+  it('a list accepts a token from any client it names, by either token', async () => {
+    for (const client of ['web', 'phone']) {
+      expect(await accepts(['web', 'phone'], access(client))).toBe(true);
+      expect(await accepts(['web', 'phone'], id(client))).toBe(true);
+    }
+  });
+
+  it('a token from neither client is refused 401', async () => {
+    expect(await accepts(['web', 'phone'], access('someone-elses-app'))).toBe('unauthorized');
+    expect(await accepts(['web', 'phone'], id('someone-elses-app'))).toBe('unauthorized');
+
+    // End to end: the middleware answers it 401, in the error shape.
+    const issuer = await makeTestIssuer();
+    const listApp = appWith(
+      createVerifier({ issuer: TEST_ISSUER, clientIds: ['web', 'phone'], getKey: issuer.getKey }),
+    );
+    try {
+      const whoamiWith = async (clientId: string) =>
+        listApp.inject({
+          method: 'GET',
+          url: '/whoami',
+          headers: { authorization: `Bearer ${await issuer.sign({ clientId })}` },
+        });
+      expect((await whoamiWith('phone')).statusCode).toBe(200);
+      const refused = await whoamiWith('someone-elses-app');
+      expect(refused.statusCode).toBe(401);
+      expect(errorOf(refused).code).toBe('unauthorized');
+    } finally {
+      await listApp.close();
+    }
+  });
+});
+
+/*
  * The 401-vs-503 classification is the crux of the honesty rule, so it is tested
  * against the REAL createVerifier (not an injected stub): a genuinely bad token
  * is a 401, but a failure to reach or parse the key set is a 503 — never a
@@ -146,7 +203,7 @@ describe('authenticate', () => {
  */
 describe('createVerifier failure classification', () => {
   async function classify(token: string, getKey: Parameters<typeof createVerifier>[0]['getKey']) {
-    const verify = createVerifier({ issuer: TEST_ISSUER, audience: TEST_AUDIENCE, getKey });
+    const verify = createVerifier({ issuer: TEST_ISSUER, clientIds: [TEST_AUDIENCE], getKey });
     return verify(token).then(
       () => null,
       (err: unknown) => (err instanceof ApiError ? err.code : 'threw-non-api'),

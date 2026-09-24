@@ -52,15 +52,16 @@ export type TokenVerifier = (token: string) => Promise<AuthedIdentity>;
 
 interface VerifierConfig {
   issuer: string;
-  audience: string;
+  /** The app clients whose tokens are accepted (`AUTH_AUDIENCE`): the portal's, the phone's. */
+  clientIds: readonly string[];
   getKey: JWTVerifyGetKey;
 }
 
 /**
  * Build a verifier from a key resolver. Cognito issues both id tokens (the app
  * client id is in `aud`) and access tokens (it's in `client_id`, with no `aud`),
- * so we verify the signature/issuer/expiry with jose and then check the client
- * id against either claim ourselves.
+ * so we verify the signature/issuer/expiry with jose and then check either
+ * claim against the accepted client ids ourselves.
  */
 export function createVerifier(config: VerifierConfig): TokenVerifier {
   return async (token: string): Promise<AuthedIdentity> => {
@@ -83,7 +84,7 @@ export function createVerifier(config: VerifierConfig): TokenVerifier {
 
     const clientId = typeof payload.client_id === 'string' ? payload.client_id : undefined;
     const audiences = toAudienceList(payload.aud);
-    if (clientId !== config.audience && !audiences.includes(config.audience)) {
+    if (!config.clientIds.some((id) => id === clientId || audiences.includes(id))) {
       throw ApiError.unauthorized('token was not issued for this app');
     }
     if (typeof payload.sub !== 'string' || payload.sub.length === 0) {
@@ -224,7 +225,7 @@ export function displayNameFromClaims(claims: JWTPayload): string | undefined {
 export function createCognitoVerifier(env: Env): TokenVerifier {
   return createVerifier({
     issuer: env.AUTH_ISSUER,
-    audience: env.AUTH_AUDIENCE,
+    clientIds: env.AUTH_AUDIENCE,
     getKey: createRemoteJWKSet(new URL(env.AUTH_JWKS_URI)),
   });
 }

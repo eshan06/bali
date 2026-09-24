@@ -138,7 +138,7 @@ export async function createLocalWorld(): Promise<DemoWorld> {
   const getKey = createLocalJWKSet({ keys: [publicJwk] });
   const verifier = createVerifier({
     issuer: LOCAL_ISSUER,
-    audience: LOCAL_AUDIENCE,
+    clientIds: [LOCAL_AUDIENCE],
     getKey,
   });
   const tokenFor = (sub: string): Promise<string> =>
@@ -158,7 +158,7 @@ export async function createLocalWorld(): Promise<DemoWorld> {
     SHUTDOWN_DEADLINE_MS: 8000,
     AUTH_ISSUER: LOCAL_ISSUER,
     AUTH_JWKS_URI: `${LOCAL_ISSUER}/.well-known/jwks.json`,
-    AUTH_AUDIENCE: LOCAL_AUDIENCE,
+    AUTH_AUDIENCE: [LOCAL_AUDIENCE],
     DATABASE_URL: 'postgres://unused@localhost:5432/sim',
     INTERNAL_API_KEY: LOCAL_INTERNAL_KEY,
   };

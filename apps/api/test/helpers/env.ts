@@ -11,7 +11,7 @@ export const testEnv: Env = {
   SHUTDOWN_DEADLINE_MS: 8000,
   AUTH_ISSUER: TEST_ISSUER,
   AUTH_JWKS_URI: `${TEST_ISSUER}/.well-known/jwks.json`,
-  AUTH_AUDIENCE: TEST_AUDIENCE,
+  AUTH_AUDIENCE: [TEST_AUDIENCE],
   DATABASE_URL: 'postgres://unused@localhost:5432/test',
   INTERNAL_API_KEY: 'test-internal-key-0123456789',
 };

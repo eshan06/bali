@@ -51,8 +51,15 @@ const envSchema = z.object({
    */
   AUTH_ISSUER: z.string().url(),
   AUTH_JWKS_URI: z.string().url(),
-  /** The Cognito app client id: an access token's `client_id` or an id token's `aud`. */
-  AUTH_AUDIENCE: z.string().min(1),
+  /**
+   * The Cognito app clients whose tokens are accepted — an access token's `client_id` or an id
+   * token's `aud` — comma-separated: the portal's and the phone's own (B4). One id accepts exactly
+   * that client, as it always did; an empty entry fails the boot rather than drop a client.
+   */
+  AUTH_AUDIENCE: z
+    .string()
+    .transform((value) => value.split(',').map((id) => id.trim()))
+    .pipe(z.array(z.string().min(1, 'names an empty client id'))),
   /** Postgres connection string. Required; the client connects lazily so boot needs no live DB. */
   DATABASE_URL: z.string().min(1),
   /**
