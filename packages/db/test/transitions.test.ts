@@ -23,6 +23,7 @@ import {
   joinClassByCode,
   protectionOff,
   refocus,
+  renameStudent,
   startSession,
   tapIn,
   unlock,
@@ -3679,5 +3680,90 @@ describe('enrollment lifecycle', () => {
         ),
     );
     expect(liveD.endedAt).toBeNull();
+  });
+});
+
+describe('renameStudent', () => {
+  /** A student in `classId`, named `displayName`. */
+  async function classmate(tag: string, displayName: string | null, classId: string) {
+    const row = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `classmate-${tag}`, role: 'student', displayName })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId, studentId: row.id });
+    return row;
+  }
+  const rename = (studentId: string, displayName: string, eventId = newUuidV7()) =>
+    renameStudent(db, { studentId, displayName, eventId });
+
+  it('sets the name and records it, beside the name it replaced, in no session or class', async () => {
+    const { student } = await seedClass('rename-record');
+    await rename(student.id, 'Ana');
+    const eventId = newUuidV7();
+
+    const result = await rename(student.id, 'Ana Reyes', eventId);
+
+    expect(result.outcome).toBe('applied');
+    expect(result.user.displayName).toBe('Ana Reyes');
+    const recorded = one(await db.select().from(events).where(eq(events.eventId, eventId)));
+    expect(recorded).toMatchObject({
+      type: 'display_name_changed',
+      userId: student.id,
+      sessionId: null,
+      classId: null,
+      payload: { display_name: 'Ana Reyes', previous_display_name: 'Ana' },
+    });
+  });
+
+  it('compares names as a reader would: case, spacing and compatibility forms aside', async () => {
+    const { student, klass } = await seedClass('rename-key');
+    await classmate('rename-key-1', 'Strauß', klass.id);
+    await classmate('rename-key-2', 'Ｂｅａ  Ortiz', klass.id);
+    await classmate('rename-key-3', 'Zoe\u0308', klass.id);
+
+    for (const name of [
+      'STRAUSS',
+      'bea ortiz',
+      'Zo\u00eb',
+      // Characters that draw nothing cannot make a name another: a joiner, a
+      // variation selector, a Hangul filler; nor can a blank that looks like
+      // a space, the blank braille cell.
+      'Bea\u200d Ortiz',
+      'Bea\ufe0f Ortiz',
+      'Bea Ortiz\u3164',
+      'Bea\u2800Ortiz',
+    ]) {
+      await expect(rename(student.id, name), name).rejects.toMatchObject({
+        code: 'DISPLAY_NAME_TAKEN',
+      });
+    }
+    // Look-alikes from another script are another name (a Cyrillic а).
+    expect((await rename(student.id, 'Be\u0430 Ortiz')).outcome).toBe('applied');
+  });
+
+  it('compares with live classes only: an archived one is no longer shared', async () => {
+    const { student, klass } = await seedClass('rename-archived');
+    await classmate('rename-archived-1', 'Bea', klass.id);
+    await db.update(classes).set({ removedAt: new Date() }).where(eq(classes.id, klass.id));
+
+    expect((await rename(student.id, 'Bea')).outcome).toBe('applied');
+  });
+
+  it('replays a recorded id with the name now, and refuses an id another event holds', async () => {
+    const { student } = await seedClass('rename-replay');
+    const other = await seedClass('rename-replay-other');
+    const first = newUuidV7();
+    await rename(student.id, 'Ana', first);
+    await rename(student.id, 'Bea');
+
+    const replay = await rename(student.id, 'Ana', first);
+
+    expect(replay.outcome).toBe('replay');
+    expect(replay.user.displayName).toBe('Bea');
+    await expect(rename(other.student.id, 'Cal', first)).rejects.toMatchObject({
+      code: 'EVENT_ID_CONFLICT',
+    });
   });
 });

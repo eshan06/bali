@@ -1,5 +1,20 @@
-import { type Database, findUserByCognitoId } from '@bali/db';
-import type { MeResponse } from '@bali/shared';
+import {
+  type Database,
+  enrollments,
+  events,
+  findUserByCognitoId,
+  startSession,
+  users,
+} from '@bali/db';
+import type {
+  ApiErrorBody,
+  MeResponse,
+  RosterResponse,
+  SessionSnapshot,
+  UpdateMeResponse,
+} from '@bali/shared';
+import { and, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
@@ -483,5 +498,377 @@ describe('GET /v1/me', () => {
   it('requires authentication', async () => {
     const res = await ctx.app.inject({ method: 'GET', url: '/v1/me' });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('PATCH /v1/me', () => {
+  function rename(token: string | null, body?: unknown) {
+    return ctx.app.inject({
+      method: 'PATCH',
+      url: '/v1/me',
+      headers: token === null ? {} : { authorization: `Bearer ${token}` },
+      ...(body === undefined ? {} : { payload: body as object }),
+    });
+  }
+  const renameTo = (token: string, displayName: string, eventId: string = randomUUID()) =>
+    rename(token, { displayName, eventId });
+
+  /** Another student, called `displayName`, in each of `classIds`. */
+  async function classmate(tag: string, displayName: string | null, ...classIds: string[]) {
+    const [row] = await db
+      .insert(users)
+      .values({ cognitoId: `student-${tag}`, role: 'student', displayName })
+      .returning();
+    for (const classId of classIds)
+      await db.insert(enrollments).values({ classId, studentId: row!.id });
+    return row!;
+  }
+  const storedName = async (userId: string) =>
+    (await db.select().from(users).where(eq(users.id, userId)))[0]!.displayName;
+  const renamesOf = (userId: string) =>
+    db
+      .select()
+      .from(events)
+      .where(and(eq(events.userId, userId), eq(events.type, 'display_name_changed')));
+  const taken = {
+    error: {
+      code: 'conflict',
+      reason: 'display_name_taken',
+      message: 'a classmate already uses that name',
+    },
+  };
+
+  it('sets the name, stored trimmed with each run of spaces made one, and records it', async () => {
+    const { student } = await seedClassroom(db, 'rn-set');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+
+    const res = await renameTo(token, '  Ana \u00a0  Rodríguez ', eventId);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UpdateMeResponse>()).toEqual({
+      outcome: 'applied',
+      user: { id: student.id, role: 'student', displayName: 'Ana Rodríguez' },
+    });
+    expect((await me(token)).body.user.displayName).toBe('Ana Rodríguez');
+    // One event, in no session and no class, keeping what it replaced.
+    const [recorded, ...more] = await renamesOf(student.id);
+    expect(more).toEqual([]);
+    expect(recorded).toMatchObject({
+      eventId,
+      sessionId: null,
+      classId: null,
+      payload: { display_name: 'Ana Rodríguez', previous_display_name: null },
+    });
+  });
+
+  it('reaches the teacher’s grid and roster at their next read', async () => {
+    // The grid's names come from the snapshot, which the portal re-reads every
+    // 15 s; no event carries a rename to the stream.
+    const { teacher, student, klass } = await seedClassroom(db, 'rn-grid');
+    const now = Date.now();
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(now - 60_000),
+      endsAt: new Date(now + 25 * 60_000),
+    });
+    expect((await renameTo(await ctx.tokenFor(student.cognitoId), 'Ana R.')).statusCode).toBe(200);
+
+    const teacherToken = await ctx.tokenFor(teacher.cognitoId);
+    const snapshot = await authedInject(ctx.app, teacherToken, {
+      method: 'GET',
+      url: `/v1/sessions/${session.id}`,
+    });
+    expect(snapshot.json<SessionSnapshot>().students.map((s) => s.displayName)).toEqual(['Ana R.']);
+    const roster = await authedInject(ctx.app, teacherToken, {
+      method: 'GET',
+      url: `/v1/classes/${klass.id}/roster`,
+    });
+    expect(roster.json<RosterResponse>().students.map((s) => s.displayName)).toEqual(['Ana R.']);
+  });
+
+  it('answers a replay with the name now, applies nothing, and never refuses it', async () => {
+    const { student, klass } = await seedClassroom(db, 'rn-replay');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const first = randomUUID();
+    expect((await renameTo(token, 'Ana', first)).statusCode).toBe(200);
+    expect((await renameTo(token, 'Bea')).statusCode).toBe(200);
+    // A classmate takes the name the lost request set, so a fresh attempt at
+    // it would be refused: its replay is still only a replay.
+    const cal = await classmate('rn-replay-cal', null, klass.id);
+    expect((await renameTo(await ctx.tokenFor(cal.cognitoId), 'ana')).statusCode).toBe(200);
+
+    const res = await renameTo(token, 'Ana', first);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UpdateMeResponse>()).toEqual({
+      outcome: 'replay',
+      user: { id: student.id, role: 'student', displayName: 'Bea' },
+    });
+    expect(await storedName(student.id)).toBe('Bea');
+    expect((await renamesOf(student.id)).filter((e) => e.eventId === first)).toHaveLength(1);
+  });
+
+  it('refuses an eventId another event holds (409 event_id_conflict), changing nothing', async () => {
+    const { student, klass, block } = await seedClassroom(db, 'rn-spent');
+    const now = Date.now();
+    await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(now - 60_000),
+      endsAt: new Date(now + 25 * 60_000),
+    });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapped = randomUUID();
+    const tap = await authedInject(ctx.app, token, {
+      method: 'POST',
+      url: '/v1/taps',
+      payload: { tagId: block.tagId, eventId: tapped, deviceTime: new Date().toISOString() },
+    });
+    expect(tap.statusCode).toBe(200);
+    // Another student's rename is not this one's to replay either.
+    const other = await classmate('rn-spent-other', null);
+    const theirs = randomUUID();
+    expect((await renameTo(await ctx.tokenFor(other.cognitoId), 'Dee', theirs)).statusCode).toBe(
+      200,
+    );
+
+    for (const eventId of [tapped, theirs]) {
+      const res = await renameTo(token, 'Dee', eventId);
+      expect(res.statusCode).toBe(409);
+      expect(res.json<ApiErrorBody>().error.reason).toBe('event_id_conflict');
+    }
+    expect(await storedName(student.id)).toBeNull();
+    expect(await renamesOf(student.id)).toEqual([]);
+  });
+
+  it('refuses a name a classmate in any shared class uses, ignoring case and spacing', async () => {
+    // Ana is in two classes: Bea shares one, Cal the other (owner decision 8).
+    const a = await seedClassroom(db, 'rn-taken-a');
+    const b = await seedClassroom(db, 'rn-taken-b');
+    await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
+    await classmate('rn-taken-bea', 'Bea Ortiz', b.klass.id);
+    await classmate('rn-taken-cal', 'Cal Díaz', a.klass.id);
+    await classmate('rn-taken-zoe', 'Zo\u00eb', b.klass.id);
+    const token = await ctx.tokenFor(a.student.cognitoId);
+
+    for (const name of [
+      'bea ortiz',
+      '  BEA   ORTIZ ',
+      'cal díaz',
+      // The same letters, spelled another way: full-width, a decomposed accent.
+      'Ｃａｌ Ｄíａｚ',
+      'Zoe\u0308',
+      // A character that draws nothing does not make it another name.
+      'Bea\u200d Ortiz',
+    ]) {
+      const res = await renameTo(token, name);
+      expect(res.statusCode, name).toBe(409);
+      expect(res.json(), name).toEqual(taken);
+    }
+    // Refused, never a silent rename: nothing stored, nothing recorded.
+    expect(await storedName(a.student.id)).toBeNull();
+    expect(await renamesOf(a.student.id)).toEqual([]);
+  });
+
+  it('lets a name used only outside the caller’s classes, or by one who left, be taken', async () => {
+    const a = await seedClassroom(db, 'rn-free-a');
+    const elsewhere = await seedClassroom(db, 'rn-free-b');
+    await classmate('rn-free-dana', 'Dana', elsewhere.klass.id);
+    const eve = await classmate('rn-free-eve', 'Eve', a.klass.id);
+    await db
+      .update(enrollments)
+      .set({ removedAt: new Date() })
+      .where(eq(enrollments.studentId, eve.id));
+    const token = await ctx.tokenFor(a.student.cognitoId);
+
+    for (const name of ['Dana', 'Eve']) {
+      const res = await renameTo(token, name);
+      expect(res.statusCode, name).toBe(200);
+      expect(res.json<UpdateMeResponse>().user.displayName).toBe(name);
+    }
+  });
+
+  it('lets the student recase their own name', async () => {
+    const { student } = await seedClassroom(db, 'rn-recase');
+    const token = await ctx.tokenFor(student.cognitoId);
+    expect((await renameTo(token, 'ana reyes')).statusCode).toBe(200);
+
+    const res = await renameTo(token, 'Ana Reyes');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UpdateMeResponse>().user.displayName).toBe('Ana Reyes');
+  });
+
+  it('keeps a refused rename’s id free: sent again once the name is free, it applies', async () => {
+    const { student, klass } = await seedClassroom(db, 'rn-retry');
+    const bea = await classmate('rn-retry-bea', 'Bea', klass.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+    expect((await renameTo(token, 'Bea', eventId)).statusCode).toBe(409);
+    expect((await renameTo(await ctx.tokenFor(bea.cognitoId), 'Beatriz')).statusCode).toBe(200);
+
+    const res = await renameTo(token, 'Bea', eventId);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UpdateMeResponse>().outcome).toBe('applied');
+  });
+
+  it('never refuses a join over a name, and leaves the collision it makes', async () => {
+    // Decision 8 polices an edit. A join refused over a classmate's choice
+    // would keep a student out of their class; the teacher sees both names.
+    const { teacher, student, klass } = await seedClassroom(db, 'rn-join');
+    expect((await renameTo(await ctx.tokenFor(student.cognitoId), 'Ana')).statusCode).toBe(200);
+    const newcomer = await ctx.tokenFor('rn-join-newcomer');
+    expect((await renameTo(newcomer, 'ana')).statusCode).toBe(200);
+
+    const join = await authedInject(ctx.app, newcomer, {
+      method: 'POST',
+      url: '/v1/enrollments',
+      payload: {
+        joinCode: klass.joinCode,
+        eventId: randomUUID(),
+        deviceTime: new Date().toISOString(),
+      },
+    });
+
+    expect(join.statusCode).toBe(200);
+    const roster = await authedInject(ctx.app, await ctx.tokenFor(teacher.cognitoId), {
+      method: 'GET',
+      url: `/v1/classes/${klass.id}/roster`,
+    });
+    expect(roster.json<RosterResponse>().students.map((s) => s.displayName)).toEqual([
+      'Ana',
+      'ana',
+    ]);
+  });
+
+  it('does not police a name filled from sign-in claims', async () => {
+    const { student, klass } = await seedClassroom(db, 'rn-fill');
+    expect((await renameTo(await ctx.tokenFor(student.cognitoId), 'Ana Reyes')).statusCode).toBe(
+      200,
+    );
+    const nameless = await classmate('rn-fill-other', null, klass.id);
+    const token = await ctx.issuer.sign({
+      sub: nameless.cognitoId,
+      extraClaims: { name: 'Ana Reyes' },
+    });
+
+    expect((await me(token)).body.user.displayName).toBe('Ana Reyes');
+  });
+
+  it('is never overwritten by a later sign-in’s name', async () => {
+    // The fill only ever fills a NULL, and a name the student set is never one.
+    const { student } = await seedClassroom(db, 'rn-kept');
+    const plain = await ctx.tokenFor(student.cognitoId);
+    expect((await renameTo(plain, 'Bea')).statusCode).toBe(200);
+    const named = await ctx.issuer.sign({
+      sub: student.cognitoId,
+      extraClaims: { name: 'Ana Reyes', username: 'demo-ana@example.test' },
+    });
+
+    expect((await me(named)).body.user.displayName).toBe('Bea');
+    expect(await storedName(student.id)).toBe('Bea');
+  });
+
+  it('refuses a name that breaks a rule as display_name_invalid, and changes nothing', async () => {
+    const { student } = await seedClassroom(db, 'rn-invalid');
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    for (const name of [
+      '',
+      '   ',
+      // Nothing visible: joiners, a Hangul filler, a blank braille cell.
+      '\u200d\u200c',
+      '\u3164',
+      '\u2800',
+      // Past the limit, counted in code points.
+      'A'.repeat(65),
+      '\u{1F600}'.repeat(65),
+      // Controls and format characters, refused rather than stripped: a
+      // newline or a tab, a bell, a bidi override, a line separator, a lone
+      // surrogate half.
+      'Ana\nReyes',
+      'Ana\tReyes',
+      'Ana\u0007',
+      'Ana\u202eseyer',
+      'Ana\u2028Reyes',
+      'Ana\ud800',
+    ]) {
+      const res = await renameTo(token, name);
+      expect(res.statusCode, JSON.stringify(name)).toBe(400);
+      expect(res.json<ApiErrorBody>().error, JSON.stringify(name)).toMatchObject({
+        code: 'bad_input',
+        reason: 'display_name_invalid',
+      });
+    }
+    expect(await storedName(student.id)).toBeNull();
+    expect(await renamesOf(student.id)).toEqual([]);
+  });
+
+  it('takes a name at the limit, and the joiners names and emoji need', async () => {
+    const { student } = await seedClassroom(db, 'rn-edge');
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    for (const name of [
+      'A'.repeat(64),
+      '\u{1F600}'.repeat(64),
+      'Ana \u{1F469}\u200d\u{1F4BB}',
+      '\u0645\u200c\u06cc\u200c\u0631\u0648\u0645',
+    ]) {
+      const res = await renameTo(token, name);
+      expect(res.statusCode, name).toBe(200);
+      expect(res.json<UpdateMeResponse>().user.displayName, name).toBe(name);
+    }
+  });
+
+  it('refuses a malformed body as invalid_request', async () => {
+    const { student } = await seedClassroom(db, 'rn-malformed');
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    for (const body of [
+      undefined,
+      {},
+      { displayName: 'Ana' },
+      { displayName: 'Ana', eventId: 'not-a-uuid' },
+      { displayName: 42, eventId: randomUUID() },
+      { eventId: randomUUID() },
+    ]) {
+      const res = await rename(token, body);
+      expect(res.statusCode, JSON.stringify(body)).toBe(400);
+      expect(res.json<ApiErrorBody>().error, JSON.stringify(body)).toMatchObject({
+        code: 'bad_input',
+        reason: 'invalid_request',
+      });
+    }
+  });
+
+  it('gives a first-time caller a row, as a join does', async () => {
+    const res = await renameTo(await ctx.tokenFor('rn-first-call'), 'Ana');
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<UpdateMeResponse>();
+    expect(body).toMatchObject({
+      outcome: 'applied',
+      user: { role: 'student', displayName: 'Ana' },
+    });
+    expect((await findUserByCognitoId(db, 'rn-first-call'))?.id).toBe(body.user.id);
+  });
+
+  it('requires authentication', async () => {
+    const res = await rename(null, { displayName: 'Ana', eventId: randomUUID() });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('is a student’s: a teacher is 403, and their name is left as it is', async () => {
+    const { teacher } = await seedClassroom(db, 'rn-teacher');
+
+    const res = await renameTo(await ctx.tokenFor(teacher.cognitoId), 'Ms. Rivera');
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({
+      error: { code: 'forbidden', message: 'only a student sets their own name here' },
+    });
+    expect(await storedName(teacher.id)).toBeNull();
+    expect(await renamesOf(teacher.id)).toEqual([]);
   });
 });

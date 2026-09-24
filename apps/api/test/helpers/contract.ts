@@ -12,6 +12,7 @@ import {
   type JoinCodePreviewResponse,
   type MeClass,
   type MeResponse,
+  type MeUser,
   PARTICIPATION_STATES,
   PROTECTION_OFF_RECORDED_AS,
   type ProtectionOffResponse,
@@ -27,6 +28,7 @@ import {
   UNLOCK_RECORDED_OUTCOMES,
   unlockDisposition,
   type UnlockResponse,
+  type UpdateMeResponse,
   USER_ROLES,
 } from '@bali/shared';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
@@ -57,6 +59,7 @@ interface Contract {
   EndEnrollmentResponse: EndEnrollmentResponse;
   JoinCodePreviewResponse: JoinCodePreviewResponse;
   HistoryPage: HistoryPage;
+  UpdateMeResponse: UpdateMeResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -81,6 +84,11 @@ const sessionView = object<SessionView>()({
   endsAt: z.iso.datetime(),
 });
 const meClass = object<MeClass>()({ id: z.uuid(), name: z.string() });
+const meUser = object<MeUser>()({
+  id: z.uuid(),
+  role: z.enum(USER_ROLES),
+  displayName: z.string().nullable(),
+});
 const historyEvent = object<HistoryEvent>()({
   eventId: z.uuid(),
   type: z.enum(HISTORY_EVENT_TYPES),
@@ -106,11 +114,7 @@ const historyEvent = object<HistoryEvent>()({
  */
 export const SCHEMAS = {
   MeResponse: object<MeResponse>()({
-    user: object<MeResponse['user']>()({
-      id: z.uuid(),
-      role: z.enum(USER_ROLES),
-      displayName: z.string().nullable(),
-    }),
+    user: meUser,
     classes: z.array(meClass),
     session: object<NonNullable<MeResponse['session']>>()({
       ...sessionView.shape,
@@ -164,6 +168,10 @@ export const SCHEMAS = {
     events: z.array(historyEvent),
     nextBefore: z.uuid().nullable(),
   }),
+  UpdateMeResponse: object<UpdateMeResponse>()({
+    outcome: z.enum(['applied', 'replay']),
+    user: meUser,
+  }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -207,6 +215,8 @@ export const ENDPOINTS: Record<
   'DELETE /v1/enrollments/{id}': { type: 'EndEnrollmentResponse' },
   'GET /v1/join-codes/{code}': { type: 'JoinCodePreviewResponse' },
   'GET /v1/me/history': { type: 'HistoryPage' },
+  // Not an outbox record: the Me screen sends a rename while open (A8).
+  'PATCH /v1/me': { type: 'UpdateMeResponse' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */

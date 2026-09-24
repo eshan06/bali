@@ -1,3 +1,4 @@
+import { DISPLAY_NAME_MAX_LENGTH } from '@bali/shared';
 import {
   createRemoteJWKSet,
   errors as joseErrors,
@@ -6,6 +7,7 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 
+import { INVISIBLE, UNPRINTABLE } from '../display-name.js';
 import type { Env } from '../env.js';
 import { ApiError } from '../errors.js';
 
@@ -108,16 +110,6 @@ const NAME_CLAIMS = ['name', 'preferred_username'];
  */
 const IDENTIFIER_CLAIMS = ['cognito:username', 'username'];
 
-/** A grid cell, not an essay. */
-const MAX_DISPLAY_NAME = 64;
-
-/**
- * Nothing a reader would see: whitespace, default-ignorable characters (the
- * joiners, Hangul fillers, variation selectors), and two symbols drawn as blank
- * space, the blank braille cell and the musical null notehead.
- */
-const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800\u{1D159}]*$/u;
-
 /**
  * A dashed UUID, in either case: what a pool configured with
  * `UsernameAttributes: ['email']` (or phone) gives every user as a username.
@@ -177,20 +169,12 @@ function isOpaqueIdentifier(value: string): boolean {
 }
 
 /**
- * Trim, drop control characters, and clamp — the value is an attribute the
- * student can set on themselves, and it lands in a teacher's grid and in logs,
- * where a bidi override or an ANSI escape would be someone else's cursor.
+ * Trim, drop what a name never carries (`UNPRINTABLE`), and clamp — the value
+ * is an attribute the student can set on themselves, and it lands in a
+ * teacher's grid. A claim is cleaned rather than refused: nobody is there to
+ * fix it, and the fill would never replace what it stored.
  *
- * Zero-width joiner and non-joiner are kept: they are `\p{Cf}` too, but they
- * carry meaning in Persian, Arabic and Indic names and inside emoji sequences.
- *
- * Line and paragraph separators (U+2028, U+2029) go too: a log viewer can
- * break a line on them.
- *
- * A lone surrogate half passes TypeScript happily and then reaches Postgres,
- * which stores it as U+FFFD — and the fill would never replace it. So lone
- * halves in the claim are dropped (`\p{Cs}`; a proper pair is one code point
- * and is kept), and the clamp counts code POINTS, so its cut never makes one.
+ * The clamp counts code POINTS, so its cut never makes a lone surrogate half.
  *
  * A name made only of what INVISIBLE lists — joiners, a Hangul filler, a blank
  * braille cell, a null notehead — counts as no name at all. Stored, it would blank the
@@ -198,11 +182,9 @@ function isOpaqueIdentifier(value: string): boolean {
  */
 function cleanClaim(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const stripped = value.replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu, (char) =>
-    char === '\u200c' || char === '\u200d' ? char : '',
-  );
+  const stripped = value.replace(UNPRINTABLE, '');
   // Trimmed again after the cut, which can land just after a space.
-  const clamped = [...stripped.trim()].slice(0, MAX_DISPLAY_NAME).join('').trim();
+  const clamped = [...stripped.trim()].slice(0, DISPLAY_NAME_MAX_LENGTH).join('').trim();
   return INVISIBLE.test(clamped) ? undefined : clamped;
 }
 

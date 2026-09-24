@@ -1,0 +1,26 @@
+{
+  "endpoint": "PATCH /v1/me",
+  "scenario": "A name of nothing but spaces: blank.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "displayName": "   ",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "reason": "display_name_invalid",
+      "message": "invalid request",
+      "details": [
+        {
+          "path": "displayName",
+          "message": "is blank"
+        }
+      ]
+    }
+  }
+}

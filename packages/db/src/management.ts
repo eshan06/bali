@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 
+import { JOIN_CODE_LENGTH } from '@bali/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
@@ -30,8 +31,11 @@ type BlockRow = typeof blocks.$inferSelect;
  * Pinned by a test rather than a CHECK constraint.
  */
 export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-/** Every code's length — and so the longest one a route accepts. */
-export const JOIN_CODE_LENGTH = 6;
+/**
+ * Every code's length — and so the longest one a route accepts. Its source is
+ * `@bali/shared`, where the phone and the portal read the same limit.
+ */
+export { JOIN_CODE_LENGTH };
 /** Bounded so a broken database can never spin here forever. */
 const JOIN_CODE_ATTEMPTS = 8;
 

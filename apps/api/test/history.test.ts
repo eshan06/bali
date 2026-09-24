@@ -354,7 +354,11 @@ describe('GET /v1/me/history', () => {
     const res = await history(ana, `?before=${beas[1]!.eventId}`);
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: { code: 'bad_input', message: 'before is not an event of this history' },
+      error: {
+        code: 'bad_input',
+        reason: 'unknown_cursor',
+        message: 'before is not an event of this history',
+      },
     });
   });
 
@@ -411,6 +415,7 @@ describe('GET /v1/me/history', () => {
     // No history holds a cursor for them yet.
     const res = await history(token, `?before=${randomUUID()}`);
     expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: { reason?: string } }>().error.reason).toBe('unknown_cursor');
   });
 
   it('refuses a limit it cannot honour and a cursor that is not an event of this history', async () => {
@@ -438,21 +443,25 @@ describe('GET /v1/me/history', () => {
       );
     expect(hidden).toHaveLength(2);
 
-    for (const query of [
-      '?limit=0',
-      '?limit=51',
-      '?limit=-1',
-      '?limit=1.5',
-      '?limit=ten',
-      '?limit=',
-      '?before=not-a-cursor',
-      `?before=${randomUUID()}`,
+    // Two refusals under one status, told apart by their reason: a malformed
+    // query is a client bug, a cursor this history does not hold means
+    // "reload from the top".
+    const refusals: [string, string][] = [
+      ...['?limit=0', '?limit=51', '?limit=-1', '?limit=1.5', '?limit=ten', '?limit='].map(
+        (query): [string, string] => [query, 'invalid_request'],
+      ),
+      ['?before=not-a-cursor', 'invalid_request'],
+      [`?before=${randomUUID()}`, 'unknown_cursor'],
       // An event of theirs the history does not show is no place in it.
-      ...hidden.map((e) => `?before=${e.eventId}`),
-    ]) {
+      ...hidden.map((e): [string, string] => [`?before=${e.eventId}`, 'unknown_cursor']),
+    ];
+    for (const [query, reason] of refusals) {
       const res = await history(token, query);
       expect(res.statusCode, query).toBe(400);
-      expect(res.json<{ error: { code: string } }>().error.code, query).toBe('bad_input');
+      expect(res.json<{ error: { code: string; reason?: string } }>().error, query).toMatchObject({
+        code: 'bad_input',
+        reason,
+      });
     }
     expect((await historyOf(token, '?limit=50')).events).toHaveLength(1);
   });

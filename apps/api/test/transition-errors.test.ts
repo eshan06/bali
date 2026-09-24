@@ -73,13 +73,27 @@ const EXPECTED: Record<
     reason: 'protection_off',
     message: 'Screen Time permission is off: tap the block to rejoin',
   },
+  DISPLAY_NAME_TAKEN: {
+    code: 'conflict',
+    status: 409,
+    reason: 'display_name_taken',
+    message: 'a classmate already uses that name',
+  },
 };
 
 /**
  * The reasons no engine refusal maps to: DELETE /v1/enrollments/{id}'s two
- * 403s, which that route raises itself (A6; pinned in enrollments.test.ts).
+ * 403s, which that route raises itself (A6; pinned in enrollments.test.ts),
+ * and the 400s of the history and of a rename (A8; pinned in history.test.ts
+ * and me.test.ts).
  */
-const ROUTE_REASONS: ApiErrorReason[] = ['unknown_user', 'enrollment_not_yours'];
+const ROUTE_REASONS: ApiErrorReason[] = [
+  'unknown_user',
+  'enrollment_not_yours',
+  'invalid_request',
+  'unknown_cursor',
+  'display_name_invalid',
+];
 
 /** What `mapTransitionError` turns an engine refusal with `code` into. */
 async function mapped(code: TransitionErrorCode): Promise<ApiError> {

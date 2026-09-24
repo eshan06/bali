@@ -1,4 +1,4 @@
-import { JOIN_CODE_LENGTH } from '@bali/db';
+import { JOIN_CODE_LENGTH } from '@bali/shared';
 import { z } from 'zod';
 
 /*

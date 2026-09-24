@@ -1,6 +1,6 @@
 {
   "endpoint": "GET /v1/me/history",
-  "scenario": "A history page of no moments at all.",
+  "scenario": "A history page of no moments at all: a malformed query, a client bug.",
   "request": {
     "path": "/v1/me/history?limit=0"
   },
@@ -9,6 +9,7 @@
   "body": {
     "error": {
       "code": "bad_input",
+      "reason": "invalid_request",
       "message": "invalid request",
       "details": [
         {

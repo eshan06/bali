@@ -31,8 +31,8 @@ export class ApiError extends Error {
     return API_ERROR_STATUS[this.code];
   }
 
-  static badInput(message: string, details?: unknown): ApiError {
-    return new ApiError('bad_input', message, details);
+  static badInput(message: string, details?: unknown, reason?: ApiErrorReason): ApiError {
+    return new ApiError('bad_input', message, details, reason);
   }
   static unauthorized(message = 'authentication required'): ApiError {
     return new ApiError('unauthorized', message);
@@ -78,12 +78,13 @@ function zodDetails(err: ZodError): { path: string; message: string }[] {
 /**
  * Validate `data` against `schema`, throwing a 400 ApiError with per-field
  * details on failure. Use for every body, params, and query object before it
- * reaches the database.
+ * reaches the database. `reason` names the refusal where a 400 on the endpoint
+ * can also mean something else (`API_ERROR_REASONS`).
  */
-export function parse<T>(schema: ZodType<T>, data: unknown): T {
+export function parse<T>(schema: ZodType<T>, data: unknown, reason?: ApiErrorReason): T {
   const result = schema.safeParse(data);
   if (!result.success) {
-    throw ApiError.badInput('invalid request', zodDetails(result.error));
+    throw ApiError.badInput('invalid request', zodDetails(result.error), reason);
   }
   return result.data;
 }

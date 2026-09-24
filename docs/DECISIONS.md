@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A8: a student edits their own display name, `PATCH /v1/me`.**
+  D1's Me screen shows the name under "Your teachers see this name." with an
+  edit button, and owner decision 8 polices it: unique within each class,
+  ignoring case. **Shape:** `PATCH /v1/me` with `{ displayName, eventId }`,
+  answering `{ outcome: 'applied' | 'replay', user }` (`UpdateMeRequest`,
+  `UpdateMeResponse`); `user` is the boot call's own (`MeUser`, now named),
+  so one decode serves both. A PATCH of the boot call's resource rather than a
+  new path: the name is a field of "me", and a later field would join it
+  additively. **Recorded, and idempotent on `eventId`** (CLAUDE.md): the engine
+  (`renameStudent`) writes `users.display_name` and a `display_name_changed`
+  event (new in `EVENT_TYPES`; payload: the name and the one it replaced) in
+  one transaction. The event is where the idempotency key lives — the events
+  unique constraint, as for every other mutation; a column holding only the
+  last id would apply the retry of an older rename over a newer one — and it
+  keeps the name history, since the grid and every report print a student's
+  current name beside records made under an older one. A replay (the id
+  already recorded as this student's rename) applies nothing and answers the
+  name now, not the retry's, and is checked before anything else, so it is
+  never refused — not even when a classmate has since taken the name; an id
+  another event holds is `409 event_id_conflict`. A refused rename records
+  nothing, so its id stays free. The event names no session or class: no feed
+  or stream carries it and the history (A7) does not show it. **The teacher's
+  grid** reads names from the snapshot (`GET /v1/sessions/{id}`, a join on
+  `users`), which the portal re-reads every 15 s, and the roster reads them the
+  same way, so a rename reaches the grid within one refresh — a label, not a
+  state, so the lag claims nothing false (tested through the snapshot and the
+  roster). Not an outbox record: the Me screen sends it while open and shows a
+  failure with a retry (rule 5). **Uniqueness:** names are compared as a reader
+  sees them — without the characters that draw nothing (a joiner, a variation
+  selector, a Hangul filler: a name may carry them, but adding one cannot make
+  a classmate's name another — santa's review caught that the first key let
+  `Bea\u200d Ortiz` past `Bea Ortiz`), in Unicode compatibility form (NFKC: a
+  decomposed accent, a full-width letter), each run of blank space made one
+  (whitespace and the blank-looking symbols), trimmed, and case-folded (upper
+  then lower, so `ß` meets `SS`) — against every other
+  student actively enrolled in any live class the caller is actively in, and a
+  match is `409 display_name_taken`, never a silent rename. The student's own
+  name in another case is theirs to take. **Serialised by locks, not a
+  constraint:** names live on `users` and classes are many-to-many, so no
+  unique index can say "within each class", and a constraint would refuse the
+  joins decision 8 does not cover. `renameStudent` locks the caller's `users`
+  row, then every live class they are in, in id order, both `FOR NO KEY
+  UPDATE`: two classmates renaming at once meet on a class they share, and the
+  second checks only once the first has committed; the caller's row first
+  serialises a retry racing its original even when they are in no class, so
+  it is answered as its replay. One order for the classes, so renames cannot
+  deadlock one another; NO KEY UPDATE conflicts with a join's and a Start's
+  `FOR UPDATE` on the class (both their first lock, so neither holds anything
+  while it waits) but not with the key-share lock every event insert takes on
+  its class and user, so a lesson's taps never wait on a rename. Real-Postgres
+  tests: two classmates at once (without the class lock both win, round 0,
+  three runs of three), the lock order held (a NOWAIT probe; a random order
+  fails within three rounds), three classes shared in a ring (staged, no
+  deadlock), a retry racing its original (without the row lock both answer
+  `applied`), and a sign-in's fill racing a rename. **What it does not cover,
+  decided conservatively:** a join is never refused over a name — decision 8
+  is about editing, and a join refused over a classmate's choice would keep a
+  student out of their class; a name filled from sign-in claims (2026-09-22)
+  is not policed — the student did not choose it; a collision a later join or
+  fill creates is left as it is — the teacher sees both names, and either
+  student can rename; names that only look alike across scripts (a Cyrillic
+  `а` for a Latin `a`) are different names — that takes a confusables table; a
+  classmate who has left, or a class archived, no longer counts; the teacher's
+  own name is not a classmate's. **Validation at the route:** the name is
+  trimmed and each run of whitespace made one space — stored so, and the answer
+  returns what was stored — then refused as `400 display_name_invalid` when it
+  is blank or has nothing visible, is longer than `DISPLAY_NAME_MAX_LENGTH` (64
+  code points: the token fill's clamp, now one constant in `@bali/shared` so the
+  phone's field holds to it), or carries a control or format character (bar
+  the joiners names need), a lone surrogate half or a line or paragraph
+  separator — the token fill's own strip list (`display-name.ts`, shared by
+  both), refused rather than stripped because a student typing a name must see
+  what is stored; checked on the name as sent, so a tab or newline is refused,
+  not made a space. A malformed body is `400 invalid_request`. The fill still
+  only fills a NULL, so it never overwrites a name the student set (tested,
+  and raced). **Who:** signed in, or `401`; a caller with no row yet gets one,
+  as a join does; a teacher is `403` — decision 8 rules on students' names
+  within classes, and a teacher's name (what students read on the consent
+  screen) waits for a portal screen and a ruling of its own. **Rode along, from
+  #66's review:** `JOIN_CODE_LENGTH` moved to `@bali/shared` (`@bali/db`
+  re-exports it), a client-facing input limit like `HISTORY_PAGE_LIMIT`; and
+  the history's `400` was two refusals told apart only by `details` — a
+  malformed `limit` or `before` is now `invalid_request` (a client bug), a
+  cursor the history does not hold `unknown_cursor` (reload from the top).
+  `invalid_request` is the reason for a request that fails validation on an
+  endpoint where a `400` can also mean something else — the history and
+  `PATCH /v1/me`; elsewhere a malformed body still carries none, per A5.
 - **2026-09-24** — **A7: the student's own history, `GET /v1/me/history`.**
   D1's History screen ("The same moments your teachers see — nothing more")
   shows days of class cards — the class, its teacher, and each moment with its

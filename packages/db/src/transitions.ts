@@ -13,11 +13,19 @@ import {
   MAX_SESSION_MINUTES,
   SILENCE_THRESHOLD_MS,
 } from '@bali/shared';
-import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
-import { liveClassWithCode } from './queries.js';
-import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
+import { liveClassWithCode, type UserRow } from './queries.js';
+import {
+  armedTaps,
+  classes,
+  enrollments,
+  events,
+  participations,
+  sessions,
+  users,
+} from './schema.js';
 import { isDeadlock, isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
@@ -66,6 +74,7 @@ export const TRANSITION_ERROR_CODES = [
   'CLASS_NOT_FOUND',
   'ENROLLMENT_NOT_FOUND',
   'PROTECTION_OFF',
+  'DISPLAY_NAME_TAKEN',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -2494,4 +2503,144 @@ export async function endEnrollment(
       };
     }),
   );
+}
+
+export interface RenameInput {
+  studentId: string;
+  /** The name as the route validated it: trimmed, each run of spaces made one. */
+  displayName: string;
+  /** The client's idempotency key for the display_name_changed event (rule 4). */
+  eventId: string;
+}
+export interface RenameResult {
+  /** 'applied' set the name; 'replay' this event id already did, and nothing is applied again. */
+  outcome: 'applied' | 'replay';
+  /** The student's row as it stands now — on a replay, a later rename's name if one came since. */
+  user: UserRow;
+}
+
+/**
+ * What two names are compared as, for owner decision 8 ("ignoring case") — as
+ * a reader sees them: without the characters that draw nothing (joiners,
+ * variation selectors, Hangul fillers), which a name may carry but which
+ * cannot make it another; in Unicode's compatibility form, so a decomposed
+ * accent or a full-width letter is the name it looks like; with every run of
+ * blank space — whitespace, and the symbols the API's `INVISIBLE` counts as
+ * blank — made one space, and trimmed; and case-folded, upper then lower, so
+ * `ß` meets `SS`. Look-alikes across scripts (a Cyrillic `а` for a Latin `a`)
+ * stay different names — telling those apart takes a confusables table, and
+ * the teacher sees both.
+ */
+function nameKey(name: string): string {
+  return name
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, '')
+    .normalize('NFKC')
+    .replace(/[\s\u2800\u{1D159}]+/gu, ' ')
+    .trim()
+    .toUpperCase()
+    .toLowerCase();
+}
+
+/**
+ * A student sets their own display name (A8) — what teachers read beside them
+ * in the grid and beside every record. Unique within each class (owner
+ * decision 8): refused when a classmate in any live class they share already
+ * uses it, by `nameKey`. Only a rename is policed: a join is never refused over
+ * a name, a name filled from sign-in claims is not checked, and a collision a
+ * later join makes is left as it is — the teacher sees both.
+ *
+ * Recorded as a `display_name_changed` event beside the new name, one
+ * transaction: the event holds the idempotency key (rule 4) and keeps the name
+ * history, since every screen prints a student's current name beside records
+ * made under an older one. No session and no class: no feed carries it, and a
+ * grid shows the new name at its next snapshot.
+ */
+export async function renameStudent(db: Database, input: RenameInput): Promise<RenameResult> {
+  return db.transaction(async (tx) => {
+    // The student's row first, so two requests of theirs serialise whatever
+    // classes they are in: a retry racing its original waits here, then finds
+    // it below and is answered as its replay. NO KEY UPDATE rather than UPDATE,
+    // so the foreign-key checks their own taps and unlocks take go on around it.
+    const me = firstOrUndefined(
+      await tx.select().from(users).where(eq(users.id, input.studentId)).for('no key update'),
+    );
+    if (!me) throw new Error('renameStudent: no such user');
+
+    // Replay first, as in extendSession: once recorded, the answer is the truth
+    // now — never a refusal, even if a classmate has since taken the name.
+    const prior = firstOrUndefined(
+      await tx
+        .select({ type: events.type, userId: events.userId })
+        .from(events)
+        .where(eq(events.eventId, input.eventId))
+        .limit(1),
+    );
+    if (prior) {
+      if (prior.type === 'display_name_changed' && prior.userId === me.id) {
+        return { outcome: 'replay', user: me };
+      }
+      throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+    }
+
+    // Every live class they are in, locked in one order: two classmates
+    // renaming at once meet on a class they share, and the second checks only
+    // once the first has committed, so it sees the name the first took. One
+    // order, so neither waits on the other while holding what it needs. NO KEY
+    // UPDATE conflicts with itself and with a join's or a Start's lock on the
+    // class, but not with the foreign-key check each of the class's events
+    // takes, so a lesson never waits on a rename.
+    const shared = await tx
+      .select({ id: classes.id })
+      .from(classes)
+      .innerJoin(enrollments, eq(enrollments.classId, classes.id))
+      .where(
+        and(
+          eq(enrollments.studentId, me.id),
+          isNull(enrollments.removedAt),
+          isNull(classes.removedAt),
+        ),
+      )
+      .orderBy(asc(classes.id))
+      .for('no key update', { of: classes });
+
+    if (shared.length > 0) {
+      const classmates = await tx
+        .select({ displayName: users.displayName })
+        .from(enrollments)
+        .innerJoin(users, eq(users.id, enrollments.studentId))
+        .where(
+          and(
+            inArray(
+              enrollments.classId,
+              shared.map((c) => c.id),
+            ),
+            isNull(enrollments.removedAt),
+            ne(enrollments.studentId, me.id),
+            isNotNull(users.displayName),
+          ),
+        );
+      const wanted = nameKey(input.displayName);
+      if (classmates.some((c) => nameKey(c.displayName!) === wanted)) {
+        throw new TransitionError('DISPLAY_NAME_TAKEN', 'a classmate already uses that name');
+      }
+    }
+
+    const user = firstOrUndefined(
+      await tx
+        .update(users)
+        .set({ displayName: input.displayName })
+        .where(eq(users.id, me.id))
+        .returning(),
+    );
+    if (!user) throw new Error('renameStudent: update returned no row');
+    await insertEvent(tx, {
+      eventId: input.eventId,
+      type: 'display_name_changed',
+      userId: me.id,
+      // No session window to clamp to: the server's clock (rule 1).
+      occurredAt: new Date(),
+      payload: { display_name: input.displayName, previous_display_name: me.displayName },
+    });
+    return { outcome: 'applied', user };
+  });
 }
