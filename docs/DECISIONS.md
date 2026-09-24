@@ -22,7 +22,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   changed. **The order on dev:** the phone's id is appended to dev's `AUTH_AUDIENCE` only
   once this is deployed — the code before it compares the whole value with the token's
   client id, so a list set first would refuse every token. The owner's side is
-  `docs/DEPLOY.md`, "The phone's sign-in (dev)": the pool's hosted-UI domain, the phone's
+  `docs/DEPLOY.md`, "The phone's sign-in": the pool's hosted-UI domain, the phone's
   client, and its refresh-token expiration raised above Cognito's 30-day default — Cognito
   refusing the refresh token is the app's one sign-out, and auth decision 2 has a student
   sign in roughly once, ever. **The rider (#78's review):** `returnedSince` reads the

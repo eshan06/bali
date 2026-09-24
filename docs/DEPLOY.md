@@ -55,45 +55,58 @@ them fully separate):
 5. **Verify** — `GET /healthz` returns `{"status":"ok"}`; a signed request to
    `GET /v1/me` returns the caller; the cron shows `{"expired":N,"wentSilent":M}`.
 
-## The phone's sign-in (dev) — owner action (needs the AWS console)
+## The phone's sign-in — owner action (needs the AWS console)
 
 The student app signs in through Cognito's hosted UI with the authorization-code
 grant and PKCE (Phase 3, B4), over its **own** app client in the same pool as
 the portal's — never the portal's web client (`docs/WEB.md`), since the callback
-URLs and grant settings differ. Two values come out of this, the hosted-UI
-domain and the phone's client id; neither is secret.
+URLs and grant settings differ. Each environment gives two values, the
+hosted-UI domain and the phone's client id; neither is secret.
 
-In the AWS console → Cognito → the dev user pool, `us-east-1_YTloqilwT`:
+**Dev — done** (owner, 2026-09-24), in the pool `us-east-1_YTloqilwT`, and
+checked with a public authorize request (`bali://auth/callback`, scope
+`openid email profile`, PKCE S256 → the hosted sign-in page):
 
-1. **Hosted-UI domain.** The pool has none yet. **Branding → Domain → Create
-   Cognito domain**, with a prefix such as `bali-dev`, and choose **Hosted UI
+- **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
+- **The phone's app client:** `bali-ios-dev`, id `33qr62dl4ee4inigneidmfe2s9`
+- **Still to confirm:** its refresh-token expiration (step 3 below), which no
+  request from outside can show.
+
+**Production — still to do**, in its own pool (hosting decision 2). In the AWS
+console → Cognito → that user pool:
+
+1. **Hosted-UI domain**, if the pool has none: **Branding → Domain → Create
+   Cognito domain**, with a prefix such as `bali`, and choose **Hosted UI
    (classic)**, which needs no style. The domain is
-   `https://<prefix>.auth.us-east-1.amazoncognito.com`, the pool's one — the
+   `https://<prefix>.auth.<region>.amazoncognito.com`, the pool's one — the
    portal's `NEXT_PUBLIC_COGNITO_DOMAIN` too.
 2. **The phone's app client.** **Applications → App clients → Create app
    client**, type **Mobile app**: a public client, so no client secret (a phone
    cannot keep one, and the app sends none). Name it something like
-   `bali-ios-dev`. On its **Login pages**:
+   `bali-ios`. On its **Login pages**:
    - **Allowed callback URLs:** `bali://auth/callback`, exactly.
    - **Identity providers:** Cognito user pool.
    - **OAuth grant types:** **Authorization code grant** only.
-   - **OpenID Connect scopes:** `openid`, `email`, `profile`.
+   - **OpenID Connect scopes:** `openid`, `email`, `profile`. Tick **Profile**
+     by hand: a new Mobile-app client allows only `openid`, `email` and
+     `phone`.
 3. **Refresh-token expiration.** On the client's **App client information →
    Edit**, raise **Refresh token expiration** above Cognito's 30-day default —
    365 days, say. Cognito refusing the refresh token is the app's one
    sign-out, so at 30 days every student is signed out monthly, where auth
    decision 2 has a student sign in roughly once, ever.
 
-**Where the values go:**
+**Where the values go** (each environment's own):
 
 - **The domain and the client id:** `ios/project.yml`'s build settings,
-  `BALI_COGNITO_DOMAIN` and `BALI_COGNITO_CLIENT_ID` (B4c adds them).
-- **The client id, again:** appended to dev's `AUTH_AUDIENCE` on Railway,
+  `BALI_COGNITO_DOMAIN` and `BALI_COGNITO_CLIENT_ID` — dev's with B4c,
+  production's once it exists (Phase 5).
+- **The client id, again:** appended to that environment's `AUTH_AUDIENCE`,
   after the id already there (`<that id>,<the phone's>`) — **only once B4a is
-  deployed.** Before it, the API reads `AUTH_AUDIENCE` as a single id, so a
-  list matches no token and locks every dev sign-in out. The same holds the
+  deployed there.** Before it, the API reads `AUTH_AUDIENCE` as a single id,
+  so a list matches no token and locks every sign-in out. The same holds the
   other way: trim the list back to one id before rolling the API back past
-  B4a.
+  B4a. Dev's is appended by the planning session once #81 (B4a) has deployed.
 
 ## Local run
 
