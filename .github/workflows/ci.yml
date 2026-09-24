@@ -104,11 +104,14 @@ jobs:
       # SwiftPM's build output: a warm one about halves the build (its module
       # caches survive a fresh checkout). The key names the image — bump both
       # together, so a new compiler starts clean — and hashes the sources, so
-      # a change saves a fresh cache.
+      # a change saves a fresh cache. Only the sources, by their own folders:
+      # the key is evaluated again on the host after the job, when .build is
+      # there, written from inside the container, and a pattern that reaches
+      # into it fails the job (ios/BaliCore/**/*.swift did).
       - uses: actions/cache@v4
         with:
           path: ios/BaliCore/.build
-          key: balicore-swift6.4-noble-${{ hashFiles('ios/BaliCore/**/*.swift') }}
+          key: balicore-swift6.4-noble-${{ hashFiles('ios/BaliCore/Package.swift', 'ios/BaliCore/Sources/**', 'ios/BaliCore/Tests/**') }}
           restore-keys: balicore-swift6.4-noble-
       - run: swift test
         working-directory: ios/BaliCore
