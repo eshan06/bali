@@ -7,6 +7,8 @@ import Testing
 let tapRoute = "POST /v1/taps"
 let unlockRoute = "POST /v1/sessions/s/unlock"
 let refocusRoute = "POST /v1/sessions/s/refocus"
+let checkInRoute = "POST /v1/sessions/s/checkin"
+let meRoute = "GET /v1/me"
 
 @Suite("The drain: the outbox, sent through the one client", .timeLimit(.minutes(1)))
 struct DrainTests {
@@ -155,6 +157,7 @@ struct DrainTests {
         var state = await rig.until { $0.retryAt == at(2) }
         #expect(state.queued.map(\.stuck) == [true])
         #expect(state.queued.first?.lastReason == .eventIdConflict)
+        #expect(state.pendingTap == nil)
         await rig.engine.retryNow()
         let again = try await rig.server.next(tapRoute)
         #expect(again.eventId == tap.eventId)
@@ -177,6 +180,8 @@ struct DrainTests {
                     change: .protectionOff(session: "s"), status: 409,
                     reason: .notParticipating, message: "not_participating"))
         #expect(state.queued.isEmpty)
+        // …and the truth is read again.
+        #expect(try await rig.server.next(meRoute).route == meRoute)
         await rig.stop()
     }
 }
