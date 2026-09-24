@@ -102,8 +102,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # SwiftPM's build output: a warm one about halves the build (its module
-      # caches survive a fresh checkout). The image is in the key, so a new
-      # compiler starts clean; the sources too, so a change saves a fresh one.
+      # caches survive a fresh checkout). The key names the image — bump both
+      # together, so a new compiler starts clean — and hashes the sources, so
+      # a change saves a fresh cache.
       - uses: actions/cache@v4
         with:
           path: ios/BaliCore/.build
