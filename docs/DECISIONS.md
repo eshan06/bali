@@ -25,7 +25,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   own only, so it never files anything into their session, and says nothing of their tap —
   and so is a teacher's; never a `403`: an unlock is never refused. **Armed:** the unlock
   came before any session did, so the Start that converts the tap files nothing — it joins
-  the student, as the tap asked (the owner's "kept as an unattached record"). **Decided
+  the student, as the tap asked (the owner's "kept as an unattached record"); one reaching
+  the server after that Start finds the tap landed and is filed there, like any. A note
+  says what the server knew when the unlock arrived: an `unknown_tap` whose tap then arms
+  stays so, kept in no class, and no Start files it. **Decided
   here — the tap arriving after its unlock:** the phone sends in order, but a tap stuck at
   its retry bound (B3a: refused, or 8 unsettled answers, say through a deploy) steps aside
   for the unlock behind it. Kept unattached and never filed, that order would end with the

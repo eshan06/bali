@@ -394,9 +394,9 @@ with no finer meaning than its status carries none.
   after it — a late unlock, recorded and answered with the state it left alone, or with
   none once the student has left the session (ruled 2026-09-24, A10: "after" by the
   clamped times, a return's never later than the server recorded it, and a tie flips;
-  A11: after the end too, never "left unlocked" over a phone shielded at it); the outbox disposition
-  (`recorded` / `retry` / `reauth`) is the typed table in `@bali/shared`. "Never
-  refuse" is not "never check": a caller
+  A11: after the end too, never "left unlocked" over a phone shielded at it); the
+  outbox disposition (`recorded` / `retry` / `reauth`) is the typed table in
+  `@bali/shared`. "Never refuse" is not "never check": a caller
   with no participation row in the session **and** no active enrollment in its class
   has no standing there, so their unlock records as an orphan (`not_enrolled`, no
   session or class attached, the claimed id in the payload) rather than writing into

@@ -136,8 +136,9 @@ export interface UnlockResponse {
    * when it was recorded, not flipped — 'protection_off', or after a late
    * unlock (`superseded`) what the student's own later changes made it, which
    * the phone applies; null when no participation was live (none, or it had
-   * ended); on a replay, the participation's current stored state (which may be
-   * an ended participation's last state), or null when there is none.
+   * ended — a late unlock landing after the student left the session
+   * included); on a replay, the participation's current stored state (which
+   * may be an ended participation's last state), or null when there is none.
    */
   state: ParticipationState | null;
   /**

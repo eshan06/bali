@@ -1677,7 +1677,10 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // unattached, noted `unknown_tap`. The tap has landed, so it is filed
       // here now by the unlock's rules, as it would have been had the tap come
       // first: under a fresh id naming the kept record (history is
-      // append-only), and the tap's answer carries the state it leaves.
+      // append-only), and the tap's answer carries the state it leaves. The id
+      // is the server's, as a switch's or a Start's derived events are: the
+      // phone's ids are the tap's and the kept unlock's, and this runs only
+      // with the tap's first insert, so once.
       let state: ParticipationState = 'focused';
       for (const kept of await unlocksAwaitingTap(tx, input.studentId, input.eventId)) {
         const payload = (kept.payload ?? {}) as Record<string, unknown>;
@@ -2295,11 +2298,13 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
       await lockTap(tx, input.tapEventId);
+      // The caller's own only: an id another student's event holds is refused
+      // all the same (`insertEvent`), without locking their session first.
       const recorded = firstOrUndefined(
         await tx
           .select({ sessionId: events.sessionId })
           .from(events)
-          .where(eq(events.eventId, input.eventId))
+          .where(and(eq(events.eventId, input.eventId), eq(events.userId, input.studentId)))
           .limit(1),
       );
       const landed =
@@ -2325,7 +2330,11 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
         return unlockIn(tx, session, { ...input, sessionId: session.id }, filing);
       }
 
-      // Kept unattached — or this unlock's retry, whose note is not written again.
+      // Kept unattached — or this unlock's retry, whose note is not written
+      // again. A row a Start has consumed counts as armed on purpose: a Start
+      // committing between the look for the tap above and this one leaves the
+      // unlock as made before it, so kept as armed — never `unknown_tap`, which
+      // that tap, landed through the Start and not `tapIn`, would never file.
       const armed =
         recorded === undefined &&
         firstOrUndefined(
