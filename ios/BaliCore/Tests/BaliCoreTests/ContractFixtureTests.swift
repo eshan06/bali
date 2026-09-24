@@ -65,6 +65,7 @@ enum Contract {
         "POST /v1/taps": TapRequest.self,
         "POST /v1/sessions/{id}/checkin": CheckInRequest.self,
         "POST /v1/sessions/{id}/unlock": UnlockRequest.self,
+        "POST /v1/taps/{eventId}/unlock": UnlockRequest.self,
         "POST /v1/sessions/{id}/refocus": RefocusRequest.self,
         "POST /v1/sessions/{id}/protection-off": ProtectionOffRequest.self,
         "POST /v1/enrollments": EnrollmentJoinRequest.self,
@@ -79,6 +80,10 @@ enum Contract {
             tapDisposition(.status(status), try answer(TapResponse.self, status, body)).rawValue
         },
         "POST /v1/sessions/{id}/unlock": { status, body in
+            unlockDisposition(.status(status), try answer(UnlockResponse.self, status, body))
+                .rawValue
+        },
+        "POST /v1/taps/{eventId}/unlock": { status, body in
             unlockDisposition(.status(status), try answer(UnlockResponse.self, status, body))
                 .rawValue
         },

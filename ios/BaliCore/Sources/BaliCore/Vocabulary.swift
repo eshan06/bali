@@ -69,11 +69,14 @@ public enum UnlockOutcome: String, CaseIterable, Sendable { case applied, record
 public enum StateChangeOutcome: String, CaseIterable, Sendable { case applied, recorded, replay }
 /// `UNLOCK_RECORDED_AS`: why an unlock was recorded without flipping a participation.
 /// `superseded`: a late unlock — the student's own refocus or tap went ahead of it — whose answer
-/// names the state it left alone.
+/// names the state it left alone while the student is still in the session. `tapArmed` and
+/// `unknownTap`: an unlock sent under its tap (`APIClient.unlock(tap:_:)`) kept with no session —
+/// the tap waits for its teacher's Start, or the server has no tap of the student's by that id.
 public enum UnlockRecordedAs: String, CaseIterable, Sendable {
     case noLiveParticipation = "no_live_participation", afterSessionEnd = "after_session_end"
     case unknownSession = "unknown_session", notEnrolled = "not_enrolled"
     case protectionOff = "protection_off", superseded
+    case tapArmed = "tap_armed", unknownTap = "unknown_tap"
 }
 /// `PROTECTION_OFF_RECORDED_AS`: why a protection-off report was recorded without marking one.
 public enum ProtectionOffRecordedAs: String, CaseIterable, Sendable {
