@@ -1,91 +1,80 @@
 ---
-description: Adversarial dual-review convergence loop — two independent model reviewers must both approve before code ships.
+description: Adversarial dual-review loop — two independent reviewers, only proven problems block, up to 2 rounds (docs-only changes skip it).
 ---
 
 # Santa Loop
 
-Adversarial dual-review convergence loop using the santa-method skill. Two independent reviewers — different models, no shared context — must both return NICE before code ships.
+Two independent reviewers — different models, no shared context — review the change before it ships. Only **proven problems** block: a finding has to fit the BLOCKER rules and survive a check before anyone changes code for it. Easy style notes get fixed on the way without costing a round. Code gets up to 2 rounds; round 2 checks only the fixes.
 
-## Purpose
-
-Run two independent reviewers (Claude Opus + an external model) against the current task output. Both must return NICE before the code is pushed. If either returns NAUGHTY, fix all flagged issues, commit, and re-run fresh reviewers — up to 3 rounds.
+These rules override the santa-method skill's generic defaults (3 rounds, fix every flagged issue, full re-review each round).
 
 ## Usage
 
 ```
-/santa-loop [file-or-glob | description]
+/santa-loop [description of the change]
 ```
 
 ## Workflow
 
-### Step 1: Identify What to Review
+### Step 0: Scope and size
 
-Determine the scope from `$ARGUMENTS` or fall back to uncommitted changes:
+The scope is everything this branch changes against `main`. Commit work in progress first, then:
 
 ```bash
-git diff --name-only HEAD
+git fetch -q origin
+git diff --stat origin/main...HEAD
 ```
 
-Read all changed files to build the full review context. If `$ARGUMENTS` specifies a path, file, or description, use that as the scope instead.
+- **Docs-only** (every change is Markdown or a comment): skip the review and go to Step 5. The GitHub Claude Review still gates the PR.
+- **Size:** count changed lines, not counting tests, Markdown, the lockfile or generated migrations:
 
-### Step 2: Build the Rubric
+  ```bash
+  git diff --numstat origin/main...HEAD -- . ':!*.md' ':!*.test.*' ':!*/test/*' ':!*Tests/*' ':!package-lock.json' ':!packages/db/migrations/*' | awk '{s += $1 + $2} END {print s + 0}'
+  ```
 
-Construct a rubric appropriate to the file types under review. Every criterion must have an objective PASS/FAIL condition. Include at minimum:
+  Over ~400: stop and split the step into smaller PRs — one change each — before reviewing anything. If it genuinely can't be split, say why in the PR description and carry on.
 
-| Criterion            | Pass Condition                                     |
-| -------------------- | -------------------------------------------------- |
-| Correctness          | Logic is sound, no bugs, handles edge cases        |
-| Security             | No secrets, injection, XSS, or OWASP Top 10 issues |
-| Error handling       | Errors handled explicitly, no silent swallowing    |
-| Completeness         | All requirements addressed, no missing cases       |
-| Internal consistency | No contradictions between files or sections        |
-| No regressions       | Changes don't break existing behavior              |
+### Step 1: The blocking rules — one source
 
-Add domain-specific criteria based on file types (e.g., type safety for TS, memory safety for Rust, migration safety for SQL).
+What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`. Give both reviewers its rules verbatim — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
 
-### Step 3: Dual Independent Review
+### Step 2: Dual independent review
 
-Launch two reviewers **in parallel** using the Agent tool (both in a single message for concurrent execution). Both must complete before proceeding to the verdict gate.
+Launch both reviewers **in parallel** (one message, two tool uses). Each gets:
 
-Each reviewer evaluates every rubric criterion as PASS or FAIL, then returns structured JSON:
+- the rules from Step 1, verbatim
+- the diff (`git diff origin/main...HEAD`), not whole files — reviewers open files themselves when they need context
+- this instruction: "You are an independent reviewer and have NOT seen any other review. Report a BLOCKER only if it fits the rules and you can cite the file:line and a concrete failure: this input or state → this wrong result. Everything else is a WARN. Zero findings is a normal, common result — do not manufacture findings."
+- this output format:
 
 ```json
 {
-  "verdict": "PASS" | "FAIL",
-  "checks": [
-    {"criterion": "...", "result": "PASS|FAIL", "detail": "..."}
+  "blockers": [
+    { "file": "...", "line": 0, "rule": "...", "failure": "input/state → wrong result" }
   ],
-  "critical_issues": ["..."],
-  "suggestions": ["..."]
+  "warns": ["file:line — note"]
 }
 ```
 
-The verdict gate (Step 4) maps these to NICE/NAUGHTY: both PASS → NICE, either FAIL → NAUGHTY.
+#### Reviewer A: Claude (always runs)
 
-#### Reviewer A: Claude Agent (always runs)
+An Agent with `subagent_type: code-reviewer` and `model: opus`.
 
-Launch an Agent (subagent_type: `code-reviewer`, model: `opus`) with the full rubric + all files under review. The prompt must include:
+#### Reviewer B: external model (Claude fallback only if no external CLI is installed)
 
-- The complete rubric
-- All file contents under review
-- "You are an independent quality reviewer. You have NOT seen any other review. Your job is to find problems, not to approve."
-- Return the structured JSON verdict above
-
-#### Reviewer B: External Model (Claude fallback only if no external CLI installed)
-
-First, detect which CLIs are available:
+Detect which CLIs are available:
 
 ```bash
 command -v codex >/dev/null 2>&1 && echo "codex" || true
 command -v gemini >/dev/null 2>&1 && echo "gemini" || true
 ```
 
-Build the reviewer prompt (identical rubric + instructions as Reviewer A) and write it to a unique temp file:
+Write the same prompt Reviewer A gets to a unique temp file:
 
 ```bash
 PROMPT_FILE=$(mktemp /tmp/santa-reviewer-b-XXXXXX.txt)
 cat > "$PROMPT_FILE" << 'EOF'
-... full rubric + file contents + reviewer instructions ...
+... rules + diff + instruction + output format ...
 EOF
 ```
 
@@ -105,76 +94,51 @@ gemini -p "$(cat "$PROMPT_FILE")" -m gemini-2.5-pro
 rm -f "$PROMPT_FILE"
 ```
 
-**Claude Agent fallback** (only if neither `codex` nor `gemini` is installed)
-Launch a second Claude Agent (subagent_type: `code-reviewer`, model: `opus`). Log a warning that both reviewers share the same model family — true model diversity was not achieved but context isolation is still enforced.
+**Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer` and `model: opus`. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
 
-In all cases, the reviewer must return the same structured JSON verdict as Reviewer A.
+### Step 3: Verdict
 
-### Step 4: Verdict Gate
+- **No blockers** from either reviewer → **NICE**: fix the easy WARNs (Step 4, item 3), then go to Step 5.
+- **Any blocker** → Step 4.
 
-- **Both PASS** → **NICE** — proceed to Step 6 (push)
-- **Either FAIL** → **NAUGHTY** — merge all critical issues from both reviewers, deduplicate, proceed to Step 5
+### Step 4: Check, then fix
 
-### Step 5: Fix Cycle (NAUGHTY path)
+1. Merge and dedupe both reviewers' blockers.
+2. **Check each blocker before changing code.** Re-read the cited lines and their callers. For a logic or race bug, write the failing test first — CLAUDE.md's regression-test-first rule.
+   - The test fails → it's real: fix it.
+   - You can't make it fail, or the code already handles it → **dismissed**: one line for the PR description, `dismissed: <finding> — <why>`.
+   - A race that only the real-Postgres lane can show (`TEST_DATABASE_URL` unset here) is never dismissed for not reproducing locally: write the race test, fix the code if the reasoning holds, and let CI's real-Postgres lane decide.
+   - Missing tests → add them. A rule break → confirm the rule in CLAUDE.md or ARCHITECTURE.md, then fix it.
+3. **WARNs:** fix the easy ones now — a rename, a stray log, a comment, a small cleanup. They never start another round. One that needs a real rewrite goes in the PR description instead. Never open a follow-up PR just for WARNs.
+4. Commit: `fix: address santa-loop review findings (round N)`.
+5. **Round 2** — only if round 1 fixed at least one blocker. Fresh reviewers get the fix diff (`git diff <round-1 head>..HEAD`), the round-1 list (fixed, dismissed and why) and one question: did these fixes work, and did they break anything? They don't re-raise dismissed findings unless a fix changed that code. Round-2 blockers get the same check-then-fix. There is no round 3 — the GitHub Claude Review checks the final code.
+6. **Park** only when a real blocker can't be fixed within this step or needs an owner decision: push, open the PR as a **draft** that lists it, leave auto-merge off, and report the step as parked.
 
-1. Display all critical issues from both reviewers
-2. Fix every flagged issue — change only what was flagged, no drive-by refactors
-3. Commit all fixes in a single commit:
-   ```
-   fix: address santa-loop review findings (round N)
-   ```
-4. Re-run Step 3 with **fresh reviewers** (no memory of previous rounds)
-5. Repeat until both return PASS
-
-**Maximum 3 iterations.** If still NAUGHTY after 3 rounds, stop and present remaining issues:
-
-```
-SANTA LOOP ESCALATION (exceeded 3 iterations)
-
-Remaining issues after 3 rounds:
-- [list all unresolved critical issues from both reviewers]
-
-Manual review required before proceeding.
-```
-
-Do NOT push.
-
-### Step 6: Push (NICE path)
-
-When both reviewers return PASS:
+### Step 5: Push
 
 ```bash
 git push -u origin HEAD
 ```
 
-### Step 7: Final Report
+Then carry on with CLAUDE.md's ship step. When there are any, the PR description gets a **Review notes** section: dismissed findings and WARNs left undone, one line each.
 
-Print the output report (see Output section below).
-
-## Output
+### Step 6: Report
 
 ```
-SANTA VERDICT: [NICE / NAUGHTY (escalated)]
+SANTA VERDICT: NICE / SKIPPED (docs-only) / PARKED
 
-Reviewer A (Claude Opus):   [PASS/FAIL]
-Reviewer B ([model used]):  [PASS/FAIL]
+Reviewer A (Claude Opus):   [n] blockers · [m] warns
+Reviewer B ([model used]):  [n] blockers · [m] warns
 
-Agreement:
-  Both flagged:      [issues caught by both]
-  Reviewer A only:   [issues only A caught]
-  Reviewer B only:   [issues only B caught]
-
-Iterations: [N]/3
-Result:     [PUSHED / ESCALATED TO USER]
+Blockers:  [x] fixed · [y] dismissed (reasons in the PR)
+WARNs:     [a] fixed · [b] listed in the PR
+Rounds:    [N]/2
 ```
 
 ## Notes
 
-- Reviewer A (Claude Opus) always runs — guarantees at least one strong reviewer regardless of tooling.
-- Model diversity is the goal for Reviewer B. GPT-5.4 or Gemini 2.5 Pro gives true independence — different training data, different biases, different blind spots. The Claude-only fallback still provides value via context isolation but loses model diversity.
-- Strongest available models are used: Opus for Reviewer A, GPT-5.4 or Gemini 2.5 Pro for Reviewer B.
-- External reviewers run with `--sandbox read-only` (Codex) to prevent repo mutation during review.
-- Fresh reviewers each round prevents anchoring bias from prior findings.
-- The rubric is the most important input. Tighten it if reviewers rubber-stamp or flag subjective style issues.
-- Commits happen on NAUGHTY rounds so fixes are preserved even if the loop is interrupted.
-- Push only happens after NICE — never mid-loop.
+- Reviewer A (Claude Opus) always runs, so there is always one strong reviewer. Reviewer B's different model (GPT-5.4 or Gemini 2.5 Pro) brings different blind spots; the Claude-only fallback keeps context isolation but loses that.
+- External reviewers run read-only (`--sandbox read-only` for Codex).
+- Fresh reviewers each round keep them from anchoring on earlier findings; round 2's narrow scope keeps them off code that's already settled.
+- Fixes are committed each round, so an interrupted loop keeps them.
+- Reviewers flagging style as blockers, or rubber-stamping? Fix the rules in `claude-review.yml`, never a santa-only rubric.
