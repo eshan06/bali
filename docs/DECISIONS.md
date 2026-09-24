@@ -28,10 +28,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   footer. It re-runs on `edited`, so stripping the footer turns it green with
   no push; a self-test of the patterns (`attribution.test.sh`) runs first, so
   a pattern that stops matching fails the check instead of passing every PR.
-  It blocks once the owner adds it to `protect-main`'s required checks. Not
-  here: the footer the Claude Review workflow appends to its own comment
-  lives in `claude-review.yml`, which a session cannot edit without tripping
-  the action's tamper guard (GOTCHAS); the owner is handling that one.
+  It blocks once the owner adds it to `protect-main`'s required checks. The
+  footer the Claude Review workflow appended to its own comment is gone too:
+  `claude-review.yml` now posts `claude-review.md` as written. Editing that
+  file trips the action's tamper guard (GOTCHAS), so that one-line PR merged
+  through the owner's one-time ruleset toggle.
 - **2026-09-24** — **A3: the tap and state-change outbox tables.**
   `tapDisposition` and `stateChangeDisposition` (`@bali/shared`,
   `outbox-contract.ts`, beside the unlock's) are pure functions of the status —
