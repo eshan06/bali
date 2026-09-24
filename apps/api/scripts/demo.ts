@@ -1,4 +1,5 @@
 import {
+  type ApiErrorBody,
   type BlockDetail,
   type CheckInResponse,
   type ClassDetail,
@@ -9,6 +10,7 @@ import {
   type EventType,
   type EventsPage,
   type FeedEvent,
+  type ProtectionOffResponse,
   type RefocusResponse,
   type SessionSnapshot,
   type StartSessionResponse,
@@ -61,7 +63,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /** The cast. Keys double as the suffix of each actor's env vars in remote mode. */
 const TEACHER: DemoActorSpec = { key: 'teacher', displayName: 'Ms. Rivera', role: 'teacher' };
 const STUDENTS: DemoActorSpec[] = [
-  { key: 'ana', displayName: 'Ana', role: 'student' }, // emergency unlock, then refocus
+  { key: 'ana', displayName: 'Ana', role: 'student' }, // unlock + refocus; protection off + re-tap
   { key: 'ben', displayName: 'Ben', role: 'student' }, // goes silent, then comes back
   { key: 'cal', displayName: 'Cal', role: 'student' }, // removed mid-session, unlocks anyway
   { key: 'dana', displayName: 'Dana', role: 'student' }, // stays focused the whole time
@@ -308,6 +310,57 @@ async function main(): Promise<void> {
     });
     console.log('Ana: focused → unlocked → focused, every step live on the grid.');
 
+    line('8:06am — Ana switches Screen Time off, then taps back in');
+    // iOS drops every shield the moment the permission goes, so her phone
+    // reports it — never green, never an unlock (ARCHITECTURE, iOS rules). The
+    // rest of the room checks in meanwhile, so a slow remote run cannot age a
+    // phone past the 90s threshold before Ben's incident.
+    const besideAna = students.filter((s) => s.key !== ana.key);
+    await withHeartbeats(startHeartbeats(call, sid, besideAna), async () => {
+      const anaOff = await call<ProtectionOffResponse>(
+        'POST',
+        `/v1/sessions/${sid}/protection-off`,
+        { token: ana.token, body: { eventId: randomUUID(), deviceTime: iso() } },
+      );
+      assert(anaOff.outcome === 'applied', `Ana protection-off outcome ${anaOff.outcome}`);
+      assert(
+        anaOff.state === 'protection_off',
+        `Ana should be protection off, got ${anaOff.state}`,
+      );
+      // Like the unlock, it must reach the teacher's screen live (rule 6).
+      const liveOff = await grid.waitFor(
+        (e) => e.type === 'protection_off' && e.userId === ana.userId,
+        { label: "Ana's protection off", timeoutMs: world.liveWaitMs },
+      );
+      console.log(`  live: protection_off for Ana arrived on the stream at seq ${liveOff.seq}.`);
+
+      // Refocus cannot leave it: her shields are gone, and only a re-tap re-shields.
+      const refused = await call<ApiErrorBody>('POST', `/v1/sessions/${sid}/refocus`, {
+        token: ana.token,
+        body: { eventId: randomUUID(), deviceTime: iso() },
+        expectStatus: 409,
+      });
+      assert(
+        refused.error.message.includes('Screen Time'),
+        `Ana's refocus should be refused for protection off, got "${refused.error.message}"`,
+      );
+      console.log(`  refocus refused (409): "${refused.error.message}"`);
+      const retapId = randomUUID();
+      const retap = await call<TapResponse>('POST', '/v1/taps', {
+        token: ana.token,
+        body: { tagId: block.tagId, eventId: retapId, deviceTime: iso() },
+      });
+      assert(
+        retap.state === 'focused',
+        `Ana's re-tap should refocus her, got ${String(retap.state)}`,
+      );
+      await grid.waitFor((e) => e.eventId === retapId, {
+        label: "Ana's re-tap",
+        timeoutMs: world.liveWaitMs,
+      });
+    });
+    console.log('Ana: protection off → (refocus refused) → re-tap → focused, live on the grid.');
+
     line('8:07am — Ben goes quiet (a phone in a bag)');
     const ben = byKey('ben');
     // Everyone else keeps checking in, so the silence that follows is Ben's alone.
@@ -489,6 +542,7 @@ async function main(): Promise<void> {
       'tap_in',
       'unlock',
       'refocus',
+      'protection_off',
       'went_silent',
       'came_back',
       'enrollment_removed',
@@ -496,10 +550,18 @@ async function main(): Promise<void> {
     for (const t of required) {
       assert(types.includes(t), `event log should contain ${t}`);
     }
-    assert(types.filter((t) => t === 'tap_in').length === 4, 'four taps in the log');
+    assert(
+      types.filter((t) => t === 'tap_in').length === 5,
+      "four taps at the bell, plus Ana's re-tap",
+    );
     assert(
       types.filter((t) => t === 'unlock').length === 2,
       "Ana's and Cal's unlocks both recorded",
+    );
+    assert(types.filter((t) => t === 'protection_off').length === 1, 'exactly one protection_off');
+    assert(
+      types.filter((t) => t === 'refocus').length === 1,
+      'the refused refocus recorded nothing',
     );
     assert(types.filter((t) => t === 'went_silent').length === 1, 'exactly one went_silent');
     assert(types.filter((t) => t === 'came_back').length === 1, 'exactly one came_back');

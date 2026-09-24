@@ -208,6 +208,38 @@ describe.runIf(REAL_PG)('GET /v1/sessions/:id/stream (SSE, real Postgres)', () =
     stream.close();
   });
 
+  it("delivers a phone's protection-off report to the teacher's stream", async () => {
+    // End to end over HTTP, as the exit demo drives it: the grid can only show
+    // "turned protection off" if the report's event reaches the live stream.
+    const { teacher, student, session } = await seedRunning('stream-protoff');
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: new Date(),
+    });
+    const stream = await openStream(session.id, await tokenFor(teacher.cognitoId));
+    expect(stream.status).toBe(200);
+
+    const eventId = randomUUID();
+    const res = await fetch(`http://127.0.0.1:${port}/v1/sessions/${session.id}/protection-off`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await tokenFor(student.cognitoId)}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ eventId, deviceTime: new Date().toISOString() }),
+    });
+    expect(res.status).toBe(200);
+
+    await stream.waitFor((e) => e.some((x) => x.eventId === eventId));
+    expect(stream.events.find((x) => x.eventId === eventId)).toMatchObject({
+      type: 'protection_off',
+      userId: student.id,
+    });
+    stream.close();
+  });
+
   it('a reconnect with the overlap window delivers every event exactly once after dedupe', async () => {
     const { teacher, student, session } = await seedRunning('stream-reconnect');
     const token = await tokenFor(teacher.cognitoId);

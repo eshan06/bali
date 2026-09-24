@@ -39,7 +39,9 @@ identical either way:
 
 - Ms. Rivera creates a class and a block, four students join by code, the session
   starts, and every phone taps in (all focused) and heartbeats.
-- **Ana** hits emergency unlock, then refocuses.
+- **Ana** hits emergency unlock, then refocuses. Then she switches Screen Time off:
+  her phone reports **protection off** (never green, never an unlock), refocus is
+  refused, and only a re-tap of the block returns her to focus.
 - **Ben**'s phone goes quiet; the minute sweep opens a silence episode
   (`went_silent`), and his next check-in closes it (`came_back`) — while the plain
   heartbeats emit no events at all.
