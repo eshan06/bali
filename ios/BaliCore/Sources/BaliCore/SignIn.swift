@@ -143,7 +143,9 @@ public actor SignIn: TokenProvider {
     /// How long before its expiry an access token stops being given, so one sent arrives in time.
     static let margin: TimeInterval = 60
 
-    let cognito: Cognito
+    /// Nonisolated, so the app reads it without a hop: an actor's `let` is isolated outside its
+    /// module.
+    public nonisolated let cognito: Cognito
     let store: any TokenStore
     let transport: any HTTPTransport
     let now: @Sendable () -> Date

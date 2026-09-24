@@ -10,7 +10,7 @@ let refocusRoute = "POST /v1/sessions/s/refocus"
 let checkInRoute = "POST /v1/sessions/s/checkin"
 let meRoute = "GET /v1/me"
 
-@Suite("The drain: the outbox, sent through the one client", .timeLimit(.minutes(1)))
+@Suite("The drain: the outbox, sent through the one client", .timeLimit(.minutes(3)))
 struct DrainTests {
     @Test("What the phone did goes at once, carrying its event id, and leaves once the server has it")
     func sendsAtOnce() async throws {

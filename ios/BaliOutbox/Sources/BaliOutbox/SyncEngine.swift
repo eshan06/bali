@@ -132,6 +132,20 @@ public actor SyncEngine {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
     }
 
+    /// The app's one engine, over the student's sign-in (B4): the API client's tokens are its, a
+    /// 401's `refresh` is its, and every token it gets otherwise — a sign-in, a renewal of its own —
+    /// sends everything again at once.
+    public static func make(
+        outbox: Outbox, api: URL, signIn: SignIn,
+        transport: any HTTPTransport = URLSessionTransport(), clock: any SyncClock = SystemClock()
+    ) async -> SyncEngine {
+        let client = APIClient(baseURL: api, tokens: signIn, transport: transport)
+        let engine = SyncEngine(
+            outbox: outbox, client: client, clock: clock, refresh: { await signIn.refresh() })
+        await signIn.whenTokenArrives { [weak engine] in await engine?.retryNow() }
+        return engine
+    }
+
     /// Drains the outbox and reads the truth, until cancelled: one run at a time, and a run
     /// cancelled can run again.
     public func run() async {

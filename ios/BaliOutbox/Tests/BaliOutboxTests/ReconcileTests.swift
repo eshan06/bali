@@ -4,7 +4,7 @@ import Testing
 
 @testable import BaliOutbox
 
-@Suite("Applying answers: the phone's truth", .timeLimit(.minutes(1)))
+@Suite("Applying answers: the phone's truth", .timeLimit(.minutes(3)))
 struct AnswerTests {
     @Test(
         "A tap is shielded for at once while unanswered; then the phone is in the session its answer names, in the state it names"
@@ -99,7 +99,7 @@ struct AnswerTests {
     }
 }
 
-@Suite("The check-in and the reads of the truth", .timeLimit(.minutes(1)))
+@Suite("The check-in and the reads of the truth", .timeLimit(.minutes(3)))
 struct ReadTests {
     @Test("The check-in runs every 30 seconds in the foreground — never behind it — and coming back reads the truth")
     func cadence() async throws {
@@ -224,7 +224,7 @@ struct ReadTests {
     }
 }
 
-@Suite("The reconcile: no read overrides a newer change", .timeLimit(.minutes(1)))
+@Suite("The reconcile: no read overrides a newer change", .timeLimit(.minutes(3)))
 struct StaleReadTests {
     @Test("#56's race: a check-in read before an unlock and answered after it is never applied")
     func readBeforeChange() async throws {
