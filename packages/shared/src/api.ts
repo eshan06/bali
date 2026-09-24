@@ -108,7 +108,7 @@ export interface TapRequest {
   /** The phone's own order for this tap (A12): what orders it against the student's unlock. */
   order?: ActionOrder | null;
 }
-export type TapOutcome ='joined' | 'switched' | 'armed' | 'already_armed' | 'replay';
+export type TapOutcome = 'joined' | 'switched' | 'armed' | 'already_armed' | 'replay';
 export interface TapResponse {
   /**
    * `already_armed` is also the answer to the retry of a tap still waiting

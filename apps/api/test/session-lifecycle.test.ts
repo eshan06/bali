@@ -848,7 +848,11 @@ describe('the phone’s own order (A12)', () => {
     expect(tapped.json<TapResponse>().outcome).toBe('joined');
     for (const bad of odd) {
       for (const url of [`/v1/sessions/${session.id}/unlock`, `/v1/taps/${tapId}/unlock`]) {
-        const res = await post(token, url, { eventId: randomUUID(), deviceTime: ago(40), order: bad });
+        const res = await post(token, url, {
+          eventId: randomUUID(),
+          deviceTime: ago(40),
+          order: bad,
+        });
         expect(res.statusCode, `${url} ${JSON.stringify(bad)}`).toBe(200);
         expect(unlockDisposition(res.statusCode, res.json())).toBe('recorded');
       }

@@ -16,19 +16,7 @@ import {
   SILENCE_THRESHOLD_MS,
   tidyDisplayName,
 } from '@bali/shared';
-import {
-  and,
-  asc,
-  between,
-  eq,
-  gt,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  ne,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, between, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
 import { liveClassWithCode, type UserRow } from './queries.js';

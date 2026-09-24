@@ -1978,7 +1978,13 @@ describe('the phone’s own order decides its unlock against its return (A12)', 
   const n = (seq: number, install = phone) => ({ install, seq });
   type Order = ReturnType<typeof n> | null;
   function move(session: { id: string }, student: { id: string }, deviceTime: Date, order: Order) {
-    return { sessionId: session.id, studentId: student.id, eventId: newUuidV7(), deviceTime, order };
+    return {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime,
+      order,
+    };
   }
   /** A 09:00–09:25 lesson whose student has not tapped in. */
   async function room(tag: string) {

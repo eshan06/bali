@@ -8,6 +8,86 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A12: the phone's own order, not its clock, decides whether a student's
+  unlock came after their own refocus or tap (owner ruling).** The ruling, verbatim: "The
+  phone numbers its own actions with a counter, not the clock, and the server orders a
+  student's own unlock and refocus by that counter. A tampered clock can then never undo a
+  real unlock. It adds one optional field, done as its own small step before B6." **Why:**
+  A10 judged "after" by the clamped device times, each return capped at `recorded_at`, so a
+  clock turned back between the student's return and a real Emergency Unlock made that
+  unlock read as late — recorded, `superseded`, not applied, the phone shielded again — and
+  it did not take until the clock was right. **The counter was already there:** the outbox's
+  `seq INTEGER PRIMARY KEY AUTOINCREMENT`, which SQLite never reuses or lowers in the file's
+  life, and whose order the records drain in — the order the phone acted in. It is per file,
+  and one file serves the app and its extensions (B3b-2), so a reinstall (a new app-group
+  container) starts again at 1: the field carries the file's identity. **The field:** one
+  optional object, `order: { install, seq }` (`ActionOrder` in `@bali/shared` and BaliCore):
+  `install` a UUID minted once per outbox file (BaliOutbox's migration `v2`, a lower-case
+  UUID in `outboxState`), `seq` the record's own. On every record the outbox sends: the tap,
+  the unlock under a session and A11's under a tap (one body), the refocus — and protection
+  off, the uniform choice, since its body and engine path are the refocus's
+  (`StateChangeBody`, `changeState`): stored there, read by nothing yet. Not the check-in, a
+  join or a rename: no outbox record, nothing ordered. A retried record sends the same (its
+  request is built from what was stored). **Stored:** two nullable columns on `events`,
+  `order_install uuid` and `order_seq bigint`, both or neither (`events_order_whole`,
+  migration `0008`) — columns, not the payload, because the teacher's live feed ships the
+  payload whole and has no use for a phone's install id. Written only by `insertEvent`, and
+  only an order `knownOrder` can compare, as `knownReason` does for the reason. **The
+  judgement** (`returnedSince`): a return of the student's own in that session — `tap_in` or
+  `refocus` — from the unlock's install is after it exactly when its seq is greater. Every
+  other pair keeps A10's time rule, unchanged: no order on either side (the A10 tests pass as
+  they were), on one side only (an old build's, or a tap converted at Start), or another
+  install's (a reinstall, another phone). Any return after it and the unlock is `superseded`.
+  Protection off still comes first, and the ended row (#76's rider) is judged the same way:
+  late by the order once the student has left, and not late by the clock alone — the unlock
+  they left on keeps its `after_session_end` / `no_live_participation`. Occurred times never
+  change (rule 1's clamp stands): the order decides only which of the student's own two
+  actions came last. The read now covers the student's events in the whole window
+  (`events_user_occurred_idx`, still), since by the order a return timed before the unlock
+  can come after it. **A11's paths:** `unlockUnderTap` hands the order to `unlockIn`; a
+  record kept `unknown_tap` keeps its order, and `tapIn`'s filing loop files it with that
+  order — made while its tap was unanswered, it is numbered after it, so the tap just
+  recorded is never a return after it; a later re-tap of the phone's is. Lock order
+  unchanged: `lockTap`, then the session. **An armed tap keeps none:** the Start converts it
+  at the window's start (a pre-bell claim clamps there, and a return is never later than the
+  server recorded it), so the time rule orders it — a column on `armed_taps` would buy
+  nothing a school meets. **Trust boundary:** validated at the route (`Order`, over the
+  shared `isActionOrder`: a UUID install and a positive safe integer seq) and again in the
+  engine. A malformed order is taken as none **on every endpoint**, never a `400`: on an
+  unlock a `400` keeps the record out forever (B3a keeps a refused unlock stuck and resends
+  the identical body — the reason's rule), and on a refocus it is dropped for good and a tap
+  left stuck, all over a field whose absence already has an answer; one rule everywhere, so a
+  phone never needs to know which endpoint is strict. **A forged order is harmless:** it is
+  the student's own claim about their own two actions, compared only among the caller's own
+  events. The worst it does is apply a stuck unlock the student could have made anew
+  (Emergency Unlock is always allowed), or make their own unlock read late — recorded either
+  way, in the session's feed and their history, and answered with the state the phone then
+  shields to, so the grid is never green over an unshielded phone. **Not covered,
+  disclosed:** (1) a refocus the phone made before its unlock that reaches the server after
+  it still applies — only one in flight when the unlock was recorded can (the outbox deletes
+  a queued refocus), its request outliving the phone's timeout: arrival order, not a clock,
+  and the ruling orders the unlock's judgement; (2) a backup of the outbox file restored onto
+  a second phone still in use shares its install, so the two phones' orders compare as one's
+  — at worst a forged order's effect. **Elsewhere the phone's clock still orders a student's
+  own actions** (out of this ruling, listed not fixed): the history (`getHistoryPage`, newest
+  first by clamped `occurred_at`) lists an unlock the order applied — timed before the
+  refocus it followed — under that refocus; and Phase 4's reports must not compute focus
+  time from the times alone where the order decided (PLAN's reports row). Nothing else in
+  the engine compares a student's own device times. **Riders (#77's review):** an engine test
+  pins that an unlock kept `unknown_tap` whose tap then arms is never filed — the Start joins
+  the student focused, the record in no class; and the chip turn's comment says its
+  unlock-only scope is deliberate, not defensive. **Tests:** the engine on PGlite (a clock
+  turned back: applied; a stuck unlock older by the order: late, its clock reading later;
+  another install's and one-sided pairs: the time rule, both ways; the ended row; protection
+  off first; A11's tap-bound unlock in both arrival orders; a late tap's filing; replay; what
+  is stored, and a malformed order as none), a real-Postgres race (the late unlock against
+  the return that went ahead of it, on a clock turned back), the API (each endpoint takes and
+  keeps it; the clock case end to end with its replay; a malformed order never refused, on
+  every endpoint), the route's schema table, five fixtures (`*-ordered`), BaliCore (the
+  wire, both ways) and BaliOutbox (the install minted once per file, a v1 file given one, each
+  record's own seq — never reused, the same on every retry). Six mutations of the rule and
+  what it stores each turn a test red, the race among them.
+
 - **2026-09-24** — **A11: an unlock made before the phone's own tap is answered is filed
   under that tap (owner decision 11).** **The endpoint:** `POST /v1/taps/{eventId}/unlock`,
   additive — the tap's id in the path, the session unlock's body (`eventId`, `deviceTime`,
