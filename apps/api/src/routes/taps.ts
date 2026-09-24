@@ -6,12 +6,13 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
-import { DeviceTime } from './schemas.js';
+import { DeviceTime, Order } from './schemas.js';
 
 const TapBody = z.object({
   tagId: z.string().min(1),
   eventId: z.string().uuid(),
   deviceTime: DeviceTime,
+  order: Order,
 });
 
 /**
@@ -50,6 +51,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
           studentId: student.id,
           eventId: body.eventId,
           deviceTime,
+          order: body.order ?? null,
         }),
       );
       return {
@@ -74,6 +76,9 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
     // by "is a 409 when the event_id belongs to another student's armed
     // tap" — an engine test cannot catch this, because the throw is right
     // and only the status is wrong.
+    //
+    // Its order is not kept (A12): the Start converts the tap at the window's
+    // start, and an unlock is ordered against that `tap_in` by the times.
     const armed = await mapTransitionError(() =>
       armTap(db, {
         studentId: student.id,

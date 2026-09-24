@@ -222,6 +222,14 @@ export const events = pgTable(
     /** When it happened on the device — already clamped to the session window (rule 1). */
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The order the phone acted in (A12): its outbox file's id and the record's place in it, a
+     * counter no clock moves — what orders a student's own unlock against their return. Both or
+     * neither; neither on an event no phone numbered (an old build's, one the server mints, a
+     * tap converted at Start). Columns, not payload, so the live feed never carries them.
+     */
+    orderInstall: uuid('order_install'),
+    orderSeq: bigint('order_seq', { mode: 'number' }),
   },
   (t) => [
     // The catch-up read: "everything for this session after seq N".
@@ -246,6 +254,8 @@ export const events = pgTable(
     index('events_unattached_tap_idx')
       .on(sql`(${t.payload}->>'claimed_tap_event_id')`)
       .where(sql`${t.type} = 'unlock' and ${t.sessionId} is null`),
+    // An order is its install and its seq together: half of one orders nothing.
+    check('events_order_whole', sql`(${t.orderInstall} IS NULL) = (${t.orderSeq} IS NULL)`),
   ],
 );
 
