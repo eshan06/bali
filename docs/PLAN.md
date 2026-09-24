@@ -298,10 +298,13 @@ under-13 parental-consent machinery.
 
 ## External / waiting
 
-- **Family Controls distribution entitlement** (Apple) — applied for; blocks
-  TestFlight/App Store, not development builds. Bundle IDs incl. monitor
-  extension (and shield-UI extension) should be in the request — it used v2's
-  identifiers, which v3 reuses (listed on B2).
+- **Family Controls distribution entitlement** (Apple) — ✅ granted (owner,
+  2026-09-24), so TestFlight and the App Store no longer wait on Apple. Apple
+  approves it per bundle ID, and all three targets use it: `com.bali.Bali`,
+  `com.bali.Bali.BaliMonitor` and `com.bali.Bali.BaliShield` — v2's
+  identifiers, which the request used and v3 reuses (B2). In the developer
+  portal each one shows "Family Controls (Distribution)" among its
+  capabilities; one without it can't ship through TestFlight.
 - Apple checklist: bundle IDs registered, App Store Connect record created.
 
 ## Decision log
