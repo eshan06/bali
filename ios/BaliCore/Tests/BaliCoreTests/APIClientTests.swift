@@ -398,18 +398,22 @@ struct APIClientTests {
 /// A server on a local port, for the real transport: it answers its first request with `answer`
 /// — or, given none, never answers at all — and keeps the head of the request it read.
 final class LocalServer: @unchecked Sendable {
+    /// A socket call that failed while setting the server up.
+    struct SetupFailed: Error { let errno: Int32 }
+
     let port: UInt16
     private let listener: Int32
     private let lock = NSLock()
     private var received = ""
     var head: String { lock.withLock { received } }
 
-    init(answer: String?) {
+    init(answer: String?) throws {
         #if canImport(Glibc)
             let fd = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
         #else
             let fd = socket(AF_INET, SOCK_STREAM, 0)
         #endif
+        guard fd >= 0 else { throw SetupFailed(errno: errno) }
         var address = sockaddr_in()
         #if canImport(Darwin)
             address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -417,11 +421,15 @@ final class LocalServer: @unchecked Sendable {
         address.sin_family = sa_family_t(AF_INET)
         address.sin_addr.s_addr = inet_addr("127.0.0.1")
         var length = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                _ = bind(fd, $0, length)  // port 0: any free one
-                _ = listen(fd, 8)
-                _ = getsockname(fd, $0, &length)
+        try withUnsafeMutablePointer(to: &address) {
+            try $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                // Port 0: any free one, which getsockname then reads back.
+                guard bind(fd, $0, length) == 0, listen(fd, 8) == 0,
+                    getsockname(fd, $0, &length) == 0
+                else {
+                    defer { close(fd) }
+                    throw SetupFailed(errno: errno)
+                }
             }
         }
         (listener, port) = (fd, UInt16(bigEndian: address.sin_port))
@@ -429,6 +437,10 @@ final class LocalServer: @unchecked Sendable {
         guard let answer else { return }
         Thread.detachNewThread { [self] in
             let connection = accept(fd, nil, nil)
+            guard connection >= 0 else {
+                lock.withLock { received = "accept failed: errno \(errno)" }
+                return
+            }
             var bytes: [UInt8] = []
             var buffer = [UInt8](repeating: 0, count: 4096)
             while !String(decoding: bytes, as: UTF8.self).contains("\r\n\r\n") {
@@ -452,7 +464,7 @@ struct URLSessionTransportTests {
     func answers() async throws {
         let fixture = try Contract.load("me/in-session.json")
         let body = String(decoding: try JSONEncoder().encode(fixture.body), as: UTF8.self)
-        let server = LocalServer(
+        let server = try LocalServer(
             answer: "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
                 + "Content-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)")
         let client = APIClient(
@@ -469,19 +481,22 @@ struct URLSessionTransportTests {
 
     @Test("A server that never answers times out: .networkError, and the record kept")
     func timesOut() async throws {
-        let server = LocalServer(answer: nil)
+        let server = try LocalServer(answer: nil)
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
             tokens: FixedToken(token: "t"), timeout: 1)
         let started = Date()
         let response = await client.unlock(
             session: "s1", UnlockRequest(eventId: "e1", deviceTime: started))
+        let waited = Date().timeIntervalSince(started)
         #expect(response.result == .networkError)
         #expect(response.noAnswer == .unreachable)
         #expect(unlockDisposition(response.result, response.answer) == .retry)
-        // Its own second, not the session's 15: on Linux, a timeout given to URLRequest's
-        // initializer is ignored for the session's.
-        #expect(Date().timeIntervalSince(started) < 10)
+        // A wait, not a refusal — the server still listens, never having read a byte — and its
+        // own second, not the session's 15: on Linux, a timeout given to URLRequest's initializer
+        // is ignored for the session's.
+        #expect(server.head.isEmpty)
+        #expect(waited > 0.5 && waited < 10)
     }
 
     @Test("The default session caches nothing, and bounds a request's wait and a whole exchange")
