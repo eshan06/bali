@@ -206,7 +206,7 @@ struct UnlockSafetyTests {
     ]
 
     @Test(
-        "A random walk of records, sends and retries deletes an unlock only when a send says recorded"
+        "A random walk of records and sends, due or not, deletes an unlock only when a send says recorded"
     )
     func randomWalk() async throws {
         for seed in 1...12 as ClosedRange<UInt64> {
@@ -221,12 +221,7 @@ struct UnlockSafetyTests {
                 case 0: try outbox.record(.tap(tagId: "tag"), now: now)
                 case 1: try outbox.record(.refocus(session: session), now: now)
                 case 2: try outbox.record(.protectionOff(session: session), now: now)
-                case 3:
-                    if Bool.random(using: &random) {
-                        try outbox.protectionRestored()
-                    } else {
-                        try outbox.retryNow(now)
-                    }
+                case 3: try outbox.protectionRestored()
                 case 4:
                     let unlock = try #require(
                         try outbox.record(.unlock(session: session, reason: nil), now: now))

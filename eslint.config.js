@@ -4,17 +4,8 @@ import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  // SwiftPM's .build holds its dependencies' checkouts, GRDB's JavaScript included.
-  {
-    ignores: [
-      '**/node_modules/',
-      '**/dist/',
-      '**/coverage/',
-      '**/.next/',
-      '**/next-env.d.ts',
-      '**/.build/',
-    ],
-  },
+  { ignores: ['**/node_modules/', '**/dist/', '**/coverage/', '**/.next/', '**/next-env.d.ts'] },
+  { ignores: ['**/.build/'] }, // SwiftPM's: dependencies' checkouts, GRDB's JavaScript too
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

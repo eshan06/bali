@@ -2,12 +2,10 @@ import BaliCore
 import Foundation
 import GRDB
 
-/// The phone's outbox (ARCHITECTURE, "How a tap works"): each tap, emergency unlock, refocus and
-/// protection-off report the phone acted on, kept until an answer lets it go. BaliCore's tables say
-/// what an answer means; this applies them, with the rules no table can express — supersession,
-/// order, backoff and the retry bound (docs/DECISIONS.md, B3a). The sync engine (B3b) sends
-/// `nextDue`'s `request` through `APIClient` and hands the answer to `settle`. Every call takes
-/// `now`: the clock is the caller's.
+/// The phone's outbox: each tap, emergency unlock, refocus and protection-off report it acted on,
+/// kept until an answer lets it go. BaliCore's tables say what an answer means; this applies them,
+/// with the rules no table can express (docs/DECISIONS.md, B3a). The sync engine (B3b) sends
+/// `nextDue`'s `request` through `APIClient` and hands the answer to `settle`, each with its `now`.
 public struct Outbox: Sendable {
     /// The app group the app and its extensions share (ARCHITECTURE, iOS decision 3).
     public static let appGroup = "group.com.bali.shared"
@@ -62,42 +60,43 @@ public struct Outbox: Sendable {
     static let reportedKey = "protectionOffReported"
     static let lastUnlockKey = "lastUnlock"
 
-    /// Queues what the phone just did under a fresh event id, due at once, with the rules that go
-    /// with it. A tap or an unlock supersedes every queued refocus — deleted, never sent: it could
-    /// only make the phone's truth older. Protection off is reported once per revocation — nil when
-    /// already reported for this session — and again after a tap (which returns the row to focused)
-    /// or `protectionRestored`. Anything else is always queued.
+    /// Queues what the phone just did under a fresh event id, due at once. A tap or an unlock
+    /// supersedes every queued refocus (deleted, never sent: it could only make the truth older).
+    /// Protection off is reported once per revocation — nil when already reported in this session —
+    /// and again after a tap, which returns the row to focused, or `protectionRestored`.
     @discardableResult
     public func record(_ change: Change, now: Date) throws -> OutboxRecord? {
         try pool.write { db in
             let eventId = EventID.mint(at: now)
             var follows: String?
+            let row: (kind: String, tagId: String?, session: String?, reason: UnlockReason?)
             switch change {
-            case .tap:
+            case .tap(let tagId):
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
                 try Self.setState(db, Self.reportedKey, nil)
-            case .unlock:
+                row = ("tap", tagId, nil, nil)
+            case .unlock(let session, let reason):
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
                 try Self.setState(db, Self.lastUnlockKey, eventId)
+                row = ("unlock", nil, session, reason)
             case .refocus(let session):
                 // The unlock it returns from — the latest — while it is queued, in this session.
                 follows = try String.fetchOne(
                     db, sql: "SELECT eventId FROM outbox WHERE sessionId = ? AND eventId = ?",
                     arguments: [session, Self.state(db, Self.lastUnlockKey)])
+                row = ("refocus", nil, session, nil)
             case .protectionOff(let session):
                 if try Self.state(db, Self.reportedKey) == session { return nil }
                 try Self.setState(db, Self.reportedKey, session)
+                row = ("protection_off", nil, session, nil)
             }
-            var (tagId, reason): (String?, UnlockReason?) = (nil, nil)
-            if case .tap(let tag) = change { tagId = tag }
-            if case .unlock(_, let given) = change { reason = given }
             try db.execute(
                 sql: """
                     INSERT INTO outbox (eventId, kind, tagId, sessionId, reason, follows,
                       recordedAt, nextAttemptAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 arguments: [
-                    eventId, change.kind, tagId, change.session, reason?.rawValue, follows, now,
+                    eventId, row.kind, row.tagId, row.session, row.reason?.rawValue, follows, now,
                     now,
                 ])
             return try Self.fetch(db, eventId)
@@ -117,11 +116,10 @@ public struct Outbox: Sendable {
         case idle
     }
 
-    /// The next record to send, in the order the phone acted. A pending record — not stuck — holds
-    /// every record behind it, backoff included, so an unlock always goes ahead of a later refocus.
-    /// A stuck one holds nothing: it is retried on its own backoff among them. And a refocus waits
-    /// for the unlock it returns from to be recorded, stuck or not: sent ahead of it, the refocus
-    /// would leave the server's truth `unlocked` once that unlock landed.
+    /// The next record to send, in the order the phone acted. A pending (not stuck) record holds
+    /// every record behind it, backoff included; a stuck one holds nothing, retried on its own
+    /// backoff among them. A refocus waits for the unlock it returns from to be recorded, stuck or
+    /// not: landing after it, that unlock would leave the server's truth `unlocked`.
     public func nextDue(now: Date) throws -> Due {
         let records = try records()
         let queued = Set(records.map(\.eventId))
@@ -135,15 +133,12 @@ public struct Outbox: Sendable {
         return wake.map { .wait(until: $0) } ?? .idle
     }
 
-    /// Applies one send's answer — what `APIClient` returned for `eventId`'s `request` — by the
-    /// record's table, and returns the disposition for the sync engine to act on; nil when the
-    /// record is gone (superseded in flight): its answer is older than the phone's truth.
-    ///
-    /// An ending disposition deletes the record; any other keeps it, due after `backoff`, with its
-    /// answer for a screen. It is stuck at a refusal (`retry_and_surface`), or at `bound` server
-    /// answers that left it unsettled — any status but 401, 408 and 429 (sign-in's, the network's,
-    /// load's). Stuck stays stuck and is never a deletion: an unlock leaves only once recorded, a
-    /// tap only on a 2xx, and a state change the server never decided on is never dropped.
+    /// Applies one send's answer (`APIClient`'s, to the record's `request`) by the record's table,
+    /// and returns the disposition for the sync engine; nil once the record is gone — superseded in
+    /// flight, so its answer is older than the phone's truth. An ending disposition deletes it; any
+    /// other keeps it, due after `backoff`, with its answer for a screen: stuck at a refusal, or at
+    /// `bound` answers that left it unsettled (any status but 401, 408 and 429, none of them this
+    /// record's). Stuck stays stuck, and never deletes: an unlock leaves only once recorded.
     @discardableResult
     public func settle<Answer>(eventId: String, with response: APIResponse<Answer>, now: Date)
         throws -> Disposition?
@@ -181,18 +176,9 @@ public struct Outbox: Sendable {
         return wait * (1 + ((0...1).contains(jitter) ? jitter : jitter > 1 ? 1 : 0))
     }
 
-    /// Every record due at `now`, stuck ones staying stuck: the student's retry (rule 5), a fresh
-    /// token after `reauth`, the network back.
-    public func retryNow(_ now: Date) throws {
-        try pool.write {
-            try $0.execute(sql: "UPDATE outbox SET nextAttemptAt = ?", arguments: [now])
-        }
-    }
-
-    /// How many of the phone's changes await their answer, for `ReconcileStamp.awaiting`: each
-    /// record not stuck, but a refocus waiting on a stuck unlock — the server has seen neither, so
-    /// no read is newer than the phone about them. A stuck record stops holding reads (the bound);
-    /// an unrecorded unlock still guards its session (`holdsUnlock`).
+    /// How many changes await their answer, for `ReconcileStamp.awaiting`: every record not stuck,
+    /// but a refocus waiting on a stuck unlock (the server has seen neither). A stuck record stops
+    /// holding reads; an unrecorded unlock still guards its session (`holdsUnlock`).
     public func awaiting() throws -> Int {
         let records = try records()
         let stuck = Set(records.filter(\.stuck).map(\.eventId))

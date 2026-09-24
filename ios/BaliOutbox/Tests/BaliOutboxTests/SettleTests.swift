@@ -170,21 +170,4 @@ struct SettleTests {
         #expect(later.stuck && later.answers == 2 && later.attempts == 3)
         #expect(later.lastStatus == 503 && later.lastReason == nil && later.lastMessage == nil)
     }
-
-    @Test("Retry now makes every record due, stuck ones included, and leaves them stuck")
-    func retryNow() async throws {
-        let (outbox, _) = try makeOutbox()
-        let tap = try record(outbox, .tap(tagId: "tag"))
-        try await send(outbox, tap, 404, #"{"error":{"code":"not_found","message":"no block"}}"#)
-        let unlock = try record(outbox, .unlock(session: "s", reason: nil))
-        try await send(outbox, unlock, nil)
-        #expect(try outbox.nextDue(now: t0) == .wait(until: t0.addingTimeInterval(2)))
-
-        let later = t0.addingTimeInterval(1)
-        try outbox.retryNow(later)
-        #expect(try outbox.records().allSatisfy { $0.nextAttemptAt == later })
-        #expect(
-            try outbox.nextDue(now: later) == .send(try #require(try current(outbox, tap.eventId))))
-        #expect(try current(outbox, tap.eventId)?.stuck == true)
-    }
 }

@@ -12,22 +12,6 @@ public enum Change: Sendable, Hashable {
     case refocus(session: String)
     /// `POST /v1/sessions/{id}/protection-off`: the Screen Time permission was found revoked.
     case protectionOff(session: String)
-
-    var kind: String {
-        switch self {
-        case .tap: "tap"
-        case .unlock: "unlock"
-        case .refocus: "refocus"
-        case .protectionOff: "protection_off"
-        }
-    }
-
-    var session: String? {
-        switch self {
-        case .tap: nil
-        case .unlock(let session, _), .refocus(let session), .protectionOff(let session): session
-        }
-    }
 }
 
 /// One queued record.
