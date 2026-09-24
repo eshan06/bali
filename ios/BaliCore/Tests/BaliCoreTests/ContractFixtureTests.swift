@@ -183,6 +183,22 @@ extension JSONValue {
     }
 }
 
+extension DecodingError {
+    /// Where in the JSON the decode failed.
+    var path: [JSONStep] {
+        let context: Context? =
+            switch self {
+            case .typeMismatch(_, let context), .valueNotFound(_, let context),
+                .keyNotFound(_, let context), .dataCorrupted(let context):
+                context
+            @unknown default: nil
+            }
+        return (context?.codingPath ?? []).map { key in
+            key.intValue.map(JSONStep.index) ?? .key(key.stringValue)
+        }
+    }
+}
+
 @Suite("The contract fixtures")
 struct ContractFixtureTests {
     @Test(
@@ -197,12 +213,16 @@ struct ContractFixtureTests {
         #expect(answer.droppingNullFields == fixture.body.droppingNullFields)
         // Its null fields too, which that compares on neither side: one null in every fixture that
         // BaliCore lacked or misnamed would decode as nil forever. Each is sent the probe instead,
-        // and BaliCore reads it only if the decode then fails, or the probe comes back.
+        // and BaliCore reads it only if the decode then fails at that field, or the probe comes
+        // back.
         for field in fixture.body.nullFields {
-            let probed = fixture.body.replacing(field, with: Contract.probe)
-            guard let read = try? Contract.roundTrip(type, probed) else { continue }
             let name = field.map(\.description).joined(separator: ".")
-            #expect(read[field] == Contract.probe, "\(fixture.type) never reads \(name)")
+            do {
+                let read = try Contract.roundTrip(type, fixture.body.replacing(field, with: Contract.probe))
+                #expect(read[field] == Contract.probe, "\(fixture.type) never reads \(name)")
+            } catch let error as DecodingError {
+                #expect(error.path.starts(with: field), "\(fixture.type) failed elsewhere: \(error)")
+            }
         }
 
         guard let request = fixture.request.body else { return }
