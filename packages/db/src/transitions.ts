@@ -30,10 +30,11 @@ import type { Database } from './types.js';
  *   - is idempotent on the client's event_id, so a retried tap counts once
  *     (rule 4) — the events unique constraint is the dedupe, and a replay
  *     re-reads and returns the current truth without re-applying. "Current"
- *     is the operative word on the tap path: a retry answers 200 only while
- *     what it recorded is still true, and refuses when it is not, because a
- *     tap response drives a shield and a stale one would lock a student into
- *     a session that is over or that they have left (see `tapIn`);
+ *     is the operative word on the tap and refocus paths: a replay names its
+ *     session only while what it recorded is still true, and names none once
+ *     it is not, because the answer drives a shield and a stale one would lock
+ *     a student into a session that is over or that they have left (A4; see
+ *     `tapIn` and `changeState`);
  *   - clamps any device timestamp into the session window (rule 1);
  *   - returns the resulting state, which is the phone's reconciliation channel.
  *
@@ -630,26 +631,32 @@ export interface ArmTapInput {
   now?: Date;
 }
 export interface ArmTapResult {
-  /** 'armed' new/refreshed; 'already_armed' a live waiting tap stands; 'replay' this exact tap again. */
+  /**
+   * 'armed' new/refreshed; 'already_armed' a waiting tap stands — another of
+   * this student's for this teacher, or this very tap retried (A4); 'replay'
+   * this exact tap again, recorded but no longer waiting.
+   */
   outcome: 'armed' | 'already_armed' | 'replay';
   /**
    * The `armed_taps` row holding this tap's id. Normally the one waiting, but
-   * a `replay` can name a row a Start has already consumed: a rival delivery
-   * of the same tap won the id and was converted in between, so the tap is
-   * recorded and the row is spent. Absent only on the one `replay` that has
-   * no row: an id already recorded in `events`, where the tap landed in a
-   * session and nothing is waiting for it.
+   * a `replay` names a row that no longer waits: expired, or consumed by a
+   * Start — a rival delivery of the same tap won the id and was converted in
+   * between. Absent only on the one `replay` that has no row: an id already
+   * recorded in `events`, where the tap landed in a session and nothing is
+   * waiting for it.
    */
   armedTapId?: string;
 }
+
+type ArmedTapRow = typeof armedTaps.$inferSelect;
 
 /**
  * Who holds `eventId` in `armed_taps` right now — the answer both 23505
  * recoveries in `armTap` need, and scoped the same way the `exact` select at
  * the top of `armTap` is.
  *
- * `'conflict'` rather than `'replay'` for a stranger's id: answering replay
- * would hand this phone's outbox someone else's row and tell it the tap is
+ * `'conflict'` rather than `'own'` for a stranger's id: answering it as this
+ * phone's would hand its outbox someone else's row and tell it the tap is
  * durably recorded, so it drops a tap that was never armed. `'gone'` means the
  * rival rolled back or was swept between the violation and this read, which is
  * a retry rather than an answer.
@@ -659,13 +666,13 @@ async function ownerOfEventId(
   eventId: string,
   studentId: string,
   teacherId: string,
-): Promise<{ kind: 'replay'; armedTapId: string } | { kind: 'conflict' } | { kind: 'gone' }> {
+): Promise<{ kind: 'own'; row: ArmedTapRow } | { kind: 'conflict' } | { kind: 'gone' }> {
   const owner = firstOrUndefined(
     await tx.select().from(armedTaps).where(eq(armedTaps.eventId, eventId)).limit(1),
   );
   if (!owner) return { kind: 'gone' };
   if (owner.studentId !== studentId || owner.teacherId !== teacherId) return { kind: 'conflict' };
-  return { kind: 'replay', armedTapId: owner.id };
+  return { kind: 'own', row: owner };
 }
 
 /** Is this `event_id` already on record in `events`? */
@@ -706,6 +713,30 @@ async function rowIsStale(
 }
 
 /**
+ * The answer to this phone's own tap, found in `armed_taps` under its id.
+ * Still waiting — unconsumed and not stale, so a Start will convert it — it
+ * is `already_armed`: the row covers this tap, so the phone shows "waiting
+ * for your teacher" (A4); `replay` said only "recorded", and the truth the
+ * phone then re-reads cannot say it waits. Consumed or stale — expired, or
+ * its id on record, which the Start skips — it is `replay`: recorded, and no
+ * Start will honour it. `rowIsStale` decides, so this and the standing-row
+ * branches cannot disagree about a row.
+ *
+ * `armTap`'s `events` lookup answers an id on record before any path here,
+ * so the spent half is reached only when the id is recorded between the two
+ * reads. DISCLOSED SURVIVOR, like the 23505 recoveries reaching a still-
+ * waiting row: neither can be staged, so nothing goes red without them —
+ * no lock sits between those reads, `takeOverStaleRow`'s rival is always
+ * consumed (a second waiting row cannot stand beside the stale one it
+ * refreshes), and the insert's arbiter answers a waiting rival itself unless
+ * the rival lands between that check and the event-id index.
+ */
+async function answerOwnArmedTap(tx: Database, row: ArmedTapRow, now: Date): Promise<ArmTapResult> {
+  const waiting = row.consumedAt === null && !(await rowIsStale(tx, row, now));
+  return { outcome: waiting ? 'already_armed' : 'replay', armedTapId: row.id };
+}
+
+/**
  * Recycle a stale standing row for this tap. Returns the answer to give, or
  * `undefined` when the row was consumed under us — the slot is free again, so
  * the caller should record this tap as a fresh waiting one instead.
@@ -731,6 +762,7 @@ async function takeOverStaleRow(
   tx: Database,
   rowId: string,
   input: ArmTapInput,
+  now: Date,
 ): Promise<ArmTapResult | undefined> {
   let lastViolation: unknown;
   for (let attempt = 0; attempt < ARM_TAP_ATTEMPTS; attempt += 1) {
@@ -760,7 +792,7 @@ async function takeOverStaleRow(
       if (owner.kind === 'conflict') {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
-      if (owner.kind === 'replay') return { outcome: 'replay', armedTapId: owner.armedTapId };
+      if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
       // Gone again — the rival rolled back, so the id is free and the refresh
       // can land. The attempt bound covers the chase.
     }
@@ -893,7 +925,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       if (exact.studentId !== input.studentId || exact.teacherId !== input.teacherId) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
-      return { outcome: 'replay', armedTapId: exact.id };
+      return answerOwnArmedTap(tx, exact, now);
     }
 
     const waiting = firstOrUndefined(
@@ -913,7 +945,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       if (!(await rowIsStale(tx, waiting, now))) {
         return { outcome: 'already_armed', armedTapId: waiting.id };
       }
-      const takenOver = await takeOverStaleRow(tx, waiting.id, input);
+      const takenOver = await takeOverStaleRow(tx, waiting.id, input, now);
       if (takenOver) return takenOver;
       // Consumed under us. That frees the partial index, so fall through and
       // record this tap as a fresh waiting one rather than reporting a row
@@ -1001,7 +1033,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         if (owner.kind === 'conflict') {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
-        if (owner.kind === 'replay') return { outcome: 'replay', armedTapId: owner.armedTapId };
+        if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
         continue; // gone again; the attempt bound covers the chase
       }
 
@@ -1034,7 +1066,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         if (!(await rowIsStale(tx, standing, now))) {
           return { outcome: 'already_armed', armedTapId: standing.id };
         }
-        const takenOver = await takeOverStaleRow(tx, standing.id, input);
+        const takenOver = await takeOverStaleRow(tx, standing.id, input, now);
         if (takenOver) return takenOver;
         continue; // consumed under us — the slot is free, so try the insert again
       }
@@ -1348,9 +1380,22 @@ export interface TapInput {
 }
 export interface TapResult {
   outcome: 'joined' | 'switched' | 'replay';
-  state: ParticipationState;
-  participationId: string;
-  session: SessionRow;
+  /** Null, as `participationId` and `session` are, on the replay of a tap no longer current (A4). */
+  state: ParticipationState | null;
+  participationId: string | null;
+  /** The session the tap is live in: never one it is no longer in, since it drives a shield. */
+  session: SessionRow | null;
+}
+
+/** The teacher a class belongs to. */
+async function teacherOfClass(tx: Database, classId: string): Promise<string | undefined> {
+  return firstOrUndefined(
+    await tx
+      .select({ teacherId: classes.teacherId })
+      .from(classes)
+      .where(eq(classes.id, classId))
+      .limit(1),
+  )?.teacherId;
 }
 
 /**
@@ -1385,10 +1430,9 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // meeting the per-minute expiry sweep.
       //
       // BOUNDED TO WHAT IS STILL TRUE, and that bound is the whole safety of
-      // this branch: recorded truth is only a replay while it is also current
-      // truth. TapResponse hands the phone {id, classId, endsAt} and cannot
-      // say "that one is over" or "you have left it", so a stale answer here
-      // is not a small inaccuracy — it is a shield:
+      // this branch: the recorded session is named only while it is also the
+      // current truth. TapResponse hands the phone {id, classId, endsAt}, so
+      // a stale answer here is not a small inaccuracy — it is a shield:
       //   - an ENDED session keeps its original endsAt when the teacher ends
       //     it early, so replaying one points the phone at a window that has
       //     not closed yet. A foregrounded app heals inside one ~30s
@@ -1403,14 +1447,13 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       //     grid shows them green in the one they are in. Its next check-in
       //     there answers `gone` and unshields. That is the phone/grid drift
       //     the engine exists to prevent.
-      // Declining costs a 409 — EVENT_ID_CONFLICT when the retry re-resolved
-      // somewhere new, NOT_PARTICIPATING when it came back to the session that
-      // recorded it with the student's row since ended, SESSION_NOT_RUNNING
-      // when that session has itself ended. All three are loud: a non-401 4xx
-      // is "keep the record, retry, and surface".
+      // Once it is not current the tap is still on record, so it is answered
+      // `replay` with no session and no state (A4 — until then a 409, which
+      // the tap outbox keeps and retries forever): nothing to shield to, and
+      // the phone re-reads the truth.
       //
-      // Measured reach: deleting `!current.endedAt` turns "refuses to replay a
-      // participation the student has since left" red. `!recorded.endedAt`
+      // Measured reach: deleting `!current.endedAt` turns "replays a participation
+      // the student has since left with no session" red. `!recorded.endedAt`
       // survives that check on its own, because ending a session ends every
       // live participation in it in the same transaction (both endSession and
       // expireDueSessions, each with its own test) — it is kept so this branch
@@ -1426,13 +1469,23 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // given up, not preserved. The arm path answers the cross-teacher shape
       // of the same reuse with a 409 instead (armTap's teacher scope, ruled
       // 2026-09-22), so while the first participation is live the two paths
-      // differ; recorded in PLAN.md. insertEvent's conflict check is untouched and
-      // still fires for an id reused for a genuinely DIFFERENT event, which is
-      // what the unlock path depends on (ISSUES #2).
+      // differ; recorded in PLAN.md. Once it is not, they agree (below) — and
+      // a spent id reused at the SAME teacher's block is then answered
+      // `replay` with no session, as armTap answers it, so that join is
+      // dropped too, though not silently: the phone re-reads the truth.
+      // insertEvent's conflict check is untouched and still fires for an id
+      // reused for a genuinely DIFFERENT event, which is what the unlock path
+      // depends on (ISSUES #2).
       const prior = firstOrUndefined(
         await tx
-          .select({ type: events.type, sessionId: events.sessionId, userId: events.userId })
+          .select({
+            type: events.type,
+            sessionId: events.sessionId,
+            userId: events.userId,
+            teacherId: classes.teacherId,
+          })
           .from(events)
+          .leftJoin(classes, eq(classes.id, events.classId))
           .where(eq(events.eventId, input.eventId))
           .limit(1),
       );
@@ -1482,6 +1535,20 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
             session: recorded,
           };
         }
+        // No longer current, it is this tap's retry only under the teacher it
+        // was recorded with — the tapped block's, which one physical tap's
+        // retries always resolve to. Under another teacher it is a spent id
+        // reused at another block (or a block that moved, which nothing ships
+        // yet): not a retry (tap step 9), so it falls through to insertEvent's
+        // EVENT_ID_CONFLICT, as armTap refuses the same id — a 200 would drop
+        // a physical tap at that block. (A `tap_in` always carries its class,
+        // so `prior.teacherId` is never the left join's null here.)
+        if (
+          prior.sessionId === session.id ||
+          prior.teacherId === (await teacherOfClass(tx, session.classId))
+        ) {
+          return { outcome: 'replay', state: null, participationId: null, session: null };
+        }
       }
 
       if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
@@ -1497,37 +1564,15 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         occurredAt,
       });
       if (!isNew) {
-        // The tap is on record for exactly this session and student —
-        // insertEvent reports "not new" only for that — but the branch above
-        // declined to replay it, and by this line the session is running, so
-        // what it declined on was the PARTICIPATION: the row exists and has
-        // ended. The engine writes that routinely (the student left for the
-        // teacher's other session, or their enrollment was removed), so this
-        // is an ordinary case and not the "event with no row behind it" it
-        // may look like.
-        //
-        // Re-joining them here would be a fresh join wearing a spent id, and
-        // answering 200 would tell the phone it is focused where it is not —
-        // main did exactly that, reporting the stale `focused` off an ended
-        // row. Refuse, and say the true thing: they are not in this session.
-        // Pinned by "refuses a stale retry once the student has left the
-        // session that recorded it".
-        //
-        // The cost is real, and the owner ruled it in (2026-09-22): a 409
-        // keeps the outbox record, so it retries. A later retry that finds
-        // nothing running reaches `armTap`, which refuses to arm a spent id
-        // and answers `replay` with no session, so the record clears there.
-        // Until a tap has a "recorded, and no longer current" answer (Phase
-        // 3), no response HERE is both honest and final.
-        throw new TransitionError(
-          'NOT_PARTICIPATING',
-          // Says only what this branch knows. `loadParticipation` returning
-          // nothing lands here too, and nothing in the engine deletes a
-          // participation (decision 3), so that is unreachable today — but a
-          // message claiming the row "has ended" would misdirect the first
-          // person who ever does hit it.
-          'this tap is on record, but you are no longer in this session',
-        );
+        // On record for exactly this session and student — insertEvent
+        // reports "not new" only for that — yet the lookup above did not see
+        // it. Not reached today: a `tap_in` for a session is written only
+        // under its lock, which this transaction holds, or by the Start that
+        // created it, so it was committed before the lookup ran. Answered as
+        // a recorded tap naming no session all the same, never as a fresh
+        // join wearing a spent id: always safe, since the phone then re-reads
+        // the truth. DISCLOSED SURVIVOR: nothing can stage it.
+        return { outcome: 'replay', state: null, participationId: null, session: null };
       }
 
       // Decision 4: end any live participation in a DIFFERENT session first, so
@@ -1636,10 +1681,16 @@ export interface StateChangeInput {
 }
 export interface StateChangeResult {
   outcome: 'applied' | 'replay';
-  state: ParticipationState;
+  /** The stored state; null on the replay of a change whose participation has since ended. */
+  state: ParticipationState | null;
   participationId: string;
-  /** The current session, so the response carries the end time for reconciliation. */
-  session: SessionRow;
+  /**
+   * The current session, so the response carries the end time for
+   * reconciliation. Null on the replay of a change whose participation has
+   * since ended while the session runs (A4): the student is no longer in it,
+   * so there is no window to hand the phone.
+   */
+  session: SessionRow | null;
 }
 
 /**
@@ -1656,7 +1707,7 @@ async function changeState<Ended = never>(
   rules: {
     /** A stored state this change may not move a student out of; it refuses with `code`. */
     cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string };
-    /** Refuse a replay whose participation has ended, rather than answer that row's last state. */
+    /** Refuse a replay whose participation has ended, rather than answer it with no session. */
     replayNeedsLive?: boolean;
     /** Answer a change that reaches an ended session instead of refusing it; runs under the session lock. */
     afterEnd?: (tx: Database, session: SessionRow) => Promise<Ended>;
@@ -1676,8 +1727,8 @@ async function changeState<Ended = never>(
       // session's window and a refocus answer turns shields back on — a 200
       // pointing the phone at a session that is over (rule 4). The refusal
       // costs nothing: the phone drops a refused change and re-reads the truth
-      // (its outbox contract for state changes, Phase 3 A3). A change that must
-      // be kept even then answers it itself (`afterEnd`: protection off).
+      // (`stateChangeDisposition` in @bali/shared). A change that must be kept
+      // even then answers it itself (`afterEnd`: protection off).
       if (session.endedAt) {
         if (afterEnd) return afterEnd(tx, session);
         throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
@@ -1697,18 +1748,24 @@ async function changeState<Ended = never>(
       const row = await loadParticipation(tx, session.id, input.studentId);
 
       if (!isNew) {
-        // Replay: return the current truth even if the participation has ended.
+        // Replay: return the current truth.
         if (!row)
           throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
-        // Unless the change opts out: an ended row's last state is not the truth
-        // for a student removed or switched away while this session runs, and a
-        // 200 naming this session would point their phone back at it. The phone
-        // drops a refused change and re-reads the truth (Phase 3 A3).
-        if (replayNeedsLive && row.endedAt !== null) {
-          throw new TransitionError(
-            'NOT_PARTICIPATING',
-            'replayed change: participation has ended',
-          );
+        // Once the participation has ended while this session runs (removed,
+        // left the class, switched away), the ended row's last state is not
+        // the truth, and a 200 naming this session would point the phone back
+        // at a window it is no longer in — a refocus answer turns shields back
+        // on. So it names no session and no state (A4), which the phone reads
+        // as "delete it and re-read the truth"; protection off refuses instead
+        // (`replayNeedsLive`, A2), which the phone drops and re-reads the same.
+        if (row.endedAt !== null) {
+          if (replayNeedsLive) {
+            throw new TransitionError(
+              'NOT_PARTICIPATING',
+              'replayed change: participation has ended',
+            );
+          }
+          return { outcome: 'replay', state: null, participationId: row.id, session: null };
         }
         return { outcome: 'replay', state: row.state, participationId: row.id, session };
       }
@@ -2033,7 +2090,8 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
  * Return to focus after an unlock. Never out of protection off: iOS dropped
  * every shield when the permission went, so claiming focus without re-shielding
  * would put a green chip over an unshielded phone. Only a re-tap — which
- * re-shields — leaves protection off (ARCHITECTURE, iOS rules).
+ * re-shields — leaves protection off (ARCHITECTURE, iOS rules). A replay after
+ * the participation ended while the session runs names no session (A4).
  */
 export function refocus(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
   return changeState(db, input, 'refocus', 'focused', {
@@ -2117,9 +2175,9 @@ async function recordProtectionOffAfterEnd(
  * Screen Time permission was turned off — its own state, never green, never an
  * unlock. A replay after the participation ended (removal, leaving the class,
  * or a switch, while the session runs) is refused rather than answered with the
- * ended row's last state; refocus keeps that shipped answer until the owner
- * rules (PLAN, A4). A report that reaches a session already over is recorded
- * with a note instead of refused (`recordProtectionOffAfterEnd`).
+ * ended row's last state; refocus answers the same replay with no session and
+ * no state (A4). A report that reaches a session already over is recorded with
+ * a note instead of refused (`recordProtectionOffAfterEnd`).
  */
 export async function protectionOff(
   db: Database,

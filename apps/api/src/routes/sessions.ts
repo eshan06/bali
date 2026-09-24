@@ -219,7 +219,8 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
 
   // POST /v1/sessions/:id/refocus — return to focus after an unlock (strict: a
   // live participation is required, so this can 409/404 unlike unlock; and it
-  // is refused out of protection off, which only a re-tap leaves).
+  // is refused out of protection off, which only a re-tap leaves). A replay
+  // after the participation ended while the session runs names no session.
   app.post(
     '/v1/sessions/:id/refocus',
     { preHandler: app.authenticate },
@@ -239,7 +240,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       return {
         outcome: result.outcome,
         state: result.state,
-        session: toSessionView(result.session),
+        session: result.session ? toSessionView(result.session) : null,
       };
     },
   );

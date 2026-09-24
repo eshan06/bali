@@ -34,7 +34,8 @@ export type TapDisposition =
   | 'apply_session'
   /**
    * Armed (decision 5), or `already_armed` — a waiting tap of this student's
-   * for this teacher already stands and covers this one: delete the record.
+   * for this teacher already stands and covers this one, which is also the
+   * answer to the retry of a tap still waiting (A4): delete the record.
    * The tap joined nothing, so it gives the phone no window: show "Ready —
    * waiting for your teacher". A session the phone is already in is untouched
    * (arming ends nothing; only a join switches, decision 4). How the phone
@@ -44,11 +45,11 @@ export type TapDisposition =
   /**
    * Recorded, but the answer names no running session: delete the record,
    * shield to nothing it says, and re-read the truth (`GET /v1/me`), which
-   * says whether the phone is in a session at all. Today this is the `replay`
-   * of a tap retried with nothing running: one that landed in a session since
-   * over, or one still armed — its waiting row stands, so deleting is right,
-   * but the answer does not say it waits. After A4 it is also every retry
-   * recorded but no longer current.
+   * says whether the phone is in a session at all. This is the `replay` of a
+   * tap recorded but no longer current (A4): its participation ended — the
+   * student switched away, left or was removed from the class — or its
+   * session is over, whether the retry reached a running session or found
+   * nothing running.
    */
   | 'reread'
   /**
@@ -61,11 +62,11 @@ export type TapDisposition =
   | 'reauth'
   /**
    * Refused — any other 4xx: keep the record and keep retrying, because only
-   * a 2xx lets the phone delete a tap and a 409 is either a tap the server
-   * never kept or one no longer current (ARCHITECTURE, tap steps 9–10). Also
-   * surface it (rule 5: no silent retry) and re-read the truth: the answer
-   * carries no window, so the tap's own shield must not outlive it. A record
-   * kept this way never holds up the records behind it.
+   * a 2xx lets the phone delete a tap and a 409 is a tap the server never
+   * kept (ARCHITECTURE, tap steps 9–10). Also surface it (rule 5: no silent
+   * retry) and re-read the truth: the answer carries no window, so the tap's
+   * own shield must not outlive it. A record kept this way never holds up the
+   * records behind it.
    */
   | 'retry_and_surface';
 
@@ -99,27 +100,23 @@ const TAP_RECORDED: Record<TapOutcome, 'joins' | 'waits'> = {
  *     armed, 'apply_session' when it names a session, 'reread' when it names
  *     none. The session, not the outcome's name, decides whether there is a
  *     window, so `replay` with no session means "recorded — nothing to shield
- *     to, re-read the truth" today and after A4 alike.
+ *     to, re-read the truth".
  *   - 401 -> 'reauth'. No response, 408, 429, any 5xx, or a 2xx without a
  *     known outcome -> 'retry'.
  *   - any other 4xx -> 'retry_and_surface'. What `/v1/taps` refuses: 400 (a
  *     malformed tap; 413 and 415 are Fastify's), 404 (not a registered
  *     block), and 409 — `conflict`, told apart only by message (A5 decides
- *     whether errors get a machine-readable code). Today's 409s:
+ *     whether errors get a machine-readable code). The 409s:
  *       - `EVENT_ID_CONFLICT`: the id is held by a different event — another
- *         student's, another kind, this student's tap under another teacher —
- *         or a retry the server re-resolved to another running session after
- *         the one that recorded it ended or the student left it;
- *       - `NOT_PARTICIPATING`: a retry that resolved back to its own session
- *         after the student left it;
+ *         student's, another kind, or this student's tap under another
+ *         teacher (always when arming; when joining, once that tap is no
+ *         longer current) — which never lands (a client bug: the student taps
+ *         again, which mints a new id);
  *       - `SESSION_NOT_RUNNING`: a fresh tap whose session ended between the
- *         server resolving the block and locking the session (the bell), or
- *         the retry of one recorded there.
- *     A4 answers every retry recorded but no longer current with `200 replay`
- *     and no session ('reread'). What stays a 409 after it: an id held by a
- *     different event, which never lands (a client bug — the student taps
- *     again, which mints a new id), and a fresh tap that raced its session's
- *     end, whose retry resolves afresh.
+ *         server resolving the block and locking the session (the bell),
+ *         whose retry resolves afresh.
+ *     A retry recorded but no longer current is not among them since A4: it
+ *     is `200 replay` with no session ('reread').
  */
 export function tapDisposition(
   result: number | 'network_error',
@@ -147,9 +144,10 @@ export type StateChangeDisposition =
   | 'apply_session'
   /**
    * Recorded with no session — a protection-off report that first reached
-   * the server after its session ended (A2c), and its replay; both carry a
-   * null `session` and `state`: delete the record; there is no window to
-   * shield to, so re-read the truth (`GET /v1/me`).
+   * the server after its session ended (A2c), and its replay; and the replay
+   * of a refocus whose participation ended while its session runs (A4). Each
+   * carries a null `session` and `state`: delete the record; there is no
+   * window to shield to, so re-read the truth (`GET /v1/me`).
    */
   | 'reread'
   /**
@@ -185,8 +183,9 @@ const STATE_CHANGE_RECORDED: Record<StateChangeOutcome, 'running' | 'over'> = {
  * `POST /v1/sessions/{id}/refocus` and `…/protection-off` alike:
  *
  *   - a 2xx with a known outcome deletes the record — 'apply_session' when it
- *     names the running session, 'reread' when it names none (`recorded`, and
- *     its replay).
+ *     names the running session, 'reread' when it names none (`recorded` and
+ *     its replay; a refocus replayed after the student was removed, left the
+ *     class or switched away, A4).
  *   - 401 -> 'reauth'. No response, 408, 429, any 5xx, or a 2xx without a
  *     known outcome -> 'retry'. 408 and 429 are the transport's, not a
  *     refusal: a change the server never decided on is never dropped.
@@ -210,13 +209,9 @@ const STATE_CHANGE_RECORDED: Record<StateChangeOutcome, 'running' | 'over'> = {
  *   - protection off is reported once per revocation — and again after any
  *     tap or join made while it is still revoked, since each returns the row
  *     to focused (a new report, under a new id).
- *
- * One answer this table cannot make safe on its own, until A4: a refocus
- * replayed after its participation ended while the session runs — the
- * student was removed or left the class; a switch is a later tap, covered
- * above — answers that ended row's last state with the running session,
- * which reads as 'apply_session'. A4 settles it on the server, before a phone
- * ships.
+ * The first covers a refocus superseded by a switch, but not by a removal or
+ * by leaving the class — nor one already in flight — so the server answers a
+ * refocus replayed after the participation ended with no session (A4).
  */
 export function stateChangeDisposition(
   result: number | 'network_error',

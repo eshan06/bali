@@ -891,6 +891,122 @@ describe('POST /v1/sessions/:id/refocus', () => {
     expect(row?.state).toBe('unlocked');
   });
 
+  it('a retried refocus replays the current truth while the student is live', async () => {
+    const { student, session } = await seedRunning('refocus-replay');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/refocus`, body)).statusCode).toBe(200);
+
+    const retry = await post(token, `/v1/sessions/${session.id}/refocus`, body);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json<RefocusResponse>()).toEqual({
+      outcome: 'replay',
+      state: 'focused',
+      session: {
+        id: session.id,
+        classId: session.classId,
+        endsAt: session.endsAt.toISOString(),
+      },
+    });
+    const refocuses = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'refocus')));
+    expect(refocuses).toHaveLength(1);
+  });
+
+  it('a refocus retried after the student was removed replays naming no session and no state', async () => {
+    // A4: answered with the session until now — the ended row's last state
+    // and a window the phone would shield to, in a session the student is no
+    // longer in. The session still runs, so the bell's guard never saw it.
+    const { klass, student, session } = await seedRunning('refocus-removed');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/refocus`, body)).statusCode).toBe(200);
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    if (!enrollment) throw new Error('expected an enrollment');
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+
+    const retry = await post(token, `/v1/sessions/${session.id}/refocus`, body);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json<RefocusResponse>()).toEqual({
+      outcome: 'replay',
+      state: null,
+      session: null,
+    });
+  });
+
+  it("another student's refocus id is a 409, never a replay of theirs", async () => {
+    // The replay answers only the caller's own event: a classmate sending an
+    // id already recorded as someone else's refocus learns nothing about it.
+    const { school, klass, student, session } = await seedRunning('refocus-theirs');
+    const [classmate] = await db
+      .insert(users)
+      .values({ cognitoId: 'student-refocus-theirs-2', role: 'student', schoolId: school.id })
+      .returning();
+    if (!classmate) throw new Error('expected a classmate');
+    await db.insert(enrollments).values({ classId: klass.id, studentId: classmate.id });
+    for (const who of [student, classmate]) await tap(session.id, who.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    await post(token, `/v1/sessions/${session.id}/unlock`, {
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await post(token, `/v1/sessions/${session.id}/refocus`, body)).statusCode).toBe(200);
+
+    const res = await post(
+      await ctx.tokenFor(classmate.cognitoId),
+      `/v1/sessions/${session.id}/refocus`,
+      body,
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ error: { message: string } }>().error.message).toBe(
+      'event_id already used by another event',
+    );
+  });
+
+  it('rejects a malformed body (400)', async () => {
+    const { student, session } = await seedRunning('refocus-400');
+    await tap(session.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    for (const body of [
+      { eventId: 'not-a-uuid', deviceTime: now() },
+      { eventId: randomUUID() },
+      { eventId: randomUUID(), deviceTime: '2026-09-20T09:15:00' },
+    ]) {
+      const res = await post(token, `/v1/sessions/${session.id}/refocus`, body);
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
+  it('requires authentication', async () => {
+    const { session } = await seedRunning('refocus-auth');
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/refocus`,
+      payload: { eventId: randomUUID(), deviceTime: now() },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
   it('is a 409 with no live participation to refocus', async () => {
     const { student, session } = await seedRunning('refocus-none');
     const res = await post(

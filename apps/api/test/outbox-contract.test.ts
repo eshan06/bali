@@ -47,10 +47,18 @@ interface Answer {
 
 const now = () => new Date().toISOString();
 
+/**
+ * Each start is a millisecond later than the last, however fast they come: a
+ * tap resolves to the teacher's NEWEST running session (`resolveTapTarget`
+ * orders by `started_at`), so two same-teacher sessions stamped in one
+ * millisecond would leave which one a tap reaches to chance.
+ */
+let starts = 0;
 async function start(classId: string) {
+  starts += 1;
   const { session } = await startSession(db, {
     classId,
-    startedAt: new Date(Date.now() - 60_000),
+    startedAt: new Date(Date.now() - 60_000 + starts),
     endsAt: new Date(Date.now() + 25 * 60_000),
   });
   return session;
@@ -140,11 +148,7 @@ describe('tapDisposition, against POST /v1/taps', () => {
     expect(again.disposition).toBe('wait_for_start');
   });
 
-  it('a recorded tap retried with nothing running names no session: delete it and re-read', async () => {
-    // The replay that is correct today and after A4 alike: recorded, nothing
-    // to shield to. Two shapes reach it now — a tap that landed in a session
-    // since over, and the retry of a tap still armed (whose waiting row
-    // stands, so deleting is right; the answer cannot say it is waiting).
+  it('a tap landed in a session since over, retried with nothing running, names no session: delete it and re-read', async () => {
     const c = await seedClassroom(db, 'oc-over');
     const token = await ctx.tokenFor(c.student.cognitoId);
     const session = await start(c.klass.id);
@@ -155,17 +159,53 @@ describe('tapDisposition, against POST /v1/taps', () => {
     const retry = await tap(token, c.block.tagId, landed);
     expect(retry.body).toEqual({ outcome: 'replay', session: null, state: null });
     expect(retry.disposition).toBe('reread');
-
-    const waiting = randomUUID();
-    expect((await tap(token, c.block.tagId, waiting)).disposition).toBe('wait_for_start');
-    const armedRetry = await tap(token, c.block.tagId, waiting);
-    expect(armedRetry.body).toEqual({ outcome: 'replay', session: null, state: null });
-    expect(armedRetry.disposition).toBe('reread');
   });
 
-  it('a retry recorded but no longer current is a 409 today: kept, retried and surfaced', async () => {
-    // A4 answers both of these `200 replay` with no session, which the table
-    // already reads as 'reread' — these are the assertions A4 changes.
+  it('the retry of a tap still armed waits for the start, like the answer it lost', async () => {
+    // A4: it answered `replay` with no session ('reread') — deleting was
+    // right, since the waiting row stands, but the truth the phone then
+    // re-read cannot say it is waiting.
+    const c = await seedClassroom(db, 'oc-armed-retry');
+    const token = await ctx.tokenFor(c.student.cognitoId);
+    const waiting = randomUUID();
+    expect((await tap(token, c.block.tagId, waiting)).disposition).toBe('wait_for_start');
+
+    const retry = await tap(token, c.block.tagId, waiting);
+    expect(retry.body).toEqual({ outcome: 'already_armed', session: null, state: null });
+    expect(retry.disposition).toBe('wait_for_start');
+  });
+
+  it('the retry of an armed tap that landed meanwhile re-reads rather than waits', async () => {
+    // From #62's review: armed (not in the running class yet), then joined
+    // by code, so the next delivery of the same id lands in the running
+    // session; that ends. The waiting row still stands, but the next Start
+    // skips it, so `already_armed` would show "waiting for your teacher" for
+    // a tap no Start joins. It stays `replay`, naming no session.
+    const c = await seedClassroom(db, 'oc-armed-landed');
+    const session = await start(c.klass.id);
+    const token = await ctx.tokenFor('student-oc-armed-landed-newcomer');
+    const eventId = randomUUID();
+    expect((await tap(token, c.block.tagId, eventId)).body.outcome).toBe('armed');
+    const joined = await post(token, '/v1/enrollments', {
+      joinCode: c.klass.joinCode,
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    expect(joined.status).toBe(200);
+    const landed = await tap(token, c.block.tagId, eventId);
+    expect(landed.body).toMatchObject({ outcome: 'joined', state: 'focused' });
+    expect(landed.body.session?.id).toBe(session.id);
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+
+    const retry = await tap(token, c.block.tagId, eventId);
+    expect(retry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(retry.disposition).toBe('reread');
+  });
+
+  it('a retry recorded but no longer current names no session: delete it and re-read', async () => {
+    // A4: each of these was a 409 — NOT_PARTICIPATING, EVENT_ID_CONFLICT —
+    // which the table keeps, retries and surfaces forever though the tap is
+    // on record. The honest answer is recorded, with no window.
     const c = await seedClassroom(db, 'oc-stale');
     const second = await secondClass(c, 'JOIN-oc-stale-2');
     const token = await ctx.tokenFor(c.student.cognitoId);
@@ -179,20 +219,41 @@ describe('tapDisposition, against POST /v1/taps', () => {
     expect((await tap(token, c.block.tagId)).body.outcome).toBe('switched');
     await endSession(db, { sessionId: period2.id, at: new Date(), reason: 'ended' });
     const leftRetry = await tap(token, c.block.tagId, left);
-    expect(leftRetry.status).toBe(409);
-    expect(leftRetry.body.error?.message).toBe('not in this session');
-    expect(leftRetry.disposition).toBe('retry_and_surface');
+    expect(leftRetry.status).toBe(200);
+    expect(leftRetry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(leftRetry.disposition).toBe('reread');
 
     // Over: period 1 ends and a period 3 starts, so the retry of a tap
     // recorded in period 1 is re-resolved to period 3.
     const over = randomUUID();
     expect((await tap(token, c.block.tagId, over)).body.outcome).toBe('joined');
     await endSession(db, { sessionId: period1.id, at: new Date(), reason: 'ended' });
-    await start(second.id);
+    const period3 = await start(second.id);
     const overRetry = await tap(token, c.block.tagId, over);
-    expect(overRetry.status).toBe(409);
-    expect(overRetry.body.error?.message).toBe('event_id already used by another event');
-    expect(overRetry.disposition).toBe('retry_and_surface');
+    expect(overRetry.status).toBe(200);
+    expect(overRetry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(overRetry.disposition).toBe('reread');
+
+    // Removed: in period 3, then removed from its class while it runs; a
+    // period 4 of the teacher's first class starts, and the retry of the
+    // period-3 tap resolves there.
+    const removed = randomUUID();
+    expect((await tap(token, c.block.tagId, removed)).body.session?.id).toBe(period3.id);
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, second.id), eq(enrollments.studentId, c.student.id)));
+    if (!enrollment) throw new Error('expected an enrollment');
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    await start(c.klass.id);
+    const removedRetry = await tap(token, c.block.tagId, removed);
+    expect(removedRetry.status).toBe(200);
+    expect(removedRetry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(removedRetry.disposition).toBe('reread');
   });
 
   it('an id held by a different event is a 409 that never lands: kept and surfaced', async () => {
@@ -380,31 +441,37 @@ describe('stateChangeDisposition, against refocus and protection off', () => {
     expect(resent.body).toMatchObject({ outcome: 'applied', state: 'focused' });
   });
 
-  it('the refocus replay A4 settles: after a removal it still names the running session', async () => {
-    // Pre-existing (A2's entry): a refocus replayed after its participation
-    // ended while the session runs answers that ended row's last state with
-    // the session, which the table reads as 'apply_session'. The outbox's
+  it('a refocus replayed after the student was removed or switched away names no session: delete and re-read', async () => {
+    // A4. Until it, this answered the ended row's last state WITH the
+    // running session, which the table reads as 'apply_session' — shields
+    // back on, for a session the student is no longer in. The outbox's
     // superseded-refocus rule covers a switch (a later tap), not a removal,
-    // so A4 settles this on the server before a phone ships — and this
-    // assertion is the one it changes.
-    const { klass, student, session, token } = await running('oc-sc-a4');
-    await unlock(token, session.id);
-    const refocusId = randomUUID();
-    expect((await change(token, session.id, 'refocus', refocusId)).status).toBe(200);
-    const [enrollment] = await db
-      .select()
-      .from(enrollments)
-      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
-    if (!enrollment) throw new Error('expected an enrollment');
-    await endEnrollment(db, {
-      enrollmentId: enrollment.id,
-      reason: 'removed_from_class',
-      at: new Date(),
-    });
+    // and a refocus already in flight when the student switched still lands.
+    for (const ending of ['removed', 'switched'] as const) {
+      const c = await running(`oc-sc-a4-${ending}`);
+      await unlock(c.token, c.session.id);
+      const refocusId = randomUUID();
+      expect((await change(c.token, c.session.id, 'refocus', refocusId)).status).toBe(200);
+      if (ending === 'removed') {
+        const [enrollment] = await db
+          .select()
+          .from(enrollments)
+          .where(and(eq(enrollments.classId, c.klass.id), eq(enrollments.studentId, c.student.id)));
+        if (!enrollment) throw new Error('expected an enrollment');
+        await endEnrollment(db, {
+          enrollmentId: enrollment.id,
+          reason: 'removed_from_class',
+          at: new Date(),
+        });
+      } else {
+        await start((await secondClass(c, `JOIN-oc-sc-a4-${ending}-2`)).id);
+        expect((await tap(c.token, c.block.tagId)).body.outcome).toBe('switched');
+      }
 
-    const replay = await change(token, session.id, 'refocus', refocusId);
-    expect(replay.body).toMatchObject({ outcome: 'replay', state: 'focused' });
-    expect(replay.body.session?.id).toBe(session.id);
-    expect(replay.disposition).toBe('apply_session');
+      const replay = await change(c.token, c.session.id, 'refocus', refocusId);
+      expect(replay.status, ending).toBe(200);
+      expect(replay.body, ending).toEqual({ outcome: 'replay', state: null, session: null });
+      expect(replay.disposition, ending).toBe('reread');
+    }
   });
 });

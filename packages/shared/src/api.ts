@@ -45,19 +45,23 @@ export interface TapRequest {
 }
 export type TapOutcome = 'joined' | 'switched' | 'armed' | 'already_armed' | 'replay';
 export interface TapResponse {
+  /**
+   * `already_armed` is also the answer to the retry of a tap still waiting
+   * (A4), so a phone that lost the first answer learns it waits for Start.
+   */
   outcome: TapOutcome;
   /**
    * The joined session for `joined` / `switched`, and for the `replay` of a
-   * tap whose participation is still live. Null when the tap was armed — and
-   * null on one `replay` too: an id already recorded in `events` with nothing
-   * waiting for it, where the tap landed in a session that has since ended.
+   * tap whose participation is still live, in a session still running. Null
+   * when the tap was armed — and on the `replay` of a tap recorded but no
+   * longer current (A4): its participation ended, or its session is over.
    *
    * The session, not the outcome, is what gives a phone a window to shield
    * to: a `replay` with no session means "recorded — delete it, nothing to
    * shield to, re-read the truth" (`tapDisposition`: 'reread').
    */
   session: SessionView | null;
-  /** The resulting stored state when joined; null when armed. */
+  /** The resulting stored state when joined; null when armed, and on a replay no longer current. */
   state: ParticipationState | null;
 }
 
@@ -170,8 +174,18 @@ export interface RefocusRequest {
 }
 export interface RefocusResponse {
   outcome: 'applied' | 'replay';
-  state: ParticipationState;
-  session: SessionView;
+  /**
+   * The current stored state. Null on the `replay` of a refocus whose
+   * participation has since ended while the session runs — removed, left the
+   * class, switched away (A4).
+   */
+  state: ParticipationState | null;
+  /**
+   * The running session, for reconciliation. Null on that replay: the student
+   * is no longer in it, so no answer hands the phone its window to shield to
+   * (`stateChangeDisposition`: 'reread').
+   */
+  session: SessionView | null;
 }
 
 // POST /v1/sessions/{id}/protection-off — the phone found its Screen Time

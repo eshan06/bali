@@ -40,21 +40,24 @@ middle was considered and rejected — see below.)
    another student's, or another kind of event — is not a retry but a client bug, and gets
    `409` instead: a `200` would tell the phone to delete a record the server never kept.
    On the arm path (decision 5, nothing joinable running) the same goes for this
-   student's tap recorded under another teacher, and for an id already held by a waiting
-   tap that is not this student's for this teacher. Blocks cannot move yet; the endpoint
-   that lets them must revisit the other-teacher case, because after a move an honest
-   retry looks exactly like it.
+   student's tap recorded under another teacher — and on the join path too, once that
+   tap is no longer current (step 10) — and for an id already held by a waiting tap that
+   is not this student's for this teacher. Blocks cannot move yet; the endpoint that lets
+   them must revisit the other-teacher case, because after a move an honest retry looks
+   exactly like it.
 10. Respond `200 OK`. Only now does the phone delete the record from local storage. The
     retry of a tap that already landed gets that `200` with what was recorded — even when
-    the server now resolves the tag to a different running session — but only while it is
-    still true: the participation live, its session running. Once that session has ended
-    or the student has left it, a retry that reaches a running session gets `409` (ruled
-    2026-09-22), because a `200` naming the old session would keep a backgrounded phone
-    shielded to a window that is over; one that reaches nothing running is answered
-    `replay` with no session — recorded, with no window to shield to, so the phone deletes
-    it and re-reads the truth. The phone keeps a `409`'s record and keeps retrying it, and
-    shows it (rule 5) while re-reading the truth; the typed table is `tapDisposition` in
-    `@bali/shared`.
+    the server now resolves the tag to a different running session — but it names that
+    session only while it is still true: the participation live, its session running.
+    Once that session has ended or the student has left it (switched away, left or was
+    removed from the class), the retry is answered `replay` with no session (ruled
+    2026-09-24, replacing 2026-09-22's `409`): recorded, with no window to shield to, so
+    the phone deletes it and re-reads the truth — a `200` naming the old session would
+    keep a backgrounded phone shielded to a window that is over. The retry of a tap still
+    waiting for Start (decision 5) is answered `already_armed`, so the phone keeps showing
+    "waiting for your teacher". The phone keeps a `409`'s record and keeps retrying it,
+    and shows it (rule 5) while re-reading the truth; the typed table is `tapDisposition`
+    in `@bali/shared`.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
 **Why there's no queue between the API and the database.** A queue (usually Redis — a
@@ -284,6 +287,9 @@ Student app:
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
   unlock, and coming back from one. The unlock may carry an optional reason (bathroom,
   nurse, other); one the server does not recognise is recorded as none rather than refused.
+  A refocus replayed after the student's participation ended while the session runs
+  (removed, left the class, switched away) is answered `replay` with no session and no
+  state (ruled 2026-09-24), never with that ended row's last state and a window.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
   (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state. A
   report that first reaches the server after the session ended, from a student who was in
@@ -338,11 +344,11 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   participation row, so the case this rule exists for is untouched.
 - **Taps and state changes have typed tables too** (`@bali/shared`). A tap record is
   deleted only on a `2xx`, and the phone shields only to a session the answer names —
-  `armed` waits for Start, and a recorded tap naming none re-reads the truth; a refused
-  tap (a `4xx` but `401`, `408`, `429`) is kept, retried and shown (`tapDisposition`). A
-  refused refocus or protection-off report is dropped and the truth re-read, never
-  resent — final for its `event_id` (`stateChangeDisposition`). A read — a check-in,
-  `GET /v1/me` — never overrides a newer state change of the phone's
+  `armed` waits for Start, and a recorded tap or change naming none re-reads the truth;
+  a refused tap (a `4xx` but `401`, `408`, `429`) is kept, retried and shown
+  (`tapDisposition`). A refused refocus or protection-off report is dropped and the truth
+  re-read, never resent — final for its `event_id` (`stateChangeDisposition`). A read — a
+  check-in, `GET /v1/me` — never overrides a newer state change of the phone's
   (`readMayReconcile`).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
@@ -536,9 +542,10 @@ Each exists because v2 broke it and shipped a real bug
    screen only claims what was verified. (v2: showed a ticking focus timer while nothing
    was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always
-   safe. (v2: had no such IDs on some paths.) A retried tap is answered with what was
-   recorded while that is still true, and never with a `200` that points a phone at a
-   session that is over (tap step 10, ruled 2026-09-22) — a tap response drives a shield.
+   safe. (v2: had no such IDs on some paths.) A retried tap or refocus is answered with
+   what was recorded while that is still true, and once it is not, with a `200` that names
+   no session — never one that points a phone at a session it is no longer in (tap step
+   10, ruled 2026-09-22 and 2026-09-24): the answer drives a shield.
 5. **No silent failures.** Every failure is shown to the user with a way to retry. (v2:
    "Revoke link" could fail and close as if it had worked.)
 6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event
