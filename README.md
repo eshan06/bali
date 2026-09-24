@@ -3,6 +3,10 @@
 Tap a block, the phone locks into focus. This is the v3 rebuild; the design doc is
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+**Looking for the version that works today?** v2 — the app as it ran before this rebuild —
+is on the [`v2-archive`](https://github.com/eshan06/bali/tree/v2-archive) branch. `main` is
+v3 and isn't finished yet; [docs/PLAN.md](docs/PLAN.md) says where it stands.
+
 ## Layout
 
 | Workspace         | What it is                                                        |
