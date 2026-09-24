@@ -1,0 +1,15 @@
+{
+  "endpoint": "GET /v1/join-codes/{code}",
+  "scenario": "A preview sent with no bearer token.",
+  "request": {
+    "path": "/v1/join-codes/JOIN-FX-ENROLL"
+  },
+  "status": 401,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "unauthorized",
+      "message": "missing bearer token"
+    }
+  }
+}

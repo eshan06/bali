@@ -8,6 +8,59 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A6: the join-code preview, `GET /v1/join-codes/{code}`.**
+  D1's consent screen names the class and its teacher ("with Ms. Rivera",
+  "What Ms. Rivera sees") before the student commits, with "Not my class" as
+  the way back, so before joining the phone needs what only the server knows.
+  **Shape:** a `GET` on the code, a read like `/v1/me`, answering `{ class: {
+  id, name }, teacher: { displayName }, alreadyEnrolled }`
+  (`JoinCodePreviewResponse`). `class` is the join's own `MeClass`, so one
+  decode serves both answers. `displayName` is null when the teacher's account
+  carries none (a pool that signs in by email — 2026-09-22's display-name
+  entry), and the screen then says "your teacher". The "sees / never sees"
+  list is fixed product copy, the same for every class, so it is not served.
+  **Who:** signed in, or `401`. A teacher gets the join's `403`, since a
+  teacher cannot join. A caller with no row yet is answered as the student a
+  join would make them, in no class: the preview looks the row up and never
+  creates one, so it writes nothing at all — no user, no enrollment, no event,
+  and no `event_id` to carry. **Already in the class** is `200` with
+  `alreadyEnrolled: true`, previewing the join's `already_enrolled` no-op
+  rather than refusing; a student who has left is not in it (a re-join adds a
+  fresh enrollment). **One code, one answer.** The join did not normalise: it
+  matched the code exactly as sent, so `kwx49q` was a `404` for class
+  `KWX49Q`. One zod schema (`JoinCode`) now serves the join's body and the
+  preview's path, trimming and upper-casing the code. Codes are minted
+  upper-case from an alphabet with no look-alikes, so case and surrounding
+  whitespace carry no meaning. The preview finds the class by the join's own
+  condition (that code, on a live class), so the two cannot name different
+  classes. For the join this is a correction under API decision 2, and for
+  every code the server mints only a widening: the length check still runs on
+  the code as sent, so every input it refused, it refuses with the same
+  status, and a code typed in lower case or with a stray space now joins. (A
+  code stored in lower case could no longer be joined, and only a test seed
+  was: the seeds now mint upper-case codes, like the real generator.) An
+  unknown code, an archived class's code and a regenerated class's old code
+  are the join's own `404 class_not_found` (A5's reason); an empty code is
+  `400`. **Enumeration:** a preview reveals the class and its teacher's name —
+  what a join to the same code returns, plus the name the screen shows. Unlike
+  a join it leaves no enrollment on a roster, so guessing codes is quieter
+  than joining. Today only the code space (31⁶ ≈ 887M) bounds it; per-account
+  budgets are ISSUES #1, landing in Phase 4 with the rest of rate limiting, and
+  none is built here. The code rides the path, so it lands in request logs
+  like any URL — it is the code the classroom board shows, and a teacher
+  regenerates one that leaks. **Rode along, from #64's review:** `npm run
+  fixtures` removed the whole `contracts/fixtures/` directory while the drift
+  check reconciles only `*.json`, so a README kept there for BaliCore's authors
+  would have been deleted silently. It now clears only the `*.json`, pinned by
+  a test. And `DELETE /v1/enrollments/{id}`'s two `403 forbidden` refusals
+  (the caller has no account here yet; the enrollment is neither theirs nor in
+  a class they teach) were told apart only by message. They now carry
+  `unknown_user` and `enrollment_not_yours`, with `code`, status and message
+  unchanged. `API_ERROR_REASONS` was one value per engine refusal; it is now
+  also one per refusal a route makes itself where one status covers several
+  on an endpoint, and a test names those so no reason sits in the vocabulary
+  unused. The fixture `enrollments/403-forbidden` is now
+  `403-enrollment-not-yours`, beside `403-unknown-user`.
 - **2026-09-24** — **A5: the contract fixtures, and a machine-readable
   `reason` on errors.** **Errors get a reason.** C5 must tell `PROTECTION_OFF`
   ("tap the block to rejoin") from `NOT_PARTICIPATING` ("you're not in this

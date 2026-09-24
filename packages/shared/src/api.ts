@@ -241,6 +241,21 @@ export interface EnrollmentJoinResponse {
   class: MeClass;
 }
 
+// GET /v1/join-codes/{code} — what a join code opens, before joining it (A6).
+// Matched as the join matches it, so the two never name different classes; a
+// code no live class holds is the join's 404 `class_not_found`.
+export interface JoinCodePreviewResponse {
+  /** The class the code names — the one POST /v1/enrollments would join. */
+  class: MeClass;
+  /**
+   * Its teacher, as the consent screen names them ("What Ms. Rivera sees").
+   * `displayName` is null when their account carries none.
+   */
+  teacher: { displayName: string | null };
+  /** True when the caller is in this class already: a join would answer `already_enrolled`. */
+  alreadyEnrolled: boolean;
+}
+
 // GET /v1/classes/{id}/roster — the teacher's roster of active students.
 export interface RosterStudent {
   enrollmentId: string;

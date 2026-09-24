@@ -1,4 +1,4 @@
-import { type Database, endSession, enrollments, startSession } from '@bali/db';
+import { type Database, endSession, enrollments, startSession, users } from '@bali/db';
 import {
   API_ERROR_REASONS,
   type ApiErrorBody,
@@ -9,8 +9,9 @@ import {
 } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { type AuthedApp, makeAuthedApp } from './helpers/app.js';
@@ -19,8 +20,10 @@ import {
   ENDPOINTS,
   type Fixture,
   FIXTURES_DIR,
+  jsonFiles,
   SCHEMAS,
   serialize,
+  writeFixtures,
 } from './helpers/contract.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 
@@ -92,8 +95,17 @@ const SCENARIOS: Record<string, string> = {
   'enrollments/404-class-not-found': 'A join code no class has.',
   'enrollments/left': 'A student leaves their class mid-session: the participation ends too.',
   'enrollments/already-removed': 'Leaving the class again: a no-op.',
-  'enrollments/403-forbidden': 'A student trying to remove a classmate’s enrollment.',
+  'enrollments/403-enrollment-not-yours': 'A student trying to remove a classmate’s enrollment.',
+  'enrollments/403-unknown-user': 'Leaving by someone the server has no account for yet.',
   'enrollments/404-enrollment-not-found': 'Leaving an enrollment the server does not know.',
+  'join-codes/found':
+    'A preview of a class’s code before joining it (A6): the class and its teacher.',
+  'join-codes/unnamed-teacher':
+    'A preview of a class whose teacher’s account carries no display name: “your teacher”.',
+  'join-codes/already-enrolled': 'A preview of the code of a class the student is in already.',
+  'join-codes/404-class-not-found': 'A preview of a join code no class has: the join’s refusal.',
+  'join-codes/400-bad-input': 'A preview of an empty code.',
+  'join-codes/401-unauthorized': 'A preview sent with no bearer token.',
 };
 
 interface Call {
@@ -147,7 +159,7 @@ async function capture(
   expected: Record<string, unknown> = {},
 ) {
   const scenario = SCENARIOS[name];
-  const endpoint = `${call.method} ${call.path.replace(/[0-9a-f-]{36}/g, '{id}')}`;
+  const endpoint = `${call.method} ${routeOf(call.path)}`;
   const contract = ENDPOINTS[endpoint];
   if (scenario === undefined || contract === undefined) throw new Error(`${name}: unknown`);
   const res = await send(call);
@@ -170,6 +182,12 @@ async function capture(
     body: res.body,
     ...(disposition && { disposition }),
   });
+}
+
+/** The route a path is for: its ids, and a join code, become their parameter's name. */
+function routeOf(path: string) {
+  const ids = path.replace(/[0-9a-f-]{36}/g, '{id}');
+  return ids.replace(/^\/v1\/join-codes\/[^/]*$/, '/v1/join-codes/{code}');
 }
 
 /** A step that sets a scenario up: it must succeed, and it is no fixture. */
@@ -294,23 +312,38 @@ async function captureAll() {
   await capture('protection-off/recorded', lateReport, 200, { outcome: 'recorded' });
   await capture('protection-off/recorded-replay', lateReport, 200, { outcome: 'replay' });
 
-  // Joining and leaving by code (auth decision 3).
+  // Previewing a code, then joining and leaving by it (A6, auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');
+  await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, room.teacher.id));
+  const preview = (code: string, as: string | null = newcomer): Call => ({
+    as,
+    method: 'GET',
+    path: `/v1/join-codes/${code}`,
+  });
+  const outside = { alreadyEnrolled: false };
+  await capture('join-codes/found', preview(room.klass.joinCode), 200, outside);
+  await capture('join-codes/unnamed-teacher', preview(arm.klass.joinCode), 200, outside);
   const byCode = (joinCode: string) =>
     post(newcomer, '/v1/enrollments', { joinCode, eventId: randomUUID(), deviceTime });
   await capture('enrollments/joined', byCode(room.klass.joinCode), 200, { outcome: 'joined' });
+  const inside = { alreadyEnrolled: true };
+  await capture('join-codes/already-enrolled', preview(room.klass.joinCode), 200, inside);
   const already = { outcome: 'already_enrolled' };
   await capture('enrollments/already-enrolled', byCode(room.klass.joinCode), 200, already);
   const noClass = { reason: 'class_not_found' };
+  await capture('join-codes/404-class-not-found', preview('NO-SUCH-CODE'), 404, noClass);
   await capture('enrollments/404-class-not-found', byCode('NO-SUCH-CODE'), 404, noClass);
-  const theirs = await enrollmentOf(room.klass.id, room.student.id);
-  const forbidden = { code: 'forbidden' };
-  await capture(
-    'enrollments/403-forbidden',
-    del(newcomer, `/v1/enrollments/${theirs}`),
-    403,
-    forbidden,
+  await capture('join-codes/400-bad-input', preview(''), 400, { code: 'bad_input' });
+  const anonymousPreview = preview(room.klass.joinCode, null);
+  await capture('join-codes/401-unauthorized', anonymousPreview, 401, { code: 'unauthorized' });
+  const theirs = del(
+    newcomer,
+    `/v1/enrollments/${await enrollmentOf(room.klass.id, room.student.id)}`,
   );
+  const notYours = { reason: 'enrollment_not_yours' };
+  await capture('enrollments/403-enrollment-not-yours', theirs, 403, notYours);
+  const stranger = { ...theirs, as: await token('student-fx-stranger') };
+  await capture('enrollments/403-unknown-user', stranger, 403, { reason: 'unknown_user' });
   const nobody = del(newcomer, `/v1/enrollments/${randomUUID()}`);
   const noEnrollment = { reason: 'enrollment_not_found' };
   await capture('enrollments/404-enrollment-not-found', nobody, 404, noEnrollment);
@@ -342,16 +375,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
   it('are the answers the API gives today', async () => {
     expect([...fixtures.keys()].sort()).toEqual(Object.keys(SCENARIOS).sort());
     if (UPDATE) {
-      await rm(FIXTURES_DIR, { recursive: true, force: true });
-      for (const [name, fixture] of fixtures) {
-        await mkdir(dirname(fileOf(name)), { recursive: true });
-        await writeFile(fileOf(name), serialize(fixture));
-      }
+      await writeFixtures(FIXTURES_DIR, fixtures);
       return;
     }
-    const committed = (await readdir(FIXTURES_DIR, { recursive: true }))
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => file.slice(0, -'.json'.length));
+    const committed = (await jsonFiles(FIXTURES_DIR)).map((file) => file.slice(0, -'.json'.length));
     // Only what a scenario writes: a stale file is a fixture of nothing.
     expect(committed.sort(), 'run npm run fixtures').toEqual([...fixtures.keys()].sort());
     for (const [name, fixture] of fixtures) {
@@ -376,6 +403,13 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(joins).toEqual(new Set(['joined', 'already_enrolled']));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');
     expect(leaves).toEqual(new Set(['ended', 'already_removed']));
+    const previews = valuesOf('JoinCodePreviewResponse', 'alreadyEnrolled');
+    expect(previews).toEqual(new Set([true, false]));
+    // A teacher with a name and one without: BaliCore decodes it as optional.
+    const teachers = [...valuesOf('JoinCodePreviewResponse', 'teacher')] as {
+      displayName: unknown;
+    }[];
+    expect(new Set(teachers.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
     // A replay, and a boot call, with a session and without: the session, not
     // the outcome, gives a phone its window (A3, A4).
     for (const type of ['TapResponse', 'RefocusResponse', 'MeResponse']) {
@@ -392,6 +426,24 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     const reasons = errors.map((f) => (f.body as ApiErrorBody).error.reason).filter(Boolean);
     const phones = API_ERROR_REASONS.filter((reason) => reason !== 'invalid_extension');
     expect(new Set(reasons)).toEqual(new Set(phones));
+  });
+
+  it('are rewritten JSON only: a file kept beside them outlives a regenerate', async () => {
+    // The drift check reconciles `*.json` alone, so the rewrite must clear
+    // no more than that: it used to remove the whole directory, and a README
+    // for BaliCore's authors would have gone with it, silently (#64's review).
+    const dir = await mkdtemp(join(tmpdir(), 'bali-fixtures-'));
+    try {
+      await mkdir(join(dir, 'retired'));
+      await writeFile(join(dir, 'retired', 'endpoint.json'), '{}\n');
+      await writeFile(join(dir, 'README.md'), 'For BaliCore.\n');
+      await writeFixtures(dir, new Map([['me/new-student', fixtures.get('me/new-student')!]]));
+      expect(await readFile(join(dir, 'README.md'), 'utf8')).toBe('For BaliCore.\n');
+      // A stale fixture is still a fixture of nothing, and goes.
+      expect(await jsonFiles(dir)).toEqual([join('me', 'new-student.json')]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('refuse an answer its type does not describe', () => {

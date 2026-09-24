@@ -1,0 +1,19 @@
+{
+  "endpoint": "GET /v1/join-codes/{code}",
+  "scenario": "A preview of the code of a class the student is in already.",
+  "request": {
+    "path": "/v1/join-codes/JOIN-FX-ENROLL"
+  },
+  "status": 200,
+  "type": "JoinCodePreviewResponse",
+  "body": {
+    "class": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "name": "Class fx-enroll"
+    },
+    "teacher": {
+      "displayName": "Ms. Rivera"
+    },
+    "alreadyEnrolled": true
+  }
+}

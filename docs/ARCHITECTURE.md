@@ -298,7 +298,15 @@ Student app:
   it at the end, is recorded like a late unlock instead of refused (ruled 2026-09-24): noted
   `after_session_end` in `payload.recorded_as`, the key and value an unlock uses, and
   answered `recorded` with no session, so no answer hands a phone a window to shield to.
-- `POST /v1/enrollments` — join a class by code.
+- `GET /v1/join-codes/{code}` — what a code opens, before joining it (the consent preview):
+  the class, its teacher's display name, and whether the caller is in it already. A read
+  that creates and writes nothing. It matches a code as the join does — one schema, to which
+  case and surrounding whitespace are noise — so the two never name different classes, and
+  it refuses what the join refuses: an unknown, archived or regenerated code is `404
+  class_not_found`, a teacher `403`. It reveals what a join to that code would, plus the
+  teacher's name; per-account budgets on guessing codes arrive with ISSUES #1 (Phase 4).
+- `POST /v1/enrollments` — join a class by code, matched ignoring case and surrounding
+  whitespace (A6).
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record.
 - `GET /v1/me/history` — the student's own timeline screens.
@@ -328,7 +336,8 @@ The shape is `{ error: { code, reason?, message, details? } }`: `code` is the st
 class, and `reason` says which refusal it was where one status covers several — a
 refocus's `409` is protection off, not in the session, the session over or a spent id —
 from one closed, additive-only vocabulary in `@bali/shared` (`API_ERROR_REASONS`, one
-value per refusal the transition engine makes; decided 2026-09-24). A client keys on
+value per refusal the transition engine makes, and per refusal a route makes itself where
+one status covers several; decided 2026-09-24). A client keys on
 `reason`, never on the message, and reads a value it does not know as none. An error
 with no finer meaning than its status carries none.
 

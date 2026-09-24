@@ -1,0 +1,19 @@
+{
+  "endpoint": "GET /v1/join-codes/{code}",
+  "scenario": "A preview of a class whose teacher’s account carries no display name: “your teacher”.",
+  "request": {
+    "path": "/v1/join-codes/JOIN-FX-ARM"
+  },
+  "status": 200,
+  "type": "JoinCodePreviewResponse",
+  "body": {
+    "class": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "name": "Class fx-arm"
+    },
+    "teacher": {
+      "displayName": null
+    },
+    "alreadyEnrolled": false
+  }
+}

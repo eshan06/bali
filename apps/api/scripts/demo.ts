@@ -10,6 +10,7 @@ import {
   type EventType,
   type EventsPage,
   type FeedEvent,
+  type JoinCodePreviewResponse,
   type ProtectionOffResponse,
   type RefocusResponse,
   type SessionSnapshot,
@@ -202,12 +203,21 @@ async function main(): Promise<void> {
     });
     console.log(`class "${klass.name}" (join code ${klass.joinCode}); block tag ${block.tagId}`);
 
-    line('the students join by code');
+    line('the students preview the code, then join by it');
     const enrollmentIds = new Map<string, string>();
     for (const s of students) {
+      // Typed in lower case: the preview and the join both match it anyway (A6).
+      const typed = klass.joinCode.toLowerCase();
+      const p = await call<JoinCodePreviewResponse>('GET', `/v1/join-codes/${typed}`, {
+        token: s.token,
+      });
+      assert(
+        p.class.id === klass.id,
+        `${s.displayName} previewed "${p.class.name}", not the class`,
+      );
       const j = await call<EnrollmentJoinResponse>('POST', '/v1/enrollments', {
         token: s.token,
-        body: { joinCode: klass.joinCode, eventId: randomUUID(), deviceTime: iso() },
+        body: { joinCode: typed, eventId: randomUUID(), deviceTime: iso() },
       });
       assert(
         j.outcome === 'joined' || j.outcome === 'already_enrolled',

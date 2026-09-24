@@ -27,3 +27,15 @@ import { z } from 'zod';
  * instant, and `clampToWindow` compares instants.
  */
 export const DeviceTime = z.string().datetime({ offset: true });
+
+/**
+ * A join code as a student typed it — for the join and its preview both, so
+ * the two can never name different classes (A6). Codes are minted upper-case
+ * from an alphabet with no look-alikes (`generateJoinCode`), so case and
+ * surrounding whitespace are noise: `kwx49q ` is `KWX49Q`.
+ *
+ * The length check runs on the code as sent, before it is trimmed: the join's
+ * check since Phase 2, kept as it was, so normalising only ever turns a 404
+ * into a join. A blank code is still the join's 404; only an empty one is a 400.
+ */
+export const JoinCode = z.string().min(1).trim().toUpperCase();

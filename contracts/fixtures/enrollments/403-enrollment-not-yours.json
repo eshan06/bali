@@ -1,0 +1,16 @@
+{
+  "endpoint": "DELETE /v1/enrollments/{id}",
+  "scenario": "A student trying to remove a classmate’s enrollment.",
+  "request": {
+    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001"
+  },
+  "status": 403,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "reason": "enrollment_not_yours",
+      "message": "not allowed to remove this enrollment"
+    }
+  }
+}

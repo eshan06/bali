@@ -29,10 +29,11 @@ export type ApiErrorCode = keyof typeof API_ERROR_STATUS;
  * Which refusal an error is, where its status alone does not say (A5): a
  * refocus's `409 conflict` is protection off, not in the session, the session
  * over, or a spent id, and a phone shows each differently — so it keys on this,
- * never on the message. One value per refusal the transition engine makes;
- * an error with no finer meaning than its status carries none. Additive-only
- * like the other vocab, and a client reads a value it does not know as none: a
- * newer server may send one.
+ * never on the message. One value per refusal the transition engine makes, and
+ * per refusal a route makes itself where one status covers several on it —
+ * leaving a class's two 403s (A6); an error with no finer meaning than its
+ * status carries none. Additive-only like the other vocab, and a client reads a
+ * value it does not know as none: a newer server may send one.
  */
 export const API_ERROR_REASONS = [
   'session_not_found',
@@ -43,6 +44,10 @@ export const API_ERROR_REASONS = [
   'class_not_found',
   'enrollment_not_found',
   'protection_off',
+  // DELETE /v1/enrollments/{id}'s 403s: the caller has no account here yet, or
+  // the enrollment is neither their own nor in a class they teach.
+  'unknown_user',
+  'enrollment_not_yours',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

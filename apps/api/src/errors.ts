@@ -37,8 +37,8 @@ export class ApiError extends Error {
   static unauthorized(message = 'authentication required'): ApiError {
     return new ApiError('unauthorized', message);
   }
-  static forbidden(message = 'not allowed'): ApiError {
-    return new ApiError('forbidden', message);
+  static forbidden(message = 'not allowed', reason?: ApiErrorReason): ApiError {
+    return new ApiError('forbidden', message, undefined, reason);
   }
   static notFound(message = 'not found'): ApiError {
     return new ApiError('not_found', message);
