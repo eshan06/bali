@@ -1,6 +1,6 @@
 import { MAX_SESSION_MINUTES, type UnlockReason } from '@bali/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import {
@@ -3715,6 +3715,25 @@ describe('renameStudent', () => {
       classId: null,
       payload: { display_name: 'Ana Reyes', previous_display_name: 'Ana' },
     });
+  });
+
+  it('retries a transaction Postgres aborts as a deadlock, as every engine mutation does', async () => {
+    // No cycle is known to reach a rename, so no race can stage one: this pins
+    // the retry itself. The first attempt is aborted the way Postgres aborts a
+    // deadlock's loser (40P01, wrapped as drizzle wraps it); the second runs.
+    const { student } = await seedClass('rename-deadlock');
+    const deadlock = new Error('Failed query', {
+      cause: Object.assign(new Error('deadlock detected'), { code: '40P01' }),
+    });
+    const spy = vi.spyOn(db, 'transaction').mockImplementationOnce(() => Promise.reject(deadlock));
+    try {
+      const result = await rename(student.id, 'Ana');
+
+      expect(result.outcome).toBe('applied');
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('compares names as a reader would: case, spacing and compatibility forms aside', async () => {

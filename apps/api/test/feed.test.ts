@@ -1,5 +1,17 @@
-import { type Database, endSession, enrollments, startSession, tapIn, users } from '@bali/db';
-import type { EventsPage, SessionSnapshot } from '@bali/shared';
+import {
+  type Database,
+  endEnrollment,
+  endSession,
+  enrollments,
+  protectionOff,
+  refocus,
+  renameStudent,
+  startSession,
+  tapIn,
+  unlock,
+  users,
+} from '@bali/db';
+import type { EventsPage, SessionSnapshot, SnapshotStudent } from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -143,6 +155,189 @@ describe('GET /v1/sessions/:id (snapshot)', () => {
     const { session } = await seedRunning('snap-auth');
     const res = await ctx.app.inject({ method: 'GET', url: `/v1/sessions/${session.id}` });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
+  const change = (sessionId: string, studentId: string) => ({
+    sessionId,
+    studentId,
+    eventId: randomUUID(),
+    deviceTime: new Date(),
+  });
+
+  /** Another student of `klass`, enrolled now. */
+  async function classmate(tag: string, schoolId: string, classId: string) {
+    const row = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `student-${tag}`, role: 'student', schoolId })
+        .returning(),
+    );
+    const enrollment = one(
+      await db.insert(enrollments).values({ classId, studentId: row.id }).returning(),
+    );
+    return { ...row, enrollmentId: enrollment.id };
+  }
+
+  async function snapshotOf(teacherCognitoId: string, sessionId: string) {
+    const res = await get(await ctx.tokenFor(teacherCognitoId), `/v1/sessions/${sessionId}`);
+    expect(res.statusCode).toBe(200);
+    return res.json<SessionSnapshot>();
+  }
+  function row(snap: SessionSnapshot, studentId: string): SnapshotStudent | undefined {
+    return snap.students.find((s) => s.studentId === studentId);
+  }
+
+  it("carries an unlock's reason until the student is back in focus", async () => {
+    const { teacher, student, session } = await seedRunning('a9-reason');
+    await tapIn(db, change(session.id, student.id));
+    await unlock(db, { ...change(session.id, student.id), reason: 'bathroom' });
+
+    const unlocked = row(await snapshotOf(teacher.cognitoId, session.id), student.id);
+    expect(unlocked).toMatchObject({
+      state: 'unlocked',
+      unlock: { reason: 'bathroom', recordedAs: null },
+      protectionOffAfterEnd: false,
+    });
+    expect(Date.parse(unlocked!.unlock!.occurredAt)).not.toBeNaN();
+
+    await refocus(db, change(session.id, student.id));
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'focused',
+      unlock: null,
+    });
+  });
+
+  it('carries an unlock recorded against protection off, and the state stays protection off', async () => {
+    const { teacher, student, session } = await seedRunning('a9-off');
+    await tapIn(db, change(session.id, student.id));
+    await protectionOff(db, change(session.id, student.id));
+    const res = await unlock(db, { ...change(session.id, student.id), reason: 'nurse' });
+    expect(res.recordedAs).toBe('protection_off');
+
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'protection_off',
+      unlock: { reason: 'nurse', recordedAs: 'protection_off' },
+    });
+
+    // A re-tap returns to focus: the unlock is history.
+    await tapIn(db, change(session.id, student.id));
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'focused',
+      unlock: null,
+    });
+  });
+
+  it('carries the late records a session end leaves the row without', async () => {
+    const { teacher, student, school, klass, session } = await seedRunning('a9-late');
+    const ben = await classmate('a9-late-ben', school.id, klass.id);
+    await tapIn(db, change(session.id, student.id));
+    await tapIn(db, change(session.id, ben.id));
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+
+    const before = await snapshotOf(teacher.cognitoId, session.id);
+    expect(row(before, student.id)).toMatchObject({ unlock: null, protectionOffAfterEnd: false });
+
+    // After the end: recorded with a note, and the ended row left as it was.
+    await unlock(db, { ...change(session.id, student.id), reason: 'other' });
+    const off = await protectionOff(db, change(session.id, ben.id));
+    expect(off.outcome).toBe('recorded');
+
+    const after = await snapshotOf(teacher.cognitoId, session.id);
+    expect(row(after, student.id)).toMatchObject({
+      state: 'focused',
+      endedAt: row(before, student.id)!.endedAt,
+      unlock: { reason: 'other', recordedAs: 'after_session_end' },
+      protectionOffAfterEnd: false,
+    });
+    expect(row(after, ben.id)).toMatchObject({
+      state: 'focused',
+      endedAt: row(before, ben.id)!.endedAt,
+      unlock: null,
+      protectionOffAfterEnd: true,
+    });
+    expect(row(before, ben.id)!.endedAt).not.toBeNull();
+  });
+
+  it('carries a student removed mid-session, with their unlock, and a rename of theirs', async () => {
+    // Removed: the active roster no longer has them, but the session's record
+    // does — so every tab shows the same chip, and its name keeps refreshing.
+    const { teacher, student, school, klass, session } = await seedRunning('a9-removed');
+    const cal = await classmate('a9-removed-cal', school.id, klass.id);
+    const dan = await classmate('a9-removed-dan', school.id, klass.id);
+    await tapIn(db, change(session.id, cal.id));
+    await endEnrollment(db, {
+      enrollmentId: cal.enrollmentId,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    await unlock(db, change(session.id, cal.id));
+    // Dan never tapped in and left: nothing on record here, so not carried.
+    await endEnrollment(db, {
+      enrollmentId: dan.enrollmentId,
+      reason: 'left_class',
+      at: new Date(),
+    });
+    await renameStudent(db, { studentId: cal.id, displayName: 'Cal R.', eventId: randomUUID() });
+
+    const snap = await snapshotOf(teacher.cognitoId, session.id);
+    // In enrollment order, Cal's removed enrollment keeping his place.
+    expect(snap.students.map((s) => s.studentId)).toEqual([student.id, cal.id]);
+    expect(row(snap, cal.id)).toMatchObject({
+      enrollmentId: cal.enrollmentId,
+      displayName: 'Cal R.',
+      state: 'focused',
+      unlock: { reason: null, recordedAs: 'no_live_participation' },
+    });
+    expect(row(snap, cal.id)!.endedAt).not.toBeNull();
+  });
+
+  it('carries a re-enrolled student once, on their live enrollment and in its place', async () => {
+    const { teacher, student, school, klass, session } = await seedRunning('a9-rejoin');
+    const eve = await classmate('a9-rejoin-eve', school.id, klass.id);
+    const fay = await classmate('a9-rejoin-fay', school.id, klass.id);
+    await tapIn(db, change(session.id, eve.id));
+    await endEnrollment(db, {
+      enrollmentId: eve.enrollmentId,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    const again = one(
+      await db.insert(enrollments).values({ classId: klass.id, studentId: eve.id }).returning(),
+    );
+
+    const snap = await snapshotOf(teacher.cognitoId, session.id);
+    expect(snap.students.map((s) => s.studentId)).toEqual([student.id, fay.id, eve.id]);
+    expect(row(snap, eve.id)!.enrollmentId).toBe(again.id);
+  });
+
+  it("keeps another session's records out", async () => {
+    const { teacher, student, klass } = await seedClassroom(db, 'a9-scope');
+    const first = (
+      await startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(Date.now() - 120_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      })
+    ).session;
+    await tapIn(db, change(first.id, student.id));
+    await unlock(db, { ...change(first.id, student.id), reason: 'nurse' });
+    await endSession(db, { sessionId: first.id, at: new Date(), reason: 'ended' });
+    await protectionOff(db, change(first.id, student.id));
+    const second = (
+      await startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      })
+    ).session;
+
+    expect(row(await snapshotOf(teacher.cognitoId, second.id), student.id)).toMatchObject({
+      state: null,
+      unlock: null,
+      protectionOffAfterEnd: false,
+    });
   });
 });
 

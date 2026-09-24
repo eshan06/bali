@@ -12,6 +12,7 @@ import {
   isUnlockReason,
   MAX_SESSION_MINUTES,
   SILENCE_THRESHOLD_MS,
+  tidyDisplayName,
 } from '@bali/shared';
 import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
@@ -2524,19 +2525,15 @@ export interface RenameResult {
  * a reader sees them: without the characters that draw nothing (joiners,
  * variation selectors, Hangul fillers), which a name may carry but which
  * cannot make it another; in Unicode's compatibility form, so a decomposed
- * accent or a full-width letter is the name it looks like; with every run of
- * blank space — whitespace, and the symbols the API's `INVISIBLE` counts as
- * blank — made one space, and trimmed; and case-folded, upper then lower, so
- * `ß` meets `SS`. Look-alikes across scripts (a Cyrillic `а` for a Latin `a`)
+ * accent or a full-width letter is the name it looks like; with its blank
+ * space tidied exactly as the route stores a name (`tidyDisplayName`: every
+ * run made one space, trimmed); and case-folded, upper then lower, so `ß`
+ * meets `SS`. Look-alikes across scripts (a Cyrillic `а` for a Latin `a`)
  * stay different names — telling those apart takes a confusables table, and
  * the teacher sees both.
  */
 function nameKey(name: string): string {
-  return name
-    .replace(/\p{Default_Ignorable_Code_Point}/gu, '')
-    .normalize('NFKC')
-    .replace(/[\s\u2800\u{1D159}]+/gu, ' ')
-    .trim()
+  return tidyDisplayName(name.replace(/\p{Default_Ignorable_Code_Point}/gu, '').normalize('NFKC'))
     .toUpperCase()
     .toLowerCase();
 }
@@ -2556,6 +2553,17 @@ function nameKey(name: string): string {
  * grid shows the new name at its next snapshot.
  */
 export async function renameStudent(db: Database, input: RenameInput): Promise<RenameResult> {
+  // Retry on deadlock, as every other engine mutation does. No cycle is known:
+  // this locks the caller's row and then their classes in id order, and a join
+  // or a Start takes its class lock first, holding nothing yet. So this is
+  // defence in depth — were one ever found, a rename that lost it would reach
+  // the phone as a 500 rather than land. A re-run is safe: the aborted attempt
+  // committed nothing, and the replay check comes first.
+  return withDeadlockRetry(() => renameOnce(db, input));
+}
+
+/** `renameStudent`'s one transaction. */
+function renameOnce(db: Database, input: RenameInput): Promise<RenameResult> {
   return db.transaction(async (tx) => {
     // The student's row first, so two requests of theirs serialise whatever
     // classes they are in: a retry racing its original waits here, then finds

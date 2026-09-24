@@ -1,4 +1,4 @@
-import { DISPLAY_NAME_MAX_LENGTH } from '@bali/shared';
+import { DISPLAY_NAME_MAX_LENGTH, tidyDisplayName } from '@bali/shared';
 import { z } from 'zod';
 
 /*
@@ -35,16 +35,18 @@ export const UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?![\u200c\u200d])\p{Cf}/
 export const INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800\u{1D159}]*$/u;
 
 /**
- * The name a student sets (A8): trimmed, each run of spaces made one — what is
- * stored, and what the answer returns — and refused when it is blank or
- * invisible, longer than `DISPLAY_NAME_MAX_LENGTH` code points, or carries
- * anything UNPRINTABLE. That last is checked on the name as sent, so a newline
- * or a tab is refused rather than quietly made a space.
+ * The name a student sets (A8): its blank space tidied as the engine compares
+ * it (`tidyDisplayName` — trimmed, each run made one space, the blank braille
+ * cell and null notehead counted as blank) — what is stored, and what the
+ * answer returns — and refused when it is blank or invisible, longer than
+ * `DISPLAY_NAME_MAX_LENGTH` code points, or carries anything UNPRINTABLE. That
+ * last is checked on the name as sent, so a newline or a tab is refused rather
+ * than quietly made a space.
  */
 export const DisplayName = z
   .string()
   .refine((name) => name.search(UNPRINTABLE) === -1, 'has a character that cannot be shown')
-  .transform((name) => name.trim().replace(/\s+/gu, ' '))
+  .transform(tidyDisplayName)
   .refine((name) => !INVISIBLE.test(name), 'is blank')
   .refine(
     (name) => [...name].length <= DISPLAY_NAME_MAX_LENGTH,

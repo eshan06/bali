@@ -562,6 +562,20 @@ describe('PATCH /v1/me', () => {
     });
   });
 
+  it('tidies the blank symbols a name is compared without, as it tidies spaces', async () => {
+    // The engine compares names with the blank braille cell and the null
+    // notehead as blank space; the stored name must not keep one at an edge
+    // (a leading U+2800 was stored as sent) or a run of them inside.
+    const { student } = await seedClassroom(db, 'rn-blank');
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    const res = await renameTo(token, '⠀Bea⠀⠀Ortiz\u{1D159}');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<UpdateMeResponse>().user.displayName).toBe('Bea Ortiz');
+    expect(await storedName(student.id)).toBe('Bea Ortiz');
+  });
+
   it('reaches the teacher’s grid and roster at their next read', async () => {
     // The grid's names come from the snapshot, which the portal re-reads every
     // 15 s; no event carries a rename to the stream.

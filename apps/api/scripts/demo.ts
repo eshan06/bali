@@ -532,12 +532,16 @@ async function main(): Promise<void> {
     }
     assert(display.get(byKey('ana').userId) === 'focused', 'Ana should read focused');
     assert(display.get(ben.userId) === 'focused', 'Ben should read focused again');
-    // Cal was removed, so he drops off the active roster a fresh snapshot builds
-    // from; the teacher's live grid learned of his exit from the enrollment_removed
-    // event on the feed (below), not from this roster.
-    assert(!display.has(cal.userId), 'Cal, removed, is no longer on the active roster');
+    // Cal was removed, and the snapshot still carries him — the session holds
+    // his participation — as the ended row plus the unlock his phone sent after
+    // it: the portal's "Left · unlocked" on every tab, whenever it was opened.
+    const calRow = snap.students.find((st) => st.studentId === cal.userId);
+    assert(
+      display.get(cal.userId) === 'ended' && calRow?.unlock?.recordedAs === 'no_live_participation',
+      `Cal, removed, should stay on the grid with his unlock, got ${JSON.stringify(calRow)}`,
+    );
     assert(display.get(byKey('dana').userId) === 'focused', 'Dana should read focused');
-    console.log('  (Cal was removed — off the roster; his exit is in the event log below.)');
+    console.log('  (Cal was removed — left, his unlock kept: the portal reads "Left · unlocked".)');
 
     line('the permanent event log (rule 6)');
     const log = await call<EventsPage>('GET', `/v1/sessions/${sid}/events?after=0`, {
@@ -684,6 +688,16 @@ async function main(): Promise<void> {
     );
     console.log(
       `  late: Dana's protection off, sent after the bell, recorded at seq ${lateOff.seq}.`,
+    );
+    // The grid keeps it past its next refresh: the snapshot carries the late
+    // report beside the ended row, which it leaves as the bell left it (A9).
+    const lateSnap = await call<SessionSnapshot>('GET', `/v1/sessions/${expiringId}`, {
+      token: teacher.token,
+    });
+    const danaLateRow = lateSnap.students.find((s) => s.studentId === dana.userId);
+    assert(
+      danaLateRow?.protectionOffAfterEnd === true,
+      `Dana's late report should stay on the grid's snapshot, got ${JSON.stringify(danaLateRow)}`,
     );
     openSessionId = null;
     expiryStream.close();
