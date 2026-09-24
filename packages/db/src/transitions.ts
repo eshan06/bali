@@ -170,8 +170,8 @@ async function insertEvent(
     userId?: string | null;
     occurredAt: Date;
     payload?: unknown;
-    /** The phone's own order for it (A12) — one `knownOrder` gave, or none. */
-    order?: ActionOrder | null;
+    /** The phone's own order for it (A12); only one `knownOrder` can compare is kept. */
+    order?: unknown;
   },
 ): Promise<boolean> {
   const inserted = await tx
@@ -184,8 +184,7 @@ async function insertEvent(
       userId: e.userId ?? null,
       occurredAt: e.occurredAt,
       payload: e.payload ?? null,
-      orderInstall: e.order?.install ?? null,
-      orderSeq: e.order?.seq ?? null,
+      ...orderColumns(e.order),
     })
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
@@ -465,6 +464,8 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       classId: session.classId,
       userId: tap.studentId,
       occurredAt,
+      // The tap's own order (A12), so an unlock is ordered against it as the phone made them.
+      order: { install: tap.orderInstall, seq: tap.orderSeq },
     } as const;
     let spent = false;
     try {
@@ -648,6 +649,8 @@ export interface ArmTapInput {
   blockId?: string;
   eventId: string;
   deviceTime: Date;
+  /** The phone's own order for the tap (A12): kept for the `tap_in` its conversion records. */
+  order?: ActionOrder | null;
   /** End of the school day; the tap is ignored at conversion if this has passed. */
   expiresAt: Date;
   /** Server clock for the expiry comparison; defaults to now. */
@@ -798,6 +801,7 @@ async function takeOverStaleRow(
               blockId: input.blockId ?? null,
               eventId: input.eventId,
               deviceTime: input.deviceTime,
+              ...orderColumns(input.order),
               expiresAt: input.expiresAt,
             })
             .where(and(eq(armedTaps.id, rowId), isNull(armedTaps.consumedAt)))
@@ -1026,6 +1030,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
                 blockId: input.blockId ?? null,
                 eventId: input.eventId,
                 deviceTime: input.deviceTime,
+                ...orderColumns(input.order),
                 expiresAt: input.expiresAt,
               })
               .onConflictDoNothing({
@@ -1913,12 +1918,18 @@ function knownReason(reason: unknown): UnlockReason | null {
 }
 
 /**
- * The phone's order (A12), the same way: only one the engine can compare reaches an event —
- * its two fields and nothing else — and anything else is none, never a refusal. An unlock
- * must be recorded whatever it carries, and a malformed install would fail the insert.
+ * The phone's order (A12), the same way: only one the engine can compare reaches a row — its
+ * two fields and nothing else — and anything else is none, never a refusal. An unlock must be
+ * recorded whatever it carries, and a malformed install would fail the insert.
  */
 function knownOrder(order: unknown): ActionOrder | null {
   return isActionOrder(order) ? { install: order.install, seq: order.seq } : null;
+}
+
+/** An order's two columns, on an event or a waiting tap: both, or — `knownOrder`'s none — neither. */
+function orderColumns(order: unknown): { orderInstall: string | null; orderSeq: number | null } {
+  const known = knownOrder(order);
+  return { orderInstall: known?.install ?? null, orderSeq: known?.seq ?? null };
 }
 
 /** The payload stored on an event that already landed; null when it has none. */
@@ -1958,8 +1969,8 @@ async function recordedReason(tx: Database, eventId: string): Promise<UnlockReas
  * counter no clock moves, so such a return is after the unlock exactly when its
  * seq is greater — a clock turned back between the two changes nothing, and a
  * tampered clock can never undo a real unlock. Any other pair — no order on
- * either side or on one (an old build, a tap converted at Start), or another
- * install's (a reinstall starts its counter again, another phone has its own)
+ * either side or on one (an old build's), or another install's (a reinstall
+ * starts its counter again, another phone has its own)
  * — keeps A10's rule, the server's order (rule 1): each claim clamped into the
  * window, and a return's never later than the server recorded it — a clock
  * running fast at the return cannot then outrank the real unlocks that follow

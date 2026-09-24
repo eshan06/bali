@@ -781,6 +781,22 @@ describe('the phone’s own order (A12)', () => {
     );
   });
 
+  it('a tap that only arms keeps its order for the `tap_in` its Start records', async () => {
+    const { student, block, klass } = await seedClassroom(db, 'order-api-armed');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const res = await post(token, '/v1/taps', {
+      tagId: block.tagId,
+      eventId: randomUUID(),
+      deviceTime: ago(5),
+      order: order(1),
+    });
+    expect(res.json<TapResponse>().outcome).toBe('armed');
+    const now = Date.now();
+    const window = { startedAt: new Date(now), endsAt: new Date(now + 25 * 60_000) };
+    expect((await startSession(db, { classId: klass.id, ...window })).armedConverted).toBe(1);
+    expect(await ordersOf(student.id)).toEqual([{ type: 'tap_in', install, seq: 1 }]);
+  });
+
   it('a clock turned back between the refocus and a real unlock: applied by the order, and a retry replays', async () => {
     // A10's one clock case: by the times this unlock is older than the
     // refocus and would be recorded as late; by the phone's order it is last.

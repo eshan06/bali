@@ -1,5 +1,5 @@
 {
-  "id": "43410e8e-4640-4ead-9bb8-3442544ed17d",
+  "id": "39e6a273-057c-4612-bd2c-a9d310765775",
   "prevId": "86a16d41-7634-4930-b36f-2635a5908b0a",
   "version": "7",
   "dialect": "postgresql",
@@ -43,6 +43,18 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "order_install": {
+          "name": "order_install",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "order_seq": {
+          "name": "order_seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "expires_at": {
           "name": "expires_at",
@@ -156,7 +168,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "armed_taps_order_whole": {
+          "name": "armed_taps_order_whole",
+          "value": "(\"armed_taps\".\"order_install\" IS NULL) = (\"armed_taps\".\"order_seq\" IS NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.blocks": {

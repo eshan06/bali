@@ -77,8 +77,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
     // tap" — an engine test cannot catch this, because the throw is right
     // and only the status is wrong.
     //
-    // Its order is not kept (A12): the Start converts the tap at the window's
-    // start, and an unlock is ordered against that `tap_in` by the times.
+    // Its order is kept with it (A12), for the `tap_in` the Start records.
     const armed = await mapTransitionError(() =>
       armTap(db, {
         studentId: student.id,
@@ -86,6 +85,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
         blockId: target.blockId,
         eventId: body.eventId,
         deviceTime,
+        order: body.order ?? null,
         expiresAt: endOfDay(new Date()),
       }),
     );

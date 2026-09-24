@@ -31,13 +31,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   request is built from what was stored). **Stored:** two nullable columns on `events`,
   `order_install uuid` and `order_seq bigint`, both or neither (`events_order_whole`,
   migration `0008`) — columns, not the payload, because the teacher's live feed ships the
-  payload whole and has no use for a phone's install id. Written only by `insertEvent`, and
-  only an order `knownOrder` can compare, as `knownReason` does for the reason. **The
+  payload whole and has no use for a phone's install id. Written only by the engine
+  (`orderColumns`), and only an order `knownOrder` can compare, as `knownReason` does for
+  the reason. **An armed tap keeps its order** in the same two columns on `armed_taps` (a
+  stale row taken over takes the new tap's), and the Start records its `tap_in` with it:
+  kept none, a tap armed on a clock running fast and an unlock made after the clock went
+  back past the Start would be ordered by the times, and the real unlock read as late
+  (santa's review). **The
   judgement** (`returnedSince`): a return of the student's own in that session — `tap_in` or
   `refocus` — from the unlock's install is after it exactly when its seq is greater. Every
   other pair keeps A10's time rule, unchanged: no order on either side (the A10 tests pass as
-  they were), on one side only (an old build's, or a tap converted at Start), or another
-  install's (a reinstall, another phone). Any return after it and the unlock is `superseded`.
+  they were), on one side only (an old build's), or another install's (a reinstall, another
+  phone). Any return after it and the unlock is `superseded`.
   Protection off still comes first, and the ended row (#76's rider) is judged the same way:
   late by the order once the student has left, and not late by the clock alone — the unlock
   they left on keeps its `after_session_end` / `no_live_participation`. Occurred times never
@@ -48,10 +53,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   record kept `unknown_tap` keeps its order, and `tapIn`'s filing loop files it with that
   order — made while its tap was unanswered, it is numbered after it, so the tap just
   recorded is never a return after it; a later re-tap of the phone's is. Lock order
-  unchanged: `lockTap`, then the session. **An armed tap keeps none:** the Start converts it
-  at the window's start (a pre-bell claim clamps there, and a return is never later than the
-  server recorded it), so the time rule orders it — a column on `armed_taps` would buy
-  nothing a school meets. **Trust boundary:** validated at the route (`Order`, over the
+  unchanged: `lockTap`, then the session. **Trust boundary:** validated at the route (`Order`, over the
   shared `isActionOrder`: a UUID install and a positive safe integer seq) and again in the
   engine. A malformed order is taken as none **on every endpoint**, never a `400`: on an
   unlock a `400` keeps the record out forever (B3a keeps a refused unlock stuck and resends
@@ -79,14 +81,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   unlock-only scope is deliberate, not defensive. **Tests:** the engine on PGlite (a clock
   turned back: applied; a stuck unlock older by the order: late, its clock reading later;
   another install's and one-sided pairs: the time rule, both ways; the ended row; protection
-  off first; A11's tap-bound unlock in both arrival orders; a late tap's filing; replay; what
-  is stored, and a malformed order as none), a real-Postgres race (the late unlock against
+  off first; A11's tap-bound unlock in both arrival orders; a late tap's filing; an armed
+  tap's order through its Start, a stale row's taken over; replay; what is stored, and a
+  malformed order as none), a real-Postgres race (the late unlock against
   the return that went ahead of it, on a clock turned back), the API (each endpoint takes and
-  keeps it; the clock case end to end with its replay; a malformed order never refused, on
-  every endpoint), the route's schema table, five fixtures (`*-ordered`), BaliCore (the
+  keeps it, an armed tap until its Start; the clock case end to end with its replay; a
+  malformed order never refused, on every endpoint), the route's schema table, five fixtures (`*-ordered`), BaliCore (the
   wire, both ways) and BaliOutbox (the install minted once per file, a v1 file given one, each
-  record's own seq — never reused, the same on every retry). Six mutations of the rule and
-  what it stores each turn a test red, the race among them.
+  record's own seq — never reused, the same on every retry). Seven mutations of the rule and
+  what it stores each turn a test red — the first on the real-Postgres race too.
 
 - **2026-09-24** — **A11: an unlock made before the phone's own tap is answered is filed
   under that tap (owner decision 11).** **The endpoint:** `POST /v1/taps/{eventId}/unlock`,

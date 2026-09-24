@@ -2238,6 +2238,35 @@ describe('the phone’s own order decides its unlock against its return (A12)', 
     });
   });
 
+  it('an armed tap keeps its order, and the Start converts it with it', async () => {
+    // Tapped before the bell (#1) on a clock running fast — it claims 09:03 for
+    // a 09:00 Start; the clock then went back past the Start, and a real unlock
+    // (#2) claims 08:50, clamped to 09:00. By the times the converted tap came
+    // after it; by the order it did not.
+    const { teacher, student, klass } = await seedClass('order-armed');
+    const arm = (eventId: string, seq: number, now: string, expiresAt: string) =>
+      armTap(db, {
+        studentId: student.id,
+        teacherId: teacher.id,
+        eventId,
+        deviceTime: at(3),
+        order: n(seq),
+        expiresAt: new Date(expiresAt),
+        now: new Date(now),
+      });
+    // A waiting tap gone stale is taken over by the next, order and all.
+    await arm(newUuidV7(), 1, '2026-01-01T07:00:00Z', '2026-01-01T08:00:00Z');
+    const tap = newUuidV7();
+    const taken = await arm(tap, 2, '2026-01-01T08:58:00Z', '2026-01-01T23:59:59Z');
+    expect(taken.outcome).toBe('armed');
+
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    expect(await orderOf(tap)).toEqual(n(2));
+    const real = move(session, student, new Date('2026-01-01T08:50:00Z'), n(3));
+    expect(await unlock(db, real)).toMatchObject({ outcome: 'applied', state: 'unlocked' });
+  });
+
   it('a retry is answered where it was recorded, and its order is not written again', async () => {
     const { session, student } = await lesson('order-replay');
     await tapIn(db, move(session, student, at(8), n(2)));
