@@ -19,21 +19,24 @@ struct SharingTests {
         #expect(try monitor.records() == [tap])
 
         // The monitor holds the write lock half a second; the app's write waits, then goes.
+        final class Locked: @unchecked Sendable { var at = ContinuousClock.now }
+        let locked = Locked()
         let (holding, done) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
         DispatchQueue.global().async {
             try? monitor.pool.write { db in
                 try db.execute(sql: "INSERT INTO outboxState (key, value) VALUES ('probe', 'x')")
+                locked.at = .now
                 holding.signal()
                 Thread.sleep(forTimeInterval: 0.5)
             }
             done.signal()
         }
         holding.wait()
-        let started = Date()
         let unlock = try #require(try app.record(.unlock(session: "s", reason: nil), now: t0))
-        let waited = Date().timeIntervalSince(started)
+        // Timed from when the monitor took the lock, so a stalled runner cannot shorten it.
+        let waited = ContinuousClock.now - locked.at
         done.wait()
-        #expect(waited >= 0.3, "\(waited)")
+        #expect(waited >= .milliseconds(500), "\(waited)")
         #expect(try monitor.records() == [tap, unlock])
     }
 
@@ -100,14 +103,18 @@ struct SharingTests {
     func engineSuspended() async throws {
         let rig = try Rig(outbox: try suspending(temporaryFile()))
         let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        // Unanswered once, it is due again in 2 s: the wait the refused settle below ends.
+        try await rig.server.next(unlockRoute).reply(nil)
+        await rig.until { $0.retryAt == at(2) }
+        rig.clock.advance(by: 2)
         let sent = try await rig.server.next(unlockRoute)
         Outbox.suspend()
         defer { Outbox.resume() }
         sent.reply(200, Answer.unlocked())
-        try await Task.sleep(for: .milliseconds(100))
+        let state = await rig.until { $0.retryAt == nil }
         #expect(try rig.outbox.records().map(\.eventId) == [unlock.eventId])
         // Suspension is not a failure to show: the engine waits for the app to come back.
-        #expect(await rig.engine.state.link != .storageFailed)
+        #expect(state.link != .storageFailed)
         #expect(rig.clock.deadlines.isEmpty)
         Outbox.resume()
         await rig.engine.setForeground(true)

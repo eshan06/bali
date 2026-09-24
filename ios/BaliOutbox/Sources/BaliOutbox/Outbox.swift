@@ -48,8 +48,8 @@ public struct Outbox: Sendable {
         pool = try Self.coordinated(url) { url in
             let pool = try DatabasePool(
                 path: url.path(percentEncoded: false), configuration: configuration)
-            try Self.migrator.migrate(pool)
             if try pool.read(Self.migrator.hasBeenSuperseded) { throw TooNew() }
+            try Self.migrator.migrate(pool)
             return pool
         }
         self.random = random
