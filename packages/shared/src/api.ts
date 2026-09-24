@@ -95,7 +95,11 @@ export interface TapResponse {
    * shield to, re-read the truth" (`tapDisposition`: 'reread').
    */
   session: SessionView | null;
-  /** The resulting stored state when joined; null when armed, and on a replay no longer current. */
+  /**
+   * The resulting stored state when joined — `unlocked` when an unlock sent
+   * under this tap reached the server first and is filed now (decision 11);
+   * null when armed, and on a replay no longer current.
+   */
   state: ParticipationState | null;
 }
 
@@ -136,7 +140,11 @@ export interface UnlockResponse {
    * an ended participation's last state), or null when there is none.
    */
   state: ParticipationState | null;
-  /** The session for reconciliation; null only when the session id was unknown. */
+  /**
+   * The session for reconciliation; null only when the unlock is kept with no
+   * session — the session id was unknown, or the tap it was sent under has no
+   * session to file it in (`tap_armed`, `unknown_tap`).
+   */
   session: SessionView | null;
   /**
    * The reason on record for this unlock: the one this request carried when the
@@ -191,6 +199,10 @@ export interface CheckInResponse {
 }
 
 // POST /v1/sessions/{id}/unlock — emergency unlock (never discarded; see UnlockResponse).
+// POST /v1/taps/{eventId}/unlock — the same unlock, sent under the phone's own
+// tap while that tap is unanswered, so the phone cannot name a session (owner
+// decision 11): filed in whatever session the tap landed in, under that
+// session's rules, or kept with no session and a note. Same body, same answer.
 export interface UnlockRequest {
   /** Client idempotency key for the unlock event (rule 4). */
   eventId: string;

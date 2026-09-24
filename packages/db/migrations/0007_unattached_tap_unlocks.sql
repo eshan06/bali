@@ -1,0 +1,1 @@
+CREATE INDEX "events_unattached_tap_idx" ON "events" USING btree (("payload"->>'claimed_tap_event_id')) WHERE "events"."type" = 'unlock' and "events"."session_id" is null;

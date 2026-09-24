@@ -27,6 +27,8 @@ import {
   startSession,
   tapIn,
   unlock,
+  unlocksAwaitingTap,
+  unlockUnderTap,
 } from '../src/transitions.js';
 import { makeTestDb } from '../src/testing.js';
 import type { Database } from '../src/types.js';
@@ -1438,6 +1440,56 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
     });
   });
 
+  it('is still late once the student has left the session: noted, with no state to name (#76)', async () => {
+    // Stuck on the phone from 09:03 while the student came back to focus at
+    // 09:08 and was shielded when they left — at the bell, or removed. Read as
+    // no live participation it would paint "Left · unlocked" over them.
+    for (const leaves of ['bell', 'removal'] as const) {
+      const { session, student } = await lesson(`late-left-${leaves}`);
+      await unlock(db, move(session, student, at(5)));
+      await refocus(db, move(session, student, at(8)));
+      if (leaves === 'bell') {
+        await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+      } else {
+        const [enrollment] = await db
+          .select()
+          .from(enrollments)
+          .where(eq(enrollments.studentId, student.id));
+        await endEnrollment(db, {
+          enrollmentId: enrollment!.id,
+          reason: 'removed_from_class',
+          at: at(12),
+        });
+      }
+
+      const late = { ...move(session, student, at(3)), reason: 'nurse' as const };
+      expect(await unlock(db, late), leaves).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'superseded',
+        state: null,
+        participationId: null,
+        session: { id: session.id },
+        reason: 'nurse',
+      });
+      const row = await rowOf(session.id, student.id);
+      expect(row.state, leaves).toBe('focused');
+      expect(row.endedAt, leaves).not.toBeNull();
+      const recorded = (await unlocksIn(session.id)).find((e) => e.eventId === late.eventId);
+      expect(recorded?.payload, leaves).toEqual({ recorded_as: 'superseded', reason: 'nurse' });
+    }
+  });
+
+  it('with no return after it, an unlock landing once the student has left keeps its note', async () => {
+    // The unlock the student left on: "Left · unlocked" is the truth.
+    const { session, student } = await lesson('late-left-unlocked');
+    await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+    expect(await unlock(db, move(session, student, at(9)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'after_session_end',
+      state: null,
+    });
+  });
+
   it('protection off comes first: the state an unlock never softens', async () => {
     const { session, student } = await lesson('late-protoff');
     await tapIn(db, move(session, student, at(4)));
@@ -1537,6 +1589,276 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
       const recorded = one(await unlocksIn(session.id));
       expect(recorded.payload).toEqual({ recorded_as: 'superseded', reason: 'bathroom' });
     });
+  });
+});
+
+describe('an unlock sent under its tap (decision 11)', () => {
+  // The phone taps with no signal and shields at once; the student unlocks
+  // before the tap's answer comes, so the phone sends the unlock under the
+  // tap's id. It is filed wherever that tap landed — or kept unattached with a
+  // note when the tap has no session to file it in. Never refused, never lost.
+  const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+  /** A class in a 09:00–09:25 lesson; its student has not tapped in. */
+  async function lesson(tag: string) {
+    const c = await seedClass(tag);
+    const w = window('2026-01-01T09:00:00Z');
+    return { ...c, session: (await startSession(db, { classId: c.klass.id, ...w })).session };
+  }
+  const tapped = (session: { id: string }, studentId: string, eventId: string, deviceTime: Date) =>
+    tapIn(db, { sessionId: session.id, studentId, eventId, deviceTime });
+  const underTap = (studentId: string, tapEventId: string, deviceTime: Date, reason?: 'nurse') => ({
+    tapEventId,
+    studentId,
+    eventId: newUuidV7(),
+    deviceTime,
+    ...(reason && { reason }),
+  });
+  const stateOf = async (sessionId: string, studentId: string) =>
+    one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)),
+        ),
+    ).state;
+  const unlocksOf = (studentId: string) =>
+    db
+      .select()
+      .from(events)
+      .where(and(eq(events.userId, studentId), eq(events.type, 'unlock')))
+      .orderBy(asc(events.seq));
+
+  it('is filed in the session its tap landed in, by its rules, clamped to its window', async () => {
+    const { session, student } = await lesson('tap-unlock-filed');
+    const tap = newUuidV7();
+    await tapped(session, student.id, tap, at(1));
+    // A clock running fast: clamped into the window it is filed in (rule 1).
+    const sent = underTap(student.id, tap, at(40), 'nurse');
+    expect(await unlockUnderTap(db, sent)).toMatchObject({
+      outcome: 'applied',
+      recordedAs: null,
+      state: 'unlocked',
+      session: { id: session.id },
+      reason: 'nurse',
+    });
+    expect(await stateOf(session.id, student.id)).toBe('unlocked');
+    expect(one(await unlocksOf(student.id))).toMatchObject({
+      eventId: sent.eventId,
+      sessionId: session.id,
+      classId: session.classId,
+      occurredAt: session.endsAt,
+      payload: { tap_event_id: tap, reason: 'nurse' },
+    });
+  });
+
+  it('is filed where the tap switched the student to, never where the phone was before', async () => {
+    const { session: before, student } = await lesson('tap-unlock-switch');
+    const other = await seedClass('tap-unlock-switch-to');
+    await db.insert(enrollments).values({ classId: other.klass.id, studentId: student.id });
+    const w = window('2026-01-01T09:00:00Z');
+    const after = (await startSession(db, { classId: other.klass.id, ...w })).session;
+    await tapped(before, student.id, newUuidV7(), at(1));
+    const tap = newUuidV7();
+    await tapped(after, student.id, tap, at(5));
+
+    expect(await unlockUnderTap(db, underTap(student.id, tap, at(6)))).toMatchObject({
+      outcome: 'applied',
+      session: { id: after.id },
+    });
+    expect(await stateOf(after.id, student.id)).toBe('unlocked');
+    expect((await unlocksOf(student.id)).map((e) => e.sessionId)).toEqual([after.id]);
+  });
+
+  it('meets the rest of that session’s rules: late, protection off, after the end', async () => {
+    const { session, student } = await lesson('tap-unlock-rules');
+    const tap = newUuidV7();
+    await tapped(session, student.id, tap, at(1));
+    // The student's own re-tap at 09:06 went ahead of an unlock made at 09:04 (A10).
+    await tapped(session, student.id, newUuidV7(), at(6));
+    expect(await unlockUnderTap(db, underTap(student.id, tap, at(4)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+    });
+    await protectionOff(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(8),
+    });
+    expect(await unlockUnderTap(db, underTap(student.id, tap, at(9)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'protection_off',
+      state: 'protection_off',
+    });
+    await endSession(db, { sessionId: session.id, at: at(20), reason: 'ended' });
+    expect(await unlockUnderTap(db, underTap(student.id, tap, at(21)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'after_session_end',
+      state: null,
+      session: { id: session.id },
+    });
+  });
+
+  it('is kept unattached, noted, when its tap was only armed — and the Start joins without it', async () => {
+    const { teacher, student, klass } = await seedClass('tap-unlock-armed');
+    const tap = newUuidV7();
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: tap,
+      deviceTime: new Date('2026-01-01T08:57:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T08:57:00Z'),
+    });
+    const sent = underTap(student.id, tap, new Date('2026-01-01T08:58:00Z'), 'nurse');
+    expect(await unlockUnderTap(db, sent)).toEqual({
+      outcome: 'recorded',
+      recordedAs: 'tap_armed',
+      state: null,
+      participationId: null,
+      session: null,
+      reason: 'nurse',
+    });
+    expect(one(await unlocksOf(student.id))).toMatchObject({
+      sessionId: null,
+      classId: null,
+      payload: {
+        recorded_as: 'tap_armed',
+        claimed_tap_event_id: tap,
+        device_time: sent.deviceTime.toISOString(),
+        reason: 'nurse',
+      },
+    });
+
+    // The unlock came before any session did: the Start joins the student, as
+    // their tap asked, and files nothing.
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    expect(await stateOf(session.id, student.id)).toBe('focused');
+    expect(await unlocksOf(student.id)).toHaveLength(1);
+  });
+
+  it('is kept unattached, noted, when no tap of the caller’s has that id — never in another’s session', async () => {
+    const { session, student } = await lesson('tap-unlock-unknown');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-tap-unlock-unknown-classmate', role: 'student' })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: session.classId, studentId: classmate.id });
+    const theirs = newUuidV7();
+    await tapped(session, classmate.id, theirs, at(1));
+
+    for (const tap of [newUuidV7(), theirs]) {
+      const sent = underTap(student.id, tap, at(3));
+      expect(await unlockUnderTap(db, sent)).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'unknown_tap',
+        state: null,
+        session: null,
+      });
+      const kept = (await unlocksOf(student.id)).find((e) => e.eventId === sent.eventId);
+      expect(kept).toMatchObject({ sessionId: null, payload: { claimed_tap_event_id: tap } });
+    }
+    expect(await stateOf(session.id, classmate.id)).toBe('focused');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+  });
+
+  it('a tap landing after its unlock files it there: both arrival orders end alike', async () => {
+    // The phone sends in order, but a tap stuck at its retry bound (B3a) steps
+    // aside for the unlock behind it. Either way the student tapped at 09:02
+    // and unlocked at 09:04, and that is what the session says.
+    for (const unlockFirst of [true, false]) {
+      const { session, student } = await lesson(`tap-unlock-order-${unlockFirst}`);
+      const tap = newUuidV7();
+      const sent = underTap(student.id, tap, at(4), 'nurse');
+      const theTap = () => tapped(session, student.id, tap, at(2));
+      if (unlockFirst) {
+        expect(await unlockUnderTap(db, sent)).toMatchObject({ recordedAs: 'unknown_tap' });
+        expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'unlocked' });
+      } else {
+        expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'focused' });
+        expect(await unlockUnderTap(db, sent)).toMatchObject({ outcome: 'applied' });
+      }
+
+      expect(await stateOf(session.id, student.id)).toBe('unlocked');
+      const filed = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+      expect(filed.occurredAt).toEqual(at(4));
+      expect(filed.payload).toEqual({
+        tap_event_id: tap,
+        ...(unlockFirst && { unattached_event_id: sent.eventId }),
+        reason: 'nurse',
+      });
+      // Each retry answers the truth now, and nothing is filed twice.
+      expect(await theTap()).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+      expect(await unlockUnderTap(db, sent)).toMatchObject({
+        outcome: 'replay',
+        reason: 'nurse',
+        session: unlockFirst ? null : { id: session.id },
+      });
+      expect(await unlocksOf(student.id)).toHaveLength(unlockFirst ? 2 : 1);
+    }
+  });
+
+  it('a late tap files its unlock by the session’s rules: late when a later return went ahead', async () => {
+    const { session, student } = await lesson('tap-unlock-late-tap');
+    const tap = newUuidV7();
+    const sent = underTap(student.id, tap, at(4));
+    await unlockUnderTap(db, sent);
+    // The student's re-tap at 09:06 lands before the 09:02 tap it came after.
+    await tapped(session, student.id, newUuidV7(), at(6));
+    expect(await tapped(session, student.id, tap, at(2))).toMatchObject({ state: 'focused' });
+    const filed = one((await eventsFor(session.id)).filter((e) => e.type === 'unlock'));
+    expect(filed.payload).toEqual({
+      tap_event_id: tap,
+      unattached_event_id: sent.eventId,
+      recorded_as: 'superseded',
+    });
+  });
+
+  it('a tap files only the unlocks its own student sent under it', async () => {
+    const { session, student } = await lesson('tap-unlock-own');
+    const tap = newUuidV7();
+    await unlockUnderTap(db, underTap(student.id, tap, at(4)));
+    // Another of the student's taps files nothing, nor a stranger reusing the id.
+    await tapped(session, student.id, newUuidV7(), at(6));
+    const stranger = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-tap-unlock-own-stranger', role: 'student' })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: session.classId, studentId: stranger.id });
+    expect(await tapped(session, stranger.id, tap, at(7))).toMatchObject({ state: 'focused' });
+    expect(await stateOf(session.id, student.id)).toBe('focused');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+  });
+
+  it('a retry is refused as any unlock is when its id is another event’s', async () => {
+    const { session, student } = await lesson('tap-unlock-conflict');
+    const tap = newUuidV7();
+    await tapped(session, student.id, tap, at(1));
+    await expect(
+      unlockUnderTap(db, { ...underTap(student.id, tap, at(3)), eventId: tap }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect(await unlocksOf(student.id)).toHaveLength(0);
+  });
+
+  it('every tap’s look for them is one probe of their index', async () => {
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`);
+      const result = await tx.execute(
+        sql`explain ${unlocksAwaitingTap(tx, newUuidV7(), newUuidV7())}`,
+      );
+      const rows = (
+        Array.isArray(result) ? result : (result as { rows: unknown[] }).rows
+      ) as Record<string, string>[];
+      return rows.map((row) => Object.values(row).join(' ')).join('\n');
+    });
+    expect(plan, plan).toContain('events_unattached_tap_idx');
   });
 });
 

@@ -9,6 +9,8 @@ import {
   refocus,
   startSession,
   unlock,
+  type UnlockResult,
+  unlockUnderTap,
 } from '@bali/db';
 import type {
   CheckInResponse,
@@ -52,16 +54,29 @@ const UnlockBody = StateChangeBody.extend({
   reason: z.enum(UNLOCK_REASONS).nullish().catch(null),
 });
 
+const TapParams = z.object({ eventId: z.string().uuid() });
+
 function toSessionView(s: { id: string; classId: string; endsAt: Date }): SessionView {
   return { id: s.id, classId: s.classId, endsAt: s.endsAt.toISOString() };
+}
+
+function toUnlockResponse(result: UnlockResult): UnlockResponse {
+  return {
+    outcome: result.outcome,
+    recordedAs: result.recordedAs,
+    state: result.state,
+    session: result.session ? toSessionView(result.session) : null,
+    reason: result.reason,
+  };
 }
 
 /**
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
  * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
- * like a tap. All are thin wrappers over the transition engine — the engine owns
- * the writes, these just authorize and shape the response.
+ * like a tap — an unlock sent under a tap too, which names its tap, not a session. All are thin
+ * wrappers over the transition engine — the engine owns the writes, these just authorize and
+ * shape the response.
  */
 export function registerSessionsRoute(app: FastifyInstance, db: Database): void {
   // POST /v1/classes/:id/sessions — start (or return the already-running) session.
@@ -176,13 +191,32 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           reason: body.reason ?? null,
         }),
       );
-      return {
-        outcome: result.outcome,
-        recordedAs: result.recordedAs,
-        state: result.state,
-        session: result.session ? toSessionView(result.session) : null,
-        reason: result.reason,
-      };
+      return toUnlockResponse(result);
+    },
+  );
+
+  // POST /v1/taps/:eventId/unlock — the same unlock, sent under the phone's own
+  // tap while that tap is unanswered (owner decision 11): filed in whatever
+  // session the tap landed in, or kept with no session and a note — among the
+  // caller's own taps only. Never refused either, and mapped the same way.
+  app.post(
+    '/v1/taps/:eventId/unlock',
+    { preHandler: app.authenticate },
+    async (request): Promise<UnlockResponse> => {
+      const identity = requireAuth(request);
+      const { eventId: tapEventId } = parse(TapParams, request.params);
+      const body = parse(UnlockBody, request.body);
+      const student = await findOrCreateStudent(db, identity.sub);
+      const result = await mapTransitionError(() =>
+        unlockUnderTap(db, {
+          tapEventId,
+          studentId: student.id,
+          eventId: body.eventId,
+          deviceTime: new Date(body.deviceTime),
+          reason: body.reason ?? null,
+        }),
+      );
+      return toUnlockResponse(result);
     },
   );
 

@@ -50,6 +50,13 @@
       "when": 1790237717189,
       "tag": "0006_closed_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790277274572,
+      "tag": "0007_unattached_tap_unlocks",
+      "breakpoints": true
     }
   ]
 }

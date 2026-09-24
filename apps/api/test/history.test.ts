@@ -318,7 +318,8 @@ describe('GET /v1/me/history', () => {
     expect(top.nextBefore).toBe(top.events[1]!.eventId);
 
     // A newer moment, and an older one: an unlock sent at 09:05 that first
-    // reaches the server now, after the bell — recorded in its place.
+    // reaches the server now, after the bell — recorded in its place, late
+    // (the 09:20 refocus went ahead of it).
     await startAt(room.klass.id, '10:00', '10:50');
     await ok(tap(token, room.block.tagId, '10:01'));
     await ok(change(token, first.id, 'unlock', '09:05'));
@@ -326,7 +327,7 @@ describe('GET /v1/me/history', () => {
     const next = await historyOf(token, `?limit=2&before=${top.nextBefore}`);
     expect(next.events.map(line)).toEqual([
       `unlock 09:10 ${room.klass.name}`,
-      `unlock 09:05 ${room.klass.name} after_session_end`,
+      `unlock 09:05 ${room.klass.name} superseded`,
     ]);
     const last = await historyOf(token, `?limit=2&before=${next.nextBefore}`);
     expect(last.events.map(line)).toEqual([`tap_in 09:01 ${room.klass.name}`]);
