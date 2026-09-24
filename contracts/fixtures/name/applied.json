@@ -1,0 +1,21 @@
+{
+  "endpoint": "PATCH /v1/me",
+  "scenario": "A student sets their own display name (A8), stored trimmed.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "displayName": "  Eve   Park ",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "UpdateMeResponse",
+  "body": {
+    "outcome": "applied",
+    "user": {
+      "id": "00000000-0000-7000-8000-000000000002",
+      "role": "student",
+      "displayName": "Eve Park"
+    }
+  }
+}

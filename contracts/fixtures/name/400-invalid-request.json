@@ -1,0 +1,26 @@
+{
+  "endpoint": "PATCH /v1/me",
+  "scenario": "A rename whose eventId is not a UUID: a client bug.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "displayName": "Eve",
+      "eventId": "x"
+    }
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "reason": "invalid_request",
+      "message": "invalid request",
+      "details": [
+        {
+          "path": "eventId",
+          "message": "Invalid UUID"
+        }
+      ]
+    }
+  }
+}

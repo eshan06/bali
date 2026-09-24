@@ -1,6 +1,6 @@
 {
   "endpoint": "GET /v1/me/history",
-  "scenario": "A history page before an event this history does not hold.",
+  "scenario": "A history page before an event this history does not hold: reload from the top.",
   "request": {
     "path": "/v1/me/history?before=00000000-0000-7000-8000-000000000001"
   },
@@ -9,6 +9,7 @@
   "body": {
     "error": {
       "code": "bad_input",
+      "reason": "unknown_cursor",
       "message": "before is not an event of this history"
     }
   }

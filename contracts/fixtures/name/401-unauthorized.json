@@ -1,0 +1,19 @@
+{
+  "endpoint": "PATCH /v1/me",
+  "scenario": "A rename sent with no bearer token.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "displayName": "Eve",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 401,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "unauthorized",
+      "message": "missing bearer token"
+    }
+  }
+}

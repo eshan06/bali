@@ -31,8 +31,8 @@ export type ApiErrorCode = keyof typeof API_ERROR_STATUS;
  * over, or a spent id, and a phone shows each differently — so it keys on this,
  * never on the message. One value per refusal the transition engine makes, and
  * per refusal a route makes itself where one status covers several on it —
- * leaving a class's two 403s (A6); an error with no finer meaning than its
- * status carries none. Additive-only like the other vocab, and a client reads a
+ * leaving a class's two 403s (A6), the history's and a rename's two 400s (A8);
+ * an error with no finer meaning than its status carries none. Additive-only like the other vocab, and a client reads a
  * value it does not know as none: a newer server may send one.
  */
 export const API_ERROR_REASONS = [
@@ -48,6 +48,17 @@ export const API_ERROR_REASONS = [
   // the enrollment is neither their own nor in a class they teach.
   'unknown_user',
   'enrollment_not_yours',
+  // A request that fails validation (a client bug), on an endpoint where a 400
+  // can also mean something else: GET /v1/me/history and PATCH /v1/me (A8).
+  'invalid_request',
+  // GET /v1/me/history: `before` names no moment of this history — reload
+  // from the top.
+  'unknown_cursor',
+  // PATCH /v1/me (A8): the name breaks a rule (blank, too long, a character
+  // that cannot be shown) — or a classmate in a shared class already uses it
+  // (owner decision 8), a 409.
+  'display_name_invalid',
+  'display_name_taken',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

@@ -24,6 +24,20 @@ export const EVENT_PAGE_LIMIT = 200;
 export const HISTORY_PAGE_LIMIT = 50;
 
 /**
+ * Every join code's length (the server mints them, `generateJoinCode`), so the
+ * longest code the join and its preview accept (A6) — and what a phone's or the
+ * portal's code field holds to.
+ */
+export const JOIN_CODE_LENGTH = 6;
+
+/**
+ * The longest display name, in code points (a grid cell, not an essay): what a
+ * student may set (`PATCH /v1/me`, A8), and where a name read off a sign-in
+ * token is cut. A phone's name field holds to it.
+ */
+export const DISPLAY_NAME_MAX_LENGTH = 64;
+
+/**
  * How often a live stream sends an SSE comment so idle connections and proxies
  * stay open — and, on the client, what silence from the server MEANS.
  *
@@ -124,6 +138,9 @@ export const EVENT_TYPES = [
   // Decision 5: a Start declined a waiting tap because the tap it records had
   // already landed. Names the student, not a participation — they did not join.
   'armed_tap_skipped',
+  // A student set their own display name (A8): no session, no class. Its
+  // payload keeps the name and the one it replaced — what a teacher was shown.
+  'display_name_changed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

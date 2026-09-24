@@ -33,6 +33,9 @@ const REFUSALS: Record<
     'protection_off',
     'Screen Time permission is off: tap the block to rejoin',
   ],
+  // Owner decision 8: a classmate in a class the student shares already uses
+  // the name, ignoring case and spacing. Nothing was changed.
+  DISPLAY_NAME_TAKEN: ['conflict', 'display_name_taken', 'a classmate already uses that name'],
 };
 
 /**

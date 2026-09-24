@@ -113,15 +113,24 @@ const SCENARIOS: Record<string, string> = {
   'history/first-page': 'The newest three moments of that history, and the cursor to the next.',
   'history/next-page': 'The three moments after them, sent that cursor as `before`.',
   'history/empty': 'The history of someone signing in for the first time: nothing, and no row.',
-  'history/400-bad-cursor': 'A history page before an event this history does not hold.',
-  'history/400-bad-limit': 'A history page of no moments at all.',
+  'history/400-bad-cursor':
+    'A history page before an event this history does not hold: reload from the top.',
+  'history/400-bad-limit': 'A history page of no moments at all: a malformed query, a client bug.',
   'history/401-unauthorized': 'A history asked for with no bearer token.',
+  'name/applied': 'A student sets their own display name (A8), stored trimmed.',
+  'name/replay': 'The retry of that rename, after a later one: the name now, not the retry’s.',
+  'name/409-display-name-taken':
+    'A name a classmate in a shared class uses, in another case and spacing (owner decision 8).',
+  'name/400-display-name-invalid': 'A name of nothing but spaces: blank.',
+  'name/400-invalid-request': 'A rename whose eventId is not a UUID: a client bug.',
+  'name/401-unauthorized': 'A rename sent with no bearer token.',
+  'name/403-teacher': 'A teacher setting their name: not here — the ruling is about students.',
 };
 
 interface Call {
   /** A bearer token, or null to send none. */
   as: string | null;
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   path: string;
   body?: object;
 }
@@ -440,9 +449,43 @@ async function captureAll() {
   const firstSignIn = await token('student-fx-hist-newcomer');
   await capture('history/empty', history(firstSignIn), 200, { nextBefore: null });
   const nowhere = history(her, `?before=${randomUUID()}`);
-  await capture('history/400-bad-cursor', nowhere, 400, { code: 'bad_input' });
-  await capture('history/400-bad-limit', history(her, '?limit=0'), 400, { code: 'bad_input' });
+  await capture('history/400-bad-cursor', nowhere, 400, { reason: 'unknown_cursor' });
+  const noLimit = history(her, '?limit=0');
+  await capture('history/400-bad-limit', noLimit, 400, { reason: 'invalid_request' });
   await capture('history/401-unauthorized', history(null), 401, { code: 'unauthorized' });
+
+  // A student names themselves (A8): unique within each class they are in
+  // (owner decision 8), and idempotent on its id.
+  const naming = await seedClassroom(db, 'fx-name');
+  const [bea] = await db
+    .insert(users)
+    .values({ cognitoId: 'student-fx-name-bea', role: 'student', displayName: 'Bea Ortiz' })
+    .returning();
+  await db.insert(enrollments).values({ classId: naming.klass.id, studentId: bea!.id });
+  const eve = await token(naming.student.cognitoId);
+  const rename = (
+    as: string | null,
+    displayName: string,
+    eventId: string = randomUUID(),
+  ): Call => ({
+    as,
+    method: 'PATCH',
+    path: '/v1/me',
+    body: { displayName, eventId },
+  });
+  const setName = rename(eve, '  Eve   Park ');
+  await capture('name/applied', setName, 200, { outcome: 'applied' });
+  await setup(rename(eve, 'Eve P.'));
+  await capture('name/replay', setName, 200, { outcome: 'replay' });
+  const beasName = rename(eve, 'bea  ORTIZ');
+  await capture('name/409-display-name-taken', beasName, 409, { reason: 'display_name_taken' });
+  const blank = rename(eve, '   ');
+  await capture('name/400-display-name-invalid', blank, 400, { reason: 'display_name_invalid' });
+  const unkeyed = rename(eve, 'Eve', 'x');
+  await capture('name/400-invalid-request', unkeyed, 400, { reason: 'invalid_request' });
+  await capture('name/401-unauthorized', rename(null, 'Eve'), 401, { code: 'unauthorized' });
+  const theTeacher = rename(await token(naming.teacher.cognitoId), 'Ms. Park');
+  await capture('name/403-teacher', theTeacher, 403, { code: 'forbidden' });
 }
 
 beforeAll(async () => {
@@ -488,6 +531,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(valuesOf('RefocusResponse', 'outcome')).toEqual(new Set(['applied', 'replay']));
     expect(valuesOf('ProtectionOffResponse', 'outcome')).toEqual(new Set(STATE_CHANGE_OUTCOMES));
     expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(['live', 'gone']));
+    expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(['applied', 'replay']));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');
     expect(joins).toEqual(new Set(['joined', 'already_enrolled']));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');

@@ -1,0 +1,19 @@
+{
+  "endpoint": "PATCH /v1/me",
+  "scenario": "A teacher setting their name: not here — the ruling is about students.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "displayName": "Ms. Park",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 403,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "message": "only a student sets their own name here"
+    }
+  }
+}

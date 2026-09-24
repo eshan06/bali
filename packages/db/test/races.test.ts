@@ -1,10 +1,11 @@
 import type { EventType } from '@bali/shared';
-import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
+import { hasSqlState } from '../src/sql-errors.js';
 import {
   armedTaps,
   blocks,
@@ -27,6 +28,7 @@ import {
   markSilentParticipations,
   protectionOff,
   refocus,
+  renameStudent,
   startSession,
   tapIn,
   unlock,
@@ -2069,4 +2071,247 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     expect(fresh.eventId).toBe(refreshEventId);
     expect(fresh.consumedAt).toBeNull();
   }, 20_000);
+});
+
+describe.runIf(REAL_PG)('display names under contention (real Postgres)', () => {
+  /*
+   * Owner decision 8 — a name unique within each class — is a read-then-write:
+   * look at the classmates' names, then take one. Two classmates doing it at
+   * once each see the other's old name, so without the class locks in
+   * `renameStudent` both win. Rounds and a warm pool, as the blocks above: one
+   * pair can simply fail to overlap.
+   */
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  /** A school, `classCount` classes, and `students` students each in the classes listed for them. */
+  async function roster(tag: string, classCount: number, students: number[][]) {
+    const school = one(
+      await db
+        .insert(schools)
+        .values({ name: `School ${tag}` })
+        .returning(),
+    );
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `teacher-${tag}`, role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const classIds: string[] = [];
+    for (let i = 0; i < classCount; i += 1) {
+      const klass = one(
+        await db
+          .insert(classes)
+          .values({
+            teacherId: teacher.id,
+            schoolId: school.id,
+            name: `C${i}`,
+            joinCode: `${tag}-${i}`,
+          })
+          .returning(),
+      );
+      classIds.push(klass.id);
+    }
+    const studentIds: string[] = [];
+    for (const [n, taking] of students.entries()) {
+      const student = one(
+        await db
+          .insert(users)
+          .values({ cognitoId: `student-${tag}-${n}`, role: 'student', schoolId: school.id })
+          .returning(),
+      );
+      for (const i of taking) {
+        await db.insert(enrollments).values({ classId: classIds[i]!, studentId: student.id });
+      }
+      studentIds.push(student.id);
+    }
+    return { classIds, studentIds };
+  }
+
+  const nameOf = async (userId: string) =>
+    one(await db.select().from(users).where(eq(users.id, userId))).displayName;
+
+  it('two classmates taking one name at once: exactly one gets it', async () => {
+    // Two classes they share, joined in opposite orders.
+    for (let round = 0; round < 20; round += 1) {
+      const {
+        studentIds: [a, b],
+      } = await roster(`race-name-${round}`, 2, [
+        [0, 1],
+        [1, 0],
+      ]);
+
+      const settled = await Promise.allSettled([
+        renameStudent(db, { studentId: a!, displayName: 'Ana Reyes', eventId: newUuidV7() }),
+        renameStudent(db, { studentId: b!, displayName: 'ANA REYES', eventId: newUuidV7() }),
+      ]);
+
+      const refused = settled.filter((r) => r.status === 'rejected');
+      expect(refused, `round ${round}`).toHaveLength(1);
+      expect((refused[0] as PromiseRejectedResult).reason).toMatchObject({
+        code: 'DISPLAY_NAME_TAKEN',
+      });
+      const names = [await nameOf(a!), await nameOf(b!)];
+      expect(
+        names.filter((name) => name !== null),
+        `round ${round}`,
+      ).toHaveLength(1);
+    }
+  });
+
+  /**
+   * Hold `classIds` in an open transaction until `release` — so a rename parks
+   * on the first of them it locks — and resolve once they are held.
+   */
+  async function holdClasses(classIds: string[]) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const holding = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const done = db.transaction(async (tx) => {
+      await tx
+        .select({ id: classes.id })
+        .from(classes)
+        .where(inArray(classes.id, classIds))
+        .for('no key update');
+      locked();
+      await held;
+    });
+    await holding;
+    return { release, done };
+  }
+
+  /**
+   * Wait until `n` backends are parked on a lock, then run `whileParked`, and
+   * release the holder whatever happens — a missed staging must fail the test,
+   * never wedge the suite behind the holder (as the held-transaction tests above).
+   */
+  async function whileParked(
+    n: number,
+    holder: { release: () => void; done: Promise<void> },
+    whileParked: () => Promise<void> = async () => {},
+  ) {
+    try {
+      const deadline = Date.now() + 5_000;
+      while ((await lockWaiters()) < n) {
+        if (Date.now() > deadline) throw new Error(`fewer than ${n} renames parked on a class`);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await whileParked();
+    } finally {
+      holder.release();
+      await holder.done;
+    }
+  }
+
+  it('takes a student’s classes in one order: the first held while it waits on the next', async () => {
+    // The order is what keeps renames from deadlocking one another (next
+    // test). A holder takes the student's later class by id, so the rename
+    // parks on it — and must by then hold the earlier one, which a NOWAIT
+    // probe finds taken. Taken the other way round, it parks holding nothing.
+    for (let round = 0; round < 10; round += 1) {
+      const {
+        classIds,
+        studentIds: [a],
+      } = await roster(`race-order-${round}`, 2, [[1, 0]]);
+      // Postgres compares uuids byte by byte, as this compares lower-case hex.
+      const [earlier, later] = [...classIds].sort();
+      const holder = await holdClasses([later!]);
+
+      const renaming = renameStudent(db, {
+        studentId: a!,
+        displayName: 'Ana',
+        eventId: newUuidV7(),
+      });
+      let probe = '';
+      await whileParked(1, holder, async () => {
+        try {
+          await db
+            .select({ id: classes.id })
+            .from(classes)
+            .where(eq(classes.id, earlier!))
+            .for('no key update', { noWait: true });
+          probe = 'free';
+        } catch (err) {
+          // 55P03: lock_not_available — someone holds the row.
+          if (!hasSqlState(err, '55P03')) throw err;
+          probe = 'held';
+        }
+      });
+
+      expect(probe, `round ${round}`).toBe('held');
+      expect((await renaming).outcome).toBe('applied');
+    }
+  }, 20_000);
+
+  it('renames across classes shared in a ring never deadlock', async () => {
+    /*
+     * A is in C0 and C1, B in C1 and C2, C in C2 and C0. Each locks its two
+     * classes, so in any order but one for all, each can end up holding one
+     * class and waiting on another's: a cycle, and Postgres aborts one rename.
+     * Staged, not hoped for — the gap between one statement's two row locks is
+     * too short to interleave by chance: a holder takes all three classes, so
+     * each rename parks on the first class it locks, then lets go of them at
+     * once. Measured with the order made random: a deadlock in four runs of
+     * six — the waiters re-race for the rows on waking, so not every round
+     * closes the cycle, which is why the test above pins the order itself.
+     */
+    for (let round = 0; round < 30; round += 1) {
+      const { classIds, studentIds } = await roster(`race-ring-${round}`, 3, [
+        [0, 1],
+        [1, 2],
+        [2, 0],
+      ]);
+      const holder = await holdClasses(classIds);
+
+      const renames = studentIds.map((studentId, n) =>
+        renameStudent(db, { studentId, displayName: `Student ${n}`, eventId: newUuidV7() }),
+      );
+      await whileParked(3, holder);
+      const settled = await Promise.allSettled(renames);
+
+      expect(
+        settled.map((r) => (r.status === 'fulfilled' ? r.value.outcome : String(r.reason))),
+        `round ${round}`,
+      ).toEqual(['applied', 'applied', 'applied']);
+    }
+  }, 60_000);
+
+  it('a rename racing its own retry is answered as its replay', async () => {
+    // In no class, so no class lock orders the pair: the student's own row does.
+    for (let round = 0; round < 15; round += 1) {
+      const {
+        studentIds: [a],
+      } = await roster(`race-name-retry-${round}`, 0, [[]]);
+      const input = { studentId: a!, displayName: 'Ana Reyes', eventId: newUuidV7() };
+
+      const results = await Promise.all([renameStudent(db, input), renameStudent(db, input)]);
+
+      expect(results.map((r) => r.outcome).sort()).toEqual(['applied', 'replay']);
+      expect(results.map((r) => r.user.displayName)).toEqual(['Ana Reyes', 'Ana Reyes']);
+      const recorded = await db.select().from(events).where(eq(events.eventId, input.eventId));
+      expect(recorded).toHaveLength(1);
+    }
+  });
+
+  it('a sign-in’s fill racing a rename never overwrites the name the student set', async () => {
+    for (let round = 0; round < 15; round += 1) {
+      const cognitoId = `race-fill-rename-${round}-${newUuidV7()}`;
+      const created = await findOrCreateStudent(db, cognitoId);
+      expect(created.displayName).toBeNull();
+
+      await Promise.all([
+        findOrCreateStudent(db, cognitoId, 'demo-ana@example.test'),
+        renameStudent(db, { studentId: created.id, displayName: 'Ana', eventId: newUuidV7() }),
+      ]);
+
+      expect(await nameOf(created.id)).toBe('Ana');
+    }
+  });
 });

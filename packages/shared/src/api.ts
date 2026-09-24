@@ -28,11 +28,38 @@ export interface MeClass {
   id: string;
   name: string;
 }
+export interface MeUser {
+  id: string;
+  role: UserRole;
+  /** What teachers see beside this student; null until a sign-in or the student sets one. */
+  displayName: string | null;
+}
 export interface MeResponse {
-  user: { id: string; role: UserRole; displayName: string | null };
+  user: MeUser;
   classes: MeClass[];
   /** The caller's live session, if any, with its derived display state. */
   session: (SessionView & { state: DisplayState }) | null;
+}
+
+// PATCH /v1/me — a student sets their own display name (A8). Unique within
+// each class: a name a classmate in any shared class already uses, ignoring
+// case and spacing, is `409 display_name_taken` (owner decision 8); a name
+// that breaks a rule is `400 display_name_invalid`. Stored trimmed, with each
+// run of spaces made one.
+export interface UpdateMeRequest {
+  /** At most `DISPLAY_NAME_MAX_LENGTH` code points once trimmed, and something visible. */
+  displayName: string;
+  /** Client idempotency key for the display_name_changed event (rule 4). */
+  eventId: string;
+}
+export interface UpdateMeResponse {
+  /**
+   * 'applied' set the name; 'replay' this eventId already did — nothing is
+   * applied again, and `user` is the truth now, which a later rename may have
+   * changed since.
+   */
+  outcome: 'applied' | 'replay';
+  user: MeUser;
 }
 
 // POST /v1/taps — the tap.

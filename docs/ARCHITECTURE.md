@@ -282,6 +282,17 @@ Student app:
 - `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
   call quietly creates the student's `users` row; a later call fills in a display name
   the row was created without, and never changes one it has.
+- `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
+  stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
+  gives it. Unique within each class (owner decision 8): a name another student in any
+  live class the caller is in already uses — compared ignoring case, spacing and Unicode
+  compatibility forms — is `409 display_name_taken`, never a silent rename; the engine
+  serialises it by locking the caller's row, then their classes in id order. A join is
+  never refused over a name, a name filled from sign-in claims is not policed, and a
+  collision a later join makes is left for the teacher to see. Recorded as a
+  `display_name_changed` event (the name and the one it replaced) with no session: a
+  grid shows the new name at its next snapshot. A replay applies nothing and answers the
+  name now; a teacher is `403`.
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
@@ -320,7 +331,8 @@ Student app:
   before anything else, since a switch mints the join first and stamps both with one
   time; then `seq`. Paged: at most 50 a page, and `nextBefore`, the last event's id, to
   pass as `before` — a cursor that names a row, so a moment recorded between pages never
-  shifts one; a `before` the history does not hold is `400`. A read that creates nothing:
+  shifts one; a `before` the history does not hold is `400 unknown_cursor` (reload from
+  the top), a malformed query `400 invalid_request`. A read that creates nothing:
   no row yet is an empty history. Only ever the caller's own; a teacher is `403`.
 
 Teacher app and web portal:

@@ -47,7 +47,9 @@ export function registerHistoryRoute(app: FastifyInstance, db: Database): void {
     { preHandler: app.authenticate },
     async (request): Promise<HistoryPage> => {
       const identity = requireAuth(request);
-      const { before, limit } = parse(HistoryQuery, request.query);
+      // A malformed query is a client bug; a cursor this history does not
+      // hold is the phone's cue to reload from the top — a reason each.
+      const { before, limit } = parse(HistoryQuery, request.query, 'invalid_request');
 
       // Looked up, never created: no row yet is no history yet.
       const caller = await findUserByCognitoId(db, identity.sub);
@@ -58,7 +60,13 @@ export function registerHistoryRoute(app: FastifyInstance, db: Database): void {
       const page = caller && (await getHistoryPage(db, caller.id, { before, limit }));
       // A cursor this history does not hold — another account's, say: the
       // phone reloads from the top.
-      if (!page) throw ApiError.badInput('before is not an event of this history');
+      if (!page) {
+        throw ApiError.badInput(
+          'before is not an event of this history',
+          undefined,
+          'unknown_cursor',
+        );
+      }
       return { events: page.events.map(toHistoryEvent), nextBefore: page.nextBefore };
     },
   );
