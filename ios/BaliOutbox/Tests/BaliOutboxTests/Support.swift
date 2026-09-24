@@ -13,9 +13,21 @@ let t0 = Date(timeIntervalSince1970: 1_790_000_000)
 
 /// A fresh outbox in a file of its own, its jitter fixed at `random`.
 func makeOutbox(random: Double = 0) throws -> (outbox: Outbox, url: URL) {
-    let url = FileManager.default.temporaryDirectory
-        .appending(path: "BaliOutboxTests-\(UUID().uuidString).sqlite")
-    return (try Outbox(at: url, random: { random }), url)
+    let url = temporaryFile()
+    return (try open(url, random: random), url)
+}
+
+/// A new file's URL, in a folder of its own.
+func temporaryFile() -> URL {
+    FileManager.default.temporaryDirectory.appending(path: "BaliOutboxTests-\(UUID().uuidString)")
+        .appending(path: "outbox.sqlite")
+}
+
+/// The outbox at `url`, its jitter fixed at `random`.
+func open(_ url: URL, random: Double = 0) throws -> Outbox {
+    try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    return try Outbox(at: url, random: { random })
 }
 
 /// Queues `change`, which the test expects to be queued.
@@ -63,21 +75,7 @@ func send(_ outbox: Outbox, _ record: OutboxRecord, _ status: Int?, _ body: Data
     let client = APIClient(
         baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
         transport: Canned(status: status, body: body))
-    let id = record.eventId
-    switch record.request {
-    case .tap(let request):
-        let response = await client.tap(request)
-        return try outbox.settle(eventId: id, with: response, now: now)
-    case .unlock(let session, let request):
-        let response = await client.unlock(session: session, request)
-        return try outbox.settle(eventId: id, with: response, now: now)
-    case .refocus(let session, let request):
-        let response = await client.refocus(session: session, request)
-        return try outbox.settle(eventId: id, with: response, now: now)
-    case .protectionOff(let session, let request):
-        let response = await client.protectionOff(session: session, request)
-        return try outbox.settle(eventId: id, with: response, now: now)
-    }
+    return try outbox.settle(await record.send(through: client), now: now)
 }
 
 /// A disposition as the TypeScript writes it.

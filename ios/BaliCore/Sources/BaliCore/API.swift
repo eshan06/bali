@@ -10,6 +10,9 @@ public struct SessionView: Codable, Sendable, Hashable {
     public let id: String
     public let classId: String
     public let endsAt: Date
+    public init(id: String, classId: String, endsAt: Date) {
+        (self.id, self.classId, self.endsAt) = (id, classId, endsAt)
+    }
 }
 
 public struct MeClass: Codable, Sendable, Hashable {
