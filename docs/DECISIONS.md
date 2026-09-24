@@ -13,10 +13,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   santa three times — six fix rounds — and merged `main` in three times), and
   review notes spawned follow-up PR chains (#36 → #37 → #38). Now `/plan`
   hands each step to a fresh worker sub-agent, one at a time, so no PR
-  inherits another's context; a PR is one change under ~400 changed lines,
-  tests excluded (that line would have split #29 at 641 and #49 at 780, and
-  passed #28, #53 and #54). `/santa-loop`: docs-only changes skip it; code
-  gets up to 2 rounds and round 2 checks only the fixes; a finding blocks
+  inherits another's context, and a worker never plans or starts workers of
+  its own; a PR is one change under ~400 changed lines, tests excluded (that
+  line would have split #29 at 641 and #49 at 780, and passed #28, #53 and
+  #54), and a worker whose step runs over hands it back to the conductor to
+  split. `/santa-loop`: docs-only changes skip it, except changes to the
+  rules themselves; code gets up to 2 rounds and round 2 checks only the
+  fixes and any dismissals; a finding blocks
   only if it fits the BLOCKER rules in `claude-review.yml` — the one
   definition all three reviewers use — and survives a check (a failing test
   for logic bugs); easy WARNs are fixed in the same PR without another round,
