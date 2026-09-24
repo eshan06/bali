@@ -811,10 +811,8 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // `replay` would tell this outbox the tap is durably recorded, so it drops
     // a tap that was never armed and never converts. `insertEvent` refuses the same class of reuse for the same
     // reason ("a student's app is an adversary here"), and this holds that
-    // line: a non-401 4xx keeps the record and retries, which loses nothing.
-    // Not "and surfaces" — that is the UNLOCK contract's `retry_and_surface`,
-    // and no tap-side disposition exists yet, which PLAN.md records as the
-    // open Phase 3 gap.
+    // line: a non-401 4xx keeps the record, retries and surfaces it
+    // (`tapDisposition` in @bali/shared), which loses nothing.
     //
     // The TEACHER axis is the owner's 2026-09-22 ruling, a `/v1` 200 -> 409.
     // Unscoped, an id spent under teacher A answered `replay` on teacher B's
@@ -877,8 +875,8 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // `resolveTapTarget` resolves the teacher from the tag as it stands NOW,
     // so a tap armed under X whose 200 was lost, retried after the block moved
     // to Y, is this student's own id for their own physical tap — and it gets
-    // a permanent 409 that nothing surfaces, since no tap-side disposition
-    // exists. Unreachable today: nothing outside tests writes
+    // a permanent 409, which the phone keeps and surfaces (`tapDisposition`)
+    // but never lands. Unreachable today: nothing outside tests writes
     // `blocks.removed_at`, so no shipped path moves a block.
     //
     // NOT patched here, because the obvious patch is wrong. Taking the row

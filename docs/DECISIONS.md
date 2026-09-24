@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A3: the tap and state-change outbox tables.**
+  `tapDisposition` and `stateChangeDisposition` (`@bali/shared`,
+  `outbox-contract.ts`, beside the unlock's) are pure functions of the status —
+  or `'network_error'` — and the body, like `unlockDisposition`, each over a
+  table typed on its whole outcome union, so a new outcome does not compile
+  until it is placed; an API test binds both to the server's real answers.
+  Decided here: (1) **The session an answer names decides the window, not the
+  outcome's name.** A recorded tap naming a session reconciles to it (shielded
+  only while `state` is `focused` — a replay answers the current state); one
+  naming none is `reread` — delete it, shield to nothing, re-read
+  `GET /v1/me` — which is what A4's `200 replay` with no session will mean,
+  with nothing to change here. `armed` / `already_armed` wait for Start and
+  protection off's `recorded` re-reads, whatever session an answer carried.
+  (2) **A refused tap is kept, retried and shown** (`retry_and_surface`: a
+  `4xx` but `401`, `408`, `429`), the 409 that can never land included — an id
+  held by a different event. Tap steps 9–10 settle "kept": only a 200 lets
+  the phone delete a tap, and a 409 means the server never kept it or it is
+  no longer current. Rule 5 settles "shown", replacing 2026-09-22's "retried
+  but not surfaced", which was only for want of this table. Conservative:
+  nothing the server may not hold is deleted, and an id that is spent or
+  held can never land as a new join. The phone also re-reads the truth, since
+  the answer carries no window and the tap's own shield must not outlive it;
+  a kept record must not hold up the records behind it, or one client bug
+  would wedge every later tap and unlock; and the student's way to retry is a
+  new tap, under a new id. After A4 the 409s left are that conflict and a
+  fresh tap that raced its session's end, whose retry resolves afresh, as a
+  404 (a tag that is not a registered block) does once the block is
+  registered. (3) **A refused refocus or protection-off report is dropped**,
+  as A2's entry decided: delete it, never resend its id, re-read the truth
+  and show the refusal. **408 and 429 are the transport's, never a refusal,**
+  in both new tables, because a drop is irreversible and a change the server
+  never decided on must not be lost. (4) **The reconcile rule is a helper,
+  `readMayReconcile`.** The phone counts its state changes, bumping the count
+  when one is made and when one is answered, and stamps each read — a
+  check-in or `GET /v1/me` — with that count and how many still await an
+  answer; the read applies only if none awaited when it was sent and the
+  count has not moved. That covers #56's race — a check-in that read before a
+  refocus committed and answered after it — and a read that is merely late.
+  An unlock awaits until `recorded`, so no read puts shields back over an
+  emergency unlock the server has not recorded. The superseded-refocus and
+  protection-off re-report rules are stated on `stateChangeDisposition`:
+  outbox mechanics no status-and-body table can express. Two findings went
+  onto A4's line: the refocus replay A2's entry recorded is only partly
+  covered by the superseded rule — a switch is a later tap, a removal or
+  leaving the class is not — so the server fix stays A4's before a phone
+  ships; and the retry of a still-armed tap answers `replay` with no session,
+  the shape of a tap recorded in a session since over, so the phone deletes
+  it rightly but cannot show "waiting for your teacher".
 - **2026-09-24** — **A2c: a protection-off that first reaches the server after
   the bell is recorded with a note (owner decision 10).** The owner chose
   "record it with a note": saved like a late unlock, so the history says why
