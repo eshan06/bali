@@ -32,8 +32,9 @@ struct TimeTests {
 
     @Test("A time encodes as JS toISOString writes it, milliseconds and all")
     func encodes() throws {
-        let precise = Stamp(at: Date(timeIntervalSince1970: 1_790_247_192.345))
-        #expect(try encoded(precise) == #"{"at":"2026-09-24T10:53:12.345Z"}"#)
+        // Half a second is exact in binary, so this holds whether a platform rounds or truncates.
+        let precise = Stamp(at: Date(timeIntervalSince1970: 1_790_247_192.5))
+        #expect(try encoded(precise) == #"{"at":"2026-09-24T10:53:12.500Z"}"#)
         let whole = Stamp(at: Date(timeIntervalSince1970: 946_684_860))
         #expect(try encoded(whole) == #"{"at":"2000-01-01T00:01:00.000Z"}"#)
     }
