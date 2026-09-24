@@ -25,7 +25,10 @@ enum Contract {
     /// One fixture file, as `Fixture` in apps/api/test/helpers/contract.ts writes it. Its
     /// `disposition` is what the TypeScript outbox table says of the answer: the port must agree.
     struct Fixture: Decodable {
-        struct Request: Decodable { let body: JSONValue? }
+        struct Request: Decodable {
+            let path: String
+            let body: JSONValue?
+        }
 
         let endpoint: String
         let request: Request
