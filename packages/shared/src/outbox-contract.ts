@@ -243,14 +243,17 @@ export interface ReconcileStamp {
   /**
    * Bumped each time the phone makes a state change — a tap, an unlock, a
    * refocus, a protection-off report, each acted on at once and written to
-   * the outbox — and each time one is answered: its disposition is anything
-   * but 'retry' or 'reauth'.
+   * the outbox — and each time an answer to one arrives: any disposition but
+   * 'retry' or 'reauth', including every later answer to a record the outbox
+   * kept and resent.
    */
   changes: number;
   /**
-   * The phone's state changes still waiting for that answer. An unlock waits
-   * until it is `recorded`: no read may put shields back over an emergency
-   * unlock the server has not recorded.
+   * How many of those changes still wait for their answer, each counted once,
+   * from when it is made until its first answer — or, for an unlock, until it
+   * is `recorded`, since no read may put shields back over an emergency
+   * unlock the server has not recorded. A kept record's later answers never
+   * touch it, so it never goes below zero.
    */
   awaiting: number;
 }

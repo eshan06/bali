@@ -171,10 +171,14 @@ describe('readMayReconcile (a read never overrides a newer state change)', () =>
         c.changes += 1;
         c.awaiting += 1;
       },
-      /** One of them answered (a disposition other than retry/reauth). */
+      /** A change's first answer (a disposition other than retry/reauth). */
       answer: () => {
         c.changes += 1;
         c.awaiting -= 1;
+      },
+      /** A later answer to a record the outbox kept and resent ('retry_and_surface'). */
+      answerAgain: () => {
+        c.changes += 1;
       },
       stamp: (): ReconcileStamp => ({ ...c }),
     };
@@ -212,6 +216,39 @@ describe('readMayReconcile (a read never overrides a newer state change)', () =>
     p.make();
     const checkIn = p.stamp();
     expect(readMayReconcile(checkIn, p.stamp())).toBe(false);
+  });
+
+  it('a kept record waits only for its first answer; each later one still outdates a read in flight', () => {
+    // A refused tap is kept and resent ('retry_and_surface'). Its first
+    // answer ends its wait, so reads reconcile between resends — the phone
+    // must re-read the truth after it — and awaiting never goes below zero.
+    const p = phone();
+    p.make();
+    p.answer(); // 409: kept, surfaced
+    const between = p.stamp();
+    expect(between.awaiting).toBe(0);
+    expect(readMayReconcile(between, p.stamp())).toBe(true);
+
+    // A resend lands (the block got registered, say: 200 joined) while a
+    // check-in is in flight: that answer is newer than the check-in's read.
+    const checkIn = p.stamp();
+    p.answerAgain();
+    expect(p.stamp().awaiting).toBe(0);
+    expect(readMayReconcile(checkIn, p.stamp())).toBe(false);
+    const next = p.stamp();
+    expect(readMayReconcile(next, p.stamp())).toBe(true);
+  });
+
+  it('an unlock waits until recorded: a refused one keeps every read from putting shields back', () => {
+    const p = phone();
+    p.make(); // the student unlocks
+    p.answerAgain(); // 409 'retry_and_surface': kept, and still waiting
+    const checkIn = p.stamp();
+    expect(checkIn.awaiting).toBe(1);
+    expect(readMayReconcile(checkIn, p.stamp())).toBe(false);
+    p.answer(); // at last, recorded
+    const next = p.stamp();
+    expect(readMayReconcile(next, p.stamp())).toBe(true);
   });
 
   it('once the change is answered, the next read reconciles', () => {
