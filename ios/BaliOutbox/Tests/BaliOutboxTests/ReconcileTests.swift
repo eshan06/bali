@@ -142,6 +142,23 @@ struct ReadTests {
         await rig.stop()
     }
 
+    @Test("An outbox the check-in cannot stamp from is shown, and no read is made until it can be")
+    func unreadableOutbox() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.foreground()
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE outbox RENAME TO gone") }
+        rig.clock.advance(by: 30)
+        await rig.until { $0.link == .storageFailed }
+        try await rig.sleeping([at(60)])
+        #expect(await rig.server.waiting.isEmpty)
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        await rig.until { $0.link == .reached }
+        await rig.stop()
+    }
+
     @Test("Out of a session there is nothing to check in to: the foreground reads the truth, once")
     func noSessionNoCheckIn() async throws {
         let rig = try Rig()

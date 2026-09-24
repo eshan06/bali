@@ -185,14 +185,26 @@ actor Tokens: TokenProvider {
     private(set) var token: String? = "token-1"
     private(set) var refreshes = 0
     let refreshWorks: Bool
+    /// Refreshes under way, held until `release()`; nil when refreshes are not held.
+    private var held: [CheckedContinuation<Void, Never>]?
 
     init(refreshWorks: Bool = true) { self.refreshWorks = refreshWorks }
 
     func accessToken() -> String? { token }
     func set(_ token: String?) { self.token = token }
 
-    func refresh() -> Bool {
+    /// Every refresh from now on runs until `release()`: one under way, for as long as the test says.
+    func hold() { held = [] }
+
+    func release() {
+        let waiting = held ?? []
+        held = nil
+        for refresh in waiting { refresh.resume() }
+    }
+
+    func refresh() async -> Bool {
         refreshes += 1
+        if held != nil { await withCheckedContinuation { held?.append($0) } }
         guard refreshWorks else { return false }
         token = "token-\(refreshes + 1)"
         return true

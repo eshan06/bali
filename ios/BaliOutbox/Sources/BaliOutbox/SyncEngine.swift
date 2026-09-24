@@ -59,7 +59,8 @@ public struct SyncState: Sendable, Hashable {
     public var heardAt: Date?
     /// When the outbox sends next; nil when nothing is queued or it waits on a ring.
     public var retryAt: Date?
-    /// The last state change the server refused, dropped and never sent again: shown (rule 5).
+    /// The last state change the server refused, dropped and never sent again: shown (rule 5)
+    /// until the phone's next change.
     public var refused: Refusal?
 
     /// A tap the server has not answered yet: shielded for at once, to decision 7's cap (B5).
@@ -110,8 +111,7 @@ public actor SyncEngine {
     private var rereading = false
     /// Whether a fresh token was already tried since the last answer that was not a 401.
     private var refreshed = false
-    /// The refresh under way, which a 401 heard while it runs shares: none can be yet, with the
-    /// drain the only sender — B3b-2's check-in will be a second.
+    /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
     private var reauth: Task<Bool, Never>?
     private var running = false
     private enum Loop { case drain, read }
@@ -120,7 +120,11 @@ public actor SyncEngine {
 
     /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready. It
     /// must return at once — false when only the student can give a token, whose sign-in then calls
-    /// `retryNow` — because the drain waits on it: nothing is sent until it returns.
+    /// `retryNow` — because the drain waits on it: nothing is sent until it returns. It is asked
+    /// once per rejection: a fresh token rejected too is not refreshed again until an answer that
+    /// is not a 401, or `retryNow()`. From there recovery is B4's, by contract: `accessToken()`
+    /// never gives a token it knows has expired, and every token B4 gets but through `refresh` —
+    /// a sign-in, a refresh of its own — is followed by `retryNow()`.
     public init(
         outbox: Outbox, client: APIClient, clock: any SyncClock = SystemClock(),
         refresh: @escaping @Sendable () async -> Bool = { false }
@@ -128,10 +132,12 @@ public actor SyncEngine {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
     }
 
-    /// Drains the outbox and reads the truth, until cancelled. Once, for the app's life.
+    /// Drains the outbox and reads the truth, until cancelled: one run at a time, and a run
+    /// cancelled can run again.
     public func run() async {
         guard !running else { return }
         running = true
+        defer { running = false }
         refreshQueue()
         await withDiscardingTaskGroup { group in
             group.addTask { await self.drain() }
@@ -141,8 +147,9 @@ public actor SyncEngine {
 
     /// Queues what the phone just did — acted on at once — and sends it; nil when there is nothing
     /// to send (protection off already reported). Throws when it could not be written: the caller
-    /// shows it (rule 5). An unlock names its session; one made while the phone's own tap is
-    /// unanswered has none yet — open decision 11, settled before B6 and C5 make one.
+    /// shows it (rule 5). The student acting again ends a refusal's showing. An unlock names its
+    /// session; one made while the phone's own tap is unanswered is filed under that tap (decision
+    /// 11) — A11's endpoint, which B6 and C5 use; until then there is none to send it to.
     @discardableResult
     public func record(_ change: Change) throws -> OutboxRecord? {
         guard let record = try outbox.record(change, now: clock.now()) else { return nil }
@@ -151,6 +158,7 @@ public actor SyncEngine {
         update {
             $0.standing = $0.standing.acting(change)
             $0.queued = queued
+            $0.refused = nil
         }
         ring(.drain)
         return record
@@ -230,10 +238,10 @@ public actor SyncEngine {
     {
         await heard(sent.result, sent.noAnswer)
         let queued = queue()
+        let applies = stored(outbox.awaiting) == 0
         var next = state
         next.queued = queued
         defer { state = next }
-        let applies = (try? outbox.awaiting()) == 0
         switch disposition {
         case .tap(.retry)?, .unlock(.retry)?, .stateChange(.retry)?, .tap(.reauth)?,
             .unlock(.reauth)?, .stateChange(.reauth)?:
@@ -268,7 +276,7 @@ public actor SyncEngine {
     private func read() async {
         while !Task.isCancelled {
             rung.remove(.read)
-            if let sent = try? stamp() {
+            if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
                     let response = await client.me()
@@ -314,10 +322,11 @@ public actor SyncEngine {
     /// phone's can be newer (`readMayReconcile`). And no read turns a session's shields back on
     /// over an unrecorded emergency unlock (`holdsUnlock`): its window applies, its focus does not.
     private func reconcile(_ sent: ReconcileStamp, _ read: Standing) {
-        guard let now = try? stamp(), readMayReconcile(sent: sent, now: now) else { return }
+        guard let now = stored(stamp), readMayReconcile(sent: sent, now: now) else { return }
         var read = read
-        if case .inSession(let session, .focused?) = read, !state.standing.isFocused(in: session.id),
-            (try? outbox.holdsUnlock(session: session.id)) ?? true
+        if case .inSession(let session, .focused?) = read,
+            !state.standing.isFocused(in: session.id),
+            stored({ try outbox.holdsUnlock(session: session.id) }) ?? true
         {
             read = .inSession(session, .unlocked)
         }
@@ -369,10 +378,13 @@ public actor SyncEngine {
     private func refreshQueue() { state.queued = queue() }
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
-    private func queue() -> [OutboxRecord] {
-        do { return try outbox.records() } catch {
+    private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
+
+    /// What `read` reads from the outbox; nil when it cannot be read, which is shown (rule 5).
+    private func stored<T>(_ read: () throws -> T) -> T? {
+        do { return try read() } catch {
             _ = failed(error)
-            return state.queued
+            return nil
         }
     }
 
@@ -385,7 +397,11 @@ public actor SyncEngine {
     }
 
     private func ring(_ loop: Loop) {
-        if let waiter = waiters.removeValue(forKey: loop) { waiter.resume() } else { rung.insert(loop) }
+        if let waiter = waiters.removeValue(forKey: loop) {
+            waiter.resume()
+        } else {
+            rung.insert(loop)
+        }
     }
 
     /// Waits for `deadline` (nil: none) or a ring, whichever comes first — a ring made while the

@@ -72,8 +72,7 @@ public struct Outbox: Sendable {
 
     /// Whether `error` is a write refused while the app is suspended, not a failure.
     public static func isSuspension(_ error: any Error) -> Bool {
-        guard let error = error as? DatabaseError else { return false }
-        return error.resultCode == .SQLITE_INTERRUPT || error.resultCode == .SQLITE_ABORT
+        (error as? DatabaseError)?.isInterruptionError == true
     }
 
     /// `open(url)`, coordinated with every other process opening the file (Linux has no

@@ -8,6 +8,14 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **Owner ruling: decision 11 — an emergency unlock made while the
+  phone's own tap is unanswered is filed under its tap.** The phone sends it with the
+  tap's `event_id`, and the server records it in whatever session that tap landed in —
+  late or noted, as today — or as an unattached record with a note when the tap was only
+  armed or never arrived: never lost, and never in the session the phone was in before a
+  tap that switched it (a read would then re-shield the new session over it). A11 builds
+  the endpoint (`POST /v1/taps/{eventId}/unlock`, additive); B6 and C5 use it. Until
+  then `SyncEngine.record` needs a session, so nothing sends one.
 - **2026-09-24** — **B3b-2: the check-in, the reconcile, and one file for the app and its
   extensions.** **The phone's truth** is `SyncState.standing` — out, waiting (armed), or
   in a session in a state: shielded only while `focused`, and a state this build does not
@@ -51,15 +59,30 @@ a real decision? Add a dated entry at the top: what was decided and why.
   migration coordinated by `NSFileCoordinator` (Darwin), so two processes never migrate at
   once; and a file a newer build has migrated is refused (`TooNew`), never written through
   a schema this build does not know. An extension gets no notice before iOS suspends it,
-  so B5's open the file, act and close it. **Tests** (Swift Testing, Linux and the iOS
+  so B5's open the file, act and close it. **Rode along (#74's review):** a cancelled
+  `run()` runs again (nothing reset `running`, so a torn-down task stranded the queue);
+  a refused change is shown until the phone's next change, the student acting again (it
+  was never cleared); `Sent` carries its 2xx answer's session and state — the record is
+  gone once settled, and the reconcile applies them; two 401s at once, the drain's and a
+  read's, share one refresh — reachable only now there are two senders; and a failed read
+  of the outbox is shown anywhere the engine reads it, never skipped. **B4's contract**
+  (the second-401 seam, made explicit): `refresh` is asked once per rejection, so a
+  fresh token rejected too is not refreshed again until an answer that is not a 401, or
+  `retryNow()` — refreshing at every 401 would have a school's phones hammer Cognito
+  through an outage of the API's token check. From there recovery is B4's:
+  `accessToken()` never gives a token it knows has expired, and every token B4 gets but
+  through `refresh` is followed by `retryNow()`. **Tests** (Swift Testing, Linux and the iOS
   Simulator): the tap's outcomes, the phone's own changes at once, a later change standing
   over an older answer, the notes that re-read, the check-in's cadence (foreground only),
   its answers, a re-read with no answer, `GET /v1/me`'s states, an armed phone left
   waiting, #56's race and a read sent while a change awaited, the unlock guard (the window
   and the end apply; a refocus since stands); and two connections on one file (each sees
   the other's records, a write waits out the other's), persistent WAL, suspension (a write
-  refused, a read allowed; the engine waits and sends again) and a newer schema refused.
-  A waiting test fails in thirty seconds rather than hanging a CI job. Twenty-three
+  refused, a read allowed; the engine waits and sends again) and a newer schema refused;
+  and the review's — a run again after a cancelled one, a refusal cleared by the next
+  change, one refresh shared by two 401s, `retryNow` ending a rejection, an outbox the
+  check-in cannot read shown. A waiting test fails in thirty seconds rather than hanging
+  a CI job. Twenty-three
   mutations of the rules, B3b-1's with them, each turn a test red.
 - **2026-09-24** — **B3b-1: the sync engine's drain — one client, retry-now, and the
   waits on sign-in; a record's answer is read only by its own kind's table.**
