@@ -16,6 +16,7 @@ import {
 import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
+import { liveClassWithCode } from './queries.js';
 import { armedTaps, classes, enrollments, events, participations, sessions } from './schema.js';
 import { isDeadlock, isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
@@ -2316,7 +2317,7 @@ export async function joinClassByCode(
       await tx
         .select()
         .from(classes)
-        .where(and(eq(classes.joinCode, input.joinCode), isNull(classes.removedAt)))
+        .where(liveClassWithCode(input.joinCode))
         .limit(1)
         .for('update'),
     );

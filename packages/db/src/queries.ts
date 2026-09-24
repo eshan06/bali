@@ -129,6 +129,15 @@ export async function findClassById(db: Database, classId: string): Promise<Clas
   );
 }
 
+/**
+ * The class a join code opens: the live one holding it. The join
+ * (`joinClassByCode`) and its preview (`previewJoinCode`) both find it by
+ * this, so the two can never name different classes (A6).
+ */
+export function liveClassWithCode(joinCode: string) {
+  return and(eq(classes.joinCode, joinCode), isNull(classes.removedAt));
+}
+
 export interface JoinCodePreview {
   class: ClassRow;
   teacherDisplayName: string | null;
@@ -138,8 +147,8 @@ export interface JoinCodePreview {
 
 /**
  * What a join code opens, for the preview before joining (Phase 3 · A6): the
- * live class holding the code — by the condition `joinClassByCode` joins on —
- * its teacher's display name, and whether `studentId` is in it already.
+ * live class holding the code (`liveClassWithCode`, as the join finds it), its
+ * teacher's display name, and whether `studentId` is in it already.
  * Undefined when no live class holds the code: unknown, archived, or
  * regenerated away. A read: no lock, no write; a caller with no row yet passes
  * no `studentId` and is in no class.
@@ -154,7 +163,7 @@ export async function previewJoinCode(
       .select({ class: classes, teacherDisplayName: users.displayName })
       .from(classes)
       .innerJoin(users, eq(users.id, classes.teacherId))
-      .where(and(eq(classes.joinCode, joinCode), isNull(classes.removedAt)))
+      .where(liveClassWithCode(joinCode))
       .limit(1),
   );
   if (!found) return undefined;

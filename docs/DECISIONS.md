@@ -32,8 +32,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   preview's path, trimming and upper-casing the code. Codes are minted
   upper-case from an alphabet with no look-alikes, so case and surrounding
   whitespace carry no meaning. The preview finds the class by the join's own
-  condition (that code, on a live class), so the two cannot name different
-  classes. For the join this is a correction under API decision 2, and for
+  condition (`liveClassWithCode`: that code, on a live class), so the two
+  cannot name different classes. For the join this is a correction under API decision 2, and for
   every code the server mints only a widening: the length check still runs on
   the code as sent, so every input it refused, it refuses with the same
   status, and a code typed in lower case or with a stray space now joins. (A
