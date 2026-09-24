@@ -23,11 +23,12 @@ func temporaryFile() -> URL {
         .appending(path: "outbox.sqlite")
 }
 
-/// The outbox at `url`, its jitter fixed at `random`.
+/// The outbox at `url`, opened as the app opens it but deaf to the suspension notifications,
+/// which reach every database in the process — only `SharingTests` posts them.
 func open(_ url: URL, random: Double = 0) throws -> Outbox {
     try FileManager.default.createDirectory(
         at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-    return try Outbox(at: url, random: { random })
+    return try Outbox(at: url, random: { random }, suspends: false)
 }
 
 /// Queues `change`, which the test expects to be queued.

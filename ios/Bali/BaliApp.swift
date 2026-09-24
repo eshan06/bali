@@ -6,6 +6,8 @@ import SwiftUI
 // all it shows is that BaliCore and BaliOutbox are linked in, and which build this is.
 @main
 struct BaliApp: App {
+    @Environment(\.scenePhase) private var phase
+
     var body: some Scene {
         WindowGroup {
             VStack(spacing: 8) {
@@ -15,6 +17,12 @@ struct BaliApp: App {
                 Text(String(reflecting: Outbox.self)).font(.body.monospaced())
                 Text("Build \(Self.version)").font(.footnote).foregroundStyle(.secondary)
             }
+        }
+        // The outbox is in the app group, shared with the extensions: suspended holding a lock on
+        // it, the app would be killed (0xdead10cc). So it takes none behind the app, and takes
+        // them again in front.
+        .onChange(of: phase) { _, phase in
+            if phase == .background { Outbox.suspend() } else { Outbox.resume() }
         }
     }
 

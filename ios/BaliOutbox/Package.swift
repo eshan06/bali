@@ -15,7 +15,11 @@ let package = Package(
     targets: [
         .target(
             name: "BaliOutbox",
-            dependencies: ["BaliCore", .product(name: "GRDB", package: "GRDB.swift")]),
+            dependencies: [
+                "BaliCore", .product(name: "GRDB", package: "GRDB.swift"),
+                // The SQLite C API GRDB is built on, for the persistent WAL mode.
+                .product(name: "GRDBSQLite", package: "GRDB.swift"),
+            ]),
         .testTarget(name: "BaliOutboxTests", dependencies: ["BaliOutbox"]),
     ],
     swiftLanguageModes: [.v6]

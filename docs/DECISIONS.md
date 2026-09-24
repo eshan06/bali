@@ -8,6 +8,82 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **Owner ruling: decision 11 — an emergency unlock made while the
+  phone's own tap is unanswered is filed under its tap.** The phone sends it with the
+  tap's `event_id`, and the server records it in whatever session that tap landed in —
+  late or noted, as today — or as an unattached record with a note when the tap was only
+  armed or never arrived: never lost, and never in the session the phone was in before a
+  tap that switched it (a read would then re-shield the new session over it). A11 builds
+  the endpoint (`POST /v1/taps/{eventId}/unlock`, additive); B6 and C5 use it. Until
+  then `SyncEngine.record` needs a session, so nothing sends one.
+- **2026-09-24** — **B3b-2: the check-in, the reconcile, and one file for the app and its
+  extensions.** **The phone's truth** is `SyncState.standing` — out, waiting (armed), or
+  in a session in a state: shielded only while `focused`, and a state this build does not
+  know never is — with `pendingTap`, a tap not yet answered, which enforcement shields for
+  at once to decision 7's cap (not a stuck one: a refused tap's shield must not outlive
+  the refusal). Screens and enforcement read it from `updates()`. **The phone's own
+  changes stand at once** (`record`: an unlock, a refocus, protection off of the session
+  it is in). **A change's own answer** is the truth as of that change: applied when it
+  names a live session — a session and a state — unless a later change of the phone's
+  still waits for its own answer (`awaiting()`), which then stands over it. Armed waits
+  for the Start but never ends a session the phone is in (arming joins nothing). An
+  answer naming no live session — a tap recorded but no longer current, or refused; an
+  unlock recorded with a note, which may name the session it ended but no state; a state
+  change recorded after the end, or dropped — re-reads the truth (`GET /v1/me`). **Reads**
+  — the check-in, and `GET /v1/me` on coming to the foreground and whenever an answer says
+  to (one with no answer is tried again at the next wake, never at once) — are stamped
+  when sent (`ReconcileStamp`: `changes`, each change the phone makes and each answer to
+  one but retry and reauth; B3a's `awaiting`) and applied only when `readMayReconcile`
+  says no change can be newer. **The unlock guard, exactly:** no read turns a session's
+  shields back on over an unrecorded unlock (`holdsUnlock`) — a read saying `focused`
+  there applies its window, as `unlocked` — unless the phone is focused there already, by
+  a refocus or a tap made since: the guard stops a read undoing the student's unlock,
+  never the student's own return to focus (B3a's guard as worded would have held a
+  re-tapped phone unlocked against its own tap). The end of the session, or another
+  session, always applies. **The check-in** every 30 s in the foreground only (iOS won't
+  run the timer behind the app: best-effort, decision 4), for the session the phone is
+  in; `gone` or a `404` re-reads the truth. No poll while armed or out of a session: how
+  an armed phone learns of the Start is open decision 6. **One step, one change of
+  state:** each step publishes at once, so enforcement never sees half of one — a tap's
+  answer published as "no tap pending" before "in the session" would unshield, then
+  shield. **One file** (B5 needs it), as GRDB's "Sharing a Database" says: a 5-second busy
+  timeout, so a write waits out an extension's instead of failing `SQLITE_BUSY`;
+  suspension — the app posts `Outbox.suspend()` as it enters the background and
+  `resume()` as it leaves it (`BaliApp`'s scene phase), so no outbox takes a lock while
+  the app is suspended (iOS kills a process that does, 0xdead10cc); a write refused then
+  (`isSuspension`) is no failure to show, and the engine waits for the app to come back —
+  an answer lost to it is not lost: the record goes again and is answered as a replay;
+  persistent WAL, so a process that only reads (the shield extension) can open the file
+  after the last writer closed it — tested on the connection's own flag, since GRDB
+  closes a pool's readers last and would keep the files anyway; the open and the
+  migration coordinated by `NSFileCoordinator` (Darwin), so two processes never migrate at
+  once; and a file a newer build has migrated is refused (`TooNew`), never written through
+  a schema this build does not know. An extension gets no notice before iOS suspends it,
+  so B5's open the file, act and close it. **Rode along (#74's review):** a cancelled
+  `run()` runs again (nothing reset `running`, so a torn-down task stranded the queue);
+  a refused change is shown until the phone's next change, the student acting again (it
+  was never cleared); `Sent` carries its 2xx answer's session and state — the record is
+  gone once settled, and the reconcile applies them; two 401s at once, the drain's and a
+  read's, share one refresh — reachable only now there are two senders; and a failed read
+  of the outbox is shown anywhere the engine reads it, never skipped. **B4's contract**
+  (the second-401 seam, made explicit): `refresh` is asked once per rejection, so a
+  fresh token rejected too is not refreshed again until an answer that is not a 401, or
+  `retryNow()` — refreshing at every 401 would have a school's phones hammer Cognito
+  through an outage of the API's token check. From there recovery is B4's:
+  `accessToken()` never gives a token it knows has expired, and every token B4 gets but
+  through `refresh` is followed by `retryNow()`. **Tests** (Swift Testing, Linux and the iOS
+  Simulator): the tap's outcomes, the phone's own changes at once, a later change standing
+  over an older answer, the notes that re-read, the check-in's cadence (foreground only),
+  its answers, a re-read with no answer, `GET /v1/me`'s states, an armed phone left
+  waiting, #56's race and a read sent while a change awaited, the unlock guard (the window
+  and the end apply; a refocus since stands); and two connections on one file (each sees
+  the other's records, a write waits out the other's), persistent WAL, suspension (a write
+  refused, a read allowed; the engine waits and sends again) and a newer schema refused;
+  and the review's — a run again after a cancelled one, a refusal cleared by the next
+  change, one refresh shared by two 401s, `retryNow` ending a rejection, an outbox the
+  check-in cannot read shown. A waiting test fails in thirty seconds rather than hanging
+  a CI job. Twenty-three
+  mutations of the rules, B3b-1's with them, each turn a test red.
 - **2026-09-24** — **B3b-1: the sync engine's drain — one client, retry-now, and the
   waits on sign-in; a record's answer is read only by its own kind's table.**
   `SyncEngine` (`ios/BaliOutbox/SyncEngine.swift`), an actor, is the one owner of the

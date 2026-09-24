@@ -7,6 +7,8 @@ import Testing
 let tapRoute = "POST /v1/taps"
 let unlockRoute = "POST /v1/sessions/s/unlock"
 let refocusRoute = "POST /v1/sessions/s/refocus"
+let checkInRoute = "POST /v1/sessions/s/checkin"
+let meRoute = "GET /v1/me"
 
 @Suite("The drain: the outbox, sent through the one client", .timeLimit(.minutes(1)))
 struct DrainTests {
@@ -156,6 +158,64 @@ struct DrainTests {
     }
 
     @Test(
+        "A fresh token rejected too is not refreshed again until B4's retryNow — owed for every token it gets but through refresh — after which the next 401 refreshes"
+    )
+    func retryNowEndsRejection() async throws {
+        let rig = try Rig()
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(401)
+        try await rig.server.next(tapRoute).reply(401)
+        await rig.until { $0.retryAt == at(4) }
+        #expect(await rig.tokens.refreshes == 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(tapRoute).reply(401)
+        let fresh = try await rig.server.next(tapRoute)
+        #expect(fresh.token == "Bearer token-3")
+        #expect(await rig.tokens.refreshes == 2)
+        await rig.stop()
+    }
+
+    @Test(
+        "Two 401s at once — the outbox's and a check-in's — share one refresh, and everything goes again once, with the fresh token"
+    )
+    func sharedRefresh() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.foreground()
+        let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        let sent = try await rig.server.next(unlockRoute)
+        rig.clock.advance(by: 30)
+        let checkIn = try await rig.server.next(checkInRoute)
+        await rig.tokens.hold()
+        sent.reply(401)
+        try await eventually { await rig.tokens.refreshes == 1 }
+        // The check-in's 401, heard while that refresh runs: a second later, so the test sees it.
+        rig.clock.advance(by: 1)
+        checkIn.reply(401)
+        await rig.until { $0.heardAt == at(31) }
+        await rig.tokens.release()
+        let again = try await rig.server.next(unlockRoute)
+        #expect(again.eventId == unlock.eventId && again.token == "Bearer token-2")
+        #expect(try await rig.server.next(meRoute).token == "Bearer token-2")
+        #expect(await rig.tokens.refreshes == 1)
+        await rig.stop()
+    }
+
+    @Test("A run cancelled — its task torn down — runs again: nothing queued is stranded")
+    func runsAgain() async throws {
+        let rig = try Rig()
+        rig.running.cancel()
+        await rig.running.value
+        let tap = try #require(try await rig.engine.record(.tap(tagId: "tag")))
+        let engine = rig.engine
+        let again = Task { await engine.run() }
+        #expect(try await rig.server.next(tapRoute).eventId == tap.eventId)
+        again.cancel()
+        await rig.stop()
+        await again.value
+    }
+
+    @Test(
         "An outbox that cannot be read is shown, and read again within a minute — the record kept, and sent once it can be"
     )
     func storageFails() async throws {
@@ -190,6 +250,7 @@ struct DrainTests {
         var state = await rig.until { $0.retryAt == at(2) }
         #expect(state.queued.map(\.stuck) == [true])
         #expect(state.queued.first?.lastReason == .eventIdConflict)
+        #expect(state.pendingTap == nil)
         await rig.engine.retryNow()
         let again = try await rig.server.next(tapRoute)
         #expect(again.eventId == tap.eventId)
@@ -199,7 +260,9 @@ struct DrainTests {
         await rig.stop()
     }
 
-    @Test("A state change the server refuses is dropped, never sent again — and shown")
+    @Test(
+        "A state change the server refuses is dropped, never sent again — and shown until the phone's next change"
+    )
     func dropShown() async throws {
         let rig = try Rig()
         try await rig.engine.record(.protectionOff(session: "s"))
@@ -212,6 +275,11 @@ struct DrainTests {
                     change: .protectionOff(session: "s"), status: 409,
                     reason: .notParticipating, message: "not_participating"))
         #expect(state.queued.isEmpty)
+        // …and the truth is read again.
+        #expect(try await rig.server.next(meRoute).route == meRoute)
+        // The student acts again: that refusal is history, no longer shown.
+        try await rig.engine.record(.tap(tagId: "tag"))
+        #expect(await rig.engine.state.refused == nil)
         await rig.stop()
     }
 }
