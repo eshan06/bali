@@ -5,6 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   { ignores: ['**/node_modules/', '**/dist/', '**/coverage/', '**/.next/', '**/next-env.d.ts'] },
+  { ignores: ['**/.build/'] }, // SwiftPM's: dependencies' checkouts, GRDB's JavaScript too
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

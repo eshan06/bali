@@ -248,7 +248,8 @@ export interface ReconcileStamp {
    * from when it is made until its first answer — or, for an unlock, until it
    * is `recorded`, since no read may put shields back over an emergency
    * unlock the server has not recorded. A kept record's later answers never
-   * touch it, so it never goes below zero.
+   * touch it, so it never goes below zero. A record stuck at the outbox's
+   * retry bound stops counting; a stuck unlock still guards its session (B3a).
    */
   awaiting: number;
 }

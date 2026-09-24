@@ -21,6 +21,9 @@ settings:
 packages:
   BaliCore:
     path: BaliCore
+  # The student's outbox, in the app group (student-only: the teacher app has none).
+  BaliOutbox:
+    path: BaliOutbox
 
 # Each target is iPhone only (TARGETED_DEVICE_FAMILY 1): XcodeGen's iOS preset sets iPhone
 # and iPad per target, over anything the project sets.
@@ -38,6 +41,7 @@ targets:
         TARGETED_DEVICE_FAMILY: '1'
     dependencies:
       - package: BaliCore
+      - package: BaliOutbox
       # Both extensions ship inside the app.
       - target: BaliMonitor
       - target: BaliShield

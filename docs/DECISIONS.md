@@ -8,6 +8,102 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B3a: the phone's outbox store, and the retry bound.**
+  **The bound (#59's and #70's reviews).** A record is **stuck** at once when
+  refused — `retry_and_surface`, a tap's or an unlock's 4xx but 401, 408 and
+  429 — or after **8** server answers that left it unsettled: every status
+  but 401 (sign-in's; B4 refreshes), 408 and 429 (the network's, the load's),
+  so a 5xx, a 3xx, and a 2xx this build cannot read (an outcome a newer server
+  added, a body that does not decode). No answer never counts: offline is not
+  the record's fault. Eight answers are three to six minutes of backoff — past
+  a deploy's blip, well inside a class. **Stuck is never a deletion:** an
+  unlock leaves only once recorded (ISSUES #2), a tap only on a 2xx
+  (ARCHITECTURE), a state change is dropped only on its table's refusal, never
+  at the bound (one the server never decided on is never dropped). It is
+  retried forever at the capped backoff and shown — its last status, reason
+  and message are kept for a screen (rule 5) — and stays stuck. **What
+  changes: it holds nothing.** Not the records behind it — a kept record never
+  blocks them (A3), or one client bug, or one outcome a newer server added,
+  would wedge every later tap and unlock — and not the phone's reads: it stops
+  counting in `ReconcileStamp.awaiting` (`Outbox.awaiting()`), so a check-in
+  or `GET /v1/me` reconciles again, and an early end, a removal, an extension
+  or a later session's truth reaches the phone. A tap stopped awaiting at its
+  first answer already; for an unlock and a state change this is new.
+  **Exactly how an unlock stops blocking reconciles:** stuck, it leaves
+  `awaiting`, but an unrecorded unlock still guards its own session — while one
+  is queued (`holdsUnlock(session:)`), no read may put that session's shields
+  back on (a read there that says `focused` is not applied as focus; its end or
+  window still is). The emergency unlock stands on the phone until the server
+  has it, and blocks nothing else. The refocus returning from it waits unsent
+  and does not await either: the server has seen neither. Why eight and not at
+  once for a `retry` answer: a 5xx or an unreadable 2xx may be the whole server
+  (a deploy, a captive portal), and stepping aside then reorders records when
+  it comes back; eight keep a blip in order and still unwedge a failure of one
+  record within minutes. The accepted cost: records stuck through a long
+  outage retry in jittered order when it ends, so two taps, or a report and a
+  tap, can land out of order — the refocus hold covers the pair whose order
+  changes the truth, and an unlock always records. `ReconcileStamp.awaiting`'s
+  comment says so, in the TypeScript and in BaliCore. **The store:**
+  `ios/BaliOutbox`, a Swift package on BaliCore and GRDB 7.11.1 (pinned
+  exactly; its manifest needs Xcode 16.3), student-only, linked by the app.
+  The database is `outbox.sqlite` in the app group's container
+  (`Outbox.appGroupURL`, `group.com.bali.shared`), a WAL `DatabasePool`,
+  opened by the app alone so far; tests inject a temporary file. **Schema
+  v1:** `outbox`, one row per record — `seq` (the order the phone acted),
+  `eventId` (a UUIDv7 minted when it acted, rule 4), `kind` (tap, unlock,
+  refocus, protection_off), its payload as columns (`tagId`, `sessionId`,
+  `reason`; checks tie each to its kind), `recordedAt` (sent as `deviceTime`),
+  `attempts`, `answers` (what the bound counts), `nextAttemptAt`, `stuck`,
+  the last answer (`lastStatus`, `lastReason`, `lastMessage`) and `follows`;
+  and `outboxState`, the rules' own: the session protection off was last
+  reported for, and the latest unlock's id. Every attempt builds the same
+  request from the stored columns. **The rules, applied (BaliCore's tables
+  decide, never this store):** a disposition that ends a record deletes it,
+  any other keeps it. **Supersession:** a tap or an unlock deletes every
+  queued refocus, unsent; one in flight settles to nothing (`settle` answers
+  nil), and its answer, older than the phone's truth, is not applied. Nothing
+  supersedes an unlock, a tap or a protection-off report. **Protection off is
+  reported once per revocation:** again after a tap (it returns the row to
+  focused), after `protectionRestored()`, or in another session — an armed tap
+  converted at Start is one; the flag survives a relaunch. **Order:** in the
+  order the phone acted. A pending record holds every record behind it, its
+  backoff included, so an unlock always goes ahead of a later refocus; a stuck
+  one steps aside, retried on its own backoff among them. A refocus waits for
+  the unlock it returns from — the latest, still queued, in its session — to
+  be recorded, even stuck: an unlock landing after its refocus leaves the
+  server at `unlocked`, the grid showing an unlock the student came back from
+  and the next read unshielding them. It waits on its own unlock only, never
+  an older stuck one: stuck while a newer unlock landed, that one is failing on
+  its own and may never land, and waiting would hold the refocus forever, the
+  server at `unlocked` while the student is back in focus. The cost if it does
+  land later: the engine flips a live focused row on any new unlock, whatever
+  its device time, so the row reads `unlocked` again until the next change —
+  recording an unlock older than the row's last refocus without flipping it is
+  a server question, left for the owner. **Backoff:** 2 s, 4 s, 8 s, 16 s, 32 s, then 60 s (the
+  cap), each plus a uniform extra of up to as much again, so 600 phones never
+  retry in unison; every send that leaves the record counts, no answer and a
+  401 included, so an offline phone never spins; the random source is clamped
+  (NaN reads as none), so the bounds hold whatever it returns. **Not here
+  (B3b):** the loop that drains `nextDue`, the 30-second check-in, applying
+  answers (reconcile; stamping reads with `awaiting()`; `holdsUnlock`'s
+  guard), one shared `APIClient`, a retry-now for the student's retry and
+  after a reauth, and GRDB's multi-process setup (a busy timeout, suspension
+  in the background, iOS's 0xdead10cc) once an extension opens the database
+  (B5). An unlock made while the phone's own tap is unanswered has no session
+  to name yet: B6 decides what it is sent to. **Also:** ESLint ignores
+  `**/.build/` — GRDB's checkout carries JavaScript, so `npm run lint` failed
+  after any local `swift test`. CI's Linux Swift job installs
+  `libsqlite3-dev` (three tries: a mirror mid-sync failed it once) and runs
+  BaliOutbox's tests; the macOS job runs them on the iOS Simulator, on iOS's
+  own SQLite. **Tests** (Swift Testing): every case in `contracts/outbox/` —
+  the TypeScript's own answers, 25 results × 37 bodies per table — settles as
+  its disposition and deletes exactly when that ends the record (an unlock
+  only when recorded, a refusal stuck at once); each real fixture of the four
+  endpoints, its answer kept; the backoff and the jitter's bounds; the bound
+  per answer kind; the order; supersession; protection off; `awaiting` and
+  `holdsUnlock`; migration from an empty file, and a reopened one; and a
+  seeded random walk in which nothing deletes an unlock but a `recorded`.
+  Twenty-one mutations of the rules each turn a test red.
 - **2026-09-24** — **B2: the iOS app skeleton, generated by XcodeGen, and the
   macOS job that builds it; BaliCore follows no redirect.** **The project is
   generated, never committed.** `ios/project.yml` is the project: the app
