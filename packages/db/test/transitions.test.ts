@@ -831,9 +831,9 @@ describe('state changes', () => {
     it('an unlock while protection is off closes an open silence episode', async () => {
       // Defensive: nothing leaves an episode open on a protection-off row today
       // (the sweep marks only focused rows, protectionOff closes any episode it
-      // finds, and a sweep racing it queues behind it or deadlocks — Phase 3
-      // A2b), so the test plants one. Contact must still close it if a future
-      // path does.
+      // finds, and when the two race, the sweep queues behind it or one side
+      // loses a deadlock and retries into one of those cases), so the test
+      // plants one. Contact must still close it if a future path does.
       const { session, student } = await joined('protoff-unlock-silence');
       await protectionOff(db, change(session, student, 5));
       await db

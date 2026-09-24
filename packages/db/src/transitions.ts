@@ -105,13 +105,17 @@ function heardNow(): Date {
 }
 
 /**
- * Retry a transaction that Postgres aborts with a deadlock (40P01). A
- * session-scoped participation-ender (endEnrollment) and a cross-session switch
- * (tapIn -> endParticipationsElsewhere) can both reach the same participation row
- * while holding different session locks, and Postgres aborts one side. Every
- * engine mutation is idempotent (event_id / removed_at), so re-running the loser
- * is safe and converges. PGlite is single-connection and never deadlocks, so this
- * is a no-op there.
+ * Retry a transaction that Postgres aborts with a deadlock (40P01). Two engine
+ * writers can reach the same participation row in opposite lock orders: a
+ * session-scoped change (endEnrollment, endSession, unlock, refocus,
+ * protection-off) locks the session and then the row, while a cross-session
+ * switch (tapIn or an armed tap converting at Start -> endParticipationsElsewhere),
+ * the silence sweep and a check-in closing a silence episode take the row first
+ * and then this session's key-share lock for their event. Postgres aborts one
+ * side, so both sides retry. Every engine mutation is idempotent (event_id /
+ * removed_at / a guarded UPDATE), so re-running the loser is safe and
+ * converges. PGlite is single-connection and never deadlocks, so this is a
+ * no-op there.
  */
 async function withDeadlockRetry<T>(fn: () => Promise<T>, attempts = 5): Promise<T> {
   for (let i = 0; ; i += 1) {
@@ -1300,31 +1304,36 @@ export async function markSilentParticipations(db: Database, now: Date): Promise
 
   let opened = 0;
   for (const c of candidates) {
-    const didOpen = await db.transaction(async (tx) => {
-      const marked = await tx
-        .update(participations)
-        .set({ silentSince: now })
-        .where(
-          and(
-            eq(participations.id, c.participationId),
-            isNull(participations.silentSince),
-            isNull(participations.endedAt),
-            eq(participations.state, 'focused'),
-            silent,
-          ),
-        )
-        .returning({ id: participations.id });
-      if (marked.length === 0) return false; // a racing sweep or a state change won
-      await insertEvent(tx, {
-        eventId: newUuidV7(),
-        type: 'went_silent',
-        sessionId: c.sessionId,
-        classId: c.classId,
-        userId: c.studentId,
-        occurredAt: clampToWindow(now, c.startedAt, c.endsAt),
-      });
-      return true;
-    });
+    // Retry on deadlock: this takes the participation row first and the
+    // session's key-share lock (the event's foreign key) second, while unlock
+    // and the state changes lock the session first — either side can lose.
+    const didOpen = await withDeadlockRetry(() =>
+      db.transaction(async (tx) => {
+        const marked = await tx
+          .update(participations)
+          .set({ silentSince: now })
+          .where(
+            and(
+              eq(participations.id, c.participationId),
+              isNull(participations.silentSince),
+              isNull(participations.endedAt),
+              eq(participations.state, 'focused'),
+              silent,
+            ),
+          )
+          .returning({ id: participations.id });
+        if (marked.length === 0) return false; // a racing sweep or a state change won
+        await insertEvent(tx, {
+          eventId: newUuidV7(),
+          type: 'went_silent',
+          sessionId: c.sessionId,
+          classId: c.classId,
+          userId: c.studentId,
+          occurredAt: clampToWindow(now, c.startedAt, c.endsAt),
+        });
+        return true;
+      }),
+    );
     if (didOpen) opened += 1;
   }
   return opened;
@@ -1653,70 +1662,79 @@ async function changeState(
   } = {},
 ): Promise<StateChangeResult> {
   const { cannotLeave, replayNeedsLive = false } = rules;
-  return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
-    if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-    // Ahead of any replay, deliberately: a change retried after the bell is
-    // refused rather than replayed, because its answer would carry this
-    // session's window and a refocus answer turns shields back on — a 200
-    // pointing the phone at a session that is over (rule 4). The refusal
-    // costs nothing: the phone drops a refused change and re-reads the truth
-    // (its outbox contract for state changes, Phase 3 A3).
-    if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+  // Retry on deadlock: this locks the session first and the participation row
+  // second, while the silence sweep, a tap switching the student out of this
+  // session, and an armed tap converting at another Start take the row first —
+  // either side can lose. Idempotent on event_id — safe to retry.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+      if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+      // Ahead of any replay, deliberately: a change retried after the bell is
+      // refused rather than replayed, because its answer would carry this
+      // session's window and a refocus answer turns shields back on — a 200
+      // pointing the phone at a session that is over (rule 4). The refusal
+      // costs nothing: the phone drops a refused change and re-reads the truth
+      // (its outbox contract for state changes, Phase 3 A3).
+      if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
-    const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+      const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
 
-    const isNew = await insertEvent(tx, {
-      eventId: input.eventId,
-      type: eventType,
-      sessionId: session.id,
-      classId: session.classId,
-      userId: input.studentId,
-      occurredAt,
-    });
-
-    const row = await loadParticipation(tx, session.id, input.studentId);
-
-    if (!isNew) {
-      // Replay: return the current truth even if the participation has ended.
-      if (!row)
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
-      // Unless the change opts out: an ended row's last state is not the truth
-      // for a student removed or switched away while this session runs, and a
-      // 200 naming this session would point their phone back at it. The phone
-      // drops a refused change and re-reads the truth (Phase 3 A3).
-      if (replayNeedsLive && row.endedAt !== null) {
-        throw new TransitionError('NOT_PARTICIPATING', 'replayed change: participation has ended');
-      }
-      return { outcome: 'replay', state: row.state, participationId: row.id, session };
-    }
-
-    // A fresh change needs a live participation to move.
-    if (!row || row.endedAt !== null) {
-      throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
-    }
-    // Throwing here rolls the event insert above back with it: a refused change
-    // records nothing.
-    if (cannotLeave !== undefined && row.state === cannotLeave.state) {
-      throw new TransitionError(cannotLeave.code, cannotLeave.message);
-    }
-
-    await closeOpenSilence(
-      tx,
-      {
-        id: row.id,
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId,
+        type: eventType,
         sessionId: session.id,
         classId: session.classId,
-        studentId: input.studentId,
-      },
-      occurredAt,
-    );
-    await tx
-      .update(participations)
-      .set({ state: nextState, lastSeenAt: heardNow() })
-      .where(eq(participations.id, row.id));
-    return { outcome: 'applied', state: nextState, participationId: row.id, session };
-  });
+        userId: input.studentId,
+        occurredAt,
+      });
+
+      const row = await loadParticipation(tx, session.id, input.studentId);
+
+      if (!isNew) {
+        // Replay: return the current truth even if the participation has ended.
+        if (!row)
+          throw new TransitionError('NOT_PARTICIPATING', 'replayed change has no participation');
+        // Unless the change opts out: an ended row's last state is not the truth
+        // for a student removed or switched away while this session runs, and a
+        // 200 naming this session would point their phone back at it. The phone
+        // drops a refused change and re-reads the truth (Phase 3 A3).
+        if (replayNeedsLive && row.endedAt !== null) {
+          throw new TransitionError(
+            'NOT_PARTICIPATING',
+            'replayed change: participation has ended',
+          );
+        }
+        return { outcome: 'replay', state: row.state, participationId: row.id, session };
+      }
+
+      // A fresh change needs a live participation to move.
+      if (!row || row.endedAt !== null) {
+        throw new TransitionError('NOT_PARTICIPATING', 'no live participation to change');
+      }
+      // Throwing here rolls the event insert above back with it: a refused change
+      // records nothing.
+      if (cannotLeave !== undefined && row.state === cannotLeave.state) {
+        throw new TransitionError(cannotLeave.code, cannotLeave.message);
+      }
+
+      await closeOpenSilence(
+        tx,
+        {
+          id: row.id,
+          sessionId: session.id,
+          classId: session.classId,
+          studentId: input.studentId,
+        },
+        occurredAt,
+      );
+      await tx
+        .update(participations)
+        .set({ state: nextState, lastSeenAt: heardNow() })
+        .where(eq(participations.id, row.id));
+      return { outcome: 'applied', state: nextState, participationId: row.id, session };
+    }),
+  );
 }
 
 /** An emergency unlock, with the reason the student chose to give, if any. */
@@ -1845,150 +1863,157 @@ async function recordOrphanUnlock(
  */
 export async function unlock(db: Database, input: UnlockInput): Promise<UnlockResult> {
   const reason = knownReason(input.reason);
-  return db.transaction(async (tx) => {
-    const session = await loadSession(tx, input.sessionId, { forUpdate: true });
+  // Retry on deadlock, as changeState does: the same session-then-row lock
+  // order meets the same rivals. A 40P01 that escaped reached the phone as a
+  // 500 — retried, so never lost, but a record the server could have kept at
+  // once. Idempotent on event_id — safe to retry.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const session = await loadSession(tx, input.sessionId, { forUpdate: true });
 
-    if (!session) {
-      // Nothing to attach to — the record still survives, unattached.
-      return recordOrphanUnlock(tx, input, 'unknown_session');
-    }
+      if (!session) {
+        // Nothing to attach to — the record still survives, unattached.
+        return recordOrphanUnlock(tx, input, 'unknown_session');
+      }
 
-    const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
-    const row = await loadParticipation(tx, session.id, input.studentId);
+      const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+      const row = await loadParticipation(tx, session.id, input.studentId);
 
-    // The only authorization this endpoint has — and it can never be a refusal.
-    // Without it any account holding a valid token could POST an unlock for a
-    // session id it merely guessed and write permanent rows into a stranger's
-    // class history, live grid and unlock reports. A caller with no
-    // participation row here AND no active enrollment in the class has no
-    // standing in this session, so the record is kept as an orphan (rule 6 —
-    // never discarded) rather than attached to someone else's session.
-    //
-    // This does not weaken ISSUES #2: a student removed mid-session still has
-    // their (now ended) participation row, so they keep attaching to the
-    // session and their unlock is recorded against it exactly as before.
-    if (row === undefined) {
-      const enrolled = await tx
-        .select({ id: enrollments.id })
-        .from(enrollments)
-        .where(
-          and(
-            eq(enrollments.classId, session.classId),
-            eq(enrollments.studentId, input.studentId),
-            isNull(enrollments.removedAt),
-          ),
-        )
-        .limit(1);
-      if (enrolled.length === 0) return recordOrphanUnlock(tx, input, 'not_enrolled');
-    }
+      // The only authorization this endpoint has — and it can never be a refusal.
+      // Without it any account holding a valid token could POST an unlock for a
+      // session id it merely guessed and write permanent rows into a stranger's
+      // class history, live grid and unlock reports. A caller with no
+      // participation row here AND no active enrollment in the class has no
+      // standing in this session, so the record is kept as an orphan (rule 6 —
+      // never discarded) rather than attached to someone else's session.
+      //
+      // This does not weaken ISSUES #2: a student removed mid-session still has
+      // their (now ended) participation row, so they keep attaching to the
+      // session and their unlock is recorded against it exactly as before.
+      if (row === undefined) {
+        const enrolled = await tx
+          .select({ id: enrollments.id })
+          .from(enrollments)
+          .where(
+            and(
+              eq(enrollments.classId, session.classId),
+              eq(enrollments.studentId, input.studentId),
+              isNull(enrollments.removedAt),
+            ),
+          )
+          .limit(1);
+        if (enrolled.length === 0) return recordOrphanUnlock(tx, input, 'not_enrolled');
+      }
 
-    const live = row !== undefined && row.endedAt === null ? row : undefined;
+      const live = row !== undefined && row.endedAt === null ? row : undefined;
 
-    // Why nothing flips, when nothing does. With no live participation an ended
-    // session dominates (the whole session is over), otherwise it's a student
-    // removed from the class mid-session — the ISSUES #2 case. A live student
-    // whose protection is off is not flipped either: that state is never
-    // softened into an unlock (ARCHITECTURE, iOS rules: "never green, never an
-    // unlock") — iOS already dropped the shields, and the grid must keep saying
-    // the permission is off until a re-tap. Recorded all the same, never refused.
-    let note: UnlockRecordedAs | null = null;
-    if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
-    else if (live.state === 'protection_off') note = 'protection_off';
+      // Why nothing flips, when nothing does. With no live participation an ended
+      // session dominates (the whole session is over), otherwise it's a student
+      // removed from the class mid-session — the ISSUES #2 case. A live student
+      // whose protection is off is not flipped either: that state is never
+      // softened into an unlock (ARCHITECTURE, iOS rules: "never green, never an
+      // unlock") — iOS already dropped the shields, and the grid must keep saying
+      // the permission is off until a re-tap. Recorded all the same, never refused.
+      let note: UnlockRecordedAs | null = null;
+      if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
+      else if (live.state === 'protection_off') note = 'protection_off';
 
-    const payload: Record<string, unknown> = {};
-    if (note !== null) payload.recorded_as = note;
-    if (reason !== null) payload.reason = reason;
+      const payload: Record<string, unknown> = {};
+      if (note !== null) payload.recorded_as = note;
+      if (reason !== null) payload.reason = reason;
 
-    const isNew = await insertEvent(tx, {
-      eventId: input.eventId,
-      type: 'unlock',
-      sessionId: session.id,
-      classId: session.classId,
-      userId: input.studentId,
-      occurredAt,
-      payload: Object.keys(payload).length > 0 ? payload : null,
-    });
-
-    if (!isNew) {
-      // Replay: return the current truth — the stored state if a participation
-      // row exists at all (live or since-ended), never a refusal — and the
-      // reason that was recorded rather than the one this retry carries.
-      return {
-        outcome: 'replay',
-        recordedAs: null,
-        state: row?.state ?? null,
-        participationId: row?.id ?? null,
-        session,
-        reason: await recordedReason(tx, input.eventId),
-      };
-    }
-
-    if (live && note === null) {
-      await closeOpenSilence(
-        tx,
-        {
-          id: live.id,
-          sessionId: session.id,
-          classId: session.classId,
-          studentId: input.studentId,
-        },
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'unlock',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: input.studentId,
         occurredAt,
-      );
-      await tx
-        .update(participations)
-        .set({ state: 'unlocked', lastSeenAt: heardNow() })
-        .where(eq(participations.id, live.id));
-      return {
-        outcome: 'applied',
-        recordedAs: null,
-        state: 'unlocked',
-        participationId: live.id,
-        session,
-        reason,
-      };
-    }
+        payload: Object.keys(payload).length > 0 ? payload : null,
+      });
 
-    if (live) {
-      // Protection off: nothing flips, but the phone made contact — last
-      // contact moves (the grid's "last seen"), and any open silence episode
-      // closes. Defensive: none can be open today — the sweep marks only
-      // focused rows, protectionOff closes any episode it finds, and a sweep
-      // racing it either queues behind it or deadlocks (Phase 3 A2b) — but
-      // contact must never leave one open.
-      await closeOpenSilence(
-        tx,
-        {
-          id: live.id,
-          sessionId: session.id,
-          classId: session.classId,
-          studentId: input.studentId,
-        },
-        occurredAt,
-      );
-      await tx
-        .update(participations)
-        .set({ lastSeenAt: heardNow() })
-        .where(eq(participations.id, live.id));
+      if (!isNew) {
+        // Replay: return the current truth — the stored state if a participation
+        // row exists at all (live or since-ended), never a refusal — and the
+        // reason that was recorded rather than the one this retry carries.
+        return {
+          outcome: 'replay',
+          recordedAs: null,
+          state: row?.state ?? null,
+          participationId: row?.id ?? null,
+          session,
+          reason: await recordedReason(tx, input.eventId),
+        };
+      }
+
+      if (live && note === null) {
+        await closeOpenSilence(
+          tx,
+          {
+            id: live.id,
+            sessionId: session.id,
+            classId: session.classId,
+            studentId: input.studentId,
+          },
+          occurredAt,
+        );
+        await tx
+          .update(participations)
+          .set({ state: 'unlocked', lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        return {
+          outcome: 'applied',
+          recordedAs: null,
+          state: 'unlocked',
+          participationId: live.id,
+          session,
+          reason,
+        };
+      }
+
+      if (live) {
+        // Protection off: nothing flips, but the phone made contact — last
+        // contact moves (the grid's "last seen"), and any open silence episode
+        // closes. Defensive: none can be open today — the sweep marks only
+        // focused rows, protectionOff closes any episode it finds, and when the
+        // two race, the sweep queues behind it or one side loses a deadlock and
+        // retries into one of those cases — but contact must never leave one
+        // open.
+        await closeOpenSilence(
+          tx,
+          {
+            id: live.id,
+            sessionId: session.id,
+            classId: session.classId,
+            studentId: input.studentId,
+          },
+          occurredAt,
+        );
+        await tx
+          .update(participations)
+          .set({ lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        return {
+          outcome: 'recorded',
+          recordedAs: note,
+          state: live.state,
+          participationId: live.id,
+          session,
+          reason,
+        };
+      }
+
+      // No live participation: the committed event is itself the record.
       return {
         outcome: 'recorded',
         recordedAs: note,
-        state: live.state,
-        participationId: live.id,
+        state: null,
+        participationId: null,
         session,
         reason,
       };
-    }
-
-    // No live participation: the committed event is itself the record.
-    return {
-      outcome: 'recorded',
-      recordedAs: note,
-      state: null,
-      participationId: null,
-      session,
-      reason,
-    };
-  });
+    }),
+  );
 }
 
 /**
@@ -2063,38 +2088,46 @@ export async function checkIn(db: Database, input: CheckInInput): Promise<CheckI
   // if two check-ins race — the loser just records its heartbeat. (If a sweep
   // opens an episode between the read above and here, the next check-in closes
   // it: a one-heartbeat lag, never a lost or duplicated `came_back`.)
-  return db.transaction(async (tx) => {
-    const closed = await tx
-      .update(participations)
-      .set({ lastSeenAt: heardNow(), silentSince: null })
-      // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
-      // participation only: a check-in racing endSession then records no
-      // came_back on the just-ended row (it falls through to the heartbeat below).
-      .where(
-        and(
-          eq(participations.id, live.id),
-          isNotNull(participations.silentSince),
-          isNull(participations.endedAt),
-        ),
-      )
-      .returning({ id: participations.id });
-    if (closed.length === 0) {
-      await tx
+  //
+  // Retry on deadlock, as the sweep does: this takes the row first and the
+  // session's key-share lock (the event's foreign key) second, while a state
+  // change or unlock sent as the phone comes back locks the session first —
+  // either side can lose. The guarded UPDATE makes a re-run safe: it closes
+  // the episode only if nothing closed it meanwhile.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      const closed = await tx
         .update(participations)
-        .set({ lastSeenAt: heardNow() })
-        .where(eq(participations.id, live.id));
+        .set({ lastSeenAt: heardNow(), silentSince: null })
+        // `ended_at IS NULL` (like the sweep's guard) keeps `came_back` on a live
+        // participation only: a check-in racing endSession then records no
+        // came_back on the just-ended row (it falls through to the heartbeat below).
+        .where(
+          and(
+            eq(participations.id, live.id),
+            isNotNull(participations.silentSince),
+            isNull(participations.endedAt),
+          ),
+        )
+        .returning({ id: participations.id });
+      if (closed.length === 0) {
+        await tx
+          .update(participations)
+          .set({ lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        return { status: 'live', state: live.state, session };
+      }
+      await insertEvent(tx, {
+        eventId: newUuidV7(),
+        type: 'came_back',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: input.studentId,
+        occurredAt: seenAt,
+      });
       return { status: 'live', state: live.state, session };
-    }
-    await insertEvent(tx, {
-      eventId: newUuidV7(),
-      type: 'came_back',
-      sessionId: session.id,
-      classId: session.classId,
-      userId: input.studentId,
-      occurredAt: seenAt,
-    });
-    return { status: 'live', state: live.state, session };
-  });
+    }),
+  );
 }
 
 export interface JoinClassInput {

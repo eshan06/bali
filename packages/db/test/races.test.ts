@@ -314,6 +314,218 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 
+  it('unlock, refocus and protection off racing the silence sweep never fail on a deadlock', async () => {
+    // Opposite lock orders: the sweep's per-phone transaction takes the
+    // participation row first (its guarded UPDATE), then the session's
+    // key-share lock for its went_silent event; unlock and the state changes
+    // take the session lock first, then the row. Postgres aborts one side with
+    // 40P01 — as a 500 to the phone, before both sides retried it (an unlock
+    // lost 83 races in 100). Every round races one change against a sweep that
+    // is due to mark the phone silent; both must settle, in either order.
+    const stale = new Date(Date.now() - 5 * 60_000);
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['unlock', 'refocus', 'protection_off'] as const) {
+        const { classId, studentId } = await seed(`race-sweep-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, change());
+        await db
+          .update(participations)
+          .set({ lastSeenAt: stale })
+          .where(eq(participations.sessionId, session.id));
+
+        const move =
+          rival === 'unlock'
+            ? unlock(db, change())
+            : rival === 'refocus'
+              ? refocus(db, change())
+              : protectionOff(db, change());
+        await Promise.all([markSilentParticipations(db, new Date()), move]);
+
+        const row = one(await liveParticipations(session.id));
+        expect(row.state).toBe(
+          rival === 'unlock' ? 'unlocked' : rival === 'refocus' ? 'focused' : 'protection_off',
+        );
+        // Whichever order won, the change was contact: it closed any episode
+        // the sweep opened, and every went_silent has its came_back.
+        expect(row.silentSince).toBeNull();
+        const wentSilent = await eventsOfType(session.id, 'went_silent');
+        expect(await eventsOfType(session.id, 'came_back')).toHaveLength(wentSilent.length);
+      }
+    }
+  }, 120_000);
+
+  it('a check-in closing a silence episode racing unlock, refocus or protection off never fails on a deadlock', async () => {
+    // The close side of the race above. A check-in that finds an episode open
+    // closes it in a transaction that takes the participation row first (its
+    // guarded UPDATE), then the session's key-share lock for its came_back
+    // event; a state change sent as the phone comes back — its outbox draining
+    // beside the check-in — locks the session first. Postgres aborted one side
+    // with 40P01, and it was almost always the check-in (15, 20 and 16 of 20),
+    // which reached the phone as a 500.
+    const stale = new Date(Date.now() - 5 * 60_000);
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['unlock', 'refocus', 'protection_off'] as const) {
+        const { classId, studentId } = await seed(`race-back-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, change());
+        await db
+          .update(participations)
+          .set({ lastSeenAt: stale })
+          .where(eq(participations.sessionId, session.id));
+        await markSilentParticipations(db, new Date());
+        // The premise: an episode is open, so the check-in takes its closing
+        // transaction rather than the plain heartbeat.
+        expect(one(await liveParticipations(session.id)).silentSince).not.toBeNull();
+
+        const move =
+          rival === 'unlock'
+            ? unlock(db, change())
+            : rival === 'refocus'
+              ? refocus(db, change())
+              : protectionOff(db, change());
+        const [back] = await Promise.all([
+          checkIn(db, { sessionId: session.id, studentId, deviceTime: new Date() }),
+          move,
+        ]);
+
+        expect(back.status).toBe('live');
+        const row = one(await liveParticipations(session.id));
+        expect(row.state).toBe(
+          rival === 'unlock' ? 'unlocked' : rival === 'refocus' ? 'focused' : 'protection_off',
+        );
+        // One episode, closed exactly once, by whichever contact won.
+        expect(row.silentSince).toBeNull();
+        expect(await eventsOfType(session.id, 'went_silent')).toHaveLength(1);
+        expect(await eventsOfType(session.id, 'came_back')).toHaveLength(1);
+      }
+    }
+  }, 120_000);
+
+  it('unlock and protection off racing a switch away never fail on a deadlock', async () => {
+    // A tap into another session, or an armed tap converting at another
+    // class's Start, ends this participation while holding THAT session's
+    // lock, then records the leave here (key-share on this session). Unlock
+    // and protection off hold this session's lock and want the row: the same
+    // opposite orders as the sweep. The switching side already retried; now
+    // both do, so each racer ends the way one of the two orders allows.
+    for (let round = 0; round < 12; round += 1) {
+      for (const via of ['tap', 'armed_start'] as const) {
+        for (const rival of ['unlock', 'protection_off'] as const) {
+          const tag = `race-leave-${via}-${rival}-${round}`;
+          const school = one(
+            await db
+              .insert(schools)
+              .values({ name: `S ${tag}` })
+              .returning(),
+          );
+          const [teacher, otherTeacher, student] = await db
+            .insert(users)
+            .values([
+              { cognitoId: `t-${tag}`, role: 'teacher', schoolId: school.id },
+              { cognitoId: `t2-${tag}`, role: 'teacher', schoolId: school.id },
+              { cognitoId: `s-${tag}`, role: 'student', schoolId: school.id },
+            ])
+            .returning();
+          const here = one(
+            await db
+              .insert(classes)
+              .values({
+                teacherId: teacher!.id,
+                schoolId: school.id,
+                name: `C ${tag}`,
+                joinCode: `C-${tag}`,
+              })
+              .returning(),
+          );
+          // A switching tap goes to the same teacher's other class; an armed
+          // tap waits for another teacher's, converted when that class starts.
+          const there = one(
+            await db
+              .insert(classes)
+              .values({
+                teacherId: via === 'tap' ? teacher!.id : otherTeacher!.id,
+                schoolId: school.id,
+                name: `D ${tag}`,
+                joinCode: `D-${tag}`,
+              })
+              .returning(),
+          );
+          await db.insert(enrollments).values([
+            { classId: here.id, studentId: student!.id },
+            { classId: there.id, studentId: student!.id },
+          ]);
+          const now = Date.now();
+          const win = { startedAt: new Date(now - 60_000), endsAt: new Date(now + 25 * 60_000) };
+          const session = (await startSession(db, { classId: here.id, ...win })).session;
+          const change = (sessionId: string) => ({
+            sessionId,
+            studentId: student!.id,
+            eventId: newUuidV7(),
+            deviceTime: new Date(),
+          });
+          await tapIn(db, change(session.id));
+
+          let leave: () => Promise<unknown>;
+          if (via === 'tap') {
+            const next = (await startSession(db, { classId: there.id, ...win })).session;
+            leave = () => tapIn(db, change(next.id));
+          } else {
+            await armTap(db, {
+              studentId: student!.id,
+              teacherId: otherTeacher!.id,
+              eventId: newUuidV7(),
+              deviceTime: new Date(),
+              expiresAt: new Date(now + 3_600_000),
+            });
+            leave = () => startSession(db, { classId: there.id, ...win });
+          }
+
+          const [moved, left] = await Promise.allSettled([
+            rival === 'unlock'
+              ? unlock(db, change(session.id))
+              : protectionOff(db, change(session.id)),
+            leave(),
+          ]);
+
+          expect(left.status).toBe('fulfilled');
+          if (rival === 'unlock') {
+            // Never refused (ISSUES #2): applied here, or recorded after the leave.
+            expect(moved.status).toBe('fulfilled');
+            expect(await eventsOfType(session.id, 'unlock')).toHaveLength(1);
+          } else if (moved.status === 'rejected') {
+            // The leave landed first, leaving nothing here to mark — a refusal,
+            // never a deadlock — and the refusal recorded nothing.
+            expect(moved.reason).toMatchObject({ code: 'NOT_PARTICIPATING' });
+            expect(await eventsOfType(session.id, 'protection_off')).toHaveLength(0);
+          } else {
+            // It landed first: applied here, and then the leave ended the row.
+            expect(moved.value).toMatchObject({ outcome: 'applied', state: 'protection_off' });
+            expect(await eventsOfType(session.id, 'protection_off')).toHaveLength(1);
+          }
+          // Either way the student ends up live only where they went.
+          expect(await liveParticipations(session.id)).toHaveLength(0);
+          const live = await db
+            .select()
+            .from(participations)
+            .where(and(eq(participations.studentId, student!.id), isNull(participations.endedAt)));
+          expect(live).toHaveLength(1);
+        }
+      }
+    }
+  }, 240_000);
+
   it('a mid-session removal racing endSession stays atomic (enrollment removed, participation ended once)', async () => {
     // Both endEnrollment and endSession lock the session FOR UPDATE, so they
     // serialize: whichever wins, the enrollment is removed and the participation
