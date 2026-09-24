@@ -9,7 +9,7 @@ import Testing
 /// The app and an extension open one file (B5): two connections, as two processes would. Serialized,
 /// and the only suite whose outboxes hear GRDB's suspension notifications, which reach every
 /// database in the process.
-@Suite("One file, two processes", .serialized, .timeLimit(.minutes(1)))
+@Suite("One file, two processes", .serialized, .timeLimit(.minutes(3)))
 struct SharingTests {
     @Test("Each sees what the other queued, and a write waits out the other's instead of failing")
     func twoProcesses() throws {

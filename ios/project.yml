@@ -39,6 +39,17 @@ targets:
         INFOPLIST_FILE: Bali/Info.plist
         CODE_SIGN_ENTITLEMENTS: Bali/Bali.entitlements
         TARGETED_DEVICE_FAMILY: '1'
+        # Where the app signs in and syncs (B4), read from Info.plist: public values, no secret —
+        # the phone's Cognito app client is a public one. Dev's, until prod exists (Phase 5) and a
+        # Release configuration overrides them. Railway named dev's API before the environment was
+        # renamed. The dev pool's hosted-UI domain and the phone's app client are still to be made
+        # (docs/DEPLOY.md, "The phone's sign-in"); until then the app says sign-in is not set up.
+        BALI_API_URL: https://bali-production-09a2.up.railway.app
+        BALI_COGNITO_DOMAIN: ''
+        BALI_COGNITO_CLIENT_ID: ''
+        # Caught by the sign-in's own browser session, so it is no URL type of the app's: no other
+        # app or page can open the app with an answer.
+        BALI_COGNITO_REDIRECT_URI: bali://auth/callback
     dependencies:
       - package: BaliCore
       - package: BaliOutbox

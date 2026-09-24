@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BaliAPIURL</key>
+	<string>$(BALI_API_URL)</string>
+	<key>BaliCognitoClientID</key>
+	<string>$(BALI_COGNITO_CLIENT_ID)</string>
+	<key>BaliCognitoDomain</key>
+	<string>$(BALI_COGNITO_DOMAIN)</string>
+	<key>BaliCognitoRedirectURI</key>
+	<string>$(BALI_COGNITO_REDIRECT_URI)</string>
 	<key>NFCReaderUsageDescription</key>
 	<string>Bali reads your teacher's Bali block to start focus.</string>
 	<key>UIApplicationSceneManifest</key>
