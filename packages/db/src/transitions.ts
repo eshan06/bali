@@ -651,24 +651,6 @@ export interface ArmTapResult {
 type ArmedTapRow = typeof armedTaps.$inferSelect;
 
 /**
- * The answer to this phone's own tap, found in `armed_taps` under its id.
- * Still waiting, it is `already_armed`: the row covers this tap, so the phone
- * shows "waiting for your teacher" (A4) — `replay` said only "recorded", and
- * the truth the phone then re-reads cannot say it waits. Expired or consumed,
- * it is `replay`: recorded, and nothing waits for it.
- *
- * The 23505 recoveries reach a still-waiting row only in a race no test
- * stages: `takeOverStaleRow`'s rival is always consumed, since a second
- * waiting row cannot stand beside the stale one it refreshes, and the
- * insert's arbiter answers a waiting rival itself unless the rival lands
- * between that check and the event-id index.
- */
-function answerOwnArmedTap(row: ArmedTapRow, now: Date): ArmTapResult {
-  const waiting = row.consumedAt === null && row.expiresAt.getTime() > now.getTime();
-  return { outcome: waiting ? 'already_armed' : 'replay', armedTapId: row.id };
-}
-
-/**
  * Who holds `eventId` in `armed_taps` right now — the answer both 23505
  * recoveries in `armTap` need, and scoped the same way the `exact` select at
  * the top of `armTap` is.
@@ -731,6 +713,30 @@ async function rowIsStale(
 }
 
 /**
+ * The answer to this phone's own tap, found in `armed_taps` under its id.
+ * Still waiting — unconsumed and not stale, so a Start will convert it — it
+ * is `already_armed`: the row covers this tap, so the phone shows "waiting
+ * for your teacher" (A4); `replay` said only "recorded", and the truth the
+ * phone then re-reads cannot say it waits. Consumed or stale — expired, or
+ * its id on record, which the Start skips — it is `replay`: recorded, and no
+ * Start will honour it. `rowIsStale` decides, so this and the standing-row
+ * branches cannot disagree about a row.
+ *
+ * `armTap`'s `events` lookup answers an id on record before any path here,
+ * so the spent half is reached only when the id is recorded between the two
+ * reads. DISCLOSED SURVIVOR, like the 23505 recoveries reaching a still-
+ * waiting row: neither can be staged, so nothing goes red without them —
+ * no lock sits between those reads, `takeOverStaleRow`'s rival is always
+ * consumed (a second waiting row cannot stand beside the stale one it
+ * refreshes), and the insert's arbiter answers a waiting rival itself unless
+ * the rival lands between that check and the event-id index.
+ */
+async function answerOwnArmedTap(tx: Database, row: ArmedTapRow, now: Date): Promise<ArmTapResult> {
+  const waiting = row.consumedAt === null && !(await rowIsStale(tx, row, now));
+  return { outcome: waiting ? 'already_armed' : 'replay', armedTapId: row.id };
+}
+
+/**
  * Recycle a stale standing row for this tap. Returns the answer to give, or
  * `undefined` when the row was consumed under us — the slot is free again, so
  * the caller should record this tap as a fresh waiting one instead.
@@ -786,7 +792,7 @@ async function takeOverStaleRow(
       if (owner.kind === 'conflict') {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
-      if (owner.kind === 'own') return answerOwnArmedTap(owner.row, now);
+      if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
       // Gone again — the rival rolled back, so the id is free and the refresh
       // can land. The attempt bound covers the chase.
     }
@@ -919,7 +925,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       if (exact.studentId !== input.studentId || exact.teacherId !== input.teacherId) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
-      return answerOwnArmedTap(exact, now);
+      return answerOwnArmedTap(tx, exact, now);
     }
 
     const waiting = firstOrUndefined(
@@ -1027,7 +1033,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         if (owner.kind === 'conflict') {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
-        if (owner.kind === 'own') return answerOwnArmedTap(owner.row, now);
+        if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
         continue; // gone again; the attempt bound covers the chase
       }
 

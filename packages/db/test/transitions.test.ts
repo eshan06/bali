@@ -1593,6 +1593,67 @@ describe('armed taps', () => {
     expect(retry).toEqual({ outcome: 'replay', armedTapId: first.armedTapId });
   });
 
+  it('the retry of an armed tap whose id landed meanwhile is only a replay: no Start will honour it', async () => {
+    /*
+     * From #62's review. The tap arms (the student is not in the running
+     * class yet) and its answer is lost; the student joins the class, and the
+     * next delivery of the same id resolves to the running session and lands
+     * as a `tap_in`; that session ends. The waiting row still stands under the
+     * id — unconsumed, unexpired — but the next Start skips it
+     * (`armed_tap_skipped`), so answering `already_armed` would show "waiting
+     * for your teacher" for a tap no Start will join. It must stay `replay`,
+     * and the phone re-reads the truth.
+     *
+     * Answered by armTap's `events` lookup, which runs before the `exact`
+     * read; `answerOwnArmedTap` asks `rowIsStale` as well, for the same id
+     * recorded between those two reads — a race nothing can stage.
+     */
+    const { teacher, student, klass } = await seedClass('arm-retry-landed');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const tap = {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: new Date('2026-01-01T09:01:00Z'),
+    };
+    const armed = await armTap(db, tap);
+    expect(armed.outcome).toBe('armed');
+    expect(
+      (
+        await tapIn(db, {
+          sessionId: session.id,
+          studentId: student.id,
+          eventId: tap.eventId,
+          deviceTime: tap.deviceTime,
+        })
+      ).outcome,
+    ).toBe('joined');
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+
+    expect(await armTap(db, { ...tap, now: new Date('2026-01-01T09:30:00Z') })).toEqual({
+      outcome: 'replay',
+    });
+    // The row still stands, and the next Start skips it rather than join.
+    const next = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    expect(next.armedConverted).toBe(0);
+    const skipped = one(
+      (await eventsFor(next.session.id)).filter((e) => e.type === 'armed_tap_skipped'),
+    );
+    expect(skipped.payload).toEqual({ armed_tap_event_id: tap.eventId });
+  });
+
   it('a waiting tap becomes a focused participation at session start (decision 5)', async () => {
     const { teacher, student, klass } = await seedClass('arm-convert');
     const armEventId = newUuidV7();

@@ -303,7 +303,10 @@ async function main(): Promise<void> {
       token: ana.token,
       body: { eventId: randomUUID(), deviceTime: iso() },
     });
-    assert(anaRefocus.state === 'focused', `Ana should be refocused, got ${anaRefocus.state}`);
+    assert(
+      anaRefocus.state === 'focused',
+      `Ana should be refocused, got ${String(anaRefocus.state)}`,
+    );
     await grid.waitFor((e) => e.type === 'refocus' && e.userId === ana.userId, {
       label: "Ana's refocus",
       timeoutMs: world.liveWaitMs,

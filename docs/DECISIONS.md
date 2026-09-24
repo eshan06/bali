@@ -53,10 +53,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   phone could not show "waiting for your teacher" for a tap that will join at
   Start. `already_armed` already means "a waiting tap of this student's for
   this teacher stands and covers this one" (`wait_for_start`), so this is a
-  correction within the shipped vocabulary, not a new promise. Only a row that
-  still waits (unconsumed, unexpired) answers it; expired or consumed, it stays
-  `replay`, since no Start will honour it. Every door gives it: the `exact`
-  read and both 23505 recoveries (`answerOwnArmedTap`). **Refocus.** A refocus
+  correction within the shipped vocabulary, not a new promise. Only a row a
+  Start will still convert answers it — unconsumed, and not stale by
+  `rowIsStale`, the test the standing-row branches use (unexpired, its id not
+  on record, which the Start would skip); any other stays `replay`, since no
+  Start will honour it. Every door gives it: the `exact` read and both 23505
+  recoveries (`answerOwnArmedTap`). #62's review found the first version
+  checked only consumed and expired; its sequential case — an armed id that
+  later lands as a `tap_in` — was already answered `replay` by `armTap`'s
+  `events` lookup, which runs first (pinned now by an engine and an API
+  test), so `rowIsStale` guards only an id recorded between the two reads, a
+  race nothing can stage. **Refocus.** A refocus
   replayed after its participation ended while the session runs (removed,
   left the class, switched away) answered that row's last state WITH the
   session — `apply_session`, shields back on for a session the student is no

@@ -175,6 +175,33 @@ describe('tapDisposition, against POST /v1/taps', () => {
     expect(retry.disposition).toBe('wait_for_start');
   });
 
+  it('the retry of an armed tap that landed meanwhile re-reads rather than waits', async () => {
+    // From #62's review: armed (not in the running class yet), then joined
+    // by code, so the next delivery of the same id lands in the running
+    // session; that ends. The waiting row still stands, but the next Start
+    // skips it, so `already_armed` would show "waiting for your teacher" for
+    // a tap no Start joins. It stays `replay`, naming no session.
+    const c = await seedClassroom(db, 'oc-armed-landed');
+    const session = await start(c.klass.id);
+    const token = await ctx.tokenFor('student-oc-armed-landed-newcomer');
+    const eventId = randomUUID();
+    expect((await tap(token, c.block.tagId, eventId)).body.outcome).toBe('armed');
+    const joined = await post(token, '/v1/enrollments', {
+      joinCode: c.klass.joinCode,
+      eventId: randomUUID(),
+      deviceTime: now(),
+    });
+    expect(joined.status).toBe(200);
+    const landed = await tap(token, c.block.tagId, eventId);
+    expect(landed.body).toMatchObject({ outcome: 'joined', state: 'focused' });
+    expect(landed.body.session?.id).toBe(session.id);
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+
+    const retry = await tap(token, c.block.tagId, eventId);
+    expect(retry.body).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(retry.disposition).toBe('reread');
+  });
+
   it('a retry recorded but no longer current names no session: delete it and re-read', async () => {
     // A4: each of these was a 409 — NOT_PARTICIPATING, EVENT_ID_CONFLICT —
     // which the table keeps, retries and surfaces forever though the tap is
