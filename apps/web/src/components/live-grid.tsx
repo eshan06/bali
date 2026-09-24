@@ -15,6 +15,7 @@ import {
   snapshotIsFresh,
   staleness,
   type Students,
+  unlockNote,
 } from '@/lib/grid-state';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
@@ -168,10 +169,15 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           {rows.map((s) => {
             const display = gridDisplay(s, now);
             const chip = CHIP[display];
+            // The unlock the chip carries — its reason, or on a protection-off
+            // chip the unlock itself — rides after the label, never replacing it.
+            const note = unlockNote(s, display);
             return (
               <li key={s.studentId} className={`rounded-lg border px-3 py-2 text-sm ${chip.cls}`}>
                 <div className="font-medium">{s.displayName ?? s.studentId.slice(0, 8)}</div>
-                <div className="text-xs opacity-80">{chip.label}</div>
+                <div className="text-xs opacity-80">
+                  {note === null ? chip.label : `${chip.label} · ${note}`}
+                </div>
               </li>
             );
           })}

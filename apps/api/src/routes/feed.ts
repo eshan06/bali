@@ -96,6 +96,8 @@ export function registerFeedRoutes(
           joinedAt: r.joinedAt?.toISOString() ?? null,
           lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
           endedAt: r.endedAt?.toISOString() ?? null,
+          unlock: r.unlock && { ...r.unlock, occurredAt: r.unlock.occurredAt.toISOString() },
+          protectionOffAfterEnd: r.protectionOffAfterEnd,
         })),
       };
     },

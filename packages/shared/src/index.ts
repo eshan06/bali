@@ -38,6 +38,18 @@ export const JOIN_CODE_LENGTH = 6;
 export const DISPLAY_NAME_MAX_LENGTH = 64;
 
 /**
+ * A display name with its blank space tidied: every run of it made one space,
+ * and none left at either end. Blank is whitespace and the two symbols drawn
+ * as blank space, the blank braille cell (U+2800) and the musical null notehead
+ * (U+1D159). One class for both readers: what `PATCH /v1/me` stores (A8), and
+ * what the engine compares names as — so a stored name never keeps a blank
+ * edge the comparison would ignore.
+ */
+export function tidyDisplayName(name: string): string {
+  return name.replace(/[\s⠀\u{1D159}]+/gu, ' ').trim();
+}
+
+/**
  * How often a live stream sends an SSE comment so idle connections and proxies
  * stay open — and, on the client, what silence from the server MEANS.
  *

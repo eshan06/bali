@@ -1,4 +1,10 @@
-import type { EventType, FeedEvent, ParticipationState, SessionSnapshot } from '@bali/shared';
+import type {
+  EventType,
+  FeedEvent,
+  ParticipationState,
+  SessionSnapshot,
+  SnapshotUnlock,
+} from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +15,7 @@ import {
   snapshotIsFresh,
   staleness,
   type Students,
+  unlockNote,
 } from './grid-state';
 
 const T0 = '2026-01-01T08:00:00.000Z';
@@ -16,7 +23,14 @@ const T1 = '2026-01-01T08:05:00.000Z';
 
 function snapshot(
   latestSeq: number,
-  students: { id: string; name?: string; state?: ParticipationState | null }[],
+  students: {
+    id: string;
+    name?: string;
+    state?: ParticipationState | null;
+    endedAt?: string;
+    unlock?: SnapshotUnlock;
+    protectionOffAfterEnd?: boolean;
+  }[],
 ): SessionSnapshot {
   return {
     session: { id: 's1', classId: 'c1', startedAt: T0, endsAt: T1 },
@@ -27,15 +41,30 @@ function snapshot(
       studentId: s.id,
       displayName: s.name ?? s.id,
       state: s.state === undefined ? 'focused' : s.state,
-      joinedAt: T0,
-      lastSeenAt: T0,
-      endedAt: null,
+      joinedAt: s.state === null ? null : T0,
+      lastSeenAt: s.state === null ? null : T0,
+      endedAt: s.endedAt ?? null,
+      unlock: s.unlock ?? null,
+      protectionOffAfterEnd: s.protectionOffAfterEnd ?? false,
     })),
   };
 }
 
-function evt(seq: number, type: EventType, userId: string | null, at = T1): FeedEvent {
-  return { seq, eventId: `ev-${seq}`, type, userId, occurredAt: at, payload: null };
+function evt(
+  seq: number,
+  type: EventType,
+  userId: string | null,
+  at = T1,
+  payload: Record<string, unknown> | null = null,
+): FeedEvent {
+  return { seq, eventId: `ev-${seq}`, type, userId, occurredAt: at, payload };
+}
+
+/** The chip as a teacher reads it: the display, and what it adds for an unlock. */
+function chip(students: Students, id: string, now = new Date(T1)) {
+  const s = students[id];
+  const display = gridDisplay(s, now);
+  return { display, note: unlockNote(s, display) };
 }
 
 describe('grid-state', () => {
@@ -257,6 +286,270 @@ describe('gridDisplay', () => {
     const students = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
     // T0 + 5 minutes with no contact is well past the 90s threshold.
     expect(gridDisplay(students.ana, now)).toBe('silent');
+  });
+});
+
+describe('the unlock a chip carries (A9)', () => {
+  const unlockEvt = (seq: number, id: string, payload: Record<string, unknown> | null) =>
+    evt(seq, 'unlock', id, T1, payload);
+
+  it("shows an unlock's reason on the chip, and a return to focus clears it", () => {
+    // The privacy contract promises the teacher sees the reason (A1).
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlockEvt(6, 'ana', { reason: 'bathroom' }));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'bathroom' });
+
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
+
+    s = applyEvent(s, unlockEvt(8, 'ana', { reason: 'nurse' }));
+    expect(chip(s, 'ana').note).toBe('nurse');
+    s = applyEvent(s, unlockEvt(9, 'ana', { reason: 'other' }));
+    expect(chip(s, 'ana').note).toBe('other reason');
+    // None given, or one this tab does not know (a newer server's): the label alone.
+    s = applyEvent(s, unlockEvt(10, 'ana', null));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: null });
+    s = applyEvent(s, unlockEvt(11, 'ana', { reason: 'pass' }));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: null });
+
+    s = applyEvent(s, unlockEvt(12, 'ana', { reason: 'bathroom' }));
+    s = applyEvent(s, evt(13, 'tap_in', 'ana'));
+    expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
+  });
+
+  it('a tap or a refocus ends the unlock a chip carries', () => {
+    // Visible once protection goes off afterwards: that chip must not carry
+    // an unlock from before the student was back in focus.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, unlockEvt(6, 'ana', { reason: 'bathroom' }));
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    s = applyEvent(s, evt(8, 'protection_off', 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'protection_off', note: null });
+
+    s = applyEvent(s, unlockEvt(9, 'ben', { reason: 'nurse' }));
+    s = applyEvent(s, evt(10, 'tap_in', 'ben'));
+    s = applyEvent(s, evt(11, 'protection_off', 'ben'));
+    expect(chip(s, 'ben')).toEqual({ display: 'protection_off', note: null });
+  });
+
+  it('keeps the reason when the participation ends unlocked', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlockEvt(6, 'ana', { reason: 'nurse' }));
+    s = applyEvent(s, evt(7, 'session_expired', null));
+    expect(chip(s, 'ana')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+  });
+
+  it('shows an unlock recorded against protection off, never softening it', () => {
+    // A2: the engine records the unlock and leaves the row in protection off.
+    // Today's chip did not change at all, so the unlock showed nowhere.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, unlockEvt(7, 'ana', { recorded_as: 'protection_off', reason: 'nurse' }));
+    expect(chip(s, 'ana')).toEqual({ display: 'protection_off', note: 'unlocked · nurse' });
+
+    s = applyEvent(s, evt(8, 'protection_off', 'ben'));
+    s = applyEvent(s, unlockEvt(9, 'ben', { recorded_as: 'protection_off' }));
+    expect(chip(s, 'ben')).toEqual({ display: 'protection_off', note: 'unlocked' });
+
+    s = applyEvent(s, evt(10, 'session_expired', null));
+    expect(chip(s, 'ana')).toEqual({ display: 'left_protection_off', note: 'unlocked · nurse' });
+  });
+
+  it('never reads an unlock noted protection off as an unlock, whatever the tab had', () => {
+    // The note is the engine's word that protection is off. A chip the tab
+    // still had as focused (the report is out of order) or never had at all
+    // must not turn orange off the back of it.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlockEvt(6, 'ana', { recorded_as: 'protection_off', reason: 'bathroom' }));
+    expect(chip(s, 'ana')).toEqual({ display: 'protection_off', note: 'unlocked · bathroom' });
+    s = applyEvent(s, unlockEvt(7, 'eve', { recorded_as: 'protection_off' }));
+    expect(chip(s, 'eve')).toEqual({ display: 'protection_off', note: 'unlocked' });
+  });
+
+  it('an unlock before protection went off stays on the protection-off chip', () => {
+    // It is the unlock since the student was last in focus; protection off
+    // goes on top of it, and only a tap or a refocus clears either.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlockEvt(6, 'ana', { reason: 'bathroom' }));
+    s = applyEvent(s, evt(7, 'protection_off', 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'protection_off', note: 'unlocked · bathroom' });
+  });
+
+  it('the boot snapshot shows the unlock the stream will not replay', () => {
+    // An unlock older than the overlap window reaches a freshly opened tab
+    // only through the snapshot.
+    const at = '2026-01-01T08:01:00.000Z';
+    const s = fromSnapshot(
+      snapshot(90, [
+        {
+          id: 'ana',
+          state: 'unlocked',
+          unlock: { reason: 'bathroom', recordedAs: null, occurredAt: at },
+        },
+        {
+          id: 'ben',
+          state: 'protection_off',
+          unlock: { reason: 'nurse', recordedAs: 'protection_off', occurredAt: at },
+        },
+        { id: 'cal', state: 'unlocked' },
+      ]),
+    );
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'bathroom' });
+    expect(chip(s, 'ben')).toEqual({ display: 'protection_off', note: 'unlocked · nurse' });
+    expect(chip(s, 'cal')).toEqual({ display: 'unlocked', note: null });
+  });
+
+  it('replaying the overlap over the boot snapshot lands where the snapshot was', () => {
+    // The first connect resumes at latestSeq - overlap, so the stream re-applies
+    // what the snapshot already reflects: the two readings must agree.
+    const at = T1;
+    const boot = snapshot(9, [
+      {
+        id: 'ana',
+        state: 'unlocked',
+        unlock: { reason: 'nurse', recordedAs: null, occurredAt: at },
+      },
+      {
+        id: 'ben',
+        state: 'protection_off',
+        unlock: { reason: 'other', recordedAs: 'protection_off', occurredAt: at },
+      },
+      { id: 'cal', state: 'focused' },
+    ]);
+    let s = fromSnapshot(boot);
+    for (const e of [
+      unlockEvt(2, 'cal', { reason: 'bathroom' }),
+      evt(3, 'refocus', 'cal'),
+      evt(4, 'protection_off', 'ben'),
+      unlockEvt(5, 'ana', { reason: 'bathroom' }),
+      evt(6, 'refocus', 'ana'),
+      unlockEvt(7, 'ana', { reason: 'nurse' }),
+      unlockEvt(8, 'ben', { recorded_as: 'protection_off', reason: 'other' }),
+    ]) {
+      s = applyEvent(s, e);
+    }
+    const booted = fromSnapshot(boot);
+    for (const id of ['ana', 'ben']) expect(chip(s, id)).toEqual(chip(booted, id));
+    expect(chip(s, 'cal', new Date(T0))).toEqual(chip(booted, 'cal', new Date(T0)));
+  });
+});
+
+describe('a student the snapshot does not carry (A9)', () => {
+  it('whose phone unlocks with no live participation reads Left · unlocked, not Unlocked', () => {
+    // Removed before this tab opened — outside the overlap, so it never saw
+    // them leave — and then their phone unlocks. The engine's note says there
+    // is no live participation; a live orange chip would say there is.
+    let s = fromSnapshot(snapshot(80, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(81, 'unlock', 'cal', T1, { recorded_as: 'no_live_participation' }));
+    expect(chip(s, 'cal')).toEqual({ display: 'left_unprotected', note: null });
+    s = applyEvent(
+      s,
+      evt(82, 'unlock', 'dan', T1, { recorded_as: 'after_session_end', reason: 'nurse' }),
+    );
+    expect(chip(s, 'dan')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+  });
+
+  it('with no participation, reads the same from the stream and from the snapshot', () => {
+    // Enrolled, never tapped in, and yet an unlock kept against the session:
+    // the phone is unshielded and the student is not in it.
+    const unlock: SnapshotUnlock = {
+      reason: null,
+      recordedAs: 'no_live_participation',
+      occurredAt: T1,
+    };
+    let streamed = fromSnapshot(snapshot(5, [{ id: 'ana', state: null }]));
+    streamed = applyEvent(
+      streamed,
+      evt(6, 'unlock', 'ana', T1, { recorded_as: 'no_live_participation' }),
+    );
+    const refreshed = fromSnapshot(snapshot(6, [{ id: 'ana', state: null, unlock }]));
+    expect(chip(streamed, 'ana')).toEqual({ display: 'left_unprotected', note: null });
+    expect(chip(refreshed, 'ana')).toEqual(chip(streamed, 'ana'));
+  });
+});
+
+describe('a late record survives the snapshot refresh (A9)', () => {
+  // A late record — noted `after_session_end` — leaves the ended row as the end
+  // left it (A2c), so the refresh reads a plain ended row: the snapshot carries
+  // the record beside it, and the grid reads it as the stream did.
+  const lateUnlock: SnapshotUnlock = {
+    reason: 'nurse',
+    recordedAs: 'after_session_end',
+    occurredAt: T1,
+  };
+
+  it('a late unlock keeps its Left · unlocked chip', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'session_expired', null));
+    s = applyEvent(
+      s,
+      evt(7, 'unlock', 'ana', T1, { recorded_as: 'after_session_end', reason: 'nurse' }),
+    );
+    expect(chip(s, 'ana')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+
+    s = mergeSnapshot(s, snapshot(7, [{ id: 'ana', endedAt: T1, unlock: lateUnlock }]));
+    expect(chip(s, 'ana')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+  });
+
+  it('a late protection off keeps its Left · protection off chip', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'session_expired', null));
+    s = applyEvent(s, evt(7, 'protection_off', 'ana', T1, { recorded_as: 'after_session_end' }));
+    expect(chip(s, 'ana').display).toBe('left_protection_off');
+
+    s = mergeSnapshot(s, snapshot(7, [{ id: 'ana', endedAt: T1, protectionOffAfterEnd: true }]));
+    expect(chip(s, 'ana')).toEqual({ display: 'left_protection_off', note: null });
+  });
+
+  it('a late protection off and a late unlock read protection off in either order', () => {
+    // Never softened, from the stream or from the snapshot: the row ended
+    // unlocked, and neither late record changed it.
+    const ended = snapshot(5, [{ id: 'ana', state: 'unlocked', endedAt: T1 }]);
+    const off = evt(6, 'protection_off', 'ana', T1, { recorded_as: 'after_session_end' });
+    const unlock = evt(7, 'unlock', 'ana', T1, {
+      recorded_as: 'after_session_end',
+      reason: 'nurse',
+    });
+    const want = { display: 'left_protection_off', note: 'unlocked · nurse' };
+    expect(chip(applyEvent(applyEvent(fromSnapshot(ended), off), unlock), 'ana')).toEqual(want);
+    expect(chip(applyEvent(applyEvent(fromSnapshot(ended), unlock), off), 'ana')).toEqual(want);
+    const refreshed = snapshot(7, [
+      {
+        id: 'ana',
+        state: 'unlocked',
+        endedAt: T1,
+        unlock: lateUnlock,
+        protectionOffAfterEnd: true,
+      },
+    ]);
+    expect(chip(fromSnapshot(refreshed), 'ana')).toEqual(want);
+  });
+});
+
+describe('names reach the grid (A9)', () => {
+  it('a rename reaches every chip at the next snapshot refresh', () => {
+    // `display_name_changed` names no session, so no stream carries it.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana', name: 'Ana' }]));
+    s = applyEvent(s, evt(6, 'tap_in', 'dan'));
+    expect(s.dan.displayName).toBeNull();
+    s = mergeSnapshot(
+      s,
+      snapshot(6, [
+        { id: 'ana', name: 'Ana R.' },
+        { id: 'dan', name: 'Dan' },
+      ]),
+    );
+    expect(s.ana.displayName).toBe('Ana R.');
+    expect(s.dan.displayName).toBe('Dan');
+  });
+
+  it('drops an absent student the refresh no longer carries, rather than keep a stale chip', () => {
+    // Enrolled, never tapped in, then left the class: nothing on record for
+    // this session, so nothing to keep — and a kept chip's name never refreshes.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben', state: null }]));
+    s = mergeSnapshot(s, snapshot(6, [{ id: 'ana' }]));
+    expect(s.ben).toBeUndefined();
+    expect(s.ana).toBeDefined();
   });
 });
 

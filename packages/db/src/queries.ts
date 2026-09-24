@@ -337,28 +337,76 @@ export interface SnapshotRosterRow {
   joinedAt: Date | null;
   lastSeenAt: Date | null;
   endedAt: Date | null;
+  /** Their latest unlock here since they last tapped in or refocused, or null. */
+  unlock: {
+    reason: UnlockReason | null;
+    recordedAs: UnlockRecordedAs | null;
+    occurredAt: Date;
+  } | null;
+  /** A protection-off report reached this session after it ended (A2c). */
+  protectionOffAfterEnd: boolean;
 }
 
+/** An unlock's or a protection-off's note, as stored in `payload.recorded_as`; null when none. */
+function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null {
+  return (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
+    ? (payload.recorded_as as UnlockRecordedAs)
+    : null;
+}
+
+/** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */
+const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly EventType[];
+
 /**
- * The grid-boot roster for a session (decision 5): every active enrollment of the
- * class LEFT JOINed to that student's participation IN THIS SESSION, so a student
- * who hasn't tapped in yet still appears (with null participation fields). The
- * caller derives each display state; this returns the stored slice.
+ * The grid-boot roster for a session (decision 5): every student the session's
+ * feed can name, with their participation IN THIS SESSION — the class's active
+ * enrollments, so a student who hasn't tapped in yet still appears (with null
+ * participation fields), and anyone the session holds a participation or an
+ * unlock for who has since left the class, so a chip the stream painted never
+ * outlives the snapshot that would refresh its name. One row a student, on
+ * their live enrollment or else their last, in enrollment order.
+ *
+ * Beside the stored slice, what it does not show (A9): the student's latest
+ * unlock since they last tapped in or refocused — the engine records one
+ * without flipping the row when protection is off, when nothing is live, and
+ * after the end — and whether a protection-off report came after the end,
+ * which leaves the ended row alone (A2c). The caller derives each display
+ * state; one statement, so the row and its records are read at one instant.
  */
 export async function getSessionRoster(
   db: Database,
   sessionId: string,
   classId: string,
 ): Promise<SnapshotRosterRow[]> {
-  return db
-    .select({
+  const turn = db
+    .select({ type: events.type, payload: events.payload, occurredAt: events.occurredAt })
+    .from(events)
+    .where(
+      and(
+        eq(events.sessionId, sessionId),
+        eq(events.userId, users.id),
+        inArray(events.type, CHIP_TURNS),
+      ),
+    )
+    .orderBy(desc(events.seq))
+    .limit(1)
+    .as('turn');
+  const lateOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and ${events.type} = 'protection_off' and ${events.payload}->>'recorded_as' = 'after_session_end')`;
+
+  const rows = await db
+    .selectDistinctOn([users.id], {
       enrollmentId: enrollments.id,
+      enrolledAt: enrollments.createdAt,
       studentId: users.id,
       displayName: users.displayName,
       state: participations.state,
       joinedAt: participations.joinedAt,
       lastSeenAt: participations.lastSeenAt,
       endedAt: participations.endedAt,
+      turnType: turn.type,
+      turnPayload: turn.payload,
+      turnAt: turn.occurredAt,
+      protectionOffAfterEnd: lateOff,
     })
     .from(enrollments)
     .innerJoin(users, eq(enrollments.studentId, users.id))
@@ -366,8 +414,39 @@ export async function getSessionRoster(
       participations,
       and(eq(participations.studentId, users.id), eq(participations.sessionId, sessionId)),
     )
-    .where(and(eq(enrollments.classId, classId), isNull(enrollments.removedAt)))
-    .orderBy(enrollments.createdAt);
+    .leftJoinLateral(turn, sql`true`)
+    .where(
+      and(
+        eq(enrollments.classId, classId),
+        // An unlock is the only turn with no participation behind it.
+        or(isNull(enrollments.removedAt), isNotNull(participations.id), isNotNull(turn.type)),
+      ),
+    )
+    .orderBy(users.id, sql`${enrollments.removedAt} is null desc`, desc(enrollments.createdAt));
+
+  return rows
+    .sort((a, b) => a.enrolledAt.getTime() - b.enrolledAt.getTime())
+    .map((r) => {
+      const payload = (r.turnPayload ?? {}) as Record<string, unknown>;
+      return {
+        enrollmentId: r.enrollmentId,
+        studentId: r.studentId,
+        displayName: r.displayName,
+        state: r.state,
+        joinedAt: r.joinedAt,
+        lastSeenAt: r.lastSeenAt,
+        endedAt: r.endedAt,
+        unlock:
+          r.turnType === 'unlock' && r.turnAt !== null
+            ? {
+                reason: isUnlockReason(payload.reason) ? payload.reason : null,
+                recordedAs: recordedAsOf(payload),
+                occurredAt: r.turnAt,
+              }
+            : null,
+        protectionOffAfterEnd: r.protectionOffAfterEnd,
+      };
+    });
 }
 
 /** The highest event seq for a session (0 when it has none) — the snapshot's stream cursor. */
@@ -608,10 +687,7 @@ export async function getHistoryPage(
       occurredAt: row.occurredAt!,
       reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
       recordedAs:
-        (row.type === 'unlock' || row.type === 'protection_off') &&
-        (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
-          ? (payload.recorded_as as UnlockRecordedAs)
-          : null,
+        row.type === 'unlock' || row.type === 'protection_off' ? recordedAsOf(payload) : null,
       countedIn:
         row.type === 'armed_tap_skipped'
           ? (counted.get(payload.armed_tap_event_id as string) ?? null)

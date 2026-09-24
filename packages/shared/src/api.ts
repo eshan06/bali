@@ -388,7 +388,16 @@ export interface EndEnrollmentResponse {
 // GET /v1/sessions/{id} — the grid boot snapshot (decision 5): the session, its
 // roster with each student's participation, and the latest event seq to stream
 // from, in one round trip.
+/** An emergency unlock as the grid shows it on a student's chip (A9). */
+export interface SnapshotUnlock {
+  /** The reason the student gave (A1); null when none. */
+  reason: UnlockReason | null;
+  /** Why it flipped nothing, when it flipped nothing (`payload.recorded_as`); null when it flipped the row. */
+  recordedAs: UnlockRecordedAs | null;
+  occurredAt: string;
+}
 export interface SnapshotStudent {
+  /** Their live enrollment in the class; for a student who has since left it, their last. */
   enrollmentId: string;
   studentId: string;
   displayName: string | null;
@@ -402,12 +411,31 @@ export interface SnapshotStudent {
   joinedAt: string | null;
   lastSeenAt: string | null;
   endedAt: string | null;
+  /**
+   * The student's latest emergency unlock in this session since they last
+   * tapped in or returned to focus, or null. `state` does not always show it:
+   * the engine records an unlock without flipping the row when protection is
+   * off (never softened into an unlock), when no participation is live, and
+   * after the end — the grid reads it here as it reads the unlock event.
+   */
+  unlock: SnapshotUnlock | null;
+  /**
+   * True when a protection-off report first reached the server after this
+   * session ended (A2c, noted `after_session_end`): recorded, while the ended
+   * row stays as the end left it.
+   */
+  protectionOffAfterEnd: boolean;
 }
 export interface SessionSnapshot {
   session: SessionView & { startedAt: string };
   ended: boolean;
   /** The highest event seq for this session; stream from `latestSeq - EVENT_RESUME_OVERLAP`. */
   latestSeq: number;
+  /**
+   * Every student the session's feed can name: the class's active roster, and
+   * anyone it holds a participation or an unlock for who has since left the
+   * class — so each chip's name and state come back with every snapshot.
+   */
   students: SnapshotStudent[];
 }
 

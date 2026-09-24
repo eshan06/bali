@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A9: the live grid tells the truth about unlocks and late
+  records.** **The reason:** the chip shows an unlock's reason (A1) after its
+  label — "Unlocked · bathroom", "Left · unlocked · nurse" — as the privacy
+  contract promises. **An unlock recorded against protection off** (A2) left
+  the chip unchanged, so it showed nowhere; it now rides on that chip as a
+  detail — "Protection off · unlocked · nurse" — red, labelled protection off
+  first, never the orange unlock chip and never green (rule 2 and the iOS
+  rules). The unlock a chip carries is the student's latest since they last
+  tapped in or refocused: a tap or a refocus clears it, protection off does
+  not (an unlock before protection went off stays on its chip — the student
+  has not been back in focus since). One definition, so the stream and the
+  snapshot compute the same thing. **Late records survive the refresh —
+  decided: the snapshot carries them, not the grid's merge.** A late unlock
+  or protection off (`after_session_end`) leaves the ended row alone (A2c,
+  unchanged: the engine is not touched), so the 15 s refresh read a plain
+  ended row and the chip reverted to "Left". A merge that remembered what the
+  stream painted would only know what this tab saw: a tab opened after the
+  overlap window would show a different chip for the same student, and an
+  unlock's reason older than that window would reach a fresh tab nowhere.
+  So `GET /v1/sessions/{id}` gains two additive fields per student (a teacher
+  shape; the fixtures cover student endpoints only): `unlock` (that latest
+  unlock — `reason`, `recordedAs`, `occurredAt` — or null) and
+  `protectionOffAfterEnd`, read with the row in one statement (a lateral
+  subquery), so the row and its records are one instant. The grid reads the
+  snapshot's unlock and the streamed event through one function, so the two
+  cannot differ: noted `protection_off`, the chip reads protection off
+  whatever the tab had (an out-of-order report, or a student it never had —
+  which read "Unlocked"); noted as finding nothing live (`no_live_participation`,
+  `after_session_end`), the chip is ended — which fixes the pre-existing case
+  of a student the tab never saw leave, whose later unlock read a live
+  "Unlocked" instead of "Left · unlocked". **Who the snapshot carries:** every
+  student the session's feed can name — the class's active roster, plus
+  anyone with a participation or an unlock in this session who has since left
+  the class (one row each, on their live enrollment or else their last).
+  Before, a removed student's chip lived only in the tab that saw the removal:
+  the merge kept it, but nothing refreshed its name again (a rename after the
+  removal stayed stale for the tab's life), and a tab opened later showed them
+  not at all, or as a UUID prefix when an event surfaced them. Now every tab
+  shows the same chip, and every chip's name comes back with every snapshot;
+  an absent student the snapshot no longer carries (left the class with
+  nothing on record here) is dropped rather than kept with a stale name. The
+  exit demo's check flips with it: removed Cal stays on the snapshot, ended,
+  with his unlock. **Names:** a rename (`display_name_changed`, no session, so
+  no stream) reaches an open grid at its next 15 s snapshot, for every chip on
+  it; the class page's roster list under the grid is read when the page loads,
+  so a rename shows there on reload — noted, not changed. **Rode along, from
+  #67's review:** `renameStudent` runs in `withDeadlockRetry` like every other
+  engine mutation — no cycle is known (its caller's row, then their classes in
+  id order; a join or a Start holds nothing when it takes its class lock), so
+  defence in depth, with no staged race for a deadlock nothing reaches; and one
+  blank class for a stored name and the comparison (`tidyDisplayName` in
+  `@bali/shared`: whitespace, the blank braille cell and the null notehead) —
+  the route trimmed only `\s`, so `"⠀Bea"` was stored with its leading blank.
+  Pinned by grid tests for each state and reason, the protection-off unlock,
+  the no-live note, each late record across a refresh and the replayed
+  overlap converging on the snapshot; API tests for the snapshot's records,
+  its membership (removed, re-enrolled, left with nothing), its scoping to one
+  session and a removed student's rename; and the tidy — each red without its
+  fix.
 - **2026-09-24** — **A8: a student edits their own display name, `PATCH /v1/me`.**
   D1's Me screen shows the name under "Your teachers see this name." with an
   edit button, and owner decision 8 polices it: unique within each class,

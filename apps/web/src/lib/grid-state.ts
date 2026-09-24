@@ -4,8 +4,10 @@ import type {
   ParticipationState,
   ProtectionOffRecordedAs,
   SessionSnapshot,
+  UnlockReason,
+  UnlockRecordedAs,
 } from '@bali/shared';
-import { deriveDisplayState, PARTICIPATION_STATES } from '@bali/shared';
+import { deriveDisplayState, isUnlockReason, PARTICIPATION_STATES } from '@bali/shared';
 
 /**
  * The live grid's pure state machine, kept out of the component so it can be
@@ -18,25 +20,78 @@ import { deriveDisplayState, PARTICIPATION_STATES } from '@bali/shared';
 export interface Student {
   studentId: string;
   displayName: string | null;
+  /**
+   * The state the chip shows: the stored one, plus the records the engine
+   * keeps without changing the row — an unlock after the participation ended,
+   * a protection off reported after the bell.
+   */
   state: ParticipationState | null;
   joinedAt: Date | null;
   lastSeenAt: Date | null;
   endedAt: Date | null;
+  /**
+   * The student's latest unlock since they last tapped in or refocused: the
+   * chip shows it, with its reason — a protection-off chip too, which it never
+   * relabels.
+   */
+  unlock: { reason: UnlockReason | null } | null;
 }
 
 export type Students = Record<string, Student>;
 
+/** Notes that say the engine found no live participation to flip. */
+const NOTHING_LIVE: readonly unknown[] = [
+  'no_live_participation',
+  'after_session_end',
+] satisfies UnlockRecordedAs[];
+
+/**
+ * One unlock record onto a chip, in place. The streamed event and the
+ * snapshot's `unlock` both land here, so the two never read one differently
+ * (rule 2 — the grid mirrors the engine):
+ * - noted `protection_off`, the engine found protection off and left it so —
+ *   and so does the chip, whatever this tab had: never an unlock, never green;
+ * - otherwise it reads unlocked, unless it already reads protection off, which
+ *   an unlock never softens (the engine's rule, and an out-of-order report's);
+ * - noted as finding nothing live, the student is not in the session (removed,
+ *   left, switched away, the session over, or never tapped in) — so the chip is
+ *   never live, even for a tab that did not see them go.
+ */
+function applyUnlock(s: Student, reason: unknown, note: unknown, at: Date): void {
+  s.unlock = { reason: isUnlockReason(reason) ? reason : null };
+  s.state =
+    note === ('protection_off' satisfies UnlockRecordedAs) || s.state === 'protection_off'
+      ? 'protection_off'
+      : 'unlocked';
+  if (NOTHING_LIVE.includes(note)) s.endedAt ??= at;
+}
+
+function payloadOf(e: FeedEvent): Record<string, unknown> {
+  return typeof e.payload === 'object' && e.payload !== null
+    ? (e.payload as Record<string, unknown>)
+    : {};
+}
+
 export function fromSnapshot(snap: SessionSnapshot): Students {
   const out: Students = {};
   for (const s of snap.students) {
-    out[s.studentId] = {
+    const student: Student = {
       studentId: s.studentId,
       displayName: s.displayName,
       state: s.state,
       joinedAt: s.joinedAt ? new Date(s.joinedAt) : null,
       lastSeenAt: s.lastSeenAt ? new Date(s.lastSeenAt) : null,
       endedAt: s.endedAt ? new Date(s.endedAt) : null,
+      unlock: null,
     };
+    // What the stored row does not show, read as the stream reads it (A9). A
+    // late report leaves the ended row alone (A2c), so without these the 15 s
+    // refresh put a late record's chip back to plain "Left".
+    if (s.protectionOffAfterEnd) student.state = 'protection_off';
+    if (s.unlock) {
+      applyUnlock(student, s.unlock.reason, s.unlock.recordedAs, new Date(s.unlock.occurredAt));
+    }
+    out[s.studentId] = student;
   }
   return out;
 }
@@ -62,7 +117,7 @@ function advance(current: Date | null, at: Date): Date {
   return current !== null && current.getTime() > at.getTime() ? current : at;
 }
 
-/** A student the roster hasn't seen yet (mid-session joiner, or one removed). */
+/** A student the roster hasn't seen yet (a mid-session joiner). */
 function unknownStudent(studentId: string): Student {
   return {
     studentId,
@@ -71,6 +126,7 @@ function unknownStudent(studentId: string): Student {
     joinedAt: null,
     lastSeenAt: null,
     endedAt: null,
+    unlock: null,
   };
 }
 
@@ -84,9 +140,9 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
   }
   const id = e.userId;
   if (!id) return prev;
-  // A student the snapshot doesn't carry still gets a chip rather than being
-  // dropped: a mid-session joiner, or one removed whose phone then unlocks.
-  // The record is durable either way; the grid must not stay silent about it.
+  // A student the snapshot doesn't carry yet still gets a chip rather than
+  // being dropped. The record is durable; the grid must not stay silent about
+  // it, and the next snapshot carries them.
   const s: Student = { ...(prev[id] ?? unknownStudent(id)) };
   switch (e.type) {
     case 'tap_in':
@@ -94,17 +150,18 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       s.lastSeenAt = advance(s.lastSeenAt, at);
       s.endedAt = null;
       s.joinedAt ??= at;
+      s.unlock = null; // back in focus: an earlier unlock is history
       break;
-    case 'unlock':
-      // Mirrors the engine (rule 2): an unlock never softens protection off
-      // into "unlocked" — live or ended, the engine records it and leaves the
-      // state alone, so the chip stays.
-      if (s.state !== 'protection_off') s.state = 'unlocked';
+    case 'unlock': {
+      const payload = payloadOf(e);
+      applyUnlock(s, payload.reason, payload.recorded_as, at);
       s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
+    }
     case 'refocus':
       s.state = 'focused';
       s.lastSeenAt = advance(s.lastSeenAt, at);
+      s.unlock = null;
       break;
     case 'protection_off':
       s.state = 'protection_off';
@@ -112,10 +169,7 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       // A report recorded after the session ended (owner decision 10) is never
       // a live chip, even for a tab that never saw the end: a student the
       // snapshot no longer carries would otherwise read "Protection off", live.
-      if (
-        (e.payload as { recorded_as?: unknown } | null)?.recorded_as ===
-        ('after_session_end' satisfies ProtectionOffRecordedAs)
-      ) {
+      if (payloadOf(e).recorded_as === ('after_session_end' satisfies ProtectionOffRecordedAs)) {
         s.endedAt ??= at;
       }
       break;
@@ -140,15 +194,20 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
 
 /**
  * Fold a refreshed snapshot over the current roster. The snapshot is
- * authoritative for everyone it carries, but `getSessionRoster` joins only
- * *active* enrollments — so a student the stream surfaced who has since left the
- * roster (removed mid-session, whose phone then hit Emergency Unlock) is kept
- * rather than blinking off the grid seconds later. The event record is durable;
- * the screen should agree with it.
+ * authoritative for everyone it carries — names included, which no stream
+ * event carries (a rename names no session) — and it carries every student
+ * the session's feed can name, removed ones too. A chip the stream painted
+ * that it does not carry yet (a snapshot from an older server) is kept rather
+ * than blinking off the grid: the record is durable, and the screen should
+ * agree with it. An absent student it no longer carries has left the class
+ * with nothing on record here, so they go — kept, their name would never
+ * refresh again.
  */
 export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
   const next = fromSnapshot(snap);
-  for (const [id, student] of Object.entries(prev)) if (!(id in next)) next[id] = student;
+  for (const [id, student] of Object.entries(prev)) {
+    if (!(id in next) && student.state !== null) next[id] = student;
+  }
   return next;
 }
 
@@ -187,6 +246,28 @@ export function gridDisplay(s: Student, now: Date): GridDisplay {
     { state: s.state, joinedAt: s.joinedAt ?? now, lastSeenAt: s.lastSeenAt, endedAt: s.endedAt },
     now,
   );
+}
+
+const REASON_TEXT: Record<UnlockReason, string> = {
+  bathroom: 'bathroom',
+  nurse: 'nurse',
+  other: 'other reason',
+};
+
+/**
+ * What a chip adds, after its label, for the unlock it carries (A9): the reason
+ * on a chip that already says unlocked, and on a protection-off chip the
+ * unlock itself — a detail beside the state, never the state, so protection
+ * off is never relabelled an unlock nor shown green. Null when it adds nothing.
+ */
+export function unlockNote(s: Student, display: GridDisplay): string | null {
+  if (s.unlock === null) return null;
+  const reason = s.unlock.reason === null ? null : REASON_TEXT[s.unlock.reason];
+  if (display === 'unlocked' || display === 'left_unprotected') return reason;
+  if (display === 'protection_off' || display === 'left_protection_off') {
+    return reason === null ? 'unlocked' : `unlocked · ${reason}`;
+  }
+  return null;
 }
 
 /**
