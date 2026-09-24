@@ -208,8 +208,8 @@ struct Rig {
     let tokens: Tokens
     let running: Task<Void, Never>
 
-    init(refreshWorks: Bool = true) throws {
-        let outbox = try makeOutbox().outbox
+    init(outbox: Outbox? = nil, refreshWorks: Bool = true) throws {
+        let outbox = try outbox ?? makeOutbox().outbox
         let tokens = Tokens(refreshWorks: refreshWorks)
         let client = APIClient(
             baseURL: URL(string: "https://api.bali.test")!, tokens: tokens, transport: server)
@@ -246,7 +246,22 @@ struct Rig {
         try await eventually { clock.deadlines == deadlines }
     }
 
-    /// Stops the engine: its drain must end.
+    /// Taps into `view` as the server answers it: the phone in that session, focused.
+    func tapIn(_ view: SessionView = session()) async throws {
+        try await engine.record(.tap(tagId: "tag"))
+        try await server.next(tapRoute).reply(200, Answer.joined(view))
+        await until { $0.standing == .inSession(view, .focused) && $0.queued.isEmpty }
+    }
+
+    /// Brings the app to the foreground, answering the read of the truth it makes at once; the
+    /// read loop then waits for its next check-in.
+    func foreground(_ me: String = Answer.me()) async throws {
+        await engine.setForeground(true)
+        try await server.next(meRoute).reply(200, me)
+        try await eventually { clock.deadlines.contains(clock.now().addingTimeInterval(30)) }
+    }
+
+    /// Stops the engine: both loops must end.
     func stop() async {
         running.cancel()
         await server.close()
@@ -286,11 +301,32 @@ enum Answer {
     static func joined(_ view: SessionView = session(), state: String = "focused") -> String {
         #"{"outcome":"joined","session":\#(json(view)),"state":"\#(state)"}"#
     }
+    static func replay(_ view: SessionView = session(), state: String) -> String {
+        #"{"outcome":"replay","session":\#(json(view)),"state":"\#(state)"}"#
+    }
+    static let armed = #"{"outcome":"armed","session":null,"state":null}"#
+    static let replayNoSession = #"{"outcome":"replay","session":null,"state":null}"#
     static func unlocked(_ view: SessionView = session()) -> String {
         #"{"outcome":"applied","recordedAs":null,"state":"unlocked","session":\#(json(view)),"reason":null}"#
     }
+    static let unlockNoted =
+        #"{"outcome":"recorded","recordedAs":"no_live_participation","state":null,"session":null,"reason":null}"#
+    static func unlockAfterEnd(_ view: SessionView = session()) -> String {
+        #"{"outcome":"recorded","recordedAs":"after_session_end","state":null,"session":\#(json(view)),"reason":null}"#
+    }
     static func refocused(_ view: SessionView = session()) -> String {
         #"{"outcome":"applied","state":"focused","session":\#(json(view))}"#
+    }
+    static func live(_ view: SessionView = session(), state: String = "focused") -> String {
+        #"{"status":"live","state":"\#(state)","session":\#(json(view))}"#
+    }
+    static let gone = #"{"status":"gone","state":null,"session":null}"#
+    static func me(_ view: SessionView? = session(), state: String = "focused") -> String {
+        let live = view.map {
+            #"{"id":"\#($0.id)","classId":"\#($0.classId)","endsAt":"\#(iso($0.endsAt))","state":"\#(state)"}"#
+        }
+        return
+            #"{"user":{"id":"u","role":"student","displayName":null},"classes":[],"session":\#(live ?? "null")}"#
     }
     static func refused(_ reason: String) -> String {
         #"{"error":{"code":"conflict","reason":"\#(reason)","message":"\#(reason)"}}"#

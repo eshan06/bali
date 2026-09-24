@@ -121,16 +121,32 @@ public struct Sent: Sendable {
     /// Any status but a 2xx: the error body, whose `reason` a screen keys on.
     public let error: ApiErrorBody?
     public let disposition: Disposition
+    /// A 2xx answer's session and state: the truth as of this change, to reconcile to.
+    public let session: SessionView?
+    public let state: ParticipationState?
 
-    fileprivate init<Answer>(
+    fileprivate init<Answer: ChangeAnswer>(
         _ eventId: String, _ response: APIResponse<Answer>, _ disposition: Disposition
     ) {
-        (self.eventId, result, noAnswer, error, self.disposition) =
-            (eventId, response.result, response.noAnswer, response.error, disposition)
+        (self.eventId, result, noAnswer, error) =
+            (eventId, response.result, response.noAnswer, response.error)
+        (self.disposition, session, state) =
+            (disposition, response.answer?.session, response.answer?.state?.known)
     }
 
     var status: Int? { if case .status(let status) = result { status } else { nil } }
 }
+
+/// An outbox endpoint's answer: each names the session and the state it left the phone in.
+protocol ChangeAnswer: Decodable, Sendable {
+    var session: SessionView? { get }
+    var state: OrUnknown<ParticipationState>? { get }
+}
+
+extension TapResponse: ChangeAnswer {}
+extension UnlockResponse: ChangeAnswer {}
+extension RefocusResponse: ChangeAnswer {}
+extension ProtectionOffResponse: ChangeAnswer {}
 
 /// What one answer means for a record, by its kind's table — BaliCore's, never decided here.
 public enum Disposition: Sendable, Hashable {

@@ -1,6 +1,7 @@
 import BaliCore
 import Foundation
 import GRDB
+import GRDBSQLite
 
 /// The phone's outbox: each tap, emergency unlock, refocus and protection-off report it acted on,
 /// kept until an answer lets it go. BaliCore's tables say what an answer means; this applies them,
@@ -13,6 +14,8 @@ public struct Outbox: Sendable {
     public static let bound = 8
     /// The longest backoff, before its jitter.
     public static let backoffCap: TimeInterval = 60
+    /// How long a write waits on another process's — an extension's — before it fails.
+    public static let busyTimeout: TimeInterval = 5
 
     let pool: DatabasePool
     let random: @Sendable () -> Double
@@ -21,9 +24,72 @@ public struct Outbox: Sendable {
     public init(at url: URL, random: @escaping @Sendable () -> Double = { .random(in: 0..<1) })
         throws
     {
-        pool = try DatabasePool(path: url.path(percentEncoded: false))
-        try Self.migrator.migrate(pool)
+        try self.init(at: url, random: random, suspends: true)
+    }
+
+    /// The file is shared with the extensions (B5), so it is opened as GRDB's "Sharing a Database"
+    /// says: a write waits out another process's instead of failing (`busyTimeout`); none takes a
+    /// lock while the app is suspended (`suspend()`), or iOS kills it (0xdead10cc); the WAL files
+    /// outlive the last connection, so a process that only reads can always open it; and the setup
+    /// is coordinated, so two processes never migrate at once. A file a newer build has migrated is
+    /// refused, never written through a schema this one does not know. `suspends` is for the tests:
+    /// the notifications reach every database in the process.
+    init(at url: URL, random: @escaping @Sendable () -> Double, suspends: Bool) throws {
+        var configuration = Configuration()
+        configuration.busyMode = .timeout(Self.busyTimeout)
+        configuration.observesSuspensionNotifications = suspends
+        configuration.prepareDatabase { db in
+            guard !db.configuration.readonly else { return }
+            var persist: CInt = 1
+            let code = sqlite3_file_control(
+                db.sqliteConnection, nil, SQLITE_FCNTL_PERSIST_WAL, &persist)
+            guard code == SQLITE_OK else { throw DatabaseError(resultCode: ResultCode(rawValue: code)) }
+        }
+        pool = try Self.coordinated(url) { url in
+            let pool = try DatabasePool(
+                path: url.path(percentEncoded: false), configuration: configuration)
+            try Self.migrator.migrate(pool)
+            if try pool.read(Self.migrator.hasBeenSuperseded) { throw TooNew() }
+            return pool
+        }
         self.random = random
+    }
+
+    /// The file was migrated by a newer build than this one.
+    public struct TooNew: Error {}
+
+    /// The app is about to be suspended: from now on no outbox in this process takes a lock — a
+    /// write fails instead (`isSuspension`), and is made again once `resume()` is posted. The app
+    /// posts it as it enters the background.
+    public static func suspend() {
+        NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+    }
+
+    /// The app is back: the outboxes take locks again.
+    public static func resume() {
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+    }
+
+    /// Whether `error` is a write refused while the app is suspended, not a failure.
+    public static func isSuspension(_ error: any Error) -> Bool {
+        guard let error = error as? DatabaseError else { return false }
+        return error.resultCode == .SQLITE_INTERRUPT || error.resultCode == .SQLITE_ABORT
+    }
+
+    /// `open(url)`, coordinated with every other process opening the file (Linux has no
+    /// NSFileCoordinator, and no other process).
+    static func coordinated<T>(_ url: URL, _ open: (URL) throws -> T) throws -> T {
+        #if canImport(Darwin)
+            var result: Result<T, any Error>?
+            var failure: NSError?
+            NSFileCoordinator(filePresenter: nil).coordinate(
+                writingItemAt: url, options: .forMerging, error: &failure
+            ) { url in result = Result { try open(url) } }
+            guard let result else { throw failure ?? CocoaError(.fileWriteUnknown) }
+            return try result.get()
+        #else
+            return try open(url)
+        #endif
     }
 
     #if canImport(Darwin)
