@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **Owner rulings: no student allow-list, and D1 approved.**
+  **No allow-list** (owner: "remove the allowed during class thing as an
+  option. literally just dont give them an option and use apples default
+  list"). The shield blocks every app a third-party app can block —
+  ManagedSettings `shield.applicationCategories = .all()` and
+  `shield.webDomainCategories = .all()` — and the student never picks apps: no
+  `FamilyActivityPicker` step, in onboarding or anywhere else. iOS itself
+  keeps calls, FaceTime, Messages and Emergency SOS working; a third party
+  cannot block them. Why: the owner wants no option at all, and beyond the
+  one-time Screen Time grant the picker was the only setup the shield asked of
+  a student (v2's `docs/ZERO_SETUP_ANALYSIS.md` §4). v2 ran this shield on the
+  owner's iPhone: it shipped `.all()` with an optional once-ever exception
+  picker, which with nothing picked is exactly this (`v2-archive`:
+  `docs/HANDOFF.md` session 8, `ios/Bali/Bali/Core/ScreenTime.swift`); its
+  `docs/FULL_FOCUS_PLAN.md` §6 names the floor iOS keeps and the gap.
+  **The gap:** an app a student medically needs — a glucose monitor, an
+  assistive-communication app — is blocked too. At launch the exit is
+  Emergency Unlock, always allowed and always recorded; any carve-out is a
+  later product decision for the owner, not made here (parked in
+  ARCHITECTURE's iOS "Decided later"). **D1 approved**
+  ([Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)).
+  After the owner's feedback the canvas was regenerated with the Bali Design
+  System: a light theme like the owner's teacher app; the ring mark drawn
+  without its stone-50 tile (the owner overrode the design system's "the tile
+  is part of the mark" rule for the student app); the allowed-apps screen
+  removed (the Focus, shield and Me screens say every app is paused and that
+  calls, FaceTime, Messages and Emergency SOS always work); and a Focus
+  screen in three states — normal, final two minutes, offline — with an arc
+  countdown and "Hold to unlock — your teacher will see it" always visible.
+  The teacher sees an unlock live on the grid; there are no push
+  notifications at launch. The owner: "yes good. go ahead" — A6, A7 and A8
+  no longer wait on D1.
 - **2026-09-24** — **A4: a retry recorded but no longer current is answered
   `200 replay` naming no session — a tap's and a refocus's.** A `/v1`
   correction under API decision 2, of answers that told a phone something
