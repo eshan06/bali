@@ -126,7 +126,13 @@ enum Contract {
         let directory = repoRoot.appending(path: "contracts/fixtures/\(folder)")
         return try FileManager.default.contentsOfDirectory(atPath: directory.path)
             .filter { $0.hasSuffix(".json") }.sorted()
-            .map { ($0, try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: directory.appending(path: $0)))) }
+            .map {
+                (
+                    $0,
+                    try JSONDecoder().decode(
+                        Fixture.self, from: Data(contentsOf: directory.appending(path: $0)))
+                )
+            }
     }
 
     /// `contracts/outbox/<name>.json`: for each body, the results each disposition answers.

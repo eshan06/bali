@@ -9,7 +9,9 @@ let refused = #"{"error":{"code":"bad_input","message":"refused"}}"#
 
 @Suite("The order records go in")
 struct OrderTests {
-    @Test("In the order the phone acted: an unlock goes ahead of a later refocus, and nothing overtakes it while it backs off")
+    @Test(
+        "In the order the phone acted: an unlock goes ahead of a later refocus, and nothing overtakes it while it backs off"
+    )
     func unlockBeforeRefocus() async throws {
         let (outbox, _) = try makeOutbox()
         let unlock = try record(outbox, .unlock(session: "s", reason: nil))
@@ -23,23 +25,31 @@ struct OrderTests {
         let retried = try #require(try current(outbox, unlock.eventId))
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(2)) == .send(retried))
         try await send(outbox, retried, 500, at: t0.addingTimeInterval(2))
-        #expect(try outbox.nextDue(now: t0.addingTimeInterval(3)) == .wait(until: t0.addingTimeInterval(6)))
+        #expect(
+            try outbox.nextDue(now: t0.addingTimeInterval(3))
+                == .wait(until: t0.addingTimeInterval(6)))
 
         try await send(outbox, retried, 200, recorded, at: t0.addingTimeInterval(6))
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(6)) == .send(refocus))
     }
 
-    @Test("A pending record holds every record behind it, whatever their kinds, until it is answered")
+    @Test(
+        "A pending record holds every record behind it, whatever their kinds, until it is answered")
     func pendingHoldsTheQueue() async throws {
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "tag"))
         let unlock = try record(outbox, .unlock(session: "s", reason: nil))
         try record(outbox, .protectionOff(session: "s"))
         try await send(outbox, tap, nil)
-        #expect(try outbox.nextDue(now: t0.addingTimeInterval(1)) == .wait(until: t0.addingTimeInterval(2)))
+        #expect(
+            try outbox.nextDue(now: t0.addingTimeInterval(1))
+                == .wait(until: t0.addingTimeInterval(2)))
         try await send(outbox, tap, 502, at: t0.addingTimeInterval(2))
-        #expect(try outbox.nextDue(now: t0.addingTimeInterval(5)) == .wait(until: t0.addingTimeInterval(6)))
-        let joined = #"{"outcome":"joined","session":{"id":"s","classId":"c","endsAt":"2026-09-24T09:50:00.000Z"},"state":"focused"}"#
+        #expect(
+            try outbox.nextDue(now: t0.addingTimeInterval(5))
+                == .wait(until: t0.addingTimeInterval(6)))
+        let joined =
+            #"{"outcome":"joined","session":{"id":"s","classId":"c","endsAt":"2026-09-24T09:50:00.000Z"},"state":"focused"}"#
         try await send(outbox, tap, 200, joined, at: t0.addingTimeInterval(6))
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(6)) == .send(unlock))
     }
@@ -54,7 +64,9 @@ struct OrderTests {
         let report = try record(outbox, .protectionOff(session: "s"))
         var now = t0
         while try current(outbox, tap.eventId)?.stuck == false {
-            #expect(try outbox.nextDue(now: now) == .send(try #require(try current(outbox, tap.eventId))))
+            #expect(
+                try outbox.nextDue(now: now)
+                    == .send(try #require(try current(outbox, tap.eventId))))
             try await send(outbox, tap, status, body, at: now)
             now = try #require(try current(outbox, tap.eventId)).nextAttemptAt
         }
@@ -71,7 +83,9 @@ struct OrderTests {
         #expect(try outbox.nextDue(now: before) == .wait(until: stuck.nextAttemptAt))
     }
 
-    @Test("A refocus is never sent before the unlock it returns from is recorded — even with that unlock stuck — while the rest go on")
+    @Test(
+        "A refocus is never sent before the unlock it returns from is recorded — even with that unlock stuck — while the rest go on"
+    )
     func refocusWaitsForItsUnlock() async throws {
         let (outbox, _) = try makeOutbox()
         let unlock = try record(outbox, .unlock(session: "s", reason: nil))
@@ -82,14 +96,18 @@ struct OrderTests {
         #expect(try outbox.nextDue(now: t0) == .send(report))
         try await send(outbox, report, 200, #"{"outcome":"applied"}"#)
         #expect(try outbox.nextDue(now: t0) == .wait(until: t0.addingTimeInterval(2)))
-        #expect(try outbox.nextDue(now: t0.addingTimeInterval(9)) == .send(try #require(try current(outbox, unlock.eventId))))
+        #expect(
+            try outbox.nextDue(now: t0.addingTimeInterval(9))
+                == .send(try #require(try current(outbox, unlock.eventId))))
 
         // Recorded at last: its refocus follows.
         try await send(outbox, unlock, 200, recorded, at: t0.addingTimeInterval(9))
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(9)) == .send(refocus))
     }
 
-    @Test("A refocus waits only on its own unlock: not on an older one still stuck, nor on another session's")
+    @Test(
+        "A refocus waits only on its own unlock: not on an older one still stuck, nor on another session's"
+    )
     func refocusWaitsOnlyOnItsOwn() async throws {
         let (outbox, _) = try makeOutbox()
         let older = try record(outbox, .unlock(session: "s", reason: nil))
@@ -115,14 +133,17 @@ struct OrderTests {
         let refocus = try record(outbox, .refocus(session: "s"))
         #expect(try outbox.nextDue(now: t0) == .wait(until: t0.addingTimeInterval(2)))
         try await send(outbox, unlock, 200, recorded, at: t0.addingTimeInterval(2))
-        try await send(outbox, refocus, 200, #"{"outcome":"applied"}"#, at: t0.addingTimeInterval(2))
+        try await send(
+            outbox, refocus, 200, #"{"outcome":"applied"}"#, at: t0.addingTimeInterval(2))
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(2)) == .idle)
     }
 }
 
 @Suite("What holds the phone's reads")
 struct AwaitingTests {
-    @Test("Every record still pending awaits its answer; a refused tap no longer does, as its first answer came")
+    @Test(
+        "Every record still pending awaits its answer; a refused tap no longer does, as its first answer came"
+    )
     func pending() async throws {
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "tag"))
@@ -172,14 +193,21 @@ struct UnlockSafetyTests {
     /// Answers of every shape: none; each outcome of each table, with a session and without; one
     /// no build knows; bodies that do not decode; refusals; the transport's statuses.
     static let answers: [(Int?, String)] = [
-        (nil, ""), (200, #"{"outcome":"applied"}"#), (200, recorded), (200, #"{"outcome":"replay"}"#),
-        (200, #"{"outcome":"joined","session":{"id":"s","classId":"c","endsAt":"2026-09-24T09:50:00.000Z"},"state":"focused"}"#),
-        (200, #"{"outcome":"armed","session":null,"state":null}"#), (200, #"{"outcome":"replay","session":null}"#),
+        (nil, ""), (200, #"{"outcome":"applied"}"#), (200, recorded),
+        (200, #"{"outcome":"replay"}"#),
+        (
+            200,
+            #"{"outcome":"joined","session":{"id":"s","classId":"c","endsAt":"2026-09-24T09:50:00.000Z"},"state":"focused"}"#
+        ),
+        (200, #"{"outcome":"armed","session":null,"state":null}"#),
+        (200, #"{"outcome":"replay","session":null}"#),
         (200, #"{"outcome":"what"}"#), (200, "{"), (204, ""), (302, ""), (400, refused), (401, ""),
         (404, refused), (408, ""), (409, refused), (429, ""), (500, ""), (503, "<html>"),
     ]
 
-    @Test("A random walk of records, sends and retries deletes an unlock only when a send says recorded")
+    @Test(
+        "A random walk of records, sends and retries deletes an unlock only when a send says recorded"
+    )
     func randomWalk() async throws {
         for seed in 1...12 as ClosedRange<UInt64> {
             var random = SplitMix64(state: seed)
@@ -193,9 +221,15 @@ struct UnlockSafetyTests {
                 case 0: try outbox.record(.tap(tagId: "tag"), now: now)
                 case 1: try outbox.record(.refocus(session: session), now: now)
                 case 2: try outbox.record(.protectionOff(session: session), now: now)
-                case 3: if Bool.random(using: &random) { try outbox.protectionRestored() } else { try outbox.retryNow(now) }
+                case 3:
+                    if Bool.random(using: &random) {
+                        try outbox.protectionRestored()
+                    } else {
+                        try outbox.retryNow(now)
+                    }
                 case 4:
-                    let unlock = try #require(try outbox.record(.unlock(session: session, reason: nil), now: now))
+                    let unlock = try #require(
+                        try outbox.record(.unlock(session: session, reason: nil), now: now))
                     unrecorded.insert(unlock.eventId)
                 case 5...7:
                     guard case .send(let due) = try outbox.nextDue(now: now) else { break }
@@ -204,7 +238,9 @@ struct UnlockSafetyTests {
                         unrecorded.remove(due.eventId)
                     }
                 default:
-                    guard let any = try outbox.records().randomElement(using: &random) else { break }
+                    guard let any = try outbox.records().randomElement(using: &random) else {
+                        break
+                    }
                     let (status, body) = Self.answers.randomElement(using: &random)!
                     if try await send(outbox, any, status, body, at: now) == .unlock(.recorded) {
                         unrecorded.remove(any.eventId)

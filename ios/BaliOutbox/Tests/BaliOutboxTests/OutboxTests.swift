@@ -30,7 +30,9 @@ struct SchemaTests {
         #expect(try outbox.awaiting() == 0)
     }
 
-    @Test("What is queued outlives the process: reopened, the file holds it all, and the rules' state")
+    @Test(
+        "What is queued outlives the process: reopened, the file holds it all, and the rules' state"
+    )
     func reopens() async throws {
         let (outbox, url) = try makeOutbox()
         let unlock = try record(outbox, .unlock(session: "s", reason: .nurse))
@@ -50,7 +52,8 @@ struct SchemaTests {
     @Test("The schema refuses a row its kind could not send")
     func refusesMalformedRows() throws {
         let (outbox, _) = try makeOutbox()
-        let insert = "INSERT INTO outbox (eventId, kind, tagId, sessionId, recordedAt, nextAttemptAt)"
+        let insert =
+            "INSERT INTO outbox (eventId, kind, tagId, sessionId, recordedAt, nextAttemptAt)"
         for values in [
             "('a', 'tap', NULL, NULL, 0, 0)",  // a tap with no tag
             "('b', 'tap', 'tag', 's', 0, 0)",  // a tap with a session
@@ -67,13 +70,16 @@ struct SchemaTests {
 
 @Suite("Queuing what the phone did")
 struct RecordTests {
-    @Test("Each change is queued under a new UUIDv7 minted at that moment, due at once, sent as its request")
+    @Test(
+        "Each change is queued under a new UUIDv7 minted at that moment, due at once, sent as its request"
+    )
     func queues() throws {
         let (outbox, _) = try makeOutbox()
         let at = t0.addingTimeInterval(7)
         let changes: [Change] = [
             .tap(tagId: "04:A2:1B"), .unlock(session: "s", reason: .bathroom),
-            .unlock(session: "s", reason: nil), .refocus(session: "s"), .protectionOff(session: "s"),
+            .unlock(session: "s", reason: nil), .refocus(session: "s"),
+            .protectionOff(session: "s"),
         ]
         var records: [OutboxRecord] = []
         for change in changes { records.append(try record(outbox, change, at: at)) }
@@ -82,17 +88,21 @@ struct RecordTests {
         for record in records {
             #expect(record.eventId.wholeMatch(of: Self.uuidV7) != nil, "\(record.eventId)")
             // Its first 48 bits are the time it was recorded, in milliseconds.
-            #expect(UInt64(record.eventId.replacing("-", with: "").prefix(12), radix: 16) == 1_790_000_007_000)
+            #expect(
+                UInt64(record.eventId.replacing("-", with: "").prefix(12), radix: 16)
+                    == 1_790_000_007_000)
             #expect(record.recordedAt == at && record.nextAttemptAt == at)
             #expect(record.attempts == 0 && record.answers == 0 && !record.stuck)
-            #expect(record.lastStatus == nil && record.lastReason == nil && record.lastMessage == nil)
+            #expect(
+                record.lastStatus == nil && record.lastReason == nil && record.lastMessage == nil)
         }
         #expect(Set(records.map(\.eventId)).count == records.count)
         let id = records.map(\.eventId)
         #expect(
             records.map(\.request) == [
                 .tap(TapRequest(tagId: "04:A2:1B", eventId: id[0], deviceTime: at)),
-                .unlock(session: "s", UnlockRequest(eventId: id[1], deviceTime: at, reason: .bathroom)),
+                .unlock(
+                    session: "s", UnlockRequest(eventId: id[1], deviceTime: at, reason: .bathroom)),
                 .unlock(session: "s", UnlockRequest(eventId: id[2], deviceTime: at)),
                 .refocus(session: "s", RefocusRequest(eventId: id[3], deviceTime: at)),
                 .protectionOff(session: "s", ProtectionOffRequest(eventId: id[4], deviceTime: at)),
@@ -128,7 +138,8 @@ struct RecordTests {
         let inFlight = try record(outbox, .refocus(session: "s"))
         let latest = try record(outbox, later)
 
-        #expect(try outbox.records().map(\.eventId) == [unlock, report, tap, latest].map(\.eventId))
+        #expect(
+            try outbox.records().map(\.eventId) == [unlock, report, tap, latest].map(\.eventId))
         // One that was in flight comes back to nothing: its answer is older than the phone's truth.
         #expect(try await send(outbox, inFlight, 200, #"{"outcome":"applied"}"#) == nil)
         // Nothing supersedes an unlock, a tap or a protection-off report.
@@ -137,7 +148,9 @@ struct RecordTests {
         #expect(try outbox.records().count == 6)
     }
 
-    @Test("Protection off is reported once per revocation, and again after a tap, in another session, or once restored")
+    @Test(
+        "Protection off is reported once per revocation, and again after a tap, in another session, or once restored"
+    )
     func protectionOffOnce() throws {
         let (outbox, _) = try makeOutbox()
         let first = try record(outbox, .protectionOff(session: "s"))

@@ -15,7 +15,8 @@ struct SettleTests {
         "On every result and body the TypeScript's tables answer, the record goes exactly when its disposition ends it — an unlock only when recorded — and a refusal is stuck at once",
         arguments: [
             ("tap", Change.tap(tagId: "tag")), ("unlock", .unlock(session: "s", reason: nil)),
-            ("state-change", .refocus(session: "s")), ("state-change", .protectionOff(session: "s")),
+            ("state-change", .refocus(session: "s")),
+            ("state-change", .protectionOff(session: "s")),
         ])
     func everyGeneratedCase(table: String, change: Change) async throws {
         let (outbox, _) = try makeOutbox()
@@ -26,20 +27,24 @@ struct SettleTests {
                     let status = try Contract.status(result)
                     // A fresh record per send (protection off: a fresh session, reported once each).
                     let fresh: Change =
-                        if case .protectionOff = change { .protectionOff(session: "s\(checked)") }
-                        else { change }
+                        if case .protectionOff = change {
+                            .protectionOff(session: "s\(checked)")
+                        } else { change }
                     let queued = try record(outbox, fresh)
                     let disposition = try await send(
                         outbox, queued, status, testCase.body?.data ?? Data(), at: t0)
                     let body = testCase.body.map { String(decoding: $0.data, as: UTF8.self) }
-                    let context = "\(fresh) \(status.map(String.init) ?? "no answer") \(body ?? "no body")"
+                    let context =
+                        "\(fresh) \(status.map(String.init) ?? "no answer") \(body ?? "no body")"
                     #expect(disposition?.rawValue == expected, "\(context)")
                     let kept = try current(outbox, queued.eventId)
                     #expect((kept == nil) == Self.ending.contains(expected), "\(context)")
                     if case .unlock = change {
                         #expect((kept == nil) == (expected == "recorded"), "\(context)")
                     }
-                    if let kept { #expect(kept.stuck == (expected == "retry_and_surface"), "\(context)") }
+                    if let kept {
+                        #expect(kept.stuck == (expected == "retry_and_surface"), "\(context)")
+                    }
                     checked += 1
                 }
             }
@@ -57,14 +62,18 @@ struct SettleTests {
         #expect(fixtures.count >= 4)
         for (index, (name, fixture)) in fixtures.enumerated() {
             let fresh: Change =
-                if case .protectionOff = change { .protectionOff(session: "s\(index)") } else { change }
+                if case .protectionOff = change { .protectionOff(session: "s\(index)") } else {
+                    change
+                }
             let queued = try record(outbox, fresh)
-            let disposition = try await send(outbox, queued, fixture.status, fixture.body.data, at: t0)
+            let disposition = try await send(
+                outbox, queued, fixture.status, fixture.body.data, at: t0)
             #expect(disposition?.rawValue == fixture.disposition, "\(folder)/\(name)")
             let kept = try current(outbox, queued.eventId)
             #expect((kept == nil) == Self.ending.contains(fixture.disposition), "\(folder)/\(name)")
             if let kept {
-                let error = try? BaliJSON.makeDecoder().decode(ApiErrorBody.self, from: fixture.body.data)
+                let error = try? BaliJSON.makeDecoder().decode(
+                    ApiErrorBody.self, from: fixture.body.data)
                 #expect(kept.lastStatus == fixture.status, "\(folder)/\(name)")
                 #expect(kept.lastReason == error?.error.reason, "\(folder)/\(name)")
                 #expect(kept.lastMessage == error?.error.message, "\(folder)/\(name)")
@@ -99,7 +108,9 @@ struct SettleTests {
         }
     }
 
-    @Test("A 401 and no answer are not the record's fault: they back off but never count toward the bound, nor do 408 and 429")
+    @Test(
+        "A 401 and no answer are not the record's fault: they back off but never count toward the bound, nor do 408 and 429"
+    )
     func notAnswers() async throws {
         let (outbox, _) = try makeOutbox()
         let unlock = try record(outbox, .unlock(session: "s", reason: nil))
@@ -114,7 +125,8 @@ struct SettleTests {
     @Test(
         "The bound: the server's answers that leave a record unsettled — a 5xx, a 3xx, a 2xx this build cannot read — make it stuck at the eighth, and stuck stays stuck",
         arguments: [
-            (Change.tap(tagId: "tag"), 500, ""), (.tap(tagId: "tag"), 200, #"{"outcome":"queued"}"#),
+            (Change.tap(tagId: "tag"), 500, ""),
+            (.tap(tagId: "tag"), 200, #"{"outcome":"queued"}"#),
             (.unlock(session: "s", reason: nil), 503, "<html>"),
             (.unlock(session: "s", reason: nil), 200, #"{"outcome":"recorded_elsewhere"}"#),
             (.refocus(session: "s"), 302, ""), (.protectionOff(session: "s"), 200, "not json"),
@@ -171,7 +183,8 @@ struct SettleTests {
         let later = t0.addingTimeInterval(1)
         try outbox.retryNow(later)
         #expect(try outbox.records().allSatisfy { $0.nextAttemptAt == later })
-        #expect(try outbox.nextDue(now: later) == .send(try #require(try current(outbox, tap.eventId))))
+        #expect(
+            try outbox.nextDue(now: later) == .send(try #require(try current(outbox, tap.eventId))))
         #expect(try current(outbox, tap.eventId)?.stuck == true)
     }
 }

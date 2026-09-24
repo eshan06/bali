@@ -2,15 +2,15 @@ import BaliCore
 import Foundation
 import GRDB
 
-/// What the phone did, acted on at once and queued to send: a record's change.
+/// What the phone did — acted on at once, and queued to send.
 public enum Change: Sendable, Hashable {
-    /// `POST /v1/taps`: the block's tag the phone read.
+    /// `POST /v1/taps`: the tag the phone read.
     case tap(tagId: String)
-    /// `POST /v1/sessions/{id}/unlock`, with the reason the student gave, if any.
+    /// `POST /v1/sessions/{id}/unlock`, with the student's reason, if any.
     case unlock(session: String, reason: UnlockReason?)
     /// `POST /v1/sessions/{id}/refocus`.
     case refocus(session: String)
-    /// `POST /v1/sessions/{id}/protection-off`: the phone found its Screen Time permission revoked.
+    /// `POST /v1/sessions/{id}/protection-off`: the Screen Time permission was found revoked.
     case protectionOff(session: String)
 
     var kind: String {
@@ -30,33 +30,27 @@ public enum Change: Sendable, Hashable {
     }
 }
 
-/// One record of the outbox, as `Outbox` keeps it.
+/// One queued record.
 public struct OutboxRecord: Sendable, Hashable {
-    /// Minted when the phone acted, a UUIDv7, and sent with every attempt (rule 4).
+    /// A UUIDv7 minted when the phone acted, sent with every attempt (rule 4).
     public let eventId: String
     public let change: Change
-    /// The phone's clock when it acted — the request's `deviceTime`.
+    /// The phone's clock when it acted: the request's `deviceTime`.
     public let recordedAt: Date
-    /// Sends that left it in the outbox.
+    /// Sends that left it queued; of them, `answers` the server answered — what the bound counts.
     public let attempts: Int
-    /// Of those, the ones the server answered — any status but 401, 408 and 429: what the bound
-    /// counts (`Outbox.bound`).
     public let answers: Int
-    /// When it may be sent again.
     public let nextAttemptAt: Date
-    /// Given up waiting on: refused (`retry_and_surface`), or left unsettled by `Outbox.bound`
-    /// answers. Still kept and retried, and shown to the student; it no longer holds the records
-    /// behind it, nor the phone's reads (`Outbox.awaiting`).
+    /// Refused (`retry_and_surface`), or unsettled by `Outbox.bound` answers: still kept, retried
+    /// and shown, but no longer holding the records behind it or the phone's reads.
     public let stuck: Bool
-    /// The last answer, for a screen: its status (nil when none came), and an error's reason and
-    /// message.
+    /// The last answer, for a screen: its status (nil for none), an error's reason and message.
     public let lastStatus: Int?
     public let lastReason: ApiErrorReason?
     public let lastMessage: String?
-    /// A refocus's: the unlock it returns from, while that unlock is unrecorded.
+    /// A refocus's: the unlock it returns from, while that is unrecorded.
     let follows: String?
 
-    /// A record's request, for the matching `APIClient` call.
     public enum Request: Sendable, Hashable {
         case tap(TapRequest)
         case unlock(session: String, UnlockRequest)
@@ -64,20 +58,17 @@ public struct OutboxRecord: Sendable, Hashable {
         case protectionOff(session: String, ProtectionOffRequest)
     }
 
-    /// The request to send it as, built from what was stored, so every attempt sends the same.
+    /// The request to send, built from what was stored: every attempt sends the same.
     public var request: Request {
-        switch change {
-        case .tap(let tagId):
-            .tap(TapRequest(tagId: tagId, eventId: eventId, deviceTime: recordedAt))
+        let (id, time) = (eventId, recordedAt)
+        return switch change {
+        case .tap(let tagId): .tap(TapRequest(tagId: tagId, eventId: id, deviceTime: time))
         case .unlock(let session, let reason):
-            .unlock(
-                session: session,
-                UnlockRequest(eventId: eventId, deviceTime: recordedAt, reason: reason))
+            .unlock(session: session, UnlockRequest(eventId: id, deviceTime: time, reason: reason))
         case .refocus(let session):
-            .refocus(session: session, RefocusRequest(eventId: eventId, deviceTime: recordedAt))
+            .refocus(session: session, RefocusRequest(eventId: id, deviceTime: time))
         case .protectionOff(let session):
-            .protectionOff(
-                session: session, ProtectionOffRequest(eventId: eventId, deviceTime: recordedAt))
+            .protectionOff(session: session, ProtectionOffRequest(eventId: id, deviceTime: time))
         }
     }
 }
@@ -112,26 +103,23 @@ extension OutboxRecord: FetchableRecord {
     struct UnknownKind: Error { let kind: String }
 }
 
-/// What one send's answer means for a record, by the table for its kind — BaliCore's, never
-/// decided here.
+/// What one answer means for a record, by its kind's table — BaliCore's, never decided here.
 public enum Disposition: Sendable, Hashable {
     case tap(TapDisposition)
     case unlock(UnlockDisposition)
     case stateChange(StateChangeDisposition)
 
     init<Answer>(_ change: Change, _ response: APIResponse<Answer>) {
+        let (result, answer) = (response.result, response.answer)
         switch change {
-        case .tap: self = .tap(tapDisposition(response.result, response.answer as? TapResponse))
-        case .unlock:
-            self = .unlock(unlockDisposition(response.result, response.answer as? UnlockResponse))
+        case .tap: self = .tap(tapDisposition(result, answer as? TapResponse))
+        case .unlock: self = .unlock(unlockDisposition(result, answer as? UnlockResponse))
         case .refocus, .protectionOff:
-            self = .stateChange(
-                stateChangeDisposition(response.result, response.answer as? any StateChangeAnswer))
+            self = .stateChange(stateChangeDisposition(result, answer as? any StateChangeAnswer))
         }
     }
 
-    /// Whether the record stays: every disposition but the ones the tables say delete it. Each case
-    /// by name, so one BaliCore adds does not compile until it is placed.
+    /// Whether the record stays queued: each case by name, so one BaliCore adds must be placed.
     var keeps: Bool {
         switch self {
         case .tap(.applySession), .tap(.waitForStart), .tap(.reread), .unlock(.recorded),
@@ -144,13 +132,13 @@ public enum Disposition: Sendable, Hashable {
         }
     }
 
-    /// A refusal the record is kept through — stuck at once.
+    /// A refusal the record is kept through: stuck at once.
     var refused: Bool { self == .tap(.retryAndSurface) || self == .unlock(.retryAndSurface) }
 }
 
-/// The phone mints each record's event id when it acts, offline included, as the API's ids are
-/// written: a lower-case UUIDv7 — its first 48 bits the Unix time in milliseconds, the rest random
-/// but the version and variant (ARCHITECTURE, data-model decision 2). Foundation's `UUID` is a v4.
+/// Event ids as the API's are written: a lower-case UUIDv7, minted by the phone when it acts,
+/// offline too — the Unix time in milliseconds, then random bits (ARCHITECTURE, data model,
+/// decision 2). Foundation's `UUID` is a v4.
 enum EventID {
     static func mint(at now: Date) -> String {
         var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max) }

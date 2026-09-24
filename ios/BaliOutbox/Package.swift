@@ -1,10 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// BaliOutbox: the student phone's outbox — the taps, unlocks and state changes it has acted on and
-// not yet had answered, in a GRDB database in the app group (ARCHITECTURE, "iOS app structure",
-// decision 3), kept, ordered and retried by BaliCore's outbox tables. Student-only: the teacher app
-// has no outbox.
+// BaliOutbox: the student phone's outbox, a GRDB database in the app group (ARCHITECTURE, "iOS app
+// structure", decision 3), run by BaliCore's outbox tables. Student-only: the teacher app has none.
 let package = Package(
     name: "BaliOutbox",
     platforms: [.iOS(.v17), .macOS(.v14)],
