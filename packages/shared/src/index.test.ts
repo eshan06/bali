@@ -48,7 +48,7 @@ describe('@bali/shared', () => {
       { install: install.replaceAll('-', ''), seq: 1 },
       { install: 42, seq: 1 },
     ]) {
-      expect(isActionOrder(order), JSON.stringify(order) ?? String(order)).toBe(false);
+      expect(isActionOrder(order), JSON.stringify(order) ?? 'undefined').toBe(false);
     }
   });
 
