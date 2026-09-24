@@ -33,7 +33,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   EVENT_ID_CONFLICT`, as the arm path's teacher scope (2026-09-22, item 5)
   already refuses it — a `200` would drop a physical tap at that block. While
   it is still current it is replayed naming its session, the split #28
-  recorded; unchanged. (2) **What still 409s:** an id held by a different
+  recorded; unchanged. The cost, the one the replay already carried while
+  current: the server cannot tell a retry from a reuse, so a spent id reused
+  for a new physical tap at the SAME teacher's block, once no longer current,
+  is answered `replay` with no session — as `armTap` answers it — and that
+  join is dropped, though not silently: the phone re-reads the truth, which
+  shows it in no session. An honest client mints one id per physical tap.
+  (2) **What still 409s:** an id held by a different
   event — another student's, another kind, this student's tap under another
   teacher — and a fresh tap that raced its session's end, whose retry resolves
   afresh. `NOT_PARTICIPATING` no longer reaches a tap: the `!isNew` branch

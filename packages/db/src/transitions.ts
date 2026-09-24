@@ -656,6 +656,12 @@ type ArmedTapRow = typeof armedTaps.$inferSelect;
  * shows "waiting for your teacher" (A4) — `replay` said only "recorded", and
  * the truth the phone then re-reads cannot say it waits. Expired or consumed,
  * it is `replay`: recorded, and nothing waits for it.
+ *
+ * The 23505 recoveries reach a still-waiting row only in a race no test
+ * stages: `takeOverStaleRow`'s rival is always consumed, since a second
+ * waiting row cannot stand beside the stale one it refreshes, and the
+ * insert's arbiter answers a waiting rival itself unless the rival lands
+ * between that check and the event-id index.
  */
 function answerOwnArmedTap(row: ArmedTapRow, now: Date): ArmTapResult {
   const waiting = row.consumedAt === null && row.expiresAt.getTime() > now.getTime();
@@ -1457,7 +1463,10 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // given up, not preserved. The arm path answers the cross-teacher shape
       // of the same reuse with a 409 instead (armTap's teacher scope, ruled
       // 2026-09-22), so while the first participation is live the two paths
-      // differ; recorded in PLAN.md. Once it is not, they agree (below).
+      // differ; recorded in PLAN.md. Once it is not, they agree (below) — and
+      // a spent id reused at the SAME teacher's block is then answered
+      // `replay` with no session, as armTap answers it, so that join is
+      // dropped too, though not silently: the phone re-reads the truth.
       // insertEvent's conflict check is untouched and still fires for an id
       // reused for a genuinely DIFFERENT event, which is what the unlock path
       // depends on (ISSUES #2).
@@ -1526,7 +1535,8 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // reused at another block (or a block that moved, which nothing ships
         // yet): not a retry (tap step 9), so it falls through to insertEvent's
         // EVENT_ID_CONFLICT, as armTap refuses the same id — a 200 would drop
-        // a physical tap at that block.
+        // a physical tap at that block. (A `tap_in` always carries its class,
+        // so `prior.teacherId` is never the left join's null here.)
         if (
           prior.sessionId === session.id ||
           prior.teacherId === (await teacherOfClass(tx, session.classId))
