@@ -32,8 +32,11 @@ jobs:
         env:
           # Through env, never inline: refnames may contain $, backticks, ;.
           BASE_REF: ${{ github.base_ref }}
+        # The diff on its own line, so a failing one fails the step: piped
+        # into grep, it would read as "no iOS change" and skip the build.
         run: |
-          if git diff --name-only "origin/$BASE_REF"...HEAD | grep -qE '^(ios/|\.github/workflows/ios\.yml$)'; then
+          changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
+          if printf '%s\n' "$changed" | grep -qE '^(ios/|\.github/workflows/ios\.yml$)'; then
             echo "ios=true" >> "$GITHUB_OUTPUT"
           else
             echo "ios=false" >> "$GITHUB_OUTPUT"
