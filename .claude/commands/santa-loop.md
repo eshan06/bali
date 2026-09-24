@@ -36,7 +36,7 @@ git diff --stat origin/main...HEAD
 
 ### Step 1: The blocking rules — one source
 
-What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`, from "Judge the diff against the repository's own rules" through "Everything else is WARN." Read it and give that text to both reviewers verbatim. Don't add criteria here — santa must never be stricter than the final gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
+What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`. Give both reviewers its rules verbatim — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
 
 ### Step 2: Dual independent review
 
