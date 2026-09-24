@@ -103,17 +103,22 @@ interface Call {
   path: string;
   body?: object;
 }
-const now = () => new Date().toISOString();
+/**
+ * The phone's clock, fixed: the server clamps it into the session's window
+ * anyway, and a fixed value can never share a millisecond with a time the
+ * server stamps — stand-ins are numbered by value, so that would renumber one.
+ */
+const deviceTime = '2026-01-01T09:00:00.000Z';
 const get = (as: string, path: string): Call => ({ as, method: 'GET', path });
 const del = (as: string, path: string): Call => ({ as, method: 'DELETE', path });
 const post = (as: string, path: string, body: object): Call => ({ as, method: 'POST', path, body });
 const tap = (as: string, tagId: string, eventId: string = randomUUID()) =>
-  post(as, '/v1/taps', { tagId, eventId, deviceTime: now() });
+  post(as, '/v1/taps', { tagId, eventId, deviceTime });
 /** An unlock, refocus or protection-off report — under a fresh id unless given one. */
 const change = (as: string, sessionId: string, route: string, eventId = randomUUID(), extra = {}) =>
-  post(as, `/v1/sessions/${sessionId}/${route}`, { eventId, deviceTime: now(), ...extra });
+  post(as, `/v1/sessions/${sessionId}/${route}`, { eventId, deviceTime, ...extra });
 const checkin = (as: string, sessionId: string) =>
-  post(as, `/v1/sessions/${sessionId}/checkin`, { deviceTime: now() });
+  post(as, `/v1/sessions/${sessionId}/checkin`, { deviceTime });
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -292,7 +297,7 @@ async function captureAll() {
   // Joining and leaving by code (auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');
   const byCode = (joinCode: string) =>
-    post(newcomer, '/v1/enrollments', { joinCode, eventId: randomUUID(), deviceTime: now() });
+    post(newcomer, '/v1/enrollments', { joinCode, eventId: randomUUID(), deviceTime });
   await capture('enrollments/joined', byCode(room.klass.joinCode), 200, { outcome: 'joined' });
   const already = { outcome: 'already_enrolled' };
   await capture('enrollments/already-enrolled', byCode(room.klass.joinCode), 200, already);
@@ -311,7 +316,7 @@ async function captureAll() {
   await capture('enrollments/404-enrollment-not-found', nobody, 404, noEnrollment);
 
   // A malformed tap, one with no token, and one of no registered block.
-  const bad = post(newcomer, '/v1/taps', { tagId: 'TAG-fx', eventId: 'x', deviceTime: now() });
+  const bad = post(newcomer, '/v1/taps', { tagId: 'TAG-fx', eventId: 'x', deviceTime });
   await capture('taps/400-bad-input', bad, 400, { code: 'bad_input' });
   const anonymous = { ...tap(newcomer, 'TAG-fx'), as: null };
   await capture('taps/401-unauthorized', anonymous, 401, { code: 'unauthorized' });
