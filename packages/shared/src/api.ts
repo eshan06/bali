@@ -2,6 +2,7 @@ import type { DisplayState } from './state.js';
 import type {
   EventType,
   ParticipationState,
+  ProtectionOffRecordedAs,
   UnlockReason,
   UnlockRecordedAs,
   UserRole,
@@ -176,11 +177,15 @@ export interface RefocusResponse {
 
 // POST /v1/sessions/{id}/protection-off — the phone found its Screen Time
 // permission revoked (iOS has already dropped every shield). Strict like
-// refocus: a 409 is a refusal — nothing live to mark, the session over, or an
-// id already used by another event. A retry is refused too once the student
+// refocus while the session runs: a 409 is a refusal — nothing live to mark, or
+// an id already used by another event. A retry is refused too once the student
 // has left the session (removed, left the class, or switched away) — never a
-// replay naming a session they are no longer in. Leaving the state takes a re-tap — refocus is
-// refused from it.
+// replay naming a session they are no longer in. Once the session has ended, a
+// report from a student who was in it at the end is recorded with a note
+// instead (owner decision 10): 'recorded', with no session and no state —
+// nothing to shield to. Every other report after the end is still a 409,
+// including the retry of one that landed while the session ran (it is on
+// record). Leaving the state takes a re-tap — refocus is refused from it.
 export interface ProtectionOffRequest {
   /** Client idempotency key for the protection_off event (rule 4). */
   eventId: string;
@@ -188,10 +193,25 @@ export interface ProtectionOffRequest {
   deviceTime: string;
 }
 export interface ProtectionOffResponse {
-  outcome: 'applied' | 'replay';
-  /** 'protection_off' when applied; the current stored state on a replay. */
-  state: ParticipationState;
-  session: SessionView;
+  /**
+   * 'applied' marked a live participation; 'recorded' saved a report that first
+   * reached the server after the session ended and marked nothing (owner
+   * decision 10 — saved like a late unlock); 'replay' the report already landed.
+   */
+  outcome: 'applied' | 'recorded' | 'replay';
+  /** Why nothing was marked, on a fresh 'recorded' report; null for 'applied' and 'replay', as on an unlock. */
+  recordedAs: ProtectionOffRecordedAs | null;
+  /**
+   * 'protection_off' when applied; the current stored state on a replay while
+   * the session runs. Null once the session has ended: nothing is live.
+   */
+  state: ParticipationState | null;
+  /**
+   * The running session, for reconciliation. Null once it has ended: after an
+   * early end its endsAt is still ahead, and no answer may hand a phone a
+   * window to shield to.
+   */
+  session: SessionView | null;
 }
 
 // POST /v1/enrollments — join a class by code (auth decision 3).

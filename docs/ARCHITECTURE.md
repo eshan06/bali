@@ -283,7 +283,11 @@ Student app:
   unlock, and coming back from one. The unlock may carry an optional reason (bathroom,
   nurse, other); one the server does not recognise is recorded as none rather than refused.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
-  (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state.
+  (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state. A
+  report that first reaches the server after the session ended, from a student who was in
+  it at the end, is recorded like a late unlock instead of refused (ruled 2026-09-24): noted
+  `after_session_end` in `payload.recorded_as`, the key and value an unlock uses, and
+  answered `recorded` with no session, so no answer hands a phone a window to shield to.
 - `POST /v1/enrollments` — join a class by code.
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record.
@@ -444,8 +448,10 @@ and data types, so the two apps can't drift out of type-agreement.
   next check-in notices and reports it (`POST /v1/sessions/{id}/protection-off`), the server
   records it as its own event, and the grid shows "turned protection off" (a distinct state —
   never green, never an unlock: an unlock arriving then is recorded without softening it).
-  Returning to focus needs an explicit re-tap; refocus is refused out of it. This permanently
-  kills v2's worst bug, which was pretending to be shielded after exactly this.
+  Returning to focus needs an explicit re-tap; refocus is refused out of it. A report that
+  only reaches the server after the bell is still recorded, with a note, so the history says
+  why the phone went quiet. This permanently kills v2's worst bug, which was pretending to be
+  shielded after exactly this.
 - **A closed app still shows the truth fast.** When the app is force-quit, check-ins stop and
   within about a minute the grid shows "app closed" honestly. (What should happen to the
   shields themselves in that case is in "decided later" below.)

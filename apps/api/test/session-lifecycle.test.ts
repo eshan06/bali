@@ -6,6 +6,7 @@ import {
   participations,
   startSession,
   tapIn,
+  users,
 } from '@bali/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type {
@@ -551,12 +552,14 @@ describe('POST /v1/sessions/:id/protection-off', () => {
     expect(res.statusCode).toBe(200);
     const first = res.json<ProtectionOffResponse>();
     expect(first.outcome).toBe('applied');
+    expect(first.recordedAs).toBeNull();
     expect(first.state).toBe('protection_off');
-    expect(first.session.id).toBe(session.id);
+    expect(first.session?.id).toBe(session.id);
 
     const retry = await post(token, `/v1/sessions/${session.id}/protection-off`, body);
     expect(retry.json<ProtectionOffResponse>()).toMatchObject({
       outcome: 'replay',
+      recordedAs: null,
       state: 'protection_off',
     });
     const recorded = await db
@@ -580,7 +583,9 @@ describe('POST /v1/sessions/:id/protection-off', () => {
     // The teacher ends the lesson early, so the session's endsAt is still ahead:
     // a 200 replay would hand a phone that already heard "gone" a window to
     // shield to (a refocus answer turns shields back on). The phone drops the
-    // refusal and re-reads the truth instead.
+    // refusal and re-reads the truth instead. The report landed while the
+    // session ran, so decision 10 (a report FIRST arriving after the end is
+    // recorded) does not cover its retry: it is on record, and keeps the 409.
     const { teacher, student, session } = await seedRunning('protoff-after-bell');
     await tap(session.id, student.id);
     const token = await ctx.tokenFor(student.cognitoId);
@@ -606,6 +611,95 @@ describe('POST /v1/sessions/:id/protection-off', () => {
       expect(retry.statusCode).toBe(409);
       expect(retry.json<{ error: { message: string } }>().error.message).toBe('session has ended');
     }
+  });
+
+  it('a report that first arrives after the session ended is recorded with a note: 200, no session', async () => {
+    // Owner decision 10: saved like a late unlock, so the history says why the
+    // phone went quiet. The teacher ended this lesson early, so its endsAt is
+    // still ahead: the answer carries no session and no state, so the phone is
+    // never handed a window to shield to.
+    const { teacher, student, session } = await seedRunning('protoff-late');
+    await tap(session.id, student.id);
+    await post(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}/end`);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const url = `/v1/sessions/${session.id}/protection-off`;
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    const recorded = () =>
+      db
+        .select()
+        .from(events)
+        .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+
+    const res = await post(token, url, body);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<ProtectionOffResponse>()).toEqual({
+      outcome: 'recorded',
+      recordedAs: 'after_session_end',
+      state: null,
+      session: null,
+    });
+    const retry = await post(token, url, body);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json<ProtectionOffResponse>()).toEqual({
+      outcome: 'replay',
+      recordedAs: null,
+      state: null,
+      session: null,
+    });
+    expect((await recorded()).map((e) => e.payload)).toEqual([
+      { recorded_as: 'after_session_end' },
+    ]);
+
+    // Validation still comes first: a malformed report is a 400 and records nothing.
+    for (const bad of [{ eventId: 'not-a-uuid', deviceTime: now() }, { eventId: randomUUID() }]) {
+      expect((await post(token, url, bad)).statusCode).toBe(400);
+    }
+    expect(await recorded()).toHaveLength(1);
+  });
+
+  it('after the end, anyone who was not in the session at its end is still a 409, and nothing is recorded', async () => {
+    // Decision 10 covers a student who was in the session when it ended. An
+    // outsider, the teacher, an enrolled student who never tapped in, and one
+    // removed before the end keep the refusal they had: no one writes into a
+    // session they were not in at its end.
+    const { school, klass, teacher, student, session } = await seedRunning('protoff-late-who');
+    const [absent, removed] = await db
+      .insert(users)
+      .values(
+        ['absent', 'removed'].map((who) => ({
+          cognitoId: `student-protoff-late-${who}`,
+          role: 'student' as const,
+          schoolId: school.id,
+        })),
+      )
+      .returning();
+    if (!absent || !removed) throw new Error('expected two students');
+    const [, removedEnrollment] = await db
+      .insert(enrollments)
+      .values([absent, removed].map((s) => ({ classId: klass.id, studentId: s.id })))
+      .returning();
+    await tap(session.id, student.id);
+    await tap(session.id, removed.id);
+    await endEnrollment(db, {
+      enrollmentId: removedEnrollment!.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    await post(await ctx.tokenFor(teacher.cognitoId), `/v1/sessions/${session.id}/end`);
+
+    for (const sub of ['outsider', teacher.cognitoId, absent.cognitoId, removed.cognitoId]) {
+      const res = await post(await ctx.tokenFor(sub), `/v1/sessions/${session.id}/protection-off`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+      });
+      expect(res.statusCode, sub).toBe(409);
+      expect(res.json<{ error: { message: string } }>().error.message).toBe('session has ended');
+    }
+    const recorded = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, session.id), eq(events.type, 'protection_off')));
+    expect(recorded).toHaveLength(0);
   });
 
   it('a report retried after the student was removed mid-session is a 409, never a replay naming the session', async () => {

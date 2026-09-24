@@ -143,6 +143,17 @@ export const UNLOCK_RECORDED_AS = [
 export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
 
 /**
+ * Why a protection-off report was recorded without marking a participation.
+ * It lands in the event's `payload.recorded_as` — the key, and the value, a
+ * late unlock carries for the same reason, so a report reads one field for
+ * both. `after_session_end`: the report first reached the server after its
+ * session had ended (owner decision 10, 2026-09-24). Additive-only like the
+ * other vocab.
+ */
+export const PROTECTION_OFF_RECORDED_AS = ['after_session_end'] as const;
+export type ProtectionOffRecordedAs = (typeof PROTECTION_OFF_RECORDED_AS)[number];
+
+/**
  * Why a student unlocked, when they chose to say — the launch stand-in for real
  * passes (PLAN.md: unlock with an optional, skippable reason). It lands in the
  * unlock event's `payload.reason`, so it reaches the teacher with the unlock.

@@ -199,6 +199,29 @@ describe('gridDisplay', () => {
     expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
   });
 
+  it('a report recorded after the end is never a live chip, even for a student the roster lost', () => {
+    // Owner decision 10: a protection-off that first reaches the server after
+    // the session ended is recorded with a note. A tab that saw the end reads it
+    // as "Left · protection off" already; one that did not — a student no
+    // longer on the active roster, whose end it never applied — must not show a
+    // live "Protection off" on a session that is over.
+    const late = (seq: number, id: string): FeedEvent => ({
+      ...evt(seq, 'protection_off', id),
+      payload: { recorded_as: 'after_session_end' },
+    });
+    let students = fromSnapshot(snapshot(8, [{ id: 'ana' }]));
+    // The note decides, not being unknown: a report made in the session still
+    // reads live for a joiner the snapshot has not caught up with.
+    students = applyEvent(students, evt(9, 'protection_off', 'dan'));
+    expect(gridDisplay(students.dan, now)).toBe('protection_off');
+
+    students = applyEvent(students, evt(10, 'session_expired', null));
+    students = applyEvent(students, late(11, 'ana'));
+    expect(gridDisplay(students.ana, now)).toBe('left_protection_off');
+    students = applyEvent(students, late(12, 'cal'));
+    expect(gridDisplay(students.cal, now)).toBe('left_protection_off');
+  });
+
   it('names a state this tab does not know rather than guessing a chip', () => {
     // An open tab can outlive a deploy that adds a participation state.
     const students = fromSnapshot(

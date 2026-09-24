@@ -650,6 +650,28 @@ async function main(): Promise<void> {
       danaAfter.status === 'gone',
       `Dana's check-in after expiry should read gone, got ${danaAfter.status}`,
     );
+    // A report her phone queued while offline — its Screen Time permission went
+    // off — can only land now, after the bell. It is still recorded, with a
+    // note, so the history says why the phone went quiet (owner decision 10),
+    // and answered with no session: nothing to shield to.
+    const danaLate = await call<ProtectionOffResponse>(
+      'POST',
+      `/v1/sessions/${expiringId}/protection-off`,
+      { token: dana.token, body: { eventId: randomUUID(), deviceTime: iso() } },
+    );
+    assert(
+      danaLate.outcome === 'recorded' &&
+        danaLate.recordedAs === 'after_session_end' &&
+        danaLate.session === null,
+      `Dana's late report should be recorded with a note and no session, got ${JSON.stringify(danaLate)}`,
+    );
+    const lateOff = await expiryStream.waitFor(
+      (e) => e.type === 'protection_off' && e.userId === dana.userId,
+      { label: "Dana's late protection off", timeoutMs: world.liveWaitMs },
+    );
+    console.log(
+      `  late: Dana's protection off, sent after the bell, recorded at seq ${lateOff.seq}.`,
+    );
     openSessionId = null;
     expiryStream.close();
     expiryStream = null;

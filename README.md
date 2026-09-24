@@ -54,7 +54,9 @@ identical either way:
 - A second, one-minute session then **ends itself at the bell** — nobody presses
   anything; the sweep expires it, `session_expired` reaches the grid live, the
   participations close, and the phone learns the truth from its own next check-in
-  (decision 6).
+  (decision 6). A protection-off report that phone only sends after the bell is
+  still **recorded with a note** (`after_session_end`), live on the grid, and
+  answered with no session to shield to.
 
 It prints the live grid and the permanent event log at the end, and it is
 **self-checking**: each incident asserts the guarantee it exists to prove, so a
