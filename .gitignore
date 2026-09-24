@@ -22,6 +22,9 @@ build/
 next-env.d.ts
 coverage/
 *.tsbuildinfo
+# SwiftPM's (ios/BaliCore), and the package state Xcode keeps beside it
+.build/
+.swiftpm/
 
 # graphify knowledge graph — regenerable (`graphify update .`), stays local
 graphify-out/

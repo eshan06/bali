@@ -87,3 +87,31 @@ jobs:
           # loses TEST_DATABASE_URL, fail the job instead of silently skipping
           # the race tests.
           REQUIRE_REAL_PG: '1'
+
+  # BaliCore, the iOS apps' Swift package, decodes every contract fixture and
+  # mirrors @bali/shared's vocabularies, so a change to an answer, a fixture or
+  # a vocabulary goes red here until the Swift types catch up. It is Foundation
+  # only, so it runs on Linux in Swift's official image — no macOS minutes.
+  # On every PR, not path-filtered: the contract spans apps/api (which writes
+  # the fixtures), packages/shared, contracts/ and ios/, and a filtered job
+  # never reports on the PRs it skips, so it could not be made required.
+  swift:
+    name: BaliCore Swift tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.4-noble
+    steps:
+      - uses: actions/checkout@v4
+      # SwiftPM's build output: a warm one about halves the build (its module
+      # caches survive a fresh checkout). The key names the image — bump both
+      # together, so a new compiler starts clean — and hashes the sources, so
+      # a change saves a fresh cache. Only the sources, by their own folders:
+      # the key is evaluated again on the host after the job, when .build is
+      # there, written from inside the container, and a pattern that reaches
+      # into it fails the job (ios/BaliCore/**/*.swift did).
+      - uses: actions/cache@v4
+        with:
+          path: ios/BaliCore/.build
+          key: balicore-swift6.4-noble-${{ hashFiles('ios/BaliCore/Package.swift', 'ios/BaliCore/Sources/**', 'ios/BaliCore/Tests/**') }}
+          restore-keys: balicore-swift6.4-noble-
+      - run: swift test
+        working-directory: ios/BaliCore
