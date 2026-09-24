@@ -108,6 +108,15 @@ struct OutboxContractTests {
         }
     }
 
+    @Test("stateChangeDisposition takes a literal nil: one entry point for both answers, never ambiguous")
+    func stateChangeTakesNil() {
+        // With an overload per answer type, none of these compiled (#70's review).
+        #expect(stateChangeDisposition(.networkError, nil) == .retry)
+        #expect(stateChangeDisposition(.status(200), nil) == .retry)
+        #expect(stateChangeDisposition(.status(401), nil) == .reauth)
+        #expect(stateChangeDisposition(.status(409), nil) == .drop)
+    }
+
     /// A case's body as the app decodes an answer: an outcome it does not know is `.unknown`.
     /// Every body is one the answer's type decodes — no case goes unanswered on a decode error.
     func decode<T: Decodable>(_: T.Type, _ body: JSONValue?) throws -> T? {

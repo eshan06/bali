@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B1c: BaliCore's API client — a send's answer is a value
+  the outbox tables take whole.** `APIClient` (`APIClient.swift`) has one
+  method per student endpoint, typed request in, `APIResponse<Answer>` out,
+  and no method throws. **The result shape:** `result` is B1b's `SendResult`
+  (the status, or `.networkError` when no answer came), `answer` the body
+  decoded as the endpoint's type the way the app decodes — only on a 2xx, nil
+  when it does not decode — and `error` the body as `ApiErrorBody`, only on
+  any other status, nil when it does not decode (a proxy's page). So the
+  hand-off is `tapDisposition(response.result, response.answer)`, and a
+  refusal is a value like any answer: nothing is lost in a `catch` on the way
+  to the table. `noAnswer` says why there was none. The client sends each
+  request once and judges nothing — no retry, refresh or deletion; the sync
+  engine (B3) does, with the tables. Even a failure that cannot happen (a URL
+  or body that does not build) sends nothing and keeps the record, never a
+  request without its body, which a state change's table would drop as a
+  400. **The token-provider contract:** `TokenProvider.accessToken() async ->
+  String?`, asked before every request and never cached, so a refreshed token
+  goes on the next one; B4 plugs Cognito in. Nil (or empty) is "none right
+  now" — offline with an expired token, a refresh under way, not signed in:
+  the client sends nothing and answers `.networkError` with `NoAnswer.noToken`.
+  Every table reads that as `retry`, so the record is kept and nothing reads it
+  as a sign-out (auth: "Only a real 'no' signs anyone out", "A saved emergency
+  unlock outlives an expired token"). It is never sent without the token: the
+  server would answer `401`, a "no" nobody said, and the caller's reauth path
+  would act on it — for the same reason it is not reported as a 401 either.
+  It has its own case, not `.unreachable`, so a screen can say which (rule 5).
+  A real `401` comes back as a value (`reauth`), and the refresh is B4's.
+  **Timeouts:** 15 s without a byte per request (`APIClient.requestTimeout`)
+  and 30 s for a whole exchange (the default session's resource timeout) —
+  inside the 30-second check-in, and a timeout is `.networkError`, `retry`,
+  which is safe because every write is idempotent on its event id. The
+  timeout is set on the request as a property: FoundationNetworking ignores
+  one passed to `URLRequest`'s initializer and waits the session's instead —
+  a real-socket test caught it. **The transport** is a protocol, `send(URLRequest)
+  → (Data, HTTPURLResponse)`, throwing only when no HTTP answer came; the
+  default is a URLSession that is ephemeral with no URL cache, so a read of
+  the truth is never answered from a cache and nothing about a student is
+  kept on disk. **On the wire:** the bearer token on every request; a JSON
+  content type only with a body, because Fastify refuses one on an empty body
+  — a `DELETE`'s — with a 400, which would make leaving a class fail; each
+  path parameter and query value percent-encoded byte by byte but ASCII
+  letters, digits, `-`, `_` and `~`, so a typed join code cannot reshape the
+  URL (it goes as typed: the server reads case and whitespace as noise); a
+  base URL may carry a path. **Tests:** every fixture is sent through the
+  client over a transport double and must go out as it was sent — the
+  endpoint's method, its path, its body as JSON, plus the bearer, the content
+  type exactly when there is a body, and the timeout — and its answer, fed
+  back, must come out as the status and body that land on its recorded
+  `disposition`; a call must exist for every endpoint the fixtures hold. Beside
+  them: no answer (five `URLError`s × the four outbox records), bodies that do
+  not decode, a body read only as its status's, a 401 (sent once, the token
+  asked once), no token (nothing sent), a fresh token per request, escaping,
+  a base path; and two over a real local socket — a real answer through
+  URLSession with the bearer on the wire, and a server that never answers,
+  timed out at the request's own second. **Rode along (#70's review):**
+  `stateChangeDisposition` is one entry point over `(any StateChangeAnswer)?`,
+  a protocol refocus's and protection off's answers conform to, instead of an
+  overload per answer type — a literal `nil` was ambiguous between the two,
+  and now compiles; the TypeScript's is one function over the union too.
 - **2026-09-24** — **B1b: the outbox tables in BaliCore, proven equal to the
   TypeScript's.** **The port** keeps the TS names — `unlockDisposition`,
   `tapDisposition`, `stateChangeDisposition`, `readMayReconcile` — and each

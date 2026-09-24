@@ -116,6 +116,24 @@ public enum StateChangeDisposition: String, CaseIterable, Sendable {
     case reauth
 }
 
+/// An answer `stateChangeDisposition` reads — a refocus's or a protection-off report's, the
+/// TypeScript's `RefocusResponse | ProtectionOffResponse`.
+public protocol StateChangeAnswer: Sendable {
+    /// The outcome read as a `StateChangeOutcome`, the union of both endpoints' outcomes — from its
+    /// raw value, so a refocus answered `recorded` reads as a report's would; nil for one this
+    /// build does not know.
+    var stateChangeOutcome: StateChangeOutcome? { get }
+    var session: SessionView? { get }
+}
+
+extension RefocusResponse: StateChangeAnswer {
+    public var stateChangeOutcome: StateChangeOutcome? { .init(rawValue: outcome.rawValue) }
+}
+
+extension ProtectionOffResponse: StateChangeAnswer {
+    public var stateChangeOutcome: StateChangeOutcome? { .init(rawValue: outcome.rawValue) }
+}
+
 /// The state-change outbox's decision from one send attempt, for `POST /v1/sessions/{id}/refocus`
 /// and `…/protection-off` alike:
 ///
@@ -145,22 +163,11 @@ public enum StateChangeDisposition: String, CaseIterable, Sendable {
 /// The first covers a refocus superseded by a switch, but not by a removal or by leaving the class
 /// — nor one already in flight — so the server answers a refocus replayed after the participation
 /// ended with no session (A4).
-public func stateChangeDisposition(_ result: SendResult, _ body: RefocusResponse?)
-    -> StateChangeDisposition
-{
-    stateChangeDisposition(result, outcome: body?.outcome.rawValue, session: body?.session)
-}
-
-/// The state-change outbox's decision for a protection-off report: the same table as a refocus's.
-public func stateChangeDisposition(_ result: SendResult, _ body: ProtectionOffResponse?)
-    -> StateChangeDisposition
-{
-    stateChangeDisposition(result, outcome: body?.outcome.rawValue, session: body?.session)
-}
-
-/// One table for both endpoints, as in the TypeScript: it reads an answer's outcome as a
-/// `StateChangeOutcome`, the union of refocus's and protection off's.
-private func stateChangeDisposition(_ result: SendResult, outcome: String?, session: SessionView?)
+///
+/// One entry point for both endpoints, as in the TypeScript: `body` is a `RefocusResponse` or a
+/// `ProtectionOffResponse`, or nil — and a literal `nil` compiles, where one overload per answer
+/// type made it ambiguous.
+public func stateChangeDisposition(_ result: SendResult, _ body: (any StateChangeAnswer)?)
     -> StateChangeDisposition
 {
     guard case .status(let status) = result else { return .retry }
@@ -169,8 +176,8 @@ private func stateChangeDisposition(_ result: SendResult, outcome: String?, sess
     case 408, 429: return .retry
     case 200..<300:
         // Every outcome, one by one: one BaliCore adds does not compile until it is placed here.
-        switch outcome.flatMap(StateChangeOutcome.init(rawValue:)) {
-        case .applied?, .replay?: return session != nil ? .applySession : .reread
+        switch body?.stateChangeOutcome {
+        case .applied?, .replay?: return body?.session != nil ? .applySession : .reread
         // `recorded` means the session is over, so it never shields — even if an answer ever
         // carried a session.
         case .recorded?: return .reread
