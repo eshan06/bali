@@ -64,6 +64,9 @@ public enum TapOutcome: String, CaseIterable, Sendable {
 }
 /// `UNLOCK_RECORDED_OUTCOMES`: every one means the unlock is recorded.
 public enum UnlockOutcome: String, CaseIterable, Sendable { case applied, recorded, replay }
+/// `STATE_CHANGE_OUTCOMES`: every outcome a refocus or a protection-off report answers with, as
+/// `stateChangeDisposition` reads both.
+public enum StateChangeOutcome: String, CaseIterable, Sendable { case applied, recorded, replay }
 /// `UNLOCK_RECORDED_AS`: why an unlock was recorded without flipping a participation.
 public enum UnlockRecordedAs: String, CaseIterable, Sendable {
     case noLiveParticipation = "no_live_participation", afterSessionEnd = "after_session_end"

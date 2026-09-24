@@ -29,7 +29,9 @@ variable with notes). Every variable the API reads is declared and validated in
 instead of a crash somewhere downstream.
 
 `ios/BaliCore` needs Swift 6, on macOS or Linux: `swift test` there decodes every contract
-fixture in `contracts/fixtures/` with the Swift types, in place.
+fixture in `contracts/fixtures/` with the Swift types, in place, and checks its outbox tables
+against the TypeScript's answers in the fixtures and in `contracts/outbox/`. `npm run fixtures`
+regenerates both directories.
 
 ## The exit demo (phone simulator)
 

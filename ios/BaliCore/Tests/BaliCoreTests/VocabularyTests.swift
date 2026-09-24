@@ -28,30 +28,37 @@ struct VocabularyTests {
             : list.matches(of: /'([^']*)'/).map { String($0.1) }
     }
 
-    @Test(
-        "Each vocabulary holds its list's values, in its order",
-        arguments: [
-            ("index.ts", "USER_ROLES", UserRole.allCases.map(\.rawValue)),
-            ("index.ts", "PARTICIPATION_STATES", ParticipationState.allCases.map(\.rawValue)),
-            ("index.ts", "HISTORY_EVENT_TYPES", HistoryEventType.allCases.map(\.rawValue)),
-            ("index.ts", "UNLOCK_RECORDED_AS", UnlockRecordedAs.allCases.map(\.rawValue)),
-            (
-                "index.ts", "PROTECTION_OFF_RECORDED_AS",
-                ProtectionOffRecordedAs.allCases.map(\.rawValue)
-            ),
-            ("index.ts", "UNLOCK_REASONS", UnlockReason.allCases.map(\.rawValue)),
-            ("errors.ts", "API_ERROR_STATUS", ApiErrorCode.allCases.map(\.rawValue)),
-            ("errors.ts", "API_ERROR_REASONS", ApiErrorReason.allCases.map(\.rawValue)),
-            ("outbox-contract.ts", "TAP_OUTCOMES", TapOutcome.allCases.map(\.rawValue)),
-            (
-                "outbox-contract.ts", "STATE_CHANGE_OUTCOMES",
-                ProtectionOffResponse.Outcome.allCases.map(\.rawValue)
-            ),
-            (
-                "unlock-contract.ts", "UNLOCK_RECORDED_OUTCOMES",
-                UnlockOutcome.allCases.map(\.rawValue)
-            ),
-        ])
+    /// A vocabulary's values, in its order.
+    static func values<Vocabulary: RawRepresentable & CaseIterable>(_: Vocabulary.Type) -> [String]
+    where Vocabulary.RawValue == String {
+        Vocabulary.allCases.map(\.rawValue)
+    }
+
+    /// Each vocabulary: the file its list is in, the list, and BaliCore's values for it.
+    static let vocabularies: [(file: String, list: String, swift: [String])] = [
+        ("index.ts", "USER_ROLES", values(UserRole.self)),
+        ("index.ts", "PARTICIPATION_STATES", values(ParticipationState.self)),
+        ("index.ts", "HISTORY_EVENT_TYPES", values(HistoryEventType.self)),
+        ("index.ts", "UNLOCK_RECORDED_AS", values(UnlockRecordedAs.self)),
+        ("index.ts", "PROTECTION_OFF_RECORDED_AS", values(ProtectionOffRecordedAs.self)),
+        ("index.ts", "UNLOCK_REASONS", values(UnlockReason.self)),
+        ("errors.ts", "API_ERROR_STATUS", values(ApiErrorCode.self)),
+        ("errors.ts", "API_ERROR_REASONS", values(ApiErrorReason.self)),
+        ("outbox-contract.ts", "TAP_OUTCOMES", values(TapOutcome.self)),
+        ("outbox-contract.ts", "STATE_CHANGE_OUTCOMES", values(StateChangeOutcome.self)),
+        ("unlock-contract.ts", "UNLOCK_RECORDED_OUTCOMES", values(UnlockOutcome.self)),
+        // Each response's own: a value one gains fails here even with no fixture carrying it —
+        // `removed_from_class` is a teacher's answer, never in a student fixture.
+        ("api.ts", "UPDATE_ME_OUTCOMES", values(UpdateMeResponse.Outcome.self)),
+        ("api.ts", "CHECK_IN_STATUSES", values(CheckInResponse.Status.self)),
+        ("api.ts", "REFOCUS_OUTCOMES", values(RefocusResponse.Outcome.self)),
+        ("api.ts", "PROTECTION_OFF_OUTCOMES", values(ProtectionOffResponse.Outcome.self)),
+        ("api.ts", "ENROLLMENT_JOIN_OUTCOMES", values(EnrollmentJoinResponse.Outcome.self)),
+        ("api.ts", "END_ENROLLMENT_OUTCOMES", values(EndEnrollmentResponse.Outcome.self)),
+        ("api.ts", "END_ENROLLMENT_REASONS", values(EndEnrollmentResponse.Reason.self)),
+    ]
+
+    @Test("Each vocabulary holds its list's values, in its order", arguments: vocabularies)
     func mirrors(file: String, list: String, swift: [String]) throws {
         #expect(try Self.values(of: list, in: Self.source(file)) == swift)
     }
