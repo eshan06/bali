@@ -1191,6 +1191,7 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
     // window rather than a new end still in the past). Computed HERE, under
     // the same FOR UPDATE that loaded the session, so a concurrent extend has
     // either already committed and is included, or is waiting behind this one.
+    // Never earlier than the end it had: `returnedSince` relies on it.
     const base = Math.max(input.at.getTime(), session.endsAt.getTime());
     const newEndsAt = new Date(base + input.durationMinutes * 60_000);
     // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
@@ -1999,7 +2000,12 @@ async function returnedSince(
         eq(events.userId, studentId),
         // Every return here is clamped into the window, so the read ranges
         // over the student's own events in it (`events_user_occurred_idx`):
-        // by the order, one timed before the unlock can come after it.
+        // by the order, one timed before the unlock can come after it. Sound
+        // only because a window never shrinks — `extendSession`, the one
+        // writer of `ends_at`, only moves it later, and `endSession` sets
+        // `ended_at` alone. A window that shrank would drop a return clamped
+        // under the old one out of this range, and a late unlock would flip a
+        // phone its student holds in focus (#78's review).
         between(events.occurredAt, session.startedAt, session.endsAt),
         eq(events.sessionId, session.id),
         inArray(events.type, ['tap_in', 'refocus']),

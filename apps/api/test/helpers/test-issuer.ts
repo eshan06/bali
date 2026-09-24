@@ -51,7 +51,7 @@ export async function makeTestIssuer(): Promise<TestIssuer> {
   publicJwk.use = 'sig';
 
   const getKey = createLocalJWKSet({ keys: [publicJwk] });
-  const verifier = createVerifier({ issuer: TEST_ISSUER, audience: TEST_AUDIENCE, getKey });
+  const verifier = createVerifier({ issuer: TEST_ISSUER, clientIds: [TEST_AUDIENCE], getKey });
 
   async function sign(opts: SignOptions = {}): Promise<string> {
     const now = Math.floor(Date.now() / 1000);

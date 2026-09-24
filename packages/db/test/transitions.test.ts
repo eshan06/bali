@@ -1353,6 +1353,28 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
     expect((await rowOf(session.id, student.id)).state).toBe('unlocked');
   });
 
+  it('stays late after the session is extended: an extension never shrinks the window', async () => {
+    // #78's review: `returnedSince` reads returns within [started_at, ends_at],
+    // sound only while `ends_at` never moves earlier. A re-tap near the old end,
+    // then "add time" pressed early in the lesson: a new end of now + 5 minutes
+    // would drop the re-tap out of that range and apply the late unlock.
+    const { session, student } = await lesson('late-extended');
+    await tapIn(db, move(session, student, at(20)));
+    const extended = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 5,
+      at: at(10),
+    });
+    expect(extended.endsAt).toEqual(at(30));
+
+    expect(await unlock(db, move(session, student, at(19)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'focused',
+    });
+    expect((await rowOf(session.id, student.id)).state).toBe('focused');
+  });
+
   it('flips whichever lands first of the same pair, and ends in the return either way', async () => {
     // An unlock at 09:04 and the refocus at 09:06, in both arrival orders.
     for (const unlockFirst of [true, false]) {
