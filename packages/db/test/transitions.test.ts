@@ -694,6 +694,59 @@ describe('state changes', () => {
     }
   });
 
+  it('an answer that names no session names no participation either (A5)', async () => {
+    /*
+     * #62's review: the two "recorded, but no longer current" replays
+     * disagreed — a tap's named no participation, a refocus's the ended row.
+     * One shape before the fixtures and BaliCore freeze it: wherever
+     * `session` is null, so is `participationId` — A2c's late protection-off
+     * included. (The tap's is pinned where its replays are.)
+     */
+    const at = (minute: number) => new Date(`2026-01-01T09:0${minute}:00Z`);
+    const { session, student } = await joined('no-session-no-row');
+    const change = (minute: number) => ({
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(minute),
+    });
+    await unlock(db, change(2));
+    const refocused = change(3);
+    expect((await refocus(db, refocused)).participationId).not.toBeNull();
+    const enrollment = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(
+          and(eq(enrollments.classId, session.classId), eq(enrollments.studentId, student.id)),
+        ),
+    );
+    await endEnrollment(db, { enrollmentId: enrollment.id, reason: 'left_class', at: at(4) });
+    expect(await refocus(db, refocused)).toEqual({
+      outcome: 'replay',
+      state: null,
+      participationId: null,
+      session: null,
+    });
+
+    const late = await joined('no-session-no-row-late');
+    await endSession(db, { sessionId: late.session.id, at: at(5), reason: 'ended' });
+    const report = {
+      sessionId: late.session.id,
+      studentId: late.student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(6),
+    };
+    for (const outcome of ['recorded', 'replay']) {
+      expect(await protectionOff(db, report)).toMatchObject({
+        outcome,
+        state: null,
+        participationId: null,
+        session: null,
+      });
+    }
+  });
+
   describe('the optional reason', () => {
     const at = new Date('2026-01-01T09:05:00Z');
 

@@ -1,4 +1,9 @@
-import { API_ERROR_STATUS, type ApiErrorBody, type ApiErrorCode } from '@bali/shared';
+import {
+  API_ERROR_STATUS,
+  type ApiErrorBody,
+  type ApiErrorCode,
+  type ApiErrorReason,
+} from '@bali/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError, type ZodType } from 'zod';
 
@@ -15,6 +20,8 @@ export class ApiError extends Error {
     readonly code: ApiErrorCode,
     message: string,
     readonly details?: unknown,
+    /** Which refusal this is, when the code alone does not say (`API_ERROR_REASONS`). */
+    readonly reason?: ApiErrorReason,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -47,8 +54,20 @@ export class ApiError extends Error {
   }
 }
 
-function body(code: ApiErrorCode, message: string, details?: unknown): ApiErrorBody {
-  return { error: details === undefined ? { code, message } : { code, message, details } };
+function body(
+  code: ApiErrorCode,
+  message: string,
+  details?: unknown,
+  reason?: ApiErrorReason,
+): ApiErrorBody {
+  return {
+    error: {
+      code,
+      ...(reason === undefined ? {} : { reason }),
+      message,
+      ...(details === undefined ? {} : { details }),
+    },
+  };
 }
 
 /** Flatten a ZodError into `[{ path, message }]` — safe to send, no values echoed. */
@@ -81,7 +100,7 @@ export function registerErrors(app: FastifyInstance): void {
 
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof ApiError) {
-      reply.status(error.status).send(body(error.code, error.message, error.details));
+      reply.status(error.status).send(body(error.code, error.message, error.details, error.reason));
       return;
     }
     if (error instanceof ZodError) {

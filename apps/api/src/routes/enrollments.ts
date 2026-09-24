@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parse } from '../errors.js';
-import { mapTransitionError } from './errors.js';
+import { mapTransitionError, refusal } from './errors.js';
 import { DeviceTime } from './schemas.js';
 
 const JoinBody = z.object({
@@ -76,7 +76,7 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
       if (!user) throw ApiError.forbidden('unknown user');
 
       const enrollment = await findEnrollmentById(db, enrollmentId);
-      if (!enrollment) throw ApiError.notFound('enrollment not found');
+      if (!enrollment) throw refusal('ENROLLMENT_NOT_FOUND');
 
       // The student may leave their own; the class's teacher may remove any.
       let reason: 'left_class' | 'removed_from_class';

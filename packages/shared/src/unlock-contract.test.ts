@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { stateChangeDisposition, tapDisposition } from './outbox-contract.js';
 import { isUnlockRecorded, unlockDisposition } from './unlock-contract.js';
 
 describe('unlock durability contract (ISSUES #2)', () => {
@@ -24,11 +25,22 @@ describe('unlock durability contract (ISSUES #2)', () => {
     expect(unlockDisposition(401)).toBe('reauth');
   });
 
-  it('transport failures, rate limiting, and 5xx are transient retries', () => {
+  it('transport failures, a timeout, rate limiting, and 5xx are transient retries', () => {
     expect(unlockDisposition('network_error')).toBe('retry');
+    expect(unlockDisposition(408)).toBe('retry');
     expect(unlockDisposition(429)).toBe('retry');
     for (const status of [500, 502, 503]) {
       expect(unlockDisposition(status)).toBe('retry');
+    }
+  });
+
+  it('reads a timeout and rate limiting as the transport, as the tap and state-change tables do', () => {
+    // A5: 408 was 'retry_and_surface' here alone — the record was kept either
+    // way, but a timeout is never a refusal, so it is never shown as one.
+    for (const status of [408, 429]) {
+      expect(unlockDisposition(status)).toBe('retry');
+      expect(tapDisposition(status)).toBe('retry');
+      expect(stateChangeDisposition(status)).toBe('retry');
     }
   });
 

@@ -1,0 +1,22 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "A tap under an id that another student’s tap already holds.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "event_id_conflict",
+      "message": "event_id already used by another event"
+    }
+  },
+  "disposition": "retry_and_surface"
+}

@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/protection-off",
+  "scenario": "A protection-off report first reaching the server after the session ended (A2c): no session.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/protection-off",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "ProtectionOffResponse",
+  "body": {
+    "outcome": "recorded",
+    "recordedAs": "after_session_end",
+    "state": null,
+    "session": null
+  },
+  "disposition": "reread"
+}

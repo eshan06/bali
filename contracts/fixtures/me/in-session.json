@@ -1,0 +1,28 @@
+{
+  "endpoint": "GET /v1/me",
+  "scenario": "The boot call of a student live in a running session.",
+  "request": {
+    "path": "/v1/me"
+  },
+  "status": 200,
+  "type": "MeResponse",
+  "body": {
+    "user": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "role": "student",
+      "displayName": null
+    },
+    "classes": [
+      {
+        "id": "00000000-0000-7000-8000-000000000002",
+        "name": "Class fx"
+      }
+    ],
+    "session": {
+      "id": "00000000-0000-7000-8000-000000000003",
+      "classId": "00000000-0000-7000-8000-000000000002",
+      "endsAt": "2000-01-01T00:01:00.000Z",
+      "state": "focused"
+    }
+  }
+}

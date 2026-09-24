@@ -324,6 +324,13 @@ database. Failures return one standard JSON error shape with the right status co
 `400` bad input, `401` bad token, `403` signed in but not allowed, `409` conflict,
 `429` over budget (per-user budgets on signed-in endpoints, per-address on sign-in,
 per ISSUES.md #1) — so every screen can show something honest instead of guessing.
+The shape is `{ error: { code, reason?, message, details? } }`: `code` is the status's
+class, and `reason` says which refusal it was where one status covers several — a
+refocus's `409` is protection off, not in the session, the session over or a spent id —
+from one closed, additive-only vocabulary in `@bali/shared` (`API_ERROR_REASONS`, one
+value per refusal the transition engine makes; decided 2026-09-24). A client keys on
+`reason`, never on the message, and reads a value it does not know as none. An error
+with no finer meaning than its status carries none.
 
 ### Rules that keep the API honest
 
@@ -354,6 +361,10 @@ per ISSUES.md #1) — so every screen can show something honest instead of guess
   (`readMayReconcile`).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
+- **The fixtures are the phone's contract.** `contracts/fixtures/` holds the API's real
+  answer to every student request, for each outcome a phone decodes — captured in memory,
+  ids and times normalised — and a test fails when one drifts. BaliCore decodes every one
+  (Phase 3, B1), so a response cannot change without the phone's contract changing with it.
 
 ## Live updates
 

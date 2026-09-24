@@ -1,0 +1,14 @@
+{
+  "endpoint": "DELETE /v1/enrollments/{id}",
+  "scenario": "Leaving the class again: a no-op.",
+  "request": {
+    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001"
+  },
+  "status": 200,
+  "type": "EndEnrollmentResponse",
+  "body": {
+    "outcome": "already_removed",
+    "reason": "left_class",
+    "endedParticipation": false
+  }
+}

@@ -193,5 +193,10 @@ describe('DELETE /v1/enrollments/:id', () => {
     const { teacher } = await seedClassroom(db, 'remove-404');
     const res = await del(await ctx.tokenFor(teacher.cognitoId), randomUUID());
     expect(res.statusCode).toBe(404);
+    // The route's own check answers with the engine's refusal for the same
+    // condition, reason and all (A5).
+    expect(res.json()).toEqual({
+      error: { code: 'not_found', reason: 'enrollment_not_found', message: 'enrollment not found' },
+    });
   });
 });

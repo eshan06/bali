@@ -1,0 +1,22 @@
+{
+  "endpoint": "POST /v1/enrollments",
+  "scenario": "A student joins a class by its code.",
+  "request": {
+    "path": "/v1/enrollments",
+    "body": {
+      "joinCode": "JOIN-fx-enroll",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "EnrollmentJoinResponse",
+  "body": {
+    "outcome": "joined",
+    "enrollmentId": "00000000-0000-7000-8000-000000000002",
+    "class": {
+      "id": "00000000-0000-7000-8000-000000000003",
+      "name": "Class fx-enroll"
+    }
+  }
+}

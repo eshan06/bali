@@ -1,0 +1,24 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "The retry of a tap that landed, its participation still live: names the session.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "TapResponse",
+  "body": {
+    "outcome": "replay",
+    "session": {
+      "id": "00000000-0000-7000-8000-000000000002",
+      "classId": "00000000-0000-7000-8000-000000000003",
+      "endsAt": "2000-01-01T00:02:00.000Z"
+    },
+    "state": "focused"
+  },
+  "disposition": "apply_session"
+}

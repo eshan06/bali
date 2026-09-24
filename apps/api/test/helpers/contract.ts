@@ -1,0 +1,215 @@
+import {
+  API_ERROR_REASONS,
+  API_ERROR_STATUS,
+  type ApiErrorBody,
+  type ApiErrorCode,
+  type CheckInResponse,
+  type EndEnrollmentResponse,
+  type EnrollmentJoinResponse,
+  type MeClass,
+  type MeResponse,
+  PARTICIPATION_STATES,
+  PROTECTION_OFF_RECORDED_AS,
+  type ProtectionOffResponse,
+  type RefocusResponse,
+  type SessionView,
+  STATE_CHANGE_OUTCOMES,
+  stateChangeDisposition,
+  TAP_OUTCOMES,
+  tapDisposition,
+  type TapResponse,
+  UNLOCK_REASONS,
+  UNLOCK_RECORDED_AS,
+  UNLOCK_RECORDED_OUTCOMES,
+  unlockDisposition,
+  type UnlockResponse,
+  USER_ROLES,
+} from '@bali/shared';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+
+/*
+ * What a contract fixture is (Phase 3 · A5) — its schemas, its endpoints and
+ * how its file is written — for the golden-file test that captures and checks
+ * every one, `../contract-fixtures.test.ts`.
+ */
+
+/** Where the fixtures live: the repo's top-level `contracts/fixtures/`. */
+export const FIXTURES_DIR = fileURLToPath(
+  new URL('../../../../contracts/fixtures/', import.meta.url),
+);
+
+/** The @bali/shared type each fixture's body must be, by name. */
+interface Contract {
+  MeResponse: MeResponse;
+  TapResponse: TapResponse;
+  CheckInResponse: CheckInResponse;
+  UnlockResponse: UnlockResponse;
+  RefocusResponse: RefocusResponse;
+  ProtectionOffResponse: ProtectionOffResponse;
+  EnrollmentJoinResponse: EnrollmentJoinResponse;
+  EndEnrollmentResponse: EndEnrollmentResponse;
+  ApiErrorBody: ApiErrorBody;
+}
+export type FixtureType = keyof Contract;
+
+/**
+ * A strict object schema for `T`. The compiler holds it to T's keys — exactly
+ * them, optional ones included — and each to a value T allows, so neither the
+ * type nor the schema can gain or lose a field alone; at run time it refuses
+ * any other key.
+ */
+const object =
+  <T>() =>
+  <S extends { [K in keyof T]-?: z.ZodType<T[K]> }>(
+    shape: S & Record<Exclude<keyof S, keyof T>, never>,
+  ) =>
+    z.strictObject(shape);
+
+const state = z.enum(PARTICIPATION_STATES);
+const sessionView = object<SessionView>()({
+  id: z.uuid(),
+  classId: z.uuid(),
+  endsAt: z.iso.datetime(),
+});
+const meClass = object<MeClass>()({ id: z.uuid(), name: z.string() });
+
+/**
+ * Each type as a strict run-time schema: a field the type lacks, a missing
+ * one, or a value outside its vocabulary is refused, so an answer cannot be
+ * written as a fixture of a type that does not describe it.
+ */
+export const SCHEMAS = {
+  MeResponse: object<MeResponse>()({
+    user: object<MeResponse['user']>()({
+      id: z.uuid(),
+      role: z.enum(USER_ROLES),
+      displayName: z.string().nullable(),
+    }),
+    classes: z.array(meClass),
+    session: object<NonNullable<MeResponse['session']>>()({
+      ...sessionView.shape,
+      state: z.enum([...PARTICIPATION_STATES, 'ended', 'silent']),
+    }).nullable(),
+  }),
+  TapResponse: object<TapResponse>()({
+    outcome: z.enum(TAP_OUTCOMES),
+    session: sessionView.nullable(),
+    state: state.nullable(),
+  }),
+  CheckInResponse: object<CheckInResponse>()({
+    status: z.enum(['live', 'gone']),
+    state: state.nullable(),
+    session: sessionView.nullable(),
+  }),
+  UnlockResponse: object<UnlockResponse>()({
+    outcome: z.enum(UNLOCK_RECORDED_OUTCOMES),
+    recordedAs: z.enum(UNLOCK_RECORDED_AS).nullable(),
+    state: state.nullable(),
+    session: sessionView.nullable(),
+    reason: z.enum(UNLOCK_REASONS).nullable(),
+  }),
+  RefocusResponse: object<RefocusResponse>()({
+    outcome: z.enum(['applied', 'replay']),
+    state: state.nullable(),
+    session: sessionView.nullable(),
+  }),
+  ProtectionOffResponse: object<ProtectionOffResponse>()({
+    outcome: z.enum(STATE_CHANGE_OUTCOMES),
+    recordedAs: z.enum(PROTECTION_OFF_RECORDED_AS).nullable(),
+    state: state.nullable(),
+    session: sessionView.nullable(),
+  }),
+  EnrollmentJoinResponse: object<EnrollmentJoinResponse>()({
+    outcome: z.enum(['joined', 'already_enrolled']),
+    enrollmentId: z.uuid(),
+    class: meClass,
+  }),
+  EndEnrollmentResponse: object<EndEnrollmentResponse>()({
+    outcome: z.enum(['ended', 'already_removed']),
+    reason: z.enum(['left_class', 'removed_from_class']),
+    endedParticipation: z.boolean(),
+  }),
+  ApiErrorBody: object<ApiErrorBody>()({
+    error: object<ApiErrorBody['error']>()({
+      code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
+      reason: z.enum(API_ERROR_REASONS).optional(),
+      message: z.string(),
+      details: z.unknown().optional(),
+    }),
+  }),
+} satisfies Record<FixtureType, z.ZodType>;
+
+/*
+ * `object` holds a schema to its type's keys and values; this holds the type
+ * to the schema's values too — a vocabulary that gains a value its schema
+ * lacks names that type here, and the line fails to compile.
+ */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Disagreeing = {
+  [K in FixtureType]: Same<z.output<(typeof SCHEMAS)[K]>, Contract[K]> extends true ? never : K;
+}[FixtureType];
+export const SCHEMAS_AGREE: [Disagreeing] extends [never] ? true : Disagreeing = true;
+
+/** The outbox table a phone runs an endpoint's answers through, in `@bali/shared`. */
+export const DISPOSITIONS = {
+  tap: tapDisposition,
+  change: stateChangeDisposition,
+  unlock: unlockDisposition,
+};
+
+/** Every student endpoint with a fixture: the type of its 2xx body, and its outbox table. */
+export const ENDPOINTS: Record<
+  string,
+  { type: Exclude<FixtureType, 'ApiErrorBody'>; outbox?: keyof typeof DISPOSITIONS }
+> = {
+  'GET /v1/me': { type: 'MeResponse' },
+  'POST /v1/taps': { type: 'TapResponse', outbox: 'tap' },
+  'POST /v1/sessions/{id}/checkin': { type: 'CheckInResponse' },
+  'POST /v1/sessions/{id}/unlock': { type: 'UnlockResponse', outbox: 'unlock' },
+  'POST /v1/sessions/{id}/refocus': { type: 'RefocusResponse', outbox: 'change' },
+  'POST /v1/sessions/{id}/protection-off': { type: 'ProtectionOffResponse', outbox: 'change' },
+  'POST /v1/enrollments': { type: 'EnrollmentJoinResponse' },
+  'DELETE /v1/enrollments/{id}': { type: 'EndEnrollmentResponse' },
+};
+
+/** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */
+export interface Fixture {
+  endpoint: string;
+  scenario: string;
+  request: { path: string; body?: object };
+  status: number;
+  type: FixtureType;
+  body: unknown;
+  /** The endpoint's outbox table applied to this answer — what BaliCore's port must also say. */
+  disposition?: string;
+}
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+const TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/g;
+
+/**
+ * A fixture as its file holds it. Each distinct id and timestamp becomes a
+ * stable stand-in, numbered in order of first appearance — still a valid UUID
+ * and ISO 8601 time, so a client decodes it with its real types — so a fixture
+ * changes only when the contract does, never because a run minted new ids.
+ */
+export function serialize(fixture: Fixture): string {
+  const standIn = (make: (n: number) => string) => {
+    const seen = new Map<string, string>();
+    return (found: string) => {
+      if (!seen.has(found)) seen.set(found, make(seen.size + 1));
+      return seen.get(found)!;
+    };
+  };
+  const json = JSON.stringify(fixture, null, 2)
+    .replace(
+      UUID,
+      standIn((n) => `00000000-0000-7000-8000-${String(n).padStart(12, '0')}`),
+    )
+    .replace(
+      TIMESTAMP,
+      standIn((n) => new Date(Date.UTC(2000, 0, 1, 0, n)).toISOString()),
+    );
+  return `${json}\n`;
+}

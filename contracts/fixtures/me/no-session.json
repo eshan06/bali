@@ -1,0 +1,23 @@
+{
+  "endpoint": "GET /v1/me",
+  "scenario": "The boot call of a student in a class, with no session running.",
+  "request": {
+    "path": "/v1/me"
+  },
+  "status": 200,
+  "type": "MeResponse",
+  "body": {
+    "user": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "role": "student",
+      "displayName": "Ana"
+    },
+    "classes": [
+      {
+        "id": "00000000-0000-7000-8000-000000000002",
+        "name": "Class fx-arm"
+      }
+    ],
+    "session": null
+  }
+}

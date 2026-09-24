@@ -1,4 +1,5 @@
-import { TransitionError, type TransitionErrorCode } from '@bali/db';
+import { TRANSITION_ERROR_CODES, TransitionError, type TransitionErrorCode } from '@bali/db';
+import { API_ERROR_REASONS, type ApiErrorReason } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError } from '../src/errors.js';
@@ -17,45 +18,92 @@ import { mapTransitionError } from '../src/routes/errors.js';
  * Exhaustive by construction: the `Record<TransitionErrorCode, …>` below is
  * typed, so adding a code to the engine without an expectation here fails
  * typecheck rather than slipping through with whatever default a partial map
- * would have given it.
+ * would have given it — and the walk over `TRANSITION_ERROR_CODES` fails at
+ * run time too.
  */
-const EXPECTED: Record<TransitionErrorCode, { code: string; status: number; message: string }> = {
-  SESSION_NOT_FOUND: { code: 'not_found', status: 404, message: 'session not found' },
-  SESSION_NOT_RUNNING: { code: 'conflict', status: 409, message: 'session has ended' },
-  NOT_PARTICIPATING: { code: 'conflict', status: 409, message: 'not in this session' },
-  INVALID_EXTENSION: { code: 'bad_input', status: 400, message: 'invalid extension duration' },
+const EXPECTED: Record<
+  TransitionErrorCode,
+  { code: string; status: number; reason: ApiErrorReason; message: string }
+> = {
+  SESSION_NOT_FOUND: {
+    code: 'not_found',
+    status: 404,
+    reason: 'session_not_found',
+    message: 'session not found',
+  },
+  SESSION_NOT_RUNNING: {
+    code: 'conflict',
+    status: 409,
+    reason: 'session_not_running',
+    message: 'session has ended',
+  },
+  NOT_PARTICIPATING: {
+    code: 'conflict',
+    status: 409,
+    reason: 'not_participating',
+    message: 'not in this session',
+  },
+  INVALID_EXTENSION: {
+    code: 'bad_input',
+    status: 400,
+    reason: 'invalid_extension',
+    message: 'invalid extension duration',
+  },
   EVENT_ID_CONFLICT: {
     code: 'conflict',
     status: 409,
+    reason: 'event_id_conflict',
     message: 'event_id already used by another event',
   },
-  CLASS_NOT_FOUND: { code: 'not_found', status: 404, message: 'no class with that join code' },
-  ENROLLMENT_NOT_FOUND: { code: 'not_found', status: 404, message: 'enrollment not found' },
+  CLASS_NOT_FOUND: {
+    code: 'not_found',
+    status: 404,
+    reason: 'class_not_found',
+    message: 'no class with that join code',
+  },
+  ENROLLMENT_NOT_FOUND: {
+    code: 'not_found',
+    status: 404,
+    reason: 'enrollment_not_found',
+    message: 'enrollment not found',
+  },
   PROTECTION_OFF: {
     code: 'conflict',
     status: 409,
+    reason: 'protection_off',
     message: 'Screen Time permission is off: tap the block to rejoin',
   },
 };
 
+/** What `mapTransitionError` turns an engine refusal with `code` into. */
+async function mapped(code: TransitionErrorCode): Promise<ApiError> {
+  const thrown = await mapTransitionError(() =>
+    Promise.reject(new TransitionError(code, 'engine said no')),
+  ).catch((err: unknown) => err);
+  expect(thrown).toBeInstanceOf(ApiError);
+  return thrown as ApiError;
+}
+
 describe('mapTransitionError', () => {
   for (const [transitionCode, expected] of Object.entries(EXPECTED)) {
-    it(`maps ${transitionCode} to ${expected.status} ${expected.code}`, async () => {
-      const thrown = await mapTransitionError(() =>
-        Promise.reject(
-          new TransitionError(transitionCode as TransitionErrorCode, 'engine said no'),
-        ),
-      ).catch((err: unknown) => err);
-
-      expect(thrown).toBeInstanceOf(ApiError);
-      const apiError = thrown as ApiError;
+    it(`maps ${transitionCode} to ${expected.status} ${expected.code} (${expected.reason})`, async () => {
+      const apiError = await mapped(transitionCode as TransitionErrorCode);
       expect(apiError.code).toBe(expected.code);
       expect(apiError.status).toBe(expected.status);
+      expect(apiError.reason).toBe(expected.reason);
       // The message the phone reads, not the engine's internal one.
       expect(apiError.message).toBe(expected.message);
       expect(apiError.message).not.toBe('engine said no');
     });
   }
+
+  it('gives every engine refusal its own reason, and the vocabulary no other (A5)', async () => {
+    // A phone keys on the reason, never the message, so a refusal without one
+    // — or two sharing one — is two answers it cannot tell apart.
+    const reasons: (ApiErrorReason | undefined)[] = [];
+    for (const code of TRANSITION_ERROR_CODES) reasons.push((await mapped(code)).reason);
+    expect(reasons.sort()).toEqual([...API_ERROR_REASONS].sort());
+  });
 
   it('lets anything that is not a TransitionError through untouched', async () => {
     // The mapper must not swallow a bug into a tidy 4xx — an unexpected throw

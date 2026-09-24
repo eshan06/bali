@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/refocus",
+  "scenario": "A refocus while protection is off: only a re-tap returns.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/refocus",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "protection_off",
+      "message": "Screen Time permission is off: tap the block to rejoin"
+    }
+  },
+  "disposition": "drop"
+}

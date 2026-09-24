@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "A tap while none of the teacher’s sessions runs: saved, waiting for Start.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx-arm",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "TapResponse",
+  "body": {
+    "outcome": "armed",
+    "session": null,
+    "state": null
+  },
+  "disposition": "wait_for_start"
+}

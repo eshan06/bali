@@ -17,10 +17,11 @@ export type UnlockDisposition =
   /** The token was rejected — refresh it, then retry (keep the record). */
   | 'reauth'
   /**
-   * A non-401 4xx that must NOT happen for a well-formed authenticated unlock
-   * under this contract (the server records instead of refusing). Keep the
-   * record and keep retrying, but ALSO surface it: a client bug (e.g. a
-   * malformed 400) must not hide behind an endless silent retry (rule 5).
+   * A 4xx but 401, 408 and 429 — one that must NOT happen for a well-formed
+   * authenticated unlock under this contract (the server records instead of
+   * refusing). Keep the record and keep retrying, but ALSO surface it: a client
+   * bug (e.g. a malformed 400) must not hide behind an endless silent retry
+   * (rule 5).
    */
   | 'retry_and_surface';
 
@@ -51,8 +52,10 @@ export function isUnlockRecorded(outcome: string): outcome is UnlockRecordedOutc
  *     body outcome is the authoritative signal, so the exact 2xx code is not
  *     coupled to the decision.
  *   - 401 -> 'reauth' (refresh the token, then retry).
- *   - a transport failure, 429 (rate limited, ISSUES #1), any 5xx, or a 2xx
- *     without a recorded outcome -> 'retry' (transient; keep and try later).
+ *   - a transport failure, 408 (the request timed out), 429 (rate limited,
+ *     ISSUES #1), any 5xx, or a 2xx without a recorded outcome -> 'retry'
+ *     (transient; keep and try later). 408 and 429 are the transport's, never a
+ *     refusal, as in the tap and state-change tables (A5).
  *   - any other non-401 4xx -> 'retry_and_surface' (keep and retry, but surface —
  *     it must not happen for an unlock, so it signals a bug, not a lost record).
  */
@@ -62,7 +65,7 @@ export function unlockDisposition(
 ): UnlockDisposition {
   if (result === 'network_error') return 'retry';
   if (result === 401) return 'reauth';
-  if (result === 429) return 'retry';
+  if (result === 408 || result === 429) return 'retry';
   if (result >= 200 && result < 300) {
     return typeof body?.outcome === 'string' && isUnlockRecorded(body.outcome)
       ? 'recorded'
