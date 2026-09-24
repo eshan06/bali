@@ -316,6 +316,57 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 
+  it('a late unlock racing the return that went ahead of it always ends in the return (A10)', async () => {
+    // An unlock stuck on the phone lands as the student's own later refocus or
+    // re-tap does. Both lock the session FOR UPDATE, and the unlock judges
+    // "after" under that lock, so either order ends in focus: unlock first
+    // flips (nothing has returned since it yet) and the return then takes
+    // over; the return first, and the unlock is recorded as superseded,
+    // flipping nothing. Never an unlock left standing over the return, and
+    // the unlock always recorded.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['refocus', 'tap'] as const) {
+        const { classId, studentId } = await seed(`race-late-unlock-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = (deviceTime: Date) => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime,
+        });
+        await tapIn(db, change(ago(50)));
+        if (rival === 'refocus') await unlock(db, change(ago(40)));
+
+        // Odd rounds give the return a head start, so both orders get exercised.
+        const lateUnlock = () => unlock(db, change(ago(45)));
+        const [late, back] = await Promise.allSettled([
+          round % 2 === 1
+            ? new Promise((resolve) => setTimeout(resolve, 10)).then(lateUnlock)
+            : lateUnlock(),
+          rival === 'refocus' ? refocus(db, change(ago(30))) : tapIn(db, change(ago(30))),
+        ]);
+
+        if (late.status === 'rejected') throw late.reason;
+        if (back.status === 'rejected') throw back.reason;
+        expect(one(await liveParticipations(session.id)).state).toBe('focused');
+        const lateEvent = (await eventsOfType(session.id, 'unlock')).at(-1)!;
+        const returned = (
+          await eventsOfType(session.id, rival === 'tap' ? 'tap_in' : 'refocus')
+        ).at(-1)!;
+        // Superseded exactly when the return committed first.
+        if (returned.seq < lateEvent.seq) {
+          expect(late.value).toMatchObject({ outcome: 'recorded', recordedAs: 'superseded' });
+          expect(lateEvent.payload).toEqual({ recorded_as: 'superseded' });
+        } else {
+          expect(late.value).toMatchObject({ outcome: 'applied', recordedAs: null });
+          expect(lateEvent.payload).toBeNull();
+        }
+        expect(await eventsOfType(session.id, 'unlock')).toHaveLength(rival === 'refocus' ? 2 : 1);
+      }
+    }
+  }, 120_000);
+
   it('protection off racing the end of the session is recorded exactly once, whichever lands first', async () => {
     // Owner decision 10: a report that reaches a session already over is
     // recorded with a note instead of refused, so this race has no losing

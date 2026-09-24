@@ -270,6 +270,26 @@ describe('GET /v1/me/history', () => {
     expect((await walk(token, 1)).flat().map(line)).toEqual(page.events.map(line));
   });
 
+  it('shows a late unlock at its own time, before the return that went ahead of it, and says so (A10)', async () => {
+    const room = await seedClassroom(db, 'h-late');
+    const token = await ctx.tokenFor(room.student.cognitoId);
+    const lesson = await startAt(room.klass.id, '09:00', '09:50');
+    await ok(tap(token, room.block.tagId, '09:01'));
+    await ok(change(token, lesson.id, 'unlock', '09:05', { reason: 'bathroom' }));
+    await ok(change(token, lesson.id, 'refocus', '09:08'));
+    // Stuck on the phone, it lands last: recorded, and the refocus stands.
+    const late = await ok(change(token, lesson.id, 'unlock', '09:03', { reason: 'nurse' }));
+    expect(late).toMatchObject({ outcome: 'recorded', recordedAs: 'superseded' });
+
+    const c = room.klass.name;
+    expect((await historyOf(token)).events.map(line)).toEqual([
+      `refocus 09:08 ${c}`,
+      `unlock 09:05 ${c} bathroom`,
+      `unlock 09:03 ${c} nurse superseded`,
+      `tap_in 09:01 ${c}`,
+    ]);
+  });
+
   it('pages through the whole history, each moment once, at any page size', async () => {
     const { token } = await aDayOfClasses('h-walk');
     const all = (await historyOf(token)).events.map((e) => e.eventId);

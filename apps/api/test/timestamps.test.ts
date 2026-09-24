@@ -120,11 +120,16 @@ function sameInstant(actual: Date, expected: Date) {
   expect(Math.abs(actual.getTime() - expected.getTime())).toBeLessThan(1000);
 }
 
+/**
+ * Tapped in a little while back, so every moment a case then stamps comes after
+ * the tap — an unlock stamped before the student's own tap is a late one (A10),
+ * recorded without flipping.
+ */
 async function joinSession(token: string, tagId: string) {
   const res = await post(token, '/v1/taps', {
     tagId,
     eventId: randomUUID(),
-    deviceTime: new Date().toISOString(),
+    deviceTime: new Date(Date.now() - 10_000).toISOString(),
   });
   expect(res.statusCode).toBe(200);
 }
