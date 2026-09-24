@@ -122,8 +122,11 @@ fast.
 **3. Nothing is truly deleted; it is marked as removed.** Removing a student from a class
 sets a `removed_at` date on their `enrollments` row instead of deleting the row. History
 stays answerable ("who was in this class in March?") and nothing pointing at the row
-breaks; screens simply skip rows where `removed_at` is set. Really deleting the row is
-exactly how v2 stranded a student in a locked session with no way out.
+breaks; screens simply skip rows where `removed_at` is set — except a session's live grid,
+which keeps a student removed from the class mid-session who was in that session (a
+participation or an unlock there), so their unlock stays visible (ruled 2026-09-24, A9).
+Really deleting the row is exactly how v2 stranded a student in a locked session with no
+way out.
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -376,9 +379,13 @@ with no finer meaning than its status carries none.
   bug lived exactly at this gap. The engine implements this: `unlock` always commits
   the event, tagging it `payload.recorded_as` (`no_live_participation` /
   `after_session_end` / `unknown_session` / `not_enrolled`) when there is no live
-  participation to flip, and `protection_off` when there is one but its protection is
-  off (never softened into an unlock); the outbox disposition (`recorded` / `retry` /
-  `reauth`) is the typed table in `@bali/shared`. "Never refuse" is not "never check": a caller
+  participation to flip, `protection_off` when there is one but its protection is
+  off (never softened into an unlock), and `superseded` when the student's own refocus
+  or tap in that session came after it — a late unlock, recorded and answered with the
+  state it left alone (ruled 2026-09-24, A10: "after" by the clamped times, a return's
+  never later than the server recorded it, and a tie flips); the outbox disposition
+  (`recorded` / `retry` / `reauth`) is the typed table in `@bali/shared`. "Never
+  refuse" is not "never check": a caller
   with no participation row in the session **and** no active enrollment in its class
   has no standing there, so their unlock records as an orphan (`not_enrolled`, no
   session or class attached, the claimed id in the payload) rather than writing into
@@ -391,7 +398,11 @@ with no finer meaning than its status carries none.
   (`tapDisposition`). A refused refocus or protection-off report is dropped and the truth
   re-read, never resent — final for its `event_id` (`stateChangeDisposition`). A read — a
   check-in, `GET /v1/me` — never overrides a newer state change of the phone's
-  (`readMayReconcile`).
+  (`readMayReconcile`). The one exception is a record stuck after repeated failures
+  (refused, or left unsettled by 8 answers): it stops holding reads back, so the phone
+  can reconcile again — while an unrecorded unlock still keeps any read from turning its
+  own session's shields back on, unless the student has refocused or re-tapped there
+  since (ruled 2026-09-24; B3a, B3b-2).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
   review, not a feature.
 - **The fixtures are the phone's contract.** `contracts/fixtures/` holds the API's real
