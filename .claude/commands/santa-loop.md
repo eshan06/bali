@@ -4,7 +4,7 @@ description: Adversarial dual-review loop — two independent reviewers, only pr
 
 # Santa Loop
 
-Two independent reviewers — different models, no shared context — review the change before it ships. Only **proven problems** block: a finding has to fit the BLOCKER rules and survive a check before anyone changes code for it. Easy style notes get fixed on the way without costing a round. Code gets up to 2 rounds; round 2 checks only the fixes.
+Two independent reviewers — different models, no shared context — review the change before it ships. Only **proven problems** block: a finding has to fit the BLOCKER rules and survive a check before anyone changes code for it. Easy style notes get fixed on the way without costing a round. Code gets up to 2 rounds; round 2 checks only the fixes and any dismissals.
 
 These rules override the santa-method skill's generic defaults (3 rounds, fix every flagged issue, full re-review each round).
 
@@ -25,7 +25,7 @@ git fetch -q origin
 git diff --stat origin/main...HEAD
 ```
 
-- **Docs-only** (every change is Markdown or a comment): skip the review and go to Step 5. The GitHub Claude Review still gates the PR.
+- **Docs-only** (every change is Markdown or a comment, and none touches the rules — `CLAUDE.md`, `.claude/`, `docs/ARCHITECTURE.md`): skip the review and go to Step 5. The GitHub Claude Review still gates the PR. A change to the rules always gets both reviewers, so they can't be loosened past a single one.
 - **Size:** count changed lines, not counting tests, Markdown, the lockfile or generated migrations:
 
   ```bash
@@ -111,7 +111,7 @@ rm -f "$PROMPT_FILE"
    - Missing tests → add them. A rule break → confirm the rule in CLAUDE.md or ARCHITECTURE.md, then fix it.
 3. **WARNs:** fix the easy ones now — a rename, a stray log, a comment, a small cleanup. They never start another round. One that needs a real rewrite goes in the PR description instead. Never open a follow-up PR just for WARNs.
 4. Commit: `fix: address santa-loop review findings (round N)`.
-5. **Round 2** — only if round 1 fixed at least one blocker. Fresh reviewers get the fix diff (`git diff <round-1 head>..HEAD`), the round-1 list (fixed, dismissed and why) and one question: did these fixes work, and did they break anything? They don't re-raise dismissed findings unless a fix changed that code. Round-2 blockers get the same check-then-fix. There is no round 3 — the GitHub Claude Review checks the final code.
+5. **Round 2** — whenever round 1 had blockers, fixed or dismissed. Fresh reviewers get the fix diff (`git diff <round-1 head>..HEAD`), the round-1 list (fixed, dismissed and why) and two questions: did the fixes work without breaking anything, and does each dismissal hold up? A dismissal they reject gets fixed now — or the step is parked if you still can't pin the failure down. They don't re-raise anything else from round 1. Round-2 blockers get the same check-then-fix. There is no round 3 — the GitHub Claude Review checks the final code.
 6. **Park** only when a real blocker can't be fixed within this step or needs an owner decision: push, open the PR as a **draft** that lists it, leave auto-merge off, and report the step as parked.
 
 ### Step 5: Push
