@@ -8,6 +8,32 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B4a: the API accepts a list of app client ids, and B4 ships in three.**
+  **The list:** `AUTH_AUDIENCE` is comma-separated, each id an app client whose tokens the
+  API accepts, matched as the one id always was (an access token's `client_id`, an id
+  token's `aud`). **Why:** the phone signs in through its own public app client (B4), in
+  the pool the portal's web client is in, and WEB.md keeps the two apart — their callback
+  URLs and grant settings differ — so one issuer now has two clients whose tokens are the
+  API's. One variable made a list rather than a second variable, because a single id then
+  reads exactly as before: no environment has to change to take this. Spaces around an id
+  are dropped; an empty entry (`a,,b`, a trailing comma, a blank value) fails the boot, as
+  a missing variable does — the empty slot is where an id was meant to be. The verifier
+  takes the list (`createVerifier({ clientIds })`); nothing else about a token's check
+  changed. **The order on dev:** the phone's id is appended to dev's `AUTH_AUDIENCE` only
+  once this is deployed — the code before it compares the whole value with the token's
+  client id, so a list set first would refuse every token. The owner's side is
+  `docs/DEPLOY.md`, "The phone's sign-in (dev)": the pool's hosted-UI domain, the phone's
+  client, and its refresh-token expiration raised above Cognito's 30-day default — Cognito
+  refusing the refresh token is the app's one sign-out, and auth decision 2 has a student
+  sign in roughly once, ever. **The rider (#78's review):** `returnedSince` reads the
+  student's returns within `[started_at, ends_at]`, which holds every return only because
+  a window never shrinks — `extendSession`, the one writer of `ends_at` once a session
+  starts, adds to the later of now and the end it had — so the read says so, and a PGlite
+  test pins it: a re-tap near the end, an extension pressed early, then a late unlock is
+  still `superseded`. **Split for size:** B4 came to 612 counted lines, over the ~400-line
+  bound, so it ships as three PRs in order: B4a (this, the API), B4b (BaliCore's `SignIn`
+  and `TokenStore`) and B4c (the app's wiring and build settings, where B4's contract with
+  the engine is kept).
 - **2026-09-24** — **A12: the phone's own order, not its clock, decides whether a student's
   unlock came after their own refocus or tap (owner ruling).** The ruling, verbatim: "The
   phone numbers its own actions with a counter, not the clock, and the server orders a

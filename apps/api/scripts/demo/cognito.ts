@@ -27,7 +27,7 @@ interface InitiateAuthResponse {
 export interface CognitoAuthConfig {
   /** The pool's region, e.g. `us-east-1`. */
   region: string;
-  /** The app client id — the same value the API validates as AUTH_AUDIENCE. */
+  /** The app client id — one of those the API accepts (AUTH_AUDIENCE). */
   clientId: string;
   /** Injection point for tests; defaults to the global fetch. */
   fetchImpl?: typeof fetch;

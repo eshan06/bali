@@ -58,7 +58,9 @@ In the AWS console → Cognito → the dev user pool → **App integration → A
 3. **Hosted UI domain.** If the pool has no hosted-UI domain yet, create one under
    **App integration → Domain** (e.g. `bali-dev`). This is the
    `NEXT_PUBLIC_COGNITO_DOMAIN`.
-4. **Copy the app client id** into `NEXT_PUBLIC_COGNITO_CLIENT_ID`.
+4. **Copy the app client id** into `NEXT_PUBLIC_COGNITO_CLIENT_ID`. The API's
+   `AUTH_AUDIENCE` lists it with the phone's, comma-separated (`docs/DEPLOY.md`):
+   a token from a client it does not list is refused.
 
 The portal builds the hosted-UI authorize URL itself (`src/lib/auth.ts`) with a
 freshly generated PKCE `code_verifier`/`code_challenge` (S256) and a `state` nonce,

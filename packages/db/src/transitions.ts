@@ -2002,10 +2002,11 @@ async function returnedSince(
         // over the student's own events in it (`events_user_occurred_idx`):
         // by the order, one timed before the unlock can come after it. Sound
         // only because a window never shrinks — `extendSession`, the one
-        // writer of `ends_at`, only moves it later, and `endSession` sets
-        // `ended_at` alone. A window that shrank would drop a return clamped
-        // under the old one out of this range, and a late unlock would flip a
-        // phone its student holds in focus (#78's review).
+        // writer of `ends_at` once a session starts (test helpers aside),
+        // only moves it later, and `endSession` sets `ended_at` alone. A
+        // window that shrank would drop a return clamped under the old one out
+        // of this range, and a late unlock would flip a phone its student
+        // holds in focus (#78's review).
         between(events.occurredAt, session.startedAt, session.endsAt),
         eq(events.sessionId, session.id),
         inArray(events.type, ['tap_in', 'refocus']),
