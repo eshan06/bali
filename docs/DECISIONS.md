@@ -8,6 +8,62 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A11: an unlock made before the phone's own tap is answered is filed
+  under that tap (owner decision 11).** **The endpoint:** `POST /v1/taps/{eventId}/unlock`,
+  additive — the tap's id in the path, the session unlock's body (`eventId`, `deviceTime`,
+  optional `reason`) and answer (`UnlockResponse`), so `unlockDisposition` deletes the record
+  exactly when it is durably recorded, as for any unlock; BaliCore's `unlock(tap:_:)`. In the
+  unlock family, not a new shape: the phone's outbox already knows the answer. **Filed:**
+  `unlockUnderTap` looks the tap up among the caller's own `tap_in` events and files the
+  unlock in that one's session by `unlock`'s rules — the body moved into `unlockIn`, which
+  both share, so the notes, A10's `superseded` and the clamp to that session's window (rule
+  1) are one code path — its payload naming the tap (`tap_event_id`). **Kept:** no session
+  to file it in, it is kept as an unknown session's is (no session or class, the claim and
+  the device's time in the payload, the server's time on the row), with two additive notes:
+  `tap_armed` (the caller's tap waits for Start) and `unknown_tap` (no tap of the caller's
+  has that id). Another student's tap id is `unknown_tap` — looked up among the caller's
+  own only, so it never files anything into their session, and says nothing of their tap —
+  and so is a teacher's; never a `403`: an unlock is never refused. **Armed:** the unlock
+  came before any session did, so the Start that converts the tap files nothing — it joins
+  the student, as the tap asked (the owner's "kept as an unattached record"). **Decided
+  here — the tap arriving after its unlock:** the phone sends in order, but a tap stuck at
+  its retry bound (B3a: refused, or 8 unsettled answers, say through a deploy) steps aside
+  for the unlock behind it. Kept unattached and never filed, that order would end with the
+  tap joining the student focused: the grid green over a phone its student unlocked, the
+  unlock in no teacher's view, and the phone re-shielded by its tap's answer — the same two
+  records giving a different truth by network timing. So a tap landing in a running session
+  (`tapIn`) files every `unknown_tap` record of its own student under its id, by the same
+  rules, under a fresh id naming the kept record (`unattached_event_id`: history is
+  append-only, the kept row stays as it was), and answers the state that leaves — `joined`,
+  `unlocked` (`apply_session`, no shield). Either order then ends alike. Not `tap_armed`
+  ones, for the reason above. **The race:** neither side sees the other's uncommitted row,
+  so arriving together each could miss the other; both take `lockTap` first — a transaction
+  advisory lock on a hash of the tap's id, before the session's lock, one order everywhere —
+  so one always commits before the other looks. Staged on the real-Postgres lane (a holder
+  parks the unlock on its own id's index right after its look; with the lock the tap waits
+  and files it, without it the tap commits focused), and raced freely in both orders.
+  **Cost:** every tap takes the lock and looks for kept unlocks, one probe of a partial
+  index holding only unlocks with no session (`events_unattached_tap_idx`, pinned by an
+  EXPLAIN test): ~0.6 ms a tap for both on the real lane, the look alone inside the
+  session's window. **Idempotency:** the unlock's own id is looked up first, so a retry is
+  answered where it was recorded — a kept one stays kept (`replay`, no session: the phone
+  re-reads) even after its tap filed it — and an id another event holds is `409`, as
+  `unlock` refuses one. **Not handled, disclosed:** an armed tap converted under a fresh id
+  because its own collided (`convertArmedTaps`, which no honest phone reaches) is known here
+  only as armed. **Riders (#76's review):** (1) `superseded` now comes before "no live
+  participation": an unlock the student's own refocus or tap in that session went ahead of
+  is late whether or not they are still in it. After the bell or a removal it was noted
+  `after_session_end` / `no_live_participation`, which the grid paints "Left · unlocked"
+  over a phone that was shielded when it left — a false alarm on ISSUES #2's own signal.
+  Answered `recorded` with no state (nothing is live), which the phone re-reads; with no
+  return after it the old notes stand. (2) The snapshot's chip turn looked past
+  `recorded_as: superseded` on every turn; scoped to unlocks, so a return is never skipped
+  for a note it cannot carry. **Tests:** the engine on PGlite (filed, filed where a switch
+  went, the rules, armed and the Start, unknown and another's, both orders, a late tap
+  filed late, only its own student's, a retry, a conflict, the index plan), the two races,
+  the API (the answer, armed and unknown, the late tap, a stranger and a teacher, `400`,
+  `409`, `401`), five fixtures, BaliCore; the riders' in the engine, the history, the
+  snapshot and the grid. Eleven mutations each turn a test red.
 - **2026-09-24** — **Owner rulings: a late unlock is recorded, not flipped (A10);
   ARCHITECTURE gains two clauses; decision 11 stands.** (1) **"Record it, don't flip."**
   The case #73's Claude Review and B3a's entry left open: an unlock stuck on the phone
