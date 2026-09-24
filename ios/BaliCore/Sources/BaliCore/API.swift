@@ -91,7 +91,8 @@ public struct CheckInResponse: Codable, Sendable, Hashable {
     public let session: SessionView?
 }
 
-/// `POST /v1/sessions/{id}/unlock` — the emergency unlock, recorded whatever the answer.
+/// `POST /v1/sessions/{id}/unlock` — the emergency unlock, recorded whatever the answer — and
+/// `POST /v1/taps/{eventId}/unlock`, the same unlock sent under the phone's own unanswered tap.
 public struct UnlockRequest: Codable, Sendable, Hashable {
     public let eventId: String
     public let deviceTime: Date

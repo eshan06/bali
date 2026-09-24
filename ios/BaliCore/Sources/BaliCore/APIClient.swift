@@ -176,6 +176,15 @@ public struct APIClient: Sendable {
         await send("POST", "/v1/sessions/\(escaped(id))/unlock", request)
     }
 
+    /// `POST /v1/taps/{eventId}/unlock` — an unlock made while the phone's own tap is unanswered,
+    /// sent under that tap's event id (owner decision 11): the server files it in whatever session
+    /// the tap landed in, or keeps it with no session. For `unlockDisposition`, as any unlock.
+    public func unlock(tap eventId: String, _ request: UnlockRequest) async
+        -> APIResponse<UnlockResponse>
+    {
+        await send("POST", "/v1/taps/\(escaped(eventId))/unlock", request)
+    }
+
     /// `POST /v1/sessions/{id}/refocus` — for `stateChangeDisposition`.
     public func refocus(session id: String, _ request: RefocusRequest) async
         -> APIResponse<RefocusResponse>

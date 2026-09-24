@@ -108,6 +108,12 @@ struct APIClientFixtureTests {
             return try answered(
                 response, fixture, unlockDisposition(response.result, response.answer).rawValue)
         },
+        "POST /v1/taps/{eventId}/unlock": { client, fixture in
+            let request = try fixture.sent(UnlockRequest.self)
+            let response = await client.unlock(tap: fixture.parameter, request)
+            return try answered(
+                response, fixture, unlockDisposition(response.result, response.answer).rawValue)
+        },
         "POST /v1/sessions/{id}/refocus": { client, fixture in
             let request = try fixture.sent(RefocusRequest.self)
             let response = await client.refocus(session: fixture.parameter, request)
@@ -225,6 +231,13 @@ struct APIClientTests {
         "unlock": { client in
             let r = await client.unlock(
                 session: "s1", UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse))
+            return Sent(
+                result: r.result, noAnswer: r.noAnswer, error: r.error,
+                disposition: unlockDisposition(r.result, r.answer).rawValue)
+        },
+        "unlock under a tap": { client in
+            let r = await client.unlock(
+                tap: "t1", UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse))
             return Sent(
                 result: r.result, noAnswer: r.noAnswer, error: r.error,
                 disposition: unlockDisposition(r.result, r.answer).rawValue)

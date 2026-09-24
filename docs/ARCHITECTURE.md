@@ -306,6 +306,15 @@ Student app:
   A refocus replayed after the student's participation ended while the session runs
   (removed, left the class, switched away) is answered `replay` with no session and no
   state (ruled 2026-09-24), never with that ended row's last state and a window.
+- `POST /v1/taps/{eventId}/unlock` — an emergency unlock made while the phone's own tap is
+  unanswered (owner decision 11): sent under the tap's `event_id`, with the session
+  unlock's body and answer. It is filed in whatever session that tap landed in, by that
+  session's unlock rules — the tap looked up among the caller's own taps only, so another
+  student's id files nothing into their session — or, with no session to file it in, kept
+  unattached as an unknown session's is: `tap_armed` (the tap waits for Start, which then
+  joins the student without it) or `unknown_tap` (no tap of the caller's has that id). A tap
+  landing after an unlock sent under it files it then, so both arrival orders end alike;
+  the two serialise on the tap. Never refused; a retry is answered where it was recorded.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
   (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state. A
   report that first reaches the server after the session ended, from a student who was in
@@ -378,14 +387,16 @@ with no finer meaning than its status carries none.
   which errors mean retry later and which mean recorded-with-a-note. v2's lost-unlock
   bug lived exactly at this gap. The engine implements this: `unlock` always commits
   the event, tagging it `payload.recorded_as` (`no_live_participation` /
-  `after_session_end` / `unknown_session` / `not_enrolled`) when there is no live
-  participation to flip, `protection_off` when there is one but its protection is
-  off (never softened into an unlock), and `superseded` when the student's own refocus
-  or tap in that session came after it — a late unlock, recorded and answered with the
-  state it left alone (ruled 2026-09-24, A10: "after" by the clamped times, a return's
-  never later than the server recorded it, and a tie flips); the outbox disposition
-  (`recorded` / `retry` / `reauth`) is the typed table in `@bali/shared`. "Never
-  refuse" is not "never check": a caller
+  `after_session_end` / `unknown_session` / `not_enrolled`, and for one sent under its
+  tap `tap_armed` / `unknown_tap`) when there is no live participation to flip,
+  `protection_off` when there is one but its protection is off (never softened into an
+  unlock), and `superseded` when the student's own refocus or tap in that session came
+  after it — a late unlock, recorded and answered with the state it left alone, or with
+  none once the student has left the session (ruled 2026-09-24, A10: "after" by the
+  clamped times, a return's never later than the server recorded it, and a tie flips;
+  A11: after the end too, never "left unlocked" over a phone shielded at it); the
+  outbox disposition (`recorded` / `retry` / `reauth`) is the typed table in
+  `@bali/shared`. "Never refuse" is not "never check": a caller
   with no participation row in the session **and** no active enrollment in its class
   has no standing there, so their unlock records as an orphan (`not_enrolled`, no
   session or class attached, the claimed id in the payload) rather than writing into

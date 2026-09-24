@@ -389,7 +389,8 @@ export async function getSessionRoster(
         eq(events.sessionId, sessionId),
         eq(events.userId, users.id),
         inArray(events.type, CHIP_TURNS),
-        sql`${events.payload}->>'recorded_as' is distinct from ${LATE_UNLOCK}`,
+        // A late unlock's note, on an unlock only: a return is never late.
+        sql`(${events.type} <> 'unlock' or ${events.payload}->>'recorded_as' is distinct from ${LATE_UNLOCK})`,
       ),
     )
     .orderBy(desc(events.seq))

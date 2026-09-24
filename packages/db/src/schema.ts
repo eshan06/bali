@@ -240,6 +240,12 @@ export const events = pgTable(
     index('events_user_occurred_idx').on(t.userId, t.occurredAt),
     // GET /v1/classes/{id}/reports/… — a class's events over a date range.
     index('events_class_occurred_idx').on(t.classId, t.occurredAt),
+    // POST /v1/taps — every tap looks up the unlocks sent under it before it
+    // arrived, which its landing files (decision 11, `unlocksAwaitingTap`).
+    // Partial, holding only unlocks kept with no session, so that is one probe.
+    index('events_unattached_tap_idx')
+      .on(sql`(${t.payload}->>'claimed_tap_event_id')`)
+      .where(sql`${t.type} = 'unlock' and ${t.sessionId} is null`),
   ],
 );
 

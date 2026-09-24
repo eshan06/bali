@@ -1,0 +1,26 @@
+{
+  "endpoint": "POST /v1/taps/{eventId}/unlock",
+  "scenario": "An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.",
+  "request": {
+    "path": "/v1/taps/00000000-0000-7000-8000-000000000001/unlock",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z",
+      "reason": "nurse"
+    }
+  },
+  "status": 200,
+  "type": "UnlockResponse",
+  "body": {
+    "outcome": "applied",
+    "recordedAs": null,
+    "state": "unlocked",
+    "session": {
+      "id": "00000000-0000-7000-8000-000000000003",
+      "classId": "00000000-0000-7000-8000-000000000004",
+      "endsAt": "2000-01-01T00:02:00.000Z"
+    },
+    "reason": "nurse"
+  },
+  "disposition": "recorded"
+}

@@ -184,10 +184,14 @@ export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
  * "recorded" unlock that moved no student state. `protection_off`: the student
  * was live but their Screen Time permission is off, a state an unlock never
  * softens (ARCHITECTURE: "never green, never an unlock"). `superseded`: the
- * student was live and had come back to focus — their own refocus or tap in
- * that session — after the unlock, which is late: stuck on the phone while the
- * return went ahead of it (owner ruling, 2026-09-24). Additive-only like the
- * other vocab.
+ * student had come back to focus — their own refocus or tap in that session —
+ * after the unlock, which is late: stuck on the phone while the return went
+ * ahead of it (owner ruling, 2026-09-24), whether or not they are still in the
+ * session. An unlock sent under its tap (`POST /v1/taps/{eventId}/unlock`,
+ * owner decision 11) whose tap has no session to file it in is kept with no
+ * session: `tap_armed`, the tap waits for its teacher's Start; `unknown_tap`,
+ * no tap of the caller's has that id — not arrived yet, refused, or another's.
+ * Additive-only like the other vocab.
  */
 export const UNLOCK_RECORDED_AS = [
   'no_live_participation',
@@ -196,6 +200,8 @@ export const UNLOCK_RECORDED_AS = [
   'not_enrolled',
   'protection_off',
   'superseded',
+  'tap_armed',
+  'unknown_tap',
 ] as const;
 export type UnlockRecordedAs = (typeof UNLOCK_RECORDED_AS)[number];
 

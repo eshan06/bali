@@ -63,6 +63,12 @@ import type { Database } from './types.js';
  * ~5.0 ms per tap with the read, ~4.8 ms without — so roughly 0.2 ms, about
  * 4% of the window. Fine at a school's scale, and now a number rather than an
  * adjective.
+ *
+ * Decision 11 added two statements to every tap: `lockTap`, taken before the
+ * session's lock, and the look for unlocks kept under the tap
+ * (`unlocksAwaitingTap`, one probe of a partial index), inside it. Measured the
+ * same way, ~5.6 ms per tap with both, ~5.0 ms with neither: about 0.6 ms for
+ * the two, of which only the look holds the session's window.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */
@@ -1391,7 +1397,11 @@ export interface TapInput {
 }
 export interface TapResult {
   outcome: 'joined' | 'switched' | 'replay';
-  /** Null, as `participationId` and `session` are, on the replay of a tap no longer current (A4). */
+  /**
+   * `unlocked` on a join that filed an unlock sent under this tap before it
+   * arrived (decision 11). Null, as `participationId` and `session` are, on the
+   * replay of a tap no longer current (A4).
+   */
   state: ParticipationState | null;
   participationId: string | null;
   /** The session the tap is live in: never one it is no longer in, since it drives a shield. */
@@ -1410,11 +1420,26 @@ async function teacherOfClass(tx: Database, classId: string): Promise<string | u
 }
 
 /**
+ * Serialise a tap's landing (`tapIn`) with an unlock sent under it
+ * (`unlockUnderTap`, decision 11). Neither can see the other's uncommitted
+ * row, so arriving together each could miss the other: the unlock kept
+ * unattached, the tap joined as focused over a phone its student unlocked.
+ * Taken first in both, before the session: one lock order. A transaction
+ * advisory lock on a hash of the tap's id, released at commit — a collision
+ * only makes two taps wait on each other.
+ */
+async function lockTap(tx: Database, tapEventId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${tapEventId}, 0))`);
+}
+
+/**
  * A tap into a running session. If the student is live in another session,
  * that participation is ended as `left_for_other_session` first (decision 4),
  * so switching classes is never counted as an emergency unlock. Reactivating a
  * participation in a session the student previously left updates the existing
- * row (there is one row per student per session), never a duplicate.
+ * row (there is one row per student per session), never a duplicate. An
+ * unlock sent under this tap that reached the server before it is filed here
+ * (decision 11).
  */
 export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   // Retry on deadlock: a cross-session switch-tap ends the student's other-session
@@ -1422,6 +1447,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   // either side can be the deadlock victim. Idempotent on event_id — safe to retry.
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
+      await lockTap(tx, input.eventId);
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
 
@@ -1645,7 +1671,37 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
           .returning(),
       );
       if (!upserted) throw new Error('tapIn: upsert returned no row');
-      return { outcome, state: 'focused', participationId: upserted.id, session };
+
+      // Decision 11: an unlock sent under this tap that reached the server
+      // first — the tap stuck on the phone, the unlock sent past it — was kept
+      // unattached, noted `unknown_tap`. The tap has landed, so it is filed
+      // here now by the unlock's rules, as it would have been had the tap come
+      // first: under a fresh id naming the kept record (history is
+      // append-only), and the tap's answer carries the state it leaves. The id
+      // is the server's, as a switch's or a Start's derived events are: the
+      // phone's ids are the tap's and the kept unlock's, and this runs only
+      // with the tap's first insert, so once.
+      let state: ParticipationState = 'focused';
+      for (const kept of await unlocksAwaitingTap(tx, input.studentId, input.eventId)) {
+        const payload = (kept.payload ?? {}) as Record<string, unknown>;
+        const claimed = new Date(String(payload.device_time));
+        const filed = await unlockIn(
+          tx,
+          session,
+          {
+            sessionId: session.id,
+            studentId: input.studentId,
+            eventId: newUuidV7(),
+            // Always the claim the kept record stored; were it unreadable, a
+            // tap must not fail for it, so the server's time of that record.
+            deviceTime: Number.isNaN(claimed.getTime()) ? kept.occurredAt : claimed,
+            reason: knownReason(payload.reason),
+          },
+          { tap_event_id: input.eventId, unattached_event_id: kept.eventId },
+        );
+        state = filed.state ?? state;
+      }
+      return { outcome, state, participationId: upserted.id, session };
     }),
   );
 }
@@ -1909,18 +1965,23 @@ async function returnedSince(
 
 /**
  * Record an unlock that must survive but must NOT attach to a session — an
- * unknown session id, or a caller with no standing in the session they named.
- * Rule 6 forbids a refusal (the phone would read one as "discard"), so the
- * claim is kept as an orphan event instead: no session, no class, the claimed
- * id in the payload. There is no window to clamp to, so rule 1 applies the only
- * way it can — the server's clock stamps the row and the device's claim is
- * preserved beside it, so a wrong or hostile phone clock cannot write a 2099
- * unlock into permanent history.
+ * unknown session id, a caller with no standing in the session they named, or
+ * a tap with no session to file it in (decision 11). Rule 6 forbids a refusal
+ * (the phone would read one as "discard"), so the claim is kept as an orphan
+ * event instead: no session, no class, the claimed id in the payload
+ * (`claimed_session_id`, or `claimed_tap_event_id`). There is no window to
+ * clamp to, so rule 1 applies the only way it can — the server's clock stamps
+ * the row and the device's claim is preserved beside it, so a wrong or hostile
+ * phone clock cannot write a 2099 unlock into permanent history.
  */
 async function recordOrphanUnlock(
   tx: Database,
-  input: UnlockInput,
-  recordedAs: Extract<UnlockRecordedAs, 'unknown_session' | 'not_enrolled'>,
+  input: Omit<UnlockInput, 'sessionId'>,
+  recordedAs: Extract<
+    UnlockRecordedAs,
+    'unknown_session' | 'not_enrolled' | 'tap_armed' | 'unknown_tap'
+  >,
+  claim: { claimed_session_id: string } | { claimed_tap_event_id: string },
 ): Promise<UnlockResult> {
   const reason = knownReason(input.reason);
   const isNew = await insertEvent(tx, {
@@ -1932,7 +1993,7 @@ async function recordOrphanUnlock(
     occurredAt: new Date(),
     payload: {
       recorded_as: recordedAs,
-      claimed_session_id: input.sessionId,
+      ...claim,
       device_time: input.deviceTime.toISOString(),
       ...(reason === null ? {} : { reason }),
     },
@@ -1961,7 +2022,8 @@ async function recordOrphanUnlock(
  *   - nor is one the student returned to focus in after the unlock — a late
  *     unlock, stuck on the phone while their refocus or tap went ahead of it
  *     (`returnedSince`): it commits noted `superseded` and returns 'recorded'
- *     with the state it left alone;
+ *     with the state it left alone — noted so still once the participation or
+ *     the session has ended, with no state left to name;
  *   - no live participation (removed mid-session, or the participation already
  *     ended) still commits the event with a `payload.recorded_as` note and
  *     returns 'recorded' — the record stands though there is no state to move;
@@ -1991,7 +2053,6 @@ async function recordOrphanUnlock(
  * land after the real endedAt but stays inside the window.
  */
 export async function unlock(db: Database, input: UnlockInput): Promise<UnlockResult> {
-  const reason = knownReason(input.reason);
   // Retry on deadlock, as changeState does: the same session-then-row lock
   // order meets the same rivals. A 40P01 that escaped reached the phone as a
   // 500 — retried, so never lost, but a record the server could have kept at
@@ -1999,155 +2060,298 @@ export async function unlock(db: Database, input: UnlockInput): Promise<UnlockRe
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
-
       if (!session) {
         // Nothing to attach to — the record still survives, unattached.
-        return recordOrphanUnlock(tx, input, 'unknown_session');
+        return recordOrphanUnlock(tx, input, 'unknown_session', {
+          claimed_session_id: input.sessionId,
+        });
       }
+      return unlockIn(tx, session, input);
+    }),
+  );
+}
 
-      const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
-      const row = await loadParticipation(tx, session.id, input.studentId);
+/**
+ * `unlock`'s rules, in a session the caller holds FOR UPDATE — shared by an
+ * unlock sent under its tap (decision 11: `unlockUnderTap`, and `tapIn` for one
+ * that arrived before its tap), whose `filing` rides in its payload.
+ */
+async function unlockIn(
+  tx: Database,
+  session: SessionRow,
+  input: UnlockInput,
+  filing: Record<string, string> = {},
+): Promise<UnlockResult> {
+  const reason = knownReason(input.reason);
+  const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+  const row = await loadParticipation(tx, session.id, input.studentId);
 
-      // The only authorization this endpoint has — and it can never be a refusal.
-      // Without it any account holding a valid token could POST an unlock for a
-      // session id it merely guessed and write permanent rows into a stranger's
-      // class history, live grid and unlock reports. A caller with no
-      // participation row here AND no active enrollment in the class has no
-      // standing in this session, so the record is kept as an orphan (rule 6 —
-      // never discarded) rather than attached to someone else's session.
-      //
-      // This does not weaken ISSUES #2: a student removed mid-session still has
-      // their (now ended) participation row, so they keep attaching to the
-      // session and their unlock is recorded against it exactly as before.
-      if (row === undefined) {
-        const enrolled = await tx
-          .select({ id: enrollments.id })
-          .from(enrollments)
-          .where(
-            and(
-              eq(enrollments.classId, session.classId),
-              eq(enrollments.studentId, input.studentId),
-              isNull(enrollments.removedAt),
-            ),
-          )
-          .limit(1);
-        if (enrolled.length === 0) return recordOrphanUnlock(tx, input, 'not_enrolled');
-      }
+  // The only authorization this endpoint has — and it can never be a refusal.
+  // Without it any account holding a valid token could POST an unlock for a
+  // session id it merely guessed and write permanent rows into a stranger's
+  // class history, live grid and unlock reports. A caller with no
+  // participation row here AND no active enrollment in the class has no
+  // standing in this session, so the record is kept as an orphan (rule 6 —
+  // never discarded) rather than attached to someone else's session.
+  //
+  // This does not weaken ISSUES #2: a student removed mid-session still has
+  // their (now ended) participation row, so they keep attaching to the
+  // session and their unlock is recorded against it exactly as before.
+  if (row === undefined) {
+    const enrolled = await tx
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.classId, session.classId),
+          eq(enrollments.studentId, input.studentId),
+          isNull(enrollments.removedAt),
+        ),
+      )
+      .limit(1);
+    if (enrolled.length === 0) {
+      return recordOrphanUnlock(tx, input, 'not_enrolled', { claimed_session_id: session.id });
+    }
+  }
 
-      const live = row !== undefined && row.endedAt === null ? row : undefined;
+  const live = row !== undefined && row.endedAt === null ? row : undefined;
 
-      // Why nothing flips, when nothing does. With no live participation an ended
-      // session dominates (the whole session is over), otherwise it's a student
-      // removed from the class mid-session — the ISSUES #2 case. A live student
-      // whose protection is off is not flipped either: that state is never
-      // softened into an unlock (ARCHITECTURE, iOS rules: "never green, never an
-      // unlock") — iOS already dropped the shields, and the grid must keep saying
-      // the permission is off until a re-tap. Nor is one whose student came back
-      // to focus after this unlock: it is late, and the return stands (owner
-      // ruling, 2026-09-24). Recorded all the same, never refused.
-      let note: UnlockRecordedAs | null = null;
-      if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
-      else if (live.state === 'protection_off') note = 'protection_off';
-      else if (await returnedSince(tx, session.id, input.studentId, occurredAt)) {
-        note = 'superseded';
-      }
+  // Why nothing flips, when nothing does. A live student whose protection is
+  // off is not flipped: that state is never softened into an unlock
+  // (ARCHITECTURE, iOS rules: "never green, never an unlock") — iOS already
+  // dropped the shields, and the grid must keep saying the permission is off
+  // until a re-tap. Nor is one who came back to focus after this unlock: it is
+  // late, and the return stands (owner ruling, 2026-09-24) — whether or not
+  // they are still here, so an unlock from before their own refocus, landing
+  // after the bell or a removal, never reads "left unlocked" over a phone that
+  // was shielded when it left (#76's review). Otherwise, with no live
+  // participation an ended session dominates (the whole session is over), else
+  // it's a student removed from the class mid-session — the ISSUES #2 case.
+  // Recorded all the same, never refused.
+  let note: UnlockRecordedAs | null = null;
+  if (live?.state === 'protection_off') note = 'protection_off';
+  else if (row && (await returnedSince(tx, session.id, input.studentId, occurredAt))) {
+    note = 'superseded';
+  } else if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
 
-      const payload: Record<string, unknown> = {};
-      if (note !== null) payload.recorded_as = note;
-      if (reason !== null) payload.reason = reason;
+  const payload: Record<string, unknown> = { ...filing };
+  if (note !== null) payload.recorded_as = note;
+  if (reason !== null) payload.reason = reason;
 
-      const isNew = await insertEvent(tx, {
-        eventId: input.eventId,
-        type: 'unlock',
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId,
+    type: 'unlock',
+    sessionId: session.id,
+    classId: session.classId,
+    userId: input.studentId,
+    occurredAt,
+    payload: Object.keys(payload).length > 0 ? payload : null,
+  });
+
+  if (!isNew) {
+    // Replay: return the current truth — the stored state if a participation
+    // row exists at all (live or since-ended), never a refusal — and the
+    // reason that was recorded rather than the one this retry carries.
+    return {
+      outcome: 'replay',
+      recordedAs: null,
+      state: row?.state ?? null,
+      participationId: row?.id ?? null,
+      session,
+      reason: await recordedReason(tx, input.eventId),
+    };
+  }
+
+  if (live && note === null) {
+    await closeOpenSilence(
+      tx,
+      {
+        id: live.id,
         sessionId: session.id,
         classId: session.classId,
-        userId: input.studentId,
-        occurredAt,
-        payload: Object.keys(payload).length > 0 ? payload : null,
+        studentId: input.studentId,
+      },
+      occurredAt,
+    );
+    await tx
+      .update(participations)
+      .set({ state: 'unlocked', lastSeenAt: heardNow() })
+      .where(eq(participations.id, live.id));
+    return {
+      outcome: 'applied',
+      recordedAs: null,
+      state: 'unlocked',
+      participationId: live.id,
+      session,
+      reason,
+    };
+  }
+
+  if (live) {
+    // Protection off, or a late unlock: nothing flips, but the phone made
+    // contact — last contact moves (the grid's "last seen"), and any open
+    // silence episode closes. Under protection off that is defensive: none
+    // can be open today — the sweep marks only focused rows, protectionOff
+    // closes any episode it finds, and when the two race, the sweep queues
+    // behind it or one side loses a deadlock and retries into one of those
+    // cases — but contact must never leave one open. The answer names the
+    // state left alone, which the phone applies — after a late unlock, what
+    // the student's own later changes made it.
+    await closeOpenSilence(
+      tx,
+      {
+        id: live.id,
+        sessionId: session.id,
+        classId: session.classId,
+        studentId: input.studentId,
+      },
+      occurredAt,
+    );
+    await tx
+      .update(participations)
+      .set({ lastSeenAt: heardNow() })
+      .where(eq(participations.id, live.id));
+    return {
+      outcome: 'recorded',
+      recordedAs: note,
+      state: live.state,
+      participationId: live.id,
+      session,
+      reason,
+    };
+  }
+
+  // No live participation: the committed event is itself the record.
+  return {
+    outcome: 'recorded',
+    recordedAs: note,
+    state: null,
+    participationId: null,
+    session,
+    reason,
+  };
+}
+
+/** An emergency unlock sent under the phone's own tap (decision 11): the tap's id, not a session's. */
+export interface TapUnlockInput {
+  /** The tap it is filed under: the `event_id` the phone minted for that tap. */
+  tapEventId: string;
+  studentId: string;
+  /** The unlock's own idempotency key (rule 4). */
+  eventId: string;
+  deviceTime: Date;
+  reason?: UnlockReason | null;
+}
+
+/**
+ * The unlocks sent under a tap before it arrived — kept unattached, noted
+ * `unknown_tap` — oldest first: what its landing files (decision 11). The
+ * type and session are literals, so the read is one probe of
+ * `events_unattached_tap_idx`, which holds only unlocks kept with no session.
+ * Unexecuted, so a test can EXPLAIN it.
+ */
+export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: string) {
+  return db
+    .select({ eventId: events.eventId, payload: events.payload, occurredAt: events.occurredAt })
+    .from(events)
+    .where(
+      and(
+        sql`${events.type} = 'unlock' and ${events.sessionId} is null`,
+        sql`${events.payload}->>'claimed_tap_event_id' = ${tapEventId}`,
+        sql`${events.payload}->>'recorded_as' = 'unknown_tap'`,
+        eq(events.userId, studentId),
+      ),
+    )
+    .orderBy(asc(events.seq));
+}
+
+/**
+ * An emergency unlock made while the phone's own tap was unanswered (owner
+ * decision 11, "file it under the tap"). The phone cannot name a session — it
+ * has not heard where the tap landed, and the one it was in before may be the
+ * one the tap switched it out of — so it sends the tap's id, and the unlock is
+ * filed in whatever session that tap landed in, by `unlock`'s rules there: the
+ * notes, A10's `superseded`, the clamp to that session's window (rule 1). Its
+ * payload names the tap (`tap_event_id`). With no session to file it in, it is
+ * kept unattached, as an unknown session's is, and noted:
+ *   - `tap_armed`: the tap waits for its teacher's Start (decision 5). The
+ *     unlock came before any session did, so the Start does not file it: the
+ *     tap joins the student, as it asked. (An armed tap converted under a fresh
+ *     id, its own collided — `convertArmedTaps`, no honest phone — is known
+ *     here only as armed.)
+ *   - `unknown_tap`: no tap of the caller's has that id — refused, another
+ *     student's, or not arrived yet. Looked up among the caller's own taps
+ *     only, so another's tap id never files this unlock into their session.
+ *     The phone sends in order, but a tap stuck at its retry bound (B3a) steps
+ *     aside for the unlock behind it, and one landing afterwards files it then
+ *     (`tapIn`): the two arrival orders end alike.
+ * Never refused: each is `recorded`, as every unlock is (ISSUES #2).
+ *
+ * Idempotent on the unlock's own id, looked up first: a retry is answered
+ * where the unlock was recorded — never re-filed where its tap landed since —
+ * or refused as `unlock` refuses an id another event holds. `lockTap` makes
+ * the tap's own landing and this wait for each other, so neither misses the
+ * other.
+ */
+export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promise<UnlockResult> {
+  // Retry on deadlock, as `unlock` does once it has the session.
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      await lockTap(tx, input.tapEventId);
+      // The caller's own only: an id another student's event holds is refused
+      // all the same (`insertEvent`), without locking their session first.
+      const recorded = firstOrUndefined(
+        await tx
+          .select({ sessionId: events.sessionId })
+          .from(events)
+          .where(and(eq(events.eventId, input.eventId), eq(events.userId, input.studentId)))
+          .limit(1),
+      );
+      const landed =
+        recorded ??
+        firstOrUndefined(
+          await tx
+            .select({ sessionId: events.sessionId })
+            .from(events)
+            .where(
+              and(
+                eq(events.eventId, input.tapEventId),
+                eq(events.userId, input.studentId),
+                eq(events.type, 'tap_in'),
+              ),
+            )
+            .limit(1),
+        );
+      const session = landed?.sessionId
+        ? await loadSession(tx, landed.sessionId, { forUpdate: true })
+        : undefined;
+      if (session) {
+        const filing = { tap_event_id: input.tapEventId };
+        return unlockIn(tx, session, { ...input, sessionId: session.id }, filing);
+      }
+
+      // Kept unattached — or this unlock's retry, whose note is not written
+      // again. A row a Start has consumed counts as armed on purpose: a Start
+      // committing between the look for the tap above and this one leaves the
+      // unlock as made before it, so kept as armed — never `unknown_tap`, which
+      // that tap, landed through the Start and not `tapIn`, would never file.
+      const armed =
+        recorded === undefined &&
+        firstOrUndefined(
+          await tx
+            .select({ id: armedTaps.id })
+            .from(armedTaps)
+            .where(
+              and(
+                eq(armedTaps.eventId, input.tapEventId),
+                eq(armedTaps.studentId, input.studentId),
+              ),
+            )
+            .limit(1),
+        ) !== undefined;
+      return recordOrphanUnlock(tx, input, armed ? 'tap_armed' : 'unknown_tap', {
+        claimed_tap_event_id: input.tapEventId,
       });
-
-      if (!isNew) {
-        // Replay: return the current truth — the stored state if a participation
-        // row exists at all (live or since-ended), never a refusal — and the
-        // reason that was recorded rather than the one this retry carries.
-        return {
-          outcome: 'replay',
-          recordedAs: null,
-          state: row?.state ?? null,
-          participationId: row?.id ?? null,
-          session,
-          reason: await recordedReason(tx, input.eventId),
-        };
-      }
-
-      if (live && note === null) {
-        await closeOpenSilence(
-          tx,
-          {
-            id: live.id,
-            sessionId: session.id,
-            classId: session.classId,
-            studentId: input.studentId,
-          },
-          occurredAt,
-        );
-        await tx
-          .update(participations)
-          .set({ state: 'unlocked', lastSeenAt: heardNow() })
-          .where(eq(participations.id, live.id));
-        return {
-          outcome: 'applied',
-          recordedAs: null,
-          state: 'unlocked',
-          participationId: live.id,
-          session,
-          reason,
-        };
-      }
-
-      if (live) {
-        // Protection off, or a late unlock: nothing flips, but the phone made
-        // contact — last contact moves (the grid's "last seen"), and any open
-        // silence episode closes. Under protection off that is defensive: none
-        // can be open today — the sweep marks only focused rows, protectionOff
-        // closes any episode it finds, and when the two race, the sweep queues
-        // behind it or one side loses a deadlock and retries into one of those
-        // cases — but contact must never leave one open. The answer names the
-        // state left alone, which the phone applies — after a late unlock, what
-        // the student's own later changes made it.
-        await closeOpenSilence(
-          tx,
-          {
-            id: live.id,
-            sessionId: session.id,
-            classId: session.classId,
-            studentId: input.studentId,
-          },
-          occurredAt,
-        );
-        await tx
-          .update(participations)
-          .set({ lastSeenAt: heardNow() })
-          .where(eq(participations.id, live.id));
-        return {
-          outcome: 'recorded',
-          recordedAs: note,
-          state: live.state,
-          participationId: live.id,
-          session,
-          reason,
-        };
-      }
-
-      // No live participation: the committed event is itself the record.
-      return {
-        outcome: 'recorded',
-        recordedAs: note,
-        state: null,
-        participationId: null,
-        session,
-        reason,
-      };
     }),
   );
 }
