@@ -73,7 +73,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   be recorded, even stuck: an unlock landing after its refocus leaves the
   server at `unlocked`, the grid showing an unlock the student came back from
   and the next read unshielding them. It waits on its own unlock only, never
-  an older stuck one. **Backoff:** 2 s, 4 s, 8 s, 16 s, 32 s, then 60 s (the
+  an older stuck one: stuck while a newer unlock landed, that one is failing on
+  its own and may never land, and waiting would hold the refocus forever, the
+  server at `unlocked` while the student is back in focus. The cost if it does
+  land later: the engine flips a live focused row on any new unlock, whatever
+  its device time, so the row reads `unlocked` again until the next change —
+  recording an unlock older than the row's last refocus without flipping it is
+  a server question, left for the owner. **Backoff:** 2 s, 4 s, 8 s, 16 s, 32 s, then 60 s (the
   cap), each plus a uniform extra of up to as much again, so 600 phones never
   retry in unison; every send that leaves the record counts, no answer and a
   401 included, so an offline phone never spins; the random source is clamped

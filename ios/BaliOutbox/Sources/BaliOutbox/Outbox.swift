@@ -176,9 +176,10 @@ public struct Outbox: Sendable {
         return wait * (1 + ((0...1).contains(jitter) ? jitter : jitter > 1 ? 1 : 0))
     }
 
-    /// How many changes await their answer, for `ReconcileStamp.awaiting`: every record not stuck,
-    /// but a refocus waiting on a stuck unlock (the server has seen neither). A stuck record stops
-    /// holding reads; an unrecorded unlock still guards its session (`holdsUnlock`).
+    /// How many changes await their answer — as `ReconcileStamp` counts one, any disposition but
+    /// retry or reauth — for its `awaiting`: every record not stuck, but a refocus waiting on a
+    /// stuck unlock (the server has seen neither). A stuck record stops holding reads; an
+    /// unrecorded unlock still guards its session (`holdsUnlock`).
     public func awaiting() throws -> Int {
         let records = try records()
         let stuck = Set(records.filter(\.stuck).map(\.eventId))
