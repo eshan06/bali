@@ -506,8 +506,13 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
             expect(await eventsOfType(session.id, 'unlock')).toHaveLength(1);
           } else if (moved.status === 'rejected') {
             // The leave landed first, leaving nothing here to mark — a refusal,
-            // never a deadlock.
+            // never a deadlock — and the refusal recorded nothing.
             expect(moved.reason).toMatchObject({ code: 'NOT_PARTICIPATING' });
+            expect(await eventsOfType(session.id, 'protection_off')).toHaveLength(0);
+          } else {
+            // It landed first: applied here, and then the leave ended the row.
+            expect(moved.value).toMatchObject({ outcome: 'applied', state: 'protection_off' });
+            expect(await eventsOfType(session.id, 'protection_off')).toHaveLength(1);
           }
           // Either way the student ends up live only where they went.
           expect(await liveParticipations(session.id)).toHaveLength(0);
