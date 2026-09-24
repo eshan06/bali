@@ -1,5 +1,15 @@
-import type { EventType, ParticipationState } from '@bali/shared';
-import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import {
+  type EventType,
+  HISTORY_EVENT_TYPES,
+  type HistoryEventType,
+  isUnlockReason,
+  type ParticipationState,
+  UNLOCK_RECORDED_AS,
+  type UnlockReason,
+  type UnlockRecordedAs,
+} from '@bali/shared';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import type { SQLWrapper } from 'drizzle-orm';
 
 import { blocks, classes, enrollments, events, participations, sessions, users } from './schema.js';
 import type { Database } from './types.js';
@@ -405,4 +415,206 @@ export async function getEventsSince(
     .where(and(eq(events.sessionId, sessionId), gt(events.seq, afterSeq)))
     .orderBy(asc(events.seq))
     .limit(limit);
+}
+
+/*
+ * GET /v1/me/history (A7) — a student's own timeline, newest first, a page at
+ * a time. Two sources, merged: their own events (`user_id`), and the end of
+ * every session that ended with them in it — the session's event, which names
+ * no student, found through the participation the end itself closed. Ordered
+ * by `occurred_at`, then a leave before anything else at one instant (a
+ * switch mints the `tap_in` first and stamps one instant on the pair, so
+ * neither column alone puts the leave first), then `seq`.
+ */
+const SESSION_END_TYPES = ['session_ended', 'session_expired'] as const;
+const OWN_HISTORY_TYPES = HISTORY_EVENT_TYPES.filter(
+  (type) => !(SESSION_END_TYPES as readonly string[]).includes(type),
+);
+
+/** A moment's place in the order. `at` is microsecond UTC text: a `Date` would tie rows Postgres does not. */
+export interface HistoryKey {
+  at: string;
+  tie: number;
+  seq: number;
+}
+const exactly = (instant: SQLWrapper) =>
+  sql<string>`to_char(${instant} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+const tieOf = sql<number>`(case when ${events.type} = 'left_for_other_session' then 0 else 1 end)`;
+
+/** The student's own moments: a shown type, in a class — an orphan unlock is in none. */
+const ownMoments = (studentId: string) =>
+  and(
+    eq(events.userId, studentId),
+    inArray(events.type, OWN_HISTORY_TYPES),
+    isNotNull(events.classId),
+  );
+/** A session's end event, and the student's participation it closed. */
+const endedWithStudent = (studentId: string) =>
+  and(
+    eq(events.sessionId, participations.sessionId),
+    inArray(events.type, SESSION_END_TYPES),
+    eq(participations.studentId, studentId),
+    inArray(participations.endedReason, SESSION_END_TYPES),
+  );
+/** Older than `key`; the first bound is the rest, loosened, for the index to range on. */
+function olderThan(key: HistoryKey, at: SQLWrapper, seq: SQLWrapper) {
+  const instant = sql`${key.at}::timestamptz`;
+  return sql`(${at} <= ${instant} and (${at} < ${instant} or ${tieOf} < ${key.tie} or (${tieOf} = ${key.tie} and ${seq} < ${key.seq})))`;
+}
+
+/**
+ * The two reads a page merges, unexecuted — exported so a test can EXPLAIN
+ * them: each is newest first, `take` rows at most, older than `key`, through
+ * its own index. The class ending is stamped with the participation's end,
+ * which the end wrote with the session's, so the instant its index ranges on
+ * is the one its key compares.
+ */
+export function historyReads(
+  db: Database,
+  studentId: string,
+  key: HistoryKey | undefined,
+  take: number,
+) {
+  const moment = {
+    eventId: events.eventId,
+    type: events.type,
+    seq: events.seq,
+    tie: tieOf,
+    payload: events.payload,
+    classId: classes.id,
+    className: classes.name,
+    teacherDisplayName: users.displayName,
+    sessionId: sessions.id,
+    startedAt: sessions.startedAt,
+    endsAt: sessions.endsAt,
+    endedAt: sessions.endedAt,
+  };
+  return {
+    own: db
+      .select({ ...moment, occurredAt: events.occurredAt, at: exactly(events.occurredAt) })
+      .from(events)
+      .innerJoin(classes, eq(classes.id, events.classId))
+      .innerJoin(users, eq(users.id, classes.teacherId))
+      .leftJoin(sessions, eq(sessions.id, events.sessionId))
+      .where(and(ownMoments(studentId), key && olderThan(key, events.occurredAt, events.seq)))
+      .orderBy(desc(events.occurredAt), desc(tieOf), desc(events.seq))
+      .limit(take),
+    ended: db
+      .select({
+        ...moment,
+        occurredAt: participations.endedAt,
+        at: exactly(participations.endedAt),
+      })
+      .from(participations)
+      .innerJoin(events, endedWithStudent(studentId))
+      .innerJoin(sessions, eq(sessions.id, participations.sessionId))
+      .innerJoin(classes, eq(classes.id, sessions.classId))
+      .innerJoin(users, eq(users.id, classes.teacherId))
+      .where(key && olderThan(key, participations.endedAt, events.seq))
+      .orderBy(desc(participations.endedAt), desc(events.seq))
+      .limit(take),
+  };
+}
+
+export interface HistoryRow {
+  eventId: string;
+  type: HistoryEventType;
+  occurredAt: Date;
+  classId: string;
+  className: string;
+  teacherDisplayName: string | null;
+  sessionId: string | null;
+  startedAt: Date | null;
+  endsAt: Date | null;
+  endedAt: Date | null;
+  reason: UnlockReason | null;
+  /** An unlock's or a protection-off's note; the latter's are a subset of the former's. */
+  recordedAs: UnlockRecordedAs | null;
+  /** For `armed_tap_skipped`: the class of the student's own `tap_in` it was declined for. */
+  countedIn: { id: string; name: string } | null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One page of a student's history, newest first: at most `limit` moments
+ * older than the moment `before` (an event id from an earlier page), and the
+ * id to pass for the page after — null when there is none. Undefined when
+ * `before` is not a moment of this history. A cursor names a row, never an
+ * offset, so a moment recorded between two pages shifts nothing: a newer one
+ * waits for a reload from the top, an older one (a late unlock is clamped
+ * into its class's window) is read in its place.
+ */
+export async function getHistoryPage(
+  db: Database,
+  studentId: string,
+  page: { before?: string; limit: number },
+): Promise<{ events: HistoryRow[]; nextBefore: string | null } | undefined> {
+  let key: HistoryKey | undefined;
+  if (page.before !== undefined) {
+    [key] = await db
+      .select({
+        at: exactly(sql`coalesce(${participations.endedAt}, ${events.occurredAt})`),
+        tie: tieOf,
+        seq: events.seq,
+      })
+      .from(events)
+      .leftJoin(participations, endedWithStudent(studentId))
+      .where(
+        and(
+          eq(events.eventId, page.before),
+          or(ownMoments(studentId), isNotNull(participations.id)),
+        ),
+      )
+      .limit(1);
+    if (!key) return undefined;
+  }
+  const reads = historyReads(db, studentId, key, page.limit + 1);
+  const merged = [...(await reads.own), ...(await reads.ended)]
+    .sort((a, b) => (a.at !== b.at ? (a.at < b.at ? 1 : -1) : b.tie - a.tie || b.seq - a.seq))
+    .slice(0, page.limit + 1);
+  const rows = merged.slice(0, page.limit).map((row) => ({
+    ...row,
+    payload: (row.payload ?? {}) as Record<string, unknown>,
+  }));
+
+  // A declined tap names the tap that already counted — the student's own `tap_in`.
+  const declined = rows
+    .filter((row) => row.type === 'armed_tap_skipped')
+    .map((row) => row.payload.armed_tap_event_id)
+    .filter((id): id is string => typeof id === 'string' && UUID.test(id));
+  const counted = new Map(
+    (declined.length === 0
+      ? []
+      : await db
+          .select({ eventId: events.eventId, id: classes.id, name: classes.name })
+          .from(events)
+          .innerJoin(classes, eq(classes.id, events.classId))
+          .where(
+            and(
+              inArray(events.eventId, declined),
+              eq(events.userId, studentId),
+              eq(events.type, 'tap_in'),
+            ),
+          )
+    ).map(({ eventId, ...cls }) => [eventId, cls]),
+  );
+
+  return {
+    events: rows.map(({ payload, ...row }) => ({
+      ...row,
+      // Every row is of a shown type, and a class ending always has its end.
+      type: row.type as HistoryEventType,
+      occurredAt: row.occurredAt!,
+      reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
+      recordedAs: (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
+        ? (payload.recorded_as as UnlockRecordedAs)
+        : null,
+      countedIn:
+        row.type === 'armed_tap_skipped'
+          ? (counted.get(payload.armed_tap_event_id as string) ?? null)
+          : null,
+    })),
+    nextBefore: merged.length > page.limit ? rows[rows.length - 1]!.eventId : null,
+  };
 }

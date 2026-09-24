@@ -6,6 +6,9 @@ import {
   type CheckInResponse,
   type EndEnrollmentResponse,
   type EnrollmentJoinResponse,
+  HISTORY_EVENT_TYPES,
+  type HistoryEvent,
+  type HistoryPage,
   type JoinCodePreviewResponse,
   type MeClass,
   type MeResponse,
@@ -53,6 +56,7 @@ interface Contract {
   EnrollmentJoinResponse: EnrollmentJoinResponse;
   EndEnrollmentResponse: EndEnrollmentResponse;
   JoinCodePreviewResponse: JoinCodePreviewResponse;
+  HistoryPage: HistoryPage;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -77,6 +81,23 @@ const sessionView = object<SessionView>()({
   endsAt: z.iso.datetime(),
 });
 const meClass = object<MeClass>()({ id: z.uuid(), name: z.string() });
+const historyEvent = object<HistoryEvent>()({
+  eventId: z.uuid(),
+  type: z.enum(HISTORY_EVENT_TYPES),
+  occurredAt: z.iso.datetime(),
+  class: meClass,
+  teacher: object<HistoryEvent['teacher']>()({ displayName: z.string().nullable() }),
+  session: object<NonNullable<HistoryEvent['session']>>()({
+    id: z.uuid(),
+    startedAt: z.iso.datetime(),
+    endsAt: z.iso.datetime(),
+    endedAt: z.iso.datetime().nullable(),
+  }).nullable(),
+  reason: z.enum(UNLOCK_REASONS).nullable(),
+  // Protection off's notes are a subset of an unlock's: one field, one vocabulary.
+  recordedAs: z.enum(UNLOCK_RECORDED_AS).nullable(),
+  countedIn: meClass.nullable(),
+});
 
 /**
  * Each type as a strict run-time schema: a field the type lacks, a missing
@@ -139,6 +160,10 @@ export const SCHEMAS = {
     teacher: object<JoinCodePreviewResponse['teacher']>()({ displayName: z.string().nullable() }),
     alreadyEnrolled: z.boolean(),
   }),
+  HistoryPage: object<HistoryPage>()({
+    events: z.array(historyEvent),
+    nextBefore: z.uuid().nullable(),
+  }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -181,6 +206,7 @@ export const ENDPOINTS: Record<
   'POST /v1/enrollments': { type: 'EnrollmentJoinResponse' },
   'DELETE /v1/enrollments/{id}': { type: 'EndEnrollmentResponse' },
   'GET /v1/join-codes/{code}': { type: 'JoinCodePreviewResponse' },
+  'GET /v1/me/history': { type: 'HistoryPage' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */

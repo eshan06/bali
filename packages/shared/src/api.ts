@@ -1,6 +1,7 @@
 import type { DisplayState } from './state.js';
 import type {
   EventType,
+  HistoryEventType,
   ParticipationState,
   ProtectionOffRecordedAs,
   UnlockReason,
@@ -254,6 +255,44 @@ export interface JoinCodePreviewResponse {
   teacher: { displayName: string | null };
   /** True when the caller is in this class already: a join would answer `already_enrolled`. */
   alreadyEnrolled: boolean;
+}
+
+// GET /v1/me/history?before=&limit= — the student's own timeline (A7), in
+// every class they have been in, left ones too.
+export interface HistoryEvent {
+  /** Stable across pages and reloads: a phone de-duplicates on it. */
+  eventId: string;
+  /**
+   * `armed_tap_skipped`: a tap a Start declined, having counted in `countedIn`
+   * already — never a join. `session_ended` / `session_expired`: the class
+   * ended while the student was in it.
+   */
+  type: HistoryEventType;
+  /** The device's time clamped into the session's window (rule 1), else the server's. */
+  occurredAt: string;
+  class: MeClass;
+  /** `displayName` is null when the teacher's account carries none. */
+  teacher: { displayName: string | null };
+  /**
+   * Its window: `endsAt` the scheduled end a time is clamped to, `endedAt` the
+   * real one (null while it runs). Null for leaving a class while none of its
+   * sessions ran.
+   */
+  session: { id: string; startedAt: string; endsAt: string; endedAt: string | null } | null;
+  reason: UnlockReason | null;
+  /** Why an unlock or protection off changed nothing — `after_session_end`: it came late. */
+  recordedAs: UnlockRecordedAs | ProtectionOffRecordedAs | null;
+  countedIn: MeClass | null;
+}
+export interface HistoryPage {
+  /**
+   * Newest first. At one instant a leave is older than the join it caused, so
+   * a phone showing a day oldest first reverses the page — never re-sorts on
+   * `occurredAt`, which ties there.
+   */
+  events: HistoryEvent[];
+  /** Pass as `before` for the next, older page; null at the end. A `400` for it: reload from the top. */
+  nextBefore: string | null;
 }
 
 // GET /v1/classes/{id}/roster — the teacher's roster of active students.

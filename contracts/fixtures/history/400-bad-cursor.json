@@ -1,0 +1,15 @@
+{
+  "endpoint": "GET /v1/me/history",
+  "scenario": "A history page before an event this history does not hold.",
+  "request": {
+    "path": "/v1/me/history?before=00000000-0000-7000-8000-000000000001"
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "message": "before is not an event of this history"
+    }
+  }
+}

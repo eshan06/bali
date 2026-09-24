@@ -1,7 +1,14 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBlock, createClass, generateJoinCode, updateClass } from '../src/management.js';
+import {
+  createBlock,
+  createClass,
+  generateJoinCode,
+  JOIN_CODE_ALPHABET,
+  JOIN_CODE_LENGTH,
+  updateClass,
+} from '../src/management.js';
 import { newUuidV7 } from '../src/ids.js';
 import { blocks, classes, schools, users } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
@@ -66,6 +73,15 @@ describe('generateJoinCode', () => {
       expect(code).toMatch(JOIN_CODE);
       expect(code).not.toMatch(/[01OIL]/);
     }
+  });
+
+  it('mints upper-case only, so every stored code is one a route can match', () => {
+    // The routes upper-case a typed code and match it exactly; this generator
+    // is the only writer of `classes.join_code`, so its alphabet is the
+    // invariant — asserted whole, not sampled.
+    expect(JOIN_CODE_ALPHABET).toBe(JOIN_CODE_ALPHABET.toUpperCase());
+    expect(JOIN_CODE_ALPHABET).toMatch(/^[A-Z2-9]+$/);
+    expect(JOIN_CODE_LENGTH).toBe(6);
   });
 });
 

@@ -1,0 +1,21 @@
+{
+  "endpoint": "GET /v1/me/history",
+  "scenario": "A history page of no moments at all.",
+  "request": {
+    "path": "/v1/me/history?limit=0"
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "message": "invalid request",
+      "details": [
+        {
+          "path": "limit",
+          "message": "Too small: expected number to be >=1"
+        }
+      ]
+    }
+  }
+}

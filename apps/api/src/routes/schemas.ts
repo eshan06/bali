@@ -1,3 +1,4 @@
+import { JOIN_CODE_LENGTH } from '@bali/db';
 import { z } from 'zod';
 
 /*
@@ -34,8 +35,10 @@ export const DeviceTime = z.string().datetime({ offset: true });
  * from an alphabet with no look-alikes (`generateJoinCode`), so case and
  * surrounding whitespace are noise: `kwx49q ` is `KWX49Q`.
  *
- * The length check runs on the code as sent, before it is trimmed: the join's
- * check since Phase 2, kept as it was, so normalising only ever turns a 404
- * into a join. A blank code is still the join's 404; only an empty one is a 400.
+ * The minimum runs on the code as sent, before it is trimmed: the join's check
+ * since Phase 2, kept as it was, so a blank code is still the join's 404 and
+ * only an empty one is a 400. The maximum runs on the trimmed code: every code
+ * is `JOIN_CODE_LENGTH` long, so a longer one names no class and is refused as
+ * bad input before any lookup (API decision 4, sane sizes).
  */
-export const JoinCode = z.string().min(1).trim().toUpperCase();
+export const JoinCode = z.string().min(1).trim().max(JOIN_CODE_LENGTH).toUpperCase();
