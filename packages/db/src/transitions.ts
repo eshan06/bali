@@ -63,6 +63,12 @@ import type { Database } from './types.js';
  * ~5.0 ms per tap with the read, ~4.8 ms without — so roughly 0.2 ms, about
  * 4% of the window. Fine at a school's scale, and now a number rather than an
  * adjective.
+ *
+ * Decision 11 added two statements to every tap: `lockTap`, taken before the
+ * session's lock, and the look for unlocks kept under the tap
+ * (`unlocksAwaitingTap`, one probe of a partial index), inside it. Measured the
+ * same way, ~5.6 ms per tap with both, ~5.0 ms with neither: about 0.6 ms for
+ * the two, of which only the look holds the session's window.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */
