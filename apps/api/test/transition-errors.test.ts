@@ -75,6 +75,12 @@ const EXPECTED: Record<
   },
 };
 
+/**
+ * The reasons no engine refusal maps to: DELETE /v1/enrollments/{id}'s two
+ * 403s, which that route raises itself (A6; pinned in enrollments.test.ts).
+ */
+const ROUTE_REASONS: ApiErrorReason[] = ['unknown_user', 'enrollment_not_yours'];
+
 /** What `mapTransitionError` turns an engine refusal with `code` into. */
 async function mapped(code: TransitionErrorCode): Promise<ApiError> {
   const thrown = await mapTransitionError(() =>
@@ -99,8 +105,10 @@ describe('mapTransitionError', () => {
 
   it('gives every engine refusal its own reason, and the vocabulary no other (A5)', async () => {
     // A phone keys on the reason, never the message, so a refusal without one
-    // — or two sharing one — is two answers it cannot tell apart.
-    const reasons: (ApiErrorReason | undefined)[] = [];
+    // — or two sharing one — is two answers it cannot tell apart. The rest of
+    // the vocabulary is refusals a route makes itself (A6), named here so a
+    // reason nobody gives cannot sit in it unnoticed.
+    const reasons: (ApiErrorReason | undefined)[] = [...ROUTE_REASONS];
     for (const code of TRANSITION_ERROR_CODES) reasons.push((await mapped(code)).reason);
     expect(reasons.sort()).toEqual([...API_ERROR_REASONS].sort());
   });

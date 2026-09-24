@@ -6,6 +6,7 @@ import {
   type CheckInResponse,
   type EndEnrollmentResponse,
   type EnrollmentJoinResponse,
+  type JoinCodePreviewResponse,
   type MeClass,
   type MeResponse,
   PARTICIPATION_STATES,
@@ -25,6 +26,8 @@ import {
   type UnlockResponse,
   USER_ROLES,
 } from '@bali/shared';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
@@ -49,6 +52,7 @@ interface Contract {
   ProtectionOffResponse: ProtectionOffResponse;
   EnrollmentJoinResponse: EnrollmentJoinResponse;
   EndEnrollmentResponse: EndEnrollmentResponse;
+  JoinCodePreviewResponse: JoinCodePreviewResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -130,6 +134,11 @@ export const SCHEMAS = {
     reason: z.enum(['left_class', 'removed_from_class']),
     endedParticipation: z.boolean(),
   }),
+  JoinCodePreviewResponse: object<JoinCodePreviewResponse>()({
+    class: meClass,
+    teacher: object<JoinCodePreviewResponse['teacher']>()({ displayName: z.string().nullable() }),
+    alreadyEnrolled: z.boolean(),
+  }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -171,6 +180,7 @@ export const ENDPOINTS: Record<
   'POST /v1/sessions/{id}/protection-off': { type: 'ProtectionOffResponse', outbox: 'change' },
   'POST /v1/enrollments': { type: 'EnrollmentJoinResponse' },
   'DELETE /v1/enrollments/{id}': { type: 'EndEnrollmentResponse' },
+  'GET /v1/join-codes/{code}': { type: 'JoinCodePreviewResponse' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */
@@ -212,4 +222,28 @@ export function serialize(fixture: Fixture): string {
       standIn((n) => new Date(Date.UTC(2000, 0, 1, 0, n)).toISOString()),
     );
   return `${json}\n`;
+}
+
+/** Every `.json` file under `dir`, relative to it — what the drift check reconciles. */
+export async function jsonFiles(dir: string): Promise<string[]> {
+  const files = await readdir(dir, { recursive: true }).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  });
+  return files.filter((file) => file.endsWith('.json')).sort();
+}
+
+/**
+ * Rewrite `dir` to hold exactly `fixtures` — what `npm run fixtures` does. It
+ * clears only what the drift check reconciles, every `.json` (a stale one is a
+ * fixture of nothing), so a file kept beside them — a README for BaliCore's
+ * authors — outlives a regenerate.
+ */
+export async function writeFixtures(dir: string, fixtures: Map<string, Fixture>): Promise<void> {
+  for (const file of await jsonFiles(dir)) await rm(join(dir, file));
+  for (const [name, fixture] of fixtures) {
+    const file = join(dir, `${name}.json`);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, serialize(fixture));
+  }
 }

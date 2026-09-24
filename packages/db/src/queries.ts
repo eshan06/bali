@@ -129,6 +129,62 @@ export async function findClassById(db: Database, classId: string): Promise<Clas
   );
 }
 
+/**
+ * The class a join code opens: the live one holding it. The join
+ * (`joinClassByCode`) and its preview (`previewJoinCode`) both find it by
+ * this, so the two can never name different classes (A6).
+ */
+export function liveClassWithCode(joinCode: string) {
+  return and(eq(classes.joinCode, joinCode), isNull(classes.removedAt));
+}
+
+export interface JoinCodePreview {
+  class: ClassRow;
+  teacherDisplayName: string | null;
+  /** The student holds an active enrollment in it: a join would be `already_enrolled`. */
+  alreadyEnrolled: boolean;
+}
+
+/**
+ * What a join code opens, for the preview before joining (Phase 3 · A6): the
+ * live class holding the code (`liveClassWithCode`, as the join finds it), its
+ * teacher's display name, and whether `studentId` is in it already.
+ * Undefined when no live class holds the code: unknown, archived, or
+ * regenerated away. A read: no lock, no write; a caller with no row yet passes
+ * no `studentId` and is in no class.
+ */
+export async function previewJoinCode(
+  db: Database,
+  joinCode: string,
+  studentId: string | undefined,
+): Promise<JoinCodePreview | undefined> {
+  const found = first(
+    await db
+      .select({ class: classes, teacherDisplayName: users.displayName })
+      .from(classes)
+      .innerJoin(users, eq(users.id, classes.teacherId))
+      .where(liveClassWithCode(joinCode))
+      .limit(1),
+  );
+  if (!found) return undefined;
+  const enrolled =
+    studentId !== undefined &&
+    (
+      await db
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.classId, found.class.id),
+            eq(enrollments.studentId, studentId),
+            isNull(enrollments.removedAt),
+          ),
+        )
+        .limit(1)
+    ).length > 0;
+  return { ...found, alreadyEnrolled: enrolled };
+}
+
 /** A session by id (any state), so the lifecycle routes can authorize the teacher. */
 export async function findSessionById(
   db: Database,

@@ -16,8 +16,8 @@ function one<T>(rows: T[]): T {
 
 /**
  * A school, a teacher (cognito id `teacher-<tag>`), an enrolled student
- * (`student-<tag>`), a class, and the teacher's block (tag `TAG-<tag>`). The
- * cognito ids are what the test issuer signs tokens for.
+ * (`student-<tag>`), a class (join code `JOIN-<TAG>`), and the teacher's block
+ * (tag `TAG-<tag>`). The cognito ids are what the test issuer signs tokens for.
  */
 export async function seedClassroom(db: Database, tag: string) {
   const school = one(
@@ -45,7 +45,9 @@ export async function seedClassroom(db: Database, tag: string) {
         teacherId: teacher.id,
         schoolId: school.id,
         name: `Class ${tag}`,
-        joinCode: `JOIN-${tag}`,
+        // Upper-case, as every real code is minted: the routes upper-case what
+        // they are sent (`JoinCode`), so a lower-case seed could never be joined.
+        joinCode: `JOIN-${tag}`.toUpperCase(),
       })
       .returning(),
   );

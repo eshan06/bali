@@ -1,6 +1,6 @@
 {
   "endpoint": "DELETE /v1/enrollments/{id}",
-  "scenario": "A student trying to remove a classmate’s enrollment.",
+  "scenario": "Leaving by someone the server has no account for yet.",
   "request": {
     "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001"
   },
@@ -9,7 +9,8 @@
   "body": {
     "error": {
       "code": "forbidden",
-      "message": "not allowed to remove this enrollment"
+      "reason": "unknown_user",
+      "message": "unknown user"
     }
   }
 }

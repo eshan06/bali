@@ -1,5 +1,18 @@
-import { type Database, enrollments, startSession } from '@bali/db';
-import type { EndEnrollmentResponse, EnrollmentJoinResponse, RosterResponse } from '@bali/shared';
+import {
+  classes,
+  type Database,
+  enrollments,
+  findUserByCognitoId,
+  startSession,
+  users,
+} from '@bali/db';
+import type {
+  ClassDetail,
+  EndEnrollmentResponse,
+  EnrollmentJoinResponse,
+  JoinCodePreviewResponse,
+  RosterResponse,
+} from '@bali/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -48,6 +61,24 @@ function del(token: string, enrollmentId: string) {
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/** GET /v1/join-codes/:code — `code` goes into the path as given, so a test can encode it. */
+function preview(token: string | null, code: string) {
+  return ctx.app.inject({
+    method: 'GET',
+    url: `/v1/join-codes/${code}`,
+    headers: token === null ? {} : { authorization: `Bearer ${token}` },
+  });
+}
+
+/** A join by `joinCode`, with a fresh id and the phone's clock. */
+function joinBy(token: string, joinCode: string) {
+  return join(token, { joinCode, eventId: randomUUID(), deviceTime: new Date().toISOString() });
+}
+
+const noClass = {
+  error: { code: 'not_found', reason: 'class_not_found', message: 'no class with that join code' },
+};
 
 describe('POST /v1/enrollments', () => {
   it('a new student joins a class by its code', async () => {
@@ -102,6 +133,143 @@ describe('POST /v1/enrollments', () => {
   it('requires authentication', async () => {
     const res = await ctx.app.inject({ method: 'POST', url: '/v1/enrollments', payload: {} });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('GET /v1/join-codes/:code', () => {
+  it('shows what a code opens — the class and its teacher — and writes nothing', async () => {
+    const { klass, teacher } = await seedClassroom(db, 'preview');
+    await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, teacher.id));
+    const newcomer = await ctx.tokenFor('preview-newcomer');
+
+    const res = await preview(newcomer, klass.joinCode);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<JoinCodePreviewResponse>()).toEqual({
+      class: { id: klass.id, name: klass.name },
+      teacher: { displayName: 'Ms. Rivera' },
+      alreadyEnrolled: false,
+    });
+    // A read: a first-time caller gets no row from it (the join makes one).
+    expect(await findUserByCognitoId(db, 'preview-newcomer')).toBeUndefined();
+    expect((await joinBy(newcomer, klass.joinCode)).json<EnrollmentJoinResponse>().outcome).toBe(
+      'joined',
+    );
+  });
+
+  it('says when the caller is in the class already, and not once they have left', async () => {
+    const { klass, student } = await seedClassroom(db, 'preview-member');
+    const token = await ctx.tokenFor(student.cognitoId);
+
+    const member = await preview(token, klass.joinCode);
+    expect(member.statusCode).toBe(200);
+    // This teacher's account carries no name: the screen says "your teacher".
+    expect(member.json<JoinCodePreviewResponse>()).toEqual({
+      class: { id: klass.id, name: klass.name },
+      teacher: { displayName: null },
+      alreadyEnrolled: true,
+    });
+    await del(token, await activeEnrollmentId(klass.id, student.id));
+    const left = await preview(token, klass.joinCode);
+    expect(left.json<JoinCodePreviewResponse>().alreadyEnrolled).toBe(false);
+  });
+
+  it('matches a code as the join does: case and surrounding spaces are noise', async () => {
+    const { klass } = await seedClassroom(db, 'preview-typed');
+    const token = await ctx.tokenFor('preview-typist');
+    const typed = ` ${klass.joinCode.toLowerCase()}\n`;
+
+    const res = await preview(token, encodeURIComponent(typed));
+    expect(res.statusCode).toBe(200);
+    expect(res.json<JoinCodePreviewResponse>().class.id).toBe(klass.id);
+    const joined = await joinBy(token, typed);
+    expect(joined.statusCode).toBe(200);
+    expect(joined.json<EnrollmentJoinResponse>().class.id).toBe(klass.id);
+  });
+
+  it('refuses a code no class holds with the join’s 404, reason and all', async () => {
+    await seedClassroom(db, 'preview-unknown');
+    const token = await ctx.tokenFor('preview-guesser');
+    for (const res of [await preview(token, 'NO-SUCH-CODE'), await joinBy(token, 'NO-SUCH-CODE')]) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual(noClass);
+    }
+  });
+
+  it('refuses an archived class’s code as the join does, and names the live class reusing it', async () => {
+    const { klass, teacher, school } = await seedClassroom(db, 'preview-archived');
+    await db.update(classes).set({ removedAt: new Date() }).where(eq(classes.id, klass.id));
+    const token = await ctx.tokenFor('preview-late');
+    for (const res of [await preview(token, klass.joinCode), await joinBy(token, klass.joinCode)]) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual(noClass);
+    }
+
+    // Only live classes hold a code, so the archived one frees it for another.
+    const [reuse] = await db
+      .insert(classes)
+      .values({
+        teacherId: teacher.id,
+        schoolId: school.id,
+        name: 'Next year',
+        joinCode: klass.joinCode,
+      })
+      .returning();
+    const previewed = await preview(token, klass.joinCode);
+    expect(previewed.json<JoinCodePreviewResponse>().class).toEqual({
+      id: reuse!.id,
+      name: 'Next year',
+    });
+    const joined = await joinBy(token, klass.joinCode);
+    expect(joined.json<EnrollmentJoinResponse>().class.id).toBe(reuse!.id);
+  });
+
+  it('refuses a regenerated class’s old code as the join does; the new one opens it', async () => {
+    const { klass, teacher } = await seedClassroom(db, 'preview-regen');
+    const regen = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/v1/classes/${klass.id}`,
+      headers: { authorization: `Bearer ${await ctx.tokenFor(teacher.cognitoId)}` },
+      payload: { regenerateCode: true },
+    });
+    const fresh = regen.json<ClassDetail>().joinCode;
+    expect(fresh).not.toBe(klass.joinCode);
+    const token = await ctx.tokenFor('preview-stale');
+
+    for (const res of [await preview(token, klass.joinCode), await joinBy(token, klass.joinCode)]) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual(noClass);
+    }
+    expect((await preview(token, fresh)).json<JoinCodePreviewResponse>().class.id).toBe(klass.id);
+  });
+
+  it('is a 400 for an empty code; a blank one names no class, as the join has always said', async () => {
+    const token = await ctx.tokenFor('preview-blank');
+    const empty = await preview(token, '');
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json()).toMatchObject({ error: { code: 'bad_input' } });
+    // Checked as sent, before trimming (`JoinCode`): normalising only ever
+    // turns a join's 404 into a join, never its 404 into a 400.
+    for (const res of [await preview(token, '%20%20'), await joinBy(token, '  ')]) {
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual(noClass);
+    }
+  });
+
+  it('requires authentication', async () => {
+    const { klass } = await seedClassroom(db, 'preview-anon');
+    const res = await preview(null, klass.joinCode);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('a teacher cannot preview joining a class (403), as they cannot join one', async () => {
+    const { klass, teacher } = await seedClassroom(db, 'preview-teacher');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    for (const res of [await preview(token, klass.joinCode), await joinBy(token, klass.joinCode)]) {
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({
+        error: { code: 'forbidden', message: 'teachers cannot join a class as a student' },
+      });
+    }
   });
 });
 
@@ -171,12 +339,21 @@ describe('DELETE /v1/enrollments/:id', () => {
     expect(body.endedParticipation).toBe(true);
   });
 
+  const notYours = {
+    error: {
+      code: 'forbidden',
+      reason: 'enrollment_not_yours',
+      message: 'not allowed to remove this enrollment',
+    },
+  };
+
   it("a different student cannot remove someone else's enrollment (403)", async () => {
     const { klass, student } = await seedClassroom(db, 'remove-idor');
     const other = await seedClassroom(db, 'remove-idor-other');
     const enrollmentId = await activeEnrollmentId(klass.id, student.id);
     const res = await del(await ctx.tokenFor(other.student.cognitoId), enrollmentId);
     expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual(notYours);
   });
 
   it('a teacher who does not own the class cannot remove its enrollment (403)', async () => {
@@ -187,6 +364,17 @@ describe('DELETE /v1/enrollments/:id', () => {
     // 200 (a role-only check instead of ownership would wrongly allow this).
     const res = await del(await ctx.tokenFor(other.teacher.cognitoId), enrollmentId);
     expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual(notYours);
+  });
+
+  it('a caller with no account here yet is refused as unknown (403), told apart by reason', async () => {
+    const { klass, student } = await seedClassroom(db, 'remove-stranger');
+    const enrollmentId = await activeEnrollmentId(klass.id, student.id);
+    const res = await del(await ctx.tokenFor('never-signed-in'), enrollmentId);
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({
+      error: { code: 'forbidden', reason: 'unknown_user', message: 'unknown user' },
+    });
   });
 
   it('is a 404 for an unknown enrollment', async () => {

@@ -1,0 +1,16 @@
+{
+  "endpoint": "GET /v1/join-codes/{code}",
+  "scenario": "A preview of a join code no class has: the join’s refusal.",
+  "request": {
+    "path": "/v1/join-codes/NO-SUCH-CODE"
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "class_not_found",
+      "message": "no class with that join code"
+    }
+  }
+}
