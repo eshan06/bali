@@ -68,12 +68,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   task's, which also covers a session passed in. The test (301, 302, 303, 307,
   308) runs on Linux in `ci.yml` and on the iOS Simulator in the macOS job.
   **Also:** #71's socket timeout test bounded its wait at ten seconds against
-  the default session's fifteen, and on the simulator the whole test process
-  stalled for seven to twelve seconds a run (every test's time jumped by it,
-  while the timeout itself fired at a second), once past that bound. It now
-  runs against a session of its own that would wait a minute, bounded at
-  thirty seconds, so the request's own second must still end the wait —
-  putting #71's Linux bug back makes it wait the minute and fail.
+  the default session's fifteen, and on GitHub's macOS runner the iOS
+  Simulator stalls for seven to thirteen seconds at a time — every test's
+  time jumps by it, the timeout's own timer included — once past that bound.
+  It now runs against a session of its own that would wait four minutes,
+  bounded at two, so the request's own second must still end the wait long
+  before the session would — putting #71's Linux bug back makes it wait the
+  session out and fail.
 - **2026-09-24** — **B1c: BaliCore's API client — a send's answer is a value
   the outbox tables take whole.** `APIClient` (`APIClient.swift`) has one
   method per student endpoint, typed request in, `APIResponse<Answer>` out,

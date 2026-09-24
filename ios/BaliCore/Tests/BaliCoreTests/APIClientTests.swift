@@ -482,10 +482,11 @@ struct URLSessionTransportTests {
     @Test("A server that never answers times out: .networkError, and the record kept")
     func timesOut() async throws {
         let server = try LocalServer(answer: nil)
-        // A session that would wait a minute: the request's own second must end it long before.
+        // A session that would wait four minutes: the request's own second must end it long
+        // before.
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 60
-        configuration.timeoutIntervalForResource = 60
+        configuration.timeoutIntervalForRequest = 240
+        configuration.timeoutIntervalForResource = 240
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
             tokens: FixedToken(token: "t"),
@@ -499,11 +500,12 @@ struct URLSessionTransportTests {
         #expect(response.noAnswer == .unreachable)
         #expect(unlockDisposition(response.result, response.answer) == .retry)
         // A wait, not a refusal — the server still listens, never having read a byte — and its
-        // own second, not the session's minute: on Linux, a timeout given to URLRequest's
+        // own second, not the session's four minutes: on Linux, a timeout given to URLRequest's
         // initializer is ignored for the session's. The bound is half the session's, not a few
-        // seconds: on the iOS Simulator the whole test process has stalled for over ten.
+        // seconds: on GitHub's macOS runner the whole iOS Simulator has stalled for over ten
+        // seconds at a time, twice in one run, the timeout's own timer with it.
         #expect(server.head.isEmpty)
-        #expect(waited > 0.5 && waited < 30)
+        #expect(waited > 0.5 && waited < 120)
     }
 
     @Test(
