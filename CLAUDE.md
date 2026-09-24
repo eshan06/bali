@@ -65,8 +65,9 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    together, fast checks locally as you go.
 4. **Verify:** first the deterministic checks (`npm run typecheck && npm run
 lint && npm test`, plus `npm run demo` when API behavior changed), then run
-   `/santa-loop` — two independent reviewers. Docs-only changes skip it; code
-   gets up to 2 rounds, and round 2 checks only the fixes. Only proven
+   `/santa-loop` — two independent reviewers. Docs-only changes skip it,
+   except changes to the rules themselves; code gets up to 2 rounds, and
+   round 2 checks only the fixes and any dismissals. Only proven
    problems block (the BLOCKER rules in `.github/workflows/claude-review.yml`);
    easy style notes get fixed in the same PR without another round. A step it
    can't settle is parked as a draft PR, and the planning session moves on.
