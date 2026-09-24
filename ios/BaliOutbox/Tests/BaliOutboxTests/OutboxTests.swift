@@ -5,6 +5,10 @@ import Testing
 
 @testable import BaliOutbox
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 @Suite("The outbox's database")
 struct SchemaTests {
     @Test("An empty file is migrated to the schema, and holds nothing")
@@ -17,7 +21,7 @@ struct SchemaTests {
                 try db.columns(in: "outboxState").map(\.name)
             )
         }
-        #expect(applied == ["v1"])
+        #expect(applied == ["v1", "v2"])
         #expect(
             columns == [
                 "seq", "eventId", "kind", "tagId", "sessionId", "reason", "follows", "recordedAt",
@@ -46,7 +50,7 @@ struct SchemaTests {
         // Protection off was reported for this session: reopening does not report it again.
         #expect(try reopened.record(.protectionOff(session: "s"), now: t0) == nil)
         let applied = try await reopened.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1"])
+        #expect(applied == ["v1", "v2"])
     }
 
     @Test("The schema refuses a row its kind could not send")
@@ -98,14 +102,19 @@ struct RecordTests {
         }
         #expect(Set(records.map(\.eventId)).count == records.count)
         let id = records.map(\.eventId)
+        // Each with its place in what the phone did (A12): the file's install, its own seq.
+        let install = try #require(try installOf(outbox))
+        let nth = { ActionOrder(install: install, seq: $0) }
         #expect(
             records.map(\.request) == [
-                .tap(TapRequest(tagId: "04:A2:1B", eventId: id[0], deviceTime: at)),
+                .tap(TapRequest(tagId: "04:A2:1B", eventId: id[0], deviceTime: at, order: nth(1))),
                 .unlock(
-                    session: "s", UnlockRequest(eventId: id[1], deviceTime: at, reason: .bathroom)),
-                .unlock(session: "s", UnlockRequest(eventId: id[2], deviceTime: at)),
-                .refocus(session: "s", RefocusRequest(eventId: id[3], deviceTime: at)),
-                .protectionOff(session: "s", ProtectionOffRequest(eventId: id[4], deviceTime: at)),
+                    session: "s",
+                    UnlockRequest(eventId: id[1], deviceTime: at, reason: .bathroom, order: nth(2))),
+                .unlock(session: "s", UnlockRequest(eventId: id[2], deviceTime: at, order: nth(3))),
+                .refocus(session: "s", RefocusRequest(eventId: id[3], deviceTime: at, order: nth(4))),
+                .protectionOff(
+                    session: "s", ProtectionOffRequest(eventId: id[4], deviceTime: at, order: nth(5))),
             ])
         #expect(records.map(\.change) == changes)
     }
@@ -180,5 +189,87 @@ struct RecordTests {
             if case .protectionOff = $0.change { true } else { false }
         }
         #expect(reports.count == 4)
+    }
+}
+
+@Suite("The phone's own order (A12)")
+struct ActionOrderTests {
+    @Test(
+        "Each file is given its install once: a lower-case UUID, the same every time it opens, another file's its own"
+    )
+    func install() throws {
+        let (outbox, url) = try makeOutbox()
+        let install = try #require(try installOf(outbox))
+        #expect(install.wholeMatch(of: Self.uuid) != nil, "\(install)")
+        #expect(try installOf(open(url)) == install)
+        #expect(try installOf(makeOutbox().outbox) != install)
+    }
+
+    @Test(
+        "Each record goes with its own seq — never reused once a record is gone — and the same one on every retry"
+    )
+    func seqs() async throws {
+        let (outbox, _) = try makeOutbox()
+        let nth = { ActionOrder(install: try #require(try installOf(outbox)), seq: $0) }
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        let unlock = try record(outbox, .unlock(session: "s", reason: nil))
+        #expect(try tap.order == nth(1) && unlock.order == nth(2))
+        // The tap answered and gone, the next record still comes after it.
+        try await send(outbox, tap, 200, #"{"outcome":"armed","session":null,"state":null}"#)
+        #expect(try current(outbox, tap.eventId) == nil)
+        #expect(try record(outbox, .refocus(session: "s")).order == nth(3))
+
+        // Unanswered and sent again: the same order on the wire each time.
+        let wire = Wire()
+        let client = APIClient(
+            baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(), transport: wire)
+        for _ in 0..<2 {
+            let queued = try #require(try current(outbox, unlock.eventId))
+            try outbox.settle(await queued.send(through: client), now: t0)
+        }
+        #expect(try await wire.orders == [nth(2), nth(2)])
+    }
+
+    @Test("A file the last build made is given its install, and what it queued goes with its seq")
+    func fromV1() throws {
+        let url = temporaryFile()
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let old = try DatabasePool(path: url.path(percentEncoded: false))
+        try Outbox.migrator.migrate(old, upTo: "v1")
+        try old.write {
+            try $0.execute(
+                sql: """
+                    INSERT INTO outbox (eventId, kind, sessionId, recordedAt, nextAttemptAt)
+                    VALUES ('e1', 'unlock', 's', ?, ?)
+                    """, arguments: [t0, t0])
+        }
+        try old.close()
+
+        let outbox = try open(url)
+        let install = try #require(try installOf(outbox))
+        #expect(try outbox.records().map(\.order) == [ActionOrder(install: install, seq: 1)])
+        let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
+        #expect(applied == ["v1", "v2"])
+    }
+
+    static var uuid: Regex<Substring> {
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+    }
+}
+
+/// Answers every request 503, keeping the order each body carried.
+actor Wire: HTTPTransport {
+    private(set) var orders: [ActionOrder?] = []
+
+    struct Body: Decodable { let order: ActionOrder? }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        orders.append(try JSONDecoder().decode(Body.self, from: request.httpBody ?? Data()).order)
+        guard let url = request.url,
+            let response = HTTPURLResponse(
+                url: url, statusCode: 503, httpVersion: "HTTP/1.1", headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(), response)
     }
 }

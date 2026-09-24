@@ -1783,6 +1783,40 @@ describe('an unlock sent under its tap (decision 11)', () => {
     expect(await unlocksOf(student.id)).toHaveLength(1);
   });
 
+  it('one kept before its tap arrived stays unattached when that tap arms: the Start joins without it (#77)', async () => {
+    // The unlock reached the server first, with no tap of the student's on
+    // record: `unknown_tap`. The tap then arrives with nothing running and
+    // arms. Only a tap landing in a running session files a kept unlock; the
+    // Start converts the armed tap and joins the student focused, as the
+    // owner ruled for `tap_armed` — the record stays in no class.
+    const { teacher, student, klass } = await seedClass('tap-unlock-unknown-then-armed');
+    const tap = newUuidV7();
+    const morning = new Date('2026-01-01T08:57:00Z');
+    const sent = underTap(student.id, tap, new Date('2026-01-01T08:58:00Z'), 'nurse');
+    expect((await unlockUnderTap(db, sent)).recordedAs).toBe('unknown_tap');
+    const armed = await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: tap,
+      deviceTime: morning,
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: morning,
+    });
+    expect(armed.outcome).toBe('armed');
+
+    const w = window('2026-01-01T09:00:00Z');
+    const { session, armedConverted } = await startSession(db, { classId: klass.id, ...w });
+    expect(armedConverted).toBe(1);
+    expect(await stateOf(session.id, student.id)).toBe('focused');
+    expect(one(await unlocksOf(student.id))).toMatchObject({
+      eventId: sent.eventId,
+      sessionId: null,
+      classId: null,
+      payload: { recorded_as: 'unknown_tap', claimed_tap_event_id: tap },
+    });
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(0);
+  });
+
   it('is kept unattached, noted, when no tap of the caller’s has that id — never in another’s session', async () => {
     const { session, student } = await lesson('tap-unlock-unknown');
     const classmate = one(
@@ -1930,6 +1964,347 @@ describe('an unlock sent under its tap (decision 11)', () => {
       return rows.map((row) => Object.values(row).join(' ')).join('\n');
     });
     expect(plan, plan).toContain('events_unattached_tap_idx');
+  });
+});
+
+describe('the phone’s own order decides its unlock against its return (A12)', () => {
+  // The owner's ruling (2026-09-24): "The phone numbers its own actions with a
+  // counter, not the clock, and the server orders a student's own unlock and
+  // refocus by that counter. A tampered clock can then never undo a real
+  // unlock." Compared only when both carry one from the same install; any other
+  // pair keeps A10's time rule.
+  const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+  const phone = newUuidV7();
+  const n = (seq: number, install = phone) => ({ install, seq });
+  type Order = ReturnType<typeof n> | null;
+  function move(session: { id: string }, student: { id: string }, deviceTime: Date, order: Order) {
+    return {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime,
+      order,
+    };
+  }
+  /** A 09:00–09:25 lesson whose student has not tapped in. */
+  async function room(tag: string) {
+    const { klass, student } = await seedClass(tag);
+    const w = window('2026-01-01T09:00:00Z');
+    return { student, session: (await startSession(db, { classId: klass.id, ...w })).session };
+  }
+  /** The same, tapped in at 09:01 as the phone's #1 — or, `null`, an old build's tap. */
+  async function lesson(tag: string, tapOrder: Order = n(1)) {
+    const { session, student } = await room(tag);
+    await tapIn(db, move(session, student, at(1), tapOrder));
+    return { session, student };
+  }
+  async function stateOf(sessionId: string, studentId: string) {
+    return one(
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)),
+        ),
+    ).state;
+  }
+  async function orderOf(eventId: string) {
+    const row = one(
+      await db
+        .select({ install: events.orderInstall, seq: events.orderSeq })
+        .from(events)
+        .where(eq(events.eventId, eventId)),
+    );
+    return row.install === null ? null : row;
+  }
+  const unlocksIn = async (sessionId: string) =>
+    (await eventsFor(sessionId)).filter((e) => e.type === 'unlock');
+
+  it('a clock turned back between the return and a real unlock: the unlock applies', async () => {
+    // A10's one clock case, closed. The phone refocused or re-tapped (#3) at
+    // 09:08, then its clock went back five minutes, and its real unlock (#4)
+    // claims 09:03. By the clamped times it is older than the return and would
+    // be recorded as late, the phone shielded again; by its order it came last.
+    for (const back of ['refocus', 'tap'] as const) {
+      const { session, student } = await lesson(`order-clock-back-${back}`);
+      await unlock(db, move(session, student, at(5), n(2)));
+      const returned = move(session, student, at(8), n(3));
+      await (back === 'refocus' ? refocus(db, returned) : tapIn(db, returned));
+      const real = { ...move(session, student, at(3), n(4)), reason: 'nurse' as const };
+
+      expect(await unlock(db, real), back).toMatchObject({
+        outcome: 'applied',
+        recordedAs: null,
+        state: 'unlocked',
+        session: { id: session.id },
+        reason: 'nurse',
+      });
+      expect(await stateOf(session.id, student.id), back).toBe('unlocked');
+      // Its time is still its clamped claim (rule 1): the order decides only
+      // which of the student's two actions came last.
+      const recorded = (await unlocksIn(session.id)).find((e) => e.eventId === real.eventId);
+      expect(recorded, back).toMatchObject({
+        occurredAt: at(3),
+        payload: { reason: 'nurse' },
+        orderInstall: phone,
+        orderSeq: 4,
+      });
+    }
+  });
+
+  it('a stuck unlock older than the return by the order is late, even when its clock reads later', async () => {
+    // Unlocked (#2) on a clock running five minutes fast and stuck there; the
+    // phone, its clock put right, unlocked again and refocused, or re-tapped,
+    // by 09:08. The stuck one lands last claiming 09:10: after the return by
+    // the times — it would flip a student the phone holds in focus — and
+    // before it by the order.
+    for (const back of ['refocus', 'tap'] as const) {
+      const { session, student } = await lesson(`order-stuck-${back}`);
+      const stuck = move(session, student, at(10), n(2));
+      if (back === 'refocus') {
+        await unlock(db, move(session, student, at(6), n(3)));
+        await refocus(db, move(session, student, at(8), n(4)));
+      } else {
+        await tapIn(db, move(session, student, at(8), n(3)));
+      }
+
+      expect(await unlock(db, stuck), back).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'superseded',
+        state: 'focused',
+      });
+      expect(await stateOf(session.id, student.id), back).toBe('focused');
+    }
+  });
+
+  it('another install’s return is judged by the time rule, both ways', async () => {
+    // A reinstall, or another phone, starts a counter of its own: its seq says
+    // nothing about this phone's, so the pair keeps A10's rule.
+    const other = newUuidV7();
+    // After by the times, though its seq is lower: late.
+    const late = await lesson('order-installs-late');
+    await unlock(db, move(late.session, late.student, at(5), n(2)));
+    await refocus(db, move(late.session, late.student, at(8), n(1, other)));
+    expect(await unlock(db, move(late.session, late.student, at(3), n(3)))).toMatchObject({
+      recordedAs: 'superseded',
+      state: 'focused',
+    });
+    // Before by the times, though its seq is higher: applied.
+    const real = await lesson('order-installs-real');
+    await unlock(db, move(real.session, real.student, at(5), n(2)));
+    await refocus(db, move(real.session, real.student, at(8), n(50, other)));
+    expect(await unlock(db, move(real.session, real.student, at(10), n(3)))).toMatchObject({
+      outcome: 'applied',
+      state: 'unlocked',
+    });
+  });
+
+  it('an order on one side only: the time rule', async () => {
+    // An old build's returns and a new build's unlock, or the reverse.
+    for (const bare of ['returns', 'unlock'] as const) {
+      const ours = (seq: number) => (bare === 'returns' ? null : n(seq));
+      const unlocks = (seq: number) => (bare === 'unlock' ? null : n(seq));
+      const { session, student } = await lesson(`order-one-side-${bare}`, ours(1));
+      await unlock(db, move(session, student, at(5), ours(2)));
+      await refocus(db, move(session, student, at(8), ours(3)));
+
+      expect(await unlock(db, move(session, student, at(3), unlocks(9))), bare).toMatchObject({
+        recordedAs: 'superseded',
+        state: 'focused',
+      });
+      expect(await unlock(db, move(session, student, at(10), unlocks(10))), bare).toMatchObject({
+        outcome: 'applied',
+        state: 'unlocked',
+      });
+    }
+  });
+
+  it('the ended row follows the same order: late by it once the student has left, and not by the clock alone', async () => {
+    const leave = async (session: { id: string }, student: { id: string }, how: string) => {
+      if (how === 'bell') {
+        await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
+        return;
+      }
+      const [enrollment] = await db
+        .select()
+        .from(enrollments)
+        .where(eq(enrollments.studentId, student.id));
+      await endEnrollment(db, {
+        enrollmentId: enrollment!.id,
+        reason: 'removed_from_class',
+        at: at(12),
+      });
+    };
+    for (const how of ['bell', 'removal'] as const) {
+      // Stuck (#2, claiming 09:10) while the phone re-tapped (#3) at 09:08 and
+      // was shielded when it left: late by the order, whatever its clock says.
+      const stuck = await lesson(`order-left-stuck-${how}`);
+      const old = move(stuck.session, stuck.student, at(10), n(2));
+      await tapIn(db, move(stuck.session, stuck.student, at(8), n(3)));
+      await leave(stuck.session, stuck.student, how);
+      expect(await unlock(db, old), how).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'superseded',
+        state: null,
+        participationId: null,
+      });
+
+      // Re-tapped (#2) at 09:08, then the clock went back: a real unlock (#3)
+      // claiming 09:03 reaches the server only after the student left. It is
+      // the unlock they left on, and its note says so — not late.
+      const real = await lesson(`order-left-real-${how}`);
+      await tapIn(db, move(real.session, real.student, at(8), n(2)));
+      await leave(real.session, real.student, how);
+      expect(await unlock(db, move(real.session, real.student, at(3), n(3))), how).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: how === 'bell' ? 'after_session_end' : 'no_live_participation',
+        state: null,
+      });
+    }
+  });
+
+  it('protection off still comes first', async () => {
+    const { session, student } = await lesson('order-protoff');
+    await protectionOff(db, move(session, student, at(6), n(2)));
+    // Last by the order, and still never a softening of protection off.
+    expect(await unlock(db, move(session, student, at(3), n(3)))).toMatchObject({
+      outcome: 'recorded',
+      recordedAs: 'protection_off',
+      state: 'protection_off',
+    });
+  });
+
+  it('an unlock sent under its tap on a clock turned back since: applied in both arrival orders', async () => {
+    // Tapped (#1) at 09:02 with no answer yet; the clock went back, and the
+    // unlock under the tap (#2) claims 09:01. By the times the tap came after
+    // it — late in both orders (A11's own test); by the order it came last.
+    for (const unlockFirst of [true, false]) {
+      const { session, student } = await room(`order-tap-unlock-${unlockFirst}`);
+      const tap = newUuidV7();
+      const theTap = () =>
+        tapIn(db, {
+          sessionId: session.id,
+          studentId: student.id,
+          eventId: tap,
+          deviceTime: at(2),
+          order: n(1),
+        });
+      const sent = {
+        tapEventId: tap,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: at(1),
+        order: n(2),
+      };
+      if (unlockFirst) {
+        expect(await unlockUnderTap(db, sent)).toMatchObject({ recordedAs: 'unknown_tap' });
+        // Kept with its order, for the tap that files it.
+        expect(await orderOf(sent.eventId)).toEqual(n(2));
+        expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'unlocked' });
+      } else {
+        expect(await theTap()).toMatchObject({ outcome: 'joined', state: 'focused' });
+        expect(await unlockUnderTap(db, sent)).toMatchObject({
+          outcome: 'applied',
+          state: 'unlocked',
+        });
+      }
+
+      expect(await stateOf(session.id, student.id)).toBe('unlocked');
+      const filed = one(await unlocksIn(session.id));
+      expect(filed).toMatchObject({ occurredAt: at(1), orderInstall: phone, orderSeq: 2 });
+      expect(filed.payload).toEqual({
+        tap_event_id: tap,
+        ...(unlockFirst && { unattached_event_id: sent.eventId }),
+      });
+    }
+  });
+
+  it('a tap filing its kept unlock finds it late when a later return went ahead by the order', async () => {
+    // Tapped (#1) at 09:02, unlocked under it (#2) at 09:04, re-tapped (#3) on
+    // a clock turned back to 09:03 — and the first tap lands last. By the
+    // times nothing came back after 09:04; by the order the re-tap did.
+    const { session, student } = await room('order-late-tap');
+    const tap = newUuidV7();
+    const kept = { tapEventId: tap, studentId: student.id, eventId: newUuidV7(), order: n(2) };
+    await unlockUnderTap(db, { ...kept, deviceTime: at(4) });
+    await tapIn(db, move(session, student, at(3), n(3)));
+    const late = { ...move(session, student, at(2), n(1)), eventId: tap };
+
+    expect(await tapIn(db, late)).toMatchObject({ outcome: 'joined', state: 'focused' });
+    expect(one(await unlocksIn(session.id)).payload).toEqual({
+      tap_event_id: tap,
+      unattached_event_id: kept.eventId,
+      recorded_as: 'superseded',
+    });
+  });
+
+  it('an armed tap keeps its order, and the Start converts it with it', async () => {
+    // Tapped before the bell (#1) on a clock running fast — it claims 09:03 for
+    // a 09:00 Start; the clock then went back past the Start, and a real unlock
+    // (#2) claims 08:50, clamped to 09:00. By the times the converted tap came
+    // after it; by the order it did not.
+    const { teacher, student, klass } = await seedClass('order-armed');
+    const arm = (eventId: string, seq: number, now: string, expiresAt: string) =>
+      armTap(db, {
+        studentId: student.id,
+        teacherId: teacher.id,
+        eventId,
+        deviceTime: at(3),
+        order: n(seq),
+        expiresAt: new Date(expiresAt),
+        now: new Date(now),
+      });
+    // A waiting tap gone stale is taken over by the next, order and all.
+    await arm(newUuidV7(), 1, '2026-01-01T07:00:00Z', '2026-01-01T08:00:00Z');
+    const tap = newUuidV7();
+    const taken = await arm(tap, 2, '2026-01-01T08:58:00Z', '2026-01-01T23:59:59Z');
+    expect(taken.outcome).toBe('armed');
+
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    expect(await orderOf(tap)).toEqual(n(2));
+    const real = move(session, student, new Date('2026-01-01T08:50:00Z'), n(3));
+    expect(await unlock(db, real)).toMatchObject({ outcome: 'applied', state: 'unlocked' });
+  });
+
+  it('a retry is answered where it was recorded, and its order is not written again', async () => {
+    const { session, student } = await lesson('order-replay');
+    await tapIn(db, move(session, student, at(8), n(2)));
+    const real = move(session, student, at(3), n(3));
+    expect((await unlock(db, real)).outcome).toBe('applied');
+
+    for (const order of [n(1), null]) {
+      expect(await unlock(db, { ...real, order })).toMatchObject({
+        outcome: 'replay',
+        state: 'unlocked',
+      });
+    }
+    expect(await orderOf(real.eventId)).toEqual(n(3));
+    expect(await unlocksIn(session.id)).toHaveLength(1);
+  });
+
+  it('is kept with every event the phone numbered, and one the engine cannot compare as none', async () => {
+    const { session, student } = await lesson('order-kept');
+    const refocused = move(session, student, at(4), n(2));
+    await refocus(db, refocused);
+    const reported = move(session, student, at(5), n(3));
+    await protectionOff(db, reported);
+    const [tapped] = (await eventsFor(session.id)).filter((e) => e.type === 'tap_in');
+    expect(await orderOf(tapped!.eventId)).toEqual(n(1));
+    expect(await orderOf(refocused.eventId)).toEqual(n(2));
+    expect(await orderOf(reported.eventId)).toEqual(n(3));
+
+    // Recorded all the same, with no order: an unlock is never refused for one.
+    for (const odd of [
+      { install: 'phone', seq: 4 },
+      { install: phone, seq: 0 },
+      { install: phone, seq: 2 ** 53 },
+      { install: phone, seq: '5' },
+    ]) {
+      const sent = move(session, student, at(6), odd as never);
+      expect((await unlock(db, sent)).outcome, JSON.stringify(odd)).toBe('recorded');
+      expect(await orderOf(sent.eventId), JSON.stringify(odd)).toBeNull();
+    }
   });
 });
 

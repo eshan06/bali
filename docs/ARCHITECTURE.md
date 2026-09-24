@@ -298,6 +298,13 @@ Student app:
   applies nothing and answers the name now; a teacher is `403`.
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
+- **The order the phone acted in** (A12): every record the phone's outbox sends — the
+  tap, both unlocks, the refocus, protection off — may carry `order`, `{ install, seq }`:
+  its outbox file's id, minted once when the file is made, and the record's place in that
+  file, a counter no clock moves. It orders the student's own unlock against their return
+  to focus (rule 1). Optional — old builds send none — and never a reason to refuse: one
+  the server cannot use (not a UUID install, not a positive safe integer seq) is taken as
+  none.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
   carries the current truth (state, end time) so the phone can reconcile.
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
@@ -394,7 +401,8 @@ with no finer meaning than its status carries none.
   after it — a late unlock, recorded and answered with the state it left alone, or with
   none once the student has left the session (ruled 2026-09-24, A10: "after" by the
   clamped times, a return's never later than the server recorded it, and a tie flips;
-  A11: after the end too, never "left unlocked" over a phone shielded at it); the
+  A11: after the end too, never "left unlocked" over a phone shielded at it; A12: by the
+  phone's own order instead when the two carry one from the same install); the
   outbox disposition (`recorded` / `retry` / `reauth`) is the typed table in
   `@bali/shared`. "Never refuse" is not "never check": a caller
   with no participation row in the session **and** no active enrollment in its class
@@ -541,7 +549,11 @@ and data types, so the two apps can't drift out of type-agreement.
   shields themselves in that case is in "decided later" below.)
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
-  (rule 1) and surfaces it to the teacher rather than trusting it.
+  (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own
+  actions came last — their unlock, or their return to focus — is not a clock's to say: the
+  phone numbers what it does with its outbox's counter, and the server orders the two by it
+  (A12, owner ruling 2026-09-24), so a clock turned back between them never undoes a real
+  unlock. The clock still decides for a build that sends no order.
 
 ### Decided later, on purpose
 
@@ -602,7 +614,11 @@ Each exists because v2 broke it and shipped a real bug
 1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
    and always clamped into the session's real window. (v2: a backdated phone clock erased
    unlocks from reports and inflated focus minutes.) The clamp orders *events*; it is not a
-   substitute for the server's own clock. `participations.last_seen_at` — the input to
+   substitute for the server's own clock. One order is not the clamp's: whether a student's
+   return to focus came after their own unlock is the phone's own order to say when both
+   carry one from the same install — its outbox's counter, which no clock moves (A12) — so a
+   tampered clock can never undo a real unlock; the times stay clamped, and still order a
+   pair without one. `participations.last_seen_at` — the input to
    silence, and so to every green chip — is stamped server-side, never from the device's
    claim: a clock running fast would clamp to `ends_at`, a time in the future, and the phone
    would never go silent however long it had been gone.

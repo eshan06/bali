@@ -57,6 +57,13 @@
       "when": 1790277274572,
       "tag": "0007_unattached_tap_unlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790283535280,
+      "tag": "0008_event_order",
+      "breakpoints": true
     }
   ]
 }

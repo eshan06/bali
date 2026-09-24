@@ -5,6 +5,16 @@ import Foundation
 // contract tests decode every fixture in contracts/fixtures/ and go red until it is. Ids are the
 // API's strings, and times are `Date`s, coded as the API writes them by `BaliJSON`.
 
+/// The order the phone acted in (A12): its outbox numbers everything it does with a counter no
+/// clock moves, and the server orders a student's own unlock and their return to focus by it.
+/// `install` names the counter — one outbox file's, minted when the file was made — and `seq` is
+/// the action's place in it, never reused or lowered while the file lives.
+public struct ActionOrder: Codable, Sendable, Hashable {
+    public let install: String
+    public let seq: Int
+    public init(install: String, seq: Int) { (self.install, self.seq) = (install, seq) }
+}
+
 /// A session as a student's phone sees it, to reconcile to: `endsAt` is when its shields come off.
 public struct SessionView: Codable, Sendable, Hashable {
     public let id: String
@@ -66,8 +76,10 @@ public struct TapRequest: Codable, Sendable, Hashable {
     public let tagId: String
     public let eventId: String
     public let deviceTime: Date
-    public init(tagId: String, eventId: String, deviceTime: Date) {
-        (self.tagId, self.eventId, self.deviceTime) = (tagId, eventId, deviceTime)
+    /// The phone's own order for the tap; left out of the body when nil, as every order is.
+    public let order: ActionOrder?
+    public init(tagId: String, eventId: String, deviceTime: Date, order: ActionOrder? = nil) {
+        (self.tagId, self.eventId, self.deviceTime, self.order) = (tagId, eventId, deviceTime, order)
     }
 }
 
@@ -98,8 +110,12 @@ public struct UnlockRequest: Codable, Sendable, Hashable {
     public let deviceTime: Date
     /// Optional and skippable; left out of the body when nil.
     public let reason: UnlockReason?
-    public init(eventId: String, deviceTime: Date, reason: UnlockReason? = nil) {
-        (self.eventId, self.deviceTime, self.reason) = (eventId, deviceTime, reason)
+    public let order: ActionOrder?
+    public init(
+        eventId: String, deviceTime: Date, reason: UnlockReason? = nil, order: ActionOrder? = nil
+    ) {
+        (self.eventId, self.deviceTime, self.reason, self.order) =
+            (eventId, deviceTime, reason, order)
     }
 }
 
@@ -115,8 +131,9 @@ public struct UnlockResponse: Codable, Sendable, Hashable {
 public struct RefocusRequest: Codable, Sendable, Hashable {
     public let eventId: String
     public let deviceTime: Date
-    public init(eventId: String, deviceTime: Date) {
-        (self.eventId, self.deviceTime) = (eventId, deviceTime)
+    public let order: ActionOrder?
+    public init(eventId: String, deviceTime: Date, order: ActionOrder? = nil) {
+        (self.eventId, self.deviceTime, self.order) = (eventId, deviceTime, order)
     }
 }
 
@@ -132,8 +149,9 @@ public struct RefocusResponse: Codable, Sendable, Hashable {
 public struct ProtectionOffRequest: Codable, Sendable, Hashable {
     public let eventId: String
     public let deviceTime: Date
-    public init(eventId: String, deviceTime: Date) {
-        (self.eventId, self.deviceTime) = (eventId, deviceTime)
+    public let order: ActionOrder?
+    public init(eventId: String, deviceTime: Date, order: ActionOrder? = nil) {
+        (self.eventId, self.deviceTime, self.order) = (eventId, deviceTime, order)
     }
 }
 

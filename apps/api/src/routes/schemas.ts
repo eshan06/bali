@@ -1,4 +1,4 @@
-import { JOIN_CODE_LENGTH } from '@bali/shared';
+import { type ActionOrder, isActionOrder, JOIN_CODE_LENGTH } from '@bali/shared';
 import { z } from 'zod';
 
 /*
@@ -28,6 +28,22 @@ import { z } from 'zod';
  * instant, and `clampToWindow` compares instants.
  */
 export const DeviceTime = z.string().datetime({ offset: true });
+
+/**
+ * The order the phone acted in (A12), on every record its outbox sends — the
+ * tap, the unlock (under a session or a tap), the refocus, and protection off,
+ * whose body is the refocus's. Optional, and never a reason to refuse, on any
+ * of them: an order the server cannot use (a wrong shape, an install that is no
+ * UUID, a seq that is no positive safe integer) is taken as none, and the
+ * record is ordered by the clamped times, as every record was before A12.
+ *
+ * Not a 400, for the unlock's reason's reason: the outbox resends the
+ * identical body, so a buggy build's malformed order would keep every unlock
+ * out of the record forever — and drop every refocus for good, and leave every
+ * tap stuck — over a field whose absence already has an answer. One rule on
+ * every endpoint, so a phone never needs to know which one is strict.
+ */
+export const Order = z.custom<ActionOrder>(isActionOrder).nullish().catch(null);
 
 /**
  * A join code as a student typed it — for the join and its preview both, so

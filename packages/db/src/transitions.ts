@@ -1,4 +1,5 @@
 import type {
+  ActionOrder,
   EventType,
   ParticipationEndedReason,
   ParticipationState,
@@ -9,12 +10,13 @@ import type {
 } from '@bali/shared';
 import {
   clampToWindow,
+  isActionOrder,
   isUnlockReason,
   MAX_SESSION_MINUTES,
   SILENCE_THRESHOLD_MS,
   tidyDisplayName,
 } from '@bali/shared';
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, between, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
 import { liveClassWithCode, type UserRow } from './queries.js';
@@ -168,6 +170,8 @@ async function insertEvent(
     userId?: string | null;
     occurredAt: Date;
     payload?: unknown;
+    /** The phone's own order for it (A12); only one `knownOrder` can compare is kept. */
+    order?: unknown;
   },
 ): Promise<boolean> {
   const inserted = await tx
@@ -180,6 +184,7 @@ async function insertEvent(
       userId: e.userId ?? null,
       occurredAt: e.occurredAt,
       payload: e.payload ?? null,
+      ...orderColumns(e.order),
     })
     .onConflictDoNothing({ target: events.eventId })
     .returning({ id: events.id });
@@ -459,6 +464,8 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       classId: session.classId,
       userId: tap.studentId,
       occurredAt,
+      // The tap's own order (A12), so an unlock is ordered against it as the phone made them.
+      order: { install: tap.orderInstall, seq: tap.orderSeq },
     } as const;
     let spent = false;
     try {
@@ -642,6 +649,8 @@ export interface ArmTapInput {
   blockId?: string;
   eventId: string;
   deviceTime: Date;
+  /** The phone's own order for the tap (A12): kept for the `tap_in` its conversion records. */
+  order?: ActionOrder | null;
   /** End of the school day; the tap is ignored at conversion if this has passed. */
   expiresAt: Date;
   /** Server clock for the expiry comparison; defaults to now. */
@@ -792,6 +801,7 @@ async function takeOverStaleRow(
               blockId: input.blockId ?? null,
               eventId: input.eventId,
               deviceTime: input.deviceTime,
+              ...orderColumns(input.order),
               expiresAt: input.expiresAt,
             })
             .where(and(eq(armedTaps.id, rowId), isNull(armedTaps.consumedAt)))
@@ -1020,6 +1030,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
                 blockId: input.blockId ?? null,
                 eventId: input.eventId,
                 deviceTime: input.deviceTime,
+                ...orderColumns(input.order),
                 expiresAt: input.expiresAt,
               })
               .onConflictDoNothing({
@@ -1394,6 +1405,8 @@ export interface TapInput {
   eventId: string;
   /** The device's clock; clamped into the session window (rule 1). */
   deviceTime: Date;
+  /** The phone's own order for the tap (A12), if it sent one: it orders the tap against an unlock. */
+  order?: ActionOrder | null;
 }
 export interface TapResult {
   outcome: 'joined' | 'switched' | 'replay';
@@ -1601,6 +1614,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         classId: session.classId,
         userId: input.studentId,
         occurredAt,
+        order: knownOrder(input.order),
       });
       if (!isNew) {
         // On record for exactly this session and student — insertEvent
@@ -1680,7 +1694,9 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // append-only), and the tap's answer carries the state it leaves. The id
       // is the server's, as a switch's or a Start's derived events are: the
       // phone's ids are the tap's and the kept unlock's, and this runs only
-      // with the tap's first insert, so once.
+      // with the tap's first insert, so once. The unlock keeps its own order
+      // (A12): made while this tap was unanswered, it is numbered after it, so
+      // the tap just recorded is never a return after it.
       let state: ParticipationState = 'focused';
       for (const kept of await unlocksAwaitingTap(tx, input.studentId, input.eventId)) {
         const payload = (kept.payload ?? {}) as Record<string, unknown>;
@@ -1696,6 +1712,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
             // tap must not fail for it, so the server's time of that record.
             deviceTime: Number.isNaN(claimed.getTime()) ? kept.occurredAt : claimed,
             reason: knownReason(payload.reason),
+            order: knownOrder({ install: kept.orderInstall, seq: kept.orderSeq }),
           },
           { tap_event_id: input.eventId, unattached_event_id: kept.eventId },
         );
@@ -1747,6 +1764,8 @@ export interface StateChangeInput {
   studentId: string;
   eventId: string;
   deviceTime: Date;
+  /** The phone's own order for the change (A12), if it sent one: it orders a return against an unlock. */
+  order?: ActionOrder | null;
 }
 export interface StateChangeResult {
   outcome: 'applied' | 'replay';
@@ -1813,6 +1832,7 @@ async function changeState<Ended = never>(
         classId: session.classId,
         userId: input.studentId,
         occurredAt,
+        order: knownOrder(input.order),
       });
 
       const row = await loadParticipation(tx, session.id, input.studentId);
@@ -1897,6 +1917,21 @@ function knownReason(reason: unknown): UnlockReason | null {
   return isUnlockReason(reason) ? reason : null;
 }
 
+/**
+ * The phone's order (A12), the same way: only one the engine can compare reaches a row — its
+ * two fields and nothing else — and anything else is none, never a refusal. An unlock must be
+ * recorded whatever it carries, and a malformed install would fail the insert.
+ */
+function knownOrder(order: unknown): ActionOrder | null {
+  return isActionOrder(order) ? { install: order.install, seq: order.seq } : null;
+}
+
+/** An order's two columns, on an event or a waiting tap: both, or — `knownOrder`'s none — neither. */
+function orderColumns(order: unknown): { orderInstall: string | null; orderSeq: number | null } {
+  const known = knownOrder(order);
+  return { orderInstall: known?.install ?? null, orderSeq: known?.seq ?? null };
+}
+
 /** The payload stored on an event that already landed; null when it has none. */
 async function storedPayload(
   tx: Database,
@@ -1924,39 +1959,51 @@ async function recordedReason(tx: Database, eventId: string): Promise<UnlockReas
 
 /**
  * Whether the student came back to focus in this session — a refocus, or a tap
- * in, their own — after `at`: an unlock timed `at` that lands after that return
- * is late (stuck on the phone while the return went ahead of it, B3a's bound),
- * and flipping it would put a student the phone holds in focus back to
- * unlocked (owner ruling, 2026-09-24).
+ * in, their own — after their unlock, timed `at`: then the unlock is late
+ * (stuck on the phone while the return went ahead of it, B3a's bound), and
+ * flipping it would put a student the phone holds in focus back to unlocked
+ * (owner ruling, 2026-09-24).
  *
- * "After" is the server's order (rule 1): each claim clamped into the window,
- * and a return's never later than the server recorded it — a clock running
- * fast at the return cannot then outrank the real unlocks that follow it
- * (`recorded_at` is its transaction's start, a little before it landed, so the
- * cap only ever errs toward flipping). A tie is not after: a clock running
+ * "After" is the phone's own order where both carry one from the same install
+ * (A12, owner ruling 2026-09-24): its outbox numbers what it does with a
+ * counter no clock moves, so such a return is after the unlock exactly when its
+ * seq is greater — a clock turned back between the two changes nothing, and a
+ * tampered clock can never undo a real unlock. Any other pair — no order on
+ * either side or on one (an old build's), or another install's (a reinstall
+ * starts its counter again, another phone has its own)
+ * — keeps A10's rule, the server's order (rule 1): each claim clamped into the
+ * window, and a return's never later than the server recorded it — a clock
+ * running fast at the return cannot then outrank the real unlocks that follow
+ * it (`recorded_at` is its transaction's start, a little before it landed, so
+ * the cap only ever errs toward flipping). A tie is not after: a clock running
  * behind clamps both to the window's start, and a real unlock must flip. What
- * is left to a clock is the one turned back between the student's return and
+ * is left to a clock there is one turned back between the student's return and
  * their unlock; that unlock is still recorded, and its answer names the focus
  * the phone then shields to — never green over an unshielded phone.
  */
 async function returnedSince(
   tx: Database,
-  sessionId: string,
+  session: SessionRow,
   studentId: string,
-  at: Date,
+  unlock: { at: Date; order: ActionOrder | null },
 ): Promise<boolean> {
+  const byTime = sql`least(${events.occurredAt}, ${events.recordedAt}) > ${unlock.at.toISOString()}::timestamptz`;
+  const after = unlock.order
+    ? sql`case when ${events.orderInstall} = ${unlock.order.install}::uuid then ${events.orderSeq} > ${unlock.order.seq}::bigint else ${byTime} end`
+    : byTime;
   const later = await tx
     .select({ id: events.id })
     .from(events)
     .where(
       and(
         eq(events.userId, studentId),
-        // Implied by the cap below; spelled out so the read ranges over the
-        // student's own events after `at` (`events_user_occurred_idx`).
-        gt(events.occurredAt, at),
-        eq(events.sessionId, sessionId),
+        // Every return here is clamped into the window, so the read ranges
+        // over the student's own events in it (`events_user_occurred_idx`):
+        // by the order, one timed before the unlock can come after it.
+        between(events.occurredAt, session.startedAt, session.endsAt),
+        eq(events.sessionId, session.id),
         inArray(events.type, ['tap_in', 'refocus']),
-        sql`least(${events.occurredAt}, ${events.recordedAt}) > ${at.toISOString()}::timestamptz`,
+        after,
       ),
     )
     .limit(1);
@@ -1997,6 +2044,8 @@ async function recordOrphanUnlock(
       device_time: input.deviceTime.toISOString(),
       ...(reason === null ? {} : { reason }),
     },
+    // Kept with it, so a tap that files it later orders it as the phone did (A12).
+    order: knownOrder(input.order),
   });
   return {
     outcome: isNew ? 'recorded' : 'replay',
@@ -2083,6 +2132,7 @@ async function unlockIn(
   filing: Record<string, string> = {},
 ): Promise<UnlockResult> {
   const reason = knownReason(input.reason);
+  const order = knownOrder(input.order);
   const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
   const row = await loadParticipation(tx, session.id, input.studentId);
 
@@ -2130,7 +2180,7 @@ async function unlockIn(
   // Recorded all the same, never refused.
   let note: UnlockRecordedAs | null = null;
   if (live?.state === 'protection_off') note = 'protection_off';
-  else if (row && (await returnedSince(tx, session.id, input.studentId, occurredAt))) {
+  else if (row && (await returnedSince(tx, session, input.studentId, { at: occurredAt, order }))) {
     note = 'superseded';
   } else if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
 
@@ -2146,6 +2196,7 @@ async function unlockIn(
     userId: input.studentId,
     occurredAt,
     payload: Object.keys(payload).length > 0 ? payload : null,
+    order,
   });
 
   if (!isNew) {
@@ -2241,6 +2292,8 @@ export interface TapUnlockInput {
   eventId: string;
   deviceTime: Date;
   reason?: UnlockReason | null;
+  /** The phone's own order for the unlock (A12), if it sent one. */
+  order?: ActionOrder | null;
 }
 
 /**
@@ -2252,7 +2305,13 @@ export interface TapUnlockInput {
  */
 export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: string) {
   return db
-    .select({ eventId: events.eventId, payload: events.payload, occurredAt: events.occurredAt })
+    .select({
+      eventId: events.eventId,
+      payload: events.payload,
+      occurredAt: events.occurredAt,
+      orderInstall: events.orderInstall,
+      orderSeq: events.orderSeq,
+    })
     .from(events)
     .where(
       and(
@@ -2429,6 +2488,7 @@ async function recordProtectionOffAfterEnd(
     // real end but stays inside the scheduled window, and the note says late.
     occurredAt: clampToWindow(input.deviceTime, session.startedAt, session.endsAt),
     payload: { recorded_as: note },
+    order: knownOrder(input.order),
   });
   if (!isNew && (await storedPayload(tx, input.eventId))?.recorded_as !== note) {
     throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');

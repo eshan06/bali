@@ -19,6 +19,35 @@ import type { UnlockRecordedOutcome } from './unlock-contract.js';
  * BaliCore's mirror of it is checked against the list itself (B1b).
  */
 
+/**
+ * The order the phone acted in (A12, owner ruling 2026-09-24): its outbox numbers everything
+ * it does with a counter no clock moves, and the server orders a student's own unlock and
+ * their return to focus — a refocus, a tap in — by it. Two actions are compared by it only
+ * when both carry one from the same `install`; any other pair keeps the clamped times (rule
+ * 1). Optional on every record the outbox sends — old builds send none — and never a reason to
+ * refuse one: an order the server cannot use is taken as none (`isActionOrder`).
+ */
+export interface ActionOrder {
+  /** Which counter: a UUID minted once when the phone's outbox file was made. A reinstall mints another. */
+  install: string;
+  /** This action's place in it: a positive safe integer, never reused or lowered while the file lives. */
+  seq: number;
+}
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True for an order the server can compare: a UUID `install`, a positive safe integer `seq`. */
+export function isActionOrder(value: unknown): value is ActionOrder {
+  if (typeof value !== 'object' || value === null) return false;
+  const { install, seq } = value as Record<string, unknown>;
+  return (
+    typeof install === 'string' &&
+    UUID_SHAPE.test(install) &&
+    Number.isSafeInteger(seq) &&
+    (seq as number) > 0
+  );
+}
+
 /** A session as a student's phone sees it for reconciliation (state + end time). */
 export interface SessionView {
   id: string;
@@ -76,6 +105,8 @@ export interface TapRequest {
   eventId: string;
   /** Device clock, ISO 8601; clamped into the session window server-side. */
   deviceTime: string;
+  /** The phone's own order for this tap (A12): what orders it against the student's unlock. */
+  order?: ActionOrder | null;
 }
 export type TapOutcome = 'joined' | 'switched' | 'armed' | 'already_armed' | 'replay';
 export interface TapResponse {
@@ -216,6 +247,12 @@ export interface UnlockRequest {
    * after unlocking has to hold the send until it is answered or skipped.
    */
   reason?: UnlockReason | null;
+  /**
+   * The phone's own order for this unlock (A12): a return of the student's from the same
+   * install is after it only when its `seq` is greater, whatever either clock said. An order
+   * the server cannot use is taken as none, never refused.
+   */
+  order?: ActionOrder | null;
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
@@ -223,6 +260,8 @@ export interface UnlockRequest {
 export interface RefocusRequest {
   eventId: string;
   deviceTime: string;
+  /** The phone's own order for this return (A12): what orders it against the student's unlock. */
+  order?: ActionOrder | null;
 }
 /** Every outcome a refocus answers with (`RefocusResponse.outcome`). */
 export const REFOCUS_OUTCOMES = ['applied', 'replay'] as const;
@@ -259,6 +298,8 @@ export interface ProtectionOffRequest {
   eventId: string;
   /** Device clock, ISO 8601; clamped into the session window server-side. */
   deviceTime: string;
+  /** The phone's own order (A12), sent with every outbox record: stored, not yet read here. */
+  order?: ActionOrder | null;
 }
 /** Every outcome a protection-off report answers with (`ProtectionOffResponse.outcome`). */
 export const PROTECTION_OFF_OUTCOMES = ['applied', 'recorded', 'replay'] as const;

@@ -30,7 +30,7 @@ import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parse } from '../errors.js';
 import { mapTransitionError } from './errors.js';
-import { DeviceTime } from './schemas.js';
+import { DeviceTime, Order } from './schemas.js';
 
 const ClassParams = z.object({ id: z.string().uuid() });
 const SessionParams = z.object({ id: z.string().uuid() });
@@ -44,6 +44,7 @@ const CheckInBody = z.object({ deviceTime: DeviceTime });
 const StateChangeBody = z.object({
   eventId: z.string().uuid(),
   deviceTime: DeviceTime,
+  order: Order,
 });
 // The unlock's optional reason can never fail validation: anything that is not
 // one of the known reasons (a future value, a wrong type, garbage) is recorded
@@ -189,6 +190,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
           reason: body.reason ?? null,
+          order: body.order ?? null,
         }),
       );
       return toUnlockResponse(result);
@@ -214,6 +216,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
           reason: body.reason ?? null,
+          order: body.order ?? null,
         }),
       );
       return toUnlockResponse(result);
@@ -240,6 +243,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           studentId: student.id,
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
+          order: body.order ?? null,
         }),
       );
       return {
@@ -269,6 +273,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           studentId: student.id,
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
+          order: body.order ?? null,
         }),
       );
       return {

@@ -1,0 +1,28 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "A tap carrying the phone’s own order (A12): its outbox file’s install, and the record’s seq.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx-order",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z",
+      "order": {
+        "install": "00000000-0000-7000-8000-000000000002",
+        "seq": 1
+      }
+    }
+  },
+  "status": 200,
+  "type": "TapResponse",
+  "body": {
+    "outcome": "joined",
+    "session": {
+      "id": "00000000-0000-7000-8000-000000000003",
+      "classId": "00000000-0000-7000-8000-000000000004",
+      "endsAt": "2000-01-01T00:02:00.000Z"
+    },
+    "state": "focused"
+  },
+  "disposition": "apply_session"
+}

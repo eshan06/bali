@@ -8,7 +8,7 @@ import {
   tapIn,
   users,
 } from '@bali/db';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import type {
   CheckInResponse,
   EndSessionResponse,
@@ -739,6 +739,153 @@ describe('POST /v1/taps/:eventId/unlock', () => {
       payload: { eventId: randomUUID(), deviceTime: now() },
     });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('the phone’s own order (A12)', () => {
+  // Every record the phone's outbox sends carries the order it acted in — its
+  // outbox file's install and the record's seq — and the engine orders the
+  // student's own unlock against their return by it. Never a reason to refuse.
+  const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+  const install = randomUUID();
+  const order = (seq: number) => ({ install, seq });
+  const ordersOf = (studentId: string) =>
+    db
+      .select({ type: events.type, install: events.orderInstall, seq: events.orderSeq })
+      .from(events)
+      .where(eq(events.userId, studentId))
+      .orderBy(asc(events.seq));
+
+  it('the tap, both unlocks, the refocus and protection off take it; the engine keeps it with each', async () => {
+    const { student, block, session } = await seedRunning('order-api-kept');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapId = randomUUID();
+    const sends = [
+      ['/v1/taps', { tagId: block.tagId, eventId: tapId }, 'joined'],
+      [`/v1/taps/${tapId}/unlock`, { eventId: randomUUID() }, 'applied'],
+      [`/v1/sessions/${session.id}/refocus`, { eventId: randomUUID() }, 'applied'],
+      [`/v1/sessions/${session.id}/unlock`, { eventId: randomUUID() }, 'applied'],
+      [`/v1/sessions/${session.id}/protection-off`, { eventId: randomUUID() }, 'applied'],
+    ] as const;
+    for (const [i, [url, body, outcome]] of sends.entries()) {
+      const res = await post(token, url, { ...body, deviceTime: ago(50 - i), order: order(i + 1) });
+      expect(res.statusCode, url).toBe(200);
+      expect(res.json<{ outcome: string }>().outcome, url).toBe(outcome);
+    }
+    expect(await ordersOf(student.id)).toEqual(
+      ['tap_in', 'unlock', 'refocus', 'unlock', 'protection_off'].map((type, i) => ({
+        type,
+        install,
+        seq: i + 1,
+      })),
+    );
+  });
+
+  it('a tap that only arms keeps its order for the `tap_in` its Start records', async () => {
+    const { student, block, klass } = await seedClassroom(db, 'order-api-armed');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const res = await post(token, '/v1/taps', {
+      tagId: block.tagId,
+      eventId: randomUUID(),
+      deviceTime: ago(5),
+      order: order(1),
+    });
+    expect(res.json<TapResponse>().outcome).toBe('armed');
+    const now = Date.now();
+    const window = { startedAt: new Date(now), endsAt: new Date(now + 25 * 60_000) };
+    expect((await startSession(db, { classId: klass.id, ...window })).armedConverted).toBe(1);
+    expect(await ordersOf(student.id)).toEqual([{ type: 'tap_in', install, seq: 1 }]);
+  });
+
+  it('a clock turned back between the refocus and a real unlock: applied by the order, and a retry replays', async () => {
+    // A10's one clock case: by the times this unlock is older than the
+    // refocus and would be recorded as late; by the phone's order it is last.
+    const { student, block, session } = await seedRunning('order-api-clock-back');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const send = (url: string, seconds: number, seq: number, eventId = randomUUID()) =>
+      post(token, url, { eventId, deviceTime: ago(seconds), order: order(seq) });
+    await post(token, '/v1/taps', {
+      tagId: block.tagId,
+      eventId: randomUUID(),
+      deviceTime: ago(50),
+      order: order(1),
+    });
+    await send(`/v1/sessions/${session.id}/unlock`, 40, 2);
+    await send(`/v1/sessions/${session.id}/refocus`, 30, 3);
+
+    const realId = randomUUID();
+    const res = await send(`/v1/sessions/${session.id}/unlock`, 45, 4, realId);
+    expect(res.statusCode).toBe(200);
+    const body = res.json<UnlockResponse>();
+    expect(body).toMatchObject({
+      outcome: 'applied',
+      recordedAs: null,
+      state: 'unlocked',
+      session: { id: session.id },
+    });
+    expect(unlockDisposition(res.statusCode, body)).toBe('recorded');
+
+    const retry = await send(`/v1/sessions/${session.id}/unlock`, 45, 4, realId);
+    expect(retry.json<UnlockResponse>()).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+    const [row] = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, session.id));
+    expect(row?.state).toBe('unlocked');
+  });
+
+  it('an order the server cannot use is taken as none on every endpoint — never refused', async () => {
+    // A 400 would keep an unlock out of the record forever (the outbox resends
+    // the identical body), drop a refocus for good and leave a tap stuck.
+    const { student, block, session } = await seedRunning('order-api-malformed');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const odd: unknown[] = [
+      null,
+      'order',
+      42,
+      [install, 1],
+      {},
+      { install },
+      { seq: 1 },
+      { install: 'not-a-uuid', seq: 1 },
+      { install, seq: 0 },
+      { install, seq: -3 },
+      { install, seq: 1.5 },
+      { install, seq: '1' },
+      { install, seq: 2 ** 53 },
+    ];
+    const tapId = randomUUID();
+    const tapped = await post(token, '/v1/taps', {
+      tagId: block.tagId,
+      eventId: tapId,
+      deviceTime: ago(50),
+      order: { install, seq: 0 },
+    });
+    expect(tapped.json<TapResponse>().outcome).toBe('joined');
+    for (const bad of odd) {
+      for (const url of [`/v1/sessions/${session.id}/unlock`, `/v1/taps/${tapId}/unlock`]) {
+        const res = await post(token, url, {
+          eventId: randomUUID(),
+          deviceTime: ago(40),
+          order: bad,
+        });
+        expect(res.statusCode, `${url} ${JSON.stringify(bad)}`).toBe(200);
+        expect(unlockDisposition(res.statusCode, res.json())).toBe('recorded');
+      }
+    }
+    for (const route of ['refocus', 'protection-off']) {
+      const res = await post(token, `/v1/sessions/${session.id}/${route}`, {
+        eventId: randomUUID(),
+        deviceTime: ago(30),
+        order: 'soon',
+      });
+      expect(res.statusCode, route).toBe(200);
+      expect(res.json<{ outcome: string }>().outcome, route).toBe('applied');
+    }
+
+    const kept = await ordersOf(student.id);
+    expect(kept).toHaveLength(2 + 2 * odd.length + 1);
+    expect(kept.filter((e) => e.install !== null || e.seq !== null)).toEqual([]);
   });
 });
 
