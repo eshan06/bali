@@ -29,6 +29,21 @@ struct OrderTests {
         #expect(try outbox.nextDue(now: t0.addingTimeInterval(6)) == .send(refocus))
     }
 
+    @Test("A pending record holds every record behind it, whatever their kinds, until it is answered")
+    func pendingHoldsTheQueue() async throws {
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        let unlock = try record(outbox, .unlock(session: "s", reason: nil))
+        try record(outbox, .protectionOff(session: "s"))
+        try await send(outbox, tap, nil)
+        #expect(try outbox.nextDue(now: t0.addingTimeInterval(1)) == .wait(until: t0.addingTimeInterval(2)))
+        try await send(outbox, tap, 502, at: t0.addingTimeInterval(2))
+        #expect(try outbox.nextDue(now: t0.addingTimeInterval(5)) == .wait(until: t0.addingTimeInterval(6)))
+        let joined = #"{"outcome":"joined","session":{"id":"s","classId":"c","endsAt":"2026-09-24T09:50:00.000Z"},"state":"focused"}"#
+        try await send(outbox, tap, 200, joined, at: t0.addingTimeInterval(6))
+        #expect(try outbox.nextDue(now: t0.addingTimeInterval(6)) == .send(unlock))
+    }
+
     @Test(
         "A kept record never blocks the ones behind it: refused, or stuck at the bound, it steps aside and is retried among them",
         arguments: [(409, refused), (500, "")])

@@ -151,6 +151,12 @@ struct SettleTests {
         #expect(kept.stuck && kept.answers == 1)
         #expect(kept.lastStatus == 409 && kept.lastReason == .eventIdConflict)
         #expect(kept.lastMessage == "event_id already used by another event")
+        // Stuck stays stuck, whatever answers next short of one that ends it.
+        try await send(outbox, queued, nil)
+        try await send(outbox, queued, 503)
+        let later = try #require(try current(outbox, queued.eventId))
+        #expect(later.stuck && later.answers == 2 && later.attempts == 3)
+        #expect(later.lastStatus == 503 && later.lastReason == nil && later.lastMessage == nil)
     }
 
     @Test("Retry now makes every record due, stuck ones included, and leaves them stuck")
