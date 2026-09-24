@@ -21,7 +21,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   any commit (base..head) carrying those lines or authored or committed by
   Claude (`Claude`, `claude[bot]`, `noreply@anthropic.com`), because a squash
   merge turns each commit author other than the merger into a co-author line
-  on `main`. It matches attribution forms, never the word: descriptions here
+  on `main` — so a commit the `@claude` assistant (`claude.yml`) pushes to a
+  PR turns it red until the branch is rewritten under the owner's identity.
+  It matches attribution forms, never the word: descriptions here
   rightly say "Claude Review" and "Claude Opus", and prose may describe the
   footer. It re-runs on `edited`, so stripping the footer turns it green with
   no push; a self-test of the patterns (`attribution.test.sh`) runs first, so
