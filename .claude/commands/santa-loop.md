@@ -32,7 +32,7 @@ git diff --stat origin/main...HEAD
   git diff --numstat origin/main...HEAD -- . ':!*.md' ':!*.test.*' ':!*/test/*' ':!*Tests/*' ':!package-lock.json' ':!packages/db/migrations/*' | awk '{s += $1 + $2} END {print s + 0}'
   ```
 
-  Over ~400: stop and split the step into smaller PRs — one change each — before reviewing anything. If it genuinely can't be split, say why in the PR description and carry on.
+  Over ~400: don't review yet. A worker pushes its branch and reports back to the conductor with a proposed split; the conductor decides — re-plan the step into smaller ones, or send the worker on as one PR with the reason in the PR description. A session working without a plan makes that call itself: split, or carry on with the reason in the PR description.
 
 ### Step 1: The blocking rules — one source
 
