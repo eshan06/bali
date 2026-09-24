@@ -52,6 +52,7 @@ public struct UpdateMeRequest: Codable, Sendable, Hashable {
 }
 
 public struct UpdateMeResponse: Codable, Sendable, Hashable {
+    /// `UPDATE_ME_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable { case applied, replay }
     public let outcome: OrUnknown<Outcome>
     public let user: MeUser
@@ -80,6 +81,7 @@ public struct CheckInRequest: Codable, Sendable, Hashable {
 }
 
 public struct CheckInResponse: Codable, Sendable, Hashable {
+    /// `CHECK_IN_STATUSES`.
     public enum Status: String, CaseIterable, Sendable { case live, gone }
     public let status: OrUnknown<Status>
     public let state: OrUnknown<ParticipationState>?
@@ -115,6 +117,7 @@ public struct RefocusRequest: Codable, Sendable, Hashable {
 }
 
 public struct RefocusResponse: Codable, Sendable, Hashable {
+    /// `REFOCUS_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable { case applied, replay }
     public let outcome: OrUnknown<Outcome>
     public let state: OrUnknown<ParticipationState>?
@@ -131,7 +134,7 @@ public struct ProtectionOffRequest: Codable, Sendable, Hashable {
 }
 
 public struct ProtectionOffResponse: Codable, Sendable, Hashable {
-    /// `STATE_CHANGE_OUTCOMES`.
+    /// `PROTECTION_OFF_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable { case applied, recorded, replay }
     public let outcome: OrUnknown<Outcome>
     public let recordedAs: OrUnknown<ProtectionOffRecordedAs>?
@@ -150,6 +153,7 @@ public struct EnrollmentJoinRequest: Codable, Sendable, Hashable {
 }
 
 public struct EnrollmentJoinResponse: Codable, Sendable, Hashable {
+    /// `ENROLLMENT_JOIN_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable {
         case joined, alreadyEnrolled = "already_enrolled"
     }
@@ -160,9 +164,11 @@ public struct EnrollmentJoinResponse: Codable, Sendable, Hashable {
 
 /// `DELETE /v1/enrollments/{id}` — leave a class.
 public struct EndEnrollmentResponse: Codable, Sendable, Hashable {
+    /// `END_ENROLLMENT_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable {
         case ended, alreadyRemoved = "already_removed"
     }
+    /// `END_ENROLLMENT_REASONS`: how the caller's action was classified.
     public enum Reason: String, CaseIterable, Sendable {
         case leftClass = "left_class", removedFromClass = "removed_from_class"
     }

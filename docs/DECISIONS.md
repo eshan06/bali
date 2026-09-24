@@ -8,6 +8,56 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **B1b: the outbox tables in BaliCore, proven equal to the
+  TypeScript's.** **The port** keeps the TS names — `unlockDisposition`,
+  `tapDisposition`, `stateChangeDisposition`, `readMayReconcile` — and each
+  rule's comment (`UnlockContract.swift`, `OutboxContract.swift`). A send's
+  result is a `SendResult`, a status or `.networkError`. The body is the
+  answer decoded as its endpoint's type, the way the app decodes it (a
+  vocabulary value it does not know is `.unknown`): nil when there is none or
+  it does not decode, which is no known outcome — `retry`, the record kept.
+  The TS tables read the raw body, so on one the API never sends (a `session`
+  that is not a session) the TS may delete where the port keeps: the port only
+  ever errs toward keeping. Refocus and protection off each get an overload of
+  `stateChangeDisposition` over one table keyed on `StateChangeOutcome`, read
+  from the outcome's raw value, because the TS reads both endpoints through one
+  table — a refocus answered `recorded` re-reads in both. Each TS
+  `Record<Outcome, …>` table is an exhaustive switch over the known outcome,
+  which keeps its guarantee: an outcome added to the enum does not compile
+  until it is placed. **Parity is proven by generated cases, not
+  hand-copied ones.** The fixtures carry each table's answer to the API's
+  real answers (A5), and BaliCore's port must give each one (a disposition on
+  an endpoint with no port fails, and every port must meet a fixture). What
+  the server does not send today lives in `contracts/outbox/`, written by a
+  golden test in `@bali/shared` (`src/outbox-cases.test.ts`) that computes
+  every answer from the TS functions themselves: per table, for each body,
+  the results each disposition answers — 25 results (no answer, the edges of
+  each status class, the ones the tables name, the API's) × 37 bodies (none;
+  every outcome any table knows, each unknown to some other table, and five
+  none knows; each with a session, a null one, none) — and 81 pairs of stamps
+  for `readMayReconcile`. In `@bali/shared` because the tables are pure
+  functions there and need no API; beside the fixtures because BaliCore reads
+  them in place, as it does the fixtures (SwiftPM bundles nothing from outside
+  its package); generated because a copied expectation drifts silently, while
+  these fail `npm test` on drift, `npm run fixtures` now runs every
+  workspace's generator (`-ws --if-present`), and CI's regenerate-and-diff
+  step covers all of `contracts/`. The TS test also requires the cases to
+  reach every value of each disposition union (a typed `Record<…, true>`),
+  and the Swift test requires each disposition enum to be exactly the values
+  reached — so a Swift case the TS never gives (a discard, say) fails too. A
+  change to a table turns the Swift job red until the port follows (checked
+  by breaking each side). **Rode along (#69's review):** the inline unions
+  BaliCore mirrors are `as const` lists in `api.ts`, their types derived from
+  them (additive), read by the vocabulary test — `ProtectionOffResponse`'s
+  too, so its Swift enum mirrors its own list rather than
+  `STATE_CHANGE_OUTCOMES`, which a refocus-only outcome would have widened —
+  and the fixture schemas and coverage test use them, so an outcome added to
+  a list demands a fixture. And the round trip compared null fields on
+  neither side, so an optional null in every fixture was checked by nothing:
+  each null field is now sent a probe, `["probe"]`, in its place. A field
+  BaliCore reads either refuses it — the decode fails — or, typed as any
+  JSON, brings it back; one that does neither is a field it never reads, and
+  fails. Decode-side, so it holds whatever coding keys a type declares.
 - **2026-09-24** — **B1a: BaliCore, the iOS apps' Swift package — its wire
   types, checked against the contract fixtures.** `ios/BaliCore` is a SwiftPM
   package (Swift 6 language mode; iOS 17, macOS 14) that uses Foundation only,

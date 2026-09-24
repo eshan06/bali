@@ -2,12 +2,17 @@ import { type Database, endSession, enrollments, startSession, tapIn, users } fr
 import {
   API_ERROR_REASONS,
   type ApiErrorBody,
+  CHECK_IN_STATUSES,
+  END_ENROLLMENT_OUTCOMES,
+  ENROLLMENT_JOIN_OUTCOMES,
   HISTORY_EVENT_TYPES,
   type HistoryPage,
-  STATE_CHANGE_OUTCOMES,
+  PROTECTION_OFF_OUTCOMES,
+  REFOCUS_OUTCOMES,
   TAP_OUTCOMES,
   UNLOCK_RECORDED_AS,
   UNLOCK_RECORDED_OUTCOMES,
+  UPDATE_ME_OUTCOMES,
 } from '@bali/shared';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
@@ -528,14 +533,14 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(valuesOf('UnlockResponse', 'recordedAs')).toEqual(
       new Set([...UNLOCK_RECORDED_AS, null]),
     );
-    expect(valuesOf('RefocusResponse', 'outcome')).toEqual(new Set(['applied', 'replay']));
-    expect(valuesOf('ProtectionOffResponse', 'outcome')).toEqual(new Set(STATE_CHANGE_OUTCOMES));
-    expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(['live', 'gone']));
-    expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(['applied', 'replay']));
+    expect(valuesOf('RefocusResponse', 'outcome')).toEqual(new Set(REFOCUS_OUTCOMES));
+    expect(valuesOf('ProtectionOffResponse', 'outcome')).toEqual(new Set(PROTECTION_OFF_OUTCOMES));
+    expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(CHECK_IN_STATUSES));
+    expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(UPDATE_ME_OUTCOMES));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');
-    expect(joins).toEqual(new Set(['joined', 'already_enrolled']));
+    expect(joins).toEqual(new Set(ENROLLMENT_JOIN_OUTCOMES));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');
-    expect(leaves).toEqual(new Set(['ended', 'already_removed']));
+    expect(leaves).toEqual(new Set(END_ENROLLMENT_OUTCOMES));
     const previews = valuesOf('JoinCodePreviewResponse', 'alreadyEnrolled');
     expect(previews).toEqual(new Set([true, false]));
     // A teacher with a name and one without: BaliCore decodes it as optional.

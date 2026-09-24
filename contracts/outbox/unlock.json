@@ -1,0 +1,311 @@
+{
+  "function": "unlockDisposition",
+  "results": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 400, 401, 403, 404, 408, 409, 413, 415, 429, 499, 500, 502, 503, 504, 599],
+  "cases": [
+    {
+      "body": null,
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "joined", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "joined", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "joined" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "switched", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "switched", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "switched" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "armed", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "armed", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "armed" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "already_armed", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "already_armed", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "already_armed" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "replay", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "replay", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "replay" },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "applied", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "applied", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "applied" },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "recorded", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "recorded", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "recorded" },
+      "dispositions": {
+        "reauth": [401],
+        "recorded": [200, 201, 204, 299],
+        "retry": ["network_error", 100, 199, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "weird", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "weird", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "weird" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "toString", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "toString", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "toString" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "__proto__", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "__proto__", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "__proto__" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "constructor", "session": { "id": "s", "classId": "c", "endsAt": "2026-09-24T09:50:00.000Z" } },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "constructor", "session": null },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    },
+    {
+      "body": { "outcome": "constructor" },
+      "dispositions": {
+        "reauth": [401],
+        "retry": ["network_error", 100, 199, 200, 201, 204, 299, 300, 304, 399, 408, 429, 500, 502, 503, 504, 599],
+        "retry_and_surface": [400, 403, 404, 409, 413, 415, 499]
+      }
+    }
+  ]
+}

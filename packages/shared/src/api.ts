@@ -2,6 +2,7 @@ import type { DisplayState } from './state.js';
 import type {
   EventType,
   HistoryEventType,
+  ParticipationEndedReason,
   ParticipationState,
   ProtectionOffRecordedAs,
   UnlockReason,
@@ -13,7 +14,9 @@ import type { UnlockRecordedOutcome } from './unlock-contract.js';
 /*
  * The DTOs for the step-7 endpoints — the wire contract clients depend on, so
  * additive-only once shipped (API-surface decision 2). Timestamps cross the wire
- * as ISO 8601 strings.
+ * as ISO 8601 strings. A closed set of values a response carries is an `as
+ * const` list its type derives from, additive-only like the other vocab, so
+ * BaliCore's mirror of it is checked against the list itself (B1b).
  */
 
 /** A session as a student's phone sees it for reconciliation (state + end time). */
@@ -52,13 +55,16 @@ export interface UpdateMeRequest {
   /** Client idempotency key for the display_name_changed event (rule 4). */
   eventId: string;
 }
+/** Every outcome `PATCH /v1/me` answers with (`UpdateMeResponse.outcome`). */
+export const UPDATE_ME_OUTCOMES = ['applied', 'replay'] as const;
+export type UpdateMeOutcome = (typeof UPDATE_ME_OUTCOMES)[number];
 export interface UpdateMeResponse {
   /**
    * 'applied' set the name; 'replay' this eventId already did — nothing is
    * applied again, and `user` is the truth now, which a later rename may have
    * changed since.
    */
-  outcome: 'applied' | 'replay';
+  outcome: UpdateMeOutcome;
   user: MeUser;
 }
 
@@ -167,9 +173,12 @@ export interface CheckInRequest {
   /** Device clock, ISO 8601; clamped into the session window server-side. */
   deviceTime: string;
 }
+/** Every status a check-in answers with (`CheckInResponse.status`). */
+export const CHECK_IN_STATUSES = ['live', 'gone'] as const;
+export type CheckInStatus = (typeof CHECK_IN_STATUSES)[number];
 export interface CheckInResponse {
   /** 'live' with the current stored state, or 'gone' when there's no live participation. */
-  status: 'live' | 'gone';
+  status: CheckInStatus;
   state: ParticipationState | null;
   /**
    * The session, for a caller with a live participation in it. Null on 'gone':
@@ -200,8 +209,11 @@ export interface RefocusRequest {
   eventId: string;
   deviceTime: string;
 }
+/** Every outcome a refocus answers with (`RefocusResponse.outcome`). */
+export const REFOCUS_OUTCOMES = ['applied', 'replay'] as const;
+export type RefocusOutcome = (typeof REFOCUS_OUTCOMES)[number];
 export interface RefocusResponse {
-  outcome: 'applied' | 'replay';
+  outcome: RefocusOutcome;
   /**
    * The current stored state. Null on the `replay` of a refocus whose
    * participation has since ended while the session runs — removed, left the
@@ -233,13 +245,16 @@ export interface ProtectionOffRequest {
   /** Device clock, ISO 8601; clamped into the session window server-side. */
   deviceTime: string;
 }
+/** Every outcome a protection-off report answers with (`ProtectionOffResponse.outcome`). */
+export const PROTECTION_OFF_OUTCOMES = ['applied', 'recorded', 'replay'] as const;
+export type ProtectionOffOutcome = (typeof PROTECTION_OFF_OUTCOMES)[number];
 export interface ProtectionOffResponse {
   /**
    * 'applied' marked a live participation; 'recorded' saved a report that first
    * reached the server after the session ended and marked nothing (owner
    * decision 10 — saved like a late unlock); 'replay' the report already landed.
    */
-  outcome: 'applied' | 'recorded' | 'replay';
+  outcome: ProtectionOffOutcome;
   /** Why nothing was marked, on a fresh 'recorded' report; null for 'applied' and 'replay', as on an unlock. */
   recordedAs: ProtectionOffRecordedAs | null;
   /**
@@ -263,8 +278,11 @@ export interface EnrollmentJoinRequest {
   /** Device clock, ISO 8601 — the join event's occurredAt. */
   deviceTime: string;
 }
+/** Every outcome a join answers with (`EnrollmentJoinResponse.outcome`). */
+export const ENROLLMENT_JOIN_OUTCOMES = ['joined', 'already_enrolled'] as const;
+export type EnrollmentJoinOutcome = (typeof ENROLLMENT_JOIN_OUTCOMES)[number];
 export interface EnrollmentJoinResponse {
-  outcome: 'joined' | 'already_enrolled';
+  outcome: EnrollmentJoinOutcome;
   enrollmentId: string;
   class: MeClass;
 }
@@ -372,15 +390,24 @@ export interface BlockDetail {
 }
 
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
+/** Every outcome ending an enrollment answers with (`EndEnrollmentResponse.outcome`). */
+export const END_ENROLLMENT_OUTCOMES = ['ended', 'already_removed'] as const;
+export type EndEnrollmentOutcome = (typeof END_ENROLLMENT_OUTCOMES)[number];
+/** Every `EndEnrollmentResponse.reason`: how the caller's action was classified. */
+export const END_ENROLLMENT_REASONS = [
+  'left_class',
+  'removed_from_class',
+] as const satisfies readonly ParticipationEndedReason[];
+export type EndEnrollmentReason = (typeof END_ENROLLMENT_REASONS)[number];
 export interface EndEnrollmentResponse {
-  outcome: 'ended' | 'already_removed';
+  outcome: EndEnrollmentOutcome;
   /**
    * How this caller's action was classified: 'left_class' (the student left) or
    * 'removed_from_class' (the class's teacher removed them). On 'ended' it is how
    * the event was recorded; on 'already_removed' (a no-op) it is only this
    * caller's intent — the earlier removal recorded its own reason.
    */
-  reason: 'left_class' | 'removed_from_class';
+  reason: EndEnrollmentReason;
   /** True when a live participation was ended too (the mid-session removal case). */
   endedParticipation: boolean;
 }
