@@ -8,6 +8,7 @@ import {
 import type { FastifyRequest } from 'fastify';
 
 import { ApiError } from '../errors.js';
+import { refusal } from '../routes/errors.js';
 import { requireAuth } from './plugin.js';
 
 /**
@@ -42,7 +43,7 @@ export async function requireSessionOwner(
 ): Promise<{ teacher: UserRow; session: SessionRow }> {
   const teacher = await requireTeacher(db, request);
   const session = await findSessionById(db, sessionId);
-  if (!session) throw ApiError.notFound('session not found');
+  if (!session) throw refusal('SESSION_NOT_FOUND');
   const klass = await findClassById(db, session.classId);
   if (!klass || klass.teacherId !== teacher.id) {
     throw ApiError.forbidden('not your session');

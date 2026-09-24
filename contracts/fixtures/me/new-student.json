@@ -1,0 +1,18 @@
+{
+  "endpoint": "GET /v1/me",
+  "scenario": "The boot call of a student signing in for the first time, in no class yet.",
+  "request": {
+    "path": "/v1/me"
+  },
+  "status": 200,
+  "type": "MeResponse",
+  "body": {
+    "user": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "role": "student",
+      "displayName": null
+    },
+    "classes": [],
+    "session": null
+  }
+}

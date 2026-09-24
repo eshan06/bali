@@ -105,14 +105,14 @@ const TAP_RECORDED: Record<TapOutcome, 'joins' | 'waits'> = {
  *     known outcome -> 'retry'.
  *   - any other 4xx -> 'retry_and_surface'. What `/v1/taps` refuses: 400 (a
  *     malformed tap; 413 and 415 are Fastify's), 404 (not a registered
- *     block), and 409 — `conflict`, told apart only by message (A5 decides
- *     whether errors get a machine-readable code). The 409s:
- *       - `EVENT_ID_CONFLICT`: the id is held by a different event — another
+ *     block), and 409 — `conflict`, told apart by `error.reason` (A5). The
+ *     409s:
+ *       - `event_id_conflict`: the id is held by a different event — another
  *         student's, another kind, or this student's tap under another
  *         teacher (always when arming; when joining, once that tap is no
  *         longer current) — which never lands (a client bug: the student taps
  *         again, which mints a new id);
- *       - `SESSION_NOT_RUNNING`: a fresh tap whose session ended between the
+ *       - `session_not_running`: a fresh tap whose session ended between the
  *         server resolving the block and locking the session (the bell),
  *         whose retry resolves afresh.
  *     A retry recorded but no longer current is not among them since A4: it

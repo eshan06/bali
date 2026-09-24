@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "A tap of a tag that is not a registered block.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "NOT-A-BLOCK",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "message": "unknown block"
+    }
+  },
+  "disposition": "retry_and_surface"
+}

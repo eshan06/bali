@@ -1,0 +1,19 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/checkin",
+  "scenario": "A check-in naming a session the server does not know.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/checkin",
+    "body": {
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "session_not_found",
+      "message": "session not found"
+    }
+  }
+}

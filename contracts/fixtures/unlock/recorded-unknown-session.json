@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/unlock",
+  "scenario": "An unlock naming a session the server does not know: kept as an orphan record.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/unlock",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "UnlockResponse",
+  "body": {
+    "outcome": "recorded",
+    "recordedAs": "unknown_session",
+    "state": null,
+    "session": null,
+    "reason": null
+  },
+  "disposition": "recorded"
+}

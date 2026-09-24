@@ -99,6 +99,11 @@ describe('POST /v1/sessions/:id/end', () => {
       `/v1/sessions/${randomUUID()}/end`,
     );
     expect(res.statusCode).toBe(404);
+    // The owner check finds the engine's condition itself, so it answers with
+    // the engine's refusal: one condition, one shape (A5).
+    expect(res.json()).toEqual({
+      error: { code: 'not_found', reason: 'session_not_found', message: 'session not found' },
+    });
   });
 
   it('requires authentication', async () => {

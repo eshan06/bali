@@ -8,6 +8,62 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-24** — **A5: the contract fixtures, and a machine-readable
+  `reason` on errors.** **Errors get a reason.** C5 must tell `PROTECTION_OFF`
+  ("tap the block to rejoin") from `NOT_PARTICIPATING` ("you're not in this
+  session") and `SESSION_NOT_RUNNING`, and all three reach a phone as `409
+  conflict`, told apart only by the human message — which is not a contract:
+  a phone matching it breaks on the first rewording. So `ApiErrorBody.error`
+  gains an optional `reason` from a closed vocabulary in `@bali/shared`
+  (`API_ERROR_REASONS`), one value per engine refusal. Exhaustive: the route
+  mapping is typed over every `TransitionErrorCode`, and a test walks the
+  engine's `TRANSITION_ERROR_CODES` and must get back exactly the vocabulary —
+  none missing, none shared. A sibling field rather than `details`, which is
+  `unknown` and already carries validation issues (an array): a code there
+  would give `details` a shape that depends on the status, to be sniffed
+  rather than decoded, where a typed optional field decodes as an optional
+  enum. Additive only: `code`, every status and every message are unchanged,
+  and an error with no finer meaning than its status (a 401, a 403, a
+  malformed body's 400, an unknown block's 404) carries none. A route that
+  finds an engine-named condition itself answers with the engine's refusal
+  (`refusal()`), so one condition never reaches a client in two shapes:
+  `DELETE /v1/enrollments/{id}`'s own 404 and a session owner's 404 now carry
+  `enrollment_not_found` and `session_not_found`. A client reads a reason it
+  does not know as none — a newer server may send one — so BaliCore decodes it
+  leniently. **The fixtures** live in a top-level `contracts/fixtures/`, not
+  in `packages/shared`: they are the wire contract between the API and every
+  client, owned by neither and not an npm workspace's files; BaliCore reads
+  them by path from `ios/` (SwiftPM cannot bundle resources from outside its
+  package anyway); and the drift check diffs one directory, prettier-ignored
+  as generated. 42 of them — every student endpoint and outcome, A2c's and
+  A4's null-session answers, every unlock `recordedAs`, each 409 kind — are
+  captured by a golden-file test (`apps/api/test/contract-fixtures.test.ts`)
+  that drives the real app on the API tests' harness. Each answer must be
+  valid for its `@bali/shared` type — strict schemas the compiler holds to the
+  type's exact keys, optional ones included, and to its values both ways — and
+  be the outcome its scenario names, or nothing is written. Ids and times
+  become stand-ins numbered by first appearance, still valid UUIDs and ISO
+  times, so a client decodes them with its real types and a fixture changes
+  only when the contract does (PGlite and real Postgres give the same bytes).
+  Each file carries its request, status, type and the disposition the TS
+  outbox table gives it, so B1's ports are checked against the same answers.
+  A test rather than a script, so `npm test` catches drift locally and on
+  both CI lanes; `npm run fixtures` rewrites them, and a CI step runs that and
+  fails on any diff (mirroring `db:generate`), so the committed tree is
+  exactly what the generator writes. A known cost: a dependency bump that
+  rewords a validation message changes `taps/400-bad-input` — regenerate.
+  **Also:** `unlockDisposition` read a `408` as `retry_and_surface`, where the
+  tap and state-change tables (A3) read it as the transport's: a timeout is
+  never a refusal, and the record was kept either way, so it is now `retry`
+  there too — surfacing it called a timeout a bug. And #62's review: the two
+  "recorded, but no longer current" replays named no participation for a tap
+  but the ended row for a refocus (engine-only, never on the wire). The rule
+  now: **an engine answer that names no session names no participation** —
+  `participationId` is null wherever `session` is, A2c's late protection-off
+  and its replay included. Null rather than the ended row's id, because
+  `state` and `session` are null precisely since the student is no longer in
+  that participation, and the id would be the one field still pointing at it.
+  `tapIn`'s same-session disjunct is commented as the fast path it is.
 - **2026-09-24** — **Owner rulings: no student allow-list, and D1 approved.**
   **No allow-list** (owner: "remove the allowed during class thing as an
   option. literally just dont give them an option and use apples default

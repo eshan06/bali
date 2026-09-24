@@ -41,6 +41,23 @@ describe('the one error shape', () => {
     expect(res.json()).toEqual({ error: { code: 'conflict', message: 'already running' } });
   });
 
+  it('renders a refusal’s reason beside its code, and none where there is none', async () => {
+    app.get('/refused', () => {
+      throw new ApiError('conflict', 'not in this session', undefined, 'not_participating');
+    });
+    app.get('/plain', () => {
+      throw ApiError.forbidden();
+    });
+    const res = await app.inject({ method: 'GET', url: '/refused' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: { code: 'conflict', reason: 'not_participating', message: 'not in this session' },
+    });
+    // The shape without one is exactly what it was before A5.
+    const plain = await app.inject({ method: 'GET', url: '/plain' });
+    expect(plain.json()).toEqual({ error: { code: 'forbidden', message: 'not allowed' } });
+  });
+
   it('includes per-field details on a validation failure, without echoing values', async () => {
     const Body = z.object({ minutes: z.number().int().positive() });
     app.post('/thing', (request) => {

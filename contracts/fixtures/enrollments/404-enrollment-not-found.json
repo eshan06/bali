@@ -1,0 +1,16 @@
+{
+  "endpoint": "DELETE /v1/enrollments/{id}",
+  "scenario": "Leaving an enrollment the server does not know.",
+  "request": {
+    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001"
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "enrollment_not_found",
+      "message": "enrollment not found"
+    }
+  }
+}

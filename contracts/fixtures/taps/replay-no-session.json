@@ -1,0 +1,20 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "The retry of a tap whose session is over, reaching the next one (A4): recorded, no session.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx-next",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "TapResponse",
+  "body": {
+    "outcome": "replay",
+    "session": null,
+    "state": null
+  },
+  "disposition": "reread"
+}

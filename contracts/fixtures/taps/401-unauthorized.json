@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/taps",
+  "scenario": "A tap sent with no bearer token.",
+  "request": {
+    "path": "/v1/taps",
+    "body": {
+      "tagId": "TAG-fx",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 401,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "unauthorized",
+      "message": "missing bearer token"
+    }
+  },
+  "disposition": "reauth"
+}

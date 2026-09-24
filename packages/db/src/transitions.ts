@@ -55,15 +55,18 @@ import type { Database } from './types.js';
  * adjective.
  */
 
-export type TransitionErrorCode =
-  | 'SESSION_NOT_FOUND'
-  | 'SESSION_NOT_RUNNING'
-  | 'NOT_PARTICIPATING'
-  | 'INVALID_EXTENSION'
-  | 'EVENT_ID_CONFLICT'
-  | 'CLASS_NOT_FOUND'
-  | 'ENROLLMENT_NOT_FOUND'
-  | 'PROTECTION_OFF';
+/** Every refusal the engine can make — a list, so a test can walk them all (A5). */
+export const TRANSITION_ERROR_CODES = [
+  'SESSION_NOT_FOUND',
+  'SESSION_NOT_RUNNING',
+  'NOT_PARTICIPATING',
+  'INVALID_EXTENSION',
+  'EVENT_ID_CONFLICT',
+  'CLASS_NOT_FOUND',
+  'ENROLLMENT_NOT_FOUND',
+  'PROTECTION_OFF',
+] as const;
+export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
 /** A refusal the engine can produce; endpoints (step 7) map these to the error shape. */
 export class TransitionError extends Error {
@@ -1542,7 +1545,9 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // yet): not a retry (tap step 9), so it falls through to insertEvent's
         // EVENT_ID_CONFLICT, as armTap refuses the same id — a 200 would drop
         // a physical tap at that block. (A `tap_in` always carries its class,
-        // so `prior.teacherId` is never the left join's null here.)
+        // so `prior.teacherId` is never the left join's null here.) The first
+        // test is only a fast path: the same session is the same class, so the
+        // same teacher — it saves the teacherOfClass read.
         if (
           prior.sessionId === session.id ||
           prior.teacherId === (await teacherOfClass(tx, session.classId))
@@ -1683,7 +1688,8 @@ export interface StateChangeResult {
   outcome: 'applied' | 'replay';
   /** The stored state; null on the replay of a change whose participation has since ended. */
   state: ParticipationState | null;
-  participationId: string;
+  /** Null on that replay too: an answer that names no session names no participation (A5). */
+  participationId: string | null;
   /**
    * The current session, so the response carries the end time for
    * reconciliation. Null on the replay of a change whose participation has
@@ -1765,7 +1771,7 @@ async function changeState<Ended = never>(
               'replayed change: participation has ended',
             );
           }
-          return { outcome: 'replay', state: null, participationId: row.id, session: null };
+          return { outcome: 'replay', state: null, participationId: null, session: null };
         }
         return { outcome: 'replay', state: row.state, participationId: row.id, session };
       }
@@ -2110,7 +2116,8 @@ export interface ProtectionOffResult {
   recordedAs: ProtectionOffRecordedAs | null;
   /** 'protection_off' when applied; the current stored state on a replay while the session runs; null once it has ended. */
   state: ParticipationState | null;
-  participationId: string;
+  /** Null once the session has ended, as `state` and `session` are: an answer naming no session names no participation (A5). */
+  participationId: string | null;
   /** The running session, so the response carries its end time; null once it has ended — no window to hand a phone. */
   session: SessionRow | null;
 }
@@ -2166,7 +2173,7 @@ async function recordProtectionOffAfterEnd(
     outcome: isNew ? 'recorded' : 'replay',
     recordedAs: isNew ? note : null,
     state: null,
-    participationId: row.id,
+    participationId: null,
     session: null,
   };
 }

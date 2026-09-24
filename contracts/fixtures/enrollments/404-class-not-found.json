@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/enrollments",
+  "scenario": "A join code no class has.",
+  "request": {
+    "path": "/v1/enrollments",
+    "body": {
+      "joinCode": "NO-SUCH-CODE",
+      "eventId": "00000000-0000-7000-8000-000000000001",
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "class_not_found",
+      "message": "no class with that join code"
+    }
+  }
+}

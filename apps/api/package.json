@@ -8,6 +8,7 @@
     "start": "tsx src/server.ts",
     "migrate": "tsx scripts/migrate.ts",
     "demo": "NODE_ENV=test tsx scripts/demo.ts",
+    "fixtures": "UPDATE_FIXTURES=1 vitest run test/contract-fixtures.test.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

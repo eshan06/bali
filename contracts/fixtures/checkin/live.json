@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/checkin",
+  "scenario": "The every-30-seconds check-in of a student live in the session.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/checkin",
+    "body": {
+      "deviceTime": "2000-01-01T00:01:00.000Z"
+    }
+  },
+  "status": 200,
+  "type": "CheckInResponse",
+  "body": {
+    "status": "live",
+    "state": "focused",
+    "session": {
+      "id": "00000000-0000-7000-8000-000000000001",
+      "classId": "00000000-0000-7000-8000-000000000002",
+      "endsAt": "2000-01-01T00:02:00.000Z"
+    }
+  }
+}
