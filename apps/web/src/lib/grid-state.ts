@@ -201,7 +201,9 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
  * than blinking off the grid: the record is durable, and the screen should
  * agree with it. An absent student it no longer carries has left the class
  * with nothing on record here, so they go — kept, their name would never
- * refresh again.
+ * refresh again. A chip with no state reads "Not here" whatever else the
+ * stream set (`gridDisplay`), so dropping one loses nothing it showed: an
+ * event that has something to show sets a state.
  */
 export function mergeSnapshot(prev: Students, snap: SessionSnapshot): Students {
   const next = fromSnapshot(snap);

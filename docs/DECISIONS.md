@@ -49,8 +49,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   shows the same chip, and every chip's name comes back with every snapshot;
   an absent student the snapshot no longer carries (left the class with
   nothing on record here) is dropped rather than kept with a stale name. The
-  exit demo's check flips with it: removed Cal stays on the snapshot, ended,
-  with his unlock. **Names:** a rename (`display_name_changed`, no session, so
+  exit demo checks both ends: removed Cal stays on the snapshot, ended, with
+  his unlock, and Dana's protection off, reported after the bell, is still on
+  it. **Names:** a rename (`display_name_changed`, no session, so
   no stream) reaches an open grid at its next 15 s snapshot, for every chip on
   it; the class page's roster list under the grid is read when the page loads,
   so a rename shows there on reload — noted, not changed. **Rode along, from
@@ -64,9 +65,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Pinned by grid tests for each state and reason, the protection-off unlock,
   the no-live note, each late record across a refresh and the replayed
   overlap converging on the snapshot; API tests for the snapshot's records,
-  its membership (removed, re-enrolled, left with nothing), its scoping to one
-  session and a removed student's rename; and the tidy — each red without its
-  fix.
+  its membership (removed, re-enrolled, left with nothing) and order, its
+  scoping to one session and a removed student's rename; and the tidy — each
+  red without its fix. Not done, on purpose: no index for the per-student
+  reads — each walks one session's events, bounded by the lesson; Phase 4's
+  load gate sizes it.
 - **2026-09-24** — **A8: a student edits their own display name, `PATCH /v1/me`.**
   D1's Me screen shows the name under "Your teachers see this name." with an
   edit button, and owner decision 8 polices it: unique within each class,

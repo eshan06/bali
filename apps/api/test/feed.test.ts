@@ -282,7 +282,8 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
     await renameStudent(db, { studentId: cal.id, displayName: 'Cal R.', eventId: randomUUID() });
 
     const snap = await snapshotOf(teacher.cognitoId, session.id);
-    expect(snap.students.map((s) => s.studentId).sort()).toEqual([student.id, cal.id].sort());
+    // In enrollment order, Cal's removed enrollment keeping his place.
+    expect(snap.students.map((s) => s.studentId)).toEqual([student.id, cal.id]);
     expect(row(snap, cal.id)).toMatchObject({
       enrollmentId: cal.enrollmentId,
       displayName: 'Cal R.',
@@ -292,9 +293,10 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
     expect(row(snap, cal.id)!.endedAt).not.toBeNull();
   });
 
-  it('carries a re-enrolled student once, on their live enrollment', async () => {
-    const { teacher, school, klass, session } = await seedRunning('a9-rejoin');
+  it('carries a re-enrolled student once, on their live enrollment and in its place', async () => {
+    const { teacher, student, school, klass, session } = await seedRunning('a9-rejoin');
     const eve = await classmate('a9-rejoin-eve', school.id, klass.id);
+    const fay = await classmate('a9-rejoin-fay', school.id, klass.id);
     await tapIn(db, change(session.id, eve.id));
     await endEnrollment(db, {
       enrollmentId: eve.enrollmentId,
@@ -305,11 +307,9 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
       await db.insert(enrollments).values({ classId: klass.id, studentId: eve.id }).returning(),
     );
 
-    const rows = (await snapshotOf(teacher.cognitoId, session.id)).students.filter(
-      (s) => s.studentId === eve.id,
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.enrollmentId).toBe(again.id);
+    const snap = await snapshotOf(teacher.cognitoId, session.id);
+    expect(snap.students.map((s) => s.studentId)).toEqual([student.id, fay.id, eve.id]);
+    expect(row(snap, eve.id)!.enrollmentId).toBe(again.id);
   });
 
   it("keeps another session's records out", async () => {
