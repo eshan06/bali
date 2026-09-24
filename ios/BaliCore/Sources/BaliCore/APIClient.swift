@@ -72,7 +72,8 @@ public protocol HTTPTransport: Sendable {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
-/// The apps' transport, over a URLSession.
+/// The apps' transport, over a URLSession. It follows no redirect: a 3xx comes back as the
+/// answer (see `NoRedirects`).
 public struct URLSessionTransport: HTTPTransport {
     /// How long a whole exchange may take, however steadily its bytes arrive.
     public static let exchangeTimeout: TimeInterval = 30
@@ -88,15 +89,39 @@ public struct URLSessionTransport: HTTPTransport {
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = APIClient.requestTimeout
         configuration.timeoutIntervalForResource = exchangeTimeout
-        return URLSession(configuration: configuration)
+        #if canImport(FoundationNetworking)
+            // FoundationNetworking asks only the session's delegate about a redirect, never the
+            // one `send` passes with the task — so on Linux the session carries it too.
+            return URLSession(
+                configuration: configuration, delegate: NoRedirects.delegate, delegateQueue: nil)
+        #else
+            return URLSession(configuration: configuration)
+        #endif
     }
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: NoRedirects.delegate)
         guard let response = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
         return (data, response)
+    }
+}
+
+/// Declines every redirect, so its 3xx comes back as the answer: a status like any other, which
+/// every outbox table reads as retry, the record kept. Followed, a redirect would carry every
+/// header, the bearer token included, to whichever host its `Location` names — and a 301 or 302
+/// would resend a POST as a GET with no body. The API never redirects: a 3xx is something else
+/// answering in its place.
+final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    static let delegate = NoRedirects()
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }
 

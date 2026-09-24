@@ -499,6 +499,32 @@ struct URLSessionTransportTests {
         #expect(waited > 0.5 && waited < 10)
     }
 
+    @Test(
+        "A redirect comes back as its status, followed nowhere: the token never reaches the address it names",
+        arguments: [301, 302, 303, 307, 308])
+    func refusesRedirects(status: Int) async throws {
+        // Where the redirect points: it answers anything that reaches it, and keeps what came.
+        let elsewhere = try LocalServer(
+            answer: "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        let server = try LocalServer(
+            answer: "HTTP/1.1 \(status) Moved\r\nLocation: http://127.0.0.1:\(elsewhere.port)/v1/taps"
+                + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        let client = APIClient(
+            baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
+            tokens: FixedToken(token: "token-real"))
+
+        let tap = await client.tap(TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: Date()))
+        #expect(tap.result == .status(status))
+        #expect(tap.noAnswer == nil)
+        // Not a 2xx, so no outcome: the tap is kept and sent again, never deleted.
+        #expect(tapDisposition(tap.result, tap.answer) == .retry)
+        #expect(server.head.hasPrefix("POST /v1/taps HTTP/1.1\r\n"))
+        #expect(server.head.contains("\r\nAuthorization: Bearer token-real\r\n"))
+        // Followed, a 301 or 302 would resend the POST as a GET with no body — and every header,
+        // the bearer token included, to whichever host the Location names.
+        #expect(elsewhere.head.isEmpty)
+    }
+
     @Test("The default session caches nothing, and bounds a request's wait and a whole exchange")
     func defaultSession() {
         let configuration = URLSessionTransport.makeSession().configuration

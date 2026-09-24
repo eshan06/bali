@@ -1,0 +1,99 @@
+# The iOS build (decision 9): the Xcode project generated from ios/project.yml,
+# the app built for the iOS Simulator with signing off, and BaliCore's tests run
+# on it — on Apple's Foundation, which parses ISO 8601 differently from the
+# Linux one the "BaliCore Swift tests (Linux)" job in ci.yml runs on. macOS
+# minutes are the dear ones: only a PR that touches ios/ or this file builds.
+name: iOS
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Decided here, not by a paths filter on the workflow: a workflow filtered
+  # out never reports, so a required check would wait on it forever, while a
+  # job skipped by its `if` reports success.
+  changes:
+    name: iOS changes
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.diff.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          # Through env, never inline: refnames may contain $, backticks, ;.
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if git diff --name-only "origin/$BASE_REF"...HEAD | grep -qE '^(ios/|\.github/workflows/ios\.yml$)'; then
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ios=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: iOS app + BaliCore tests (iOS Simulator)
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    # GitHub-hosted while the repo is public. Once it is private, the job moves
+    # to the owner's Mac, and this line is the whole change:
+    # `runs-on: [self-hosted, macOS]` — nothing below needs GitHub's image.
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Xcode 26.6 (swift-tools-version 6.0 needs 16 or later), pinned where
+      # GitHub keeps several side by side; a Mac of one's own builds with the
+      # one it has selected. DEVELOPER_DIR is `xcode-select -s` without sudo,
+      # which would stop a self-hosted Mac for a password.
+      - name: Select Xcode
+        run: |
+          if [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+      - run: xcodebuild -version
+
+      # Pinned and checksummed: every run generates with the same XcodeGen.
+      - name: Install XcodeGen
+        env:
+          VERSION: 2.46.0
+          SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/$VERSION/xcodegen.zip"
+          echo "$SHA256  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q -o "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+        working-directory: ios
+
+      # The first iPhone simulator of the iOS the selected Xcode builds for.
+      - name: Pick a simulator
+        run: |
+          runtime="com.apple.CoreSimulator.SimRuntime.iOS-$(xcrun --sdk iphonesimulator --show-sdk-version | tr . -)"
+          id=$(xcrun simctl list -j devices available | jq -r --arg runtime "$runtime" \
+            '.devices[$runtime] // [] | map(select(.name | startswith("iPhone"))) | first | .udid // empty')
+          if [ -z "$id" ]; then
+            echo "::error::No iPhone simulator for $runtime:"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "SIMULATOR=platform=iOS Simulator,id=$id" >> "$GITHUB_ENV"
+
+      - name: Build the app for the simulator, signing off
+        run: xcodebuild build -quiet -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO
+        working-directory: ios
+
+      - name: BaliCore's tests on the simulator
+        run: xcodebuild test -scheme BaliCore -destination "$SIMULATOR"
+        working-directory: ios/BaliCore

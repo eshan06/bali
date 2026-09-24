@@ -25,6 +25,8 @@ coverage/
 # SwiftPM's (ios/BaliCore), and the package state Xcode keeps beside it
 .build/
 .swiftpm/
+# XcodeGen writes it from ios/project.yml, which is the project (ios/README.md)
+ios/Bali.xcodeproj/
 
 # graphify knowledge graph — regenerable (`graphify update .`), stays local
 graphify-out/
