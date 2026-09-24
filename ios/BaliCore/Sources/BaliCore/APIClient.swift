@@ -265,7 +265,7 @@ public struct APIClient: Sendable {
 /// `value` as one path segment or query value: every byte but an ASCII letter or digit, `-`, `_`
 /// or `~` percent-encoded, so nothing a student types — a space, a `/`, a `?`, a `..` — changes
 /// the URL's shape.
-private func escaped(_ value: String) -> String {
+func escaped(_ value: String) -> String {
     value.utf8.map { byte in
         switch byte {
         case UInt8(ascii: "A")...UInt8(ascii: "Z"), UInt8(ascii: "a")...UInt8(ascii: "z"),
