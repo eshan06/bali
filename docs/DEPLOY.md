@@ -91,7 +91,9 @@ In the AWS console → Cognito → the dev user pool, `us-east-1_YTloqilwT`:
 - **The client id, again:** appended to dev's `AUTH_AUDIENCE` on Railway,
   after the id already there (`<that id>,<the phone's>`) — **only once B4a is
   deployed.** Before it, the API reads `AUTH_AUDIENCE` as a single id, so a
-  list matches no token and locks every dev sign-in out.
+  list matches no token and locks every dev sign-in out. The same holds the
+  other way: trim the list back to one id before rolling the API back past
+  B4a.
 
 ## Local run
 
