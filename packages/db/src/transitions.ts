@@ -2520,15 +2520,25 @@ export interface RenameResult {
 }
 
 /**
- * What two names are compared as, for owner decision 8 ("ignoring case"):
- * Unicode's compatibility form, so a decomposed accent or a full-width letter
- * is the name it looks like; trimmed, each run of spaces made one; and
- * case-folded, upper then lower, so `ß` meets `SS`. Look-alikes across
- * scripts (a Cyrillic `а` for a Latin `a`) stay different names — telling
- * those apart takes a confusables table, and the teacher sees both.
+ * What two names are compared as, for owner decision 8 ("ignoring case") — as
+ * a reader sees them: without the characters that draw nothing (joiners,
+ * variation selectors, Hangul fillers), which a name may carry but which
+ * cannot make it another; in Unicode's compatibility form, so a decomposed
+ * accent or a full-width letter is the name it looks like; with every run of
+ * blank space — whitespace, and the symbols the API's `INVISIBLE` counts as
+ * blank — made one space, and trimmed; and case-folded, upper then lower, so
+ * `ß` meets `SS`. Look-alikes across scripts (a Cyrillic `а` for a Latin `a`)
+ * stay different names — telling those apart takes a confusables table, and
+ * the teacher sees both.
  */
 function nameKey(name: string): string {
-  return name.normalize('NFKC').trim().replace(/\s+/gu, ' ').toUpperCase().toLowerCase();
+  return name
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, '')
+    .normalize('NFKC')
+    .replace(/[\s\u2800\u{1D159}]+/gu, ' ')
+    .trim()
+    .toUpperCase()
+    .toLowerCase();
 }
 
 /**

@@ -658,6 +658,8 @@ describe('PATCH /v1/me', () => {
       // The same letters, spelled another way: full-width, a decomposed accent.
       'Ｃａｌ Ｄíａｚ',
       'Zoe\u0308',
+      // A character that draws nothing does not make it another name.
+      'Bea\u200d Ortiz',
     ]) {
       const res = await renameTo(token, name);
       expect(res.statusCode, name).toBe(409);

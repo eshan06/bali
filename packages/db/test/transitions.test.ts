@@ -3723,7 +3723,18 @@ describe('renameStudent', () => {
     await classmate('rename-key-2', 'Ｂｅａ  Ortiz', klass.id);
     await classmate('rename-key-3', 'Zoe\u0308', klass.id);
 
-    for (const name of ['STRAUSS', 'bea ortiz', 'Zo\u00eb']) {
+    for (const name of [
+      'STRAUSS',
+      'bea ortiz',
+      'Zo\u00eb',
+      // Characters that draw nothing cannot make a name another: a joiner, a
+      // variation selector, a Hangul filler; nor can a blank that looks like
+      // a space, the blank braille cell.
+      'Bea\u200d Ortiz',
+      'Bea\ufe0f Ortiz',
+      'Bea Ortiz\u3164',
+      'Bea\u2800Ortiz',
+    ]) {
       await expect(rename(student.id, name), name).rejects.toMatchObject({
         code: 'DISPLAY_NAME_TAKEN',
       });

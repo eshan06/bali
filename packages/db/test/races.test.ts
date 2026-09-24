@@ -2188,14 +2188,14 @@ describe.runIf(REAL_PG)('display names under contention (real Postgres)', () => 
   }
 
   /**
-   * Wait until `n` backends are parked on a lock, then run `whileParked`, and
+   * Wait until `n` backends are parked on a lock, then run `meanwhile`, and
    * release the holder whatever happens — a missed staging must fail the test,
    * never wedge the suite behind the holder (as the held-transaction tests above).
    */
   async function whileParked(
     n: number,
     holder: { release: () => void; done: Promise<void> },
-    whileParked: () => Promise<void> = async () => {},
+    meanwhile: () => Promise<void> = async () => {},
   ) {
     try {
       const deadline = Date.now() + 5_000;
@@ -2203,7 +2203,7 @@ describe.runIf(REAL_PG)('display names under contention (real Postgres)', () => 
         if (Date.now() > deadline) throw new Error(`fewer than ${n} renames parked on a class`);
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      await whileParked();
+      await meanwhile();
     } finally {
       holder.release();
       await holder.done;

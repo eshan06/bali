@@ -285,14 +285,14 @@ Student app:
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
-  live class the caller is in already uses — compared ignoring case, spacing and Unicode
-  compatibility forms — is `409 display_name_taken`, never a silent rename; the engine
-  serialises it by locking the caller's row, then their classes in id order. A join is
-  never refused over a name, a name filled from sign-in claims is not policed, and a
-  collision a later join makes is left for the teacher to see. Recorded as a
-  `display_name_changed` event (the name and the one it replaced) with no session: a
-  grid shows the new name at its next snapshot. A replay applies nothing and answers the
-  name now; a teacher is `403`.
+  live class the caller is in already uses — compared ignoring case, spacing, Unicode
+  compatibility forms and characters that draw nothing — is `409 display_name_taken`,
+  never a silent rename; the engine serialises it by locking the caller's row, then
+  their classes in id order. A join is never refused over a name, a name filled from
+  sign-in claims is not policed, and a collision a later join makes is left for the
+  teacher to see. Recorded as a `display_name_changed` event (the name and the one it
+  replaced) with no session: a grid shows the new name at its next snapshot. A replay
+  applies nothing and answers the name now; a teacher is `403`.
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response

@@ -32,8 +32,9 @@ export type ApiErrorCode = keyof typeof API_ERROR_STATUS;
  * never on the message. One value per refusal the transition engine makes, and
  * per refusal a route makes itself where one status covers several on it —
  * leaving a class's two 403s (A6), the history's and a rename's two 400s (A8);
- * an error with no finer meaning than its status carries none. Additive-only like the other vocab, and a client reads a
- * value it does not know as none: a newer server may send one.
+ * an error with no finer meaning than its status carries none. Additive-only
+ * like the other vocab, and a client reads a value it does not know as none:
+ * a newer server may send one.
  */
 export const API_ERROR_REASONS = [
   'session_not_found',

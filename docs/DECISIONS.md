@@ -36,9 +36,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   state, so the lag claims nothing false (tested through the snapshot and the
   roster). Not an outbox record: the Me screen sends it while open and shows a
   failure with a retry (rule 5). **Uniqueness:** names are compared as a reader
-  sees them — Unicode compatibility form (NFKC: a decomposed accent, a
-  full-width letter), trimmed, each run of whitespace made one space, and
-  case-folded (upper then lower, so `ß` meets `SS`) — against every other
+  sees them — without the characters that draw nothing (a joiner, a variation
+  selector, a Hangul filler: a name may carry them, but adding one cannot make
+  a classmate's name another — santa's review caught that the first key let
+  `Bea\u200d Ortiz` past `Bea Ortiz`), in Unicode compatibility form (NFKC: a
+  decomposed accent, a full-width letter), each run of blank space made one
+  (whitespace and the blank-looking symbols), trimmed, and case-folded (upper
+  then lower, so `ß` meets `SS`) — against every other
   student actively enrolled in any live class the caller is actively in, and a
   match is `409 display_name_taken`, never a silent rename. The student's own
   name in another case is theirs to take. **Serialised by locks, not a
