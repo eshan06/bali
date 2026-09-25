@@ -28,6 +28,11 @@ public enum Standing: Sendable, Hashable {
     /// In `session`: shielded only while `focused` (nil is a state this build does not know), and
     /// only until its `endsAt`, which the phone's own clock keeps (data model, decision 6).
     case inSession(SessionView, ParticipationState?)
+    /// Not known: the outbox file would not give back where the phone stood at launch — a storage
+    /// failure, shown. Enforcement never begins from nothing: the shields are left as they are,
+    /// and nothing is kept over the file's standing, until it is read again or the server's truth
+    /// says where the phone stands.
+    case unread
 
     /// The phone's own change, at once: a state change of the session it is in. A tap changes
     /// nothing here — it is `SyncState.pendingTap` until answered.
@@ -51,7 +56,8 @@ extension Standing: Codable {}
 
 /// What the engine knows, for the screens (C1–C6) and enforcement (B5): `SyncEngine.updates()`.
 public struct SyncState: Sendable, Hashable {
-    /// The server's truth as last reconciled, with the phone's own changes over it.
+    /// The server's truth as last reconciled, with the phone's own changes over it; `.unread` while
+    /// the file has not given back where the phone stood.
     public var standing = Standing.out
     /// Every record queued, in the order the phone acted: a stuck one is shown with its last
     /// answer (rule 5).
@@ -107,10 +113,11 @@ public actor SyncEngine {
     let refresh: @Sendable () async -> Bool
 
     /// The standing is kept in the outbox file as it changes, so a relaunch starts where the phone
-    /// stood — shielded still, offline too — and the extensions can read it (B5).
+    /// stood — shielded still, offline too — and the extensions can read it (B5); never while it is
+    /// `.unread`, which would write over the file's truth from nothing.
     public private(set) var state = SyncState() {
         didSet {
-            if state.standing != kept { keepStanding() }
+            if state.standing != kept, state.standing != .unread { keepStanding() }
             if state != oldValue { publish() }
         }
     }
@@ -152,6 +159,7 @@ public actor SyncEngine {
             state.standing = try outbox.standing()
             kept = state.standing
         } catch {
+            state.standing = .unread
             state.link = .storageFailed
         }
     }
@@ -306,8 +314,13 @@ public actor SyncEngine {
             }
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:
-            // Arming ends nothing: a session the phone is in stays (decision 4).
-            if case .inSession = next.standing {} else if applies { next.standing = .waiting }
+            switch next.standing {
+            // Arming ends nothing: a session the phone is in stays (decision 4) — and one it may
+            // be in, where it stood unread, is asked of the server.
+            case .inSession: break
+            case .unread: reread()
+            case .out, .waiting: if applies { next.standing = .waiting }
+            }
         case .tap(.reread)?, .tap(.retryAndSurface)?, .stateChange(.reread)?: reread()
         case .stateChange(.drop)?:
             next.refused = Refusal(
@@ -318,12 +331,13 @@ public actor SyncEngine {
         changes += 1
     }
 
-    /// Reads the truth: a re-read (`GET /v1/me`) when one was asked for — tried again at the next
-    /// wake until it is answered — or, in the foreground, the check-in of the session the phone is
-    /// in; then waits for the next.
+    /// Reads the truth: where the phone stood, from the file, while that is unread; then a re-read
+    /// (`GET /v1/me`) when one was asked for — tried again at the next wake until it is answered —
+    /// or, in the foreground, the check-in of the session the phone is in; then waits for the next.
     private func read() async {
         while !Task.isCancelled {
             rung.remove(.read)
+            readStanding()
             // Rule 3, before the check-in: a protection off it reports is a change, which the
             // check-in's stamp then counts.
             if !rereading, foreground, case .inSession = state.standing { await check?() }
@@ -352,8 +366,24 @@ public actor SyncEngine {
                     }
                 }
             }
-            await pause(.read, until: foreground ? clock.now() + Self.checkInInterval : nil)
+            await pause(.read, until: nextRead)
         }
+    }
+
+    /// When the read loop wakes on its own: for the check-in, in the foreground — and while where
+    /// the phone stood is unread, within a minute, to read the file again.
+    private var nextRead: Date? {
+        if foreground { return clock.now() + Self.checkInInterval }
+        return state.standing == .unread ? clock.now() + Outbox.backoffCap : nil
+    }
+
+    /// Where the phone stood, read again while the file would not give it back: followed, and kept
+    /// as it changes, from then on. The server's truth settles it too — a read, or a change's
+    /// answer naming the session — so a file that never reads never strands the phone.
+    private func readStanding() {
+        guard state.standing == .unread, let standing = stored(outbox.standing) else { return }
+        kept = standing
+        state.standing = standing
     }
 
     /// `GET /v1/me`'s answer, as a standing: its live session, or none.

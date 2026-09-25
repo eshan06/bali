@@ -8,6 +8,62 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5a-2: enforcement hardened from #86's Claude Review before the owner's first
+  iPhone check — a check's finding never lost to a pass, a standing the file will not give back
+  never starts the phone out, `Protection.unreported` tested, and not determined reported only once
+  it lasts.** Four WARNs of #86's last review, each a real defect in enforcement, each fixed with
+  its failing test first. **(1) A lost `unreported`:** `Enforcer.apply()` copied `protection`,
+  waited on Screen Time, and wrote the copy back, so a `check()` that ran during the wait — its
+  protection off refused by the outbox — had `unreported` reset, and rule 5's banner never showed.
+  `apply()` now reads `protection` after its last wait and sets only its own fields: the permission,
+  the shields, their end. **(2) A standing the file will not give back** — a read refused, a busy
+  file, a form this build cannot decode — started the engine `.out`, so the enforcer took the
+  shields off a phone mid-session and the next change of state wrote `.out` over the file's truth:
+  enforcement began from nothing. It is now `Standing.unread`, shown (`link = .storageFailed`; the
+  Debug readout says so). The enforcer never takes the shields off over it — they stay as the store
+  holds them, the last run's, and a tap not yet answered still puts them on — nothing is kept over
+  the file's standing, and the read loop reads the file again within a minute and at every ring (the
+  foreground, the student's retry). The server's truth settles it too — a read, or a change's answer
+  naming its session and state — so a file that never reads (a newer build's form) cannot strand a
+  student behind shields with no session to unlock; an armed answer, which names no session, asks
+  the server rather than settling it, since arming ends no session the phone may be in. `.unread` is
+  never written, so the file's form is unchanged. B5b's monitor reads the same standing, and must
+  keep the same rule: never clear the store over a standing it cannot read. **Not covered,
+  disclosed:** while it holds, no screen can name a session to unlock — B6's unlock under a pending
+  tap included, whose shields it holds too — nothing ends the shields at a bell the phone does not
+  know, and a permission found off has no session to be reported in; so a file that stays unreadable
+  offline holds the shields until the phone is online or the file reads (C5 decides what Emergency
+  Unlock offers then), and a denied permission is reported once the standing is settled. **(3)
+  `Protection.unreported`**, rule 5's surface, had no test: it is raised when the report cannot be
+  queued and cleared by the next check that queues it. **(4) Not determined reported as protection
+  off:** the check reported any permission but approved, and Family Controls can read it not
+  determined for a moment just after a launch (B5a's "assumed, and checked on the phone") — a false
+  "turned protection off", in the permanent history, that only a re-tap leaves. Yet a phone never
+  granted the permission cannot shield, and leaving it unreported would show green over it. **The
+  rule:** denied is protection off at once; not determined only once checks have read it so for a
+  check-in interval, 30 s by the phone's clock — two checks in a row at the check-in's cadence, so
+  within about a minute of the permission going. Any read of approved or denied ends the run — a
+  check's, or an enforcement pass's, which reads the permission at every change of state, so a
+  launch's passing read never joins a later one — and a clock turned back starts it again rather
+  than stalling it. By time, not by a count of checks: the app checks at once whenever it comes to
+  the foreground, so two checks can land in one second, and a count would report a launch's passing
+  read where a time cannot. So a passing read is never reported, and a phone never granted — or one
+  iOS reads not determined once revoked — is reported a check-in later than a denial would be.
+  **Assumed, and checked on the phone** (step 13, now expecting no false protection off after a
+  relaunch): that the read settles within a check-in interval; if it takes longer, the bound is
+  revisited on the phone's evidence. **Found here:** three protection-off tests moved the clock
+  right after a check-in's answer, before the read loop slept towards the next, so the move could
+  come first and the check-in they waited for came a check-in later — one failed so here, beside the
+  new tests in its suite; they now wait until the check-in is due (`checkInDue`). **Tests**
+  (`EnforcementTests.swift`, Linux and the iOS Simulator): a pass held at its last read of the store
+  while a check fails to queue its report; the flag raised and cleared; a passing not determined —
+  at two checks a second apart, then approved — never reported; never granted, reported once, a
+  check-in on; a pass's read ending a run; the clock turned back; an unreadable standing that keeps
+  the shields, is not written over, is read again within a minute and followed; the server's truth
+  settling it; an armed answer over it. Of 17 mutations of the four fixes, all 17 turn a test red.
+  **Santa** (two Claude reviewers, round 1): no blockers; the easy WARNs fixed here — a pass's read
+  ends a not-determined run, and the disclosure above names the unlock under a pending tap and the
+  denied permission while the standing is unread — and the rest listed in the PR.
 - **2026-09-25** — **T1: the device checks' teacher on dev is a terminal command, not the portal,
   for now.** The iPhone checks (B4c, B5a; later B5b, B5c, B6, E1) need a teacher on dev: a class to
   join, a block to tap, a session and a view of each student. The portal cannot be that teacher on
