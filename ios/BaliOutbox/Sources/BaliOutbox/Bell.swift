@@ -3,7 +3,7 @@ import Foundation
 /// The bell with the app closed (ARCHITECTURE, "iOS app structure", decision 2 and "Decided later":
 /// leaning (a); B5b): the window the shields are on is registered with iOS as a DeviceActivity
 /// schedule, and iOS wakes the monitor extension at its end — the bell, or decision 7's cap — with
-/// the app open or force-quit; and a backup window beside it, so a wake that dies never keeps the
+/// the app open or force-quit; and a backup window beside it, so a wake that dies does not keep the
 /// shields past the bell until the app is opened (B5b-3). The rules, apart from iOS: the enforcer
 /// registers the windows, and the monitor carries out `wake`.
 public enum Bell {
@@ -97,11 +97,12 @@ public enum Bell {
     /// The monitor's `wake` at `now`, woken under `woken`, carried out: nothing keeps the shields on
     /// — `clear` them, which says whether the store held any, and ask iOS nothing; else its next
     /// wake asked of `center` under `next(after:)` — never the name that woke it — and nothing else
-    /// asked of it. One iOS refuses leaves nothing to wake the monitor again but the bell's backup,
-    /// so the shields it keeps may outlive their end with the app closed: `refused` is set to
-    /// `now`, for the app to show from its next open (`Protection.monitorUnscheduled`), and a wake
-    /// that ends well — cleared, or its next wake taken — sets it back to none (#92's review). What
-    /// it did, for the Debug readout.
+    /// asked of it. One iOS refuses leaves nothing to wake the monitor again — but the bell's
+    /// backup, when it is still to come — so the shields it keeps may outlive their end with the
+    /// app closed: `refused` is set to `now`, for the app to show from its next open
+    /// (`Protection.monitorUnscheduled`), and a wake that ends well — cleared, or its next wake
+    /// taken, the backup's too — sets it back to none (#92's review). What it did, for the Debug
+    /// readout.
     public static func carryOut(
         _ wake: Wake, woken: Name?, at now: Date, in center: some BellCenter,
         clearing clear: () -> Bool, refused: inout Date?

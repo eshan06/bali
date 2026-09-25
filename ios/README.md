@@ -119,43 +119,60 @@ Bali's own shield, "Focused with Bali until 9:42", is round 3's (B5c), below.
 
 After round 1, on the same build and phone: signed in, Screen Time allowed, the class joined, and
 `npm run dev:teacher -- watch` running. "Force-quit" is swiping the app away in the app switcher.
-The readout's `Monitor:` line says what the DeviceActivity monitor did at its last wake — the time,
-what it did, and how long it took — since the monitor can show nothing itself. Should iOS refuse the
-monitor its next wake, the `Screen Time:` line says so from the next open, until a window is
-registered again: `the monitor's bell NOT scheduled at <time>, app closed`.
+The readout's `Monitor:` lines say what the DeviceActivity monitor did at its last three wakes,
+newest first — the time, which window woke it, what it did, and how long it took — since the
+monitor can show nothing itself. The windows (B5b-3): `bell`, the one the app registers for the
+bell; `backup`, registered beside it and ending two minutes later, in case the bell's wake is lost;
+and `tick` and `tock`, the ones the monitor asks for itself, in turn — never the one that woke it,
+since on iOS 18 asking for that one can hang the monitor. A wake that takes the shields off says
+`cleared`; one that finds them off already — the backup, after the bell's wake — says
+`nothing to clear`; one iOS ended before it finished stays `not finished`. Should iOS refuse the
+monitor its next wake, the `Screen Time:` line says so from the next open, unless a later wake
+ended well: `the monitor's bell NOT scheduled at <time>, app closed`. Its `bell NOT scheduled` is
+a window the app asked for — the bell's or its backup — refused, and asked for again.
 
 **"Within a minute after the bell"** below is when iOS wakes the monitor at the end of its window,
 the first whole minute on or after the bell. If iOS wakes it early, before the bell, the monitor
 keeps the shields and asks to be woken again the next whole minute on: they come off less than
-_two_ minutes after the bell, and the `Monitor:` line is that second wake's.
+_two_ minutes after the bell, and that second wake's line is `tick`'s. Two minutes after the bell's
+window, the backup wakes the monitor too — after the bell's wake, it finds nothing to clear.
 
 1. **The window is registered.** `npm run dev:teacher -- start 20`, then **Tap** with
    `DEVICE-CHECK-1`: `shields on, due until` the bell, and no `bell NOT scheduled` on that line.
 2. **Force-quit, the bell — Phase 0's question.** Force-quit the app while shielded and leave the
    phone until the bell. Within a minute after the bell, with the app still closed, blocked apps
    open again; `watch` showed the student silent a minute and a half after the force-quit, then
-   the session over. Open the app: `Monitor: <a time within a minute after the bell> · cleared ·`
-   and a fraction of a second, and no `bell NOT scheduled` on the `Screen Time:` line.
+   the session over. Open the app: `Monitor: <a time within a minute after the bell> · bell ·
+   cleared ·` and a fraction of a second — opened two minutes after that or later, with
+   `<that time plus two minutes> · backup · nothing to clear ·` above it — and no
+   `bell NOT scheduled` on the `Screen Time:` line.
 3. **A window shorter than iOS's 15-minute floor.** `start 15`, wait 5 minutes, **Tap** (10
-   minutes left), force-quit: as step 2 — off within a minute after the bell, `Monitor: … · cleared`.
-4. **An Emergency Unlock cancels the window.** `start 15`, **Tap**, **Emergency Unlock**,
-   force-quit: the apps stay open, and after the bell the `Monitor:` line is still step 3's — nothing
-   woke it.
-5. **An extension moves the window.** `start 15`, **Tap**, then `npm run dev:teacher -- extend 10`
+   minutes left), force-quit: as step 2 — off within a minute after the bell, `bell · cleared`.
+4. **An Emergency Unlock cancels the windows.** `start 15`, **Tap**, **Emergency Unlock**,
+   force-quit: the apps stay open, and after the bell, and two minutes on, the `Monitor:` lines are
+   still step 3's — nothing woke it.
+5. **An extension moves the windows.** `start 15`, **Tap**, then `npm run dev:teacher -- extend 10`
    with the app open until the next check-in moves `due until` 10 minutes on (still no
-   `bell NOT scheduled`). Force-quit: still shielded past the first bell; off within a minute after
-   the new one, `Monitor: … · cleared`.
-6. **Decision 7's cap with the app closed.** With no session running, turn on **Cap a tap at 15 min
+   `bell NOT scheduled`). Force-quit: still shielded past the first bell, and nothing woke the
+   monitor then; off within a minute after the new one, `bell · cleared`.
+6. **A lost wake: the backup clears (B5b-3).** `start 15`, **Tap**, turn on **Lose the bell's next
+   wake (device check)**, and force-quit. At the bell the apps stay shielded — the monitor does
+   nothing at the bell's wake, as if it had died there — and two to three minutes after the bell
+   they open, the app still closed. Open the app: `Monitor: <that time> · backup · cleared ·` and a
+   fraction of a second, above `<the bell's wake> · bell · lost on purpose (device check) — nothing
+   done`, and the toggle off again: it loses one wake only.
+7. **Decision 7's cap with the app closed.** With no session running, turn on **Cap a tap at 15 min
    (device check)**, turn on Airplane Mode, and **Tap**: `due until` the tap's time plus 15 minutes
    (the floor, not 50). Force-quit: within a minute after that time the apps open, the tap never
-   answered. Open the app, still in Airplane Mode: `Monitor: … · cleared`, `Standing: in no session`.
-   Turn the cap off and Airplane Mode off: the tap is answered armed —
+   answered. Open the app, still in Airplane Mode: `Monitor: … · bell · cleared`,
+   `Standing: in no session`. Turn the cap off and Airplane Mode off: the tap is answered armed —
    `Standing: waiting for the teacher's Start` — and a `start` today would join it, so run this
    step last.
-7. **The monitor never stalls.** Every `Monitor:` line above took a fraction of a second, never the
-   2-second bound on its whole open and read of the file, and the app, opened straight after each
-   wake, started normally — no `The outbox could not be opened`, no `storage failed`. A wake that
-   could not read the file says `file not read — kept, again <time>`, and tries again a minute on.
+8. **The monitor never stalls.** Every `Monitor:` line above took a fraction of a second, never the
+   2-second bound on its whole open and read of the file, and none says `not finished`; and the
+   app, opened straight after each wake, started normally — no `The outbox could not be opened`, no
+   `storage failed`. A wake that could not read the file says `file not read — kept, again <time>`,
+   and the monitor tries again a minute on, as `tick` or `tock`.
 
 ### Round 3 (B5c): Bali's own shield
 
