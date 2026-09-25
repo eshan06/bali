@@ -197,29 +197,8 @@
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000018",
-        "type": "unlock",
+        "type": "tap_in",
         "occurredAt": "2000-01-01T00:13:00.000Z",
-        "class": {
-          "id": "00000000-0000-7000-8000-000000000004",
-          "name": "Class fx-hist-p5"
-        },
-        "teacher": {
-          "displayName": "Mr. Okafor"
-        },
-        "session": {
-          "id": "00000000-0000-7000-8000-000000000017",
-          "startedAt": "2000-01-01T00:10:00.000Z",
-          "endsAt": "2000-01-01T00:11:00.000Z",
-          "endedAt": "2000-01-01T00:11:00.000Z"
-        },
-        "reason": null,
-        "recordedAs": null,
-        "countedIn": null
-      },
-      {
-        "eventId": "00000000-0000-7000-8000-000000000019",
-        "type": "refocus",
-        "occurredAt": "2000-01-01T00:14:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000004",
           "name": "Class fx-hist-p5"
@@ -238,9 +217,9 @@
         "countedIn": null
       },
       {
-        "eventId": "00000000-0000-7000-8000-000000000020",
-        "type": "tap_in",
-        "occurredAt": "2000-01-01T00:15:00.000Z",
+        "eventId": "00000000-0000-7000-8000-000000000019",
+        "type": "unlock",
+        "occurredAt": "2000-01-01T00:14:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000004",
           "name": "Class fx-hist-p5"
@@ -259,51 +238,51 @@
         "countedIn": null
       },
       {
-        "eventId": "00000000-0000-7000-8000-000000000021",
-        "type": "unlock",
-        "occurredAt": "2000-01-01T00:16:00.000Z",
+        "eventId": "00000000-0000-7000-8000-000000000020",
+        "type": "refocus",
+        "occurredAt": "2000-01-01T00:15:00.000Z",
         "class": {
-          "id": "00000000-0000-7000-8000-000000000008",
-          "name": "Class fx-hist-p3"
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
         },
         "teacher": {
-          "displayName": "Ms. Rivera"
+          "displayName": "Mr. Okafor"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000017",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:11:00.000Z"
         },
         "reason": null,
-        "recordedAs": "after_session_end",
+        "recordedAs": "superseded",
         "countedIn": null
       },
       {
-        "eventId": "00000000-0000-7000-8000-000000000023",
-        "type": "session_expired",
+        "eventId": "00000000-0000-7000-8000-000000000021",
+        "type": "tap_in",
         "occurredAt": "2000-01-01T00:16:00.000Z",
         "class": {
-          "id": "00000000-0000-7000-8000-000000000008",
-          "name": "Class fx-hist-p3"
+          "id": "00000000-0000-7000-8000-000000000004",
+          "name": "Class fx-hist-p5"
         },
         "teacher": {
-          "displayName": "Ms. Rivera"
+          "displayName": "Mr. Okafor"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000017",
+          "startedAt": "2000-01-01T00:10:00.000Z",
+          "endsAt": "2000-01-01T00:11:00.000Z",
+          "endedAt": "2000-01-01T00:11:00.000Z"
         },
         "reason": null,
         "recordedAs": null,
         "countedIn": null
       },
       {
-        "eventId": "00000000-0000-7000-8000-000000000024",
-        "type": "protection_off",
-        "occurredAt": "2000-01-01T00:18:00.000Z",
+        "eventId": "00000000-0000-7000-8000-000000000022",
+        "type": "unlock",
+        "occurredAt": "2000-01-01T00:17:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
           "name": "Class fx-hist-p3"
@@ -312,18 +291,39 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
         "reason": null,
         "recordedAs": "after_session_end",
         "countedIn": null
       },
       {
+        "eventId": "00000000-0000-7000-8000-000000000024",
+        "type": "session_expired",
+        "occurredAt": "2000-01-01T00:17:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
+        },
+        "reason": null,
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
         "eventId": "00000000-0000-7000-8000-000000000025",
-        "type": "tap_in",
+        "type": "protection_off",
         "occurredAt": "2000-01-01T00:19:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
@@ -333,18 +333,18 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
         "reason": null,
-        "recordedAs": null,
+        "recordedAs": "after_session_end",
         "countedIn": null
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000026",
-        "type": "protection_off",
+        "type": "tap_in",
         "occurredAt": "2000-01-01T00:20:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
@@ -354,10 +354,10 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
         "reason": null,
         "recordedAs": null,
@@ -365,7 +365,7 @@
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000027",
-        "type": "refocus",
+        "type": "protection_off",
         "occurredAt": "2000-01-01T00:21:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
@@ -375,10 +375,10 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
         "reason": null,
         "recordedAs": null,
@@ -386,7 +386,7 @@
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000028",
-        "type": "unlock",
+        "type": "refocus",
         "occurredAt": "2000-01-01T00:22:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
@@ -396,18 +396,18 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
-        "reason": "bathroom",
+        "reason": null,
         "recordedAs": null,
         "countedIn": null
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000029",
-        "type": "tap_in",
+        "type": "unlock",
         "occurredAt": "2000-01-01T00:23:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",
@@ -417,10 +417,31 @@
           "displayName": "Ms. Rivera"
         },
         "session": {
-          "id": "00000000-0000-7000-8000-000000000022",
-          "startedAt": "2000-01-01T00:17:00.000Z",
-          "endsAt": "2000-01-01T00:16:00.000Z",
-          "endedAt": "2000-01-01T00:16:00.000Z"
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
+        },
+        "reason": "bathroom",
+        "recordedAs": null,
+        "countedIn": null
+      },
+      {
+        "eventId": "00000000-0000-7000-8000-000000000030",
+        "type": "tap_in",
+        "occurredAt": "2000-01-01T00:24:00.000Z",
+        "class": {
+          "id": "00000000-0000-7000-8000-000000000008",
+          "name": "Class fx-hist-p3"
+        },
+        "teacher": {
+          "displayName": "Ms. Rivera"
+        },
+        "session": {
+          "id": "00000000-0000-7000-8000-000000000023",
+          "startedAt": "2000-01-01T00:18:00.000Z",
+          "endsAt": "2000-01-01T00:17:00.000Z",
+          "endedAt": "2000-01-01T00:17:00.000Z"
         },
         "reason": null,
         "recordedAs": null,

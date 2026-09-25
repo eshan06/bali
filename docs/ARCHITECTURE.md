@@ -97,8 +97,9 @@ never stored here, no screen can ever show it.
   history.
 - `armed_taps` — one row per tap made before a session was running (decision 5): saved as
   student + teacher and waiting. When the teacher presses Start, each becomes a
-  participation unless its tap had already landed; it expires at the end of the school
-  day. Transient — not the permanent history that lives in `events`.
+  participation unless its tap had already landed, or a later tap of the student's went
+  ahead of it (A14); it expires at the end of the school day. Transient — not the
+  permanent history that lives in `events`.
 
 ### The decisions (2026-09-15)
 
@@ -131,7 +132,8 @@ way out.
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
 `left_for_other_session` — its own kind of event, so switching classes is never counted
-as an emergency unlock in any report.
+as an emergency unlock in any report. A tap the phone made before a later tap of its own
+into another session switches nothing when it lands after it (A14; rule 1's order).
 
 **5. A tap before the teacher has started is saved and waits — an "armed" tap.** It's
 7:58, the bell hasn't rung, and a student taps the block walking to their seat — no
@@ -139,14 +141,18 @@ session exists yet. Rejecting the tap punishes normal behavior; shielding now lo
 phone before class starts. So the server just saves "this student tapped this teacher's
 block" and the phone shows "Ready — waiting for your teacher." When the teacher presses
 Start, every waiting tap becomes a participation and those phones shield — nobody taps
-twice. The one exception is a tap that was already honoured (ruled 2026-09-22): a waiting
-tap whose `event_id` is already recorded as that student's own `tap_in` is the retry of a
-tap that landed in another session, and joining it would shield the student in a session
-they never tapped into. It is consumed without joining and recorded as an
-`armed_tap_skipped` event in the session that declined it, so the history says why that
-student is not there. It's saved as student + teacher, since one block serves all of a
-teacher's classes and the class is only knowable once a session starts. It expires at the
-end of the school day.
+twice. Two exceptions. A tap that was already honoured (ruled 2026-09-22): a waiting tap
+whose `event_id` is already recorded as that student's own `tap_in` is the retry of a tap
+that landed in another session, and joining it would shield the student in a session they
+never tapped into. It is consumed without joining and recorded as an `armed_tap_skipped`
+event in the session that declined it, so the history says why that student is not there.
+And a tap a later one went ahead of (ruled 2026-09-25, A14): a waiting tap older, by the
+phone's order, than a tap of the student's since recorded in another session — converting
+it would switch them back out of where that later tap put them. It is consumed without
+joining and recorded in the session that declined it as its `tap_in`, noted `superseded`;
+a tap that would only arm once such a later tap is recorded never waits at all. It's saved
+as student + teacher, since one block serves all of a teacher's classes and the class is
+only knowable once a session starts. It expires at the end of the school day.
 
 **6. Sessions end themselves.** The phone knows the session's end time, so it removes the
 shields at that moment using its own clock, even with no internet. On the server, a small
@@ -305,8 +311,12 @@ Student app:
   to focus, both ways (rule 1): an unlock their return went ahead of is late (A10, A12),
   and so is a return — a refocus, or a tap into a session — their unlock went ahead of
   (A13, owner ruling 2026-09-24); each is recorded, noted `superseded`, never applied.
-  Optional — old builds send none — and never a reason to refuse: one the server cannot
-  use (not a UUID install, not a positive safe integer seq) is taken as none.
+  It orders their taps too (A14, owner ruling 2026-09-25): a tap older than one of theirs
+  already recorded in another session — into a running session, arming, or converting at
+  a Start — is late, recorded and noted the same way, so no tap ever takes a student back
+  out of where their later tap put them. Optional — old builds send none — and never a
+  reason to refuse: one the server cannot use (not a UUID install, not a positive safe
+  integer seq) is taken as none.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
   carries the current truth (state, end time) so the phone can reconcile.
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
@@ -561,9 +571,10 @@ and data types, so the two apps can't drift out of type-agreement.
   actions came last — their unlock, or their return to focus — is not a clock's to say: the
   phone numbers what it does with its outbox's counter, and the server orders the two by it
   (A12, owner ruling 2026-09-24), so a clock turned back between them never undoes a real
-  unlock — nor does a return the phone made before it, however late it lands (A13). The
-  clock still decides for a build that sends no order, and only for a late unlock: a return
-  with none applies as it arrives.
+  unlock — nor does a return the phone made before it, however late it lands (A13), nor a
+  tap it made before its tap into another class (A14). The clock still decides for a build
+  that sends no order, and only for a late unlock: a return or a tap with none applies as
+  it arrives.
 
 ### Decided later, on purpose
 
@@ -630,8 +641,11 @@ Each exists because v2 broke it and shipped a real bug
    one from the same install — its outbox's counter, which no clock moves (A12) — and it
    reads both ways: a late unlock and a late return are each recorded, never applied (A10,
    A12, A13), so a tampered clock can never undo a real unlock, nor can a return that came
-   before it. The times stay clamped, and a pair the order cannot place still judges an
-   unlock by them — never a return, which then applies as it arrives.
+   before it. It ranks two taps the same way: a tap older than one already recorded in
+   another session is recorded, never applied (A14), so the student's latest tap says where
+   they are, whatever order the two reach the server in. The times stay clamped, and a
+   pair the order cannot place still judges an unlock by them — never a return or a tap,
+   which then applies as it arrives.
    `participations.last_seen_at` — the input to silence, and so to every green chip — is
    stamped server-side, never from the device's claim: a clock running fast would clamp to
    `ends_at`, a time in the future, and the phone would never go silent however long it had

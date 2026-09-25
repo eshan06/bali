@@ -78,6 +78,12 @@ import type { Database } from './types.js';
  * ~5.8 ms per tap against ~5.1 ms, measured over 30 ordered taps a round; the
  * read itself is ~0.04 ms through `events_user_occurred_idx`, the rest its
  * round trip.
+ *
+ * A14 added two: the student's lock (`lockStudentTaps`), before the session's,
+ * and for a tap carrying the order the look for a later tap of theirs in
+ * another session (`tappedSince`, one range of `events_order_tap_idx`), inside
+ * the window — ~6.8 ms per tap against ~6.2 ms on this lane's runner the same
+ * way, medians of four alternating runs: about a round trip each.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */
@@ -407,10 +413,22 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       ),
     )
     .for('update');
+  // Judged, and switched, one student at a time against their own taps (A14).
+  for (const studentId of [...new Set(waiting.map((tap) => tap.studentId))].sort()) {
+    await lockStudentTaps(tx, studentId);
+  }
 
   let converted = 0;
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
+    const order = knownOrder({ install: tap.orderInstall, seq: tap.orderSeq });
+    // A waiting tap the phone made before a tap of the student's since recorded
+    // in another session is late (A14): converted, it would switch them back
+    // out of where that later tap took them. It is recorded here, noted, and
+    // consumed like a skipped one — never joined. Judged before the insert
+    // below finds a spent id, because the note rides that insert (events are
+    // append-only): a spent tap, rare, is judged for nothing.
+    const late = await tappedSince(tx, tap.studentId, order, session.id);
 
     // A waiting tap can carry an event id that is ALREADY on record as this
     // student's own `tap_in`, and when it does the tap is not a fresh pre-bell
@@ -472,11 +490,15 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       userId: tap.studentId,
       occurredAt,
       // The tap's own order (A12), so an unlock is ordered against it as the phone made them.
-      order: { install: tap.orderInstall, seq: tap.orderSeq },
+      order,
     } as const;
     let spent = false;
     try {
-      await insertEvent(tx, { eventId: tap.eventId, ...tapInRow });
+      await insertEvent(tx, {
+        eventId: tap.eventId,
+        ...tapInRow,
+        payload: late ? LATE_RETURN : null,
+      });
     } catch (err) {
       if (!(err instanceof TransitionError) || err.code !== 'EVENT_ID_CONFLICT') throw err;
       const prior = firstOrUndefined(
@@ -491,7 +513,7 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         await insertEvent(tx, {
           eventId: newUuidV7(),
           ...tapInRow,
-          payload: { armed_tap_event_id: tap.eventId },
+          payload: { armed_tap_event_id: tap.eventId, ...(late ? LATE_RETURN : {}) },
         });
       }
     }
@@ -519,6 +541,13 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
         occurredAt: session.startedAt,
         payload: { armed_tap_event_id: tap.eventId },
       });
+      continue;
+    }
+    if (late) {
+      await tx
+        .update(armedTaps)
+        .set({ consumedAt: session.startedAt })
+        .where(eq(armedTaps.id, tap.id));
       continue;
     }
 
@@ -849,6 +878,38 @@ async function takeOverStaleRow(
 }
 
 /**
+ * A late tap on the arm path (A14), kept where every arm-path tap is kept: in
+ * `armed_taps`, but consumed as it lands, so it never waits and no Start
+ * converts it. Answered `replay` — recorded, and no Start will honour it — as
+ * its retry is (`answerOwnArmedTap` on a consumed row), so the phone deletes it
+ * and re-reads the truth. Its `event_id` index is the arbiter: a rival delivery
+ * of the same tap, uncommitted when `exact` looked, is answered as this one's
+ * retry. Nothing deletes an `armed_taps` row, so the rival is always found.
+ */
+async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promise<ArmTapResult> {
+  const recorded = firstOrUndefined(
+    await tx
+      .insert(armedTaps)
+      .values({
+        studentId: input.studentId,
+        teacherId: input.teacherId,
+        blockId: input.blockId ?? null,
+        eventId: input.eventId,
+        deviceTime: input.deviceTime,
+        ...orderColumns(input.order),
+        expiresAt: input.expiresAt,
+        consumedAt: now,
+      })
+      .onConflictDoNothing({ target: armedTaps.eventId })
+      .returning({ id: armedTaps.id }),
+  );
+  if (recorded) return { outcome: 'replay', armedTapId: recorded.id };
+  const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
+  if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
+  throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+}
+
+/**
  * Save a tap that arrived before any session was running (decision 5). Stored as
  * student+teacher; it waits until the teacher presses Start. Idempotent on the
  * client's event_id, and at most one waiting tap per student+teacher stands.
@@ -960,6 +1021,16 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return answerOwnArmedTap(tx, exact, now);
+    }
+
+    // A tap the phone made before a tap of the student's already recorded in a
+    // session (A14) never waits: a Start would convert it and switch them back
+    // out of where that later tap took them. Recorded all the same, as a row
+    // consumed on arrival, which no Start converts — and judged before a
+    // standing row answers for it, since the Start declines that row too when
+    // it is older than the same later tap.
+    if (await tappedSince(tx, input.studentId, knownOrder(input.order), null)) {
+      return recordLateArm(tx, input, now);
     }
 
     const waiting = firstOrUndefined(
@@ -1454,6 +1525,21 @@ async function lockTap(tx: Database, tapEventId: string): Promise<void> {
 }
 
 /**
+ * Serialise a student's taps into different sessions, and a Start converting
+ * their waiting tap (A14). Each judges late by the student's taps recorded
+ * elsewhere (`tappedSince`), which a rival's uncommitted tap is not yet, and
+ * each switches by the live rows it then reads — so unserialised, an older tap
+ * could judge before the newer one commits and switch after it, putting the
+ * student back where their later tap took them from. A tap takes it after
+ * `lockTap` and before its session; a Start, for every student it converts, in
+ * id order, before it touches any participation. A transaction advisory lock,
+ * like `lockTap`'s.
+ */
+async function lockStudentTaps(tx: Database, studentId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`taps:${studentId}`}, 0))`);
+}
+
+/**
  * A tap into a running session. If the student is live in another session,
  * that participation is ended as `left_for_other_session` first (decision 4),
  * so switching classes is never counted as an emergency unlock. Reactivating a
@@ -1461,8 +1547,9 @@ async function lockTap(tx: Database, tapEventId: string): Promise<void> {
  * row (there is one row per student per session), never a duplicate. An
  * unlock sent under this tap that reached the server before it is filed here
  * (decision 11). A tap the phone made before an unlock of the student's own in
- * this session that the server already has is late (A13): recorded, noted
- * `superseded`, never applied, and answered as its retry is.
+ * this session that the server already has is late (A13), and so is one it
+ * made before a tap of theirs recorded in another session (A14): recorded,
+ * noted `superseded`, never applied, and answered as its retry is.
  */
 export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   // Retry on deadlock: a cross-session switch-tap ends the student's other-session
@@ -1471,6 +1558,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
       await lockTap(tx, input.eventId);
+      await lockStudentTaps(tx, input.studentId);
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
 
@@ -1619,8 +1707,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       const order = knownOrder(input.order);
       // A tap the phone made before an unlock of the student's own here that
       // the server already has — the tap stuck at the phone's retry bound while
-      // the unlock went ahead — is late: noted as it is recorded (A13).
-      const late = await unlockedSince(tx, session, input.studentId, order);
+      // the unlock went ahead — is late: noted as it is recorded (A13). So is
+      // one it made before a tap of theirs recorded in another session, which
+      // would switch them back out of it (A14).
+      const late =
+        (await unlockedSince(tx, session, input.studentId, order)) ||
+        (await tappedSince(tx, input.studentId, order, session.id));
 
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,
@@ -1645,10 +1737,11 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       }
 
       if (late) {
-        // Never applied: nothing joins, switches or reopens — the unlock after
-        // it stands. On a row still live it is contact, as a late unlock is,
-        // and it still files what was kept under it. Answered as its retry is:
-        // the truth now, naming no session the student is not live in.
+        // Never applied: nothing joins, switches or reopens — the unlock or the
+        // tap after it stands. On a row still live it is contact, as a late
+        // unlock is, and it still files what was kept under it (where the tap
+        // is recorded, as had it landed first). Answered as its retry is: the
+        // truth now, naming no session the student is not live in.
         const live = await loadLiveParticipation(tx, session.id, input.studentId);
         if (!live) {
           await fileKeptUnlocks(tx, session, input, null);
@@ -2125,6 +2218,55 @@ async function unlockedSince(
     )
     .limit(1);
   return later.length > 0;
+}
+
+/**
+ * A tap of the student's own that their phone made after this one — the same
+ * install, a higher seq — recorded in a session other than `sessionId` (any
+ * session, for a tap with none yet). Unexecuted, so a test can EXPLAIN it: the
+ * type is a literal, so the read is one range of `events_order_tap_idx`, the
+ * install's taps past this seq.
+ */
+export function tapsMadeSince(
+  db: Database,
+  studentId: string,
+  order: ActionOrder,
+  sessionId: string | null,
+) {
+  return db
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        sql`${events.type} = 'tap_in'`,
+        eq(events.orderInstall, order.install),
+        gt(events.orderSeq, order.seq),
+        eq(events.userId, studentId),
+        sessionId === null ? undefined : ne(events.sessionId, sessionId),
+      ),
+    )
+    .limit(1);
+}
+
+/**
+ * Whether this tap is older, by the phone's own order, than a tap of the
+ * student's already recorded in another session (owner ruling, 2026-09-25;
+ * A14 — A13's rule, tap against tap): then it is late, and applying it — a
+ * switch, a join, an arm a Start would convert — would put the student back
+ * where their later tap took them from. Every such tap counts, whatever its
+ * note or whether the student is still in its session: the order says which
+ * tap came last, and a note only why one changed nothing. Only the order says
+ * so: with none, or another install's, the tap applies as it arrives. A tap
+ * into the same session is A13's to judge; one only armed is no tap here —
+ * arming ends nothing, so a tap it followed still takes.
+ */
+async function tappedSince(
+  tx: Database,
+  studentId: string,
+  order: ActionOrder | null,
+  sessionId: string | null,
+): Promise<boolean> {
+  return order !== null && (await tapsMadeSince(tx, studentId, order, sessionId)).length > 0;
 }
 
 /**

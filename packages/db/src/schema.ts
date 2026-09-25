@@ -255,6 +255,13 @@ export const events = pgTable(
     index('events_unattached_tap_idx')
       .on(sql`(${t.payload}->>'claimed_tap_event_id')`)
       .where(sql`${t.type} = 'unlock' and ${t.sessionId} is null`),
+    // POST /v1/taps and a Start — a tap is late when the phone made a tap of the
+    // student's after it, from the same install, landed in another session (A14,
+    // `tapsMadeSince`): the install's taps past a seq, which no other index can
+    // bound, since that order is the phone's and not the clock's.
+    index('events_order_tap_idx')
+      .on(t.orderInstall, t.orderSeq)
+      .where(sql`${t.type} = 'tap_in'`),
     // An order is its install and its seq together: half of one orders nothing.
     check('events_order_whole', sql`(${t.orderInstall} IS NULL) = (${t.orderSeq} IS NULL)`),
   ],
@@ -297,7 +304,9 @@ export const armedTaps = pgTable(
     /**
      * Set at the session start that took this tap: it became a participation,
      * or was declined because its tap had already landed (decision 5,
-     * recorded as `armed_tap_skipped`). NULL = still waiting.
+     * recorded as `armed_tap_skipped`) or a later tap went ahead of it (A14,
+     * its `tap_in` noted `superseded`). Set as it lands for a tap already late
+     * then (A14): it never waits. NULL = still waiting.
      */
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
     createdAt: createdAt(),

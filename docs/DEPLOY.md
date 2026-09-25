@@ -74,7 +74,8 @@ checked with a public authorize request (`bali://auth/callback`, scope
   No production API exists yet (Phase 5).
 - **In place** (2026-09-25): all three are in `ios/project.yml` (B4c), and the
   client id is on dev's `AUTH_AUDIENCE`, appended after B4a deployed.
-- **Still to confirm:** its refresh-token expiration (step 3 below), which no
+- **Refresh-token expiration — done** (owner, 2026-09-25): raised above
+  Cognito's 30-day default (step 3 below; 365 days was asked for), which no
   request from outside can show.
 
 **Production — still to do**, in its own pool (hosting decision 2). In the AWS

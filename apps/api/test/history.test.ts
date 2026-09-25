@@ -320,6 +320,45 @@ describe('GET /v1/me/history', () => {
     ]);
   });
 
+  it('shows a late tap at its own time and says so: what went ahead of it stands (A13, A14)', async () => {
+    const one = await seedClassroom(db, 'h-late-tap-one');
+    const two = await seedClassroom(db, 'h-late-tap-two');
+    const student = one.student;
+    await db.insert(enrollments).values({ classId: two.klass.id, studentId: student.id });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const lesson = await startAt(one.klass.id, '09:00', '09:50');
+    await startAt(two.klass.id, '09:00', '09:50');
+    const install = randomUUID();
+    const tapNth = (tagId: string, time: string, seq: number) =>
+      send('POST', token, '/v1/taps', {
+        tagId,
+        eventId: randomUUID(),
+        deviceTime: at(time).toISOString(),
+        order: { install, seq },
+      });
+    await ok(tapNth(one.block.tagId, '09:01', 1));
+    // A re-tap (#2) stuck while the unlock (#3) after it went first (A13).
+    await ok(change(token, lesson.id, 'unlock', '09:04', { order: { install, seq: 3 } }));
+    expect(await ok(tapNth(one.block.tagId, '09:03', 2))).toMatchObject({ state: 'unlocked' });
+    // A tap into one (#4), slow, while the tap into two (#5) went first (A14).
+    await ok(tapNth(two.block.tagId, '09:08', 5));
+    expect(await ok(tapNth(one.block.tagId, '09:06', 4))).toEqual({
+      outcome: 'replay',
+      state: null,
+      session: null,
+    });
+
+    const [c1, c2] = [one.klass.name, two.klass.name];
+    expect((await historyOf(token)).events.map(line)).toEqual([
+      `tap_in 09:08 ${c2}`,
+      `left_for_other_session 09:08 ${c1}`,
+      `tap_in 09:06 ${c1} superseded`,
+      `unlock 09:04 ${c1}`,
+      `tap_in 09:03 ${c1} superseded`,
+      `tap_in 09:01 ${c1}`,
+    ]);
+  });
+
   it('pages through the whole history, each moment once, at any page size', async () => {
     const { token } = await aDayOfClasses('h-walk');
     const all = (await historyOf(token)).events.map((e) => e.eventId);

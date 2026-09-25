@@ -1,0 +1,1 @@
+CREATE INDEX "events_order_tap_idx" ON "events" USING btree ("order_install","order_seq") WHERE "events"."type" = 'tap_in';
