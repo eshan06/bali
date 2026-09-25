@@ -66,7 +66,8 @@ struct Signed: TokenProvider {
 }
 
 /// One send of `record` as the sync engine will make it — its `request` through the real
-/// `APIClient`, answered with `status` and `body` (none when `status` is nil) — then settled.
+/// `APIClient`, answered with `status` and `body` (none when `status` is nil) — then settled; nil
+/// for an unlock not filed yet, which sends nothing (B6b).
 @discardableResult
 func send(
     _ outbox: Outbox, _ record: OutboxRecord, _ status: Int?, _ body: String = "", at now: Date = t0
@@ -81,7 +82,8 @@ func send(_ outbox: Outbox, _ record: OutboxRecord, _ status: Int?, _ body: Data
     let client = APIClient(
         baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
         transport: Canned(status: status, body: body))
-    return try outbox.settle(await record.send(through: client), now: now)
+    guard let sent = await record.send(through: client) else { return nil }
+    return try outbox.settle(sent, now: now)
 }
 
 /// A disposition as the TypeScript writes it.

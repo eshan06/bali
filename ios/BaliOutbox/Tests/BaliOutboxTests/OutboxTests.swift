@@ -21,12 +21,12 @@ struct SchemaTests {
                 try db.columns(in: "outboxState").map(\.name)
             )
         }
-        #expect(applied == ["v1", "v2", "v3"])
+        #expect(applied == ["v1", "v2", "v3", "v4"])
         #expect(
             columns == [
                 "seq", "eventId", "kind", "tagId", "sessionId", "tapId", "reason", "follows",
                 "recordedAt", "attempts", "answers", "nextAttemptAt", "stuck", "lastStatus",
-                "lastReason", "lastMessage",
+                "lastReason", "lastMessage", "orderSeq",
             ])
         #expect(state == ["key", "value"])
         #expect(try outbox.records().isEmpty)
@@ -50,32 +50,38 @@ struct SchemaTests {
         // Protection off was reported for this session: reopening does not report it again.
         #expect(try reopened.record(.protectionOff(session: "s"), now: t0) == nil)
         let applied = try await reopened.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2", "v3"])
+        #expect(applied == ["v1", "v2", "v3", "v4"])
     }
 
     @Test("The schema refuses a row its kind could not send")
     func refusesMalformedRows() throws {
         let (outbox, _) = try makeOutbox()
-        let insert =
-            "INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, recordedAt, nextAttemptAt)"
+        let insert = """
+            INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, recordedAt, nextAttemptAt,
+              orderSeq)
+            """
         for values in [
-            "('a', 'tap', NULL, NULL, NULL, 0, 0)",  // a tap with no tag
-            "('b', 'tap', 'tag', 's', NULL, 0, 0)",  // a tap with a session
-            "('c', 'unlock', NULL, NULL, NULL, 0, 0)",  // an unlock with no session, nor tap
-            "('d', 'refocus', 'tag', 's', NULL, 0, 0)",  // a refocus with a tag
-            "('e', 'checkin', NULL, 's', NULL, 0, 0)",  // not an outbox kind
-            "('f', 'tap', 'tag', NULL, 't', 0, 0)",  // a tap filed under a tap
-            "('g', 'refocus', NULL, 's', 't', 0, 0)",  // a refocus filed under a tap
-            "('h', 'protection_off', NULL, NULL, 't', 0, 0)",  // protection off with no session
+            "('a', 'tap', NULL, NULL, NULL, 0, 0, NULL)",  // a tap with no tag
+            "('b', 'tap', 'tag', 's', NULL, 0, 0, NULL)",  // a tap with a session
+            "('d', 'refocus', 'tag', 's', NULL, 0, 0, NULL)",  // a refocus with a tag
+            "('e', 'checkin', NULL, 's', NULL, 0, 0, NULL)",  // not an outbox kind
+            "('f', 'tap', 'tag', NULL, 't', 0, 0, NULL)",  // a tap filed under a tap
+            "('g', 'refocus', NULL, 's', 't', 0, 0, NULL)",  // a refocus filed under a tap
+            "('h', 'protection_off', NULL, NULL, 't', 0, 0, NULL)",  // protection off, no session
+            "('k', 'refocus', NULL, 's', NULL, 0, 0, 1)",  // a refocus in another's place
         ] {
             #expect(throws: DatabaseError.self, "\(values)") {
                 try outbox.pool.write { try $0.execute(sql: "\(insert) VALUES \(values)") }
             }
         }
-        // An unlock filed under its tap (decision 11): no session until the tap's answer names one.
         try outbox.pool.write {
-            try $0.execute(sql: "\(insert) VALUES ('i', 'unlock', NULL, NULL, 't', 0, 0)")
-            try $0.execute(sql: "\(insert) VALUES ('j', 'unlock', NULL, 's', 't', 0, 0)")
+            // An unlock filed under its tap (decision 11): no session until the tap's answer.
+            try $0.execute(sql: "\(insert) VALUES ('i', 'unlock', NULL, NULL, 't', 0, 0, NULL)")
+            try $0.execute(sql: "\(insert) VALUES ('j', 'unlock', NULL, 's', 't', 0, 0, NULL)")
+            // One made where the phone stood unread: neither, until it is filed (B6b).
+            try $0.execute(sql: "\(insert) VALUES ('c', 'unlock', NULL, NULL, NULL, 0, 0, NULL)")
+            // A follow-up, in its press's place (B6d).
+            try $0.execute(sql: "\(insert) VALUES ('l', 'unlock', NULL, 's', NULL, 0, 0, 1)")
         }
     }
 
@@ -111,7 +117,7 @@ struct SchemaTests {
 
             let outbox = try open(url)
             let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-            #expect(applied == ["v1", "v2", "v3"])
+            #expect(applied == ["v1", "v2", "v3", "v4"])
             let kept = try outbox.records()
             let install = try #require(try installOf(outbox))
             let queued: [Change] = [.unlock(session: "s", reason: .nurse)]
@@ -122,6 +128,51 @@ struct SchemaTests {
             #expect(kept.allSatisfy { $0.attempts == 3 && $0.stuck && $0.lastStatus == 409 })
             #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
             #expect(try record(outbox, .unlockUnderTap(tap: "e9", reason: nil)).order?.seq == 5)
+        }
+    }
+
+    @Test(
+        "A file B6a's build made keeps what it queued, and its counter, the queue drained or not — and takes an unlock under no session nor tap (A12, B6b)"
+    )
+    func fromV3() throws {
+        for drained in [true, false] {
+            let url = temporaryFile()
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let old = try DatabasePool(path: url.path(percentEncoded: false))
+            try Outbox.migrator.migrate(old, upTo: "v3")
+            try old.write { db in
+                for (index, kind) in ["tap", "unlock", "refocus"].enumerated() {
+                    try db.execute(
+                        sql: """
+                            INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, reason,
+                              recordedAt, nextAttemptAt, attempts, stuck, lastStatus)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 3, 1, 409)
+                            """,
+                        arguments: [
+                            "e\(index)", kind, kind == "tap" ? "tag" : nil,
+                            kind == "refocus" ? "s" : nil, kind == "unlock" ? "e0" : nil,
+                            kind == "unlock" ? "nurse" : nil, t0, t0,
+                        ])
+                }
+                try db.execute(
+                    sql: "DELETE FROM outbox WHERE eventId != 'e1' OR ?", arguments: [drained])
+            }
+            try old.close()
+
+            let outbox = try open(url)
+            let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
+            #expect(applied == ["v1", "v2", "v3", "v4"])
+            let kept = try outbox.records()
+            let install = try #require(try installOf(outbox))
+            let queued: [Change] = [.unlockUnderTap(tap: "e0", reason: .nurse)]
+            #expect(kept.map(\.change) == (drained ? [] : queued))
+            #expect(
+                kept.map(\.order)
+                    == (drained ? [] : [2]).map { ActionOrder(install: install, seq: $0) })
+            #expect(kept.allSatisfy { $0.attempts == 3 && $0.stuck && $0.lastStatus == 409 })
+            #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
+            #expect(try record(outbox, .unlockUnfiled(reason: nil)).order?.seq == 5)
         }
     }
 }
@@ -289,7 +340,7 @@ struct ActionOrderTests {
             baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(), transport: wire)
         for _ in 0..<2 {
             let queued = try #require(try current(outbox, unlock.eventId))
-            try outbox.settle(await queued.send(through: client), now: t0)
+            try outbox.settle(try #require(await queued.send(through: client)), now: t0)
         }
         #expect(try await wire.orders == [nth(2), nth(2)])
     }
@@ -314,7 +365,7 @@ struct ActionOrderTests {
         let install = try #require(try installOf(outbox))
         #expect(try outbox.records().map(\.order) == [ActionOrder(install: install, seq: 1)])
         let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2", "v3"])
+        #expect(applied == ["v1", "v2", "v3", "v4"])
     }
 
     static var uuid: Regex<Substring> {
