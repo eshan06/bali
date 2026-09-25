@@ -260,10 +260,13 @@ struct EnforcerTests {
         try await before.tapIn(session(endsAt: 1200))
         try await before.engine.record(.tap(tagId: "tag"))
         await before.stop()
-        let rig = try Rig(outbox: try open(url))
-        let state = await rig.engine.state
+        // An engine starts from the file, before it runs: enforcement never begins from nothing.
+        let client = APIClient(
+            baseURL: URL(string: "https://api.bali.test")!, tokens: Tokens(), transport: Server())
+        let state = await SyncEngine(outbox: try open(url), client: client).state
         #expect(state.standing == .inSession(session(endsAt: 1200), .focused))
         #expect(state.pendingTap != nil)
+        let rig = try Rig(outbox: try open(url))
         let screenTime = FakeScreenTime()
         await screenTime.held()
         let phone = Enforced(rig, screenTime)
@@ -353,12 +356,18 @@ struct ProtectionOffTests {
         await phone.stop()
     }
 
-    @Test("Out of a session there is nothing to report: the check leaves the outbox be")
-    func outOfSession() async throws {
+    @Test(
+        "Out of a session, or in one whose row the server already has as protection off, there is nothing to report"
+    )
+    func nothingToReport() async throws {
         let rig = try Rig()
         let screenTime = FakeScreenTime()
         await screenTime.set(.denied)
         let phone = Enforced(rig, screenTime)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().isEmpty)
+        // A read says so — say the app was reinstalled since: this file never reported it.
+        try await rig.foreground(Answer.me(session(), state: "protection_off"))
         await phone.enforcer.check()
         #expect(try rig.outbox.records().isEmpty)
         await phone.stop()

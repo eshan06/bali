@@ -46,31 +46,8 @@ public enum Standing: Sendable, Hashable {
     }
 }
 
-/// As the outbox file keeps it (`Outbox.standing()`): the session and its state's wire value.
-extension Standing: Codable {
-    private enum Key: String, CodingKey { case session, state, waiting }
-
-    public init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: Key.self)
-        if let session = try values.decodeIfPresent(SessionView.self, forKey: .session) {
-            let state = try values.decodeIfPresent(String.self, forKey: .state)
-            self = .inSession(session, state.flatMap(ParticipationState.init(rawValue:)))
-        } else {
-            self = try values.decodeIfPresent(Bool.self, forKey: .waiting) == true ? .waiting : .out
-        }
-    }
-
-    public func encode(to encoder: any Encoder) throws {
-        var values = encoder.container(keyedBy: Key.self)
-        switch self {
-        case .out: break
-        case .waiting: try values.encode(true, forKey: .waiting)
-        case .inSession(let session, let state):
-            try values.encode(session, forKey: .session)
-            try values.encodeIfPresent(state?.rawValue, forKey: .state)
-        }
-    }
-}
+/// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5).
+extension Standing: Codable {}
 
 /// What the engine knows, for the screens (C1–C6) and enforcement (B5): `SyncEngine.updates()`.
 public struct SyncState: Sendable, Hashable {

@@ -50,8 +50,9 @@ extension CodingUserInfoKey {
 
 /// `USER_ROLES`.
 public enum UserRole: String, CaseIterable, Sendable { case teacher, student }
-/// `PARTICIPATION_STATES`: a participation's stored state.
-public enum ParticipationState: String, CaseIterable, Sendable {
+/// `PARTICIPATION_STATES`: a participation's stored state. Codable for the phone's own records of
+/// it (the standing its outbox file keeps); an answer carries it as `OrUnknown`.
+public enum ParticipationState: String, CaseIterable, Sendable, Codable {
     case focused, unlocked, protectionOff = "protection_off"
 }
 /// `DisplayState`: a stored state, or one derived from it and the time (never stored).
