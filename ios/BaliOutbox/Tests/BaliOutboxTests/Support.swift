@@ -122,6 +122,7 @@ enum Contract {
     static let endpoints: [(folder: String, change: Change)] = [
         ("taps", .tap(tagId: "tag")),
         ("unlock", .unlock(session: "session", reason: nil)),
+        ("tap-unlock", .unlockUnderTap(tap: "tap", reason: nil)),
         ("refocus", .refocus(session: "session")),
         ("protection-off", .protectionOff(session: "session")),
     ]
