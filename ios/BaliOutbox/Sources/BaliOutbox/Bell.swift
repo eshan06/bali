@@ -71,18 +71,18 @@ public enum Bell {
         }
     }
 
-    /// The monitor's wake at `now` — its `wake`, with the file at `url` — carried out in an order no
-    /// kill undoes (#97's review). Its retry, the wake a minute on that a file not read asks for,
-    /// is asked of `center` first, before the file is opened: iOS may kill the monitor while it
-    /// reads — for a migration the ceiling gave up on, still holding the file's write lock
+    /// The monitor's wake at `now` — its `wake`, with the file at `url` — carried out in an order
+    /// no kill undoes (#97's review). Its retry, the wake a minute on that a file not read asks
+    /// for, is asked of `center` first, before the file is opened: iOS may kill the monitor while
+    /// it reads — for a migration the ceiling gave up on, still holding the file's write lock
     /// (0xdead10cc), or for its memory — and it is woken again all the same, or iOS's refusal is
     /// kept already. Then: nothing keeps the shields on — `clear` them, and the retry withdrawn, so
     /// nothing wakes the monitor for nothing, unless iOS holds another window by then (the app's);
     /// else the next wake is asked for — the retry, held already, or a later one in its place. One
     /// iOS refuses leaves nothing to wake the monitor again, so the shields it keeps outlive their
     /// end with the app closed: `refused` is told `now` as it happens, for the app to show from its
-    /// next open (`Protection.monitorUnscheduled`), and none once a wake is taken or the shields are
-    /// cleared (#92's review). What it did, for the Debug readout.
+    /// next open (`Protection.monitorUnscheduled`), and none once a wake is taken or the shields
+    /// are cleared (#92's review). What it did, for the Debug readout.
     public static func carryOut(
         outboxAt url: URL, at now: Date, cap: TimeInterval = SyncState.tapCap,
         in center: some BellCenter, clearing clear: () -> Void, refused: (Date?) -> Void,

@@ -223,17 +223,19 @@ struct ExtensionReadTests {
 }
 
 #if os(Linux)
-    /// Closing a connection to one file fails, while `closing` runs: each connection SQLite opens to
-    /// it keeps a statement never finalized, so `sqlite3_close` answers SQLITE_BUSY, which GRDB
-    /// throws. Linux only: Apple's SQLite takes no process-wide extension.
+    /// Closing a connection to one file fails while `closing` runs: each connection SQLite opens
+    /// to it keeps a statement never finalized, so `sqlite3_close` answers SQLITE_BUSY, which GRDB
+    /// throws. Linux only: Apple's SQLite supports no process-wide auto extension.
     private enum Unclosable {
         static let lock = NSLock()
         nonisolated(unsafe) static var path: String?
         nonisolated(unsafe) static var statements: [OpaquePointer] = []
 
+        /// An extension's entry point, as SQLite calls it: the connection, its error, its API.
+        typealias Entry = @convention(c) (OpaquePointer?, OpaquePointer?, OpaquePointer?) -> Int32
+
         /// What SQLite runs as it opens each connection, once registered.
-        static let open: @convention(c) (OpaquePointer?, OpaquePointer?, OpaquePointer?) -> Int32 = {
-            db, _, _ in
+        static let open: Entry = { db, _, _ in
             let name = sqlite3_db_filename(db, "main").map { String(cString: $0) }
             guard let name, name == Unclosable.lock.withLock({ Unclosable.path }) else {
                 return SQLITE_OK

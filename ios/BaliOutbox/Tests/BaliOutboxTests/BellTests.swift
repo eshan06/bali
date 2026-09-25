@@ -590,6 +590,11 @@ struct RegisterTests {
             #expect(said.contains("NOT registered") && refusals.last == t0, "\(said)")
             #expect(cleared == 1 && Self.heldEnd(center) == Bell.window(until: at(1200)).end)
         }
+
+        // Cleared, its retry refused: nothing is left to wake the monitor for; the refusal ends.
+        refusals = []
+        #expect(carryOut(SyncState()).hasPrefix("cleared (its retry NOT registered: "))
+        #expect(refusals == [t0, nil] && cleared == 2)
     }
 
     @Test(
