@@ -143,13 +143,18 @@ public actor SignIn: TokenProvider {
     /// How long before its expiry an access token stops being given, so one sent arrives in time.
     static let margin: TimeInterval = 60
 
-    let cognito: Cognito
+    /// Nonisolated, so the app reads it without a hop: an actor's `let` is isolated outside its
+    /// module.
+    public nonisolated let cognito: Cognito
     let store: any TokenStore
     let transport: any HTTPTransport
     let now: @Sendable () -> Date
     /// The tokens, once the store could be read (`loaded`); nil when nobody is signed in.
     private var tokens: Tokens?
     private var loaded = false
+    /// The store is behind `tokens`: a renewal's that the Keychain could not take then (the phone
+    /// locked), saved at the next ask — a refresh token Cognito rotated is kept nowhere else.
+    private var unsaved = false
     /// The renewal under way, which every caller shares.
     private var renewing: Task<Bool, Never>?
     private var tokenArrived: (@Sendable () async -> Void)?
@@ -207,7 +212,7 @@ public actor SignIn: TokenProvider {
         ]).get()
         guard let refresh = grant.refresh else { throw .refused(nil) }
         let tokens = Tokens(access: grant.access, refresh: refresh, at: now())
-        guard (try? store.save(JSONEncoder().encode(tokens))) != nil else { throw .notKept }
+        guard keep(tokens) else { throw .notKept }
         adopt(tokens)
         await tokenArrived?()
     }
@@ -240,7 +245,10 @@ public actor SignIn: TokenProvider {
     /// now — the Keychain while the phone is locked — is read again next time: never a sign-out.
     /// Tokens it cannot decode are none: the student signs in again.
     private func current() -> Tokens? {
-        guard !loaded else { return tokens }
+        if loaded {
+            if unsaved, let tokens { unsaved = !keep(tokens) }
+            return tokens
+        }
         do {
             let stored = try store.load()
             adopt(stored.flatMap { try? JSONDecoder().decode(Tokens.self, from: $0) })
@@ -248,10 +256,16 @@ public actor SignIn: TokenProvider {
         return tokens
     }
 
-    /// The phone's tokens from now on — nil: signed out — told to every watcher.
-    private func adopt(_ tokens: Tokens?) {
-        (self.tokens, loaded) = (tokens, true)
+    /// The phone's tokens from now on — nil: signed out — told to every watcher; `saved` when the
+    /// store has them too.
+    private func adopt(_ tokens: Tokens?, saved: Bool = true) {
+        (self.tokens, loaded, unsaved) = (tokens, true, !saved)
         for watcher in watchers.values { watcher.yield(tokens != nil) }
+    }
+
+    /// Whether the store took `tokens`.
+    private func keep(_ tokens: Tokens) -> Bool {
+        (try? store.save(JSONEncoder().encode(tokens))) != nil
     }
 
     /// A renewal with the refresh token, one at a time, which every caller shares — `telling` the
@@ -274,11 +288,10 @@ public actor SignIn: TokenProvider {
         guard tokens?.refresh == refresh else { return tokens != nil }
         switch answer {
         case .success(let grant):
-            // The refresh token stays Cognito's own unless the client rotates it, so the store keeps
-            // working with the one it has whether or not the fresh access token lands in it.
+            // A refresh token Cognito rotates replaces the one kept, which then stops working — so
+            // tokens the Keychain cannot take right now are saved again at the next ask.
             let fresh = Tokens(access: grant.access, refresh: grant.refresh ?? refresh, at: now())
-            _ = try? store.save(JSONEncoder().encode(fresh))
-            adopt(fresh)
+            adopt(fresh, saved: keep(fresh))
             if telling { await tokenArrived?() }
             return true
         case .failure(.refused("invalid_grant")):

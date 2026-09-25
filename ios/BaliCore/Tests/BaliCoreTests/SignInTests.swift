@@ -43,7 +43,8 @@ func refusal(_ error: String) -> String { #"{"error":"\#(error)"}"# }
 /// The hosted UI, as the browser session hands it back: the student signed in and sent back to
 /// the redirect URI with a code for the attempt the page was opened for.
 let signsIn: @Sendable (URL) async throws -> URL = { url in
-    let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+    let state =
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
         .first { $0.name == "state" }?.value ?? ""
     return URL(string: "bali://auth/callback?code=the-code&state=\(state)")!
 }
@@ -67,7 +68,9 @@ final class MemoryStore: TokenStore, @unchecked Sendable {
     var tokens: Tokens? { data.flatMap { try? JSONDecoder().decode(Tokens.self, from: $0) } }
     func setLocked(_ locked: Bool) { lock.withLock { isLocked = locked } }
 
-    func load() throws -> Data? { try lock.withLock { if isLocked { throw Locked() } else { saved } } }
+    func load() throws -> Data? {
+        try lock.withLock { if isLocked { throw Locked() } else { saved } }
+    }
     func save(_ tokens: Data) throws { try change(tokens) }
     func clear() throws { try change(nil) }
     private func change(_ data: Data?) throws {
@@ -129,6 +132,14 @@ struct SignInTests {
         #expect(Attempt(verifier: rfcVerifier, state: "s").challenge == rfcChallenge)
     }
 
+    @Test("the app reads where the hosted UI answers without a hop, as its browser session needs")
+    func redirect() {
+        // This module is not BaliCore, as the app is not: without `nonisolated` it does not compile.
+        let signIn = SignIn(
+            cognito: cognito, store: MemoryStore(), transport: TransportDouble(status: 500))
+        #expect(signIn.cognito.redirectURI.scheme == "bali")
+    }
+
     @Test("every attempt's verifier and state are fresh, URL-safe and long enough")
     func fresh() {
         let (one, two) = (Attempt(), Attempt())
@@ -173,9 +184,13 @@ struct SignInTests {
         }
     }
 
-    @Test("a sign-in exchanges its code and verifier at the token endpoint, no secret, and keeps both tokens")
+    @Test(
+        "a sign-in exchanges its code and verifier at the token endpoint, no secret, and keeps both tokens"
+    )
     func exchange() async throws {
-        let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a1"), refresh: "refresh-1").utf8)) }
+        let endpoint = TransportDouble { _ in
+            (200, Data(granted(jwt("a1"), refresh: "refresh-1").utf8))
+        }
         let (store, told) = (MemoryStore(), Told())
         let opened = Opened()
         let signIn = await signIn(store, endpoint, told: told)
@@ -188,17 +203,21 @@ struct SignInTests {
         let sent = try #require(await endpoint.sent.first)
         #expect(await endpoint.sent.count == 1)
         #expect(sent.httpMethod == "POST" && sent.url?.absoluteString == tokenEndpoint)
-        #expect(sent.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+        #expect(
+            sent.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
         #expect(sent.value(forHTTPHeaderField: "Authorization") == nil)
         let form = fields(sent.httpBody)
-        #expect(Set(form.keys) == ["grant_type", "client_id", "code", "redirect_uri", "code_verifier"])
+        #expect(
+            Set(form.keys) == ["grant_type", "client_id", "code", "redirect_uri", "code_verifier"])
         #expect(form["grant_type"] == "authorization_code" && form["client_id"] == "phone-client")
         #expect(form["code"] == "the-code" && form["redirect_uri"] == "bali://auth/callback")
         // The verifier sent is the one whose challenge the sign-in page was opened with.
         let page = try #require(await opened.url)
         let challenge = URLComponents(url: page, resolvingAgainstBaseURL: false)?.queryItems?
             .first { $0.name == "code_challenge" }?.value
-        #expect(challenge == Attempt(verifier: try #require(form["code_verifier"]), state: "").challenge)
+        #expect(
+            challenge == Attempt(verifier: try #require(form["code_verifier"]), state: "").challenge
+        )
 
         #expect(store.tokens?.access == jwt("a1") && store.tokens?.refresh == "refresh-1")
         #expect(await signIn.accessToken() == jwt("a1"))
@@ -225,7 +244,8 @@ struct SignInTests {
         await #expect(throws: error) {
             try await signIn.signIn { url in
                 guard reply != nil || answer != nil else { throw CancellationError() }
-                let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                let state =
+                    URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
                     .first { $0.name == "state" }?.value ?? ""
                 return URL(string: "bali://auth/callback?\(answer ?? "code=c")&state=\(state)")!
             }
@@ -235,11 +255,15 @@ struct SignInTests {
         #expect(await told.count == 0)
     }
 
-    @Test("a sign-in that cannot reach Cognito, or whose tokens the Keychain refuses, keeps nothing")
+    @Test(
+        "a sign-in that cannot reach Cognito, or whose tokens the Keychain refuses, keeps nothing")
     func unkept() async throws {
         let (store, told) = (MemoryStore(), Told())
-        let offline = await signIn(store, TransportDouble(throwing: URLError(.notConnectedToInternet)), told: told)
-        await #expect(throws: SignInError.unreachable) { try await offline.signIn(through: signsIn) }
+        let offline = await signIn(
+            store, TransportDouble(throwing: URLError(.notConnectedToInternet)), told: told)
+        await #expect(throws: SignInError.unreachable) {
+            try await offline.signIn(through: signsIn)
+        }
 
         store.setLocked(true)
         let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a1"), refresh: "r").utf8)) }
@@ -259,9 +283,12 @@ actor Opened {
 }
 
 @Suite(
-    "The tokens: given, renewed, and signed out only by Cognito's own no (B4)", .timeLimit(.minutes(3)))
+    "The tokens: given, renewed, and signed out only by Cognito's own no (B4)",
+    .timeLimit(.minutes(3)))
 struct TokenTests {
-    @Test("the access token is given until a minute before its own lifetime ends, whatever the phone's clock")
+    @Test(
+        "the access token is given until a minute before its own lifetime ends, whatever the phone's clock"
+    )
     func given() async throws {
         let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a2")).utf8)) }
         let (now, told) = (Now(), Told())
@@ -275,7 +302,9 @@ struct TokenTests {
         #expect(await endpoint.sent.count == 1)
     }
 
-    @Test("an expired token is renewed with the refresh token before one is given, and the engine told")
+    @Test(
+        "an expired token is renewed with the refresh token before one is given, and the engine told"
+    )
     func renewed() async throws {
         let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a2")).utf8)) }
         let (store, now, told) = (try MemoryStore.holding(jwt("a1")), Now(), Told())
@@ -287,7 +316,10 @@ struct TokenTests {
         #expect(sent.httpMethod == "POST" && sent.url?.absoluteString == tokenEndpoint)
         #expect(
             fields(sent.httpBody)
-                == ["grant_type": "refresh_token", "client_id": "phone-client", "refresh_token": "refresh-1"])
+                == [
+                    "grant_type": "refresh_token", "client_id": "phone-client",
+                    "refresh_token": "refresh-1",
+                ])
         #expect(await told.count == 1)
         // The refresh token is kept when the answer brings none; a fresh token lives its own hour.
         #expect(store.tokens?.access == jwt("a2") && store.tokens?.refresh == "refresh-1")
@@ -298,12 +330,34 @@ struct TokenTests {
 
     @Test("a refresh token Cognito rotates replaces the one kept")
     func rotated() async throws {
-        let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a2"), refresh: "refresh-2").utf8)) }
+        let endpoint = TransportDouble { _ in
+            (200, Data(granted(jwt("a2"), refresh: "refresh-2").utf8))
+        }
         let (store, now) = (try MemoryStore.holding(jwt("a1")), Now())
         let signIn = await signIn(store, endpoint, now: now, told: Told())
         now.set(4000)
         #expect(await signIn.accessToken() == jwt("a2"))
         #expect(store.tokens?.refresh == "refresh-2")
+    }
+
+    @Test("a rotated refresh token the Keychain cannot take right then is saved at the next ask")
+    func rotatedUnsaved() async throws {
+        let endpoint = TransportDouble { _ in
+            (200, Data(granted(jwt("a2"), refresh: "refresh-2").utf8))
+        }
+        let (store, now) = (try MemoryStore.holding(jwt("a1")), Now())
+        let signIn = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await signIn.accessToken() == jwt("a1"))  // read while the phone is unlocked
+
+        store.setLocked(true)
+        now.set(4000)
+        #expect(await signIn.accessToken() == jwt("a2"))  // renewed: the old refresh token is spent
+        #expect(store.tokens?.refresh == "refresh-1")  // the Keychain refused the new one
+
+        store.setLocked(false)
+        #expect(await signIn.accessToken() == jwt("a2"))
+        #expect(store.tokens?.refresh == "refresh-2" && store.tokens?.access == jwt("a2"))
+        #expect(await endpoint.sent.count == 1)
     }
 
     @Test("Cognito refusing the refresh token signs the student out — the one real no")
@@ -374,7 +428,9 @@ struct TokenTests {
         #expect(await told.count == 1)
     }
 
-    @Test("the engine's refresh is false at once when nobody is signed in: only the student can sign in")
+    @Test(
+        "the engine's refresh is false at once when nobody is signed in: only the student can sign in"
+    )
     func refreshSignedOut() async {
         let endpoint = TransportDouble(status: 200, body: granted(jwt("a1")))
         let signIn = await signIn(MemoryStore(), endpoint, told: Told())
@@ -456,6 +512,28 @@ struct TokenTests {
         #expect(await signIn.accessToken() == nil)
     }
 
+    @Test(
+        "a sign-in while a renewal runs stands, even when Cognito refuses the refresh token let go")
+    func signInMidRenewal() async throws {
+        let endpoint = HeldEndpoint()
+        let (store, now, told) = (try MemoryStore.holding(jwt("a1")), Now(), Told())
+        let signIn = await signIn(store, endpoint, now: now, told: told)
+        now.set(4000)
+
+        let renewal = Task { await signIn.accessToken() }
+        try await eventually { await endpoint.sent == 1 }
+        let signingIn = Task { try await signIn.signIn(through: signsIn) }
+        try await eventually { await endpoint.sent == 2 }
+        await endpoint.answer(200, granted(jwt("b1"), refresh: "refresh-b"), newestOnly: true)
+        try await signingIn.value
+        await endpoint.answer(400, refusal("invalid_grant"))  // the renewal's, about refresh-1
+
+        #expect(await renewal.value == jwt("b1"))  // the sign-in's token, the one there is now
+        #expect(store.tokens?.refresh == "refresh-b")
+        #expect(await first(signIn.signedIn()) == true)
+        #expect(await told.count == 1)  // the sign-in's
+    }
+
     @Test("a token whose lifetime cannot be read is given until the API refuses it")
     func unreadable() async throws {
         let endpoint = TransportDouble(status: 200, body: granted(jwt("a2")))
@@ -494,9 +572,11 @@ actor HeldEndpoint: HTTPTransport {
         return (Data(body.utf8), try #require(response))
     }
 
-    func answer(_ status: Int, _ body: String) {
-        for request in waiting { request.resume(returning: (status, body)) }
-        waiting = []
+    /// Answers every request waiting, or only the newest.
+    func answer(_ status: Int, _ body: String, newestOnly: Bool = false) {
+        let answering = newestOnly ? [waiting.removeLast()] : waiting
+        if !newestOnly { waiting = [] }
+        for request in answering { request.resume(returning: (status, body)) }
     }
 }
 
