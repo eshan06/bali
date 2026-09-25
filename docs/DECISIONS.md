@@ -8,6 +8,87 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **A13: a return the phone made before an unlock the server already has is
+  recorded, never applied (owner ruling, 2026-09-24).** The ruling, "Fix it", verbatim: "The server
+  uses the phone's order number that A12 added. A refocus or re-tap that is older than an unlock the
+  server already has is recorded but not applied, so the unlock stands. A small server-only step,
+  after B4 and before B6." **Why:** A12's entry disclosed it — its "Not covered (1)", closed here.
+  The phone refocuses, or re-taps into the session it is in, and the request is slow, outliving the
+  phone's wait, or the tap is stuck at B3a's retry bound; the student then hits Emergency Unlock,
+  the outbox deletes a queued refocus and sends the unlock, which lands first and applies. The old
+  return then landed and applied too, and within one ~30 s check-in the read put the shields back
+  over the student's emergency unlock: A12's order judged an unlock against the returns already
+  recorded (`returnedSince`), never a return against the unlocks. **The rule, A10/A12's mirror:**
+  a return — a `refocus`, or a `tap_in` into a session — is late when the student already has an
+  unlock in that session from the same install with a higher seq (`unlockedSince`). By the order
+  only: with none on either side, or another install's, the arrival order stands, as before. No
+  time rule, unlike A10's for an unlock: an unlock on a clock running fast clamps to the bell, and
+  no return could ever come after it. **Late:** recorded, never applied. The event commits noted
+  `superseded` in `payload.recorded_as` — `RETURN_RECORDED_AS`, additive, the key and value a late
+  unlock carries; BaliCore's `ReturnRecordedAs` — and what it would have flipped is left alone: no
+  join, no switch, no participation reopened. On a live row it is contact, as a late unlock is:
+  last seen moves, an open silence episode closes. **The answer is its retry's:** `replay`, with
+  the truth now — while the student is live there, the session and the state the unlock left
+  (`unlocked`, or what a later action made it), which both outbox tables and their Swift ports
+  read as `apply_session`: the record is deleted and the phone applies that state; once they are
+  not (a tap reaching a session they have since left), no session and no state, `reread`: deleted,
+  the truth re-read. Never a retry loop and never a refusal: a new outcome is `retry` in every
+  table (an old build would resend a recorded return forever); `recorded` — the state change's
+  "changed nothing" — reads as a session over in both tables (`reread`, never the state named),
+  and the tap's has none; `joined` and `applied` say it took. A late return is on record the moment
+  it lands, so answering it as its retry is exact: the first answer and every retry's are one, and
+  a replay answers what was recorded, never judging it again. On the phone, a refocus a later
+  unlock supersedes is already deleted and its answer settles to nothing (B3a), so it is a stuck
+  tap's answer that reaches the reconcile — and it now says `unlocked`. **What counts: every unlock
+  of the student's there, whatever its note.** The order says which of their own actions came last;
+  a note says only why an unlock flipped nothing, never that the student did not make it. Noted
+  `protection_off`: a re-tap older than it, applied, would lift protection off to focus — green
+  over a phone whose permission went off before that unlock. Noted `no_live_participation` or
+  `after_session_end`: a tap older than it would re-join a student whose own last word there was an
+  unlock, and a refocus after the end is refused anyway. Noted `superseded` itself: a return after
+  it by the order went ahead of it, so the return older than both changes nothing either way, and
+  its note says the truth — an unlock of the student's own came after it. Counting every record
+  both ways (`returnedSince` counts a late return too) keeps the one invariant the rule exists
+  for: within one install, the row is what the student's latest action by the phone's order made
+  it, whatever order the requests arrive in. **Only where it would apply:** judged after every
+  refusal — out of protection off, nothing live, after the end — so a late refocus is refused
+  exactly where any refocus is, recording nothing. A late tap into a session the student has since
+  left joins nothing: they are never switched back out of the one their own later tap put them in.
+  **Protection off stays out:** a late protection-off still applies — it reports the permission's
+  real state, never the student's intent, and protection off still comes first (A10). **A11's
+  filing path:** a tap is judged against the unlocks its session holds when it lands, before it
+  files the unlocks kept under it. Those were in no session until then, and, made while it was
+  unanswered, come after it by the order, so they are judged after it by the unlock's own rules: a
+  tap is never late by what it files (A12's test of both arrival orders pins it), and a late tap
+  still files them — never lost — answering the state they leave. **Where:** `changeState` (its
+  `returning` rule, the refocus's) and `tapIn` (`fileKeptUnlocks`, the filing loop, now shared by
+  the late path), both under the session lock taken as before — `lockTap`, then the session, then
+  the row — so no new lock order; the look is one read of the student's own events in the window
+  (`events_user_occurred_idx`, as `returnedSince`), and only for a return carrying an order: ~0.7
+  ms a tap on the real lane (30 ordered taps a round into one session, ~5.8 ms against ~5.1), the
+  read itself ~0.04 ms and the rest its round trip. Only the engine writes events and
+  participations. **Readers:** the live grid (`applyEvent`) leaves the chip alone for a late
+  return — contact, nothing more; the snapshot's chip turn looks past a late record of either kind
+  (the unlock-only scope of #76's rider was right while no return could carry the note); the
+  history shows the late return with its note; reports (Phase 4) must not start focus time at it
+  (PLAN's reports row). **Not covered, disclosed — outside the ruling, for the
+  owner:** (1) a return older by the order than a *protection-off* report still applies: a re-tap
+  stuck while protection went off, landing after the report, lifts the row to focus over a phone
+  iOS unshielded, and the outbox reports protection off once per revocation, so nothing says so
+  again until B5's check of the shields — B5 should report it again when a read says focused while
+  the permission is off, or the owner can extend the rule to it; (2) a tap older than a later tap
+  into another class still switches the student back: the order ranks a student's unlock against
+  their return, not two taps. **Tests:** the engine on PGlite (a late refocus and a late re-tap,
+  each with its replay; a newer return, another install's pair and no order, applied; protection
+  off still applied; every note counted; a session left, never reopened; a late tap filing what was
+  kept under it; every refusal standing; contact), a real-Postgres race of each return against the
+  unlock after it, in both arrival orders, ending unlocked; the API (both endpoints, their
+  dispositions, a replay, a session left, an unusable order); two fixtures
+  (`refocus/replay-superseded`, `taps/replay-superseded`) and a late refocus in
+  `history/every-kind`; the grid, the snapshot and the history; BaliCore's vocabulary. The gap's
+  tests failed before the fix; the grid's, the snapshot's, the history's and the race each fail
+  on a mutation of what they pin. **Rider:** `docs/GOTCHAS.md` gains B4c's worker's trap — a draft
+  marked ready reads green before its Claude Review runs.
 - **2026-09-25** — **B4c: the app's one sync engine starts over the student's sign-in, with dev's
   sign-in in its build settings — and a locked phone's Keychain is never a sign-out.**
   `SyncEngine.make` (`ios/BaliOutbox`) keeps B4's contract with the engine in one place: the API
@@ -209,7 +290,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   disclosed:** (1) a refocus the phone made before its unlock that reaches the server after
   it still applies — only one in flight when the unlock was recorded can (the outbox deletes
   a queued refocus), its request outliving the phone's timeout: arrival order, not a clock,
-  and the ruling orders the unlock's judgement; (2) a backup of the outbox file restored onto
+  and the ruling orders the unlock's judgement — **closed by A13 (2026-09-25): such a return
+  is recorded, never applied**; (2) a backup of the outbox file restored onto
   a second phone still in use shares its install, so the two phones' orders compare as one's
   — at worst a forged order's effect. **Elsewhere the phone's clock still orders a student's
   own actions** (out of this ruling, listed not fixed): the history (`getHistoryPage`, newest

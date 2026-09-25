@@ -26,7 +26,8 @@ public enum TapDisposition: String, CaseIterable, Sendable {
     /// Recorded, in a running session the answer names (`joined`, `switched`, or the `replay` of a
     /// tap still live): delete the record and reconcile to the answer. `session.endsAt` replaces
     /// decision 7's 50-minute cap; `state` is the current truth — a replay's can be `unlocked` or
-    /// `protection_off` — so the phone is shielded only while it is `focused`.
+    /// `protection_off`, a late tap's (A13) included — so the phone is shielded only while it is
+    /// `focused`.
     case applySession = "apply_session"
     /// Armed (decision 5), or `already_armed` — a waiting tap of this student's for this teacher
     /// already stands and covers this one, which is also the answer to the retry of a tap still
@@ -98,7 +99,7 @@ public func tapDisposition(_ result: SendResult, _ body: TapResponse?) -> TapDis
 /// Each raw value is the TypeScript's.
 public enum StateChangeDisposition: String, CaseIterable, Sendable {
     /// Applied, or a replay while the session runs: delete the record and reconcile to `session`
-    /// and `state` (a replay answers the current state).
+    /// and `state` (a replay answers the current state, as a late refocus does, A13).
     case applySession = "apply_session"
     /// Recorded with no session — a protection-off report that first reached the server after its
     /// session ended (A2c), and its replay; and the replay of a refocus whose participation ended

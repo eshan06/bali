@@ -290,6 +290,36 @@ describe('GET /v1/me/history', () => {
     ]);
   });
 
+  it('shows a late return at its own time and says so: the unlock after it stands (A13)', async () => {
+    const room = await seedClassroom(db, 'h-late-return');
+    const token = await ctx.tokenFor(room.student.cognitoId);
+    const lesson = await startAt(room.klass.id, '09:00', '09:50');
+    const install = randomUUID();
+    const nth = (seq: number) => ({ order: { install, seq } });
+    await ok(
+      send('POST', token, '/v1/taps', {
+        tagId: room.block.tagId,
+        eventId: randomUUID(),
+        deviceTime: at('09:01').toISOString(),
+        ...nth(1),
+      }),
+    );
+    await ok(change(token, lesson.id, 'unlock', '09:04', nth(2)));
+    // Back to focus (#3), its request outliving the phone's wait; the student
+    // unlocked again (#4), which went ahead. The refocus lands last.
+    await ok(change(token, lesson.id, 'unlock', '09:09', { reason: 'nurse', ...nth(4) }));
+    const late = await ok(change(token, lesson.id, 'refocus', '09:06', nth(3)));
+    expect(late).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+
+    const c = room.klass.name;
+    expect((await historyOf(token)).events.map(line)).toEqual([
+      `unlock 09:09 ${c} nurse`,
+      `refocus 09:06 ${c} superseded`,
+      `unlock 09:04 ${c}`,
+      `tap_in 09:01 ${c}`,
+    ]);
+  });
+
   it('pages through the whole history, each moment once, at any page size', async () => {
     const { token } = await aDayOfClasses('h-walk');
     const all = (await historyOf(token)).events.map((e) => e.eventId);

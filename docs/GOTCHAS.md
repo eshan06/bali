@@ -43,6 +43,12 @@ touching infra, CI, git plumbing, or the dev environment.
 - **GitHub silently disables a PR's auto-merge when a required check fails.**
   After driving the check green, re-enable auto-merge — a green PR otherwise
   just sits there.
+- **A draft marked ready reads green before its review has run.** Claude
+  Review skips drafts (`if: !draft`) and a skipped required check counts as
+  passing, so just after "Ready for review" the PR looks clean and
+  `enable_pr_auto_merge` answers "already mergeable", suggesting a direct
+  merge. Never merge it by hand: wait for the Claude Review run that
+  `ready_for_review` starts, and let auto-merge merge it.
 - **Dependabot-triggered workflow runs read the _Dependabot_ secrets store,
   not Actions secrets.** A secret needed in those runs must exist in both
   stores (`CLAUDE_CODE_OAUTH_TOKEN` does).

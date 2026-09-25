@@ -3,6 +3,7 @@ import type {
   FeedEvent,
   ParticipationState,
   ProtectionOffRecordedAs,
+  ReturnRecordedAs,
   SessionSnapshot,
   UnlockReason,
   UnlockRecordedAs,
@@ -73,6 +74,18 @@ function payloadOf(e: FeedEvent): Record<string, unknown> {
   return typeof e.payload === 'object' && e.payload !== null
     ? (e.payload as Record<string, unknown>)
     : {};
+}
+
+/**
+ * A late return (A13): a tap or a refocus the phone made before an unlock of
+ * the student's own there that the engine already had. It left the row as that
+ * unlock made it, and so does the chip — contact, and nothing more.
+ */
+function isLateReturn(e: FeedEvent): boolean {
+  return (
+    (e.type === 'tap_in' || e.type === 'refocus') &&
+    payloadOf(e).recorded_as === ('superseded' satisfies ReturnRecordedAs)
+  );
 }
 
 export function fromSnapshot(snap: SessionSnapshot): Students {
@@ -147,6 +160,10 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
   // being dropped. The record is durable; the grid must not stay silent about
   // it, and the next snapshot carries them.
   const s: Student = { ...(prev[id] ?? unknownStudent(id)) };
+  if (isLateReturn(e)) {
+    s.lastSeenAt = advance(s.lastSeenAt, at);
+    return { ...prev, [id]: s };
+  }
   switch (e.type) {
     case 'tap_in':
       s.state = 'focused';

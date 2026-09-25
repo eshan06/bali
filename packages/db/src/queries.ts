@@ -4,6 +4,7 @@ import {
   type HistoryEventType,
   isUnlockReason,
   type ParticipationState,
+  type ReturnRecordedAs,
   UNLOCK_RECORDED_AS,
   type UnlockReason,
   type UnlockRecordedAs,
@@ -347,22 +348,32 @@ export interface SnapshotRosterRow {
   protectionOffAfterEnd: boolean;
 }
 
-/** An unlock's or a protection-off's note, as stored in `payload.recorded_as`; null when none. */
+/**
+ * A record's note — an unlock's, a protection off's or a return's — as stored in
+ * `payload.recorded_as`; null when none.
+ */
 function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null {
   return (UNLOCK_RECORDED_AS as readonly unknown[]).includes(payload.recorded_as)
     ? (payload.recorded_as as UnlockRecordedAs)
     : null;
 }
 
+/** What can carry a note: an unlock, a protection off, and a return to focus (A13). */
+const NOTED = [
+  'unlock',
+  'protection_off',
+  'tap_in',
+  'refocus',
+] as const satisfies readonly EventType[];
+
 /** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */
 const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly EventType[];
 /**
- * A late unlock, which the student's own return to focus went ahead of: it turns nothing. The
- * filter below looks past it on an unlock only, and that scope is deliberate, not defensive: no
- * writer notes a return today, so only a hand-made row tests it — should one ever carry a note,
- * a return still turns the chip, since a student's return to focus is never late.
+ * A late record turns nothing: an unlock the student's own return went ahead of (A10), or a
+ * return their own unlock went ahead of (A13) — what went ahead stands. The filter below looks
+ * past the note on every turn, since each can carry it.
  */
-const LATE_UNLOCK: UnlockRecordedAs = 'superseded';
+const LATE: UnlockRecordedAs & ReturnRecordedAs = 'superseded';
 
 /**
  * The grid-boot roster for a session (decision 5): every student the session's
@@ -376,10 +387,11 @@ const LATE_UNLOCK: UnlockRecordedAs = 'superseded';
  * Beside the stored slice, what it does not show (A9): the student's latest
  * unlock since they last tapped in or refocused — the engine records one
  * without flipping the row when protection is off, when nothing is live, and
- * after the end; a late one (A10) turns nothing, so the turn looks past it to
- * the one before — and whether a protection-off report came after the end,
- * which leaves the ended row alone (A2c). The caller derives each display
- * state; one statement, so the row and its records are read at one instant.
+ * after the end; a late one (A10), or a late return (A13), turns nothing, so
+ * the turn looks past it to the one before — and whether a protection-off
+ * report came after the end, which leaves the ended row alone (A2c). The
+ * caller derives each display state; one statement, so the row and its
+ * records are read at one instant.
  */
 export async function getSessionRoster(
   db: Database,
@@ -394,8 +406,8 @@ export async function getSessionRoster(
         eq(events.sessionId, sessionId),
         eq(events.userId, users.id),
         inArray(events.type, CHIP_TURNS),
-        // A late unlock's note, on an unlock only: a return is never late.
-        sql`(${events.type} <> 'unlock' or ${events.payload}->>'recorded_as' is distinct from ${LATE_UNLOCK})`,
+        // A late record's note, an unlock's or a return's.
+        sql`${events.payload}->>'recorded_as' is distinct from ${LATE}`,
       ),
     )
     .orderBy(desc(events.seq))
@@ -617,7 +629,10 @@ export interface HistoryRow {
   endsAt: Date | null;
   endedAt: Date | null;
   reason: UnlockReason | null;
-  /** An unlock's or a protection-off's note; the latter's are a subset of the former's. */
+  /**
+   * An unlock's, a protection-off's or a return's note (A13): the others' are
+   * a subset of the first's.
+   */
   recordedAs: UnlockRecordedAs | null;
   /** For `armed_tap_skipped`: the class of the student's own `tap_in` it was declined for. */
   countedIn: { id: string; name: string } | null;
@@ -696,8 +711,7 @@ export async function getHistoryPage(
       type: row.type as HistoryEventType,
       occurredAt: row.occurredAt!,
       reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
-      recordedAs:
-        row.type === 'unlock' || row.type === 'protection_off' ? recordedAsOf(payload) : null,
+      recordedAs: (NOTED as readonly string[]).includes(row.type) ? recordedAsOf(payload) : null,
       countedIn:
         row.type === 'armed_tap_skipped'
           ? (counted.get(payload.armed_tap_event_id as string) ?? null)

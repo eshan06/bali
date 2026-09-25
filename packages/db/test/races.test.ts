@@ -421,6 +421,64 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   }, 120_000);
 
+  it('a late return racing the unlock the phone made after it ends unlocked, whichever lands first (A13)', async () => {
+    // A refocus or re-tap (#3) whose request outlived the phone's wait, or
+    // whose tap was stuck, and the Emergency Unlock (#4) made after it. Both
+    // lock the session FOR UPDATE, and the return judges "late" under that
+    // lock. The unlock first: the return is recorded, never applied. The
+    // return first: it applies, and the unlock — after it by the order — then
+    // flips it. Unlocked either way, and each recorded once.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    const install = newUuidV7();
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['refocus', 'tap'] as const) {
+        const { classId, studentId } = await seed(`race-late-return-${rival}-${round}`);
+        const session = await openSession(classId);
+        const change = (deviceTime: Date, seq: number) => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime,
+          order: { install, seq },
+        });
+        await tapIn(db, change(ago(50), 1));
+        await unlock(db, change(ago(45), 2));
+
+        const back = change(ago(40), 3);
+        const theReturn = () => (rival === 'refocus' ? refocus(db, back) : tapIn(db, back));
+        const newer = change(ago(30), 4);
+        const theUnlock = () => unlock(db, newer);
+        // Each round gives one side a head start, so both orders get exercised:
+        // left alone, the unlock nearly always wins a tap, which locks its id first.
+        const later = (fn: () => Promise<unknown>) =>
+          new Promise((resolve) => setTimeout(resolve, 10)).then(fn);
+        const [returned, unlocked] = await Promise.allSettled([
+          round % 2 === 1 ? later(theReturn) : theReturn(),
+          round % 2 === 0 ? later(theUnlock) : theUnlock(),
+        ]);
+
+        if (returned.status === 'rejected') throw returned.reason;
+        if (unlocked.status === 'rejected') throw unlocked.reason;
+        expect(one(await liveParticipations(session.id)).state).toBe('unlocked');
+        const eventOf = async (eventId: string) =>
+          one(await db.select().from(events).where(eq(events.eventId, eventId)));
+        const [backEvent, newerEvent] = [await eventOf(back.eventId), await eventOf(newer.eventId)];
+        // Late exactly when the unlock committed first.
+        if (newerEvent.seq < backEvent.seq) {
+          expect(returned.value).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+          expect(backEvent.payload).toEqual({ recorded_as: 'superseded' });
+        } else {
+          expect(returned.value).toMatchObject({ state: 'focused' });
+          expect(backEvent.payload).toBeNull();
+          expect(unlocked.value).toMatchObject({ outcome: 'applied', recordedAs: null });
+        }
+        expect(await eventsOfType(session.id, rival === 'tap' ? 'tap_in' : 'refocus')).toHaveLength(
+          rival === 'tap' ? 2 : 1,
+        );
+      }
+    }
+  }, 120_000);
+
   it('an unlock sent under a tap racing that tap ends unlocked, filed once, whichever lands first (decision 11)', async () => {
     // The phone sends in order, but a tap stuck at its retry bound steps aside
     // for the unlock behind it, and a request the phone gave up on may still

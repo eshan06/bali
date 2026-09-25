@@ -105,6 +105,10 @@ const SCENARIOS: Record<string, string> = {
     'A protection-off report carrying the phone’s own order (A12), as every record the outbox sends does.',
   'tap-unlock/applied-ordered':
     'An unlock sent under a re-tap on a clock still behind (A12): older than the tap by the times, after it by the order — applied.',
+  'refocus/replay-superseded':
+    'A late refocus (A13), made before an unlock the server already has, its request outliving the phone’s wait: recorded, never applied, answered as its retry is.',
+  'taps/replay-superseded':
+    'A late re-tap (A13), stuck at the phone’s retry bound while the unlock after it went first: recorded, never applied, answered as its retry is.',
   'refocus/applied': 'Back to focus after an unlock.',
   'refocus/replay': 'The retry of a refocus that landed, the student still in the session.',
   'refocus/replay-no-session':
@@ -447,6 +451,36 @@ async function captureAll() {
   });
   await capture('tap-unlock/applied-ordered', underRetap, 200, last);
 
+  // A return the phone made before an unlock the server already has (A13):
+  // recorded, never applied — the unlock stands — and answered as its retry is.
+  const tardy = await seedClassroom(db, 'fx-late-return');
+  const lesson15 = (
+    await startSession(db, {
+      classId: tardy.klass.id,
+      startedAt: new Date(lessonAt('15:00').deviceTime),
+      endsAt: new Date(lessonAt('15:50').deviceTime),
+    })
+  ).session;
+  const hal = await token(tardy.student.cognitoId);
+  const halsPhone = randomUUID();
+  const mth = (seq: number, hhmm: string) => ({
+    ...lessonAt(hhmm),
+    order: { install: halsPhone, seq },
+  });
+  const tapMth = (seq: number, hhmm: string) =>
+    post(hal, '/v1/taps', { tagId: tardy.block.tagId, eventId: randomUUID(), ...mth(seq, hhmm) });
+  await setup(tapMth(1, '15:01'));
+  await setup(change(hal, lesson15.id, 'unlock', randomUUID(), mth(2, '15:05')));
+  // Back to focus (#3), its request outliving the phone's wait, and a re-tap
+  // (#4), stuck; the student unlocked again (#5), and that went first.
+  await setup(
+    change(hal, lesson15.id, 'unlock', randomUUID(), { reason: 'nurse', ...mth(5, '15:12') }),
+  );
+  const stands = { outcome: 'replay', state: 'unlocked' };
+  const slowBack = change(hal, lesson15.id, 'refocus', randomUUID(), mth(3, '15:08'));
+  await capture('refocus/replay-superseded', slowBack, 200, stands);
+  await capture('taps/replay-superseded', tapMth(4, '15:10'), 200, stands);
+
   // Previewing a code, then joining and leaving by it (A6, auth decision 3).
   const room = await seedClassroom(db, 'fx-enroll');
   await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, room.teacher.id));
@@ -528,6 +562,11 @@ async function captureAll() {
   const sB = await startAt(p5.klass.id, '10:00', '10:50');
   const sC = await startAt(p6.klass.id, '10:00', '10:50');
   await setup(tapAt(p5.block.tagId, '10:05'));
+  // A refocus (#1) her phone made before an unlock (#2), landing after it (A13).
+  const herPhone = randomUUID();
+  const hers = (seq: number, time: string) => ({ ...at(time), order: { install: herPhone, seq } });
+  await setup(change(her, sB.id, 'unlock', randomUUID(), hers(2, '10:12')));
+  await setup(change(her, sB.id, 'refocus', randomUUID(), hers(1, '10:10')));
   await setup(tapAt(p6.block.tagId, '10:30'));
   await endAt(sC.id, '10:40', 'ended');
   await endAt(sB.id, '10:50', 'expired');
@@ -667,6 +706,8 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(new Set(moments.map((e) => e.type))).toEqual(new Set(HISTORY_EVENT_TYPES));
     const late = moments.filter((e) => e.recordedAs === 'after_session_end').map((e) => e.type);
     expect(new Set(late)).toEqual(new Set(['unlock', 'protection_off']));
+    const passed = moments.filter((e) => e.recordedAs === 'superseded').map((e) => e.type);
+    expect(new Set(passed)).toEqual(new Set(['refocus']));
     const declined = moments.find((e) => e.type === 'armed_tap_skipped');
     expect(declined?.countedIn).not.toBeNull();
     for (const optional of [

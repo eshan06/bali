@@ -28,8 +28,9 @@ export type TapDisposition =
    * Recorded, in a running session the answer names (`joined`, `switched`, or
    * the `replay` of a tap still live): delete the record and reconcile to the
    * answer. `session.endsAt` replaces decision 7's 50-minute cap; `state` is
-   * the current truth — a replay's can be `unlocked` or `protection_off` — so
-   * the phone is shielded only while it is `focused`.
+   * the current truth — a replay's can be `unlocked` or `protection_off`, a
+   * late tap's (A13) included — so the phone is shielded only while it is
+   * `focused`.
    */
   | 'apply_session'
   /**
@@ -139,7 +140,8 @@ export function tapDisposition(
 export type StateChangeDisposition =
   /**
    * Applied, or a replay while the session runs: delete the record and
-   * reconcile to `session` and `state` (a replay answers the current state).
+   * reconcile to `session` and `state` (a replay answers the current state, as
+   * a late refocus does, A13).
    */
   | 'apply_session'
   /**

@@ -18,7 +18,7 @@ import type {
   TapResponse,
   UnlockResponse,
 } from '@bali/shared';
-import { tapDisposition, unlockDisposition } from '@bali/shared';
+import { stateChangeDisposition, tapDisposition, unlockDisposition } from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -886,6 +886,103 @@ describe('the phone’s own order (A12)', () => {
     const kept = await ordersOf(student.id);
     expect(kept).toHaveLength(2 + 2 * odd.length + 1);
     expect(kept.filter((e) => e.install !== null || e.seq !== null)).toEqual([]);
+  });
+});
+
+describe('a late return (A13)', () => {
+  // A refocus or re-tap the phone made before an unlock the server already
+  // has is recorded but never applied — the unlock stands — and answered as
+  // its retry would be: the truth now, which the outbox deletes and applies.
+  const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+  const install = randomUUID();
+  const order = (seq: number) => ({ install, seq });
+  async function lesson(tag: string) {
+    const running = await seedRunning(tag);
+    const token = await ctx.tokenFor(running.student.cognitoId);
+    const tapBlock = (seconds: number, seq: number | null, eventId = randomUUID()) =>
+      post(token, '/v1/taps', {
+        tagId: running.block.tagId,
+        eventId,
+        deviceTime: ago(seconds),
+        ...(seq === null ? {} : { order: order(seq) }),
+      });
+    const send = (route: string, seconds: number, extra: object, eventId = randomUUID()) =>
+      post(token, `/v1/sessions/${running.session.id}/${route}`, {
+        eventId,
+        deviceTime: ago(seconds),
+        ...extra,
+      });
+    expect((await tapBlock(50, 1)).json<TapResponse>().outcome).toBe('joined');
+    return { ...running, tapBlock, send };
+  }
+  const stateOf = async (sessionId: string) =>
+    (await db.select().from(participations).where(eq(participations.sessionId, sessionId)))[0];
+
+  it('a late refocus is answered with the unlock that stands: deleted and applied, and its retry replays', async () => {
+    const { session, send } = await lesson('late-refocus-api');
+    await send('unlock', 40, { order: order(2) });
+    const slowId = randomUUID();
+    await send('unlock', 20, { order: order(4), reason: 'nurse' });
+
+    const res = await send('refocus', 30, { order: order(3) }, slowId);
+    expect(res.statusCode).toBe(200);
+    const body = res.json<RefocusResponse>();
+    expect(body).toEqual({
+      outcome: 'replay',
+      state: 'unlocked',
+      session: { id: session.id, classId: session.classId, endsAt: session.endsAt.toISOString() },
+    });
+    expect(stateChangeDisposition(res.statusCode, body)).toBe('apply_session');
+    expect((await stateOf(session.id))?.state).toBe('unlocked');
+
+    const retry = await send('refocus', 30, { order: order(3) }, slowId);
+    expect(retry.json<RefocusResponse>()).toEqual(body);
+  });
+
+  it('a late re-tap is answered the same way, and never shields the phone again', async () => {
+    const { session, send, tapBlock } = await lesson('late-retap-api');
+    const stuckId = randomUUID();
+    await send('unlock', 20, { order: order(3) });
+
+    const res = await tapBlock(30, 2, stuckId);
+    expect(res.statusCode).toBe(200);
+    const body = res.json<TapResponse>();
+    expect(body).toMatchObject({
+      outcome: 'replay',
+      state: 'unlocked',
+      session: { id: session.id },
+    });
+    expect(tapDisposition(res.statusCode, body)).toBe('apply_session');
+    expect((await stateOf(session.id))?.state).toBe('unlocked');
+    expect((await tapBlock(30, 2, stuckId)).json<TapResponse>()).toEqual(body);
+  });
+
+  it('a late tap into a session the student has left names no session: deleted, and the truth re-read', async () => {
+    const { session, send, tapBlock, klass, student } = await lesson('late-left-api');
+    await send('unlock', 30, { order: order(3) });
+    // Then the student left the class, and joined it again.
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    await endEnrollment(db, { enrollmentId: enrollment!.id, reason: 'left_class', at: new Date() });
+    await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
+
+    const res = await tapBlock(40, 2);
+    expect(res.json<TapResponse>()).toEqual({ outcome: 'replay', state: null, session: null });
+    expect(tapDisposition(res.statusCode, res.json())).toBe('reread');
+    expect((await stateOf(session.id))?.endedReason).toBe('left_class');
+  });
+
+  it('with no order the server can use, a return applies as it arrives, as before', async () => {
+    const { session, send } = await lesson('late-bare-api');
+    await send('unlock', 20, { order: order(3) });
+    const res = await send('refocus', 30, { order: { install, seq: 0 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<RefocusResponse>()).toMatchObject({ outcome: 'applied', state: 'focused' });
+    expect((await stateOf(session.id))?.state).toBe('focused');
+    const bad = await send('refocus', 10, { eventId: 'not-a-uuid' });
+    expect(bad.statusCode).toBe(400);
   });
 });
 

@@ -82,6 +82,10 @@ public enum UnlockRecordedAs: String, CaseIterable, Sendable {
 public enum ProtectionOffRecordedAs: String, CaseIterable, Sendable {
     case afterSessionEnd = "after_session_end"
 }
+/// `RETURN_RECORDED_AS`: why a return to focus — a refocus, or a tap — was recorded without being
+/// applied. `superseded`: the phone made it before an unlock the server already had (A13), which
+/// stands; the answer is its retry's, the truth now. A history shows it as `recordedAs`.
+public enum ReturnRecordedAs: String, CaseIterable, Sendable { case superseded }
 /// `UNLOCK_REASONS`. Codable because the phone sends one; an answer carries it as `OrUnknown`.
 public enum UnlockReason: String, CaseIterable, Sendable, Codable { case bathroom, nurse, other }
 /// `HISTORY_EVENT_TYPES`: the moments a student's history shows; the app skips an unknown one.

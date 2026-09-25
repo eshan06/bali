@@ -5,6 +5,7 @@ import type {
   ParticipationEndedReason,
   ParticipationState,
   ProtectionOffRecordedAs,
+  ReturnRecordedAs,
   UnlockReason,
   UnlockRecordedAs,
   UserRole,
@@ -113,6 +114,9 @@ export interface TapResponse {
   /**
    * `already_armed` is also the answer to the retry of a tap still waiting
    * (A4), so a phone that lost the first answer learns it waits for Start.
+   * `replay` is also the answer to a late tap (A13) — one the phone made
+   * before an unlock the server already has: recorded, never applied, and
+   * answered with the truth now, as its retry is.
    */
   outcome: TapOutcome;
   /**
@@ -267,6 +271,11 @@ export interface RefocusRequest {
 export const REFOCUS_OUTCOMES = ['applied', 'replay'] as const;
 export type RefocusOutcome = (typeof REFOCUS_OUTCOMES)[number];
 export interface RefocusResponse {
+  /**
+   * `replay` is also the answer to a late refocus (A13) — one the phone made
+   * before an unlock the server already has: recorded, never applied, and
+   * answered with the truth now, as its retry is.
+   */
   outcome: RefocusOutcome;
   /**
    * The current stored state. Null on the `replay` of a refocus whose
@@ -381,8 +390,12 @@ export interface HistoryEvent {
    */
   session: { id: string; startedAt: string; endsAt: string; endedAt: string | null } | null;
   reason: UnlockReason | null;
-  /** Why an unlock or protection off changed nothing — `after_session_end`: it came late. */
-  recordedAs: UnlockRecordedAs | ProtectionOffRecordedAs | null;
+  /**
+   * Why an unlock, a protection off or a return to focus changed nothing —
+   * `after_session_end`: it came after the end; `superseded`: it is late, a
+   * later action of the student's own there having reached the server first.
+   */
+  recordedAs: UnlockRecordedAs | ProtectionOffRecordedAs | ReturnRecordedAs | null;
   countedIn: MeClass | null;
 }
 export interface HistoryPage {
@@ -500,8 +513,8 @@ export interface SnapshotStudent {
   endedAt: string | null;
   /**
    * The student's latest emergency unlock in this session since they last
-   * tapped in or returned to focus — a late one (`superseded`) never counts —
-   * or null. `state` does not always show it:
+   * tapped in or returned to focus — a late record (`superseded`), an unlock or
+   * a return, never counts — or null. `state` does not always show it:
    * the engine records an unlock without flipping the row when protection is
    * off (never softened into an unlock), when no participation is live, and
    * after the end — the grid reads it here as it reads the unlock event.
