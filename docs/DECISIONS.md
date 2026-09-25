@@ -95,10 +95,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   for another install and for no order, every later tap counted — its session over, or noted
   late itself — the same session A13's, contact where the student is back, the late arm and
   its Start, a waiting tap declined and a newer one converting, the kept unlocks both ways and
-  on the arm path, the index's EXPLAIN); four real-Postgres races — a tap against the later
-  tap and a Start against it, each in both arrival orders, and each lock staged: holding the
-  older tap's or the Start's own id, a holder parks it just after it judged, and without the
-  lock the later tap commits and the student ends back in the older one's class; the API
+  on the arm path, the index's EXPLAIN); five real-Postgres races — a tap against the later
+  tap, an arm against it and then its Start, and a Start against it, in both arrival orders,
+  and each lock staged: holding the older tap's or the Start's own id, a holder parks it just
+  after it judged, and without the lock the later tap commits and the student ends back in
+  the older one's class; the API
   (`POST /v1/taps`: the answer, its disposition, `GET /v1/me`, A's snapshot, the retry, the
   arm path and its Start); the grid (absent stays absent; the kept unlock reads "Left ·
   unlocked" either way); BaliCore decodes the fixtures. Seven of the gap's engine tests fail

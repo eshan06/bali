@@ -617,6 +617,47 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   }, 120_000);
 
+  it('an arm racing a later tap into another class, then its Start, ends in the later one’s class (A14)', async () => {
+    // Y's block (#1) and B's (#2) at once. `armTap` takes no student lock, so
+    // it may miss the tap still in flight and arm; then the Start judges it
+    // again, under the lock, and declines it. Arm late, and it never waits.
+    // In B either way, and never joined into Y.
+    const install = newUuidV7();
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, sb, y } = await rooms(`race-a14-arm-${round}`);
+      const armed = newUuidV7();
+      const arm = () =>
+        armTap(db, {
+          studentId,
+          teacherId: y.teacherId,
+          eventId: armed,
+          deviceTime: new Date(Date.now() - 20_000),
+          order: { install, seq: 1 },
+          expiresAt: new Date(Date.now() + 3_600_000),
+        });
+      const newer = aTap(sb.id, studentId, new Date(), { install, seq: 2 });
+      const later = (fn: () => Promise<unknown>) =>
+        new Promise((resolve) => setTimeout(resolve, 10)).then(fn);
+      const [armedTap, tapped] = await Promise.allSettled([
+        round % 2 === 1 ? later(arm) : arm(),
+        round % 2 === 0 ? later(() => tapIn(db, newer)) : tapIn(db, newer),
+      ]);
+      if (armedTap.status === 'rejected') throw armedTap.reason;
+      if (tapped.status === 'rejected') throw tapped.reason;
+      expect(tapped.value).toMatchObject({ outcome: 'joined' });
+      expect(['armed', 'replay']).toContain((armedTap.value as { outcome: string }).outcome);
+
+      const { session, armedConverted } = await startSession(db, {
+        classId: y.classId,
+        startedAt: new Date(Date.now() - 1000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      expect(armedConverted).toBe(0);
+      expect(one(await liveOf(studentId)).sessionId).toBe(sb.id);
+      expect(await liveParticipations(session.id)).toHaveLength(0);
+    }
+  }, 120_000);
+
   it('a Start that judged its waiting tap before a later tap committed never switches the student back (A14)', async () => {
     // The same interleaving at a Start: it judges the waiting tap not late,
     // then parks on its `tap_in` — a holder owns the tap's id — while the

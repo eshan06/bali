@@ -425,7 +425,9 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
     // A waiting tap the phone made before a tap of the student's since recorded
     // in another session is late (A14): converted, it would switch them back
     // out of where that later tap took them. It is recorded here, noted, and
-    // consumed like a skipped one — never joined.
+    // consumed like a skipped one — never joined. Judged before the insert
+    // below finds a spent id, because the note rides that insert (events are
+    // append-only): a spent tap, rare, is judged for nothing.
     const late = await tappedSince(tx, tap.studentId, order, session.id);
 
     // A waiting tap can carry an event id that is ALREADY on record as this
