@@ -4,6 +4,9 @@ import Foundation
 /// The engine's clock: the time records are stamped with, and waiting on it — a test's own there.
 public protocol SyncClock: Sendable {
     func now() -> Date
+    /// How long the phone has run, by a clock no setting of the time moves: for a span that a clock
+    /// set forward or back must neither shrink nor stretch.
+    func uptime() -> TimeInterval
     /// Returns at `deadline`, or throws once the task is cancelled.
     func sleep(until deadline: Date) async throws
 }
@@ -12,6 +15,7 @@ public protocol SyncClock: Sendable {
 public struct SystemClock: SyncClock {
     public init() {}
     public func now() -> Date { Date() }
+    public func uptime() -> TimeInterval { ProcessInfo.processInfo.systemUptime }
     public func sleep(until deadline: Date) async throws {
         try await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow)))
     }
@@ -51,8 +55,50 @@ public enum Standing: Sendable, Hashable {
     }
 }
 
-/// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5).
-extension Standing: Codable {}
+/// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5): a
+/// form of its own, each key and value spelled out, so no change to the enum can leave a kept
+/// standing unreadable to the next build. Additive only, as `/v1` is: a later build may add a key,
+/// never rename or drop one. `.unread` is never kept: it would write over the file's truth from
+/// nothing.
+extension Standing: Codable {
+    private enum Key: String, CodingKey { case standing, sessionId, classId, endsAt, state }
+
+    public init(from decoder: any Decoder) throws {
+        let kept = try decoder.container(keyedBy: Key.self)
+        switch try kept.decode(String.self, forKey: .standing) {
+        case "out": self = .out
+        case "waiting": self = .waiting
+        case "in_session":
+            let session = SessionView(
+                id: try kept.decode(String.self, forKey: .sessionId),
+                classId: try kept.decode(String.self, forKey: .classId),
+                endsAt: try kept.decode(Date.self, forKey: .endsAt))
+            // A state this build does not know is none, never focus.
+            let state = try kept.decodeIfPresent(String.self, forKey: .state)
+            self = .inSession(session, state.flatMap(ParticipationState.init(rawValue:)))
+        case let standing:
+            throw DecodingError.dataCorruptedError(
+                forKey: .standing, in: kept, debugDescription: "No standing \(standing)")
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var kept = encoder.container(keyedBy: Key.self)
+        switch self {
+        case .out: try kept.encode("out", forKey: .standing)
+        case .waiting: try kept.encode("waiting", forKey: .standing)
+        case .inSession(let session, let state):
+            try kept.encode("in_session", forKey: .standing)
+            try kept.encode(session.id, forKey: .sessionId)
+            try kept.encode(session.classId, forKey: .classId)
+            try kept.encode(session.endsAt, forKey: .endsAt)
+            try kept.encodeIfPresent(state?.rawValue, forKey: .state)
+        case .unread:
+            throw EncodingError.invalidValue(
+                self, .init(codingPath: encoder.codingPath, debugDescription: "Never kept"))
+        }
+    }
+}
 
 /// What the engine knows, for the screens (C1–C6) and enforcement (B5): `SyncEngine.updates()`.
 public struct SyncState: Sendable, Hashable {
@@ -117,6 +163,7 @@ public actor SyncEngine {
     /// `.unread`, which would write over the file's truth from nothing.
     public private(set) var state = SyncState() {
         didSet {
+            if state.standing != .unread { armed = false }
             if state.standing != kept, state.standing != .unread { keepStanding() }
             if state != oldValue { publish() }
         }
@@ -124,6 +171,10 @@ public actor SyncEngine {
     /// The standing the file holds; nil when not known, so a write that failed — refused while the
     /// app was suspended, say — is made again at the next change of state.
     private var kept: Standing?
+    /// A tap answered armed while where the phone stood was unread, which cannot show it: carried
+    /// until the standing is known — onto an out the file gives back, or a read of the truth that
+    /// names no session — since no read shows an armed tap.
+    private var armed = false
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
     /// Rule 3's check of the shields, run before each check-in: the enforcer's (B5).
     private var check: (@Sendable () async -> Void)?
@@ -137,8 +188,9 @@ public actor SyncEngine {
     private var reauth: Task<Bool, Never>?
     private var running = false
     private enum Loop { case drain, read }
-    private var waiters: [Loop: CheckedContinuation<Void, Never>] = [:]
+    private var waiters: [Loop: (pause: Int, wake: CheckedContinuation<Void, Never>)] = [:]
     private var rung: Set<Loop> = []
+    private var pauses = 0
 
     /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready. It
     /// must return at once — false when only the student can give a token, whose sign-in then calls
@@ -203,11 +255,18 @@ public actor SyncEngine {
         if case .protectionOff(let session) = change, state.standing.isFocused(in: session) {
             try outbox.protectionRestored()
         }
-        guard let record = try outbox.record(change, now: clock.now()) else { return nil }
+        // Where it leaves the phone is kept in the change's own write: killed between two, a
+        // relaunch would stand where the phone stood before — shielded over an Emergency Unlock.
+        let standing = state.standing.acting(change)
+        let keeping = standing == .unread ? nil : standing
+        guard let record = try outbox.record(change, now: clock.now(), standing: keeping) else {
+            return nil
+        }
+        if let keeping { kept = keeping }
         changes += 1
         let queued = queue()
         update {
-            $0.standing = $0.standing.acting(change)
+            $0.standing = standing
             $0.queued = queued
             $0.refused = nil
         }
@@ -316,9 +375,11 @@ public actor SyncEngine {
         case .tap(.waitForStart)?:
             switch next.standing {
             // Arming ends nothing: a session the phone is in stays (decision 4) — and one it may
-            // be in, where it stood unread, is asked of the server.
+            // be in, where it stood unread, is asked of the server, the arming carried meanwhile.
             case .inSession: break
-            case .unread: reread()
+            case .unread:
+                if applies { armed = true }
+                reread()
             case .out, .waiting: if applies { next.standing = .waiting }
             }
         case .tap(.reread)?, .tap(.retryAndSurface)?, .stateChange(.reread)?: reread()
@@ -338,9 +399,10 @@ public actor SyncEngine {
         while !Task.isCancelled {
             rung.remove(.read)
             readStanding()
-            // Rule 3, before the check-in: a protection off it reports is a change, which the
-            // check-in's stamp then counts.
-            if !rereading, foreground, case .inSession = state.standing { await check?() }
+            // Rule 3, at each wake in the foreground: before the check-in, or the read of the truth
+            // in its place — offline, one that never completes. A protection off it reports is a
+            // change, which the read's stamp then counts.
+            if foreground, case .inSession = state.standing { await check?() }
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
@@ -383,12 +445,14 @@ public actor SyncEngine {
     private func readStanding() {
         guard state.standing == .unread, let standing = stored(outbox.standing) else { return }
         kept = standing
-        state.standing = standing
+        state.standing = armed && standing == .out ? .waiting : standing
     }
 
-    /// `GET /v1/me`'s answer, as a standing: its live session, or none.
+    /// `GET /v1/me`'s answer, as a standing: its live session, or none — waiting, while armed.
     private func standing(_ me: MeResponse) -> Standing {
-        guard let session = me.session else { return state.standing == .waiting ? .waiting : .out }
+        guard let session = me.session else {
+            return state.standing == .waiting || armed ? .waiting : .out
+        }
         let view = SessionView(id: session.id, classId: session.classId, endsAt: session.endsAt)
         return switch session.state.known {
         case .focused?, .silent?: .inSession(view, .focused)
@@ -487,24 +551,28 @@ public actor SyncEngine {
 
     private func ring(_ loop: Loop) {
         if let waiter = waiters.removeValue(forKey: loop) {
-            waiter.resume()
+            waiter.wake.resume()
         } else {
             rung.insert(loop)
         }
     }
 
     /// Waits for `deadline` (nil: none) or a ring, whichever comes first — a ring made while the
-    /// loop was busy ends the wait at once.
+    /// loop was busy ends the wait at once. The deadline's alarm rings only this pause: one that
+    /// goes off as another ring ends it, its own ring run late, neither wakes the next pause nor
+    /// leaves a ring for it — an early check-in.
     private func pause(_ loop: Loop, until deadline: Date?) async {
         guard rung.remove(loop) == nil else { return }
+        pauses += 1
+        let pause = pauses
         let alarm = deadline.map { deadline in
             Task { [clock] in
                 try await clock.sleep(until: deadline)
-                ring(loop)
+                if waiters[loop]?.pause == pause { ring(loop) }
             }
         }
         await withTaskCancellationHandler {
-            await withCheckedContinuation { waiters[loop] = $0 }
+            await withCheckedContinuation { waiters[loop] = (pause, $0) }
         } onCancel: {
             Task { await self.ring(loop) }
         }

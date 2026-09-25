@@ -1,5 +1,6 @@
 import BaliCore
 import Foundation
+import GRDB
 import Testing
 
 @testable import BaliOutbox
@@ -76,6 +77,28 @@ func spoilStanding(_ outbox: Outbox) throws {
 /// The standing as the file holds it, unread.
 func keptStanding(_ outbox: Outbox) throws -> String? {
     try outbox.pool.read { try Outbox.state($0, Outbox.standingKey) }
+}
+
+/// At every commit to the file it observes, the engine the next launch would start, were the app
+/// killed right then: each started over a connection of its own, as that launch's, never run.
+final class Relaunches: TransactionObserver, @unchecked Sendable {
+    private let lock = NSLock()
+    private var started: [SyncEngine] = []
+    private let file: Outbox
+    private let client = APIClient(
+        baseURL: URL(string: "https://api.bali.test")!, tokens: Tokens(), transport: Server())
+
+    init(_ url: URL) throws { file = try open(url) }
+
+    var engines: [SyncEngine] { lock.withLock { started } }
+
+    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool { true }
+    func databaseDidChange(with event: DatabaseEvent) {}
+    func databaseDidCommit(_ db: Database) {
+        let engine = SyncEngine(outbox: file, client: client)
+        lock.withLock { started.append(engine) }
+    }
+    func databaseDidRollback(_ db: Database) {}
 }
 
 /// An enforcer over a rig's engine and clock, with Screen Time as the test holds it.
@@ -486,7 +509,7 @@ struct ProtectionOffTests {
     }
 
     @Test(
-        "Never granted — not determined at two checks a check-in apart — is reported, once: a phone that cannot shield is never shown focused"
+        "Never granted — not determined at two checks a check-in apart, coming to the foreground and at the check-in — is reported, once: a phone that cannot shield is never shown focused"
     )
     func notDeterminedLasting() async throws {
         let rig = try Rig()
@@ -495,20 +518,17 @@ struct ProtectionOffTests {
         let phone = Enforced(rig, screenTime)
         try await rig.tapIn()
         try await rig.foreground()
-        rig.clock.advance(by: 30)
-        try await rig.server.next(checkInRoute).reply(200, Answer.live())
         #expect(try rig.outbox.records().isEmpty)
-        try await rig.checkInDue(at(60))
         rig.clock.advance(by: 30)
         try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         await rig.until {
             $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
         }
-        try await rig.checkInDue(at(90))
+        try await rig.checkInDue(at(60))
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
-        try await rig.sleeping([at(120)])
+        try await rig.sleeping([at(90)])
         #expect(await rig.server.waiting.isEmpty)
         #expect(try rig.outbox.records().isEmpty)
         await phone.stop()
@@ -542,7 +562,7 @@ struct ProtectionOffTests {
     }
 
     @Test(
-        "A clock turned back between the checks starts the run again rather than stalling it: never granted is still reported, a check-in later"
+        "A clock turned back between the checks neither stalls the run nor starts it again — it is measured by the time the phone has run: never granted is still reported, a check-in later"
     )
     func notDeterminedClockBack() async throws {
         let rig = try Rig()
@@ -552,11 +572,74 @@ struct ProtectionOffTests {
         try await rig.tapIn()
         await phone.enforcer.check()
         // The student turns the phone's clock back ten minutes.
-        rig.clock.advance(by: -600)
+        rig.clock.turn(by: -600)
         await phone.enforcer.check()
         #expect(try rig.outbox.records().isEmpty)
         rig.clock.advance(by: 30)
         await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "A clock set forward between two reads of not determined collapses no grace window: a launch's passing read is never reported, and one that lasts a check-in, by the time the phone has run, is"
+    )
+    func notDeterminedClockForward() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded }
+        // Just after a launch, the phone's clock minutes behind: not determined, for a moment.
+        await phone.screenTime.reads(.notDetermined)
+        await phone.enforcer.check()
+        // The clock corrects itself, ten minutes forward, and a second later the app checks again.
+        rig.clock.turn(by: 600)
+        rig.clock.advance(by: 1)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().isEmpty)
+        rig.clock.advance(by: 29)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "A session the phone's own clock says is over has no protection off to report, as it has no shields: none is written into its history",
+        arguments: [(1199.0, true), (1200.0, false), (1300.0, false)])
+    func notAfterTheEnd(seconds: TimeInterval, reported: Bool) async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        // Offline since the tap, say: nothing has told the phone the session is over but its clock.
+        try await rig.tapIn(session(endsAt: 1200))
+        await phone.until { $0.shielded }
+        rig.clock.advance(by: seconds)
+        await phone.screenTime.set(.denied)
+        await phone.enforcer.check()
+        let queued = try rig.outbox.records().map(\.change)
+        #expect(queued == (reported ? [.protectionOff(session: "s")] : []))
+        await phone.stop()
+    }
+
+    @Test(
+        "Offline, rule 3's check still runs every 30 seconds in the foreground — before the read of the truth that goes in the check-in's place and never completes: the shields put back, protection off queued"
+    )
+    func checkOffline() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        // In front, offline: the read of the truth gets no answer, and is tried again at each wake.
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(nil)
+        await phone.until { $0.shielded }
+        try await rig.checkInDue(at(30))
+        await phone.screenTime.drop()
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(nil)
+        try await eventually { await phone.screenTime.shielding }
+        try await rig.checkInDue(at(60))
+        await phone.screenTime.set(.denied)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(protectionOffRoute).reply(nil)
         #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
         await phone.stop()
     }
@@ -596,15 +679,77 @@ struct StandingKeptTests {
         await rig.stop()
     }
 
+    @Test(
+        "The standing is kept in a form of its own, pinned: each standing as this build writes it, and as every later build must read it — never the enum's own coding"
+    )
+    func keptForm() throws {
+        let view = session(endsAt: 1200)
+        let (ends, id) = (iso(view.endsAt), #""sessionId":"s","classId":"c""#)
+        let inSession = #""standing":"in_session",\#(id),"endsAt":"\#(ends)""#
+        let forms: [(Standing, String)] = [
+            (.out, #"{"standing":"out"}"#), (.waiting, #"{"standing":"waiting"}"#),
+            (.inSession(view, .focused), #"{\#(inSession),"state":"focused"}"#),
+            (.inSession(view, .unlocked), #"{\#(inSession),"state":"unlocked"}"#),
+            (.inSession(view, .protectionOff), #"{\#(inSession),"state":"protection_off"}"#),
+            (.inSession(view, nil), "{\(inSession)}"),
+        ]
+        func json(_ text: String) throws -> JSONValue {
+            try JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
+        }
+        func read(_ text: String) throws -> Standing {
+            try BaliJSON.makeDecoder().decode(Standing.self, from: Data(text.utf8))
+        }
+        for (standing, form) in forms {
+            let written = try BaliJSON.makeEncoder().encode(standing)
+            #expect(try json(String(decoding: written, as: UTF8.self)) == json(form), "\(form)")
+            #expect(try read(form) == standing)
+        }
+        // A key a later build adds is passed over, and a state it adds is none, never focus.
+        let later = #"{\#(inSession),"state":"on_a_break","startsAt":"x"}"#
+        #expect(try read(later) == .inSession(view, nil))
+        // Where the phone stands unread is never written over the file's truth.
+        #expect(throws: EncodingError.self) { try BaliJSON.makeEncoder().encode(Standing.unread) }
+    }
+
+    @Test(
+        "The phone's own change and the standing it leaves are kept in one write: killed at any moment after an Emergency Unlock, a relaunch never shields over it",
+        arguments: [
+            (Change.unlock(session: "s", reason: nil), ParticipationState.unlocked),
+            (.protectionOff(session: "s"), .protectionOff),
+        ])
+    func keptWithItsStanding(change: Change, state: ParticipationState) async throws {
+        let (outbox, url) = try makeOutbox()
+        let rig = try Rig(outbox: outbox)
+        try await rig.tapIn()
+        let relaunches = try Relaunches(url)
+        outbox.pool.add(transactionObserver: relaunches, extent: .observerLifetime)
+        let record = try #require(try await rig.engine.record(change))
+        outbox.pool.remove(transactionObserver: relaunches)
+        var holding: [SyncState] = []
+        for engine in relaunches.engines {
+            let relaunched = await engine.state
+            if relaunched.queued.contains(where: { $0.eventId == record.eventId }) {
+                holding.append(relaunched)
+            }
+        }
+        #expect(!holding.isEmpty)
+        for relaunched in holding {
+            #expect(relaunched.standing == .inSession(session(), state))
+            #expect(relaunched.shieldedUntil(t0) == nil)
+        }
+        await rig.stop()
+    }
+
     /// A relaunch over a file that holds where the phone stood — focused until 1200 — in a form
-    /// this build cannot read, the shields still on in the store: the engine and its enforcer.
-    func unreadable() async throws -> (Enforced, Standing) {
+    /// this build cannot read, the store holding the shields (`held`, the last run's) or none: the
+    /// engine and its enforcer.
+    func unreadable(held: Bool = true) async throws -> (Enforced, Standing) {
         let (outbox, _) = try makeOutbox()
         let kept = Standing.inSession(session(endsAt: 1200), .focused)
         try outbox.keep(kept)
         try spoilStanding(outbox)
         let screenTime = FakeScreenTime()
-        await screenTime.held()
+        if held { await screenTime.held() }
         let phone = Enforced(try Rig(outbox: outbox), screenTime)
         await phone.until { $0.permission == .approved }
         return (phone, kept)
@@ -672,8 +817,59 @@ struct StandingKeptTests {
         await phone.stop()
     }
 
-    @Test("Rule 3's check runs before each check-in — not for the foreground's read, nor behind the app")
-    func checkBeforeCheckIn() async throws {
+    @Test(
+        "Over a standing not read, a tap answered armed leaves the phone waiting when the read of the truth it asks for names no session"
+    )
+    func unreadArmedOut() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        let state = await rig.until { $0.standing != .unread }
+        #expect(state.standing == .waiting)
+        #expect(try rig.outbox.standing() == .waiting)
+        await phone.stop()
+    }
+
+    @Test(
+        "…and when the file gives back where the phone stood before that read comes, the arming is carried onto it: out becomes waiting"
+    )
+    func unreadArmedFileBack() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        try await rig.engine.record(.tap(tagId: "tag"))
+        let tap = try await rig.server.next(tapRoute)
+        // Readable again: the phone was in no session.
+        try rig.outbox.keep(.out)
+        tap.reply(200, Answer.armed)
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        await rig.until { $0.standing == .waiting }
+        #expect(try rig.outbox.standing() == .waiting)
+        await phone.stop()
+    }
+
+    @Test(
+        "Over a standing not read, the shields a tap not yet answered put on come off at decision 7's cap — the enforcer's own, not enforcement from nothing"
+    )
+    func unreadCapped() async throws {
+        let (phone, _) = try await unreadable(held: false)
+        let rig = phone.rig
+        // Offline: the tap is never answered.
+        try await rig.engine.record(.tap(tagId: "tag"))
+        await phone.until { $0.shielded && $0.until == at(SyncState.tapCap) }
+        try await rig.server.next(tapRoute).reply(nil)
+        rig.clock.advance(by: SyncState.tapCap)
+        await phone.until { !$0.shielded }
+        #expect(await !phone.screenTime.shielding)
+        #expect(await rig.engine.state.standing == .unread)
+        await phone.stop()
+    }
+
+    @Test(
+        "Rule 3's check runs at each wake of the read loop in the foreground, in a session — the read of the truth coming back makes, and each check-in — never behind the app"
+    )
+    func checkAtEachWake() async throws {
         final class Count: @unchecked Sendable {
             private let lock = NSLock()
             private var count = 0
@@ -684,17 +880,18 @@ struct StandingKeptTests {
         let rig = try Rig()
         await rig.engine.beforeEachCheckIn { checks.add() }
         try await rig.tapIn()
-        try await rig.foreground()
         #expect(checks.value == 0)
+        try await rig.foreground()
+        #expect(checks.value == 1)
         rig.clock.advance(by: 30)
         let checkIn = try await rig.server.next(checkInRoute)
-        #expect(checks.value == 1)
+        #expect(checks.value == 2)
         checkIn.reply(200, Answer.live())
         try await rig.sleeping([at(60)])
         await rig.engine.setForeground(false)
         rig.clock.advance(by: 60)
         try await rig.sleeping([])
-        #expect(checks.value == 1)
+        #expect(checks.value == 2)
         await rig.stop()
     }
 }

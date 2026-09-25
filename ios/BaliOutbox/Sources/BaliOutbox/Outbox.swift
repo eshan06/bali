@@ -141,12 +141,16 @@ public struct Outbox: Sendable {
         FROM outbox
         """
 
-    /// Queues what the phone just did under a fresh event id, due at once. A tap or an unlock
-    /// supersedes every queued refocus (deleted, never sent: it could only make the truth older).
-    /// Protection off is reported once per revocation — nil when already reported in this session —
-    /// and again after a tap, which returns the row to focused, or `protectionRestored`.
+    /// Queues what the phone just did under a fresh event id, due at once — and keeps `standing`,
+    /// where it leaves the phone, in the same write: a relaunch never finds the one without the
+    /// other. A tap or an unlock supersedes every queued refocus (deleted, never sent: it could
+    /// only make the truth older). Protection off is reported once per revocation — nil when
+    /// already reported in this session — and again after a tap, which returns the row to
+    /// focused, or `protectionRestored`.
     @discardableResult
-    public func record(_ change: Change, now: Date) throws -> OutboxRecord? {
+    public func record(_ change: Change, now: Date, standing: Standing? = nil) throws
+        -> OutboxRecord?
+    {
         try pool.write { db in
             let eventId = EventID.mint(at: now)
             var follows: String?
@@ -180,6 +184,7 @@ public struct Outbox: Sendable {
                     eventId, row.kind, row.tagId, row.session, row.reason?.rawValue, follows, now,
                     now,
                 ])
+            if let standing { try Self.keep(db, standing) }
             return try Self.fetch(db, eventId)
         }
     }
@@ -199,9 +204,11 @@ public struct Outbox: Sendable {
         }
     }
 
-    func keep(_ standing: Standing) throws {
+    func keep(_ standing: Standing) throws { try pool.write { try Self.keep($0, standing) } }
+
+    static func keep(_ db: Database, _ standing: Standing) throws {
         let kept = String(decoding: try BaliJSON.makeEncoder().encode(standing), as: UTF8.self)
-        try pool.write { try Self.setState($0, Self.standingKey, kept) }
+        try setState(db, standingKey, kept)
     }
 
     public enum Due: Sendable, Hashable {

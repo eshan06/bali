@@ -23,11 +23,16 @@ final class TestClock: SyncClock, @unchecked Sendable {
 
     private let lock = NSLock()
     private var current: Date
+    /// How long the phone has run: time passing moves it, a change of the clock does not.
+    private var running: TimeInterval = 0
     private var sleepers: [Sleeper] = []
+    /// Sleeps due, whose wake `advance(by:holdingWakes:)` holds back until `releaseWakes()`.
+    private var held: [Sleeper] = []
 
     init(_ start: Date = t0) { current = start }
 
     func now() -> Date { lock.withLock { current } }
+    func uptime() -> TimeInterval { lock.withLock { running } }
 
     /// The deadlines slept on now, soonest first.
     var deadlines: [Date] { lock.withLock { sleepers.map(\.deadline).sorted() } }
@@ -63,13 +68,36 @@ final class TestClock: SyncClock, @unchecked Sendable {
         sleeper?.wake.resume(throwing: CancellationError())
     }
 
-    /// Moves the clock on, waking every sleep that is then due.
-    func advance(by seconds: TimeInterval) {
+    /// Time passes: the clock moves on, and every sleep then due wakes — or, `holdingWakes`, is
+    /// over but not resumed until `releaseWakes()`: a wake a loaded phone runs late.
+    func advance(by seconds: TimeInterval, holdingWakes: Bool = false) {
+        move(by: seconds, running: true, holdingWakes: holdingWakes)
+    }
+
+    /// The phone's clock is set, forward or back: the time moves, how long the phone has run does
+    /// not.
+    func turn(by seconds: TimeInterval) { move(by: seconds, running: false, holdingWakes: false) }
+
+    /// Wakes the sleeps `advance(by:holdingWakes:)` held back.
+    func releaseWakes() {
+        let late = lock.withLock {
+            defer { held = [] }
+            return held
+        }
+        for sleeper in late { sleeper.wake.resume() }
+    }
+
+    private func move(by seconds: TimeInterval, running moves: Bool, holdingWakes: Bool) {
         lock.lock()
         current += seconds
+        if moves { running += seconds }
         let now = current
-        let due = sleepers.filter { $0.deadline <= now }
+        var due = sleepers.filter { $0.deadline <= now }
         sleepers.removeAll { $0.deadline <= now }
+        if holdingWakes {
+            held += due
+            due = []
+        }
         lock.unlock()
         for sleeper in due { sleeper.wake.resume() }
     }

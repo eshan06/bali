@@ -72,9 +72,13 @@ public actor Enforcer {
     private var enforcing = false
     private var again = false
     private var alarm: Task<Void, Never>?
-    /// When the checks in a row that read the permission not determined began; nil after any read
-    /// that did not — a check's, or a pass's.
-    private var undetermined: Date?
+    /// When the checks in a row that read the permission not determined began, by how long the
+    /// phone has run, which no setting of its clock moves; nil after any read that did not: a
+    /// check's, or a pass's.
+    private var undetermined: TimeInterval?
+    /// Whether the store's shields are ones this enforcer put on, not the last run's: over a
+    /// standing not read, those — a pending tap's — still come off at the cap.
+    private var putOn = false
 
     public init(engine: SyncEngine, screenTime: any ScreenTime, clock: any SyncClock = SystemClock()) {
         (self.engine, self.screenTime, self.clock) = (engine, screenTime, clock)
@@ -87,30 +91,32 @@ public actor Enforcer {
         alarm?.cancel()
     }
 
-    /// Rule 3's check, before each check-in and as the app comes to the foreground: the shields go
-    /// back on if they should be on and are not, and a permission found off in a session whose row
-    /// is not protection off already is reported — once there (the outbox's), and again whenever
-    /// the phone stands focused there (the engine's `record`, A13). Denied is off at once. Not
-    /// determined is off only once checks have read it so for a check-in interval — two in a row:
-    /// Family Controls can read it so for a moment just after a launch, and a phone never granted
-    /// the permission reads it so for good.
+    /// Rule 3's check, at each foreground wake of the engine's read loop and as the app comes to
+    /// the foreground: the shields go back on if they should be on and are not, and a permission
+    /// found off in a session whose row is not protection off already, and which the phone's own
+    /// clock says is not over, is reported — once there (the outbox's), and again whenever the
+    /// phone stands focused there (the engine's `record`, A13). Denied is off at once. Not
+    /// determined is off only once checks have read it so for a check-in interval of the phone's
+    /// running — two in a row: Family Controls can read it so for a moment just after a launch,
+    /// and a phone never granted the permission reads it so for good.
     public func check() async {
         let permission = await screenTime.permission()
-        let now = clock.now()
-        // A clock turned back starts the run again, rather than stalling it.
-        undetermined = permission == .notDetermined ? min(undetermined ?? now, now) : nil
+        let running = clock.uptime()
+        undetermined = permission == .notDetermined ? undetermined ?? running : nil
         let off =
             permission == .denied
-            || undetermined.map { now.timeIntervalSince($0) >= SyncEngine.checkInInterval } == true
-        var unreported = false
+            || undetermined.map { running - $0 >= SyncEngine.checkInInterval } == true
+        var unreported: Bool? = false
         if off, case .inSession(let session, let state) = await engine.state.standing,
-            state != .protectionOff
+            state != .protectionOff, session.endsAt > clock.now()
         {
             do { try await engine.record(.protectionOff(session: session.id)) } catch {
-                unreported = true
+                // Refused as the app is suspended, nothing is lost: the check as it comes back
+                // finds it again.
+                unreported = Outbox.isSuspension(error) ? nil : true
             }
         }
-        protection.unreported = unreported
+        if let unreported { protection.unreported = unreported }
         await enforce()
     }
 
@@ -146,16 +152,19 @@ public actor Enforcer {
     }
 
     /// The shields as the engine's truth says now — put on, or taken off, where the store says
-    /// otherwise, but never taken off while where the phone stood is unread: enforcement never
-    /// begins from nothing — and what a screen may claim of them; then a wake at their end.
+    /// otherwise, but while where the phone stood is unread, only the ones this enforcer put on
+    /// taken off: enforcement never begins from nothing — and what a screen may claim of them;
+    /// then a wake at their end.
     private func apply() async {
         let state = await engine.state
         let until = state.shieldedUntil(clock.now())
         if await screenTime.isShielding() != (until != nil) {
             if until != nil {
                 await screenTime.shield()
-            } else if state.standing != .unread {
+                putOn = true
+            } else if state.standing != .unread || putOn {
                 await screenTime.unshield()
+                putOn = false
             }
         }
         let permission = await screenTime.permission()

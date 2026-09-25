@@ -128,6 +128,29 @@ struct ReadTests {
         await rig.stop()
     }
 
+    @Test(
+        "An alarm whose ring comes late — after another ring has woken the read loop — rings nothing: no read goes early, and the check-ins keep their cadence"
+    )
+    func lateAlarm() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.foreground()
+        try await rig.sleeping([at(30)])
+        // The check-in's alarm goes off as the app comes back to the foreground, and its ring runs
+        // late: after the foreground's read of the truth has gone.
+        rig.clock.advance(by: 30, holdingWakes: true)
+        await rig.engine.setForeground(true)
+        let read = try await rig.server.next(meRoute)
+        rig.clock.releaseWakes()
+        read.reply(200, Answer.me())
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 30)
+        let next = try await rig.server.next()
+        #expect(next.route == checkInRoute && next.deviceTime == iso(at(60)))
+        next.reply(200, Answer.live())
+        await rig.stop()
+    }
+
     @Test("A read of the truth that gets no answer is tried again at the next wake — not at once")
     func rereadRetried() async throws {
         let rig = try Rig()

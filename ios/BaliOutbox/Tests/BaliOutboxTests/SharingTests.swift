@@ -147,6 +147,28 @@ struct SharingTests {
         await rig.stop()
     }
 
+    @Test(
+        "A check whose report the file refuses as the app is suspended shows no failure — nothing is lost — and the check as the app comes back reports it"
+    )
+    func checkSuspended() async throws {
+        let rig = try Rig(outbox: try suspending(temporaryFile()))
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded }
+        await phone.screenTime.set(.denied)
+        // The app leaves the foreground just as a check runs.
+        Outbox.suspend()
+        defer { Outbox.resume() }
+        await phone.enforcer.check()
+        #expect(await !phone.enforcer.protection.unreported)
+        #expect(try rig.outbox.records().isEmpty)
+        Outbox.resume()
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        #expect(await !phone.enforcer.protection.unreported)
+        await phone.stop()
+    }
+
     /// An outbox that hears the suspension notifications, as the app's does.
     func suspending(_ url: URL) throws -> Outbox {
         try FileManager.default.createDirectory(
