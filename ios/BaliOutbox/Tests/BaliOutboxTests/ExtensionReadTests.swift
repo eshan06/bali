@@ -147,10 +147,13 @@ struct ExtensionReadTests {
         }
         holding.wait()
         let cut = Bell.wake(outboxAt: url, now: at(1720), within: 0.5)
+        // Looked at while the app still writes: on the phone, the migration the bound gave up on
+        // may run on (the ceiling), but it cannot go through past that write.
+        let halfway = Result { try applied(url) }
         release.signal()
         released.wait()
         #expect(cut == .retry(Bell.window(until: at(1780))))
-        #expect(try applied(url) == ["v1", "v2", "v3"])
+        #expect(try halfway.get() == ["v1", "v2", "v3"])
         let bound = TimeInterval(patience.components.seconds)
         #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear)
         #expect(try applied(url) == ["v1", "v2", "v3", "v4"])
