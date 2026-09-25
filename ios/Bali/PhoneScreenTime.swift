@@ -3,9 +3,8 @@ import BaliOutbox
 @preconcurrency import ManagedSettings
 
 /// Screen Time on this phone (B5), for the enforcer: the app's one `ManagedSettingsStore`, named so
-/// the extensions open the very store the app shields with, and Family Controls' `.individual`
-/// authorization, which the student grants with Face ID or their passcode. Thin on purpose: what to
-/// shield, and when, is `Enforcer`'s, tested on Linux.
+/// the extensions open the same store, and Family Controls' `.individual` authorization. Thin on
+/// purpose: what to shield, and when, is `Enforcer`'s, tested on Linux.
 @MainActor
 final class PhoneScreenTime: ScreenTime {
     private let store = ManagedSettingsStore(named: .bali)

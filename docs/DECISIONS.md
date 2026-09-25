@@ -50,8 +50,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   holding reads (B3a), so a read can say focused over a phone iOS unshielded. A report that could
   not be queued is shown (`unreported`) and tried again at the next check (rule 5). **The standing,
   kept** (`Outbox.standing()`, the `standing` key of `outboxState`): the engine writes it as it
-  changes, and starts from it and from its queue before it runs. In B5a, not B5b whose monitor
-  reads it too, because the shields follow the engine from its first state: one starting from
+  changes — a write the file refuses, the app suspended say, is made again at the next change of
+  state — and starts from it and from its queue before it runs, each read on its own. In B5a,
+  not B5b whose monitor reads it too, because the shields follow the engine from its first state:
+  one starting from
   `.out` would take them off at every relaunch — a force-quit and an offline reopen would end any
   session — while shields kept on with no session known could not be unlocked, v2's stranded
   student. `Standing` is `Codable` (so is BaliCore's `ParticipationState`, for it), and a state
@@ -67,12 +69,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the join). **Not covered, disclosed:** until B5b, nothing takes the shields off at the bell
   while the app is closed — opening it after the bell does, and so does Emergency Unlock; and a
   report stuck at B3a's bound still lands after the one a focused read re-armed, a second
-  "turned protection off" in the history. **Assumed, and checked on the phone** (step 13): that
-  Family Controls reads the permission as approved as soon as the app relaunches — read as not
-  determined, the first check would report protection off that is not. **Riders (#84's review):** `docs/DEPLOY.md` lists
-  dev's API URL, and `SignIn`'s `unsaved` comment names the relaunch case — the refused refresh
-  token read back as signed in until its renewal is refused again. **Tests** (Swift Testing,
-  Linux and the iOS Simulator, `EnforcementTests.swift`): the rule's every standing, the cap and
+  "turned protection off" in the history. A standing the file cannot give back at launch starts
+  the engine out, shown as a storage failure, so the shields come off until a read. A sign-out
+  keeps the standing — a sign-out is not an unlock — so a relaunch keeps the shields until the
+  next read or the end. And the Debug readout's Emergency Unlock names the session the phone is
+  in even while a tap is unanswered: decision 11's route is B6's and C5's. **Assumed, and
+  checked on the phone** (step 13): that Family Controls reads the permission as approved as soon
+  as the app relaunches — read as not determined, the first check would report protection off
+  that is not. **Riders (#84's review):** `docs/DEPLOY.md` lists dev's API URL, and `SignIn`'s
+  `unsaved` comment names the relaunch case — the refused refresh token read back as signed in
+  until its renewal is refused again. **Tests** (Swift Testing, Linux and the iOS Simulator,
+  `EnforcementTests.swift`): the rule's every standing, the cap and
   its end, an unlock after the tap and a tap after that, a stuck tap; through the engine, a tap to
   the bell, Emergency Unlock and a refocus, the cap reached, an unlock over a pending re-tap, an
   armed and a refused tap, shields put back at the check, the claim with the permission off while
@@ -80,8 +87,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   taking them off), the permission asked for; protection off reported once, again after a read
   says focused (the rider's test, red without the re-arm), not again for an unlock,
   nothing to report out of a session or over protection off; the standing kept, a state this
-  build does not know as none; and the check before each check-in only. Of 18 mutations
-  of the rules, all 18 turn a test red.
+  build does not know as none, and a write refused while suspended made again; and the check
+  before each check-in only. Of 19 mutations of the rules, all 19 turn a test red. **Santa**
+  (two Claude reviewers, round 1): no blockers; the easy WARNs fixed here — the standing's write
+  retried, the queue read apart from the standing, the enforcer's wake holding it weakly — and
+  the rest disclosed above.
 - **2026-09-25** — **A13: a return the phone made before an unlock the server already has is
   recorded, never applied (owner ruling, 2026-09-24).** The ruling, "Fix it", verbatim: "The server
   uses the phone's order number that A12 added. A refocus or re-tap that is older than an unlock the

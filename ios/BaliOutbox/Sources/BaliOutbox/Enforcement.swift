@@ -1,9 +1,8 @@
 import Foundation
 
 // Enforcement (ARCHITECTURE, "iOS app structure"; B5): the shields follow the sync engine's truth,
-// and rule 3's check — are the shields really on while they should be, and is the Screen Time
-// permission there to keep them? — runs before each check-in. Screen Time itself is the app's
-// (FamilyControls, ManagedSettings), behind `ScreenTime`, so every rule here runs on Linux too.
+// and rule 3's check runs before each check-in. Screen Time itself is the app's, behind
+// `ScreenTime`, so every rule here runs on Linux too.
 
 /// The Screen Time permission, Family Controls' `.individual`: the student grants it with Face ID
 /// or their passcode, and can take it back in Settings, where iOS drops every shield at once.
@@ -22,8 +21,7 @@ public protocol ScreenTime: Sendable {
 }
 
 /// What a screen may claim of the shields: what the last check found (rule 3), never the standing
-/// alone — a stuck protection-off report stops holding reads (B3a), so a read can say focused over
-/// a phone iOS has unshielded.
+/// alone — a stuck report stops holding reads (B3a), so a read can say focused over no shield.
 public struct Protection: Sendable, Hashable {
     public var permission = Permission.notDetermined
     /// Verified: the store holds the shields, and the permission keeps them there.
@@ -73,7 +71,6 @@ public actor Enforcer {
     private var watchers: [UUID: AsyncStream<Protection>.Continuation] = [:]
     private var enforcing = false
     private var again = false
-    /// The wake at the shields' end, while they are on.
     private var alarm: Task<Void, Never>?
 
     public init(engine: SyncEngine, screenTime: any ScreenTime, clock: any SyncClock = SystemClock()) {
@@ -151,9 +148,9 @@ public actor Enforcer {
         protection = next
         alarm?.cancel()
         alarm = until.map { until in
-            Task { [clock] in
+            Task { [weak self, clock] in
                 do { try await clock.sleep(until: until) } catch { return }
-                await enforce()
+                await self?.enforce()
             }
         }
     }

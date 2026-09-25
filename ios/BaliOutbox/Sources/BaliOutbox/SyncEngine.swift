@@ -110,10 +110,13 @@ public actor SyncEngine {
     /// stood — shielded still, offline too — and the extensions can read it (B5).
     public private(set) var state = SyncState() {
         didSet {
-            if state.standing != oldValue.standing { _ = stored { try outbox.keep(state.standing) } }
+            if state.standing != kept { keepStanding() }
             if state != oldValue { publish() }
         }
     }
+    /// The standing the file holds; nil when not known, so a write that failed — refused while the
+    /// app was suspended, say — is made again at the next change of state.
+    private var kept: Standing?
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
     /// Rule 3's check of the shields, run before each check-in: the enforcer's (B5).
     private var check: (@Sendable () async -> Void)?
@@ -142,10 +145,12 @@ public actor SyncEngine {
         refresh: @escaping @Sendable () async -> Bool = { false }
     ) {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
-        // Where the phone stood, and what it has queued, before anything is read: enforcement
-        // follows this state from the start, so it must never begin from nothing.
+        // Where the phone stood, and what it queued, each read on its own: enforcement follows
+        // this state from the start, so it must never begin from nothing.
+        do { state.queued = try outbox.records() } catch { state.link = .storageFailed }
         do {
-            (state.standing, state.queued) = (try outbox.standing(), try outbox.records())
+            state.standing = try outbox.standing()
+            kept = state.standing
         } catch {
             state.link = .storageFailed
         }
@@ -425,6 +430,14 @@ public actor SyncEngine {
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
     private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
+
+    /// Writes the standing to the file. `kept` is set first, so the change of state a failure makes
+    /// (`failed`) writes nothing again at once; the next change does.
+    private func keepStanding() {
+        let standing = state.standing
+        kept = standing
+        if stored({ try outbox.keep(standing) }) == nil { kept = nil }
+    }
 
     /// What `read` reads from the outbox; nil when it cannot be read, which is shown (rule 5).
     private func stored<T>(_ read: () throws -> T) -> T? {

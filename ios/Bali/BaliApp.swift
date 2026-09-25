@@ -142,10 +142,8 @@ struct Placeholder: View {
 
 #if DEBUG
     /// Temporary, for B5's device check, until C1–C6 draw the real screens and B6 reads the block:
-    /// whether the engine reaches the API and when it last answered, whether someone is signed in,
-    /// where the phone stands and what rule 3's check found of the shields — and, in place of the
-    /// screens and the NFC tap, their triggers: sign-in, the Screen Time permission, joining a class,
-    /// a tap by the block's tag, and Emergency Unlock. Debug builds only.
+    /// the engine's link, the sign-in, the standing and what rule 3's check found — with triggers in
+    /// place of the screens and the NFC tap. Debug builds only.
     struct Readout: View {
         let phone: Phone
         let signIn: SignIn
