@@ -13,8 +13,10 @@ import type {
   CheckInResponse,
   EndSessionResponse,
   ExtendSessionResponse,
+  MeResponse,
   ProtectionOffResponse,
   RefocusResponse,
+  SessionSnapshot,
   TapResponse,
   UnlockResponse,
 } from '@bali/shared';
@@ -983,6 +985,97 @@ describe('a late return (A13)', () => {
     expect((await stateOf(session.id))?.state).toBe('focused');
     const bad = await send('refocus', 10, { eventId: 'not-a-uuid' });
     expect(bad.statusCode).toBe(400);
+  });
+});
+
+describe('a late tap (A14)', () => {
+  // A tap the phone made before a later tap of its own into another class,
+  // reaching the server after it, is recorded but never applied — the student
+  // stays where the later tap took them — and answered as its retry would be:
+  // no session, so the outbox deletes it and re-reads the truth.
+  const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+  const install = randomUUID();
+  /** Classes A and B running, Y not started: the student is in all three. */
+  async function rooms(tag: string) {
+    const a = await seedRunning(`${tag}-a`);
+    const b = await seedRunning(`${tag}-b`);
+    const y = await seedClassroom(db, `${tag}-y`);
+    await db.insert(enrollments).values([
+      { classId: b.klass.id, studentId: a.student.id },
+      { classId: y.klass.id, studentId: a.student.id },
+    ]);
+    const token = await ctx.tokenFor(a.student.cognitoId);
+    const tapBlock = (tagId: string, seconds: number, seq: number, eventId = randomUUID()) =>
+      post(token, '/v1/taps', {
+        tagId,
+        eventId,
+        deviceTime: ago(seconds),
+        order: { install, seq },
+      });
+    return { a, b, y, student: a.student, token, tapBlock };
+  }
+  const liveOf = (studentId: string) =>
+    db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.studentId, studentId), isNull(participations.endedAt)));
+  const noSession = { outcome: 'replay', state: null, session: null };
+
+  it('a tap into A older than the one into B names no session, and the student stays in B', async () => {
+    const { a, b, student, token, tapBlock } = await rooms('late-tap-api');
+    expect((await tapBlock(b.block.tagId, 20, 2)).json<TapResponse>().outcome).toBe('joined');
+
+    const slowId = randomUUID();
+    const res = await tapBlock(a.block.tagId, 30, 1, slowId);
+    expect(res.statusCode).toBe(200);
+    const body = res.json<TapResponse>();
+    expect(body).toEqual(noSession);
+    expect(tapDisposition(res.statusCode, body)).toBe('reread');
+    // The truth the phone re-reads: in B, focused.
+    const me = await authedInject(ctx.app, token, { method: 'GET', url: '/v1/me' });
+    expect(me.json<MeResponse>().session).toMatchObject({ id: b.session.id, state: 'focused' });
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: b.session.id }]);
+    // A's teacher never sees the student there.
+    const snap = await authedInject(ctx.app, await ctx.tokenFor(a.teacher.cognitoId), {
+      method: 'GET',
+      url: `/v1/sessions/${a.session.id}`,
+    });
+    const inA = snap.json<SessionSnapshot>().students.find((s) => s.studentId === student.id);
+    expect(inA).toMatchObject({ state: null, endedAt: null, unlock: null });
+    // Its retry replays what was recorded.
+    expect((await tapBlock(a.block.tagId, 30, 1, slowId)).json<TapResponse>()).toEqual(body);
+  });
+
+  it('in the order the phone made them, the later tap switches as always', async () => {
+    const { a, b, student, tapBlock } = await rooms('late-tap-in-order-api');
+    expect((await tapBlock(a.block.tagId, 30, 1)).json<TapResponse>().outcome).toBe('joined');
+    const res = await tapBlock(b.block.tagId, 20, 2);
+    expect(res.json<TapResponse>()).toMatchObject({
+      outcome: 'switched',
+      state: 'focused',
+      session: { id: b.session.id },
+    });
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: b.session.id }]);
+  });
+
+  it('a tap that would arm, older than the one into B, is answered the same, and no Start joins it', async () => {
+    const { b, y, student, tapBlock } = await rooms('late-arm-api');
+    await tapBlock(b.block.tagId, 20, 2);
+    const res = await tapBlock(y.block.tagId, 30, 1);
+    expect(res.json<TapResponse>()).toEqual(noSession);
+    expect(tapDisposition(res.statusCode, res.json())).toBe('reread');
+
+    const { session: ySession } = await startSession(db, {
+      classId: y.klass.id,
+      startedAt: new Date(Date.now() - 1000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: b.session.id }]);
+    const inY = await db
+      .select()
+      .from(participations)
+      .where(eq(participations.sessionId, ySession.id));
+    expect(inY).toHaveLength(0);
   });
 });
 

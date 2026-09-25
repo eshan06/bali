@@ -517,6 +517,58 @@ describe('a late return turns no chip (A13)', () => {
   });
 });
 
+describe('a late tap into a class the student’s later tap left behind (A14)', () => {
+  // A tap the phone made before its tap into another class, landing after
+  // it: recorded here, noted, and no chip turns — the student is where their
+  // later tap took them.
+  const lateTap = (seq: number, id: string) =>
+    evt(seq, 'tap_in', id, T0, { recorded_as: 'superseded' });
+
+  it('leaves a student who never joined here absent, on the stream and at the refresh', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'cal', state: null }]));
+    s = applyEvent(s, lateTap(6, 'cal'));
+    expect(chip(s, 'cal')).toEqual({ display: 'absent', note: null });
+    s = mergeSnapshot(s, snapshot(6, [{ id: 'ana' }, { id: 'cal', state: null }]));
+    expect(chip(s, 'cal')).toEqual({ display: 'absent', note: null });
+  });
+
+  it('shows an unlock filed under it as it would have, had the tap landed first', () => {
+    // Tapped in here, unlocked under that tap, then tapped into another class.
+    // In order: joined, unlocked, left. Out of order: the tap late, and the
+    // unlock filed with nothing live. Either way, "Left · unlocked".
+    const inOrder = fromSnapshot(
+      snapshot(9, [
+        {
+          id: 'ana',
+          state: 'unlocked',
+          endedAt: T1,
+          unlock: { reason: 'bathroom', recordedAs: null, occurredAt: T0 },
+        },
+      ]),
+    );
+    const late = fromSnapshot(
+      snapshot(9, [
+        {
+          id: 'ana',
+          state: null,
+          unlock: { reason: 'bathroom', recordedAs: 'no_live_participation', occurredAt: T0 },
+        },
+      ]),
+    );
+    const leftUnlocked = { display: 'left_unprotected', note: 'bathroom' };
+    expect(chip(inOrder, 'ana')).toEqual(leftUnlocked);
+    expect(chip(late, 'ana')).toEqual(leftUnlocked);
+    // And streamed, the late tap and then the unlock filed under it.
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana', state: null }]));
+    s = applyEvent(s, lateTap(6, 'ana'));
+    s = applyEvent(
+      s,
+      evt(7, 'unlock', 'ana', T0, { recorded_as: 'no_live_participation', reason: 'bathroom' }),
+    );
+    expect(chip(s, 'ana')).toEqual(leftUnlocked);
+  });
+});
+
 describe('a student the snapshot does not carry (A9)', () => {
   it('whose phone unlocks with no live participation reads Left · unlocked, not Unlocked', () => {
     // Removed before this tab opened — outside the overlap, so it never saw

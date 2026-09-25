@@ -567,7 +567,12 @@ async function captureAll() {
   const hers = (seq: number, time: string) => ({ ...at(time), order: { install: herPhone, seq } });
   await setup(change(her, sB.id, 'unlock', randomUUID(), hers(2, '10:12')));
   await setup(change(her, sB.id, 'refocus', randomUUID(), hers(1, '10:10')));
-  await setup(tapAt(p6.block.tagId, '10:30'));
+  // A tap back into period 5 (#3) her phone made before the tap into 6 (#4),
+  // landing after it (A14): recorded, and she stays in 6.
+  const tapHers = (tagId: string, seq: number, time: string) =>
+    post(her, '/v1/taps', { tagId, eventId: randomUUID(), ...hers(seq, time) });
+  await setup(tapHers(p6.block.tagId, 4, '10:30'));
+  await setup(tapHers(p5.block.tagId, 3, '10:28'));
   await endAt(sC.id, '10:40', 'ended');
   await endAt(sB.id, '10:50', 'expired');
   // A tap waiting at period 6's block whose retry lands in period 3 first:
@@ -699,15 +704,16 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     }[];
     expect(new Set(teachers.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
     // Every kind of moment a history shows (A7) — the declined tap naming
-    // where it counted, both late notes — and fields BaliCore decodes as
-    // optional, present and absent; a page with a next and one without.
+    // where it counted, both late notes, `superseded` on a refocus and on a
+    // tap (A13, A14) — and fields BaliCore decodes as optional, present and
+    // absent; a page with a next and one without.
     const histories = all.filter((f) => f.type === 'HistoryPage');
     const moments = histories.flatMap((f) => (f.body as HistoryPage).events);
     expect(new Set(moments.map((e) => e.type))).toEqual(new Set(HISTORY_EVENT_TYPES));
     const late = moments.filter((e) => e.recordedAs === 'after_session_end').map((e) => e.type);
     expect(new Set(late)).toEqual(new Set(['unlock', 'protection_off']));
     const passed = moments.filter((e) => e.recordedAs === 'superseded').map((e) => e.type);
-    expect(new Set(passed)).toEqual(new Set(['refocus']));
+    expect(new Set(passed)).toEqual(new Set(['refocus', 'tap_in']));
     const declined = moments.find((e) => e.type === 'armed_tap_skipped');
     expect(declined?.countedIn).not.toBeNull();
     for (const optional of [
