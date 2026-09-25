@@ -18,8 +18,17 @@ actor FakeScreenTime: ScreenTime {
     private(set) var shielding = false
     private(set) var granted = Permission.approved
     private(set) var unshields = 0
+    /// Reads of the store to let through before the one held (`hold(after:)`); nil: none held.
+    private var through: Int?
+    private var parked: CheckedContinuation<Void, Never>?
 
-    func isShielding() -> Bool { shielding }
+    func isShielding() async -> Bool {
+        if let left = through {
+            through = left > 0 ? left - 1 : nil
+            if left == 0 { await withCheckedContinuation { parked = $0 } }
+        }
+        return shielding
+    }
     func shield() { shielding = true }
     func unshield() {
         shielding = false
@@ -33,10 +42,41 @@ actor FakeScreenTime: ScreenTime {
         granted = permission
         if permission != .approved { shielding = false }
     }
+    /// The permission reads so, the shields untouched: Family Controls just after a launch.
+    func reads(_ permission: Permission) { granted = permission }
     /// The shields are gone, and nothing told the app.
     func drop() { shielding = false }
     /// The store holds the shields already — a relaunch's.
     func held() { shielding = true }
+
+    /// Lets `reads` reads of the store through, then holds the next until `release()`: a pass of
+    /// the enforcer waiting on Screen Time there.
+    func hold(after reads: Int) { through = reads }
+    var holding: Bool { parked != nil }
+    func release() {
+        parked?.resume()
+        parked = nil
+    }
+}
+
+/// The outbox refuses to queue a record — a write the file will not take — or takes them again.
+func refuseRecords(_ outbox: Outbox, _ refused: Bool = true) throws {
+    try outbox.pool.write {
+        try $0.execute(
+            sql: refused
+                ? "CREATE TRIGGER refuse BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'no'); END"
+                : "DROP TRIGGER refuse")
+    }
+}
+
+/// The standing the file keeps, made unreadable: this build cannot decode it.
+func spoilStanding(_ outbox: Outbox) throws {
+    try outbox.pool.write { try Outbox.setState($0, Outbox.standingKey, "spoiled") }
+}
+
+/// The standing as the file holds it, unread.
+func keptStanding(_ outbox: Outbox) throws -> String? {
+    try outbox.pool.read { try Outbox.state($0, Outbox.standingKey) }
 }
 
 /// An enforcer over a rig's engine and clock, with Screen Time as the test holds it.
@@ -81,6 +121,14 @@ struct Enforced {
         running.cancel()
         await running.value
         await rig.stop()
+    }
+}
+
+extension Rig {
+    /// Waits until the read loop sleeps until `deadline`, so the clock moved there runs that
+    /// check-in — never one a check-in later, as a move made before the loop sleeps would.
+    func checkInDue(_ deadline: Date) async throws {
+        try await eventually { clock.deadlines.contains(deadline) }
     }
 }
 
@@ -307,6 +355,7 @@ struct ProtectionOffTests {
         report.reply(200, Answer.protectionOff())
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        try await rig.checkInDue(at(60))
         return report
     }
 
@@ -335,6 +384,7 @@ struct ProtectionOffTests {
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live())
         await rig.until { $0.standing == .inSession(session(), .focused) }
+        try await rig.checkInDue(at(90))
         rig.clock.advance(by: 30)
         let again = try await rig.server.next(protectionOffRoute)
         #expect(again.eventId != first.eventId)
@@ -353,6 +403,113 @@ struct ProtectionOffTests {
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         #expect(try rig.outbox.records().map(\.eventId) == [unlock.eventId])
+        await phone.stop()
+    }
+
+    @Test(
+        "Protection off that could not be queued is shown, and tried again at the next check: queued then, it is no longer shown"
+    )
+    func unreported() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        try await rig.foreground()
+        await phone.until { $0.shielded }
+        await phone.screenTime.set(.denied)
+        try refuseRecords(rig.outbox)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        let shown = await phone.until { $0.unreported }
+        #expect(shown.permission == .denied && !shown.shielded)
+        #expect(try rig.outbox.records().isEmpty)
+        try refuseRecords(rig.outbox, false)
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        let report = try await rig.server.next(protectionOffRoute)
+        await phone.until { !$0.unreported }
+        #expect(await rig.engine.state.standing == .inSession(session(), .protectionOff))
+        report.reply(200, Answer.protectionOff())
+        await phone.stop()
+    }
+
+    @Test(
+        "A check made while a pass of the enforcer waits on Screen Time keeps what it found: the pass never writes over a protection off it could not queue"
+    )
+    func checkDuringPass() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded }
+        await phone.screenTime.set(.denied)
+        try refuseRecords(rig.outbox)
+        // A pass on the next state the engine publishes, held at its second read of the store —
+        // after it has read the permission.
+        await phone.screenTime.hold(after: 1)
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(503)
+        try await eventually { await phone.screenTime.holding }
+        await phone.enforcer.check()
+        #expect(await phone.enforcer.protection.unreported)
+        await phone.screenTime.release()
+        let now = await phone.until { $0.permission == .denied }
+        #expect(now.unreported && !now.shielded)
+        #expect(await phone.enforcer.protection.unreported)
+        await phone.stop()
+    }
+
+    @Test(
+        "Not determined for a moment — as Family Controls can read it just after a launch — is never reported, however many checks read it in that moment"
+    )
+    func notDeterminedPassing() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        try await rig.foreground()
+        await phone.until { $0.shielded }
+        // The app comes to the foreground, twice in a second: each checks at once.
+        await phone.screenTime.reads(.notDetermined)
+        await phone.enforcer.check()
+        rig.clock.advance(by: 1)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().isEmpty)
+        // The check before the next check-in reads it approved: nothing reported, nothing owed.
+        await phone.screenTime.reads(.approved)
+        rig.clock.advance(by: 29)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        await phone.screenTime.reads(.notDetermined)
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await rig.engine.state.standing == .inSession(session(), .focused))
+        await phone.stop()
+    }
+
+    @Test(
+        "Never granted — not determined at two checks a check-in apart — is reported, once: a phone that cannot shield is never shown focused"
+    )
+    func notDeterminedLasting() async throws {
+        let rig = try Rig()
+        let screenTime = FakeScreenTime()
+        await screenTime.set(.notDetermined)
+        let phone = Enforced(rig, screenTime)
+        try await rig.tapIn()
+        try await rig.foreground()
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        #expect(try rig.outbox.records().isEmpty)
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        try await rig.checkInDue(at(90))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        try await rig.sleeping([at(120)])
+        #expect(await rig.server.waiting.isEmpty)
+        #expect(try rig.outbox.records().isEmpty)
         await phone.stop()
     }
 
@@ -389,6 +546,82 @@ struct StandingKeptTests {
         try await rig.foreground(Answer.me(session(endsAt: 4000), state: "on_a_break"))
         #expect(try rig.outbox.standing() == .inSession(session(endsAt: 4000), nil))
         await rig.stop()
+    }
+
+    /// A relaunch over a file that holds where the phone stood — focused until 1200 — in a form
+    /// this build cannot read, the shields still on in the store: the engine and its enforcer.
+    func unreadable() async throws -> (Enforced, Standing) {
+        let (outbox, _) = try makeOutbox()
+        let kept = Standing.inSession(session(endsAt: 1200), .focused)
+        try outbox.keep(kept)
+        try spoilStanding(outbox)
+        let screenTime = FakeScreenTime()
+        await screenTime.held()
+        let phone = Enforced(try Rig(outbox: outbox), screenTime)
+        await phone.until { $0.permission == .approved }
+        return (phone, kept)
+    }
+
+    @Test(
+        "A standing the file would not give back at launch is never taken off from nothing: the shields stay, nothing is written over it, and it is read again within a minute"
+    )
+    func unread() async throws {
+        let (phone, kept) = try await unreadable()
+        let rig = phone.rig
+        var now = await phone.enforcer.protection
+        #expect(now.shielded && now.until == nil)
+        #expect(await phone.screenTime.unshields == 0)
+        let state = await rig.engine.state
+        #expect(state.standing == .unread && state.link == .storageFailed)
+        // The next change of state writes nothing over it: a read of the truth, unanswered.
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(nil)
+        await rig.until { $0.link == .unreachable }
+        #expect(try keptStanding(rig.outbox) == "spoiled")
+        // Readable again: read within a minute, and followed — the shields kept to its end.
+        try rig.outbox.keep(kept)
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 60)
+        now = await phone.until { $0.until == at(1200) }
+        #expect(now.shielded)
+        #expect(await phone.screenTime.unshields == 0)
+        // …and kept again as it changes.
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        #expect(try rig.outbox.standing() == .inSession(session(endsAt: 1200), .unlocked))
+        await phone.stop()
+    }
+
+    @Test(
+        "A standing the file cannot give back is settled by the server's truth too: the phone is never stranded behind it"
+    )
+    func unreadSettled() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        // The class ended while the app was closed: the server has the phone in no session.
+        try await rig.foreground(Answer.me(nil))
+        await phone.until { !$0.shielded }
+        #expect(await rig.engine.state.standing == .out)
+        #expect(try rig.outbox.standing() == .out)
+        await phone.stop()
+    }
+
+    @Test(
+        "Over a standing not read, a tap answered armed asks the server where the phone stands — arming ends nothing — and never takes the shields off"
+    )
+    func unreadArmed() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        try await rig.engine.record(.tap(tagId: "another teacher's"))
+        await phone.until { $0.until == at(SyncState.tapCap) }
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await phone.until { $0.until == nil }
+        try #require(await phone.screenTime.unshields == 0)
+        #expect(await rig.engine.state.standing == .unread)
+        try await rig.server.next(meRoute).reply(200, Answer.me(session(endsAt: 1200)))
+        await phone.until { $0.until == at(1200) }
+        #expect(await phone.screenTime.shielding)
+        #expect(await phone.screenTime.unshields == 0)
+        await phone.stop()
     }
 
     @Test("Rule 3's check runs before each check-in — not for the foreground's read, nor behind the app")

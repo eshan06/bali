@@ -218,6 +218,7 @@ struct Placeholder: View {
             case .inSession(let session, let state)?:
                 "\(state?.rawValue ?? "unknown") until \(time(session.endsAt))"
             case .waiting?: "waiting for the teacher's Start"
+            case .unread?: "not read from the phone yet — shields left as they were"
             case .out?, nil: "in no session"
             }
         }
