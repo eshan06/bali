@@ -18,12 +18,12 @@ public protocol ScreenTime: Sendable {
     func permission() async -> Permission
     /// Asks the student for the permission, with iOS's own prompt.
     func requestPermission() async throws
-    /// Asks iOS to wake the monitor at `window`'s end — the bell with the app closed (B5b) —
-    /// replacing the window asked for before; nil: at none. A window iOS takes ends the monitor's
-    /// refusal (`monitorUnscheduled`).
+    /// Asks iOS to wake the monitor at `window`'s end — the bell with the app closed (B5b) — and at
+    /// its backup's (B5b-3), replacing the windows asked for before, the monitor's own too; nil: at
+    /// none (`Bell.register`). A window iOS takes ends the monitor's refusal (`monitorUnscheduled`).
     func schedule(_ window: DateInterval?) async throws
-    /// When iOS refused the monitor the window it asked for, woken with the app closed — so nothing
-    /// woke it again, and the shields it kept outlived their end — until a window is registered
+    /// When iOS refused the monitor the window it asked for, woken with the app closed, and no wake
+    /// since ended well — so the shields it kept outlived their end — until a window is registered
     /// again; nil: none. The monitor keeps it in the app group, for the app's next open.
     func monitorUnscheduled() async -> Date?
 }
@@ -38,11 +38,12 @@ public struct Protection: Sendable, Hashable {
     public var until: Date?
     /// Protection off was found, and could not be queued: shown, and tried again at the next check.
     public var unreported = false
-    /// iOS refused the window the shields are on (B5b): with the app closed, nothing would take
-    /// them off at its end. Shown, and asked for again at the next pass.
+    /// iOS refused the window the shields are on, or its backup (B5b): with the app closed, nothing
+    /// would take them off at its end, or make a lost wake again. Shown, and asked for again at the
+    /// next pass.
     public var unscheduled = false
-    /// When iOS refused the monitor its next window, the app closed (B5b): nothing woke it again,
-    /// so the shields it kept outlived their end until the app was opened. Shown from the app's
+    /// When iOS refused the monitor its next window, the app closed (B5b), and no wake since ended
+    /// well: the shields it kept outlived their end until the app was opened. Shown from the app's
     /// next open until a window is registered again (rule 5).
     public var monitorUnscheduled: Date?
 }
