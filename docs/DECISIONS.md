@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5c: Bali's own shield over a blocked app — its words from the standing the
+  app keeps, read as the monitor reads it; the bell in the phone's own time format; D1's approved
+  look as far as `ShieldConfiguration` carries it; "OK", and no shield action extension.** **The
+  words** (`ShieldWords`, `ios/BaliOutbox`): iOS runs the shield extension out of process, as it
+  runs the monitor, so it reads the standing and the queue the app keeps in the app group through
+  B5b's bounded open (`Outbox.read`: the whole open and read within 2 s, SQLite's lock waits
+  included, the file closed before it returns). Focused in a session, its bell ahead: "Focused with
+  Bali until 9:42". A tap not yet answered keeping the shields on — `SyncState.tapHeldUntil`, the
+  rule `shieldedUntil` already used, now named so the two cannot drift: before its cap, no unlock
+  after it, not stuck — "Focused with Bali — waiting for your class", with no time, whatever the
+  phone stood in: the tap's answer may move the bell (a join, a switch, an arm), and the cap's end
+  would read as the class's end, which it is not. Anything else — the file not read (held past the
+  bound, a standing this build cannot decode, a newer build's schema, no app group), the bell past
+  (a shield not taken down yet: with the app closed, up to a minute or two, B5b), or nothing in the
+  phone's truth keeping them on — "Focused with Bali" alone: no time rather than a wrong one.
+  Beneath, D1's line: "This app is paused for class. Calls, FaceTime, Messages and Emergency SOS
+  always work. If you need out, Emergency Unlock is always in the Bali app." — "This website" over
+  a website, which iOS asks for apart. **The time, decided here:** the phone's own short time —
+  `Date.FormatStyle(date: .omitted, time: .shortened)` in its current locale, calendar and time
+  zone, so its 24-Hour Time setting holds: "9:42 AM" on a 12-hour phone, "09:42" on a 24-hour one,
+  each locale's own form elsewhere. D1's Shield artboard writes "until 10:45", its Focus screen
+  "until 10:45 AM": a 12-hour phone keeps the marker, as the Focus screen does, since dropping it
+  takes an hour-and-minute pattern of our own, which the locale no longer decides (ICU's `J`
+  skeleton writes a US phone's morning "05:13" on Linux). **The look — D1's approved Shield
+  artboard, mapped onto what `ShieldConfiguration` takes** (a background blur style and colour, an
+  icon, a title and a subtitle with their colours, two buttons' labels): stone-50 (#F7F5F2) over a
+  light material (`.systemThickMaterialLight`), so a phone in dark mode never shows iOS's dark
+  default through — D1 is light; the ring mark without its tile (the owner's D1 change), the
+  artboard's SVG as drawn (green-200 #BCDCCA track, green-600 #2C6F51 arc with round caps, its gap
+  at the upper left), a vector asset in the extension (`BaliMark`), rendered as original, never
+  tinted; the title in text-primary (#211F1B), the subtitle in text-secondary (#5B564E); "OK" in
+  white on green-700 (#245A43); no second button. **Not carried over** — the API has no say in
+  them: Instrument Sans (iOS's system font), D1's sizes (a 24/30 title, 15/22 body), its layout
+  and spacing (the 64-pt mark, the 24-pt gaps, a 56-pt button with a 14-pt radius), balanced
+  wrapping and tabular numerals: iOS lays the shield out and sizes the icon itself. **The button,
+  decided here:** "OK", D1's label, and no shield action extension (B2 made none; none is added):
+  iOS's own action, which closes the blocked app — nothing misleading. The shield cannot open the
+  app (a shield action can only close, defer or do nothing), so Emergency Unlock stays in the Bali
+  app (C5), where the subtitle sends the student. **The extension** is a thin adapter — the words,
+  with the device check's cap in a Debug build as the monitor takes it, and D1's tokens — linking
+  BaliOutbox as the monitor does. **Not covered, disclosed:** (1) whether iOS asks the extension
+  each time a shield shows, or keeps a configuration until the shields change, is not documented.
+  If it keeps one, words the phone has moved on from stay up while the shields do — "waiting for
+  your class" after the tap's answer, and after an extension the old bell: a wrong time. Round 3
+  checks both (steps 1 and 3); if iOS keeps them, the fix is the app writing the store again as the
+  bell moves — a follow-up, not guessed at here. (2) The extension's memory with GRDB linked in, as
+  B5b disclosed for the monitor: one killed for it shows iOS's default shield, which round 3 would
+  show. (3) How iOS draws the icon (its size, any tint) and whether it draws the colour opaque over
+  the material: round 3 shows the look; the asset itself is pinned on the simulator. **Tests:**
+  `ShieldWordsTests` (Linux and the iOS Simulator) — the bell on a US phone at 12 hours, the same
+  phone at 24 and a British one, another time zone, an afternoon bell; a tap not yet answered —
+  standing out, focused or unlocked — to its cap and the device check's; a tap the student
+  unlocked after, or refused; no time — not read, the bell past, every other standing; the line
+  beneath over an app and a website; and through the app's own file: tapped in, a tap offline, no
+  app group, a spoiled standing, a newer schema. `AppTests.mark` (the simulator): the extension
+  ships the mark, 64 × 64 and rendered as original, drawn as D1 has it — the arc at the right, the
+  bottom and the lower left, the track in its gap at the upper left, nothing at its centre.
+  Of 12 mutations of the rules — the words' and `tapHeldUntil`'s, each taken alone — all 12 turn
+  a test red.
 - **2026-09-25** — **B5b-2: B5b's app-side riders — the app's test target and the config pin —
   and #91's review: the app's open never waits with no end and opens the file once, a wake iOS
   refuses the monitor is shown, the monitor's whole open and read are bounded, no cap ends the

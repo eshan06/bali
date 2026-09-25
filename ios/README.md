@@ -10,7 +10,7 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine and the enforcer             |
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: at the bell, it takes the shields off, app closed   |
 | `BaliTests/`   | The app target's own tests, hosted in the app on the iOS Simulator                                                     |
-| `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
+| `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: Bali's own shield over a blocked app, in D1's look     |
 | `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
 | `BaliOutbox/`  | The outbox store (GRDB in the app group), its sync engine and the shields' enforcer — `swift test` there too           |
 
@@ -112,7 +112,7 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
 
-Still to come, with its part: Bali's own shield, "Focused with Bali until 9:42" (B5c).
+Bali's own shield, "Focused with Bali until 9:42", is round 3's (B5c), below.
 
 ### Round 2 (B5b): the bell with the app closed
 
@@ -155,6 +155,28 @@ _two_ minutes after the bell, and the `Monitor:` line is that second wake's.
    2-second bound on its whole open and read of the file, and the app, opened straight after each
    wake, started normally — no `The outbox could not be opened`, no `storage failed`. A wake that
    could not read the file says `file not read — kept, again <time>`, and tries again a minute on.
+
+### Round 3 (B5c): Bali's own shield
+
+After rounds 1 and 2, on the same build and phone, `npm run dev:teacher -- watch` running. The shield
+extension draws Bali's shield each time iOS asks for one, from where the phone stands in the outbox
+file: D1's colours, the ring mark and the words are Bali's; the font, sizes and layout are iOS's. The
+bell is written as the phone writes a time — `9:42 AM`, or `09:42` with 24-Hour Time on.
+
+1. **Tapped in: the bell.** `npm run dev:teacher -- start 20`, **Tap** with `DEVICE-CHECK-1`, then
+   open any blocked app: Bali's shield, light even with the phone in dark mode, never iOS's own — the
+   ring mark (a green arc open at the upper left, on a pale green track), the title
+   `Focused with Bali until` and the bell, and under it "This app is paused for class. Calls,
+   FaceTime, Messages and Emergency SOS always work. If you need out, Emergency Unlock is always in
+   the Bali app." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
+   once a check-in has moved `due until`, a blocked app says the new bell. If it still says the old
+   one, iOS keeps a shield's words until the shields change — note it: that is a follow-up.
+2. **After Emergency Unlock: no shield.** **Emergency Unlock**: every app opens, with no shield at
+   all, Bali's or iOS's.
+3. **A tap not yet answered: no time.** Turn on Airplane Mode and **Tap**: shielded at once, and a
+   blocked app says `Focused with Bali — waiting for your class`, with no time — the phone has not
+   heard the bell. Airplane Mode off: once `watch` shows focused, a blocked app says
+   `Focused with Bali until` and the bell again (if it still waits, the same note as step 1).
 
 ## CI
 
