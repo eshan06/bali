@@ -8,9 +8,10 @@ import Foundation
 public enum Bell {
     /// iOS's floor: no DeviceActivity interval is shorter.
     public static let floor: TimeInterval = 15 * 60
-    /// How long the monitor's whole open and read of the outbox file may wait for another process
-    /// — its coordinated open, and SQLite's locks — before it gives up and keeps the shields: never
-    /// so long that iOS kills it mid-wake.
+    /// How long the extensions' whole read of the outbox file may take — its coordinated open,
+    /// SQLite's locks, an open still under way: a ceiling (`Outbox.read`) — before the monitor
+    /// gives up and keeps the shields, and the shield says Bali's name alone: never so long that
+    /// iOS kills the monitor mid-wake.
     public static let patience: TimeInterval = 2
     /// The least the monitor waits for its next wake: to read a file it could not, or for shields
     /// still owed at a wake that came early.
@@ -60,6 +61,36 @@ public enum Bell {
     static func wake(now: Date, reading read: () throws -> SyncState) -> Wake {
         guard let state = try? read() else { return .retry(window(until: now + retry)) }
         return state.shieldedUntil(now).map { .keep(window(until: max($0, now + retry))) } ?? .clear
+    }
+
+    /// The monitor's `wake` at `now`, carried out: nothing keeps the shields on — `clear` them;
+    /// else its next wake asked of `center`. One iOS refuses leaves nothing to wake the monitor
+    /// again, so the shields it keeps outlive their end with the app closed: `refused` is set to
+    /// `now`, for the app to show from its next open (`Protection.monitorUnscheduled`), and a wake
+    /// that ends well — cleared, or its next wake taken — sets it back to none (#92's review). What
+    /// it did, for the Debug readout.
+    public static func carryOut(
+        _ wake: Wake, at now: Date, in center: some BellCenter, clearing clear: () -> Void,
+        refused: inout Date?
+    ) -> String {
+        let next: (window: DateInterval, done: String)
+        switch wake {
+        case .clear:
+            clear()
+            refused = nil
+            return "cleared"
+        case .keep(let window): next = (window, "kept until")
+        case .retry(let window): next = (window, "file not read — kept, again")
+        }
+        let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        do {
+            try register(next.window, in: center)
+            refused = nil
+            return said
+        } catch {
+            refused = now
+            return "\(said), NOT registered: \(error)"
+        }
     }
 
     /// Asks `center` to wake the monitor at `window`'s end — or, nil, at none — replacing the window
