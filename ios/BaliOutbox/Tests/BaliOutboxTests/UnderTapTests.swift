@@ -98,6 +98,8 @@ struct UnlockRouteTests {
             Issue.record("sent under its tap no more: \(filed.request)")
             return
         }
+        // A refocus there returns from it: it waits for it, as for any unlock of its session.
+        #expect(try record(outbox, .refocus(session: "s")).follows == unlock.eventId)
         // Recorded, it guards nothing.
         try await send(outbox, filed, 200, Answer.unlocked())
         #expect(try !outbox.holdsUnlock(session: "s"))

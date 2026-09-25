@@ -46,11 +46,12 @@ with Xcode 26.6 — and [Homebrew](https://brew.sh).
    and press Run (⌘R). The extensions are built and installed inside the app.
 
 The build talks to dev: `project.yml` names dev's API and its sign-in (`docs/DEPLOY.md`, "The
-phone's sign-in"). Until C1–C6 draw the screens and B6 reads the block, a Debug build's
-placeholder shows a temporary readout — the engine's link to the API, when the server last
-answered, whether someone is signed in, where the phone stands and what rule 3's check found of
-the shields — with **Sign in**, **Sign out**, **Allow Screen Time**, **Join** (a class's code),
-**Tap** (a block's tag, typed) and **Emergency Unlock** in their place.
+phone's sign-in"). Until C1–C6 draw the screens, a Debug build's placeholder shows a temporary
+readout — the engine's link to the API, when the server last answered, whether someone is signed
+in, where the phone stands, what rule 3's check found of the shields and what the outbox holds —
+with **Sign in**, **Sign out**, **Allow Screen Time**, **Join** (a class's code), **Scan** (the
+block, read over NFC: B6), **Read block code** (read only), **Tap** (a block's tag, typed — rounds
+1–3), **Emergency Unlock** and **History** in their place.
 
 NFC and Screen Time shields need a real iPhone, which is why B5 and B6 are device checkpoints;
 the simulator only proves it builds. Family Controls works in development builds already —
@@ -177,6 +178,45 @@ bell is written as the phone writes a time — `9:42 AM`, or `09:42` with 24-Hou
    blocked app says `Focused with Bali — waiting for your class`, with no time — the phone has not
    heard the bell. Airplane Mode off: once `watch` shows focused, a blocked app says
    `Focused with Bali until` and the bell again (if it still waits, the same note as step 1).
+
+### Round 4 (B6): the block, read over NFC
+
+After rounds 1–3, on B6's build and the same phone: signed in, Screen Time allowed, the class
+joined. The readout's `Outbox:` line lists what the phone has queued and not yet had answered —
+`empty` when nothing is — and **History** shows the student's latest moments, newest first.
+
+**What a block is.** A Bali block is the code written on it: ten letters and digits, in an NFC
+Text record — as v2's teacher app wrote every block (`T7XK2M9QPF`) — or at the end of a link,
+`bali://t/<code>` or `https://…/t/<code>`. The chip's own id is not used. So any NFC sticker becomes
+a block once written with such a code: in an NFC writer app (NFC Tools: Write → Add a record → Text),
+ten letters and digits, `BALIDEVCHK` say.
+
+1. **Register your block on dev.** Tap **Read block code** and hold the top of the iPhone to the
+   block: iOS's sheet says `Bali block read`, and the readout's last line
+   `block <CODE>: read only, nothing recorded` — its ten letters and digits — with `Outbox: empty`.
+   On the Mac: `npm run dev:teacher -- block <CODE>` prints `block <CODE> is yours` (its "type it
+   into the phone's Tap field" is for rounds 1–3's typed tag: this one is scanned). If the readout
+   says `not a Bali block — nothing recorded`, nothing on it is a code: write one as above and read
+   it again.
+2. **A real scan.** `npm run dev:teacher -- start 20`, then `npm run dev:teacher -- watch`, left
+   running. **Scan** and hold the phone to the block: `block <CODE>: tap recorded`, then
+   `Standing: focused until` the bell, `shields on, due until` the bell, `Outbox: empty` once the
+   tap is answered; `watch` shows the student focused, and a blocked app shows Bali's shield with
+   the bell.
+3. **Scanned with no signal, then Emergency Unlock before the answer.** Turn on Airplane Mode, then
+   **Scan** the block: `tap recorded`, still shielded — `due until` 50 minutes on, the unanswered
+   tap's cap (decision 7) — and `Outbox: tap`. **Emergency Unlock**: `recorded`, and the shields are
+   off at once — `shields off`, every app opens — `Standing: unlocked until` the bell,
+   `Outbox: tap · unlock under its tap`. Airplane Mode off: at the outbox's next try — within two
+   minutes, its backoff — `Outbox: empty`, still `unlocked`, and the shields off throughout: they
+   never come back on between the tap's answer and the unlock's. `watch` shows the student
+   unlocked, and **History** begins `unlock <time> · tap_in <time> · tap_in <time>`: the unlock,
+   filed under the tap just made, which joined first, then step 2's tap.
+4. **A tag that is not a Bali block.** Any other NFC sticker or tag — one holding a web link, or a
+   blank one — **Scan**: `not a Bali block — nothing recorded`, `Outbox: empty`, the standing and
+   the shields as they were, and nothing new in `watch`.
+5. **A scan cancelled.** **Scan**, then **Cancel** on iOS's sheet, holding it to nothing:
+   `scan cancelled — nothing recorded`, `Outbox: empty`, nothing else changed.
 
 ## CI
 

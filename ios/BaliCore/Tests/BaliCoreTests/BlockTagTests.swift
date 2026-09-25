@@ -34,6 +34,8 @@ struct BlockTagTests {
         #expect(BlockTag.code(in: [text("T7XK2M9QPF", language: "en-US")]) == "T7XK2M9QPF")
         #expect(BlockTag.code(in: [text("T7XK2M9QPF", language: "")]) == "T7XK2M9QPF")
         #expect(BlockTag.code(in: [text("0123456789")]) == "0123456789")
+        // The status byte's reserved bit set: the language code's length is its low six bits still.
+        #expect(BlockTag.code(in: [record(1, "T", "\u{42}enT7XK2M9QPF")]) == "T7XK2M9QPF")
     }
 
     @Test(
@@ -74,10 +76,11 @@ struct BlockTagTests {
             [uri(0x04, "bali.app/x/t/T7XK2M9QPF")], [uri(0x03, "bali.app/t/T7XK2M9QPF")],
             [uri(0x05, "T7XK2M9QPF")], [uri(0x00, "http://bali.app/t/T7XK2M9QPF")],
             [uri(0x00, "bali://s/T7XK2M9QPF")], [uri(0x00, "T7XK2M9QPF")],
-            // The code, but in a record of another format or type: a media type, an absolute URI,
-            // an external type, a smart poster.
-            [record(2, "text/plain", "T7XK2M9QPF")], [record(3, "bali://t/T7XK2M9QPF", "")],
-            [record(4, "bali.app:t", "T7XK2M9QPF")], [record(1, "Sp", "T7XK2M9QPF")],
+            // The code, but in a record of another format or type: a media type — one named "T"
+            // too — an absolute URI, an external type, a smart poster.
+            [record(2, "text/plain", "T7XK2M9QPF")], [record(2, "T", "\u{2}enT7XK2M9QPF")],
+            [record(3, "bali://t/T7XK2M9QPF", "")], [record(4, "bali.app:t", "T7XK2M9QPF")],
+            [record(1, "Sp", "T7XK2M9QPF")],
             // A Text record too short for its own language code, and records with no payload.
             [record(1, "T", "\u{5}en")], [record(1, "T", "")], [record(1, "U", "")], [],
         ])
