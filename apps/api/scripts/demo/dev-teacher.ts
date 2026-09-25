@@ -321,10 +321,10 @@ async function watchCommand(t: Teacher): Promise<void> {
       failing = null;
       return snap;
     } catch (err) {
-      const why = detailOf(err);
-      if (why.includes('→ 401 ')) {
+      if ((err as { status?: unknown }).status === 401) {
         throw new Error("the teacher's sign-in has expired; run watch again", { cause: err });
       }
+      const why = detailOf(err);
       if (why !== failing) say(`could not read the session (${why}); trying again`);
       failing = why;
       return null;

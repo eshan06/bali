@@ -16,6 +16,10 @@ import { deriveDisplayState, isUnlockReason, PARTICIPATION_STATES } from '@bali/
  * Everything here is a pure function of the stored roster plus one streamed
  * event; nothing time-derived is stored — `deriveDisplayState` computes silence
  * from `lastSeenAt` at render.
+ *
+ * `npm run dev:teacher`'s watch runs it from Node too
+ * (apps/api/scripts/demo/dev-teacher.ts), and the API's typecheck compiles it:
+ * keep it free of path aliases and browser globals.
  */
 
 export interface Student {
