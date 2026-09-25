@@ -814,6 +814,12 @@ struct StandingKeptTests {
         await phone.until { $0.until == at(1200) }
         #expect(await phone.screenTime.shielding)
         #expect(await phone.screenTime.unshields == 0)
+        // Known now, the standing carries the truth itself, as it would have without the gap: a
+        // read naming no session later leaves the phone out.
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        await rig.until { $0.standing == .out }
         await phone.stop()
     }
 
