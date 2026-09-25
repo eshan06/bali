@@ -8,7 +8,8 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
 | `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine and the enforcer             |
-| `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: iOS runs it at a session's edges                    |
+| `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: at the bell, it takes the shields off, app closed   |
+| `BaliTests/`   | The app target's own tests, hosted in the app on the iOS Simulator                                                     |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
 | `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
 | `BaliOutbox/`  | The outbox store (GRDB in the app group), its sync engine and the shields' enforcer — `swift test` there too           |
@@ -111,13 +112,48 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
 
-Still to come, with its part: the bell with the app force-quit — Phase 0's open question — and the
-50-minute cap with the app closed (B5b); Bali's own shield, "Focused with Bali until 9:42" (B5c).
+Still to come, with its part: Bali's own shield, "Focused with Bali until 9:42" (B5c).
+
+### Round 2 (B5b): the bell with the app closed
+
+After round 1, on the same build and phone: signed in, Screen Time allowed, the class joined, and
+`npm run dev:teacher -- watch` running. "Force-quit" is swiping the app away in the app switcher.
+The readout's `Monitor:` line says what the DeviceActivity monitor did at its last wake — the time,
+what it did, and how long it took — since the monitor can show nothing itself.
+
+1. **The window is registered.** `npm run dev:teacher -- start 20`, then **Tap** with
+   `DEVICE-CHECK-1`: `shields on, due until` the bell, and no `bell NOT scheduled` on that line.
+2. **Force-quit, the bell — Phase 0's question.** Force-quit the app while shielded and leave the
+   phone until the bell. Within a minute after the bell, with the app still closed, blocked apps
+   open again; `watch` showed the student silent a minute and a half after the force-quit, then
+   the session over. Open the app: `Monitor: <a time within a minute after the bell> · cleared ·`
+   and a fraction of a second.
+3. **A window shorter than iOS's 15-minute floor.** `start 15`, wait 5 minutes, **Tap** (10
+   minutes left), force-quit: as step 2 — off within a minute after the bell, `Monitor: … · cleared`.
+4. **An Emergency Unlock cancels the window.** `start 15`, **Tap**, **Emergency Unlock**,
+   force-quit: the apps stay open, and after the bell the `Monitor:` line is still step 3's — nothing
+   woke it.
+5. **An extension moves the window.** `start 15`, **Tap**, then `npm run dev:teacher -- extend 10`
+   with the app open until the next check-in moves `due until` 10 minutes on (still no
+   `bell NOT scheduled`). Force-quit: still shielded past the first bell; off within a minute after
+   the new one, `Monitor: … · cleared`.
+6. **Decision 7's cap with the app closed.** With no session running, turn on **Cap a tap at 15 min
+   (device check)**, turn on Airplane Mode, and **Tap**: `due until` the tap's time plus 15 minutes
+   (the floor, not 50). Force-quit: within a minute after that time the apps open, the tap never
+   answered. Open the app, still in Airplane Mode: `Monitor: … · cleared`, `Standing: in no session`.
+   Turn the cap off and Airplane Mode off: the tap is answered armed —
+   `Standing: waiting for the teacher's Start` — and a `start` today would join it, so run this
+   step last.
+7. **The monitor never stalls.** Every `Monitor:` line above took a fraction of a second, never the
+   2-second bound on waiting for the file, and the app, opened straight after each wake, started
+   normally — no `The outbox could not be opened`, no `storage failed`. A wake that could not read
+   the file says `file not read — kept, again <time>`, and tries again a minute on.
 
 ## CI
 
 The **iOS** workflow (`.github/workflows/ios.yml`) runs on every PR that touches `ios/`: it
-generates the project, builds the app for the iOS Simulator with signing off, and runs
-`BaliCore`'s and `BaliOutbox`'s tests on an iOS Simulator. Both packages' tests also run on
-Linux on every PR ("BaliCore Swift tests (Linux)" in `ci.yml`); on Linux, GRDB builds against
-the system SQLite, so `BaliOutbox` needs `libsqlite3-dev` there.
+generates the project, builds the app for the iOS Simulator with signing off, and runs the app's
+own tests (`BaliTests`, hosted in the app) and `BaliCore`'s and `BaliOutbox`'s on an iOS
+Simulator. Both packages' tests also run on Linux on every PR ("BaliCore Swift tests (Linux)" in
+`ci.yml`); on Linux, GRDB builds against the system SQLite, so `BaliOutbox` needs
+`libsqlite3-dev` there.

@@ -51,12 +51,15 @@ struct WakeTests {
     func wake(_ state: SyncState, at now: Date) -> Bell.Wake { Bell.wake(now: now) { state } }
 
     @Test(
-        "Focused in a session: kept to its bell — a wake before it, early, asks to be woken at it — and cleared from the bell on"
+        "Focused in a session: kept to its bell, and cleared from the bell on — a wake early by less than a minute asks for a window a minute on, never the one that woke it, which iOS may hold still"
     )
     func bell() throws {
         let state = try kept(.inSession(session(endsAt: 1200), .focused))
         #expect(wake(state, at: t0) == .keep(Bell.window(until: at(1200))))
-        #expect(wake(state, at: at(1199.9)) == .keep(Bell.window(until: at(1200))))
+        #expect(wake(state, at: at(1100)) == .keep(Bell.window(until: at(1200))))
+        let early = wake(state, at: at(1199.9))
+        #expect(early == .keep(Bell.window(until: at(1259.9))))
+        #expect(early != .keep(Bell.window(until: at(1200))))
         #expect(wake(state, at: at(1200)) == .clear)
         #expect(wake(state, at: at(1300)) == .clear)
     }
@@ -122,7 +125,7 @@ struct MonitorFileTests {
         let rig = try Rig(outbox: outbox)
         try await rig.tapIn(session(endsAt: 1200))
         await rig.stop()
-        #expect(Bell.wake(outboxAt: url, now: at(1199)) == .keep(Bell.window(until: at(1200))))
+        #expect(Bell.wake(outboxAt: url, now: at(600)) == .keep(Bell.window(until: at(1200))))
         #expect(Bell.wake(outboxAt: url, now: at(1200)) == .clear)
     }
 
@@ -136,10 +139,10 @@ struct MonitorFileTests {
         try await rig.server.next(tapRoute).reply(nil)
         await rig.stop()
         let cap = at(SyncState.tapCap)
-        #expect(Bell.wake(outboxAt: url, now: cap - 1) == .keep(Bell.window(until: cap)))
+        #expect(Bell.wake(outboxAt: url, now: cap - 600) == .keep(Bell.window(until: cap)))
         #expect(Bell.wake(outboxAt: url, now: cap) == .clear)
         #expect(
-            Bell.wake(outboxAt: url, now: at(Bell.floor) - 1, cap: Bell.floor)
+            Bell.wake(outboxAt: url, now: at(300), cap: Bell.floor)
                 == .keep(Bell.window(until: at(Bell.floor))))
         #expect(Bell.wake(outboxAt: url, now: at(Bell.floor), cap: Bell.floor) == .clear)
     }

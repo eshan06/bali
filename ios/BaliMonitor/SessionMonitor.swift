@@ -27,9 +27,7 @@ final class SessionMonitor: DeviceActivityMonitor {
             done = wake == .keep(window) ? "kept until \(until)" : "file not read — kept, again \(until)"
             do { try Bell.register(window) } catch { done += ", NOT registered: \(error)" }
         }
-        #if DEBUG
-            let at = Date().formatted(date: .omitted, time: .standard)
-            Bell.lastWake = "\(at) · \(done) · \(ContinuousClock.now - started)"
-        #endif
+        let at = Date().formatted(date: .omitted, time: .standard)
+        Bell.lastWake = "\(at) · \(done) · \(ContinuousClock.now - started)"
     }
 }

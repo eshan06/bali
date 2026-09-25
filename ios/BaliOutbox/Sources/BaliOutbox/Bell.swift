@@ -11,7 +11,8 @@ public enum Bell {
     /// How long the monitor waits for the outbox file — another process's coordinated open — before
     /// it gives up and keeps the shields: never so long that iOS kills it mid-wake.
     public static let patience: TimeInterval = 2
-    /// How soon a monitor that could not read the file is woken to try again.
+    /// The least the monitor waits for its next wake: to read a file it could not, or for shields
+    /// still owed at a wake that came early.
     public static let retry: TimeInterval = 60
 
     /// The interval iOS is asked for, to wake the monitor at `until`. It ends at the first whole
@@ -30,7 +31,9 @@ public enum Bell {
         /// Nothing keeps the shields on: the store is cleared.
         case clear
         /// Something does — a session the standing says still runs, a later tap's cap — so they
-        /// stay, and iOS is to wake the monitor again at this window's end.
+        /// stay, and iOS is to wake the monitor again at this window's end: theirs, but never
+        /// less than `retry` on, so a wake that came early never asks for the window that woke it —
+        /// which iOS may hold still, and the adapter would not ask for again.
         case keep(DateInterval)
         /// The file could not be read in time: the shields stay — never cleared over what the
         /// monitor cannot read — and iOS is to wake it again at this window's end, to try again.
@@ -52,6 +55,6 @@ public enum Bell {
 
     static func wake(now: Date, reading read: () throws -> SyncState) -> Wake {
         guard let state = try? read() else { return .retry(window(until: now + retry)) }
-        return state.shieldedUntil(now).map { .keep(window(until: $0)) } ?? .clear
+        return state.shieldedUntil(now).map { .keep(window(until: max($0, now + retry))) } ?? .clear
     }
 }

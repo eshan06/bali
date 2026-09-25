@@ -108,7 +108,9 @@ public struct Outbox: Sendable {
                 with: url, options: .forMerging)
             return try granted(
                 within: bound,
-                request: { coordinator.coordinate(with: [intent], queue: OperationQueue(), byAccessor: $0) },
+                request: {
+                    coordinator.coordinate(with: [intent], queue: OperationQueue(), byAccessor: $0)
+                },
                 cancel: coordinator.cancel
             ) { try open(intent.url) }
         #else
@@ -130,41 +132,36 @@ public struct Outbox: Sendable {
     ) throws -> T {
         let access = Access<T>()
         request { failure in
-            guard access.begin() else { return }
-            access.finish(failure.map { .failure($0) } ?? Result { try open() })
+            guard access.claim(opening: true) else { return }
+            access.result = failure.map { .failure($0) } ?? Result { try open() }
+            access.done.signal()
         }
         if let bound, access.done.wait(timeout: .now() + bound) == .timedOut {
-            if access.giveUp() {
+            if access.claim(opening: false) {
                 cancel()
                 throw Busy()
             }
-            return try access.outcome(waiting: true)
+            access.done.wait()
+        } else if bound == nil {
+            access.done.wait()
         }
-        return try access.outcome(waiting: bound == nil)
+        return try access.result!.get()
     }
 
-    /// One wait for access to the file, between the thread that asks and the one it is granted on.
+    /// One wait for access to the file, between the thread that asks and the one it is granted
+    /// on: the open and the giving up race for it, and the first to claim it has it.
     final class Access<T>: @unchecked Sendable {
         let done = DispatchSemaphore(value: 0)
+        /// Written before `done` is signalled, read after it is waited for.
+        var result: Result<T, any Error>?
         private let lock = NSLock()
-        private var began = false
-        private var gaveUp = false
-        private var result: Result<T, any Error>?
+        private var opening: Bool?
 
-        /// The grant came: false once the wait was given up — nothing is opened then.
-        func begin() -> Bool { lock.withLock { began = !gaveUp; return began } }
-        /// The wait is given up: false once the open has begun, which is then waited for.
-        func giveUp() -> Bool { lock.withLock { gaveUp = !began; return gaveUp } }
-
-        func finish(_ result: Result<T, any Error>) {
-            lock.withLock { self.result = result }
-            done.signal()
-        }
-
-        /// What the open came to — once it has, when `waiting`.
-        func outcome(waiting: Bool) throws -> T {
-            if waiting { done.wait() }
-            return try lock.withLock { result! }.get()
+        func claim(opening: Bool) -> Bool {
+            lock.withLock {
+                if self.opening == nil { self.opening = opening }
+                return self.opening == opening
+            }
         }
     }
 

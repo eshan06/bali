@@ -41,9 +41,9 @@
         /// Takes the shields off, as the monitor does when nothing keeps them on.
         public static func clearShields() { ManagedSettingsStore(named: .bali).clearAllSettings() }
 
-        /// A Debug build's device check, in the app group's defaults that the app and the monitor
-        /// share: the shorter cap on a tap not yet answered (`floor`, not 50 minutes), and what the
-        /// monitor's last wake did.
+        /// B5b's device check, in the app group's defaults that the app and the monitor share: the
+        /// shorter cap on a tap not yet answered a Debug build may set (`floor`, not 50 minutes),
+        /// and what the monitor's last wake did, which a Debug build's readout shows.
         public static var deviceCheckCap: TimeInterval? {
             get { deviceCheck?.object(forKey: "deviceCheckCap") as? TimeInterval }
             set { deviceCheck?.set(newValue, forKey: "deviceCheckCap") }
