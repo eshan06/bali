@@ -29,9 +29,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the server rather than settling it, since arming ends no session the phone may be in. `.unread` is
   never written, so the file's form is unchanged. B5b's monitor reads the same standing, and must
   keep the same rule: never clear the store over a standing it cannot read. **Not covered,
-  disclosed:** while it holds, no screen can name a session to unlock, and nothing ends the shields
-  at a bell the phone does not know — so a file that stays unreadable offline holds them until the
-  phone is online or the file reads (C5 decides what Emergency Unlock offers then). **(3)
+  disclosed:** while it holds, no screen can name a session to unlock — B6's unlock under a pending
+  tap included, whose shields it holds too — nothing ends the shields at a bell the phone does not
+  know, and a permission found off has no session to be reported in; so a file that stays unreadable
+  offline holds the shields until the phone is online or the file reads (C5 decides what Emergency
+  Unlock offers then), and a denied permission is reported once the standing is settled. **(3)
   `Protection.unreported`**, rule 5's surface, had no test: it is raised when the report cannot be
   queued and cleared by the next check that queues it. **(4) Not determined reported as protection
   off:** the check reported any permission but approved, and Family Controls can read it not
@@ -40,24 +42,28 @@ a real decision? Add a dated entry at the top: what was decided and why.
   granted the permission cannot shield, and leaving it unreported would show green over it. **The
   rule:** denied is protection off at once; not determined only once checks have read it so for a
   check-in interval, 30 s by the phone's clock — two checks in a row at the check-in's cadence, so
-  within about a minute of the permission going. A read of approved or denied ends the run, and a
-  clock turned back starts it again rather than stalling it. By time, not by a count of checks: the
-  app checks at once whenever it comes to the foreground, so two checks can land in one second, and
-  a count would report a launch's passing read where a time cannot. So a passing read is never
-  reported, and a phone never granted — or one iOS reads not determined once revoked — is reported a
-  check-in later than a denial would be. **Assumed, and checked on the phone** (step 13, now
-  expecting no false protection off after a relaunch): that the read settles within a check-in
-  interval; if it takes longer, the bound is revisited on the phone's evidence. **Found here:**
-  three protection-off tests moved the clock right after a check-in's answer, before the read loop
-  slept towards the next, so the move could come first and the check-in they waited for came a
-  check-in later — one failed so here, beside the new tests in its suite; they now wait until the
-  check-in is due (`checkInDue`). **Tests** (`EnforcementTests.swift`, Linux and the iOS Simulator):
-  a pass held at its last read of the store while a check fails to queue its report; the flag raised
-  and cleared; a passing not determined — at two checks a second apart, then approved — never
-  reported; never granted, reported once, a check-in on; the clock turned back; an unreadable
-  standing that keeps the shields, is not written over, is read again within a minute and followed;
-  the server's truth settling it; an armed answer over it. Of 15 mutations of the four fixes, all 15
-  turn a test red.
+  within about a minute of the permission going. Any read of approved or denied ends the run — a
+  check's, or an enforcement pass's, which reads the permission at every change of state, so a
+  launch's passing read never joins a later one — and a clock turned back starts it again rather
+  than stalling it. By time, not by a count of checks: the app checks at once whenever it comes to
+  the foreground, so two checks can land in one second, and a count would report a launch's passing
+  read where a time cannot. So a passing read is never reported, and a phone never granted — or one
+  iOS reads not determined once revoked — is reported a check-in later than a denial would be.
+  **Assumed, and checked on the phone** (step 13, now expecting no false protection off after a
+  relaunch): that the read settles within a check-in interval; if it takes longer, the bound is
+  revisited on the phone's evidence. **Found here:** three protection-off tests moved the clock
+  right after a check-in's answer, before the read loop slept towards the next, so the move could
+  come first and the check-in they waited for came a check-in later — one failed so here, beside the
+  new tests in its suite; they now wait until the check-in is due (`checkInDue`). **Tests**
+  (`EnforcementTests.swift`, Linux and the iOS Simulator): a pass held at its last read of the store
+  while a check fails to queue its report; the flag raised and cleared; a passing not determined —
+  at two checks a second apart, then approved — never reported; never granted, reported once, a
+  check-in on; a pass's read ending a run; the clock turned back; an unreadable standing that keeps
+  the shields, is not written over, is read again within a minute and followed; the server's truth
+  settling it; an armed answer over it. Of 17 mutations of the four fixes, all 17 turn a test red.
+  **Santa** (two Claude reviewers, round 1): no blockers; the easy WARNs fixed here — a pass's read
+  ends a not-determined run, and the disclosure above names the unlock under a pending tap and the
+  denied permission while the standing is unread — and the rest listed in the PR.
 - **2026-09-25** — **T1: the device checks' teacher on dev is a terminal command, not the portal,
   for now.** The iPhone checks (B4c, B5a; later B5b, B5c, B6, E1) need a teacher on dev: a class to
   join, a block to tap, a session and a view of each student. The portal cannot be that teacher on

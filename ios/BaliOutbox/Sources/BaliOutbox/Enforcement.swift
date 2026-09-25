@@ -72,8 +72,8 @@ public actor Enforcer {
     private var enforcing = false
     private var again = false
     private var alarm: Task<Void, Never>?
-    /// When the checks in a row that read the permission not determined began; nil after one that
-    /// did not.
+    /// When the checks in a row that read the permission not determined began; nil after any read
+    /// that did not — a check's, or a pass's.
     private var undetermined: Date?
 
     public init(engine: SyncEngine, screenTime: any ScreenTime, clock: any SyncClock = SystemClock()) {
@@ -159,6 +159,7 @@ public actor Enforcer {
             }
         }
         let permission = await screenTime.permission()
+        if permission != .notDetermined { undetermined = nil }
         let shielded = await screenTime.isShielding() && permission == .approved
         // Read after the last wait, so a check made meanwhile keeps what it found (`unreported`).
         var next = protection

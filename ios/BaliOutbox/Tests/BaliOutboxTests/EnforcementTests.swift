@@ -515,6 +515,33 @@ struct ProtectionOffTests {
     }
 
     @Test(
+        "Any other read ends a run of not determined — an enforcement pass's too — so a launch's passing read never joins a later one"
+    )
+    func notDeterminedRunEnds() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded }
+        await phone.screenTime.reads(.notDetermined)
+        await phone.enforcer.check()
+        // Settled: the pass on the next state the engine publishes reads it approved.
+        await phone.screenTime.reads(.approved)
+        rig.clock.advance(by: 10)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(503)
+        await phone.until { $0.permission == .approved }
+        // Not determined again, later: a run of its own, not the launch's.
+        await phone.screenTime.reads(.notDetermined)
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().isEmpty)
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
         "A clock turned back between the checks starts the run again rather than stalling it: never granted is still reported, a check-in later"
     )
     func notDeterminedClockBack() async throws {
