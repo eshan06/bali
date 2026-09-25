@@ -252,8 +252,8 @@ public struct Outbox: Sendable {
                 try Int.fetchOne(db, sql: "SELECT seq FROM sqlite_sequence WHERE name = 'outbox'")
                 ?? 0
             let columns = """
-                seq, eventId, kind, tagId, sessionId, reason, follows, recordedAt, attempts, answers,
-                  nextAttemptAt, stuck, lastStatus, lastReason, lastMessage
+                seq, eventId, kind, tagId, sessionId, reason, follows, recordedAt, attempts,
+                  answers, nextAttemptAt, stuck, lastStatus, lastReason, lastMessage
                 """
             try db.execute(
                 sql: """
@@ -262,7 +262,8 @@ public struct Outbox: Sendable {
                       kind TEXT NOT NULL
                         CHECK (kind IN ('tap', 'unlock', 'refocus', 'protection_off')),
                       tagId TEXT CHECK ((kind = 'tap') = (tagId IS NOT NULL)),
-                      sessionId TEXT CHECK (kind = 'unlock' OR (kind = 'tap') = (sessionId IS NULL)),
+                      sessionId TEXT
+                        CHECK (kind = 'unlock' OR (kind = 'tap') = (sessionId IS NULL)),
                       tapId TEXT CHECK (tapId IS NULL OR kind = 'unlock'),
                       reason TEXT, follows TEXT, recordedAt TEXT NOT NULL,
                       attempts INTEGER NOT NULL DEFAULT 0, answers INTEGER NOT NULL DEFAULT 0,
@@ -309,8 +310,9 @@ public struct Outbox: Sendable {
         try pool.write { db in
             let eventId = EventID.mint(at: now)
             var follows: String?
-            let row:
-                (kind: String, tagId: String?, session: String?, tap: String?, reason: UnlockReason?)
+            let row: (
+                kind: String, tagId: String?, session: String?, tap: String?, reason: UnlockReason?
+            )
             switch change {
             case .tap(let tagId):
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
@@ -461,9 +463,9 @@ public struct Outbox: Sendable {
         return records.filter { !$0.stuck && !($0.follows.map(stuck.contains) ?? false) }.count
     }
 
-    /// Whether an unrecorded unlock of `session` is queued — one filed under a tap whose answer named
-    /// it too. While one is, no read may put that session's shields back on: the emergency unlock
-    /// stands until the server has it.
+    /// Whether an unrecorded unlock of `session` is queued — one filed under a tap whose answer
+    /// named it too. While one is, no read may put that session's shields back on: the emergency
+    /// unlock stands until the server has it.
     public func holdsUnlock(session: String) throws -> Bool {
         try pool.read {
             try Bool.fetchOne(

@@ -43,9 +43,10 @@ struct UnlockRouteTests {
         let focused = Standing.inSession(session(), .focused)
         for standing in [Standing.out, .waiting, .unread, focused] {
             let tapped = try state(standing, [.tap(tagId: "A"), .tap(tagId: "B")])
+            let latest = tapped.queued[1].eventId
             #expect(
                 tapped.emergencyUnlock(reason: .nurse)
-                    == .unlockUnderTap(tap: tapped.queued[1].eventId, reason: .nurse), "\(standing)")
+                    == .unlockUnderTap(tap: latest, reason: .nurse), "\(standing)")
         }
         for state in [ParticipationState.focused, .unlocked, .protectionOff, nil] {
             #expect(
@@ -139,7 +140,8 @@ struct UnderTapEngineTests {
         let body = try BaliJSON.makeDecoder().decode(
             UnlockRequest.self, from: try #require(sent.request.httpBody))
         let order = try #require(tap.order)
-        #expect(body.reason == .bathroom && body.order == ActionOrder(install: order.install, seq: order.seq + 1))
+        #expect(body.reason == .bathroom)
+        #expect(body.order == ActionOrder(install: order.install, seq: order.seq + 1))
         sent.reply(200, Answer.unlocked(view))
         let state = await rig.until { $0.queued.isEmpty }
         #expect(state.standing == .inSession(view, .unlocked))

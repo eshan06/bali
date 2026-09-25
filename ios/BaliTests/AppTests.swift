@@ -44,6 +44,13 @@ struct AppTests {
     }
 
     @Test(
+        "A phone that cannot read NFC — the simulator is one — is told so at once: no scan begins, and nothing waits on one (B6)"
+    )
+    func noNFC() async {
+        #expect(await BlockReader().read() == .unsupported)
+    }
+
+    @Test(
         "The shield extension ships D1's ring mark, the icon of Bali's shield (B5c): drawn as D1 has it — the arc, and the track in its gap at the upper left, around nothing — and never tinted"
     )
     func mark() throws {

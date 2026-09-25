@@ -18,6 +18,11 @@ private func uri(_ start: UInt8, _ rest: String) -> BlockTag.Record {
     BlockTag.Record(format: 1, type: Data("U".utf8), payload: Data([start] + Array(rest.utf8)))
 }
 
+/// A record of the type name format `format`, of type `type`, holding `payload`.
+private func record(_ format: UInt8, _ type: String, _ payload: String) -> BlockTag.Record {
+    BlockTag.Record(format: format, type: Data(type.utf8), payload: Data(payload.utf8))
+}
+
 @Suite("A Bali block's code, as its NFC tag carries it (B6)")
 struct BlockTagTests {
     @Test(
@@ -50,11 +55,13 @@ struct BlockTagTests {
         "A block's link — v2's QR link, https://<host>/t/<code>, or bali://t/<code> — carries its code too, however the record abbreviates how it begins"
     )
     func link() {
-        #expect(BlockTag.code(in: [uri(0x04, "bali.app/t/T7XK2M9QPF")]) == "T7XK2M9QPF")
-        #expect(BlockTag.code(in: [uri(0x02, "bali.app/t/t7xk2m9qpf/")]) == "T7XK2M9QPF")
-        #expect(BlockTag.code(in: [uri(0x00, "https://bali.app/t/T7XK2M9QPF?from=qr")]) == "T7XK2M9QPF")
-        #expect(BlockTag.code(in: [uri(0x00, "bali://t/T7XK2M9QPF")]) == "T7XK2M9QPF")
-        #expect(BlockTag.code(in: [uri(0x00, "BALI://T/t7xk2m9qpf")]) == "T7XK2M9QPF")
+        for link in [
+            uri(0x04, "bali.app/t/T7XK2M9QPF"), uri(0x02, "bali.app/t/t7xk2m9qpf/"),
+            uri(0x00, "https://bali.app/t/T7XK2M9QPF?from=qr"), uri(0x00, "bali://t/T7XK2M9QPF"),
+            uri(0x00, "BALI://T/t7xk2m9qpf"),
+        ] {
+            #expect(BlockTag.code(in: [link]) == "T7XK2M9QPF", "\(link)")
+        }
     }
 
     @Test(
@@ -67,20 +74,20 @@ struct BlockTagTests {
             [uri(0x04, "bali.app/x/t/T7XK2M9QPF")], [uri(0x03, "bali.app/t/T7XK2M9QPF")],
             [uri(0x05, "T7XK2M9QPF")], [uri(0x00, "http://bali.app/t/T7XK2M9QPF")],
             [uri(0x00, "bali://s/T7XK2M9QPF")], [uri(0x00, "T7XK2M9QPF")],
-            // The code, but in a record of another format or type: a media type, an absolute URI.
-            [BlockTag.Record(format: 2, type: Data("text/plain".utf8), payload: Data("T7XK2M9QPF".utf8))],
-            [BlockTag.Record(format: 3, type: Data("bali://t/T7XK2M9QPF".utf8), payload: Data())],
-            [BlockTag.Record(format: 1, type: Data("Sp".utf8), payload: Data("T7XK2M9QPF".utf8))],
+            // The code, but in a record of another format or type: a media type, an absolute URI,
+            // an external type, a smart poster.
+            [record(2, "text/plain", "T7XK2M9QPF")], [record(3, "bali://t/T7XK2M9QPF", "")],
+            [record(4, "bali.app:t", "T7XK2M9QPF")], [record(1, "Sp", "T7XK2M9QPF")],
             // A Text record too short for its own language code, and records with no payload.
-            [BlockTag.Record(format: 1, type: Data("T".utf8), payload: Data([0x05, 0x65, 0x6E]))],
-            [BlockTag.Record(format: 1, type: Data("T".utf8), payload: Data())],
-            [BlockTag.Record(format: 1, type: Data("U".utf8), payload: Data())], [],
+            [record(1, "T", "\u{5}en")], [record(1, "T", "")], [record(1, "U", "")], [],
         ])
     func notABlock(records: [BlockTag.Record]) {
         #expect(BlockTag.code(in: records) == nil)
     }
 
-    @Test("The first record that holds a code is the block's: records before it that hold none are passed over")
+    @Test(
+        "The first record that holds a code is the block's: records before it that hold none are passed over"
+    )
     func firstCode() {
         #expect(
             BlockTag.code(in: [uri(0x04, "bali.app"), text("hello"), text("T7XK2M9QPF")])

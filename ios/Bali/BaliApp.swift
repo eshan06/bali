@@ -136,9 +136,9 @@ struct Placeholder: View {
 }
 
 #if DEBUG
-    /// Temporary, for B5's device check, until C1–C6 draw the real screens and B6 reads the block:
-    /// the engine's link, the sign-in, the standing and what rule 3's check found — with triggers in
-    /// place of the screens and the NFC tap. Debug builds only.
+    /// Temporary, for the device checks (B5, B6), until C1–C6 draw the real screens: the engine's
+    /// link, the sign-in, the standing, what rule 3's check found and the queue — with triggers in
+    /// place of the screens: the block's scan, and a typed tag for rounds 1–3. Debug builds only.
     struct Readout: View {
         let phone: Phone
         let signIn: SignIn
@@ -172,15 +172,35 @@ struct Placeholder: View {
                     TextField("Join code", text: $code)
                     Button("Join") { run { await join() } }.disabled(code.isEmpty)
                 }
+                // B6: the block read over NFC and tapped — or only read, to register it on dev.
+                HStack {
+                    Button("Scan") {
+                        run {
+                            let read = await BlockReader().read()
+                            let tapped = try await engine.tap(read) != nil
+                            return said(read, tapped ? "tap recorded" : "")
+                        }
+                    }
+                    Button("Read block code") {
+                        run { said(await BlockReader().read(), "read only, nothing recorded") }
+                    }
+                }
                 HStack {
                     TextField("Block tag", text: $tag)
                     Button("Tap") { run { try await act(.tap(tagId: tag)) } }.disabled(tag.isEmpty)
                 }
-                if case .inSession(let session, _) = phone.sync?.standing {
+                // Filed where decision 11 says: under a tap not yet answered, else the session.
+                if phone.sync?.emergencyUnlock(reason: nil) != nil {
                     Button("Emergency Unlock") {
-                        run { try await act(.unlock(session: session.id, reason: nil)) }
+                        run {
+                            let unlock = try await engine.emergencyUnlock()
+                            return unlock.map { "recorded: \(words($0.change))" }
+                                ?? "nothing to unlock"
+                        }
                     }
                 }
+                Text("Outbox: \(queue)")
+                Button("History") { run { await history() } }
                 // B5b's device check: a tap not yet answered capped at the floor, not 50 minutes —
                 // kept where the monitor reads it too — and what the monitor did at its last wake,
                 // since it can show nothing itself.
@@ -251,9 +271,50 @@ struct Placeholder: View {
             }
         }
 
-        /// What the phone did, through the engine, as the NFC tap and the screens will record it.
+        /// What the phone did, through the engine, as the screens will record it.
         private func act(_ change: Change) async throws -> String {
             try await engine.record(change) == nil ? "nothing new to send" : "recorded"
+        }
+
+        /// A scan, in words: a block's code and `then`, or why nothing was recorded.
+        private func said(_ read: BlockRead, _ then: String) -> String {
+            switch read {
+            case .block(let code): "block \(code): \(then)"
+            case .notBali: "not a Bali block — nothing recorded"
+            case .cancelled: "scan cancelled — nothing recorded"
+            case .unsupported: "this iPhone cannot read NFC — nothing recorded"
+            case .failed(let why): "scan failed: \(why) — nothing recorded"
+            }
+        }
+
+        /// What is queued, in the order the phone acted: a stuck record with its last answer.
+        private var queue: String {
+            let queued = phone.sync?.queued ?? []
+            guard !queued.isEmpty else { return "empty" }
+            return queued.map { record in
+                let answer = record.lastStatus.map { "\($0)" } ?? "no answer"
+                return words(record.change) + (record.stuck ? " (stuck: \(answer))" : "")
+            }.joined(separator: " · ")
+        }
+
+        private func words(_ change: Change) -> String {
+            switch change {
+            case .tap: "tap"
+            case .unlock: "unlock"
+            case .unlockUnderTap: "unlock under its tap"
+            case .refocus: "refocus"
+            case .protectionOff: "protection off"
+            }
+        }
+
+        /// The student's latest moments, as `GET /v1/me/history` gives them: newest first.
+        private func history() async -> String {
+            let page = await engine.client.history(limit: 5)
+            guard let events = page.answer?.events else {
+                return "history not read: \(page.result)"
+            }
+            return events.map { "\($0.type.rawValue) \(time($0.occurredAt))" }
+                .joined(separator: " · ")
         }
 
         private func join() async -> String {

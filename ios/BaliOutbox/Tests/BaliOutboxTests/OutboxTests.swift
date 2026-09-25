@@ -113,10 +113,11 @@ struct SchemaTests {
             #expect(applied == ["v1", "v2", "v3"])
             let kept = try outbox.records()
             let install = try #require(try installOf(outbox))
+            let queued: [Change] = [.unlock(session: "s", reason: .nurse), .refocus(session: "s")]
+            #expect(kept.map(\.change) == (drained ? [] : queued))
             #expect(
-                kept.map(\.change)
-                    == (drained ? [] : [.unlock(session: "s", reason: .nurse), .refocus(session: "s")]))
-            #expect(kept.map(\.order) == (drained ? [] : [2, 3]).map { ActionOrder(install: install, seq: $0) })
+                kept.map(\.order)
+                    == (drained ? [] : [2, 3]).map { ActionOrder(install: install, seq: $0) })
             #expect(kept.allSatisfy { $0.attempts == 3 && $0.stuck && $0.lastStatus == 409 })
             #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
             #expect(try record(outbox, .unlockUnderTap(tap: "e9", reason: nil)).order?.seq == 5)
@@ -166,11 +167,14 @@ struct RecordTests {
                     UnlockRequest(eventId: id[1], deviceTime: at, reason: .nurse, order: nth(2))),
                 .unlock(
                     session: "s",
-                    UnlockRequest(eventId: id[2], deviceTime: at, reason: .bathroom, order: nth(3))),
+                    UnlockRequest(
+                        eventId: id[2], deviceTime: at, reason: .bathroom, order: nth(3))),
                 .unlock(session: "s", UnlockRequest(eventId: id[3], deviceTime: at, order: nth(4))),
-                .refocus(session: "s", RefocusRequest(eventId: id[4], deviceTime: at, order: nth(5))),
+                .refocus(
+                    session: "s", RefocusRequest(eventId: id[4], deviceTime: at, order: nth(5))),
                 .protectionOff(
-                    session: "s", ProtectionOffRequest(eventId: id[5], deviceTime: at, order: nth(6))),
+                    session: "s",
+                    ProtectionOffRequest(eventId: id[5], deviceTime: at, order: nth(6))),
             ])
         #expect(records.map(\.change) == changes)
     }

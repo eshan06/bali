@@ -224,7 +224,9 @@ struct UnlockSafetyTests {
                 case 3: try outbox.protectionRestored()
                 case 4:
                     // Of the session, or filed under the latest tap queued (decision 11).
-                    let tap = try outbox.records().last { if case .tap = $0.change { true } else { false } }
+                    let tap = try outbox.records().last {
+                        if case .tap = $0.change { true } else { false }
+                    }
                     let change: Change =
                         if let tap, Bool.random(using: &random) {
                             .unlockUnderTap(tap: tap.eventId, reason: nil)

@@ -9,8 +9,8 @@ public enum Change: Sendable, Hashable {
     /// `POST /v1/sessions/{id}/unlock`, with the student's reason, if any.
     case unlock(session: String, reason: UnlockReason?)
     /// `POST /v1/taps/{eventId}/unlock`: an unlock made while the phone's own tap `tap` was
-    /// unanswered, filed under it (owner decision 11) — sent there always, even once the tap's answer
-    /// names a session, whose shields it then guards (`Outbox.holdsUnlock`).
+    /// unanswered, filed under it (owner decision 11) — sent there always, even once the tap's
+    /// answer names a session, whose shields it then guards (`Outbox.holdsUnlock`).
     case unlockUnderTap(tap: String, reason: UnlockReason?)
     /// `POST /v1/sessions/{id}/refocus`.
     case refocus(session: String)

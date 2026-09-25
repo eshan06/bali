@@ -4,9 +4,9 @@ import Foundation
 /// it, not the chip: ten letters and digits — v2 wrote `T7XK2M9QPF` on every block — in its NDEF
 /// message, as a well-known Text record, or at the end of a URI record, `bali://t/<code>` or
 /// `https://<host>/t/<code>` (v2's QR link). Read whatever its case, and sent upper-case, as v2
-/// minted and printed it: the `tagId` a tap sends (`POST /v1/taps`), and the one a teacher registers
-/// (`POST /v1/blocks`). A tag with nothing of the kind on it is not a Bali block, and nothing is
-/// recorded for it.
+/// minted and printed it: the `tagId` a tap sends (`POST /v1/taps`), and the one a teacher
+/// registers (`POST /v1/blocks`). A tag with nothing of the kind on it is not a Bali block, and
+/// nothing is recorded for it.
 public enum BlockTag {
     /// One NDEF record as the tag holds it: its type name format, its type and its payload.
     public struct Record: Sendable, Hashable {
@@ -34,22 +34,22 @@ public enum BlockTag {
         }
     }
 
-    /// A Text record's text: a status byte — its top bit set for UTF-16, its low six bits the length
-    /// of the language code that follows it — then the text.
+    /// A Text record's text: a status byte — its top bit set for UTF-16, its low six bits the
+    /// length of the language code that follows it — then the text.
     static func text(_ payload: Data) -> String? {
         guard let status = payload.first else { return nil }
         let start = payload.startIndex + 1 + Int(status & 0x3F)
         guard start <= payload.endIndex else { return nil }
         let text = Array(payload[start...])
         guard status & 0x80 != 0 else { return String(decoding: text, as: UTF8.self) }
-        // UTF-16: big-endian unless a byte order mark says otherwise, as the record's definition has
-        // it.
+        // UTF-16: big-endian unless a byte order mark says otherwise, as the record's definition
+        // has it.
         let little = text.starts(with: [0xFF, 0xFE])
         let bytes = Array(text.dropFirst(little || text.starts(with: [0xFE, 0xFF]) ? 2 : 0))
         guard bytes.count % 2 == 0 else { return nil }
         let units = stride(from: 0, to: bytes.count, by: 2).map { index in
-            let (high, low) = little ? (bytes[index + 1], bytes[index]) : (bytes[index], bytes[index + 1])
-            return UInt16(high) << 8 | UInt16(low)
+            let (first, second) = (UInt16(bytes[index]), UInt16(bytes[index + 1]))
+            return little ? second << 8 | first : first << 8 | second
         }
         return String(decoding: units, as: UTF16.self)
     }

@@ -522,7 +522,10 @@ struct RegisterTests {
         #expect(center.held != nil && center.starts == 1 && refused == nil && cleared == 1)
 
         center.refusing = true
-        for wake in [Bell.Wake.retry(Bell.window(until: at(60))), .keep(Bell.window(until: at(1800)))] {
+        let refusedWakes = [
+            Bell.Wake.retry(Bell.window(until: at(60))), .keep(Bell.window(until: at(1800))),
+        ]
+        for wake in refusedWakes {
             refused = nil
             let said = Bell.carryOut(
                 wake, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
