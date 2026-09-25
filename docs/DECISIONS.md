@@ -60,12 +60,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   from the real end without the truth, and clearing on a guess ends a running session early — the
   one failure the teacher's grid cannot show (it says "app closed" either way). A minute: another
   process's coordinated open is over in milliseconds, and a locked phone reads again once unlocked.
-  **The bound:** NSFileCoordinator's wait has no timeout of its own, so the monitor's open asks
-  asynchronously (`coordinate(with:queue:byAccessor:)`) and waits at most 2 s — far more than an
-  open takes, far less than iOS lets an extension run; past it the request is cancelled and `Busy`
-  thrown, and a grant that comes later opens nothing (`Outbox.granted`). An open that has begun is
-  waited for, SQLite's busy timeout bounding its steps: returning while it runs would leave the
-  file locked behind an extension iOS may suspend (0xdead10cc). The app's own open waits as before.
+  **The bound:** NSFileCoordinator's wait has no timeout of its own, so the monitor makes its
+  blocking call — the one the app has always made — on a thread of its own, and waits at most 2 s:
+  far more than an open takes, far less than iOS lets an extension run. Past it the coordinator is
+  cancelled (`cancel()`, which returns a blocked call) and `Busy` thrown, and a grant that comes
+  later opens nothing (`Outbox.granted`). An open that has begun is waited for, SQLite's busy
+  timeout bounding its steps: returning while it runs would leave the file locked behind an
+  extension iOS may suspend (0xdead10cc). The app's own open makes the call inline, as before.
+  **Found on the iOS Simulator** (this PR's first run): the asynchronous call
+  (`coordinate(with:queue:byAccessor:)` on an `OperationQueue`) never ran its accessor there
+  while the asking thread waited for it, so every open hung and the whole BaliOutbox suite with
+  them, pure tests included — its threads all blocked — until the job's 30 minutes ran out.
+  Linux, which has no NSFileCoordinator, could not show it.
   **Rider (#90's review), decided here:** over an unread standing, the last run's shields that a
   pending tap keeps on are its cap's — they come off at the cap — but its answer leaves them the
   last run's again: an armed answer asks the server where the phone stands, since arming ends no

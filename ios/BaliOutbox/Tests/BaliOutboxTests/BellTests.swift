@@ -189,20 +189,21 @@ struct MonitorFileTests {
 struct BoundTests {
     /// Access another process may hold, as a test plays it: granted at once, or when the test says.
     final class Asking: @unchecked Sendable {
+        static let file = URL(fileURLWithPath: "/granted/outbox.sqlite")
         private let lock = NSLock()
         private let atOnce: Bool
         private let asked = DispatchSemaphore(value: 0)
-        private var waiting: (@Sendable ((any Error)?) -> Void)?
+        private var waiting: (@Sendable (Result<URL, any Error>) -> Void)?
         private var cancels = 0
-        private var opens = 0
+        private var opens: [URL] = []
 
         init(atOnce: Bool) { self.atOnce = atOnce }
 
         var cancelled: Bool { lock.withLock { cancels > 0 } }
-        var opened: Int { lock.withLock { opens } }
+        var opened: [URL] { lock.withLock { opens } }
 
-        func request(_ granted: @escaping @Sendable ((any Error)?) -> Void) {
-            guard !atOnce else { return granted(nil) }
+        func request(_ granted: @escaping @Sendable (Result<URL, any Error>) -> Void) {
+            guard !atOnce else { return granted(.success(Self.file)) }
             lock.withLock { waiting = granted }
             asked.signal()
         }
@@ -213,7 +214,7 @@ struct BoundTests {
                 defer { waiting = nil }
                 return waiting
             }
-            granted?(failure)
+            granted?(failure.map { .failure($0) } ?? .success(Self.file))
         }
         /// …or as NSFileCoordinator would: on a thread of its own, once asked, `delay` seconds on.
         func grant(after delay: TimeInterval, _ failure: (any Error)? = nil) {
@@ -223,20 +224,20 @@ struct BoundTests {
                 grant(failure)
             }
         }
-        func open() -> Int {
-            lock.withLock { opens += 1 }
+        func open(_ url: URL) -> Int {
+            lock.withLock { opens.append(url) }
             return 7
         }
         func granted(within bound: TimeInterval?) throws -> Int {
-            try Outbox.granted(within: bound, request: request, cancel: cancel) { self.open() }
+            try Outbox.granted(within: bound, request: request, cancel: cancel) { self.open($0) }
         }
     }
 
-    @Test("Free, the file opens at once")
+    @Test("Free, the file opens at once, at the URL the grant gives")
     func free() throws {
         let asking = Asking(atOnce: true)
         #expect(try asking.granted(within: 1) == 7)
-        #expect(asking.opened == 1 && !asking.cancelled)
+        #expect(asking.opened == [Asking.file] && !asking.cancelled)
     }
 
     @Test(
@@ -247,9 +248,9 @@ struct BoundTests {
         let start = ContinuousClock.now
         #expect(throws: Outbox.Busy.self) { try asking.granted(within: 0.2) }
         #expect(ContinuousClock.now - start >= .milliseconds(200))
-        #expect(asking.cancelled && asking.opened == 0)
+        #expect(asking.cancelled && asking.opened.isEmpty)
         asking.grant()
-        #expect(asking.opened == 0)
+        #expect(asking.opened.isEmpty)
     }
 
     @Test(
@@ -265,9 +266,10 @@ struct BoundTests {
             finish.signal()
         }
         let value = try Outbox.granted(
-            within: bound, request: { granted in Thread.detachNewThread { granted(nil) } },
+            within: bound,
+            request: { granted in Thread.detachNewThread { granted(.success(Asking.file)) } },
             cancel: { Issue.record("an open under way was cancelled") }
-        ) {
+        ) { _ in
             began.signal()
             finish.wait()
             return 7
@@ -289,7 +291,7 @@ struct BoundTests {
         let asking = Asking(atOnce: false)
         asking.grant(after: 0, Refused())
         #expect(throws: Refused.self) { try asking.granted(within: nil) }
-        #expect(asking.opened == 0)
+        #expect(asking.opened.isEmpty)
     }
 
     #if canImport(Darwin)
@@ -299,7 +301,7 @@ struct BoundTests {
         func coordinator() throws {
             let (_, url) = try makeOutbox()
             let (holding, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-            DispatchQueue.global().async {
+            Thread.detachNewThread {
                 var failure: NSError?
                 NSFileCoordinator(filePresenter: nil).coordinate(
                     writingItemAt: url, options: .forMerging, error: &failure
@@ -308,7 +310,10 @@ struct BoundTests {
                     release.wait()
                 }
             }
-            holding.wait()
+            // Failing rather than hanging, should the holder never get the file.
+            guard holding.wait(timeout: .now() + .seconds(150)) == .success else {
+                return Issue.record("the holding coordinator was never granted the file")
+            }
             defer { release.signal() }
             #expect(throws: Outbox.Busy.self) {
                 try Outbox(at: url, random: { 0 }, suspends: false, within: 1)

@@ -103,37 +103,45 @@ public struct Outbox: Sendable {
         _ url: URL, within bound: TimeInterval?, _ open: @escaping @Sendable (URL) throws -> T
     ) throws -> T {
         #if canImport(Darwin)
-            let coordinator = NSFileCoordinator(filePresenter: nil)
-            nonisolated(unsafe) let intent = NSFileAccessIntent.writingIntent(
-                with: url, options: .forMerging)
+            // NSFileCoordinator's blocking call, the one the app has always made: inline when
+            // unbounded, and on a thread of its own when bounded, so the wait can give up on it.
+            // Not its asynchronous one: on the iOS Simulator that never ran its accessor behind a
+            // thread waiting for it, and every open hung.
+            nonisolated(unsafe) let coordinator = NSFileCoordinator(filePresenter: nil)
             return try granted(
                 within: bound,
-                request: {
-                    coordinator.coordinate(with: [intent], queue: OperationQueue(), byAccessor: $0)
+                request: { granted in
+                    let ask: @Sendable () -> Void = {
+                        var failure: NSError?
+                        coordinator.coordinate(
+                            writingItemAt: url, options: .forMerging, error: &failure
+                        ) { granted(.success($0)) }
+                        if let failure { granted(.failure(failure)) }
+                    }
+                    if bound == nil { ask() } else { Thread.detachNewThread(ask) }
                 },
-                cancel: coordinator.cancel
-            ) { try open(intent.url) }
+                cancel: coordinator.cancel, open: open)
         #else
             return try open(url)
         #endif
     }
 
     /// Runs `open` once `request` grants the access it asks for — `request` calls back when it is
-    /// granted, or with the error that ends the asking, and `open` runs inside that call, while the
-    /// access is held — waiting at most `bound` (nil: as long as it takes). Past the bound, the
-    /// asking is cancelled and `Busy` thrown, and a grant that comes after opens nothing. An open
-    /// already under way at the bound is waited for — SQLite's busy timeout bounds it — since
-    /// returning then would leave the file locked behind a process iOS may suspend.
+    /// granted, with the file's URL, or with the error that ends the asking, and `open` runs inside
+    /// that call, while the access is held — waiting at most `bound` (nil: as long as it takes).
+    /// Past the bound, the asking is cancelled and `Busy` thrown, and a grant that comes after opens
+    /// nothing. An open already under way at the bound is waited for — SQLite's busy timeout bounds
+    /// it — since returning then would leave the file locked behind a process iOS may suspend.
     static func granted<T>(
         within bound: TimeInterval?,
-        request: (@escaping @Sendable ((any Error)?) -> Void) -> Void,
+        request: (@escaping @Sendable (Result<URL, any Error>) -> Void) -> Void,
         cancel: () -> Void,
-        open: @escaping @Sendable () throws -> T
+        open: @escaping @Sendable (URL) throws -> T
     ) throws -> T {
         let access = Access<T>()
-        request { failure in
+        request { grant in
             guard access.claim(opening: true) else { return }
-            access.result = failure.map { .failure($0) } ?? Result { try open() }
+            access.result = Result { try open(grant.get()) }
             access.done.signal()
         }
         if let bound, access.done.wait(timeout: .now() + bound) == .timedOut {
