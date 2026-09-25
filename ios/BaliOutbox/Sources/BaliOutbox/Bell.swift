@@ -46,9 +46,9 @@ public enum Bell {
 
     /// The monitor's wake at `now`: the outbox file opened within `patience` (`bound`, for the tests),
     /// where the phone stood and what it queued read — with `cap`, decision 7's or a device check's —
-    /// and the file closed, then decided by the phone's own clock (data model, decision 6). The one
-    /// extension read that migrates a file this build has yet to (`Outbox.read`): the shield's never
-    /// does.
+    /// and the file closed, then decided by the phone's own clock (data model, decision 6). The
+    /// one extension read that migrates a file this build has yet to (`Outbox.read`): the shield's
+    /// never does.
     public static func wake(
         outboxAt url: URL, now: Date, cap: TimeInterval = SyncState.tapCap,
         within bound: TimeInterval = patience
