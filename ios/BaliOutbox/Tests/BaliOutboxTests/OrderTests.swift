@@ -206,33 +206,48 @@ struct UnlockSafetyTests {
     ]
 
     @Test(
-        "A random walk of records and sends, due or not, deletes an unlock only when a send says recorded"
+        "A random walk of records and sends, due or not, deletes an unlock only when a send says recorded — one not filed yet, filed, and a scan's follow-up included"
     )
     func randomWalk() async throws {
+        var (filed, followUps) = (0, 0)
         for seed in 1...12 as ClosedRange<UInt64> {
             var random = SplitMix64(state: seed)
             let (outbox, _) = try makeOutbox(random: 0.5)
             var unrecorded = Set<String>()
+            var presses = Set<ActionOrder?>()
             var now = t0
             for step in 0..<120 {
                 now = now.addingTimeInterval(Double(Int.random(in: 0..<90, using: &random)))
                 let session = ["s", "t"].randomElement(using: &random)!
-                switch Int.random(in: 0..<10, using: &random) {
+                let stood = Standing.inSession(
+                    SessionView(id: session, classId: "c", endsAt: at(3000)), .unlocked)
+                switch Int.random(in: 0..<11, using: &random) {
                 case 0: try outbox.record(.tap(tagId: "tag"), now: now)
                 case 1: try outbox.record(.refocus(session: session), now: now)
                 case 2: try outbox.record(.protectionOff(session: session), now: now)
                 case 3: try outbox.protectionRestored()
                 case 4:
-                    // Of the session, or filed under the latest tap queued (decision 11).
+                    // Of the session; filed under the latest tap queued (decision 11), made where
+                    // the phone stood in a session or not (B6d); or not filed yet (B6b).
                     let tap = try outbox.records().last {
                         if case .tap = $0.change { true } else { false }
                     }
                     let change: Change =
-                        if let tap, Bool.random(using: &random) {
-                            .unlockUnderTap(tap: tap.eventId, reason: nil)
-                        } else { .unlock(session: session, reason: nil) }
-                    let unlock = try #require(try outbox.record(change, now: now))
+                        switch (tap, Int.random(in: 0..<3, using: &random)) {
+                        case (let tap?, 0): .unlockUnderTap(tap: tap.eventId, reason: nil)
+                        case (_, 1): .unlockUnfiled(reason: nil)
+                        default: .unlock(session: session, reason: nil)
+                        }
+                    let unlock = try #require(
+                        try outbox.record(
+                            change, now: now, standing: Bool.random(using: &random) ? stood : nil))
                     unrecorded.insert(unlock.eventId)
+                    presses.insert(unlock.order)
+                case 10:
+                    let unfiled = { try outbox.records().filter(\.change.isUnfiled).count }
+                    let before = try unfiled()
+                    try outbox.file([.out, .waiting, stood].randomElement(using: &random)!)
+                    if try unfiled() < before { filed += 1 }
                 case 5...7:
                     guard case .send(let due) = try outbox.nextDue(now: now) else { break }
                     let (status, body) = Self.answers.randomElement(using: &random)!
@@ -248,9 +263,19 @@ struct UnlockSafetyTests {
                         unrecorded.remove(any.eventId)
                     }
                 }
-                let queued = try outbox.records().filter(\.change.isUnlock).map(\.eventId)
-                #expect(Set(queued) == unrecorded, "seed \(seed), step \(step)")
+                let queued = try outbox.records().filter(\.change.isUnlock)
+                for minted in queued where !unrecorded.contains(minted.eventId) {
+                    // A scan's follow-up (B6d): a session unlock, in its press's place.
+                    guard case .unlock = minted.change, presses.contains(minted.order) else {
+                        Issue.record("seed \(seed), step \(step): \(minted.change)")
+                        continue
+                    }
+                    unrecorded.insert(minted.eventId)
+                    followUps += 1
+                }
+                #expect(Set(queued.map(\.eventId)) == unrecorded, "seed \(seed), step \(step)")
             }
         }
+        #expect(filed > 0 && followUps > 0, "filed \(filed), followed up \(followUps)")
     }
 }

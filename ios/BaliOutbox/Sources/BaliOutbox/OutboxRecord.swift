@@ -12,18 +12,24 @@ public enum Change: Sendable, Hashable {
     /// unanswered, filed under it (owner decision 11) — sent there always, even once the tap's
     /// answer names a session, whose shields it then guards (`Outbox.holdsUnlock`).
     case unlockUnderTap(tap: String, reason: UnlockReason?)
+    /// An Emergency Unlock made where the phone stood unread, no tap of its own unanswered (B6b):
+    /// its session not known, it is kept and never sent until the phone knows where it stands —
+    /// then filed as one of the two above (`Outbox.file`).
+    case unlockUnfiled(reason: UnlockReason?)
     /// `POST /v1/sessions/{id}/refocus`.
     case refocus(session: String)
     /// `POST /v1/sessions/{id}/protection-off`: the Screen Time permission was found revoked.
     case protectionOff(session: String)
 
-    /// Either unlock: a session's, or one filed under a tap.
+    /// Any unlock: a session's, one filed under a tap, or one not filed yet.
     var isUnlock: Bool {
         switch self {
-        case .unlock, .unlockUnderTap: true
+        case .unlock, .unlockUnderTap, .unlockUnfiled: true
         case .tap, .refocus, .protectionOff: false
         }
     }
+
+    var isUnfiled: Bool { if case .unlockUnfiled = self { true } else { false } }
 }
 
 /// One queued record.
@@ -59,8 +65,9 @@ public struct OutboxRecord: Sendable, Hashable {
         case protectionOff(session: String, ProtectionOffRequest)
     }
 
-    /// The request to send, built from what was stored: every attempt sends the same.
-    public var request: Request {
+    /// The request to send, built from what was stored: every attempt sends the same. None for an
+    /// unlock not filed yet, which goes nowhere until it is (`Outbox.nextDue`).
+    public var request: Request? {
         let (id, time) = (eventId, recordedAt)
         func unlock(_ reason: UnlockReason?) -> UnlockRequest {
             UnlockRequest(eventId: id, deviceTime: time, reason: reason, order: order)
@@ -70,6 +77,7 @@ public struct OutboxRecord: Sendable, Hashable {
             .tap(TapRequest(tagId: tagId, eventId: id, deviceTime: time, order: order))
         case .unlock(let session, let reason): .unlock(session: session, unlock(reason))
         case .unlockUnderTap(let tap, let reason): .unlockUnderTap(tap: tap, unlock(reason))
+        case .unlockUnfiled: nil
         case .refocus(let session):
             .refocus(session: session, RefocusRequest(eventId: id, deviceTime: time, order: order))
         case .protectionOff(let session):
@@ -86,12 +94,15 @@ extension OutboxRecord: FetchableRecord {
         case "unlock":
             let reason = try row.decode(String?.self, forColumn: "reason")
                 .flatMap(UnlockReason.init(rawValue:))
-            // Filed under its tap, it stays so once the tap's answer names a session (decision 11).
+            // Filed under its tap, it stays so once the tap's answer names a session (decision 11);
+            // filed under neither, it waits to be (B6b).
             change =
                 if let tap = try row.decode(String?.self, forColumn: "tapId") {
                     .unlockUnderTap(tap: tap, reason: reason)
+                } else if let session = try row.decode(String?.self, forColumn: "sessionId") {
+                    .unlock(session: session, reason: reason)
                 } else {
-                    .unlock(session: try row.decode(forColumn: "sessionId"), reason: reason)
+                    .unlockUnfiled(reason: reason)
                 }
         case "refocus": change = .refocus(session: try row.decode(forColumn: "sessionId"))
         case "protection_off":
@@ -109,7 +120,10 @@ extension OutboxRecord: FetchableRecord {
             .flatMap(ApiErrorReason.init(rawValue:))
         lastMessage = try row.decode(forColumn: "lastMessage")
         follows = try row.decode(forColumn: "follows")
-        let seq = try row.decode(Int.self, forColumn: "seq")
+        // A follow-up's order is its press's (B6d): the same act, filed a second time.
+        let seq =
+            try row.decode(Int?.self, forColumn: "orderSeq")
+            ?? row.decode(Int.self, forColumn: "seq")
         order = try row.decode(String?.self, forColumn: "install").map {
             ActionOrder(install: $0, seq: seq)
         }
@@ -121,24 +135,25 @@ extension OutboxRecord: FetchableRecord {
 extension OutboxRecord {
     /// Sends the record's request through `client`, once, and reads the answer as its own
     /// endpoint's type by its own kind's table — the only way to make a `Sent`, so `settle` can
-    /// never read an answer by another kind's table.
-    public func send(through client: APIClient) async -> Sent {
+    /// never read an answer by another kind's table. Nil, sending nothing, for an unlock not filed.
+    public func send(through client: APIClient) async -> Sent? {
         switch request {
-        case .tap(let request):
+        case .tap(let request)?:
             let response = await client.tap(request)
             return Sent(eventId, response, .tap(tapDisposition(response.result, response.answer)))
-        case .unlock(let session, let request):
+        case .unlock(let session, let request)?:
             return unlocked(await client.unlock(session: session, request))
-        case .unlockUnderTap(let tap, let request):
+        case .unlockUnderTap(let tap, let request)?:
             return unlocked(await client.unlock(tap: tap, request))
-        case .refocus(let session, let request):
+        case .refocus(let session, let request)?:
             let response = await client.refocus(session: session, request)
             let disposition = stateChangeDisposition(response.result, response.answer)
             return Sent(eventId, response, .stateChange(disposition))
-        case .protectionOff(let session, let request):
+        case .protectionOff(let session, let request)?:
             let response = await client.protectionOff(session: session, request)
             let disposition = stateChangeDisposition(response.result, response.answer)
             return Sent(eventId, response, .stateChange(disposition))
+        case nil: return nil
         }
     }
 

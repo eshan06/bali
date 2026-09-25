@@ -12,10 +12,13 @@ import Foundation
         private var session: NFCNDEFReaderSession?
         private var answer: CheckedContinuation<BlockRead, Never>?
 
+        /// Whether this phone can read NFC: a scan begins only where it can.
+        static var canRead: Bool { NFCNDEFReaderSession.readingAvailable }
+
         /// One scan: until a tag is read, the student cancels, or iOS gives up (a minute). One at a
         /// time: asked again while one is under way, it says so rather than wait.
         func read() async -> BlockRead {
-            guard NFCNDEFReaderSession.readingAvailable else { return .unsupported }
+            guard Self.canRead else { return .unsupported }
             return await withCheckedContinuation { answer in
                 let session = NFCNDEFReaderSession(
                     delegate: self, queue: nil, invalidateAfterFirstRead: true)
@@ -73,6 +76,7 @@ import Foundation
 #else
     /// No NFC on this platform: every scan finds a phone that cannot read.
     final class BlockReader: Sendable {
+        static let canRead = false
         func read() async -> BlockRead { .unsupported }
     }
 #endif

@@ -239,7 +239,7 @@ struct Placeholder: View {
             case .inSession(let session, let state)?:
                 "\(state?.rawValue ?? "unknown") until \(time(session.endsAt))"
             case .waiting?: "waiting for the teacher's Start"
-            case .unread?: "not read from the phone yet — shields left as they were"
+            case .unread?: "not read from the phone yet — Emergency Unlock still works"
             case .out?, nil: "in no session"
             }
         }
@@ -291,6 +291,7 @@ struct Placeholder: View {
                     case .tap: "tap"
                     case .unlock: "unlock"
                     case .unlockUnderTap: "unlock under its tap"
+                    case .unlockUnfiled: "unlock, its class not known yet"
                     case .refocus: "refocus"
                     case .protectionOff: "protection off"
                     }

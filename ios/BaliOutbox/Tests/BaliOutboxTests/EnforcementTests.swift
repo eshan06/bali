@@ -120,6 +120,23 @@ final class Relaunches: TransactionObserver, @unchecked Sendable {
     func databaseDidRollback(_ db: Database) {}
 }
 
+/// A relaunch over `outbox` — a fresh one by default — whose file holds where the phone stood —
+/// focused until `endsAt` — in a form this build cannot read, the store holding the shields
+/// (`held`, the last run's) or none: the engine and its enforcer.
+func unreadable(
+    held: Bool = true, endsAt: TimeInterval = 1200, outbox: Outbox? = nil
+) async throws -> (Enforced, Standing) {
+    let outbox = try outbox ?? makeOutbox().outbox
+    let kept = Standing.inSession(session(endsAt: endsAt), .focused)
+    try outbox.keep(kept)
+    try spoilStanding(outbox)
+    let screenTime = FakeScreenTime()
+    if held { await screenTime.held() }
+    let phone = Enforced(try Rig(outbox: outbox), screenTime)
+    await phone.until { $0.permission == .approved }
+    return (phone, kept)
+}
+
 /// An enforcer over a rig's engine and clock, with Screen Time as the test holds it.
 struct Enforced {
     let rig: Rig
@@ -757,23 +774,6 @@ struct StandingKeptTests {
             #expect(relaunched.shieldedUntil(t0) == nil)
         }
         await rig.stop()
-    }
-
-    /// A relaunch over a file that holds where the phone stood — focused until `endsAt` — in a form
-    /// this build cannot read, the store holding the shields (`held`, the last run's) or none: the
-    /// engine and its enforcer.
-    func unreadable(held: Bool = true, endsAt: TimeInterval = 1200) async throws -> (
-        Enforced, Standing
-    ) {
-        let (outbox, _) = try makeOutbox()
-        let kept = Standing.inSession(session(endsAt: endsAt), .focused)
-        try outbox.keep(kept)
-        try spoilStanding(outbox)
-        let screenTime = FakeScreenTime()
-        if held { await screenTime.held() }
-        let phone = Enforced(try Rig(outbox: outbox), screenTime)
-        await phone.until { $0.permission == .approved }
-        return (phone, kept)
     }
 
     @Test(

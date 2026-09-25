@@ -39,11 +39,13 @@ public enum Standing: Sendable, Hashable {
     case unread
 
     /// The phone's own change, at once: a state change of the session it is in. A tap changes
-    /// nothing here — it is `SyncState.pendingTap` until answered; an unlock under it, any session.
+    /// nothing here — it is `SyncState.pendingTap` until answered; an unlock under it, or one not
+    /// filed yet, any session.
     func acting(_ change: Change) -> Standing {
         guard case .inSession(let session, _) = self else { return self }
         switch change {
-        case .unlock(session.id, _), .unlockUnderTap: return .inSession(session, .unlocked)
+        case .unlock(session.id, _), .unlockUnderTap, .unlockUnfiled:
+            return .inSession(session, .unlocked)
         case .refocus(session.id): return .inSession(session, .focused)
         case .protectionOff(session.id): return .inSession(session, .protectionOff)
         default: return self
@@ -53,6 +55,9 @@ public enum Standing: Sendable, Hashable {
     func isFocused(in session: String) -> Bool {
         if case .inSession(let view, .focused?) = self { view.id == session } else { false }
     }
+
+    /// The session it is in; nil: none.
+    var sessionId: String? { if case .inSession(let view, _) = self { view.id } else { nil } }
 }
 
 /// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5): a
@@ -127,12 +132,19 @@ public struct SyncState: Sendable, Hashable {
     }
 
     /// The Emergency Unlock to record now (decision 11): under a tap not yet answered — filed where
-    /// that tap lands — else of the session the phone is in; nil: nothing the phone knows shields.
+    /// that tap lands — else of the session the phone is in; where it stood unread, not filed until
+    /// the phone knows where it stands (B6b); nil: out or waiting, nothing the phone knows shields.
     public func emergencyUnlock(reason: UnlockReason?) -> Change? {
         if let tap = pendingTap { return .unlockUnderTap(tap: tap.eventId, reason: reason) }
-        guard case .inSession(let session, _) = standing else { return nil }
-        return .unlock(session: session.id, reason: reason)
+        switch standing {
+        case .inSession(let session, _): return .unlock(session: session.id, reason: reason)
+        case .unread: return .unlockUnfiled(reason: reason)
+        case .out, .waiting: return nil
+        }
     }
+
+    /// Whether an unlock made where the phone stood unread waits to be filed (B6b).
+    var holdsUnfiled: Bool { queued.contains { $0.change.isUnfiled } }
 }
 
 public enum Link: Sendable, Hashable {
@@ -220,7 +232,8 @@ public actor SyncEngine {
         do { state.queued = try outbox.records() } catch { state.link = .storageFailed }
         do {
             state.standing = try outbox.standing()
-            kept = state.standing
+            // An unlock not filed yet acts on it; the file holds it once that unlock is filed.
+            kept = state.holdsUnfiled ? nil : state.standing
         } catch {
             state.standing = .unread
             state.link = .storageFailed
@@ -354,7 +367,8 @@ public actor SyncEngine {
             do {
                 switch try outbox.nextDue(now: clock.now()) {
                 case .send(let record):
-                    let sent = await record.send(through: client)
+                    // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
+                    guard let sent = await record.send(through: client) else { break }
                     // No token: nothing went, so nothing is settled — the record waits on sign-in
                     // (a ring), or a minute. Never a sign-out, never a dropped record.
                     guard sent.noAnswer != .noToken else {
@@ -481,7 +495,7 @@ public actor SyncEngine {
     /// answer naming the session — so a file that never reads never strands the phone.
     private func readStanding() {
         guard state.standing == .unread, let standing = stored(outbox.standing) else { return }
-        kept = standing
+        kept = state.holdsUnfiled ? nil : standing
         state.standing = armed && standing == .out ? .waiting : standing
     }
 
@@ -562,12 +576,18 @@ public actor SyncEngine {
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
     private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
 
-    /// Writes the standing to the file. `kept` is set first, so the change of state a failure makes
-    /// (`failed`) writes nothing again at once; the next change does.
+    /// Writes the standing to the file — filing into it, in the same write, every unlock made where
+    /// the phone stood unread, which then goes (B6b). `kept` is set first, so the change of state a
+    /// failure makes (`failed`) writes nothing again at once; the next change does.
     private func keepStanding() {
-        let standing = state.standing
+        let (standing, filing) = (state.standing, state.holdsUnfiled)
         kept = standing
-        if stored({ try outbox.keep(standing) }) == nil { kept = nil }
+        if stored({ try filing ? outbox.file(standing) : outbox.keep(standing) }) == nil {
+            kept = nil
+        } else if filing {
+            state.queued = queue()
+            ring(.drain)
+        }
     }
 
     /// What `read` reads from the outbox; nil when it cannot be read, which is shown (rule 5).

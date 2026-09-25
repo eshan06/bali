@@ -44,7 +44,10 @@ struct AppTests {
     }
 
     @Test(
-        "A phone that cannot read NFC — the simulator is one — is told so at once: no scan begins, and nothing waits on one (B6)"
+        "A phone that cannot read NFC — the simulator is one — is told so at once: no scan begins, and nothing waits on one (B6)",
+        .disabled(
+            if: BlockReader.canRead,
+            "This phone reads NFC: a scan would begin here — round 4 checks the reader on it")
     )
     func noNFC() async {
         #expect(await BlockReader().read() == .unsupported)

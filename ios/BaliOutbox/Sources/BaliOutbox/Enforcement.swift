@@ -70,6 +70,14 @@ extension SyncState {
         else { return nil }
         return tap.recordedAt + cap
     }
+
+    /// Whether the student's Emergency Unlock has the last word on the shields: one after the tap
+    /// not yet answered — this run's or the last's: that tap holds the queue, so nothing since can
+    /// have put them back on — or with none, one made where the phone stood unread. Over a standing
+    /// not read, it takes the last run's shields off too — the way out of shields the phone can no
+    /// longer justify (B6b). A session's unlock the last run left queued alone does not: a tap
+    /// answered since may have put them back on.
+    public var unlockedLast: Bool { pendingTap == nil ? holdsUnfiled : tapHeldUntil == nil }
 }
 
 /// Keeps the shields where the engine's truth says (B5): it follows `SyncEngine.updates()`, takes
@@ -174,8 +182,8 @@ public actor Enforcer {
 
     /// The shields as the engine's truth says now — put on, or taken off, where the store says
     /// otherwise, but while where the phone stood is unread, only the ones this enforcer put on
-    /// taken off: enforcement never begins from nothing — and what a screen may claim of them;
-    /// then a wake at their end.
+    /// taken off, or any once the student has unlocked over it: enforcement never begins from
+    /// nothing — and what a screen may claim of them; then a wake at their end.
     private func apply() async {
         let state = await engine.state
         let until = state.shieldedUntil(clock.now())
@@ -183,7 +191,9 @@ public actor Enforcer {
         if until != nil, !shielding {
             await screenTime.shield()
             putOn = true
-        } else if until == nil, shielding, state.standing != .unread || putOn {
+        } else if until == nil, shielding,
+            state.standing != .unread || putOn || state.unlockedLast
+        {
             await screenTime.unshield()
             putOn = false
         }
