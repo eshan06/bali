@@ -71,7 +71,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`coordinate(with:queue:byAccessor:)` on an `OperationQueue`) never ran its accessor there
   while the asking thread waited for it, so every open hung and the whole BaliOutbox suite with
   them, pure tests included — its threads all blocked — until the job's 30 minutes ran out.
-  Linux, which has no NSFileCoordinator, could not show it.
+  Linux, which has no NSFileCoordinator, could not show it. And the simulator on GitHub's runner
+  freezes for seconds at a time (B2, B5a), so no test races the bound against a thread that must
+  run first: the monitor's reads of a free file wait with the tests' own patience (the bound is a
+  parameter, `within`, the monitor's 2 s by default), and the test of an open under way at the bound
+  has the open begin before the bounded wait does.
   **Rider (#90's review), decided here:** over an unread standing, the last run's shields that a
   pending tap keeps on are its cap's — they come off at the cap — but its answer leaves them the
   last run's again: an armed answer asks the server where the phone stands, since arming ends no

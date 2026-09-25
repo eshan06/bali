@@ -117,6 +117,14 @@ struct WakeTests {
     }
 }
 
+/// The monitor's wake over a file no other process holds, waiting for it as long as the tests wait
+/// for anything: a stall of the iOS Simulator's never reads as the file held (`BoundTests` has the
+/// bound).
+private func wakeFree(_ url: URL, at now: Date, cap: TimeInterval = SyncState.tapCap) -> Bell.Wake
+{
+    Bell.wake(outboxAt: url, now: now, cap: cap, within: TimeInterval(patience.components.seconds))
+}
+
 @Suite("The monitor reads the file the app keeps (B5b)", .timeLimit(.minutes(3)))
 struct MonitorFileTests {
     @Test("From the app's own file after a force-quit: kept to the bell, cleared at it")
@@ -125,8 +133,8 @@ struct MonitorFileTests {
         let rig = try Rig(outbox: outbox)
         try await rig.tapIn(session(endsAt: 1200))
         await rig.stop()
-        #expect(Bell.wake(outboxAt: url, now: at(600)) == .keep(Bell.window(until: at(1200))))
-        #expect(Bell.wake(outboxAt: url, now: at(1200)) == .clear)
+        #expect(wakeFree(url, at: at(600)) == .keep(Bell.window(until: at(1200))))
+        #expect(wakeFree(url, at: at(1200)) == .clear)
     }
 
     @Test(
@@ -139,12 +147,12 @@ struct MonitorFileTests {
         try await rig.server.next(tapRoute).reply(nil)
         await rig.stop()
         let cap = at(SyncState.tapCap)
-        #expect(Bell.wake(outboxAt: url, now: cap - 600) == .keep(Bell.window(until: cap)))
-        #expect(Bell.wake(outboxAt: url, now: cap) == .clear)
+        #expect(wakeFree(url, at: cap - 600) == .keep(Bell.window(until: cap)))
+        #expect(wakeFree(url, at: cap) == .clear)
         #expect(
-            Bell.wake(outboxAt: url, now: at(300), cap: Bell.floor)
+            wakeFree(url, at: at(300), cap: Bell.floor)
                 == .keep(Bell.window(until: at(Bell.floor))))
-        #expect(Bell.wake(outboxAt: url, now: at(Bell.floor), cap: Bell.floor) == .clear)
+        #expect(wakeFree(url, at: at(Bell.floor), cap: Bell.floor) == .clear)
     }
 
     @Test(
@@ -154,12 +162,12 @@ struct MonitorFileTests {
         let (spoiled, spoiledURL) = try makeOutbox()
         try spoiled.keep(.inSession(session(endsAt: 1200), .focused))
         try spoilStanding(spoiled)
-        #expect(Bell.wake(outboxAt: spoiledURL, now: at(1300)) == .retry(Bell.window(until: at(1360))))
+        #expect(wakeFree(spoiledURL, at: at(1300)) == .retry(Bell.window(until: at(1360))))
         let (newer, newerURL) = try makeOutbox()
         try newer.pool.write {
             try $0.execute(sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v99')")
         }
-        #expect(Bell.wake(outboxAt: newerURL, now: at(1300)) == .retry(Bell.window(until: at(1360))))
+        #expect(wakeFree(newerURL, at: at(1300)) == .retry(Bell.window(until: at(1360))))
     }
 
     #if os(Linux)
@@ -179,7 +187,7 @@ struct MonitorFileTests {
                 }
             }
             #expect(try descriptors() == 0)
-            #expect(Bell.wake(outboxAt: url, now: t0) == .keep(Bell.window(until: at(1200))))
+            #expect(wakeFree(url, at: t0) == .keep(Bell.window(until: at(1200))))
             #expect(try descriptors() == 0)
         }
     #endif
@@ -257,21 +265,19 @@ struct BoundTests {
         "An open already under way at the bound is waited for, never left running: returning then would leave the file locked behind a monitor iOS may suspend"
     )
     func underWay() throws {
-        let (began, finish) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-        // Long enough that the grant, on a thread of its own, comes well inside it, even loaded.
-        let bound: TimeInterval = 2
-        Thread.detachNewThread {
-            began.wait()
-            Thread.sleep(forTimeInterval: bound + 0.5)
-            finish.signal()
-        }
+        let began = DispatchSemaphore(value: 0)
+        let bound: TimeInterval = 0.5
         let value = try Outbox.granted(
             within: bound,
-            request: { granted in Thread.detachNewThread { granted(.success(Asking.file)) } },
+            request: { granted in
+                Thread.detachNewThread { granted(.success(Asking.file)) }
+                // The open has begun before the wait for it does: no stall can put them the other way.
+                began.wait()
+            },
             cancel: { Issue.record("an open under way was cancelled") }
         ) { _ in
             began.signal()
-            finish.wait()
+            Thread.sleep(forTimeInterval: bound * 3)
             return 7
         }
         #expect(value == 7)

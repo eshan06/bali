@@ -40,14 +40,15 @@ public enum Bell {
         case retry(DateInterval)
     }
 
-    /// The monitor's wake at `now`: the outbox file opened within `patience`, where the phone stood
-    /// and what it queued read — with `cap`, decision 7's or a device check's — and the file closed,
-    /// then decided by the phone's own clock (data model, decision 6).
-    public static func wake(outboxAt url: URL, now: Date, cap: TimeInterval = SyncState.tapCap)
-        -> Wake
-    {
+    /// The monitor's wake at `now`: the outbox file opened within `patience` (`bound`, for the tests),
+    /// where the phone stood and what it queued read — with `cap`, decision 7's or a device check's —
+    /// and the file closed, then decided by the phone's own clock (data model, decision 6).
+    public static func wake(
+        outboxAt url: URL, now: Date, cap: TimeInterval = SyncState.tapCap,
+        within bound: TimeInterval = patience
+    ) -> Wake {
         wake(now: now) {
-            var state = try Outbox.read(url, within: patience)
+            var state = try Outbox.read(url, within: bound)
             state.cap = cap
             return state
         }
