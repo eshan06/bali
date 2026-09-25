@@ -8,6 +8,75 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B4b: the student's sign-in, in BaliCore — Cognito's hosted UI with PKCE, the
+  tokens in the Keychain, and one sign-out.** `SignIn` (`ios/BaliCore`), an actor, is B1c's
+  `TokenProvider` and the sync engine's `refresh`. It signs the student in through Cognito's
+  hosted UI with the authorization-code grant, PKCE (S256, a fresh 32-byte verifier) and a state
+  value binding the answer to its attempt, over the phone's own public client (`docs/DEPLOY.md`,
+  "The phone's sign-in"): no client secret anywhere, and no token in any URL — the code is
+  exchanged at `/oauth2/token` in a form body. The tokens live behind `TokenStore`:
+  `KeychainTokenStore` on the phone, memory in the tests, so every rule runs on Linux too
+  (SHA-256 from CryptoKit, or swift-crypto where there is none — 4.5.2, exact, since 5.x's
+  manifest needs Swift 6.2, above GRDB's 6.1). **The browser is the app's, and ephemeral.**
+  `signIn(through:)` takes it as a closure — the app's `WebAuthenticationSession` (B4c's
+  trigger, then C1's screen) — so BaliCore stays free of UI. Ephemeral, because it then shares
+  no cookies with Safari: Cognito's hosted-UI session never outlives the sign-in, so signing out
+  of Bali is signing out and nobody is signed in as the phone's last student by a cookie;
+  nothing about a minor's sign-in stays in Safari; and iOS asks no "wants to use … to sign in"
+  first. It costs single sign-on with Safari — nothing here, where a student signs in roughly
+  once, ever (auth decision 2). The redirect, `bali://auth/callback`, is caught by that session
+  itself and is no URL type of the app's, so no other app or page can hand the app an answer —
+  and a code taken anyway is useless without the verifier. **The Keychain,
+  `WhenUnlockedThisDeviceOnly`, no shared group.** The tightest class that works today: the
+  engine sends only while the app is in the foreground (its check-in is foreground-only, and
+  the extensions record to the outbox but never send), so a token is needed only while the
+  phone is unlocked; `ThisDeviceOnly` keeps the tokens out of iCloud Keychain and out of a
+  backup restored to another phone. A Keychain that cannot be read right now (the phone locked,
+  a prewarmed launch) is read again at the next ask — never a sign-out. **B5 revisits it** if
+  work in the background — a queued unlock sent behind a locked phone — needs a token: that is
+  `AfterFirstUnlockThisDeviceOnly`, and since `save` sets the class only when it adds the item,
+  the move must update the stored item's class too. **The token's own clock, never the
+  phone's.** An access token is given until its own lifetime, `exp` − `iat` — both the server's
+  clock — has passed since it arrived, less 60 s so one sent still arrives in time. Comparing
+  `exp` with the phone's clock would have a phone set wrong send expired tokens, or renew before
+  every request (rule 1: the server owns the clock). A clock changed after a token arrived moves
+  only that token's end: set ahead, it renews early; set back, the API's `401` renews it
+  (`refresh`). A token whose lifetime cannot be read is given until the API refuses it.
+  **Only `invalid_grant` signs anyone out.** Auth's "Only a real 'no' signs anyone out": on the
+  phone that no is Cognito's token endpoint refusing the refresh token (`400 invalid_grant` —
+  revoked, expired, the account disabled or gone). Nothing else is one. The API's own `401`
+  renews the token and never signs out — an `AUTH_AUDIENCE` missing the phone's client rejects
+  every token, and must not sign a school out. A timeout, no network, a 5xx, a 429, a redirect,
+  and `invalid_client` or `unauthorized_client` (a misconfigured client: ours to fix, not the
+  student's) keep the tokens, and the next ask tries again. A sign-out forgets the tokens only,
+  never a queued record, which waits for the next sign-in ("A saved emergency unlock outlives an
+  expired token"). **Rotation-safe renewal.** One renewal at a time, shared by every caller —
+  the check-in, the drain, the engine's `refresh` — so a refresh token is never spent twice:
+  were the client to rotate refresh tokens, the second spend would be refused `invalid_grant`,
+  a sign-out we caused. A rotated refresh token replaces the one kept, and one the Keychain
+  cannot take right then (the phone locked mid-renewal) is saved again at the next ask, since
+  the old one stops working and the new one is nowhere else. An answer about a refresh token
+  the phone let go while it ran (signed out, or in again) is dropped, so a stale no never signs
+  a new sign-in out. The dev client does not rotate; none of this depends on it. **B4's
+  contract with the engine, kept:** `accessToken()` never gives a token it knows has expired or
+  the API refused; `refresh()` never waits on the student — false at once when nobody is
+  signed in — and is true once a fresh token is ready; and every token but `refresh`'s (a
+  sign-in, a renewal of its own) runs `whenTokenArrives`, which B4c points at the engine's
+  `retryNow()`. `cognito` is `nonisolated`, so the app reads the redirect's scheme for its
+  browser session without a hop (an actor's `let` is isolated outside its module) — B4c's
+  change, made here with BaliCore's API. **Tests** (`SignInTests.swift`, Linux and the iOS
+  Simulator): the S256 challenge against RFC 7636's own example; fresh verifiers and states;
+  the authorize URL, never the verifier; the answer's code taken only at the redirect URI, for
+  its attempt; the code exchange (no secret, the verifier whose challenge opened the page);
+  sign-ins that do not finish, or whose tokens the Keychain refuses, keeping nothing; the token
+  given until the margin whatever the phone's clock; renewal, the engine told; rotation, and a
+  rotated token saved after a locked Keychain; `invalid_grant` signing out, and eight other
+  answers keeping the tokens; the engine's `refresh`; one renewal shared; a locked Keychain
+  never a sign-out; signing out; a sign-out, and a sign-in, while a renewal runs; an unreadable
+  lifetime; and `cognito` read from another module. Twenty-two mutations of `SignIn` —
+  nineteen when it was written, three in review — each turn a test red. Not in them:
+  `KeychainTokenStore` itself. A package's test process carries no entitlement, and the
+  Keychain refuses it (`errSecMissingEntitlement`, -34018), so its first run is the app's (B4c).
 - **2026-09-24** — **B4a: the API accepts a list of app client ids, and B4 ships in three.**
   **The list:** `AUTH_AUDIENCE` is comma-separated, each id an app client whose tokens the
   API accepts, matched as the one id always was (an access token's `client_id`, an id

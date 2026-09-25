@@ -382,7 +382,7 @@ struct TokenTests {
         arguments: [
             nil, (500, "{}"), (503, "<html>"), (429, refusal("too_many_requests")),
             (400, refusal("invalid_client")), (400, refusal("unauthorized_client")),
-            (200, "not json"),
+            (200, "not json"), (302, refusal("invalid_grant")),  // a redirect is not Cognito
         ] as [(Int, String)?])
     func kept(reply: (Int, String)?) async throws {
         let answers = Answers(reply)

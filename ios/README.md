@@ -4,14 +4,14 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 `BaliOutbox`, the student's outbox and the sync engine that drains it (`docs/ARCHITECTURE.md`,
 "iOS app structure").
 
-| Folder         | What it is                                                                                                |
-| -------------- | --------------------------------------------------------------------------------------------------------- |
-| `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                            |
-| `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6                                               |
-| `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: iOS runs it at a session's edges       |
-| `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app             |
-| `BaliCore/`    | The API's wire types, the outbox tables and the API client — `swift test` there runs its tests, Linux too |
-| `BaliOutbox/`  | The outbox store (GRDB in the app group) and the sync engine that drains it — `swift test` there too      |
+| Folder         | What it is                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
+| `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6                                                            |
+| `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: iOS runs it at a session's edges                    |
+| `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
+| `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
+| `BaliOutbox/`  | The outbox store (GRDB in the app group) and the sync engine that drains it — `swift test` there too                   |
 
 All three targets are on team `H535678UF8`, share the app group `group.com.bali.shared`, and
 carry Family Controls; the app also reads NFC tags.
@@ -26,8 +26,8 @@ file, and after pulling a change to `ios/`.
 
 ## On your Mac
 
-You need Xcode 16.3 or later — GRDB's manifest needs Swift 6.1; CI builds with Xcode 26.6 — and
-[Homebrew](https://brew.sh).
+You need Xcode 16.3 or later — the manifests of GRDB and swift-crypto need Swift 6.1; CI builds
+with Xcode 26.6 — and [Homebrew](https://brew.sh).
 
 1. Install XcodeGen, once: `brew install xcodegen`.
 2. Generate the project and open it:
