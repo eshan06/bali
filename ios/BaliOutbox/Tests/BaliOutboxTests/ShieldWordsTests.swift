@@ -124,7 +124,8 @@ struct ShieldWordsTests {
     }
 }
 
-@Suite("The shield reads the file the app keeps, as the monitor does (B5c)", .timeLimit(.minutes(3)))
+@Suite(
+    "The shield reads the file the app keeps, as the monitor does (B5c)", .timeLimit(.minutes(3)))
 struct ShieldFileTests {
     /// The title over the file at `url`, waiting for it as long as the tests wait for anything: a
     /// stall of the iOS Simulator's never reads as the file held.

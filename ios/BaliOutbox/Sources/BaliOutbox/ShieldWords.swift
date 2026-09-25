@@ -29,9 +29,10 @@ public struct ShieldWords: Sendable, Hashable {
     }
 
     /// The words for `state` — nil: not read — at `now`. A tap not yet answered keeps the shields
-    /// on: no end is known, whatever the phone stood in before — the tap's answer may move it. Else,
-    /// focused in a session: until its bell. Else nothing says when they come off — the file not
-    /// read, the bell past, or nothing keeping them on (a shield not taken down yet): Bali's name.
+    /// on: no end is known, whatever the phone stood in before — the tap's answer may move it.
+    /// Else, focused in a session: until its bell. Else nothing says when they come off — the
+    /// file not read, the bell past, or nothing keeping them on (a shield not taken down yet):
+    /// Bali's name.
     init(_ state: SyncState?, over: Over, now: Date, time: Date.FormatStyle) {
         if let held = state?.tapHeldUntil, held > now {
             title = "Focused with Bali — waiting for your class"
