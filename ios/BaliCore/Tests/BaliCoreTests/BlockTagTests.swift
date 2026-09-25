@@ -60,7 +60,7 @@ struct BlockTagTests {
         for link in [
             uri(0x04, "bali.app/t/T7XK2M9QPF"), uri(0x02, "bali.app/t/t7xk2m9qpf/"),
             uri(0x00, "https://bali.app/t/T7XK2M9QPF?from=qr"), uri(0x00, "bali://t/T7XK2M9QPF"),
-            uri(0x00, "BALI://T/t7xk2m9qpf"),
+            uri(0x00, "BALI://T/t7xk2m9qpf"), uri(0x04, "BALI.APP/T/T7XK2M9QPF"),
         ] {
             #expect(BlockTag.code(in: [link]) == "T7XK2M9QPF", "\(link)")
         }

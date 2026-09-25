@@ -65,7 +65,7 @@ public enum BlockTag {
         let path = url.path.split(separator: "/").map(String.init)
         switch url.scheme?.lowercased() {
         case "bali" where url.host?.lowercased() == "t" && path.count == 1: return code(path[0])
-        case "https" where path.count == 2 && path[0] == "t": return code(path[1])
+        case "https" where path.count == 2 && path[0].lowercased() == "t": return code(path[1])
         default: return nil
         }
     }

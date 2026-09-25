@@ -460,16 +460,17 @@ public struct Outbox: Sendable {
         return records.filter { !$0.stuck && !($0.follows.map(stuck.contains) ?? false) }.count
     }
 
-    /// Whether an unrecorded unlock of `session`, made after the record at `seq`, is queued. While
-    /// one is, neither a read nor an older tap's answer puts that session's shields back on.
+    /// Whether an unrecorded unlock of `session`, made after the record at `seq`, is queued — or
+    /// one under a tap still queued, its session unnamed: it may be any. While one is, neither a
+    /// read nor an older tap's answer puts that session's shields back on.
     public func holdsUnlock(session: String, after seq: Int = 0) throws -> Bool {
         try pool.read {
             try Bool.fetchOne(
                 $0,
                 sql: """
-                    SELECT EXISTS (SELECT 1 FROM outbox
-                      WHERE kind = 'unlock' AND sessionId = ? AND seq > ?)
-                    """, arguments: [session, seq]) ?? false
+                    SELECT EXISTS (SELECT 1 FROM outbox WHERE kind = 'unlock' AND seq > ? AND
+                      (sessionId = ? OR tapId IN (SELECT eventId FROM outbox WHERE kind = 'tap')))
+                    """, arguments: [seq, session]) ?? false
         }
     }
 

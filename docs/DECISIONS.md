@@ -10,7 +10,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-09-25** — **B6a: the NFC tap — a block is the code written on it, read into the tap —
   and decision 11 on the phone: an Emergency Unlock made while the phone's own tap is unanswered
-  is filed under that tap, always, and guards the session its answer names. B6 ships in three.**
+  is filed under that tap, always, and guards every session until that answer names one. B6 ships
+  in three.**
   **The split:** B6 came to about 470 counted lines with its riders. B6a is the read and decision
   11, with #92's `firstMatch` rider (a test); B6b is Emergency Unlock over an unread standing
   (#92's review: the engine's path, the Debug button, and whether a fail-safe ceiling applies to
@@ -51,10 +52,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the tap's answer names a session: the server answers a retry where it was recorded, and the
   session route would refuse an id another session holds. It carries its record's order like every
   record, so the server orders it after its tap whatever the clock says, and is answered as any
-  unlock (`unlockDisposition`). **The guard, decided here (PLAN's lean):** it guards the session its
-  tap's answer names — `settle` hands that session to the unlocks filed under the tap — so, stuck,
-  it still keeps every read from shielding that session again (`holdsUnlock`); an answer naming
-  none (armed, no longer current, refused) hands it nothing. Its tap's answer does not apply while
+  unlock (`unlockDisposition`). **The guard, decided here (PLAN's lean, widened by #94's Claude
+  Review):** until its tap is answered, the unlock's session is not known — any session the phone
+  stands or reads in may be the tap's — so it guards every one: stuck, it keeps every read from
+  shielding any session again (`holdsUnlock`); a tap made after it, a return, still focuses (by the
+  phone's order). A refused tap stays queued, stuck, and so does that guard. The tap's answer names
+  the session: `settle` hands it to the unlocks filed under the tap, which guard that one only from
+  then on; an answer naming none (armed, no longer current) hands them nothing — the server keeps
+  such an unlock with no session. Its tap's answer does not apply while
   the unlock after it waits (B3b-2's rule), so nothing shields between the two answers; a tap that
   lands after its unlock — refused first, or stuck — answers `joined` and `unlocked` (A11), which
   applies: no shield. And a tap's own answer never shields over an unlock the phone made after the
@@ -90,23 +95,30 @@ a real decision? Add a dated entry at the top: what was decided and why.
   iOS Simulator): `BlockTagTests` — v2's code in a Text record, whatever its case, space, language
   code or reserved bit; UTF-16 by its mark; the links; 30 tags that are not a block; the first code
   wins. `UnlockRouteTests` — the route from every standing, a stuck tap, the latest of two; either
-  unlock ending the tap's hold; the tap's session handed on, and a refocus there following the
-  unlock. `UnderTapEngineTests` — tapped offline then unlocked, the shields off at once and never on
-  between the answers, the unlock under its tap with the next order; under a re-tap, its retry to the
-  tap still; stuck, the guard — against a read, and against its own tap's answer, both stuck, while
-  a return still focuses; a tap landing after its unlock; a scan that records nothing. The
+  unlock ending the tap's hold; every session guarded until the tap is answered, then the tap's
+  session handed on, and a refocus there following the unlock. `UnderTapEngineTests` — tapped
+  offline then unlocked, the shields off at once and never on between the answers, the unlock under
+  its tap with the next order; under a re-tap, its retry to the tap still; stuck, the guard —
+  against a read, before its tap is answered and after, and against its own tap's answer, both
+  stuck, while a return still focuses; a tap landing after its unlock; a scan that records nothing.
+  The
   migration from `v2`, drained and not; the schema; the requests; `tap-unlock/*`'s fixtures and the
   generated unlock cases through the tap route; the random walk with unlocks under taps; the
-  monitor's wake. `AppTests.noNFC` (the simulator): a phone with no NFC is told so at once. Of 25
-  mutations of the rules — the code's reading, the route, the session handed on, the guard and its
-  order, a refocus's wait, the migration's counter, what a scan records, the set-once pin — each
-  taken alone, all 25 turn a test red. **Santa** (two Claude reviewers, both the fallback — no other
+  monitor's wake. `AppTests.noNFC` (the simulator): a phone with no NFC is told so at once. Of 29
+  mutations of the rules — the code's reading, the route, the session handed on, the guard, its
+  order and its reach before the tap's answer, a refocus's wait, the migration's counter, what a
+  scan records, the set-once pin — each taken alone, all 29 turn a test red. **Claude Review**
+  (#94): one BLOCKER, fixed here, red first — an unlock under a tap not yet answered named no
+  session, so, both stuck, a read answering `focused` shielded the student again over their
+  Emergency Unlock (the guard above, now every session's until the tap's answer). Its two WARNs
+  fixed: a reader asked for a second scan mid-scan says one is under way (it left the first
+  waiting), and a link's `/T/` reads as `/t/`. **Santa** (two Claude reviewers, both the fallback — no other
   model's CLI here; round 1): no blockers. Three WARNs fixed here, the first two red first: a tap's
   answer applied over a stuck unlock made after it — tap and unlock both refused, the tap's retry
   answered `focused` shielded the student over their Emergency Unlock (the guard above); a refocus
   made while the unlock under a tap named no session yet followed nothing, and could overtake it
   stuck (it now waits for it); and a reader asked for a second scan at once would leave the first
-  waiting (noted: one scan a reader, a new one each time, as the readout does).
+  waiting (noted then; guarded since, the Claude Review's WARN above).
 - **2026-09-25** — **B5c: Bali's own shield over a blocked app — its words from the standing the
   app keeps, read as the monitor reads it; the bell in the phone's own time format; D1's approved
   look as far as `ShieldConfiguration` carries it; "OK", and no shield action extension.** **The

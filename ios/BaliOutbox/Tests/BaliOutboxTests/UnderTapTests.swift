@@ -88,18 +88,20 @@ struct UnlockRouteTests {
     }
 
     @Test(
-        "A tap's answer naming a session hands it to the unlocks filed under that tap — they guard it, and still go under the tap; an answer naming none, or another tap's, hands them nothing"
+        "Until its tap is answered an unlock under it guards every session — it may be any; the tap's answer naming one hands it that one, and it still goes under the tap; an answer naming none hands it none"
     )
     func settleNamesTheSession() async throws {
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "A"))
         let other = try record(outbox, .tap(tagId: "B"))
         let unlock = try record(outbox, .unlockUnderTap(tap: tap.eventId, reason: .nurse))
-        #expect(try !outbox.holdsUnlock(session: "s"))
+        #expect(try outbox.holdsUnlock(session: "s") && outbox.holdsUnlock(session: "t"))
+        // Another tap's answer, or a send that brings none, narrows nothing.
         try await send(outbox, other, 200, Answer.joined(session("t")))
-        #expect(try !outbox.holdsUnlock(session: "t"))
         try await send(outbox, tap, 503)
-        #expect(try !outbox.holdsUnlock(session: "s"))
+        #expect(try outbox.holdsUnlock(session: "s") && outbox.holdsUnlock(session: "t"))
+        // Over a record made after it (A12's order), it guards nothing.
+        #expect(try !outbox.holdsUnlock(session: "s", after: try #require(unlock.order).seq))
         try await send(outbox, tap, 200, Answer.joined(session("s")))
         #expect(try outbox.holdsUnlock(session: "s") && !outbox.holdsUnlock(session: "t"))
         let filed = try #require(try current(outbox, unlock.eventId))
@@ -204,6 +206,27 @@ struct UnderTapEngineTests {
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(session(endsAt: 4000)))
         try await rig.sleeping([at(60)])
+        #expect(await rig.engine.state.standing == .inSession(session(endsAt: 4000), .unlocked))
+        await rig.stop()
+    }
+
+    @Test(
+        "Before its tap is answered the unlock's session is not known — it may be any — so, both stuck, it keeps every read from shielding again: a read saying focused leaves the phone unlocked (#94's Claude Review)"
+    )
+    func guardsBeforeItsTapIsAnswered() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        let retap = try #require(try await rig.engine.tap(.block("T7XK2M9QPF")))
+        let held = try await rig.server.next(tapRoute)
+        try await rig.engine.emergencyUnlock()
+        held.reply(409, Answer.refused("session_not_running"))
+        try await rig.server.next(underTapRoute(retap)).reply(
+            400, Answer.refused("invalid_request"))
+        try await rig.server.next(meRoute).reply(200, Answer.me())
+        await rig.until { $0.queued.count == 2 && $0.queued.allSatisfy(\.stuck) }
+        #expect(try rig.outbox.awaiting() == 0)
+        #expect(try rig.outbox.holdsUnlock(session: "s") && rig.outbox.holdsUnlock(session: "t"))
+        try await rig.foreground(Answer.me(session(endsAt: 4000)))
         #expect(await rig.engine.state.standing == .inSession(session(endsAt: 4000), .unlocked))
         await rig.stop()
     }
