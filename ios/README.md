@@ -217,6 +217,18 @@ ten letters and digits, `BALIDEVCHK` say.
    the shields as they were, and nothing new in `watch`.
 5. **A scan cancelled.** **Scan**, then **Cancel** on iOS's sheet, holding it to nothing:
    `scan cancelled — nothing recorded`, `Outbox: empty`, nothing else changed.
+6. **A scan that joins no class, then Emergency Unlock before its answer (B6b, the owner's
+   ruling).** Write a second sticker with ten letters and digits no teacher registered —
+   `BALINOCLAS`, say — as in "What a block is". In a running session, focused with step 2's block,
+   turn on Airplane Mode and **Scan** the new sticker: `tap recorded`, still shielded. **Emergency
+   Unlock**: `recorded`, the shields off at once, `Outbox: tap · unlock under its tap`. Airplane
+   Mode off: the scan is refused — its block is no one's — and within two minutes
+   `Outbox: tap (stuck: 404)`: the unlock went under the scan, kept with no class, and again to the
+   class you are in. The shields stay off throughout, `watch` shows the student unlocked — the
+   class's grid sees the unlock — and **History** begins `unlock`.
+
+Emergency Unlock over a standing the phone cannot read back (B6b) has no step here: a phone cannot
+be made to lose its standing by hand, so the tests cover it.
 
 ## CI
 

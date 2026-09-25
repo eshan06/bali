@@ -8,6 +8,99 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B6b: Emergency Unlock over a standing the outbox file will not give back —
+  the shields off at once, the last run's too, the unlock kept until the phone knows where it
+  stands, then filed there; no fail-safe ceiling. With the owner's ruling on a scan that joins no
+  class (planned as B6d, folded in), and #94's two riders.** **The gap (#92's review):** since
+  B5b-2 took `capOf` away, a phone offline with a kept standing it cannot decode — a downgrade, a
+  corrupt row — kept the last run's shields with no way out in the app. **The path.** Over
+  `Standing.unread`, `SyncState.emergencyUnlock` files the press under the tap not yet answered, as
+  B6a did, else as `Change.unlockUnfiled`: an unlock under no session and no tap, which `v3`'s
+  CHECK forbade — so migration `v4` makes the table again as `v3` made it, its AUTOINCREMENT
+  counter carried over (A12's order), pinned drained and not. Either takes the last run's shields
+  off at once (`SyncState.unlockedLast`: the press has the last word — after the tap not yet
+  answered, or not filed; an unlock the last run left queued does not, since a tap answered since
+  may have put them back on). **Kept, never discarded:** not filed, it is never sent (`nextDue`)
+  and holds nothing behind it; it awaits no answer (`awaiting`), or no read could ever settle the
+  standing it waits for; it guards every session, since it may be any (`holdsUnlock`); and it acts
+  on where the phone stood, as it did on the shields, wherever that is read — a relaunch, the
+  monitor, the shield (`Outbox.standing()`), so none of them shields over it. Once the phone knows
+  where it stands — the file read again (it then stood where the file says: nothing is kept while
+  unread), or the server's truth (a read, or a change's answer) — it is filed in that session, in
+  the write that keeps the standing (`Outbox.file`; the engine's `keepStanding`), so a relaunch
+  never finds the one without the other, and sent as that session's unlock. **Where it goes when
+  the truth names no session, decided here: under the phone's last tap** (`lastTap`, kept at each
+  tap's record), by the tap route (A11): the server files it where that tap landed, by that
+  session's rules — the session over, `after_session_end` in its class's history; the student gone
+  from it, noted so — or keeps it with no class (`tap_armed`, `unknown_tap`). Never refused, and no
+  server change. The last run's shields were a session's the phone entered by its last tap, or by
+  that tap's conversion at a Start, in every case but one (a re-tap that only armed while it stood
+  focused), and there the server keeps it with no class — never lost. A new endpoint for an
+  unlock with no session would record the same press with no class every time; the last tap puts
+  it, nearly always, in the class whose shields it took off. With no tap known either (a file with
+  none since this build), it waits, kept, for a truth that names a session. **No fail-safe
+  ceiling, decided here:** over a standing not read, the last run's shields stay until the file
+  reads, the server answers, or the student presses Emergency Unlock. A ceiling ends shields on a
+  guess, over a session that may still run (B5b-2's rule), and records nothing — the one failure
+  the grid cannot show (B5b's fail-safe) — while Emergency Unlock is now their way out, always
+  allowed and always recorded: a mirror, not a cage. Decision 7's cap stays what it was decided
+  for, a tap not yet answered (the enforcer's own shields, `putOn`). Rule 3 is untouched: its check
+  puts back only shields `shieldedUntil` asks for, never over an unlock, and a screen claims
+  `Protection` — what the store holds — never the standing. **The Debug readout:** its Emergency
+  Unlock now works over an unread standing (`Outbox: unlock, its class not known yet`); C5 draws the
+  screen. **The owner's ruling (2026-09-25), on B6a's disclosure (1), verbatim:** "If the scan
+  turns out to join no class, the phone also files the unlock in the class the student is still
+  in. Their shields stay off, and class A's teacher sees the unlock on the grid. One press gives
+  two records, and nothing is discarded." **On the phone** (`Outbox.refile`, in `settle`): a scan
+  answered armed or refused — or a press under it kept with no class while the scan is still
+  queued unanswered, stuck at the bound — has each press filed under it again: a session unlock of
+  its own id, with the press's reason and time, in the session the phone stood in. None for a scan
+  that lands in a class — the press is filed there, as decision 11 has it — nor one answered no
+  longer current, which landed somewhere. **Decided here: "still in" is the session the phone stood
+  in when the student pressed** — the class whose shields the press took off — kept on the press's
+  own row in the press's own write (rider 1's), so no later read or relaunch moves it. **Minted
+  once:** in the write that settles the answer that decides it, the press giving its session up in
+  the same write, so a refusal answered again on a retry, a replay, the press's own answer after or
+  a relaunch never mints a second. **Its order, decided here: the press's own** (`orderSeq`, `v4`)
+  — it is the same act, filed a second time — not one of its own, which would put it after
+  whatever the student did since: a refocus or re-tap made after the press would then be undone.
+  So the server places it by A12 and A13 — a return made after the press and landing first makes
+  it late (`superseded`, recorded, never applied), one landing after it applies — and the phone
+  reads it in the press's place too: the queue orders by it, and a tap's answer is held back only
+  by an unlock after that tap by it, so a re-tap made after the press keeps its shields and its
+  focus. **Riders (#94's round-2 Claude Review).** (1) The guard evaporated when a tap's answer
+  named no session: armed or no longer current, the tap row went and the unlock under it guarded
+  nothing, so, stuck, a read shielded the session the student stood in over an unlock the server
+  never recorded. Now the press keeps the session the phone stood in, which the standing it leaves
+  names (`Outbox.record`), until the tap's answer names another: it guards that session until
+  recorded, or until the student refocuses or re-taps there after it, by the phone's order. Red
+  first on `main`'s code (the read shielded again); with the ruling, an armed or refused scan hands
+  that guard to the follow-up, which names the same session. (2) `AppTests.noNFC` asserted a value
+  that holds only where NFC cannot be read; it is now disabled where it can (`BlockReader.canRead`),
+  so the suite passes on a phone — not mutation-checkable off one. **Not covered, disclosed:** (1)
+  Over a standing not read, a press under a scan that joins no class gets no second record: where
+  the phone stood is not known. The class the student is in shields again at its next read once
+  that press is recorded, where the next Emergency Unlock, the standing known then, files in it.
+  (2) An unlock not filed, followed by a tap before anything names where the phone stood, is filed
+  where that tap's answer puts the student — the server orders it before the tap and notes it
+  `superseded` — or, the tap only arming, under it, kept with no class. (3) A file that refuses
+  writes as well keeps no record, so no unlock: the press fails, shown (rule 5), the shields as
+  they were — as for any Emergency Unlock; a file a newer build migrated starts no engine at all.
+  (4) With the app closed after such an unlock, the monitor still wakes each minute while the file
+  stays unreadable, clearing nothing — the shields are off already (B6c's bookkeeping). **Device
+  check:** round 4 gains step 6, the ruling (a scan of a block no teacher registered, in Airplane
+  Mode, Emergency Unlock before its answer); the unread standing has none — a phone cannot be made
+  to lose its standing by hand — so tests cover it. **Tests** (Linux and the iOS Simulator):
+  `UnreadUnlockTests` — the shields off at once and the unlock kept, sent nowhere and holding
+  nothing; under a tap not yet answered; one the last run left, which ends nothing; filed when the
+  file reads (a relaunch at every commit never focused beside it), where the server says, under the
+  last tap, and with no tap known; across relaunches, and the monitor's wake; `Outbox.file`.
+  `RefiledTests` — armed and refused, the press kept and stuck: one follow-up each, the shields
+  never back on; joined, none; the follow-up guarding its class; a re-tap after the press, by
+  order; minted once; kept while the scan is stuck at the bound, and not after a scan that landed.
+  `SchemaTests.fromV3`, the rows the schema takes, the route from an unread standing, and the
+  random walk with unlocks filed and followed up (which found the last case). Of 23 mutations of
+  the rules, each taken alone, all 23 turn a test red.
 - **2026-09-25** — **B6a: the NFC tap — a block is the code written on it, read into the tap —
   and decision 11 on the phone: an Emergency Unlock made while the phone's own tap is unanswered
   is filed under that tap, always, and guards every session until that answer names one. B6 ships
@@ -84,11 +177,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   unlock where its tap lands, never where the phone stood before it. The student's next Emergency
   Unlock, no tap pending, goes to that session. Likewise a tap refused or stuck while its unlock
   lands first (`unknown_tap`): that session shields again until the tap lands and files it — or, a
-  code never registered, until the student unlocks again. (2) After such an armed answer the phone
+  code never registered, until the student unlocks again (closed by B6b, above: the owner's ruling
+  files the unlock again in that session). (2) After such an armed answer the phone
   stands out, not waiting: the answer stood under the unlock after it, and no read shows an armed
   tap (open decision 6). (3) Over an unread standing, an Emergency Unlock with no tap pending is
   still none, and one under a pending tap is recorded but leaves the last run's shields on (only
-  the enforcer's own come off over it, B5b-2) — B6b's. (4) The reader runs on the owner's iPhone
+  the enforcer's own come off over it, B5b-2) — B6b's (closed by B6b, above). (4) The reader runs on the owner's iPhone
   only (round 4); the simulator builds it and finds no NFC. (5) The app's NFC entitlement lists NDEF beside TAG, as B2 carried v2's over; App
   Store uploads have refused NDEF for apps built against iOS 13 and later (ITMS-90778), so Phase 5's
   TestFlight may need TAG alone — an NDEF reader session runs under TAG. **Tests** (Linux and the

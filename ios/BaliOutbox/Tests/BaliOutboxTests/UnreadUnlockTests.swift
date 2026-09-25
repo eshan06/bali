@@ -179,7 +179,10 @@ struct UnreadUnlockTests {
         #expect(await !screenTime.shielding)
         await second.stop()
         try outbox.keep(kept)
-        #expect(Bell.wake(outboxAt: url, now: t0) == .clear)
+        // The monitor waits for the free file as long as the tests wait: a simulator's stall is no
+        // file held (`BoundTests` has the bound).
+        let bound = TimeInterval(patience.components.seconds)
+        #expect(Bell.wake(outboxAt: url, now: t0, within: bound) == .clear)
         let third = Enforced(try Rig(outbox: try open(url)), screenTime)
         let sent = try await third.rig.server.next(sessionUnlockRoute)
         #expect(sent.eventId == unlock.eventId)
