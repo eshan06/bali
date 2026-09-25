@@ -395,7 +395,9 @@ describe('npm run dev:teacher', { timeout: 30_000 }, () => {
     });
     expect(await failure(['block', 'TAKEN-1'])).toContain('POST /v1/blocks → 409');
 
-    const secrets = [PASSWORD, 'wrong password', testEnv.INTERNAL_API_KEY, ...issued];
+    // A token's claims and signature are each its own; any of them printed is a leak.
+    const tokenParts = issued.flatMap((token) => token.split('.').slice(1));
+    const secrets = [PASSWORD, 'wrong password', testEnv.INTERNAL_API_KEY, ...tokenParts];
     expect(issued.length).toBeGreaterThan(5);
     const everything = [...printed, ...consoleOut.map((args) => inspect(args))].join('\n');
     for (const secret of secrets) expect(everything).not.toContain(secret);
