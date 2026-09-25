@@ -26,6 +26,7 @@ import {
   renameStudent,
   startSession,
   tapIn,
+  tapsMadeSince,
   unlock,
   unlocksAwaitingTap,
   unlockUnderTap,
@@ -2625,6 +2626,338 @@ describe('a late return: the student’s own unlock came after it by the phone�
       const cameBack = (await eventsFor(session.id)).filter((e) => e.type === 'came_back');
       expect(cameBack, kind).toHaveLength(1);
     }
+  });
+});
+
+describe('a late tap: the phone’s later tap into another session went ahead of it (A14)', () => {
+  // The owner's ruling (2026-09-25), A13's rule tap against tap: "an older tap
+  // (by the phone's order) never undoes a newer one into another class. It's
+  // recorded, not applied." Only the order says so: with none, or another
+  // install's, a tap applies as it arrives.
+  const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+  const phone = newUuidV7();
+  const n = (seq: number, install = phone) => ({ install, seq });
+  type Order = ReturnType<typeof n> | null;
+  const late = { recorded_as: 'superseded' };
+  const none = { outcome: 'replay', state: null, participationId: null, session: null };
+
+  /**
+   * Classes A and B, two teachers', both running 09:00–09:25, and Y, a third
+   * teacher's, not started: the student is in all three.
+   */
+  async function rooms(tag: string) {
+    const a = await seedClass(`${tag}-a`);
+    const b = await seedClass(`${tag}-b`);
+    const y = await seedClass(`${tag}-y`);
+    const student = a.student;
+    await db.insert(enrollments).values([
+      { classId: b.klass.id, studentId: student.id },
+      { classId: y.klass.id, studentId: student.id },
+    ]);
+    const w = window('2026-01-01T09:00:00Z');
+    const sa = (await startSession(db, { classId: a.klass.id, ...w })).session;
+    const sb = (await startSession(db, { classId: b.klass.id, ...w })).session;
+    const tap = (session: { id: string }, minute: number, order: Order, eventId = newUuidV7()) => ({
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: at(minute),
+      order,
+    });
+    /** A tap of Y's block, with nothing of Y's running: it would arm. */
+    const arm = (minute: number, order: Order, eventId = newUuidV7()) => ({
+      studentId: student.id,
+      teacherId: y.teacher.id,
+      eventId,
+      deviceTime: at(minute),
+      order,
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: at(minute),
+    });
+    const startY = async () =>
+      (await startSession(db, { classId: y.klass.id, ...window('2026-01-01T09:10:00Z') })).session;
+    return { student, sa, sb, tap, arm, startY };
+  }
+  const liveOf = (studentId: string) =>
+    db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.studentId, studentId), isNull(participations.endedAt)));
+  async function rowIn(sessionId: string, studentId: string) {
+    const rows = await db
+      .select()
+      .from(participations)
+      .where(and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)));
+    return rows[0];
+  }
+  const eventOf = async (eventId: string) =>
+    one(await db.select().from(events).where(eq(events.eventId, eventId)));
+  const typesIn = async (sessionId: string) => (await eventsFor(sessionId)).map((e) => e.type);
+
+  it('a tap older than one into another class, landing after it, is recorded with a note: nothing switches back', async () => {
+    // Tapped into A (#1), the request slow; then into B (#2), which landed
+    // first. By arrival A's tap would switch the student back out of B.
+    const { student, sa, sb, tap } = await rooms('a14-late');
+    const slow = tap(sa, 2, n(1));
+    expect((await tapIn(db, tap(sb, 4, n(2)))).outcome).toBe('joined');
+
+    // Answered as its retry is: recorded, no session to shield to.
+    expect(await tapIn(db, slow)).toEqual(none);
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sb.id, state: 'focused' }]);
+    expect(await rowIn(sa.id, student.id)).toBeUndefined();
+    expect(await eventOf(slow.eventId)).toMatchObject({
+      type: 'tap_in',
+      sessionId: sa.id,
+      payload: late,
+      occurredAt: at(2),
+      orderInstall: phone,
+      orderSeq: 1,
+    });
+    expect(await typesIn(sb.id)).not.toContain('left_for_other_session');
+
+    // Its retry answers what was recorded, and records nothing twice.
+    expect(await tapIn(db, slow)).toEqual(none);
+    expect((await typesIn(sa.id)).filter((type) => type === 'tap_in')).toHaveLength(1);
+  });
+
+  it('whichever lands first, the student ends where the later tap took them', async () => {
+    // The older tap first: it joins A, and the later one switches to B.
+    const { student, sa, sb, tap } = await rooms('a14-in-order');
+    expect((await tapIn(db, tap(sa, 2, n(1)))).outcome).toBe('joined');
+    expect(await tapIn(db, tap(sb, 4, n(2)))).toMatchObject({
+      outcome: 'switched',
+      state: 'focused',
+      session: { id: sb.id },
+    });
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sb.id }]);
+
+    // A tap after it by the order applies as it always did, whatever its clock.
+    const back = tap(sa, 1, n(3));
+    expect(await tapIn(db, back)).toMatchObject({ outcome: 'switched', session: { id: sa.id } });
+    expect((await eventOf(back.eventId)).payload).toBeNull();
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sa.id, state: 'focused' }]);
+  });
+
+  it('another install’s tap, or no order on either side: the tap applies as it arrives', async () => {
+    // A reinstall or another phone counts on a counter of its own, and an old
+    // build counts nothing: there the arrival order stands, as before A14.
+    const other = newUuidV7();
+    const pairs: [string, Order, Order][] = [
+      ['install', n(9, other), n(2)],
+      ['bare-newer', null, n(2)],
+      ['bare-older', n(9), null],
+      ['bare', null, null],
+    ];
+    for (const [name, newer, older] of pairs) {
+      const { student, sa, sb, tap } = await rooms(`a14-arrival-${name}`);
+      await tapIn(db, tap(sb, 4, newer));
+      const switched = await tapIn(db, tap(sa, 2, older));
+      expect(switched, name).toMatchObject({ outcome: 'switched', session: { id: sa.id } });
+      expect(await liveOf(student.id), name).toMatchObject([{ sessionId: sa.id }]);
+    }
+  });
+
+  it('counts every later tap, whatever became of it: its session over, or noted late itself', async () => {
+    // Into B (#2), and B ended: the tap into A (#1) still never joins.
+    const over = await rooms('a14-over');
+    const slow = over.tap(over.sa, 2, n(1));
+    await tapIn(db, over.tap(over.sb, 4, n(2)));
+    await endSession(db, { sessionId: over.sb.id, at: at(10), reason: 'ended' });
+    expect(await tapIn(db, slow)).toEqual(none);
+    expect(await liveOf(over.student.id)).toHaveLength(0);
+    expect(await rowIn(over.sa.id, over.student.id)).toBeUndefined();
+
+    // In B (#1), a tap into A (#2), a re-tap of B (#3), and an unlock in B
+    // (#4), which went ahead of that re-tap (A13). The late re-tap still says
+    // the student's last tap was B's: the tap into A (#2) lands late.
+    const noted = await rooms('a14-noted');
+    await tapIn(db, noted.tap(noted.sb, 1, n(1)));
+    const toA = noted.tap(noted.sa, 2, n(2));
+    const retap = noted.tap(noted.sb, 3, n(3));
+    await unlock(db, noted.tap(noted.sb, 4, n(4)));
+    expect(await tapIn(db, retap)).toMatchObject({ outcome: 'replay', state: 'unlocked' });
+    expect((await eventOf(retap.eventId)).payload).toEqual(late);
+    expect(await tapIn(db, toA)).toEqual(none);
+    expect(await liveOf(noted.student.id)).toMatchObject([
+      { sessionId: noted.sb.id, state: 'unlocked' },
+    ]);
+  });
+
+  it('a tap into the same session stays A13’s to judge', async () => {
+    const { student, sa, tap } = await rooms('a14-same');
+    const slow = tap(sa, 2, n(1));
+    await tapIn(db, tap(sa, 4, n(2)));
+    expect(await tapIn(db, slow)).toMatchObject({ state: 'focused', session: { id: sa.id } });
+    expect((await eventOf(slow.eventId)).payload).toBeNull();
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sa.id, state: 'focused' }]);
+  });
+
+  it('is contact where the student is live again, and answered with that session', async () => {
+    // In A (#1), a re-tap of A (#2), into B (#3), and back into A (#4). The
+    // re-tap lands last: late by B's, it changes nothing — the student is in
+    // A by their own later tap — and its answer names A, the truth now.
+    const { student, sa, sb, tap } = await rooms('a14-contact');
+    await tapIn(db, tap(sa, 1, n(1)));
+    const slow = tap(sa, 2, n(2));
+    await tapIn(db, tap(sb, 3, n(3)));
+    await tapIn(db, tap(sa, 4, n(4)));
+    const stale = at(5);
+    await db
+      .update(participations)
+      .set({ lastSeenAt: stale, silentSince: stale })
+      .where(eq(participations.sessionId, sa.id));
+    const row = await rowIn(sa.id, student.id);
+
+    expect(await tapIn(db, slow)).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+      participationId: row!.id,
+      session: { id: sa.id },
+    });
+    expect((await eventOf(slow.eventId)).payload).toEqual(late);
+    const after = await rowIn(sa.id, student.id);
+    expect(after).toMatchObject({ joinedAt: row!.joinedAt, silentSince: null, endedAt: null });
+    expect(after!.lastSeenAt!.getTime()).toBeGreaterThan(stale.getTime());
+    expect((await typesIn(sa.id)).filter((type) => type === 'came_back')).toHaveLength(1);
+  });
+
+  it('a tap that would only arm never waits: recorded as it lands, and no Start converts it', async () => {
+    const { student, sb, tap, arm, startY } = await rooms('a14-arm');
+    const slow = arm(2, n(1));
+    await tapIn(db, tap(sb, 4, n(2)));
+
+    const first = await armTap(db, slow);
+    expect(first.outcome).toBe('replay');
+    const row = one(await db.select().from(armedTaps).where(eq(armedTaps.eventId, slow.eventId)));
+    expect(row).toMatchObject({
+      id: first.armedTapId,
+      consumedAt: slow.now,
+      orderInstall: phone,
+      orderSeq: 1,
+    });
+    // Its retry answers what was recorded, never judged again.
+    expect(await armTap(db, slow)).toEqual(first);
+
+    const y = await startY();
+    expect(await typesIn(y.id)).toEqual(['session_started']);
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sb.id, state: 'focused' }]);
+  });
+
+  it('a waiting tap older than one into another session: the Start records it, and joins nothing', async () => {
+    // Y's block (#1), waiting; Y's block again (#2), slow; then into B (#3).
+    const { student, sb, tap, arm, startY } = await rooms('a14-start');
+    const waiting = arm(1, n(1));
+    expect((await armTap(db, waiting)).outcome).toBe('armed');
+    const again = arm(2, n(2));
+    await tapIn(db, tap(sb, 4, n(3)));
+    // Late too, though a waiting tap stands: that one is declined at Start as well.
+    expect((await armTap(db, again)).outcome).toBe('replay');
+
+    const y = await startY();
+    expect(await eventOf(waiting.eventId)).toMatchObject({
+      type: 'tap_in',
+      sessionId: y.id,
+      payload: late,
+      orderSeq: 1,
+    });
+    expect(await rowIn(y.id, student.id)).toBeUndefined();
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: sb.id, state: 'focused' }]);
+    expect(await typesIn(sb.id)).not.toContain('left_for_other_session');
+    const consumed = one(
+      await db.select().from(armedTaps).where(eq(armedTaps.eventId, waiting.eventId)),
+    );
+    expect(consumed.consumedAt).toEqual(y.startedAt);
+    // Its retry, reaching Y's session now, is answered as recorded.
+    expect(await tapIn(db, tap(y, 1, n(1), waiting.eventId))).toEqual(none);
+  });
+
+  it('a waiting tap after the tap into another session converts, as it always did', async () => {
+    const { student, sb, tap, arm, startY } = await rooms('a14-start-newer');
+    await tapIn(db, tap(sb, 1, n(1)));
+    expect((await armTap(db, arm(2, n(2)))).outcome).toBe('armed');
+    const y = await startY();
+    expect(await liveOf(student.id)).toMatchObject([{ sessionId: y.id, state: 'focused' }]);
+    expect((await rowIn(sb.id, student.id))!.endedReason).toBe('left_for_other_session');
+  });
+
+  it('files an unlock kept under a late tap where the tap is recorded, as had it landed first', async () => {
+    // Into A (#1), unanswered; Emergency Unlock (#2), sent under that tap
+    // (decision 11); into B (#3). Either way round, the student ends in B and
+    // A holds the unlock their tap there was answered with.
+    for (const first of ['older', 'newer'] as const) {
+      const { student, sa, sb, tap } = await rooms(`a14-kept-${first}`);
+      const slow = tap(sa, 2, n(1));
+      const under = {
+        tapEventId: slow.eventId,
+        studentId: student.id,
+        eventId: newUuidV7(),
+        deviceTime: at(3),
+        order: n(2),
+      };
+      const newer = tap(sb, 4, n(3));
+      if (first === 'older') {
+        await tapIn(db, slow);
+        expect((await unlockUnderTap(db, under)).outcome).toBe('applied');
+        await tapIn(db, newer);
+      } else {
+        await tapIn(db, newer);
+        expect((await unlockUnderTap(db, under)).recordedAs).toBe('unknown_tap');
+        expect(await tapIn(db, slow)).toEqual(none);
+      }
+      expect(await liveOf(student.id), first).toMatchObject([
+        { sessionId: sb.id, state: 'focused' },
+      ]);
+      const filed = one((await eventsFor(sa.id)).filter((e) => e.type === 'unlock'));
+      expect(filed.payload, first).toMatchObject({ tap_event_id: slow.eventId });
+      expect(filed.payload, first).toEqual(
+        first === 'older'
+          ? { tap_event_id: slow.eventId }
+          : {
+              tap_event_id: slow.eventId,
+              unattached_event_id: under.eventId,
+              recorded_as: 'no_live_participation',
+            },
+      );
+    }
+  });
+
+  it('keeps an unlock sent under a late arming tap unattached, as for any armed tap', async () => {
+    const { student, sb, tap, arm, startY } = await rooms('a14-kept-arm');
+    const slow = arm(2, n(1));
+    const under = (seq: number) => ({
+      tapEventId: slow.eventId,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(3),
+      order: n(seq),
+    });
+    expect((await unlockUnderTap(db, under(2))).recordedAs).toBe('unknown_tap');
+    await tapIn(db, tap(sb, 4, n(4)));
+    expect((await armTap(db, slow)).outcome).toBe('replay');
+    expect((await unlockUnderTap(db, under(3))).recordedAs).toBe('tap_armed');
+
+    const y = await startY();
+    expect(await typesIn(y.id)).toEqual(['session_started']);
+    // Never discarded, never filed: both in no class.
+    const kept = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.userId, student.id), eq(events.type, 'unlock')));
+    expect(kept.map((e) => e.sessionId)).toEqual([null, null]);
+  });
+
+  it('every tap’s look for a later one is one range of its index', async () => {
+    const plan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`);
+      const result = await tx.execute(
+        sql`explain ${tapsMadeSince(tx, newUuidV7(), n(1), newUuidV7())}`,
+      );
+      const rows = (
+        Array.isArray(result) ? result : (result as { rows: unknown[] }).rows
+      ) as Record<string, string>[];
+      return rows.map((row) => Object.values(row).join(' ')).join('\n');
+    });
+    expect(plan, plan).toContain('events_order_tap_idx');
   });
 });
 

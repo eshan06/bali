@@ -255,6 +255,13 @@ export const events = pgTable(
     index('events_unattached_tap_idx')
       .on(sql`(${t.payload}->>'claimed_tap_event_id')`)
       .where(sql`${t.type} = 'unlock' and ${t.sessionId} is null`),
+    // POST /v1/taps and a Start — a tap is late when the phone made a tap of the
+    // student's after it, from the same install, landed in another session (A14,
+    // `tapsMadeSince`): the install's taps past a seq, which no other index can
+    // bound, since that order is the phone's and not the clock's.
+    index('events_order_tap_idx')
+      .on(t.orderInstall, t.orderSeq)
+      .where(sql`${t.type} = 'tap_in'`),
     // An order is its install and its seq together: half of one orders nothing.
     check('events_order_whole', sql`(${t.orderInstall} IS NULL) = (${t.orderSeq} IS NULL)`),
   ],
