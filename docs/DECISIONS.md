@@ -8,8 +8,8 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-09-25** — **B4b: the student's sign-in, in BaliCore — Cognito's hosted UI with PKCE, the
-  tokens in the Keychain, and one sign-out.** `SignIn` (`ios/BaliCore`), an actor, is B1c's
+- **2026-09-25** — **B4b: the student's sign-in, in BaliCore — Cognito's hosted UI with PKCE,
+  the tokens in the Keychain, and one sign-out.** `SignIn` (`ios/BaliCore`), an actor, is B1c's
   `TokenProvider` and the sync engine's `refresh`. It signs the student in through Cognito's
   hosted UI with the authorization-code grant, PKCE (S256, a fresh 32-byte verifier) and a state
   value binding the answer to its attempt, over the phone's own public client (`docs/DEPLOY.md`,
@@ -60,14 +60,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rotating client would add. An answer about a refresh token the phone let go while it ran
   (signed out, or in again) is dropped, so a stale no never signs a new sign-in out. The dev
   client does not rotate — so turning rotation on (Phase 5's production client, say) should
-  weigh that case. **B4's
-  contract with the engine, kept:** `accessToken()` never gives a token it knows has expired or
-  the API refused; `refresh()` never waits on the student — false at once when nobody is
-  signed in — and is true once a fresh token is ready; and every token but `refresh`'s (a
-  sign-in, a renewal of its own) runs `whenTokenArrives`, which B4c points at the engine's
-  `retryNow()`. `cognito` is `nonisolated`, so the app reads the redirect's scheme for its
-  browser session without a hop (an actor's `let` is isolated outside its module) — B4c's
-  change, made here with BaliCore's API. **Tests** (`SignInTests.swift`, Linux and the iOS
+  weigh that case. **B4's contract with the engine, kept:** `accessToken()` never gives a
+  token it knows has expired; `refresh()` takes the token held out of use and never waits on
+  the student — false at once when nobody is signed in — and is true once a fresh token is
+  ready; and every token but `refresh`'s (a sign-in, a renewal of its own) runs
+  `whenTokenArrives`, which B4c points at the engine's `retryNow()`. `cognito` is
+  `nonisolated`, so the app reads the redirect's scheme for its browser session without a hop
+  (an actor's `let` is isolated outside its module) — B4c's change, made here with BaliCore's
+  API. **Tests** (`SignInTests.swift`, Linux and the iOS
   Simulator): the S256 challenge against RFC 7636's own example; fresh verifiers and states;
   the authorize URL, never the verifier; the answer's code taken only at the redirect URI, for
   its attempt; the code exchange (no secret, the verifier whose challenge opened the page);
@@ -76,8 +76,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   rotated token saved after a locked Keychain; `invalid_grant` signing out, and eight other
   answers keeping the tokens; the engine's `refresh`; one renewal shared, whoever starts it; a
   locked Keychain never a sign-out; signing out; a sign-out, and a sign-in, while a renewal
-  runs; an unreadable lifetime; and `cognito` read from another module. Every mutation of
-  `SignIn`'s rules tried in review turns a test red (listed in its PR). Not in them:
+  runs; an unreadable lifetime; and `cognito` read from another module. Of 42 mutations of
+  `SignIn` tried in review (listed in its PR), 41 turn a test red; the last — `refresh()`
+  without its early return when nobody is signed in — changes nothing a caller can see, since
+  a renewal with no refresh token sends nothing. Not in them:
   `KeychainTokenStore` itself. A package's test process carries no entitlement, and the
   Keychain refuses it (`errSecMissingEntitlement`, -34018), so its first run is the app's (B4c).
 - **2026-09-24** — **B4a: the API accepts a list of app client ids, and B4 ships in three.**
