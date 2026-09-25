@@ -67,11 +67,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`events_user_occurred_idx`, as `returnedSince`), and only for a return carrying an order: ~0.7
   ms a tap on the real lane (30 ordered taps a round into one session, ~5.8 ms against ~5.1), the
   read itself ~0.04 ms and the rest its round trip. Only the engine writes events and
-  participations. **Readers:** the live grid (`applyEvent`) leaves the
-  chip alone for a late return — contact, nothing more; the snapshot's chip turn looks past a late
-  record of either kind (the unlock-only scope of #76's rider was right while no return could carry
-  the note); the history shows the late return with its note; reports (Phase 4) must not start
-  focus time at it (PLAN's reports row). **Not covered, disclosed — outside the ruling, for the
+  participations. **Readers:** the live grid (`applyEvent`) leaves the chip alone for a late
+  return — contact, nothing more; the snapshot's chip turn looks past a late record of either kind
+  (the unlock-only scope of #76's rider was right while no return could carry the note); the
+  history shows the late return with its note; reports (Phase 4) must not start focus time at it
+  (PLAN's reports row). **Not covered, disclosed — outside the ruling, for the
   owner:** (1) a return older by the order than a *protection-off* report still applies: a re-tap
   stuck while protection went off, landing after the report, lifts the row to focus over a phone
   iOS unshielded, and the outbox reports protection off once per revocation, so nothing says so

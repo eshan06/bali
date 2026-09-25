@@ -358,6 +358,14 @@ function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null
     : null;
 }
 
+/** What can carry a note: an unlock, a protection off, and a return to focus (A13). */
+const NOTED = [
+  'unlock',
+  'protection_off',
+  'tap_in',
+  'refocus',
+] as const satisfies readonly EventType[];
+
 /** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */
 const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly EventType[];
 /**
@@ -703,8 +711,7 @@ export async function getHistoryPage(
       type: row.type as HistoryEventType,
       occurredAt: row.occurredAt!,
       reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
-      // Only an unlock, a protection off or a return to focus (A13) carries one.
-      recordedAs: recordedAsOf(payload),
+      recordedAs: (NOTED as readonly string[]).includes(row.type) ? recordedAsOf(payload) : null,
       countedIn:
         row.type === 'armed_tap_skipped'
           ? (counted.get(payload.armed_tap_event_id as string) ?? null)
