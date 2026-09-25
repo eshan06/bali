@@ -222,19 +222,17 @@ struct MonitorFileTests {
             let (outbox, url) = try makeOutbox()
             try outbox.keep(.inSession(session(endsAt: 1200), .focused))
             try outbox.pool.close()
-            // Another process holds the file — no read of another's passes — for 3 s, then lets it go.
+            // Another process holds the file — no read of another's passes — for 4 s, then lets it
+            // go: past the bound, and inside the 5 s busy timeout a wait at each lock would have.
             var configuration = Configuration()
             configuration.prepareDatabase { try $0.execute(sql: "PRAGMA locking_mode = EXCLUSIVE") }
             let holder = try DatabaseQueue(
                 path: url.path(percentEncoded: false), configuration: configuration)
             try holder.write { try Outbox.setState($0, "held", "x") }
-            let released = DispatchSemaphore(value: 0)
             Thread.detachNewThread {
-                Thread.sleep(forTimeInterval: 3)
+                Thread.sleep(forTimeInterval: 4)
                 try? holder.close()
-                released.signal()
             }
-            defer { released.wait() }
             #expect(
                 Bell.wake(outboxAt: url, now: t0, within: 0.5) == .retry(Bell.window(until: at(60)))
             )

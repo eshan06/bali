@@ -8,6 +8,70 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5b-2: B5b's app-side riders — the app's test target and the config pin —
+  and #91's review: the app's open never waits with no end and opens the file once, a wake iOS
+  refuses the monitor is shown, the monitor's whole open and read are bounded, no cap ends the
+  last run's shields over an unread standing, and B5b's stated bound is corrected.** **The riders**,
+  ported by hand from `claude/fervent-bell-8nvjcp-b5b-full` onto `main` (which keeps #91's final
+  open): `BaliTests`, hosted in the app and run by the iOS Simulator job (`xcodebuild test -scheme
+  Bali`, signing off, as the build step). It depends on the packages as the app does — a hosted
+  bundle that `@testable import`s the app needs every module the app imports, GRDB's C module
+  among them — at the cost of its own copy of their code. It pins B5a-3's fix through a seam,
+  `Phone.onPhase`, what the phase drives (the engine's and the enforcer's in the app, a test's own
+  there): in front then behind at once, no check and the engine behind. The config reader is
+  BaliCore's `AppConfig`, so a test pins its four keys to `Bali/Info.plist` and `project.yml` on
+  Linux too — a key misspelt on one side built green and said "not set up" only on a phone — and
+  `AppTests.config` pins the built app's own Info.plist. **(1) The unbounded open.** #91 dropped
+  the old `throw failure ?? CocoaError(.fileWriteUnknown)`: an NSFileCoordinator call returning
+  without running its accessor and without an error left the app's open waiting with no end —
+  `Outbox.init` never returned, and nothing was shown (rule 5). `granted` now hears the asking end
+  (`over`) as well as its grant, and an asking over with no grant is a refusal — its error, or
+  `CocoaError(.fileWriteUnknown)` — which the app shows with Try again. **(2) One claim.**
+  `Access.claim(opening:)` let every grant claim again: a request calling back twice opened the
+  file twice (a second pool, never closed) and wrote the result after the waiting thread was
+  released. The first claim — the grant, a refusal or the giving up — now has it alone. **(3) A
+  wake iOS refuses the monitor, shown.** It was recorded only in the Debug readout's `lastWake`;
+  nothing wakes the monitor again, so the shields it kept outlived their end until the app was
+  opened, and nobody was told. The monitor now keeps the refusal's time in the app group
+  (`Bell.monitorUnscheduled`), and the app shows it from its next open
+  (`Protection.monitorUnscheduled`: the readout's "the monitor's bell NOT scheduled at …, app
+  closed") until a window is registered again — by the app or a later wake — or a wake of the
+  monitor's ends well. Beside `unscheduled`, not in it: that is this run's refusal, asked for again
+  at each pass; this one is the closed app's, and a cancel at the app's first pass would clear it
+  unseen. `DeviceActivityCenter` is behind `BellCenter`, so `register`'s rule is tested on Linux:
+  no window asked for while iOS holds one ending there (the components registered, read back in
+  the phone's calendar), another end replaces it, none stops it, a refusal keeps iOS's window. What
+  iOS itself gives back from `schedule(for:)` stays round 2's. **(4) The bound, corrected — not the
+  rule.** B5b stated "never early, and less than a minute past the bell with the app closed". Woken
+  before the bell, the monitor keeps the shields and asks to be woken `retry` (a minute) on, at
+  the whole minute: up to two minutes past the bell. Clamping the retry to the shields' end plus a
+  minute changes nothing — the next whole minute after the window's end is what it already asks for
+  — and anything sooner may be the very window iOS still holds, which `register` skips. So: never
+  early; less than a minute past the bell woken at the window's end, less than two woken before
+  the bell (`WakeTests.bound`); round 2's expected results say so. **(5) The monitor's whole open
+  and read, bounded.** 2 s bounded the coordinated open only: an open under way was waited for,
+  and SQLite's busy timeout — 5 s at each lock wait — could stretch a wake to ~7 s, where iOS may
+  kill the extension and nothing is cleared. The monitor's outbox now waits on SQLite's locks
+  through a busy callback that ends at one deadline, 2 s from the wake's open, so the coordinated
+  open, the pool, the migration check and the reads all end within it; a lock held past it is a
+  read refused — the fail-safe, the shields kept, woken a minute on. The app keeps its 5 s busy
+  timeout. **(6) No cap over the last run's shields — B5b's rider reversed.** #90's review had a
+  pending tap's cap take off the last run's shields over a standing not read (`capOf`): focused
+  until 10:00, the file unreadable at a 9:00 relaunch, an offline re-tap at 9:05 — the shields came
+  off at 9:55, five minutes early. Shields never end early over a session that may still run, and
+  over a standing not read any may. `capOf` is gone: over an unread standing only the shields the
+  enforcer put on come off at a cap (`putOn`); the last run's stay until the file reads or the
+  server's truth says where the phone stands — B5a-2's rule, and the monitor's (B5b's disclosure
+  that the app, unlike the monitor, would take them off is void). **Not covered, disclosed:** #90's
+  WARN stands — an offline tap over an unreadable standing keeps the last run's shields past its
+  cap until the file reads (within a minute) or the server answers. **Tests** (Linux and the iOS
+  Simulator, but for `heldPastBound`, Linux only — it races the bound against another connection's
+  hold, which the simulator's stalls could outlast — and `AppTests`, the simulator only):
+  `AppConfigTests`; `overUngranted` and `grantedTwice`; `RegisterTests` and `monitorRefused`;
+  `WakeTests.bound`; `heldPastBound`; `unreadCappedOverHeld`, now the other way round. (5)'s and
+  (6)'s were red on `main`'s code first, (1)'s and (2)'s on `main`'s behaviour in `granted`'s new
+  shape; of 9 mutations, each taken alone — one per fix, two for (3), and two for the config pin (a
+  key misspelt in the Info.plist, a setting in `project.yml`) — all 9 turn a test red.
 - **2026-09-25** — **B5b: the bell with the app closed — the window the shields are on registered
   with iOS as a DeviceActivity schedule, and the monitor extension taking them off at its end,
   force-quit or not (ARCHITECTURE's leaning (a)); with #90's two BaliOutbox riders, and the
