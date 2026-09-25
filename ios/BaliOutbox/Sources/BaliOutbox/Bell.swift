@@ -9,9 +9,9 @@ public enum Bell {
     /// iOS's floor: no DeviceActivity interval is shorter.
     public static let floor: TimeInterval = 15 * 60
     /// How long the extensions' whole read of the outbox file may take — its coordinated open,
-    /// SQLite's locks, an open still under way: a ceiling (`Outbox.read`) — before the monitor
-    /// gives up and keeps the shields, and the shield says Bali's name alone: never so long that
-    /// iOS kills the monitor mid-wake.
+    /// SQLite's locks, an open still under way: a ceiling (`Outbox.read`), a migration's own work
+    /// alone waited out — before the monitor gives up and keeps the shields, and the shield says
+    /// Bali's name alone: never so long that iOS kills the monitor mid-wake.
     public static let patience: TimeInterval = 2
     /// The least the monitor waits for its next wake: to read a file it could not, or for shields
     /// still owed at a wake that came early.
@@ -46,13 +46,15 @@ public enum Bell {
 
     /// The monitor's wake at `now`: the outbox file opened within `patience` (`bound`, for the tests),
     /// where the phone stood and what it queued read — with `cap`, decision 7's or a device check's —
-    /// and the file closed, then decided by the phone's own clock (data model, decision 6).
+    /// and the file closed, then decided by the phone's own clock (data model, decision 6). The
+    /// one extension read that migrates a file this build has yet to (`Outbox.read`): the shield's
+    /// never does.
     public static func wake(
         outboxAt url: URL, now: Date, cap: TimeInterval = SyncState.tapCap,
         within bound: TimeInterval = patience
     ) -> Wake {
         wake(now: now) {
-            var state = try Outbox.read(url, within: bound)
+            var state = try Outbox.read(url, within: bound, migrating: true)
             state.cap = cap
             return state
         }

@@ -359,6 +359,40 @@ struct BoundTests {
         #expect(ended.wait(timeout: .now() + .seconds(seconds)) == .success)
     }
 
+    @Test(
+        "Past the bound, the one open that takes the write lock — the monitor's migration, granted and under way — is waited out, not given up on: left running, it would hold the file's write lock once the read had answered, and iOS kills an extension suspended holding one (0xdead10cc) before the monitor asks for its next wake (#97's review)"
+    )
+    func waitedOut() throws {
+        let began = DispatchSemaphore(value: 0)
+        let deadline = DispatchTime.now() + 0.2
+        let returned = Returned<Int>()
+        // On a thread of its own, so that a wait with no end fails the test rather than hang it.
+        Thread.detachNewThread {
+            returned.result = Result {
+                try Outbox.granted(
+                    until: deadline, waitsOut: true,
+                    request: { grant, over in
+                        Thread.detachNewThread {
+                            grant(Asking.file)
+                            over(nil)
+                        }
+                        // The open has begun before the wait for it does.
+                        began.wait()
+                    },
+                    cancel: { Issue.record("an open under way was cancelled") }
+                ) { _ in
+                    began.signal()
+                    // Its work outlasts the bound, whatever the wait for it does: a migration
+                    // running on after the deadline.
+                    let done = deadline + 0.5
+                    while DispatchTime.now() < done { Thread.sleep(forTimeInterval: 0.01) }
+                    return 7
+                }
+            }
+        }
+        #expect(try #require(returned.wait(), "waited with no end").get() == 7)
+    }
+
     @Test("Unbounded — the app's own open — it waits as long as the file takes")
     func unbounded() throws {
         let asking = Asking(atOnce: false)
@@ -450,7 +484,7 @@ struct BoundTests {
                 return
             }
             defer { release.signal() }
-            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1) }
+            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1, migrating: true) }
             #expect(Bell.wake(outboxAt: url, now: t0) == .retry(Bell.window(until: at(60))))
         }
 
@@ -479,8 +513,30 @@ struct BoundTests {
             // a stall of the simulator's never reads as the file held.
             let bound = TimeInterval(patience.components.seconds)
             #expect(
-                try Outbox.read(url, within: bound).standing
+                try Outbox.read(url, within: bound, migrating: false).standing
                     == .inSession(session(endsAt: 1200), .focused))
+        }
+
+        @Test(
+            "On the phone, an open that writes — the monitor's migration — granted through NSFileCoordinator and still under way at the bound, is waited out (#97's review)"
+        )
+        func writerWaitedOut() throws {
+            let (_, url) = try makeOutbox()
+            let began = Returned<Bool>()
+            // Far enough off for the coordinator to grant the open first; the open outlasts it.
+            let deadline = DispatchTime.now() + 1
+            let result = Result {
+                try Outbox.coordinated(url, reading: false, until: deadline) { _ in
+                    began.result = .success(true)
+                    let done = deadline + 0.5
+                    while DispatchTime.now() < done { Thread.sleep(forTimeInterval: 0.01) }
+                    return 7
+                }
+            }
+            // Granted only past the bound — a stall of the simulator's — the open never ran:
+            // nothing to tell.
+            guard began.result != nil else { return }
+            #expect(try result.get() == 7)
         }
     #endif
 }

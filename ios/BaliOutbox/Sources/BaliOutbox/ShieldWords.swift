@@ -5,7 +5,9 @@ import Foundation
 /// out of process, as it runs the monitor, so it reads the standing and the queue the app keeps in
 /// the app group as the monitor does (`Outbox.read`): read only — a student opens blocked apps many
 /// times a minute — all of it within `Bell.patience`, a ceiling, and the file closed before it
-/// returns. What it cannot read, it gives no time for — never a wrong one.
+/// returns. Never migrating it (#97's review): a file this build has yet to migrate, the app not
+/// opened since an update, is not read here until the monitor or the app has. What it cannot read,
+/// it gives no time for — never a wrong one.
 public struct ShieldWords: Sendable, Hashable {
     public let title: String
     public let subtitle: String
@@ -23,7 +25,7 @@ public struct ShieldWords: Sendable, Hashable {
         outboxAt url: URL?, over: Over, now: Date, cap: TimeInterval = SyncState.tapCap,
         time: Date.FormatStyle = ShieldWords.time, within bound: TimeInterval = Bell.patience
     ) {
-        var state = url.flatMap { try? Outbox.read($0, within: bound) }
+        var state = url.flatMap { try? Outbox.read($0, within: bound, migrating: false) }
         state?.cap = cap
         self.init(state, over: over, now: now, time: time)
     }

@@ -5,11 +5,15 @@ import Testing
 
 @testable import BaliOutbox
 
-/// The extensions' read of the file at `url`, waiting for it as long as the tests wait for
-/// anything: a stall of the iOS Simulator's never reads as the file held (`BoundTests` has the
-/// bound).
+#if os(Linux)
+    import GRDBSQLite
+#endif
+
+/// The extensions' read of the file at `url`, read only — as the shield's is — waiting for it as
+/// long as the tests wait for anything: a stall of the iOS Simulator's never reads as the file held
+/// (`BoundTests` has the bound).
 private func read(_ url: URL) throws -> SyncState {
-    try Outbox.read(url, within: TimeInterval(patience.components.seconds))
+    try Outbox.read(url, within: TimeInterval(patience.components.seconds), migrating: false)
 }
 
 /// The file's bytes, or its WAL's (`suffix` "-wal"); nil when there is no such file.
@@ -107,25 +111,25 @@ struct ExtensionReadTests {
     }
 
     @Test(
-        "A file this build has yet to migrate — the app not opened since an update, B6a's v3 and B6b's v4 — is migrated where it is read, once, as the app's open would: the shield says the bell, the bell clears the shields, and the read after is read only"
+        "A file this build has yet to migrate — the app not opened since an update, B6a's v3 and B6b's v4 — is migrated where the monitor reads it, once, as the app's open would: the bell clears the shields, and every read after is read only. The shield never migrates it (#97's review): Bali's name alone, the file left as it is, until the monitor or the app has"
     )
     func older() throws {
         let bound = TimeInterval(patience.components.seconds)
         for version in ["v2", "v3"] {
-            let shielded = try madeBy(version)
-            let words = ShieldWords(outboxAt: shielded, over: .app, now: t0, within: bound)
-            #expect(words.title.hasPrefix("Focused with Bali until "), "\(version)")
-            let belled = try madeBy(version)
-            #expect(
-                Bell.wake(outboxAt: belled, now: at(1720), within: bound) == .clear, "\(version)")
-            for url in [shielded, belled] {
-                #expect(try applied(url) == ["v1", "v2", "v3", "v4"], "\(version)")
-                let (file, wal) = (bytes(url), bytes(url, "-wal"))
-                let state = try read(url)
-                #expect(state.standing == .inSession(class1042, .focused), "\(version)")
-                #expect(state.queued.map(\.eventId) == ["e0"], "\(version)")
-                #expect(bytes(url) == file && bytes(url, "-wal") == wal, "\(version)")
-            }
+            let url = try madeBy(version)
+            let (before, migrations) = (bytes(url), try applied(url))
+            let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
+            #expect(words.title == "Focused with Bali", "\(version)")
+            #expect(try applied(url) == migrations && bytes(url) == before, "\(version)")
+            #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear, "\(version)")
+            #expect(try applied(url) == ["v1", "v2", "v3", "v4"], "\(version)")
+            let (file, wal) = (bytes(url), bytes(url, "-wal"))
+            let shield = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
+            #expect(shield.title.hasPrefix("Focused with Bali until "), "\(version)")
+            let state = try read(url)
+            #expect(state.standing == .inSession(class1042, .focused), "\(version)")
+            #expect(state.queued.map(\.eventId) == ["e0"], "\(version)")
+            #expect(bytes(url) == file && bytes(url, "-wal") == wal, "\(version)")
         }
     }
 
@@ -155,8 +159,8 @@ struct ExtensionReadTests {
         }
         holding.wait()
         let cut = Bell.wake(outboxAt: url, now: at(1720), within: 0.5)
-        // Looked at while the app still writes: on the phone, the migration the bound gave up on
-        // may run on (the ceiling), but it cannot go through past that write.
+        // Looked at while the app still writes: the migration waits on that write only until the
+        // bound, where it fails and rolls back — it cannot go through past it.
         let halfway = Result { try applied(url) }
         release.signal()
         released.wait()
@@ -181,4 +185,72 @@ struct ExtensionReadTests {
         #expect(throws: Outbox.TooNew.self) { try read(url) }
         #expect(bytes(url) == file && bytes(url, "-wal") == wal)
     }
+
+    #if os(Linux)
+        @Test(
+            "A close that fails never takes back a read that went through: the shield says the bell it read, and the monitor keeps the shields to it — the queue closes the file as it goes all the same (#97's review)"
+        )
+        func closeFails() throws {
+            let (outbox, url) = try makeOutbox()
+            try outbox.keep(.inSession(class1042, .focused))
+            try outbox.pool.close()
+            try Unclosable.closing(url) {
+                // Staged: closing a connection to the file fails.
+                let probe = try DatabaseQueue(
+                    path: url.path(percentEncoded: false),
+                    configuration: Outbox.configuration(readonly: true, until: nil))
+                #expect(throws: DatabaseError.self) { try probe.close() }
+                #expect(try read(url).standing == .inSession(class1042, .focused))
+                let bound = TimeInterval(patience.components.seconds)
+                let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
+                #expect(words.title.hasPrefix("Focused with Bali until "))
+                #expect(
+                    Bell.wake(outboxAt: url, now: t0, within: bound)
+                        == .keep(Bell.window(until: at(1720))))
+            }
+        }
+    #endif
 }
+
+#if os(Linux)
+    /// Closing a connection to one file fails while `closing` runs: each connection SQLite opens
+    /// to it keeps a statement never finalized, so `sqlite3_close` answers SQLITE_BUSY, which GRDB
+    /// throws. Linux only: Apple's SQLite supports no process-wide auto extension.
+    private enum Unclosable {
+        static let lock = NSLock()
+        nonisolated(unsafe) static var path: String?
+        nonisolated(unsafe) static var statements: [OpaquePointer] = []
+
+        /// An extension's entry point, as SQLite calls it: the connection, its error, its API.
+        typealias Entry = @convention(c) (OpaquePointer?, OpaquePointer?, OpaquePointer?) -> Int32
+
+        /// What SQLite runs as it opens each connection, once registered.
+        static let open: Entry = { db, _, _ in
+            let name = sqlite3_db_filename(db, "main").map { String(cString: $0) }
+            guard let name, name == Unclosable.lock.withLock({ Unclosable.path }) else {
+                return SQLITE_OK
+            }
+            var statement: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT 1", -1, &statement, nil) == SQLITE_OK, let statement {
+                Unclosable.lock.withLock { Unclosable.statements.append(statement) }
+            }
+            return SQLITE_OK
+        }
+
+        /// `body`, run while closing a connection to the file at `url` fails; after it, the
+        /// statements are finalized, and the connections left open close.
+        static func closing(_ url: URL, _ body: () throws -> Void) rethrows {
+            let entry = unsafeBitCast(open, to: (@convention(c) () -> Void).self)
+            lock.withLock { path = url.path(percentEncoded: false) }
+            sqlite3_auto_extension(entry)
+            defer {
+                sqlite3_cancel_auto_extension(entry)
+                lock.withLock {
+                    for statement in statements { sqlite3_finalize(statement) }
+                    (path, statements) = (nil, [])
+                }
+            }
+            try body()
+        }
+    }
+#endif

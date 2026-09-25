@@ -82,8 +82,9 @@ public struct Outbox: Sendable {
     /// Where the phone stood and what it queued, as the extensions read them — the monitor at a
     /// wake (B5b), the shield at each blocked app (B5c) — read only (#93's review), and all of it
     /// within `bound`, a ceiling: the coordinated open, SQLite's locks and an open under way (then
-    /// `Busy`, or SQLite's busy error). Never longer: iOS waits on the shield, and would kill the
-    /// monitor mid-wake. Read only: a reading coordination, which never holds up another reader,
+    /// `Busy`, or SQLite's busy error) — all but a migration's own work, which is waited out
+    /// (`granted`). Never longer: iOS waits on the shield, and would kill the monitor mid-wake.
+    /// Read only: a reading coordination, which never holds up another reader,
     /// and a read-only connection, which begins no write transaction and writes nothing to the file
     /// or its WAL — no migration, no checkpoint as it closes, and no file where there is none. It
     /// needs the WAL files, which every read-write connection keeps (persistent WAL) and which on
@@ -91,16 +92,20 @@ public struct Outbox: Sendable {
     /// open makes them again. The file is closed before this returns, since iOS gives an extension
     /// no notice before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a
     /// newer build migrated throws (`TooNew`); one this build has yet to migrate — the app not
-    /// opened since an update — is migrated here, once, as the app's open would, within the same
-    /// bound: the bell still clears the shields, and the shield still says when. A standing it
-    /// cannot read throws: `.unread` is the app's.
-    static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
+    /// opened since an update — throws too (`TooOld`), unless `migrating`: the monitor's read
+    /// migrates it here, once, as the app's open would, within the same bound, so the bell still
+    /// clears the shields. The shield's never does (#97's review): iOS asks for it synchronously,
+    /// many times a minute, and a writing coordination and the write lock there, in the process
+    /// likeliest to be suspended without notice, would buy only the bell in its words — Bali's name
+    /// alone until the monitor or the app has migrated it. A standing it cannot read throws:
+    /// `.unread` is the app's.
+    static func read(_ url: URL, within bound: TimeInterval, migrating: Bool) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
             return try coordinated(url, reading: true, until: deadline) {
                 try kept(in: $0, readonly: true, until: deadline)
             }
-        } catch is TooOld {
+        } catch is TooOld where migrating {
             return try coordinated(url, reading: false, until: deadline) {
                 try kept(in: $0, readonly: false, until: deadline)
             }
@@ -113,7 +118,8 @@ public struct Outbox: Sendable {
     /// The standing and the queue in the file at `url`, read in one transaction on one connection —
     /// read only, or migrating first what this build has yet to — whose every wait on another
     /// process ends by `deadline` (a pool's readers would each wait GRDB's own 10 s instead), and
-    /// which is closed before this returns.
+    /// which is closed before this returns: best effort, since a close that fails must never take
+    /// back what was read (#97's review), and the queue closes the file as it goes all the same.
     static func kept(in url: URL, readonly: Bool, until deadline: DispatchTime) throws
         -> SyncState
     {
@@ -127,7 +133,7 @@ public struct Outbox: Sendable {
             guard let state = try file.read(current) else { throw TooOld() }
             return state
         }
-        try file.close()
+        try? file.close()
         return try read.get()
     }
 
@@ -160,7 +166,8 @@ public struct Outbox: Sendable {
 
     /// `open(url)`, coordinated with every other process opening the file — `reading` it, alongside
     /// any other reader, or writing — waiting for them at most until `deadline` (nil: as long as it
-    /// takes). Linux has no NSFileCoordinator, and no other process.
+    /// takes); an open that writes, once granted, is waited out (`granted`). Linux has no
+    /// NSFileCoordinator, and no other process.
     static func coordinated<T>(
         _ url: URL, reading: Bool, until deadline: DispatchTime?,
         _ open: @escaping @Sendable (URL) throws -> T
@@ -172,7 +179,7 @@ public struct Outbox: Sendable {
             // thread waiting for it, and every open hung.
             nonisolated(unsafe) let coordinator = NSFileCoordinator(filePresenter: nil)
             return try granted(
-                until: deadline,
+                until: deadline, waitsOut: !reading,
                 request: { grant, over in
                     let ask: @Sendable () -> Void = {
                         var failure: NSError?
@@ -200,15 +207,19 @@ public struct Outbox: Sendable {
     /// `over` once the asking has ended, with its error, if any — waiting at most until `deadline`
     /// (nil: as long as it takes). An asking over with no grant is a refusal — its error, or one of
     /// its own when it gave none — never a wait with no end (rule 5: the app shows it, with a
-    /// retry). The deadline is a ceiling (#93's review): past it, `Busy` is thrown, whatever the
-    /// asking is doing. Not granted yet, it is cancelled, and a grant that comes after opens
-    /// nothing; an open under way runs on, on the thread it was granted on, and its outcome is
-    /// dropped — so an `open` given a deadline holds nothing once it returns (the extensions' read
-    /// closes the file first), and its own waits on SQLite's locks end by the same deadline. The
-    /// first of the grant, the refusal and the giving up settles it: nothing after it opens the
+    /// retry). The deadline is a ceiling (#93's review): past it, `Busy` is thrown. Not granted
+    /// yet, the asking is cancelled, and a grant that comes after opens nothing; an open under way
+    /// runs on, on the thread it was granted on, and its outcome is dropped — so an `open` given a
+    /// deadline holds nothing once it returns (the extensions' read closes the file first), and its
+    /// own waits on SQLite's locks end by the same deadline. All but one open, which `waitsOut`:
+    /// the one that takes the write lock, the monitor's migration (#97's review). Left running, it
+    /// would hold that lock once the read had answered, as the monitor asks iOS for its next wake —
+    /// and iOS kills an extension suspended holding it (0xdead10cc), the wake never asked for. Its
+    /// waits end by the deadline all the same, so only its own work, milliseconds, outlasts it.
+    /// The first of the grant, the refusal and the giving up settles it: nothing after it opens the
     /// file again or answers.
     static func granted<T>(
-        until deadline: DispatchTime?,
+        until deadline: DispatchTime?, waitsOut: Bool = false,
         request: (
             _ grant: @escaping @Sendable (URL) -> Void,
             _ over: @escaping @Sendable ((any Error)?) -> Void
@@ -221,7 +232,11 @@ public struct Outbox: Sendable {
             { url in access.settle { Result { try open(url) } } },
             { failure in access.settle { .failure(failure ?? CocoaError(.fileWriteUnknown)) } })
         if let settled = access.wait(until: deadline) { return try settled.get() }
-        if access.claim() { cancel() }
+        if access.claim() {
+            cancel()
+        } else if waitsOut, let settled = access.wait(until: nil) {
+            return try settled.get()
+        }
         throw Busy()
     }
 
@@ -265,6 +280,10 @@ public struct Outbox: Sendable {
         }
     #endif
 
+    /// The file's schema, migration by migration. Each may run in the monitor extension, after an
+    /// update, waited out past its 2 s ceiling once it holds the write lock (`granted`, B6c-2): so
+    /// each must stay cheap — the outbox is a queue of the few records not yet answered, and a
+    /// migration rewrites nothing larger.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         // Records go in `seq` order; `outboxState` holds the rules' own state.
@@ -482,17 +501,17 @@ public struct Outbox: Sendable {
     static func file(_ db: Database, _ standing: Standing) throws -> Bool {
         let tap = standing.sessionId == nil ? try state(db, lastTapKey) : nil
         // Nowhere to file it — no session named, no tap known — it matches nothing, and waits.
-        // Whether it filed one is the UPDATE's own count, read with it: a statement run between
-        // the two would count instead (#96's review) — a wrong no loses the drain that sends it.
-        let filed = try {
-            try db.execute(
-                sql: """
-                    UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL
-                    """, arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
-            return db.changesCount > 0
-        }()
+        // Whether it filed one is what the UPDATE itself returns, the rows it filed — no count
+        // another statement could stand in for (#96's review, #97's): a wrong no loses the drain
+        // that sends it.
+        let filed = try String.fetchAll(
+            db,
+            sql: """
+                UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL
+                RETURNING eventId
+                """, arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
         try keep(db, standing)
-        return filed
+        return !filed.isEmpty
     }
 
     static func keep(_ db: Database, _ standing: Standing) throws {
