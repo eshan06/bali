@@ -82,8 +82,9 @@ public struct Outbox: Sendable {
     /// Where the phone stood and what it queued, as the extensions read them — the monitor at a
     /// wake (B5b), the shield at each blocked app (B5c) — read only (#93's review), and all of it
     /// within `bound`, a ceiling: the coordinated open, SQLite's locks and an open under way (then
-    /// `Busy`, or SQLite's busy error). Never longer: iOS waits on the shield, and would kill the
-    /// monitor mid-wake. Read only: a reading coordination, which never holds up another reader,
+    /// `Busy`, or SQLite's busy error) — all but a migration's own work, which is waited out
+    /// (`granted`). Never longer: iOS waits on the shield, and would kill the monitor mid-wake.
+    /// Read only: a reading coordination, which never holds up another reader,
     /// and a read-only connection, which begins no write transaction and writes nothing to the file
     /// or its WAL — no migration, no checkpoint as it closes, and no file where there is none. It
     /// needs the WAL files, which every read-write connection keeps (persistent WAL) and which on
@@ -165,7 +166,8 @@ public struct Outbox: Sendable {
 
     /// `open(url)`, coordinated with every other process opening the file — `reading` it, alongside
     /// any other reader, or writing — waiting for them at most until `deadline` (nil: as long as it
-    /// takes). Linux has no NSFileCoordinator, and no other process.
+    /// takes); an open that writes, once granted, is waited out (`granted`). Linux has no
+    /// NSFileCoordinator, and no other process.
     static func coordinated<T>(
         _ url: URL, reading: Bool, until deadline: DispatchTime?,
         _ open: @escaping @Sendable (URL) throws -> T
@@ -177,7 +179,7 @@ public struct Outbox: Sendable {
             // thread waiting for it, and every open hung.
             nonisolated(unsafe) let coordinator = NSFileCoordinator(filePresenter: nil)
             return try granted(
-                until: deadline,
+                until: deadline, waitsOut: !reading,
                 request: { grant, over in
                     let ask: @Sendable () -> Void = {
                         var failure: NSError?
@@ -205,15 +207,19 @@ public struct Outbox: Sendable {
     /// `over` once the asking has ended, with its error, if any — waiting at most until `deadline`
     /// (nil: as long as it takes). An asking over with no grant is a refusal — its error, or one of
     /// its own when it gave none — never a wait with no end (rule 5: the app shows it, with a
-    /// retry). The deadline is a ceiling (#93's review): past it, `Busy` is thrown, whatever the
-    /// asking is doing. Not granted yet, it is cancelled, and a grant that comes after opens
-    /// nothing; an open under way runs on, on the thread it was granted on, and its outcome is
-    /// dropped — so an `open` given a deadline holds nothing once it returns (the extensions' read
-    /// closes the file first), and its own waits on SQLite's locks end by the same deadline. The
-    /// first of the grant, the refusal and the giving up settles it: nothing after it opens the
+    /// retry). The deadline is a ceiling (#93's review): past it, `Busy` is thrown. Not granted
+    /// yet, the asking is cancelled, and a grant that comes after opens nothing; an open under way
+    /// runs on, on the thread it was granted on, and its outcome is dropped — so an `open` given a
+    /// deadline holds nothing once it returns (the extensions' read closes the file first), and its
+    /// own waits on SQLite's locks end by the same deadline. All but one open, which `waitsOut`:
+    /// the one that takes the write lock, the monitor's migration (#97's review). Left running, it
+    /// would hold that lock once the read had answered, as the monitor asks iOS for its next wake —
+    /// and iOS kills an extension suspended holding it (0xdead10cc), the wake never asked for. Its
+    /// waits end by the deadline all the same, so only its own work, milliseconds, outlasts it.
+    /// The first of the grant, the refusal and the giving up settles it: nothing after it opens the
     /// file again or answers.
     static func granted<T>(
-        until deadline: DispatchTime?,
+        until deadline: DispatchTime?, waitsOut: Bool = false,
         request: (
             _ grant: @escaping @Sendable (URL) -> Void,
             _ over: @escaping @Sendable ((any Error)?) -> Void
@@ -226,7 +232,11 @@ public struct Outbox: Sendable {
             { url in access.settle { Result { try open(url) } } },
             { failure in access.settle { .failure(failure ?? CocoaError(.fileWriteUnknown)) } })
         if let settled = access.wait(until: deadline) { return try settled.get() }
-        if access.claim() { cancel() }
+        if access.claim() {
+            cancel()
+        } else if waitsOut, let settled = access.wait(until: nil) {
+            return try settled.get()
+        }
         throw Busy()
     }
 

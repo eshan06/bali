@@ -134,7 +134,7 @@ struct ExtensionReadTests {
     }
 
     @Test(
-        "A migration the bound cuts off — the app writing the file just then — leaves nothing half done: the shields kept, a wake a minute on registered; that wake migrates the file, clears them, and leaves no wake behind (#97's review)"
+        "A migration the bound cuts off — the app writing the file just then — leaves nothing half done: the shields kept, and the next wake migrates the file and clears them"
     )
     func olderCutOff() throws {
         let url = try madeBy("v3")
@@ -158,26 +158,16 @@ struct ExtensionReadTests {
             released.signal()
         }
         holding.wait()
-        let center = RegisterTests.Center()
-        var cleared = 0
-        let cut = Bell.carryOut(
-            outboxAt: url, at: at(1720), in: center, clearing: { cleared += 1 },
-            refused: { _ in }, within: 0.5)
-        // Looked at while the app still writes: on the phone, the migration the bound gave up on
-        // may run on (the ceiling), but it cannot go through past that write.
+        let cut = Bell.wake(outboxAt: url, now: at(1720), within: 0.5)
+        // Looked at while the app still writes: the migration waits on that write only until the
+        // bound, where it fails and rolls back — it cannot go through past it.
         let halfway = Result { try applied(url) }
         release.signal()
         released.wait()
-        #expect(cut.hasPrefix("file not read — kept, again ") && cleared == 0)
-        // Registered as the monitor registers it, in the phone's calendar.
-        let held = RegisterTests.heldEnd(center, in: .current)
-        #expect(held == Bell.window(until: at(1780)).end)
+        #expect(cut == .retry(Bell.window(until: at(1780))))
         #expect(try halfway.get() == ["v1", "v2", "v3"])
         let bound = TimeInterval(patience.components.seconds)
-        let next = Bell.carryOut(
-            outboxAt: url, at: at(1780), in: center, clearing: { cleared += 1 },
-            refused: { _ in }, within: bound)
-        #expect(next == "cleared" && cleared == 1 && center.held == nil)
+        #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear)
         #expect(try applied(url) == ["v1", "v2", "v3", "v4"])
     }
 
