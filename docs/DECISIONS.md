@@ -101,7 +101,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   moment, which a stall can only make pass. BaliOutbox's `patience` rose from 30 to 150 seconds
   for the same stalls; a passing wait takes none of it. Checked on Linux: `TokenTests` 25 times
   under CPU stress (eight busy loops on four cores), both whole suites 8 and 5 times under it,
-  and a test run frozen 40 seconds mid-way (`SIGSTOP`) — all green.
+  and a test run frozen 40 seconds mid-way (`SIGSTOP`) — all green. The next run stalled 78
+  seconds as the real-socket tests (`URLSessionTransportTests`) began: the apps' own 15-second
+  wait ran out before the frozen local server could answer. `answers` and `refusesRedirects` now
+  take the apps' own session, its redirect delegate included, with 240-second waits
+  (`patient()`), and `timesOut` bounds its request's one second at 240 of its session's 480.
+  Checked on Linux with the whole process frozen 40 seconds at its first loopback connect (an
+  `LD_PRELOAD` shim): the old tests failed as on the runner, each alone and 1 of 3 whole runs;
+  the new pass, each alone and 3 of 3, and the whole suite 5 more times under CPU stress.
 - **2026-09-25** — **A13: a return the phone made before an unlock the server already has is
   recorded, never applied (owner ruling, 2026-09-24).** The ruling, "Fix it", verbatim: "The server
   uses the phone's order number that A12 added. A refocus or re-tap that is older than an unlock the
