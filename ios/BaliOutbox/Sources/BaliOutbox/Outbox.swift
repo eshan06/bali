@@ -120,27 +120,24 @@ public struct Outbox: Sendable {
             path: url.path(percentEncoded: false),
             configuration: configuration(readonly: readonly, until: deadline))
         let read = Result {
-            if try file.read(schema) == .older {
-                guard !readonly else { throw TooOld() }
-                try migrator.migrate(file)
-            }
-            return try file.read { db in
-                guard try schema(db) == .current else { throw TooNew() }
-                var state = SyncState()
-                (state.queued, state.standing) = (try records(db), try standing(db))
-                return state
-            }
+            if let state = try file.read(current) { return state }
+            guard !readonly else { throw TooOld() }
+            try migrator.migrate(file)
+            guard let state = try file.read(current) else { throw TooOld() }
+            return state
         }
         try file.close()
         return try read.get()
     }
 
-    /// Where a file's schema stands against this build's.
-    enum Schema { case current, older, newer }
-
-    static func schema(_ db: Database) throws -> Schema {
-        if try migrator.hasBeenSuperseded(db) { return .newer }
-        return try migrator.hasCompletedMigrations(db) ? .current : .older
+    /// The standing and the queue, read in the one transaction that checks the schema: nil from a
+    /// file this build has yet to migrate; a newer build's throws.
+    static func current(_ db: Database) throws -> SyncState? {
+        if try migrator.hasBeenSuperseded(db) { throw TooNew() }
+        guard try migrator.hasCompletedMigrations(db) else { return nil }
+        var state = SyncState()
+        (state.queued, state.standing) = (try records(db), try standing(db))
+        return state
     }
 
     /// The app is about to be suspended: from now on no outbox in this process takes a lock — a

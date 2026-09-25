@@ -21,8 +21,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   on, and one connection opened `readonly`, which takes no write lock and writes nothing — not the
   file, not its WAL, no checkpoint as it closes (its descriptor cannot take the lock one needs), and
   no file where there is none — the schema checked, and migrated only when this build has yet to
-  (below). The standing and the queue are read in one transaction, and the file is closed before
-  the read returns. **One connection, found here** (GRDB's source): a `DatabasePool`'s readers are
+  (below). The standing and the queue are read in the one transaction that checks the schema, and
+  the file is closed before the read returns. **One connection, found here** (GRDB's source): a `DatabasePool`'s readers are
   read-only connections, and GRDB gives those a busy timeout of their own, 10 s (`readonlyBusyMode`,
   not public), whatever `busyMode` says — so B5b-2's "the whole open and read waits at most 2 s,
   SQLite's locks included" held for the pool's writer, not for its reads. A `DatabaseQueue` is one
@@ -61,7 +61,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   only for its own work — each of its waits on a lock ends at the same deadline, and the read closes
   the file before it returns — so milliseconds, after the extension has answered: the shield's words
   given, the monitor's next wake asked for. iOS suspending it inside them kills it (0xdead10cc),
-  its answer given already. Waiting it out instead left iOS's synchronous
+  its answer given already. The one open that writes — a migration, once per update — is the one
+  with a write transaction to leave running; killed, it rolls back, and the next read migrates
+  again (pinned: a migration the bound cuts off leaves nothing half done, and the next wake
+  migrates the file and clears the shields). Waiting it out instead left iOS's synchronous
   `configuration(shielding:)` and the monitor with no bound at all — and a monitor killed before it
   asks for its next wake leaves the shields on past the bell until the app is opened. **The
   monitor's bookkeeping (#92's review, its second WARN):** `Bell.carryOut` — nothing keeps the
@@ -80,8 +83,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `ExtensionReadTests` — after the app has written and closed, read with nothing written, the file
   and its WAL byte for byte; the WAL files gone, made again, the file untouched; no file, none made,
   "Focused with Bali" and the shields kept; a file of `v2` and of `v3` migrated where it is read,
-  the shield saying the bell and the bell clearing the shields, then read only; a newer build's left
-  as it is. `BoundTests.underWay` — an open under way at the bound given up on, then let go, held by
+  the shield saying the bell and the bell clearing the shields, then read only; a migration the
+  bound cuts off — the app mid-write — rolled back, and the next wake migrating and clearing; a
+  newer build's left as it is. `BoundTests.underWay` — an open under way at the bound given up on, then let go, held by
   a semaphore rather than a sleep, so the bound is the only wait; `reader` — another process's
   reading coordination holds the read up not at all; `coordinator` — a writer's holds it to the
   bound. `RegisterTests.carriedOut`. Of 15 mutations of the rules — the read-only connection;
@@ -94,6 +98,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the open and the read; (3) as B5b found for the monitor's read, the explicit close changes nothing
   a caller can see — the queue closes the file as the read returns — and stays as the rule's
   statement; (4) whether iOS waits 2 s on `configuration(shielding:)` is still B5c's (4), round 3.
+  **Santa** (two Claude reviewers, both the fallback — no other model's CLI here; round 1): no
+  blockers. Fixed here: the schema is checked in the transaction that reads the standing and the
+  queue (it was a read of its own, and an app migrating in between cost a second open), and the
+  migration cut off by the bound is pinned and disclosed above. Dismissed: that `carryOut` newly
+  ends a refusal when a next wake is taken — the monitor's `Bell.register` already did (B5b-2).
 - **2026-09-25** — **B6b-2: the unlock guard on every answer, not a tap's alone; an unlock not
   filed yet filed by what the outbox file holds (#95's Claude Review, comment 5837915189, its two
   enforcement WARNs).** **(1) The guard.** Only a tap's answer was guarded (`if case .tap`): any

@@ -37,6 +37,15 @@ private func madeBy(_ version: String) throws -> URL {
     return url
 }
 
+/// The migrations the file at `url` has had, as a read-only connection reads them.
+private func applied(_ url: URL) throws -> [String] {
+    let file = try DatabaseQueue(
+        path: url.path(percentEncoded: false),
+        configuration: Outbox.configuration(readonly: true, until: nil))
+    defer { try? file.close() }
+    return try file.read(Outbox.migrator.appliedMigrations)
+}
+
 /// A session whose bell is at 10:42 AM in New York, where `t0` is 10:13:20 AM.
 private let class1042 = session(endsAt: 1720)
 
@@ -102,12 +111,7 @@ struct ExtensionReadTests {
             #expect(
                 Bell.wake(outboxAt: belled, now: at(1720), within: bound) == .clear, "\(version)")
             for url in [shielded, belled] {
-                let migrated = try DatabaseQueue(
-                    path: url.path(percentEncoded: false),
-                    configuration: Outbox.configuration(readonly: true, until: nil))
-                let applied = try migrated.read(Outbox.migrator.appliedMigrations)
-                try migrated.close()
-                #expect(applied == ["v1", "v2", "v3", "v4"], "\(version)")
+                #expect(try applied(url) == ["v1", "v2", "v3", "v4"], "\(version)")
                 let (file, wal) = (bytes(url), bytes(url, "-wal"))
                 let state = try read(url)
                 #expect(state.standing == .inSession(class1042, .focused), "\(version)")
@@ -115,6 +119,41 @@ struct ExtensionReadTests {
                 #expect(bytes(url) == file && bytes(url, "-wal") == wal, "\(version)")
             }
         }
+    }
+
+    @Test(
+        "A migration the bound cuts off — the app writing the file just then — leaves nothing half done: the shields kept, and the next wake migrates the file and clears them"
+    )
+    func olderCutOff() throws {
+        let url = try madeBy("v3")
+        // The app writing: a write transaction held open until the test lets it go — a reader
+        // passes it (WAL), a migration waits on it.
+        let (holding, release, released) = (
+            DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
+        )
+        let app = try DatabaseQueue(path: url.path(percentEncoded: false))
+        Thread.detachNewThread {
+            do {
+                try app.inTransaction(.immediate) { _ in
+                    holding.signal()
+                    release.wait()
+                    return .rollback
+                }
+            } catch {
+                holding.signal()
+            }
+            try? app.close()
+            released.signal()
+        }
+        holding.wait()
+        let cut = Bell.wake(outboxAt: url, now: at(1720), within: 0.5)
+        release.signal()
+        released.wait()
+        #expect(cut == .retry(Bell.window(until: at(1780))))
+        #expect(try applied(url) == ["v1", "v2", "v3"])
+        let bound = TimeInterval(patience.components.seconds)
+        #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear)
+        #expect(try applied(url) == ["v1", "v2", "v3", "v4"])
     }
 
     @Test(
