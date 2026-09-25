@@ -8,6 +8,77 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B6c-2: the monitor asks for its next wake before it reads the file, and a wake
+  that clears withdraws it; the shield never migrates the file; a close that fails never discards a
+  read; and whether an unlock was filed is its UPDATE's own answer (#97's Claude Review, comment
+  5840115460).** **The bell's guarantee (its first WARN).** B6c's ceiling gives up on an open still
+  under way at 2 s, and the monitor asked iOS for its next wake only once its read had returned.
+  After an app update, the app force-quit, the monitor woken at the bell: the read-only probe finds
+  the file older (`TooOld`), the migrating open is still inside the migration at the deadline,
+  holding the file's write lock, and `granted` throws `Busy`; iOS suspends the extension in the
+  cross-process `startMonitoring` call that follows and kills it for the lock (0xdead10cc). Nothing
+  wakes the monitor again and `monitorUnscheduled` is never written: the shields stay on past the
+  bell until the app is opened, with nothing for it to show — B5b's guarantee and rule 5 broken.
+  **Decided: the retry is asked for first** (`Bell.carryOut`, which `SessionMonitor` now calls
+  whole; `wake(outboxAt:)` is internal, so no caller reads before it asks). The wake a file not read
+  asks for, a minute on, is asked of iOS before the file is opened, and a refusal is told to
+  `refused` as it happens — a closure now: `Bell.monitorUnscheduled`, a computed property passed
+  `inout`, was written back only as the call returned, so a kill in between lost it. So a read that
+  fails, one given up at the ceiling, or a wake killed while it reads — for the lock, for its
+  memory, for anything — leaves the next wake registered, or the refusal kept. Then the wake is
+  carried out as before: kept — the next wake asked for, the retry itself (which iOS holds already)
+  or a later one in its place; cleared — the shields cleared. **Not chosen: never giving up on the
+  migrating open.** It would keep the one open that writes from outliving the wake, but leave the
+  monitor's wake unbounded again (#93's review), and it guards against only the kill that lock
+  causes; asking first guards against every kill, and the ceiling stays hard for everything, the
+  migrating open included. That open, given up on while it holds its write lock, may still get the
+  extension killed once it has answered (0xdead10cc): the migration rolls back, and the retry,
+  registered already, migrates it again a minute on (`olderCutOff`). **Decided: no stray retry.**
+  A wake that clears withdraws the retry it asked for, but only while iOS holds that very window
+  (`Bell.holds`): a window the app asked for meanwhile, for a tap just made, is never withdrawn. A
+  kill between the clear and the withdrawal leaves one stray wake, a minute on, which finds nothing
+  to clear and withdraws its own. A retry iOS refuses at a wake that clears is shown in the Debug
+  readout — `cleared (its retry NOT registered: …)` — and the refusal ends: nothing is left to wake
+  the monitor for. **To know:** every wake now asks iOS for a window from the extension, the bell's
+  clear too, so round 2's step 2 exercises `startMonitoring` from the extension (B5b's disclosure);
+  its expected result is unchanged. **The shield never migrates (its second WARN).** iOS asks for
+  `configuration(shielding:)` synchronously, many times a minute, and B6c had it migrate a file this
+  build had yet to — a writing coordination and the write lock on the engine's file, in the process
+  likeliest to be suspended without notice — for the bell in its words. Now
+  `Outbox.read(_:within:migrating:)` says who migrates: the monitor, whose bell has a guarantee
+  riding on it, and never the shield, where such a file reads as unread — "Focused with Bali" —
+  until the monitor or the app has migrated it; B6c's wording is corrected. **A close that fails
+  (its fourth WARN).** `kept` closed the file with `try`, outside the read's `Result`, so a close
+  that threw discarded a read that had gone through: the monitor kept the shields a minute more,
+  and the shield said "Focused with Bali" having read the bell. The close is best effort now
+  (`try?`) and the read returned; GRDB's queue closes the connection as it goes all the same.
+  Pinned on Linux (`closeFails`): an SQLite auto extension, registered for the test, leaves a
+  statement unfinalized on each connection to that one file, so `sqlite3_close` answers SQLITE_BUSY
+  and GRDB throws — Linux only, since Apple's SQLite supports no process-wide auto extension. **The
+  filing answer (its third WARN).** #96's rider wrapped the UPDATE and `db.changesCount` in a
+  closure invoked at once, and said no statement could come between the two; nothing stopped one
+  being added inside it. Now the answer is the UPDATE's own — `RETURNING eventId`, the rows it
+  filed, in SQLite since 3.35 and so on every iOS the app runs on — and B6c's claim is corrected.
+  **Tests** (Linux and the iOS Simulator, but `closeFails`, Linux only): `RegisterTests.retryFirst`
+  — as the read begins, where a kill would leave it, iOS holds the retry, or the refusal is kept;
+  `clearWithdraws` — a wake that clears withdraws its retry, and never a window the app asked for
+  meanwhile; `carriedOut` — B5b-2's bookkeeping, now through the read, and a clear over a refused
+  retry ending the refusal; `ExtensionReadTests.older` — the shield leaves an older file as it is,
+  saying "Focused with Bali", the monitor migrates it and clears the shields, and the shield then
+  says the bell, read only; `olderCutOff` — through the monitor's own entry, a migration the bound
+  cuts off leaves a wake a minute on registered, and that wake migrates the file, clears the
+  shields and withdraws it; `closeFails`. Red on `main`'s behaviour first: `retryFirst`,
+  `clearWithdraws`, `older`, `olderCutOff` and `closeFails`. Of 12 mutations — the retry asked for
+  after the read, or not at all; its refusal not kept before the read; a clear that leaves its
+  retry, withdraws whatever iOS holds, or keeps a refusal; the shield migrating; the read migrating
+  whatever it is told; the monitor never migrating; a close that fails discarding the read; the
+  filing answer always yes, or always no — each taken alone, all 12 turn a test red. **Not covered,
+  disclosed:** (1) `SessionMonitor`'s one call is Darwin-only, and untested: it hands the phone's
+  center and `monitorUnscheduled` to `carryOut(outboxAt:…)`, the entry `olderCutOff` runs; (2) an
+  open given up on while it holds the write lock happens only where a coordinator can be given up
+  on, the simulator and the phone, so the kill it may cause is pinned by what it leaves — iOS's
+  window as the read begins — not staged; (3) whether iOS lets the extension call
+  `startMonitoring` at every wake stays round 2's (B5b). **Santa:** SANTA_PENDING.
 - **2026-09-25** — **B6c: the extensions' read, read only and within a hard 2 s ceiling; a file this
   build has yet to migrate is migrated where it is read; the monitor's refusal bookkeeping in
   `Bell`, tested on Linux (#93's Claude Review, comment 5833779234; #92's review).** **The read,
@@ -39,8 +110,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   file reads as unreadable, the fail-safe — "Focused with Bali", the shields kept and the monitor
   woken a minute on — until the app's next open makes them again; no fallback is built for a case no
   build reaches. **A file this build has yet to migrate — the app not opened since an update, B6a's
-  `v3`, B6b's `v4` — decided here: migrated where it is read, once, as the app's open would** — a
-  writing coordination, a read-write connection with persistent WAL, this build's migrator — within
+  `v3`, B6b's `v4` — decided here: migrated where it is read, once, as the app's open would** (by
+  the monitor only, since B6c-2: the shield's read never migrates it) — a writing coordination, a read-write connection with persistent WAL, this build's migrator — within
   the same deadline, then read. Left unread, the monitor would keep the shields past the bell until
   the app is opened — B5b's guarantee broken, with the app force-quit through an update — and the
   shield could only say "Focused with Bali"; and this build's queries cannot read an older schema
@@ -48,7 +119,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   extension, kept for as long as old files may exist. Migrating costs one heavier open, once per
   update, bounded like the rest; every read after is read only. Nothing is read from nothing: the
   migrations are the app's, and carry its standing and queue over. What a student sees is unchanged
-  — the extensions migrated such a file before this step too, at every read. **A file a newer build
+  — the extensions migrated such a file before this step too, at every read (since B6c-2, the
+  shield says "Focused with Bali" over it until the monitor or the app has). **A file a newer build
   migrated** still reads as unreadable (`TooNew`): "Focused with Bali", and the monitor keeps the
   shields and tries again a minute on. **No file**, decided here: unreadable too — never made. The
   read-write open made an empty file and read `.out` from it, so the monitor cleared the shields
@@ -65,7 +137,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   each of its waits on a lock ends at the same deadline, and the read closes the file before it
   returns — so milliseconds, after the extension has answered: the shield's words given, the
   monitor's next wake asked for. iOS suspending it inside them kills it (0xdead10cc), its answer
-  given already. The one open that writes — a migration, once per update — is the one with a write
+  given already. (Not so for the monitor until B6c-2, #97's review: it asked for its next wake only
+  after the read, so that kill lost it; it now asks before it reads.) The one open that writes — a migration, once per update — is the one with a write
   transaction to leave running; killed, it rolls back, and the next read migrates again (pinned: a
   migration the bound cuts off leaves nothing half done, and the next wake migrates the file and
   clears the shields). Waiting it out instead left iOS's synchronous `configuration(shielding:)` and
@@ -77,7 +150,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `SessionMonitor` only calls it. Built in B6a, moved for size, cherry-picked from
   `claude/fervent-bell-8nvjcp-b6c-monitor` (`dc5b32c`) without a conflict. **Riders (#96's
   review):** `Outbox.file` reads whether it filed one off its UPDATE in the closure that runs it, so
-  no statement can come between the two (its third WARN; `filing` pins both answers); and PLAN's
+  no statement can come between the two (its third WARN; `filing` pins both answers) — a claim the
+  closure never made good, since a statement could still be added inside it: since B6c-2 the answer
+  is the UPDATE's own `RETURNING` rows; and PLAN's
   C1–C6 line tells C5 never to offer "back to focus" where B6b-2's guard made protection off's
   answer unlocked — the server refuses that refocus, and a re-tap is the way out (its first WARN; no
   engine change). **No device check changes:** the shield and the monitor read what they read
@@ -88,7 +163,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and its WAL byte for byte; the WAL files gone — made on Linux, unreadable on the simulator until
   the app's next open — the file untouched either way; no file, none made, "Focused with Bali" and
   the shields kept; a file of `v2` and of `v3` migrated where it is read, the shield saying the bell
-  and the bell clearing the shields, then read only; a migration the bound cuts off — the app
+  and the bell clearing the shields, then read only (since B6c-2, the monitor's read alone migrates
+  it); a migration the bound cuts off — the app
   mid-write — rolled back, and the next wake migrating and clearing; a newer build's left as it is.
   `BoundTests.underWay` — an open under way at the bound given up on, then let go, held by a
   semaphore rather than a sleep, so the bound is the only wait; `reader` — another process's reading
@@ -101,7 +177,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   pinned on the simulator only (`reader`), where no mutation runs; (2) one connection rather than a
   pool's readers cannot be staged: another process would have to take its lock between the open and
   the read; (3) as B5b found for the monitor's read, the explicit close changes nothing a caller can
-  see — the queue closes the file as the read returns — and stays as the rule's statement; (4)
+  see — the queue closes the file as the read returns — and stays as the rule's statement (B6c-2
+  made it best effort, and pinned a close that fails on Linux); (4)
   whether iOS waits 2 s on `configuration(shielding:)` is still B5c's (4), round 3. **Santa** (two
   Claude reviewers, both the fallback — no other model's CLI here; round 1): no blockers. Fixed
   here: the schema is checked in the transaction that reads the standing and the queue (it was a
