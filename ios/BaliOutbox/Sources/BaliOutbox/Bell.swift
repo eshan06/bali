@@ -8,8 +8,9 @@ import Foundation
 public enum Bell {
     /// iOS's floor: no DeviceActivity interval is shorter.
     public static let floor: TimeInterval = 15 * 60
-    /// How long the monitor waits for the outbox file — another process's coordinated open — before
-    /// it gives up and keeps the shields: never so long that iOS kills it mid-wake.
+    /// How long the monitor's whole open and read of the outbox file may wait for another process
+    /// — its coordinated open, and SQLite's locks — before it gives up and keeps the shields: never
+    /// so long that iOS kills it mid-wake.
     public static let patience: TimeInterval = 2
     /// The least the monitor waits for its next wake: to read a file it could not, or for shields
     /// still owed at a wake that came early.
@@ -20,7 +21,9 @@ public enum Bell {
     /// granularity iOS may keep wakes the monitor early — and less than a minute after. And it is
     /// exactly the floor long: its start moves back, never its end. So a window shorter than the
     /// floor (a tap in a session's last ten minutes) starts in the past, which iOS takes as an
-    /// interval under way.
+    /// interval under way. With the app closed, the shields so come off less than a minute past
+    /// the bell — or, when iOS wakes the monitor before the bell after all, less than two: it keeps
+    /// them, and is woken again a minute on, at the whole minute (`wake`).
     public static func window(until: Date) -> DateInterval {
         let end = Date(timeIntervalSince1970: (until.timeIntervalSince1970 / 60).rounded(.up) * 60)
         return DateInterval(start: end - floor, end: end)
@@ -33,7 +36,7 @@ public enum Bell {
         /// Something does — a session the standing says still runs, a later tap's cap — so they
         /// stay, and iOS is to wake the monitor again at this window's end: theirs, but never
         /// less than `retry` on, so a wake that came early never asks for the window that woke it —
-        /// which iOS may hold still, and the adapter would not ask for again.
+        /// which iOS may hold still, and `register` would not ask for again.
         case keep(DateInterval)
         /// The file could not be read in time: the shields stay — never cleared over what the
         /// monitor cannot read — and iOS is to wake it again at this window's end, to try again.
@@ -58,4 +61,31 @@ public enum Bell {
         guard let state = try? read() else { return .retry(window(until: now + retry)) }
         return state.shieldedUntil(now).map { .keep(window(until: max($0, now + retry))) } ?? .clear
     }
+
+    /// Asks `center` to wake the monitor at `window`'s end — or, nil, at none — replacing the window
+    /// asked for before, unless iOS holds one ending there already: a replacement may itself wake
+    /// the monitor, which asks again at each wake, and the two would never end. A window iOS
+    /// refuses throws, and iOS keeps the one it held.
+    public static func register(
+        _ window: DateInterval?, in center: some BellCenter, calendar: Calendar = .current
+    ) throws {
+        guard let window else { return center.stop() }
+        if let held = center.heldEnd(), calendar.date(from: held) == window.end { return }
+        let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        try center.start(
+            calendar.dateComponents(parts, from: window.start),
+            calendar.dateComponents(parts, from: window.end))
+    }
+}
+
+/// iOS's DeviceActivity center, as the bell asks it for wakes — behind a protocol, so `register`'s
+/// rule is tested on Linux (#91's review). The phone's is `DeviceActivityCenter`, for one activity.
+public protocol BellCenter {
+    /// The end of the window iOS holds, as it was registered; nil: none.
+    func heldEnd() -> DateComponents?
+    /// Asks iOS to wake the monitor at the end of the interval from `start` to `end`, replacing the
+    /// window it holds.
+    func start(_ start: DateComponents, _ end: DateComponents) throws
+    /// Asks iOS for no wake.
+    func stop()
 }

@@ -44,7 +44,8 @@ targets:
         # Release configuration overrides them: its API (Railway named it before the environment
         # was renamed dev), its pool's hosted-UI domain, and the phone's app client `bali-ios-dev`,
         # whose id dev's AUTH_AUDIENCE lists (docs/DEPLOY.md, "The phone's sign-in"). A build with
-        # one of them empty says sign-in is not set up.
+        # one of them empty says sign-in is not set up. BaliCore's `AppConfig` reads them, and its
+        # tests pin these names to Bali/Info.plist's keys.
         BALI_API_URL: https://bali-production-09a2.up.railway.app
         BALI_COGNITO_DOMAIN: https://bali-dev.auth.us-east-1.amazoncognito.com
         BALI_COGNITO_CLIENT_ID: '33qr62dl4ee4inigneidmfe2s9'
@@ -57,7 +58,24 @@ targets:
       # Both extensions ship inside the app.
       - target: BaliMonitor
       - target: BaliShield
-    scheme: {}
+    scheme:
+      testTargets: [BaliTests]
+
+  # The app's own tests (B5b-2), hosted in the app on the iOS Simulator. They depend on the
+  # packages as the app does, so `@testable import Bali` finds every module the app imports —
+  # GRDB's C module among them — though the bundle then carries its own copy of their code.
+  BaliTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [BaliTests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bali.BaliTests
+        TARGETED_DEVICE_FAMILY: '1'
+    dependencies:
+      - target: Bali
+      - package: BaliCore
+      - package: BaliOutbox
 
   # The DeviceActivity monitor: iOS wakes it at the end of the window the shields are on, with
   # the app open or not (decision 2), and it takes them off when nothing keeps them on (B5b).

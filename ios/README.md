@@ -9,6 +9,7 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
 | `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine and the enforcer             |
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: at the bell, it takes the shields off, app closed   |
+| `BaliTests/`   | The app target's own tests, hosted in the app on the iOS Simulator                                                     |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
 | `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
 | `BaliOutbox/`  | The outbox store (GRDB in the app group), its sync engine and the shields' enforcer — `swift test` there too           |
@@ -118,7 +119,14 @@ Still to come, with its part: Bali's own shield, "Focused with Bali until 9:42" 
 After round 1, on the same build and phone: signed in, Screen Time allowed, the class joined, and
 `npm run dev:teacher -- watch` running. "Force-quit" is swiping the app away in the app switcher.
 The readout's `Monitor:` line says what the DeviceActivity monitor did at its last wake — the time,
-what it did, and how long it took — since the monitor can show nothing itself.
+what it did, and how long it took — since the monitor can show nothing itself. Should iOS refuse the
+monitor its next wake, the `Screen Time:` line says so from the next open, until a window is
+registered again: `the monitor's bell NOT scheduled at <time>, app closed`.
+
+**"Within a minute after the bell"** below is when iOS wakes the monitor at the end of its window,
+the first whole minute on or after the bell. If iOS wakes it early, before the bell, the monitor
+keeps the shields and asks to be woken again the next whole minute on: they come off less than
+_two_ minutes after the bell, and the `Monitor:` line is that second wake's.
 
 1. **The window is registered.** `npm run dev:teacher -- start 20`, then **Tap** with
    `DEVICE-CHECK-1`: `shields on, due until` the bell, and no `bell NOT scheduled` on that line.
@@ -126,7 +134,7 @@ what it did, and how long it took — since the monitor can show nothing itself.
    phone until the bell. Within a minute after the bell, with the app still closed, blocked apps
    open again; `watch` showed the student silent a minute and a half after the force-quit, then
    the session over. Open the app: `Monitor: <a time within a minute after the bell> · cleared ·`
-   and a fraction of a second.
+   and a fraction of a second, and no `bell NOT scheduled` on the `Screen Time:` line.
 3. **A window shorter than iOS's 15-minute floor.** `start 15`, wait 5 minutes, **Tap** (10
    minutes left), force-quit: as step 2 — off within a minute after the bell, `Monitor: … · cleared`.
 4. **An Emergency Unlock cancels the window.** `start 15`, **Tap**, **Emergency Unlock**,
@@ -144,14 +152,15 @@ what it did, and how long it took — since the monitor can show nothing itself.
    `Standing: waiting for the teacher's Start` — and a `start` today would join it, so run this
    step last.
 7. **The monitor never stalls.** Every `Monitor:` line above took a fraction of a second, never the
-   2-second bound on waiting for the file, and the app, opened straight after each wake, started
-   normally — no `The outbox could not be opened`, no `storage failed`. A wake that could not read
-   the file says `file not read — kept, again <time>`, and tries again a minute on.
+   2-second bound on its whole open and read of the file, and the app, opened straight after each
+   wake, started normally — no `The outbox could not be opened`, no `storage failed`. A wake that
+   could not read the file says `file not read — kept, again <time>`, and tries again a minute on.
 
 ## CI
 
 The **iOS** workflow (`.github/workflows/ios.yml`) runs on every PR that touches `ios/`: it
-generates the project, builds the app for the iOS Simulator with signing off, and runs
-`BaliCore`'s and `BaliOutbox`'s tests on an iOS Simulator. Both packages' tests also run on
-Linux on every PR ("BaliCore Swift tests (Linux)" in `ci.yml`); on Linux, GRDB builds against
-the system SQLite, so `BaliOutbox` needs `libsqlite3-dev` there.
+generates the project, builds the app for the iOS Simulator with signing off, and runs the app's
+own tests (`BaliTests`, hosted in the app) and `BaliCore`'s and `BaliOutbox`'s on an iOS
+Simulator. Both packages' tests also run on Linux on every PR ("BaliCore Swift tests (Linux)" in
+`ci.yml`); on Linux, GRDB builds against the system SQLite, so `BaliOutbox` needs
+`libsqlite3-dev` there.

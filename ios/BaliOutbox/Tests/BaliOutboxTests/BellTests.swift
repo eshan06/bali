@@ -1,5 +1,6 @@
 import BaliCore
 import Foundation
+import GRDB
 import Testing
 
 @testable import BaliOutbox
@@ -62,6 +63,27 @@ struct WakeTests {
         #expect(early != .keep(Bell.window(until: at(1200))))
         #expect(wake(state, at: at(1200)) == .clear)
         #expect(wake(state, at: at(1300)) == .clear)
+    }
+
+    @Test(
+        "The bound with the app closed: never early; less than a minute past the bell, woken at the window's end — and less than two, woken before the bell: then kept, and woken again the next whole minute on (#91's review)"
+    )
+    func bound() throws {
+        // The bell a second, twenty seconds and fifty-nine past a whole minute (`t0` is 20 past).
+        for bell in [at(1181), at(1200), at(1239)] {
+            let state = try kept(
+                .inSession(SessionView(id: "s", classId: "c", endsAt: bell), .focused))
+            let end = Bell.window(until: bell).end
+            #expect(end >= bell && end.timeIntervalSince(bell) < 60, "\(bell)")
+            #expect(wake(state, at: end) == .clear, "\(bell)")
+            // Woken early by iOS, up to a minute before the window's end, and before the bell.
+            for early in stride(from: 0.5, to: 60, by: 3.5) where end - early < bell {
+                let next = wake(state, at: end - early)
+                #expect(next == .keep(Bell.window(until: end + 60)), "\(bell) \(early)")
+                #expect((end + 60).timeIntervalSince(bell) < 120, "\(bell) \(early)")
+                #expect(wake(state, at: end + 60) == .clear)
+            }
+        }
     }
 
     @Test("Unlocked, protection off, a state this build does not know, waiting or out: cleared")
@@ -190,6 +212,31 @@ struct MonitorFileTests {
             #expect(wakeFree(url, at: t0) == .keep(Bell.window(until: at(1200))))
             #expect(try descriptors() == 0)
         }
+
+        // Linux only, where no runner stalls for seconds the way the iOS Simulator's does: this
+        // races the monitor's bound against another connection's hold.
+        @Test(
+            "The monitor's whole open and read waits at most its bound — SQLite's waits on another process's lock included, never its 5 s busy timeout on top: a file held past the bound is not read, and the shields are kept (#91's review)"
+        )
+        func heldPastBound() throws {
+            let (outbox, url) = try makeOutbox()
+            try outbox.keep(.inSession(session(endsAt: 1200), .focused))
+            try outbox.pool.close()
+            // Another process holds the file — no read of another's passes — for 4 s, then lets it
+            // go: past the bound, and inside the 5 s busy timeout a wait at each lock would have.
+            var configuration = Configuration()
+            configuration.prepareDatabase { try $0.execute(sql: "PRAGMA locking_mode = EXCLUSIVE") }
+            let holder = try DatabaseQueue(
+                path: url.path(percentEncoded: false), configuration: configuration)
+            try holder.write { try Outbox.setState($0, "held", "x") }
+            Thread.detachNewThread {
+                Thread.sleep(forTimeInterval: 4)
+                try? holder.close()
+            }
+            #expect(
+                Bell.wake(outboxAt: url, now: t0, within: 0.5) == .retry(Bell.window(until: at(60)))
+            )
+        }
     #endif
 }
 
@@ -197,11 +244,13 @@ struct MonitorFileTests {
 struct BoundTests {
     /// Access another process may hold, as a test plays it: granted at once, or when the test says.
     final class Asking: @unchecked Sendable {
+        typealias Grant = @Sendable (URL) -> Void
+        typealias Over = @Sendable ((any Error)?) -> Void
         static let file = URL(fileURLWithPath: "/granted/outbox.sqlite")
         private let lock = NSLock()
         private let atOnce: Bool
         private let asked = DispatchSemaphore(value: 0)
-        private var waiting: (@Sendable (Result<URL, any Error>) -> Void)?
+        private var waiting: (grant: Grant, over: Over)?
         private var cancels = 0
         private var opens: [URL] = []
 
@@ -210,19 +259,24 @@ struct BoundTests {
         var cancelled: Bool { lock.withLock { cancels > 0 } }
         var opened: [URL] { lock.withLock { opens } }
 
-        func request(_ granted: @escaping @Sendable (Result<URL, any Error>) -> Void) {
-            guard !atOnce else { return granted(.success(Self.file)) }
-            lock.withLock { waiting = granted }
+        func request(_ grant: @escaping Grant, _ over: @escaping Over) {
+            guard !atOnce else {
+                grant(Self.file)
+                return over(nil)
+            }
+            lock.withLock { waiting = (grant, over) }
             asked.signal()
         }
         func cancel() { lock.withLock { cancels += 1 } }
-        /// Grants the access asked for — or ends the asking with `failure` — here and now.
+        /// Grants the access asked for — or ends the asking with `failure` — here and now, as
+        /// NSFileCoordinator's blocking call does: its accessor, then its return.
         func grant(_ failure: (any Error)? = nil) {
-            let granted = lock.withLock {
+            let asking = lock.withLock {
                 defer { waiting = nil }
                 return waiting
             }
-            granted?(failure.map { .failure($0) } ?? .success(Self.file))
+            if failure == nil { asking?.grant(Self.file) }
+            asking?.over(failure)
         }
         /// …or as NSFileCoordinator would: on a thread of its own, once asked, `delay` seconds on.
         func grant(after delay: TimeInterval, _ failure: (any Error)? = nil) {
@@ -269,8 +323,11 @@ struct BoundTests {
         let bound: TimeInterval = 0.5
         let value = try Outbox.granted(
             within: bound,
-            request: { granted in
-                Thread.detachNewThread { granted(.success(Asking.file)) }
+            request: { grant, over in
+                Thread.detachNewThread {
+                    grant(Asking.file)
+                    over(nil)
+                }
                 // The open has begun before the wait for it does: no stall can put them the other way.
                 began.wait()
             },
@@ -300,6 +357,59 @@ struct BoundTests {
         #expect(asking.opened.isEmpty)
     }
 
+    @Test(
+        "The asking over with no grant and no error — as NSFileCoordinator's call could return — is refused all the same: the app's open throws, and says so with a retry, never waiting with no end (#91's review)"
+    )
+    func overUngranted() throws {
+        let opened = Returned<Int>()
+        // On a thread of its own, so that a wait with no end fails the test rather than hang it.
+        Thread.detachNewThread {
+            opened.result = Result {
+                try Outbox.granted(
+                    within: nil, request: { _, over in over(nil) }, cancel: {}, open: { _ in 7 })
+            }
+        }
+        let result = try #require(opened.wait(), "the open never returned")
+        #expect(throws: CocoaError.self) { try result.get() }
+    }
+
+    @Test(
+        "Only the first claim has the file: an asking that grants twice, and ends with an error besides, opens it once, and that open's outcome stands (#91's review)"
+    )
+    func grantedTwice() throws {
+        let asking = Asking(atOnce: false)
+        let value = try Outbox.granted(
+            within: nil,
+            request: { grant, over in
+                grant(Asking.file)
+                grant(Asking.file)
+                over(CocoaError(.fileLocking))
+            }, cancel: {}
+        ) { asking.open($0) }
+        #expect(value == 7)
+        #expect(asking.opened == [Asking.file])
+    }
+
+    /// What a call made on another thread returned, once it has — waited for with the tests' patience.
+    final class Returned<T>: @unchecked Sendable {
+        private let lock = NSLock()
+        private let done = DispatchSemaphore(value: 0)
+        private var outcome: Result<T, any Error>?
+
+        var result: Result<T, any Error>? {
+            get { lock.withLock { outcome } }
+            set {
+                lock.withLock { outcome = newValue }
+                done.signal()
+            }
+        }
+
+        func wait() -> Result<T, any Error>? {
+            let seconds = Int(patience.components.seconds)
+            return done.wait(timeout: .now() + .seconds(seconds)) == .success ? result : nil
+        }
+    }
+
     #if canImport(Darwin)
         @Test(
             "On the phone, a file another process holds through NSFileCoordinator is waited on at most the bound: `Busy`, and the monitor keeps the shields"
@@ -327,6 +437,69 @@ struct BoundTests {
             #expect(Bell.wake(outboxAt: url, now: t0) == .retry(Bell.window(until: at(60))))
         }
     #endif
+}
+
+@Suite("The window asked of iOS's DeviceActivity center (B5b)")
+struct RegisterTests {
+    /// The center as a test holds it: the window iOS holds, and each time it was asked.
+    final class Center: BellCenter {
+        struct Refused: Error {}
+        var held: (start: DateComponents, end: DateComponents)?
+        var starts = 0
+        var stops = 0
+        var refusing = false
+
+        func heldEnd() -> DateComponents? { held?.end }
+        func start(_ start: DateComponents, _ end: DateComponents) throws {
+            if refusing { throw Refused() }
+            starts += 1
+            held = (start, end)
+        }
+        func stop() {
+            stops += 1
+            held = nil
+        }
+    }
+
+    /// A phone's calendar, away from UTC.
+    static let calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        return calendar
+    }()
+
+    @Test(
+        "A window is asked for to the second, in the phone's calendar; asked again while iOS holds it, it is not — a replacement may itself wake the monitor, and the two would never end; another end replaces it; none stops it (#91's review)"
+    )
+    func once() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center, calendar: calendar)
+        let held = try #require(center.held)
+        #expect(calendar.date(from: held.start) == bell.start)
+        #expect(calendar.date(from: held.end) == bell.end)
+        #expect(center.starts == 1)
+        try Bell.register(bell, in: center, calendar: calendar)
+        #expect(center.starts == 1)
+        let later = Bell.window(until: at(1800))
+        try Bell.register(later, in: center, calendar: calendar)
+        #expect(center.starts == 2)
+        #expect(center.held.flatMap { calendar.date(from: $0.end) } == later.end)
+        try Bell.register(nil, in: center, calendar: calendar)
+        #expect(center.stops == 1 && center.held == nil)
+    }
+
+    @Test("A window iOS refuses throws, and the one iOS held stays")
+    func refused() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center, calendar: calendar)
+        center.refusing = true
+        #expect(throws: Center.Refused.self) {
+            try Bell.register(Bell.window(until: at(1800)), in: center, calendar: calendar)
+        }
+        #expect(center.held.flatMap { calendar.date(from: $0.end) } == bell.end)
+    }
 }
 
 @Suite("The window registered, as the shields' end moves (B5b)", .timeLimit(.minutes(3)))
@@ -455,6 +628,25 @@ struct ScheduleTests {
         await phone.enforcer.check()
         await phone.until { $0.shielded }
         #expect(await phone.screenTime.registered == bell)
+        await phone.stop()
+    }
+
+    @Test(
+        "A window iOS refused the monitor, the app closed, is shown at the app's next open — the shields it kept then come off, the bell long past — until a window is registered again (#91's review)"
+    )
+    func monitorRefused() async throws {
+        let (outbox, url) = try makeOutbox()
+        try outbox.keep(.inSession(session(endsAt: -600), .focused))
+        let screenTime = FakeScreenTime()
+        await screenTime.held()
+        await screenTime.refuseMonitor(at: at(-660))
+        let phone = Enforced(try Rig(outbox: try open(url)), screenTime)
+        let opened = await phone.until { !$0.shielded && $0.permission == .approved }
+        #expect(opened.monitorUnscheduled == at(-660))
+        #expect(await screenTime.windows.isEmpty)
+        try await phone.rig.engine.record(.tap(tagId: "tag"))
+        await phone.until { $0.shielded && $0.monitorUnscheduled == nil }
+        #expect(await screenTime.registered == Bell.window(until: at(SyncState.tapCap)))
         await phone.stop()
     }
 
