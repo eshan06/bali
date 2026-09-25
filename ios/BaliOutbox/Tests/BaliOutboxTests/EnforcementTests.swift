@@ -38,6 +38,19 @@ actor FakeScreenTime: ScreenTime {
     func permission() -> Permission { granted }
     func requestPermission() { granted = .approved }
 
+    /// Each window iOS took, in order — nil for a cancel — and the one it holds now.
+    private(set) var windows: [DateInterval?] = []
+    var registered: DateInterval? { windows.last ?? nil }
+    /// Whether iOS refuses the windows asked for.
+    private var refusing = false
+    struct Refused: Error {}
+
+    func schedule(_ window: DateInterval?) throws {
+        if refusing, window != nil { throw Refused() }
+        windows.append(window)
+    }
+    func refuse(_ refusing: Bool = true) { self.refusing = refusing }
+
     /// The student changes the permission in Settings: iOS drops every shield when it goes.
     func set(_ permission: Permission) {
         granted = permission

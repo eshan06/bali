@@ -33,8 +33,12 @@ public struct Outbox: Sendable {
     /// outlive the last connection, so a process that only reads can always open it; and the setup
     /// is coordinated, so two processes never migrate at once. A file a newer build has migrated is
     /// refused, never written through a schema this one does not know. `suspends` is for the tests:
-    /// the notifications reach every database in the process.
-    init(at url: URL, random: @escaping @Sendable () -> Double, suspends: Bool) throws {
+    /// the notifications reach every database in the process. `bound` is the monitor's: the
+    /// coordinated open waits at most that long for another process, then throws `Busy`.
+    init(
+        at url: URL, random: @escaping @Sendable () -> Double, suspends: Bool,
+        within bound: TimeInterval? = nil
+    ) throws {
         var configuration = Configuration()
         configuration.busyMode = .timeout(Self.busyTimeout)
         configuration.observesSuspensionNotifications = suspends
@@ -45,7 +49,7 @@ public struct Outbox: Sendable {
                 db.sqliteConnection, nil, SQLITE_FCNTL_PERSIST_WAL, &persist)
             guard code == SQLITE_OK else { throw DatabaseError(resultCode: ResultCode(rawValue: code)) }
         }
-        pool = try Self.coordinated(url) { url in
+        pool = try Self.coordinated(url, within: bound) { [configuration] url in
             let pool = try DatabasePool(
                 path: url.path(percentEncoded: false), configuration: configuration)
             if try pool.read(Self.migrator.hasBeenSuperseded) { throw TooNew() }
@@ -57,6 +61,24 @@ public struct Outbox: Sendable {
 
     /// The file was migrated by a newer build than this one.
     public struct TooNew: Error {}
+
+    /// The file was not free within the bound: another process held it.
+    public struct Busy: Error {}
+
+    /// Where the phone stood and what it queued, as the monitor reads them (B5b): the file opened
+    /// within `bound` — never longer: iOS would kill the monitor mid-wake — read, and closed before
+    /// it returns, since iOS gives an extension no notice before it suspends it, and a lock held
+    /// then gets it killed (0xdead10cc). A standing it cannot read throws: `.unread` is the app's.
+    static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
+        let outbox = try Outbox(at: url, random: { 0 }, suspends: false, within: bound)
+        let read = Result {
+            var state = SyncState()
+            (state.queued, state.standing) = (try outbox.records(), try outbox.standing())
+            return state
+        }
+        try outbox.pool.close()
+        return try read.get()
+    }
 
     /// The app is about to be suspended: from now on no outbox in this process takes a lock — a
     /// write fails instead (`isSuspension`), and is made again once `resume()` is posted. The app
@@ -75,20 +97,75 @@ public struct Outbox: Sendable {
         (error as? DatabaseError)?.isInterruptionError == true
     }
 
-    /// `open(url)`, coordinated with every other process opening the file (Linux has no
-    /// NSFileCoordinator, and no other process).
-    static func coordinated<T>(_ url: URL, _ open: (URL) throws -> T) throws -> T {
+    /// `open(url)`, coordinated with every other process opening the file, waiting for them at most
+    /// `bound` (nil: as long as it takes). Linux has no NSFileCoordinator, and no other process.
+    static func coordinated<T>(
+        _ url: URL, within bound: TimeInterval?, _ open: @escaping @Sendable (URL) throws -> T
+    ) throws -> T {
         #if canImport(Darwin)
-            var result: Result<T, any Error>?
-            var failure: NSError?
-            NSFileCoordinator(filePresenter: nil).coordinate(
-                writingItemAt: url, options: .forMerging, error: &failure
-            ) { url in result = Result { try open(url) } }
-            guard let result else { throw failure ?? CocoaError(.fileWriteUnknown) }
-            return try result.get()
+            let coordinator = NSFileCoordinator(filePresenter: nil)
+            nonisolated(unsafe) let intent = NSFileAccessIntent.writingIntent(
+                with: url, options: .forMerging)
+            return try granted(
+                within: bound,
+                request: { coordinator.coordinate(with: [intent], queue: OperationQueue(), byAccessor: $0) },
+                cancel: coordinator.cancel
+            ) { try open(intent.url) }
         #else
             return try open(url)
         #endif
+    }
+
+    /// Runs `open` once `request` grants the access it asks for — `request` calls back when it is
+    /// granted, or with the error that ends the asking, and `open` runs inside that call, while the
+    /// access is held — waiting at most `bound` (nil: as long as it takes). Past the bound, the
+    /// asking is cancelled and `Busy` thrown, and a grant that comes after opens nothing. An open
+    /// already under way at the bound is waited for — SQLite's busy timeout bounds it — since
+    /// returning then would leave the file locked behind a process iOS may suspend.
+    static func granted<T>(
+        within bound: TimeInterval?,
+        request: (@escaping @Sendable ((any Error)?) -> Void) -> Void,
+        cancel: () -> Void,
+        open: @escaping @Sendable () throws -> T
+    ) throws -> T {
+        let access = Access<T>()
+        request { failure in
+            guard access.begin() else { return }
+            access.finish(failure.map { .failure($0) } ?? Result { try open() })
+        }
+        if let bound, access.done.wait(timeout: .now() + bound) == .timedOut {
+            if access.giveUp() {
+                cancel()
+                throw Busy()
+            }
+            return try access.outcome(waiting: true)
+        }
+        return try access.outcome(waiting: bound == nil)
+    }
+
+    /// One wait for access to the file, between the thread that asks and the one it is granted on.
+    final class Access<T>: @unchecked Sendable {
+        let done = DispatchSemaphore(value: 0)
+        private let lock = NSLock()
+        private var began = false
+        private var gaveUp = false
+        private var result: Result<T, any Error>?
+
+        /// The grant came: false once the wait was given up — nothing is opened then.
+        func begin() -> Bool { lock.withLock { began = !gaveUp; return began } }
+        /// The wait is given up: false once the open has begun, which is then waited for.
+        func giveUp() -> Bool { lock.withLock { gaveUp = !began; return gaveUp } }
+
+        func finish(_ result: Result<T, any Error>) {
+            lock.withLock { self.result = result }
+            done.signal()
+        }
+
+        /// What the open came to — once it has, when `waiting`.
+        func outcome(waiting: Bool) throws -> T {
+            if waiting { done.wait() }
+            return try lock.withLock { result! }.get()
+        }
     }
 
     #if canImport(Darwin)
