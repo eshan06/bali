@@ -535,7 +535,9 @@ public actor SyncEngine {
     /// `session` applies as unlocked while an emergency unlock the server has yet to record is
     /// queued there (`holdsUnlock`) — unless the student has returned there since: the phone stands
     /// focused there already, or the answer is to their own return made after it, by the phone's
-    /// order (`after`, that return's place in it).
+    /// order (`after`, that return's place in it). Focused already means returned since only while
+    /// every unlock takes the phone out of focus at once (`Standing.acting`) and nothing brings it
+    /// back but a refocus or an answer or a read past this guard: keep both so.
     private func keepsUnlocked(_ session: String, after: Int = 0) -> Bool {
         !state.standing.isFocused(in: session)
             && stored({ try outbox.holdsUnlock(session: session, after: after) }) ?? true

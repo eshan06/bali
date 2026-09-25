@@ -431,9 +431,10 @@ public struct Outbox: Sendable {
     @discardableResult
     static func file(_ db: Database, _ standing: Standing) throws -> Bool {
         let tap = standing.sessionId == nil ? try state(db, lastTapKey) : nil
+        // Nowhere to file it — no session named, no tap known — it matches nothing, and waits.
         try db.execute(
-            sql: "UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled)",
-            arguments: [standing.sessionId, tap])
+            sql: "UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL",
+            arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
         let filed = db.changesCount > 0
         try keep(db, standing)
         return filed

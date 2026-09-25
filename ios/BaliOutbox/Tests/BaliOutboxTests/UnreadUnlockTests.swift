@@ -201,16 +201,17 @@ struct UnreadUnlockTests {
         try outbox.keep(.inSession(session(), .focused))
         let first = try record(outbox, .unlockUnfiled(reason: .other))
         #expect(try outbox.standing() == .inSession(session(), .unlocked))
-        try outbox.file(.out)
+        #expect(try !outbox.file(.out))
         #expect(try current(outbox, first.eventId)?.change == .unlockUnfiled(reason: .other))
         let tap = try record(outbox, .tap(tagId: "tag"))
-        try outbox.file(.waiting)
+        #expect(try outbox.file(.waiting))
         #expect(
             try current(outbox, first.eventId)?.change
                 == .unlockUnderTap(tap: tap.eventId, reason: .other))
         #expect(try outbox.standing() == .waiting)
+        #expect(try !outbox.file(.waiting))
         let second = try record(outbox, .unlockUnfiled(reason: nil))
-        try outbox.file(.inSession(session(), .unlocked))
+        #expect(try outbox.file(.inSession(session(), .unlocked)))
         #expect(try current(outbox, second.eventId)?.change == .unlock(session: "s", reason: nil))
         #expect(try outbox.standing() == .inSession(session(), .unlocked))
     }
