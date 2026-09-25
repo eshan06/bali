@@ -92,7 +92,33 @@ async function seed(tag: string) {
       .returning(),
   );
   await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
-  return { classId: klass.id, studentId: student.id };
+  return { classId: klass.id, studentId: student.id, teacherId: teacher.id };
+}
+
+/**
+ * A student in three teachers' classes (A14): A and B running, Y not started,
+ * so a tap of Y's block waits for its Start.
+ */
+async function rooms(tag: string) {
+  const a = await seed(`${tag}-a`);
+  const b = await seed(`${tag}-b`);
+  const y = await seed(`${tag}-y`);
+  await db.insert(enrollments).values([
+    { classId: b.classId, studentId: a.studentId },
+    { classId: y.classId, studentId: a.studentId },
+  ]);
+  const [sa, sb] = [await openSession(a.classId), await openSession(b.classId)];
+  return { studentId: a.studentId, sa, sb, y };
+}
+
+/** A tap into `sessionId`, the phone's order on it. */
+function aTap(
+  sessionId: string,
+  studentId: string,
+  deviceTime: Date,
+  order: { install: string; seq: number },
+) {
+  return { sessionId, studentId, eventId: newUuidV7(), deviceTime, order };
 }
 
 /** Open a session on the class. `due` puts its window in the past so the sweep ends it. */
@@ -117,6 +143,18 @@ function liveParticipations(sessionId: string) {
     .select()
     .from(participations)
     .where(and(eq(participations.sessionId, sessionId), isNull(participations.endedAt)));
+}
+
+/** A student's live participations, wherever they are. */
+function liveOf(studentId: string) {
+  return db
+    .select()
+    .from(participations)
+    .where(and(eq(participations.studentId, studentId), isNull(participations.endedAt)));
+}
+
+async function eventOf(eventId: string) {
+  return one(await db.select().from(events).where(eq(events.eventId, eventId)));
 }
 
 describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
@@ -478,6 +516,140 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       }
     }
   }, 120_000);
+
+  it('a tap older than one into another class, racing it, ends in the later one’s class (A14)', async () => {
+    // Into A (#1), the request slow, then into B (#2). Each takes the
+    // student's lock before its session's and judges late under it. B's
+    // first: A's is recorded, never applied. A's first: it joins A, and B's
+    // then switches. In B either way, and each tap recorded once.
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    const install = newUuidV7();
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, sa, sb } = await rooms(`race-a14-${round}`);
+      const older = aTap(sa.id, studentId, ago(20), { install, seq: 1 });
+      const newer = aTap(sb.id, studentId, ago(10), { install, seq: 2 });
+      // Each round gives one side a head start, so both orders get exercised.
+      const later = (fn: () => Promise<unknown>) =>
+        new Promise((resolve) => setTimeout(resolve, 10)).then(fn);
+      const [olderTap, newerTap] = await Promise.allSettled([
+        round % 2 === 1 ? later(() => tapIn(db, older)) : tapIn(db, older),
+        round % 2 === 0 ? later(() => tapIn(db, newer)) : tapIn(db, newer),
+      ]);
+      if (olderTap.status === 'rejected') throw olderTap.reason;
+      if (newerTap.status === 'rejected') throw newerTap.reason;
+
+      expect(one(await liveOf(studentId)).sessionId).toBe(sb.id);
+      const [olderEvent, newerEvent] = [await eventOf(older.eventId), await eventOf(newer.eventId)];
+      if (newerEvent.seq < olderEvent.seq) {
+        expect(olderTap.value).toMatchObject({ outcome: 'replay', session: null });
+        expect(olderEvent.payload).toEqual({ recorded_as: 'superseded' });
+      } else {
+        expect(olderTap.value).toMatchObject({ outcome: 'joined' });
+        expect(newerTap.value).toMatchObject({ outcome: 'switched' });
+      }
+    }
+  }, 120_000);
+
+  it('a tap that judged itself before a later one committed never switches the student back after it (A14)', async () => {
+    // The interleaving `lockStudentTaps` exists for, staged: the older tap
+    // judges itself not late, then parks — a holder owns its id on the events
+    // index — while the later tap runs. Without the lock the later tap
+    // commits the student into B, and the older one then switches them back
+    // to A. With it the later tap waits, and switches them to B last.
+    const { studentId, sa, sb } = await rooms('race-a14-staged');
+    const install = newUuidV7();
+    const ago = (seconds: number) => new Date(Date.now() - seconds * 1000);
+    const older = aTap(sa.id, studentId, ago(20), { install, seq: 1 });
+    const newer = aTap(sb.id, studentId, ago(10), { install, seq: 2 });
+    const [parked, raced] = await behindHolder(
+      older.eventId,
+      studentId,
+      () => tapIn(db, older),
+      () => tapIn(db, newer),
+    );
+
+    expect(parked).toMatchObject({ outcome: 'joined', session: { id: sa.id } });
+    expect(raced).toMatchObject({ outcome: 'switched', session: { id: sb.id } });
+    expect(one(await liveOf(studentId)).sessionId).toBe(sb.id);
+  }, 20_000);
+
+  it('a waiting tap older than a tap into another class, racing its Start, ends in the later one’s class (A14)', async () => {
+    // Y's block (#1), waiting; into B (#2). The Start takes the student's
+    // lock before it judges the waiting tap: the tap first, and the Start
+    // declines it; the Start first, and it converts it — then the tap, after
+    // it by the order, switches the student to B.
+    const install = newUuidV7();
+    for (let round = 0; round < 12; round += 1) {
+      const { studentId, sb, y } = await rooms(`race-a14-start-${round}`);
+      const armed = newUuidV7();
+      await armTap(db, {
+        studentId,
+        teacherId: y.teacherId,
+        eventId: armed,
+        deviceTime: new Date(Date.now() - 20_000),
+        order: { install, seq: 1 },
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+      const newer = aTap(sb.id, studentId, new Date(), { install, seq: 2 });
+      const start = () =>
+        startSession(db, {
+          classId: y.classId,
+          startedAt: new Date(Date.now() - 1000),
+          endsAt: new Date(Date.now() + 25 * 60_000),
+        });
+      const later = (fn: () => Promise<unknown>) =>
+        new Promise((resolve) => setTimeout(resolve, 10)).then(fn);
+      const [started, tapped] = await Promise.allSettled([
+        round % 2 === 1 ? later(start) : start(),
+        round % 2 === 0 ? later(() => tapIn(db, newer)) : tapIn(db, newer),
+      ]);
+      if (started.status === 'rejected') throw started.reason;
+      if (tapped.status === 'rejected') throw tapped.reason;
+
+      expect(one(await liveOf(studentId)).sessionId).toBe(sb.id);
+      const converted = await eventOf(armed);
+      if (converted.seq > (await eventOf(newer.eventId)).seq) {
+        expect(converted.payload).toEqual({ recorded_as: 'superseded' });
+      } else {
+        expect(converted.payload).toBeNull();
+        expect(tapped.value).toMatchObject({ outcome: 'switched' });
+      }
+    }
+  }, 120_000);
+
+  it('a Start that judged its waiting tap before a later tap committed never switches the student back (A14)', async () => {
+    // The same interleaving at a Start: it judges the waiting tap not late,
+    // then parks on its `tap_in` — a holder owns the tap's id — while the
+    // later tap runs. Without the Start's lock the tap commits the student
+    // into B, and the conversion then switches them back into Y's session.
+    const { studentId, sb, y } = await rooms('race-a14-start-staged');
+    const install = newUuidV7();
+    const armed = newUuidV7();
+    await armTap(db, {
+      studentId,
+      teacherId: y.teacherId,
+      eventId: armed,
+      deviceTime: new Date(Date.now() - 20_000),
+      order: { install, seq: 1 },
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    const newer = aTap(sb.id, studentId, new Date(), { install, seq: 2 });
+    const [started, tapped] = await behindHolder(
+      armed,
+      studentId,
+      () =>
+        startSession(db, {
+          classId: y.classId,
+          startedAt: new Date(Date.now() - 1000),
+          endsAt: new Date(Date.now() + 25 * 60_000),
+        }),
+      () => tapIn(db, newer),
+    );
+
+    expect(started).toMatchObject({ outcome: 'created', armedConverted: 1 });
+    expect(tapped).toMatchObject({ outcome: 'switched', session: { id: sb.id } });
+    expect(one(await liveOf(studentId)).sessionId).toBe(sb.id);
+  }, 20_000);
 
   it('an unlock sent under a tap racing that tap ends unlocked, filed once, whichever lands first (decision 11)', async () => {
     // The phone sends in order, but a tap stuck at its retry bound steps aside
@@ -1625,6 +1797,67 @@ async function waitForBackendOnArmedTaps(timeoutMs = 1_500): Promise<void> {
  * naming nothing — before the gate could throw the error that says what went
  * wrong. Measured, with the gate forced to miss.
  */
+/**
+ * Stage the interleaving a student's lock exists for (A14): a holder owns
+ * `eventId` on the events index, so `parkFirst`, which records it, parks there
+ * after its judgment; `thenRace` runs meanwhile and parks behind the student's
+ * lock — or, without the lock, finishes first. Then the holder rolls back.
+ * Returns both answers.
+ */
+async function behindHolder<P, R>(
+  eventId: string,
+  userId: string,
+  parkFirst: () => Promise<P>,
+  thenRace: () => Promise<R>,
+): Promise<[P, R]> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let inserted!: () => void;
+  const hasRow = new Promise<void>((resolve) => {
+    inserted = resolve;
+  });
+  const holder = db
+    .transaction(async (tx) => {
+      await tx.insert(events).values({ eventId, type: 'unlock', userId, occurredAt: new Date() });
+      inserted();
+      await held;
+      throw new Error('rolled back on purpose');
+    })
+    .catch(() => undefined);
+  await hasRow;
+
+  const parked = parkFirst();
+  let racing: Promise<R> | undefined;
+  let unstaged: Error | null = null;
+  try {
+    await waitForBlockedBackend();
+    racing = thenRace();
+    // Wait for it to park behind the lock, or — without one — to finish.
+    let done = false;
+    const finish = () => {
+      done = true;
+    };
+    racing.then(finish, finish);
+    const deadline = Date.now() + 5_000;
+    while (!done && (await lockWaiters()) < 2 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  } catch (err) {
+    unstaged = err instanceof Error ? err : new Error(String(err));
+  } finally {
+    release();
+  }
+  await holder;
+  const settled = await Promise.allSettled([parked, racing ?? Promise.resolve(undefined)]);
+  if (unstaged !== null) throw unstaged;
+  const [first, second] = settled;
+  if (first.status === 'rejected') throw first.reason as Error;
+  if (second.status === 'rejected') throw second.reason as Error;
+  return [first.value, second.value as R];
+}
+
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
