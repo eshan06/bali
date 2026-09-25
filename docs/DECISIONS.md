@@ -30,8 +30,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   zone, so its 24-Hour Time setting holds: "9:42 AM" on a 12-hour phone, "09:42" on a 24-hour one,
   each locale's own form elsewhere. D1's Shield artboard writes "until 10:45", its Focus screen
   "until 10:45 AM": a 12-hour phone keeps the marker, as the Focus screen does, since dropping it
-  takes an hour-and-minute pattern of our own, which the locale no longer decides (ICU's `J`
-  skeleton writes a US phone's morning "05:13" on Linux). **The look — D1's approved Shield
+  takes a form of our own the locale no longer fully decides (Foundation's hour with the marker
+  omitted wrote a US phone's morning "05:13" on Linux). **The look — D1's approved Shield
   artboard, mapped onto what `ShieldConfiguration` takes** (a background blur style and colour, an
   icon, a title and a subtitle with their colours, two buttons' labels): stone-50 (#F7F5F2) over a
   light material (`.systemThickMaterialLight`), so a phone in dark mode never shows iOS's dark
@@ -56,7 +56,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   bell moves — a follow-up, not guessed at here. (2) The extension's memory with GRDB linked in, as
   B5b disclosed for the monitor: one killed for it shows iOS's default shield, which round 3 would
   show. (3) How iOS draws the icon (its size, any tint) and whether it draws the colour opaque over
-  the material: round 3 shows the look; the asset itself is pinned on the simulator. **Tests:**
+  the material: round 3 shows the look; the asset itself is pinned on the simulator. (4) The read
+  runs inside iOS's call for the configuration and may take up to the 2 s bound when another
+  process holds the file: whether iOS waits that long is not documented — if it does not, it
+  shows its default shield, which is safe and which round 3 would show. **Tests:**
   `ShieldWordsTests` (Linux and the iOS Simulator) — the bell on a US phone at 12 hours, the same
   phone at 24 and a British one, another time zone, an afternoon bell; a tap not yet answered —
   standing out, focused or unlocked — to its cap and the device check's; a tap the student
@@ -66,7 +69,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ships the mark, 64 × 64 and rendered as original, drawn as D1 has it — the arc at the right, the
   bottom and the lower left, the track in its gap at the upper left, nothing at its centre.
   Of 12 mutations of the rules — the words' and `tapHeldUntil`'s, each taken alone — all 12 turn
-  a test red.
+  a test red. **Santa** (two Claude reviewers, both the fallback — no other model's CLI here;
+  round 1): no blockers; the easy WARNs fixed — round 3's step 1 in PLAN worded as a question,
+  not a result; "never a wrong time" claimed as "never a time it cannot know", since iOS may
+  keep a shield's words; and the 2 s read inside iOS's call disclosed, (4) above.
 - **2026-09-25** — **B5b-2: B5b's app-side riders — the app's test target and the config pin —
   and #91's review: the app's open never waits with no end and opens the file once, a wake iOS
   refuses the monitor is shown, the monitor's whole open and read are bounded, no cap ends the
