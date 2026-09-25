@@ -450,7 +450,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         const theUnlock = () => unlock(db, newer);
         // Each round gives one side a head start, so both orders get exercised:
         // left alone, the unlock nearly always wins a tap, which locks its id first.
-        const later = <T>(fn: () => Promise<T>) =>
+        const later = (fn: () => Promise<unknown>) =>
           new Promise((resolve) => setTimeout(resolve, 10)).then(fn);
         const [returned, unlocked] = await Promise.allSettled([
           round % 2 === 1 ? later(theReturn) : theReturn(),

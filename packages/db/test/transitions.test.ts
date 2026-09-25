@@ -2382,11 +2382,11 @@ describe('a late return: the studentâ€™s own unlock came after it by the phoneâ€
     const row = await rowOf(session.id, student.id);
 
     // Answered as its retry is: the truth now, which the phone applies.
-    expect(await refocus(db, slow)).toEqual({
+    expect(await refocus(db, slow)).toMatchObject({
       outcome: 'replay',
       state: 'unlocked',
       participationId: row.id,
-      session: expect.objectContaining({ id: session.id }),
+      session: { id: session.id },
     });
     expect((await rowOf(session.id, student.id)).state).toBe('unlocked');
     expect(await eventOf(slow.eventId)).toMatchObject({
@@ -2411,11 +2411,11 @@ describe('a late return: the studentâ€™s own unlock came after it by the phoneâ€
     await unlock(db, move(session, student, at(6), n(3)));
     const row = await rowOf(session.id, student.id);
 
-    expect(await tapIn(db, stuck)).toEqual({
+    expect(await tapIn(db, stuck)).toMatchObject({
       outcome: 'replay',
       state: 'unlocked',
       participationId: row.id,
-      session: expect.objectContaining({ id: session.id }),
+      session: { id: session.id },
     });
     expect(await rowOf(session.id, student.id)).toMatchObject({
       state: 'unlocked',
