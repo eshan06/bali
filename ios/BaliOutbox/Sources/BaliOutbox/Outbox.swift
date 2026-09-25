@@ -128,11 +128,12 @@ public struct Outbox: Sendable {
         return migrator
     }
 
-    /// The session protection off was last reported for, the latest unlock's id, and the file's
-    /// install.
+    /// The session protection off was last reported for, the latest unlock's id, the file's
+    /// install, and the phone's standing.
     static let reportedKey = "protectionOffReported"
     static let lastUnlockKey = "lastUnlock"
     static let installKey = "install"
+    static let standingKey = "standing"
 
     /// Every record's row, with its file's install: what each request's order is made of.
     static let selection = """
@@ -183,9 +184,24 @@ public struct Outbox: Sendable {
         }
     }
 
-    /// The Screen Time permission is back: a later revocation is a new one, reported again.
+    /// A later revocation is a new one, reported again: the Screen Time permission is back, or the
+    /// phone's row is focused again (`SyncEngine.record`, A13).
     public func protectionRestored() throws {
         try pool.write { try Self.setState($0, Self.reportedKey, nil) }
+    }
+
+    /// Where the phone stood when the sync engine last said, for the app's next launch and the
+    /// extensions (B5); `.out` when it never said.
+    public func standing() throws -> Standing {
+        try pool.read { db in
+            guard let kept = try Self.state(db, Self.standingKey) else { return .out }
+            return try BaliJSON.makeDecoder().decode(Standing.self, from: Data(kept.utf8))
+        }
+    }
+
+    func keep(_ standing: Standing) throws {
+        let kept = String(decoding: try BaliJSON.makeEncoder().encode(standing), as: UTF8.self)
+        try pool.write { try Self.setState($0, Self.standingKey, kept) }
     }
 
     public enum Due: Sendable, Hashable {

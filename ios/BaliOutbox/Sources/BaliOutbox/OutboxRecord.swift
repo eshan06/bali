@@ -186,8 +186,8 @@ public enum Disposition: Sendable, Hashable {
 /// Event ids as the API's are written: a lower-case UUIDv7, minted by the phone when it acts,
 /// offline too — the Unix time in milliseconds, then random bits (ARCHITECTURE, data model,
 /// decision 2). Foundation's `UUID` is a v4.
-enum EventID {
-    static func mint(at now: Date) -> String {
+public enum EventID {
+    public static func mint(at now: Date) -> String {
         var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max) }
         let milliseconds = UInt64(max(0, now.timeIntervalSince1970 * 1000))
         for index in 0..<6 {
