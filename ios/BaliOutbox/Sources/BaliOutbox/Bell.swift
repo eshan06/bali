@@ -8,9 +8,10 @@ import Foundation
 public enum Bell {
     /// iOS's floor: no DeviceActivity interval is shorter.
     public static let floor: TimeInterval = 15 * 60
-    /// How long the monitor's whole open and read of the outbox file may wait for another process
-    /// — its coordinated open, and SQLite's locks — before it gives up and keeps the shields: never
-    /// so long that iOS kills it mid-wake.
+    /// How long the extensions' whole read of the outbox file may take — its coordinated open,
+    /// SQLite's locks, an open still under way: a ceiling (`Outbox.read`) — before the monitor
+    /// gives up and keeps the shields, and the shield says Bali's name alone: never so long that
+    /// iOS kills the monitor mid-wake.
     public static let patience: TimeInterval = 2
     /// The least the monitor waits for its next wake: to read a file it could not, or for shields
     /// still owed at a wake that came early.

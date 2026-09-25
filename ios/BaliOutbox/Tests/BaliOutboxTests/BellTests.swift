@@ -355,7 +355,8 @@ struct BoundTests {
         release.signal()
         #expect(throws: Outbox.Busy.self) { try #require(result, "waited with no end").get() }
         // The open, let go, ends on its own thread: nothing waits for it, nothing takes its value.
-        #expect(ended.wait(timeout: .now() + .seconds(Int(patience.components.seconds))) == .success)
+        let seconds = Int(patience.components.seconds)
+        #expect(ended.wait(timeout: .now() + .seconds(seconds)) == .success)
     }
 
     @Test("Unbounded — the app's own open — it waits as long as the file takes")

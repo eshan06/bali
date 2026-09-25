@@ -84,7 +84,8 @@ struct ExtensionReadTests {
         let bound = TimeInterval(patience.components.seconds)
         let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
         #expect(words.title == "Focused with Bali")
-        #expect(Bell.wake(outboxAt: url, now: t0, within: bound) == .retry(Bell.window(until: at(60))))
+        let wake = Bell.wake(outboxAt: url, now: t0, within: bound)
+        #expect(wake == .retry(Bell.window(until: at(60))))
         #expect(bytes(url) == nil && bytes(url, "-wal") == nil)
     }
 

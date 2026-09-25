@@ -3,9 +3,9 @@ import Foundation
 /// What Bali's own shield over a blocked app or website says (B5c): D1's approved words, from where
 /// the phone stands. The shield extension (`ios/BaliShield`) draws them in D1's look; iOS runs it
 /// out of process, as it runs the monitor, so it reads the standing and the queue the app keeps in
-/// the app group as the monitor does (`Bell.wake`): the whole open and read within `Bell.patience`,
-/// SQLite's locks included, and the file closed before it returns. What it cannot read, it gives no
-/// time for — never a wrong one.
+/// the app group as the monitor does (`Outbox.read`): read only — a student opens blocked apps many
+/// times a minute — all of it within `Bell.patience`, a ceiling, and the file closed before it
+/// returns. What it cannot read, it gives no time for — never a wrong one.
 public struct ShieldWords: Sendable, Hashable {
     public let title: String
     public let subtitle: String

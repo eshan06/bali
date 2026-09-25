@@ -84,15 +84,15 @@ public struct Outbox: Sendable {
     /// within `bound`, a ceiling: the coordinated open, SQLite's locks and an open under way (then
     /// `Busy`, or SQLite's busy error). Never longer: iOS waits on the shield, and would kill the
     /// monitor mid-wake. Read only: a reading coordination, which never holds up another reader,
-    /// and a read-only connection, which takes no write lock and writes nothing to the file — no
-    /// migration, no checkpoint as it closes, and no file where there is none. It needs the WAL
-    /// files, which the app keeps (persistent WAL), or else makes where the app group lets it. The
-    /// file is closed before this returns, since iOS gives an extension no notice before it
-    /// suspends it, and a lock held then gets it killed (0xdead10cc). A file a newer build migrated
-    /// throws (`TooNew`); one this build has yet to migrate — the app not opened since an update —
-    /// is migrated here, once, as the app's open would, within the same bound: the bell still
-    /// clears the shields, and the shield still says when. A standing it cannot read throws:
-    /// `.unread` is the app's.
+    /// and a read-only connection, which begins no write transaction and writes nothing to the file
+    /// or its WAL — no migration, no checkpoint as it closes, and no file where there is none. It
+    /// needs the WAL files, which the app keeps (persistent WAL), or else makes where the app group
+    /// lets it. The file is closed before this returns, since iOS gives an extension no notice
+    /// before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a newer
+    /// build migrated throws (`TooNew`); one this build has yet to migrate — the app not opened
+    /// since an update — is migrated here, once, as the app's open would, within the same bound:
+    /// the bell still clears the shields, and the shield still says when. A standing it cannot
+    /// read throws: `.unread` is the app's.
     static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
@@ -113,7 +113,9 @@ public struct Outbox: Sendable {
     /// read only, or migrating first what this build has yet to — whose every wait on another
     /// process ends by `deadline` (a pool's readers would each wait GRDB's own 10 s instead), and
     /// which is closed before this returns.
-    static func kept(in url: URL, readonly: Bool, until deadline: DispatchTime) throws -> SyncState {
+    static func kept(in url: URL, readonly: Bool, until deadline: DispatchTime) throws
+        -> SyncState
+    {
         let file = try DatabaseQueue(
             path: url.path(percentEncoded: false),
             configuration: configuration(readonly: readonly, until: deadline))
