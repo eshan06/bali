@@ -516,6 +516,28 @@ struct BoundTests {
                 try Outbox.read(url, within: bound, migrating: false).standing
                     == .inSession(session(endsAt: 1200), .focused))
         }
+
+        @Test(
+            "On the phone, an open that writes — the monitor's migration — granted through NSFileCoordinator and still under way at the bound, is waited out (#97's review)"
+        )
+        func writerWaitedOut() throws {
+            let (_, url) = try makeOutbox()
+            let began = Returned<Bool>()
+            // Far enough off for the coordinator to grant the open first; the open outlasts it.
+            let deadline = DispatchTime.now() + 1
+            let result = Result {
+                try Outbox.coordinated(url, reading: false, until: deadline) { _ in
+                    began.result = .success(true)
+                    let done = deadline + 0.5
+                    while DispatchTime.now() < done { Thread.sleep(forTimeInterval: 0.01) }
+                    return 7
+                }
+            }
+            // Granted only past the bound — a stall of the simulator's — the open never ran:
+            // nothing to tell.
+            guard began.result != nil else { return }
+            #expect(try result.get() == 7)
+        }
     #endif
 }
 

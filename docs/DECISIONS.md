@@ -57,24 +57,32 @@ a real decision? Add a dated entry at the top: what was decided and why.
   nothing stopped one being added inside it. Now the answer is the UPDATE's own — `RETURNING
   eventId`, the rows it filed, in SQLite since 3.35 and so on every iOS the app runs on (GRDB gates
   it at iOS 15) — and B6c's claim is corrected. **Tests** (Linux and the iOS Simulator, but
-  `closeFails`, Linux only): `BoundTests.waitedOut` — a writing open under way at the bound is
-  waited out and its outcome returned, where B6c's ceiling threw `Busy` (the open's own work
-  outlasts the bound whatever the wait does, so no timing decides the pass); `underWay`, unchanged,
-  still has any other open given up on; `ExtensionReadTests.older` — the shield leaves an older file
-  as it is, saying "Focused with Bali", the monitor migrates it and clears the shields, and the
-  shield then says the bell, read only; `olderCutOff` — the migration a write of the app's holds off
-  fails at the bound and rolls back, then migrates at the next wake (its comment corrected: it no
-  longer runs on); `closeFails`. Red on `main`'s behaviour first: `waitedOut`, `older` and
-  `closeFails`. Of 8 mutations — the writing open given up on too; every open under way waited out;
-  the shield migrating; the read migrating whatever it is told; the monitor never migrating; a close
-  that fails discarding the read; the filing answer always yes, or always no — each taken alone, all
-  8 turn a test red. **Not covered, disclosed:** (1) which opens are waited out — `coordinated`
-  hands `granted` `waitsOut: !reading` — is Darwin-only (Linux has no coordinator to wait on), so
-  that wiring runs under no mutation; (2) a kill during the read for anything but a held lock — the
-  monitor's memory, say — still loses the next wake, as before (the backup window above would cover
-  it); (3) the read-only probe, given up on at the bound, may hold a read lock a few milliseconds
-  past the answer — no write lock, which is what GRDB's 0xdead10cc measures guard, in the processes
-  that write. **Santa:** SANTA_PENDING.
+  `closeFails`, Linux only, and `writerWaitedOut`, the simulator only): `BoundTests.waitedOut` — a
+  writing open under way at the bound is waited out and its outcome returned, where B6c's ceiling
+  threw `Busy` (the open's own work outlasts the bound whatever the wait does, so no timing decides
+  the pass); `underWay`, unchanged, still has any other open given up on; `writerWaitedOut` — the
+  same through NSFileCoordinator: a writing coordination's open, under way at the bound, waited out
+  (granted only past the bound, the open never runs, and there is nothing to tell);
+  `ExtensionReadTests.older` — the shield leaves an older file as it is, saying "Focused with Bali",
+  the monitor migrates it and clears the shields, and the shield then says the bell, read only;
+  `olderCutOff` — the migration a write of the app's holds off fails at the bound and rolls back,
+  then migrates at the next wake (its comment corrected: it no longer runs on); `closeFails`. Red on
+  `main`'s behaviour first: `waitedOut`, `older` and `closeFails`. Of 8 mutations — the writing open
+  given up on too; every open under way waited out; the shield migrating; the read migrating
+  whatever it is told; the monitor never migrating; a close that fails discarding the read; the
+  filing answer always yes, or always no — each taken alone, all 8 turn a test red. **Not covered,
+  disclosed:** (1) which opens are waited out — `coordinated` hands `granted` `waitsOut: !reading` —
+  is Darwin-only (Linux has no coordinator to wait on): `writerWaitedOut` pins the writer's on the
+  simulator, where no mutation runs, and no test pins the reader's, which a test could only read by
+  timing; (2) a kill during the read for anything but a held lock — the monitor's memory, say —
+  still loses the next wake, as before (the backup window above would cover it); (3) the read-only
+  probe, given up on at the bound, may hold a read lock a few milliseconds past the answer — no
+  write lock, which is what GRDB's 0xdead10cc measures guard, in the processes that write. **Santa**
+  (two Claude reviewers, both the fallback — no other model's CLI here): round 1 ran on the retry
+  asked for first — no blockers, and its WARNs went with it — and again on the change as built: no
+  blockers. Fixed here, their WARNs: the writer's wiring pinned on the simulator
+  (`writerWaitedOut`), and the migrator's comment says its migrations must stay cheap, since the
+  monitor waits one out past the ceiling.
 - **2026-09-25** — **B6c: the extensions' read, read only and within a hard 2 s ceiling; a file this
   build has yet to migrate is migrated where it is read; the monitor's refusal bookkeeping in
   `Bell`, tested on Linux (#93's Claude Review, comment 5833779234; #92's review).** **The read,

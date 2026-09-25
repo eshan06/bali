@@ -280,6 +280,10 @@ public struct Outbox: Sendable {
         }
     #endif
 
+    /// The file's schema, migration by migration. Each may run in the monitor extension, after an
+    /// update, waited out past its 2 s ceiling once it holds the write lock (`granted`, B6c-2): so
+    /// each must stay cheap — the outbox is a queue of the few records not yet answered, and a
+    /// migration rewrites nothing larger.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         // Records go in `seq` order; `outboxState` holds the rules' own state.
