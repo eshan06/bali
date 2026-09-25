@@ -71,7 +71,8 @@ struct WakeTests {
     func bound() throws {
         // The bell a second, twenty seconds and fifty-nine past a whole minute (`t0` is 20 past).
         for bell in [at(1181), at(1200), at(1239)] {
-            let state = try kept(.inSession(SessionView(id: "s", classId: "c", endsAt: bell), .focused))
+            let state = try kept(
+                .inSession(SessionView(id: "s", classId: "c", endsAt: bell), .focused))
             let end = Bell.window(until: bell).end
             #expect(end >= bell && end.timeIntervalSince(bell) < 60, "\(bell)")
             #expect(wake(state, at: end) == .clear, "\(bell)")
@@ -235,7 +236,8 @@ struct MonitorFileTests {
             }
             defer { released.wait() }
             #expect(
-                Bell.wake(outboxAt: url, now: t0, within: 0.5) == .retry(Bell.window(until: at(60))))
+                Bell.wake(outboxAt: url, now: t0, within: 0.5) == .retry(Bell.window(until: at(60)))
+            )
         }
     #endif
 }
@@ -365,7 +367,8 @@ struct BoundTests {
         // On a thread of its own, so that a wait with no end fails the test rather than hang it.
         Thread.detachNewThread {
             opened.result = Result {
-                try Outbox.granted(within: nil, request: { _, over in over(nil) }, cancel: {}) { _ in 7 }
+                try Outbox.granted(
+                    within: nil, request: { _, over in over(nil) }, cancel: {}, open: { _ in 7 })
             }
         }
         let result = try #require(opened.wait(), "the open never returned")

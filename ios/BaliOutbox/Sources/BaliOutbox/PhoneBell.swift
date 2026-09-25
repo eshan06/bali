@@ -23,7 +23,8 @@
         public func start(_ start: DateComponents, _ end: DateComponents) throws {
             try startMonitoring(
                 .bali,
-                during: DeviceActivitySchedule(intervalStart: start, intervalEnd: end, repeats: false))
+                during: DeviceActivitySchedule(
+                    intervalStart: start, intervalEnd: end, repeats: false))
         }
 
         public func stop() { stopMonitoring([.bali]) }
