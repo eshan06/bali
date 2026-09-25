@@ -160,6 +160,11 @@ struct SignInTests {
                 + "&redirect_uri=bali%3A%2F%2Fauth%2Fcallback&scope=openid%20email%20profile"
                 + "&state=st&code_challenge=\(rfcChallenge)&code_challenge_method=S256")
         #expect(!url.absoluteString.contains(rfcVerifier))
+        // A domain set with a trailing slash names the same endpoints.
+        let slashed = Cognito(
+            domain: try #require(URL(string: "https://bali-dev.auth.us-east-1.amazoncognito.com/")),
+            clientId: "phone-client", redirectURI: cognito.redirectURI)
+        #expect(slashed.endpoint("oauth2/token") == tokenEndpoint)
     }
 
     @Test("the answer's code is taken only at the redirect URI, for this attempt, with no error")
@@ -203,6 +208,7 @@ struct SignInTests {
         let sent = try #require(await endpoint.sent.first)
         #expect(await endpoint.sent.count == 1)
         #expect(sent.httpMethod == "POST" && sent.url?.absoluteString == tokenEndpoint)
+        #expect(sent.timeoutInterval == APIClient.requestTimeout)  // no answer in time is no answer
         #expect(
             sent.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
         #expect(sent.value(forHTTPHeaderField: "Authorization") == nil)
@@ -457,6 +463,24 @@ struct TokenTests {
         #expect(a == jwt("a2") && b == jwt("a2") && c)
         #expect(await endpoint.sent == 1)
         #expect(await told.count == 1)
+    }
+
+    @Test("a renewal the engine's refresh started is shared too, and the engine is not told of it")
+    func sharedFromRefresh() async throws {
+        let endpoint = HeldEndpoint()
+        let told = Told()
+        let signIn = await signIn(try .holding(jwt("a1")), endpoint, told: told)
+
+        let refreshing = Task { await signIn.refresh() }
+        try await eventually { await endpoint.sent == 1 }
+        let asking = Task { await signIn.accessToken() }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await endpoint.sent == 1)
+        await endpoint.answer(200, granted(jwt("a2")))
+        let (fresh, given) = (await refreshing.value, await asking.value)
+        #expect(fresh && given == jwt("a2"))
+        #expect(await endpoint.sent == 1)
+        #expect(await told.count == 0)  // refresh's true: the engine sends everything again itself
     }
 
     @Test("a Keychain that cannot be read right now is never a sign-out")

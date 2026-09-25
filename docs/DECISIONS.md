@@ -55,9 +55,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   were the client to rotate refresh tokens, the second spend would be refused `invalid_grant`,
   a sign-out we caused. A rotated refresh token replaces the one kept, and one the Keychain
   cannot take right then (the phone locked mid-renewal) is saved again at the next ask, since
-  the old one stops working and the new one is nowhere else. An answer about a refresh token
-  the phone let go while it ran (signed out, or in again) is dropped, so a stale no never signs
-  a new sign-in out. The dev client does not rotate; none of this depends on it. **B4's
+  the old one stops working and the new one is nowhere else — lost only if iOS ends the app
+  before that ask, and then the next launch's renewal is refused: a sign-out, the one case a
+  rotating client would add. An answer about a refresh token the phone let go while it ran
+  (signed out, or in again) is dropped, so a stale no never signs a new sign-in out. The dev
+  client does not rotate — so turning rotation on (Phase 5's production client, say) should
+  weigh that case. **B4's
   contract with the engine, kept:** `accessToken()` never gives a token it knows has expired or
   the API refused; `refresh()` never waits on the student — false at once when nobody is
   signed in — and is true once a fresh token is ready; and every token but `refresh`'s (a
@@ -71,10 +74,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sign-ins that do not finish, or whose tokens the Keychain refuses, keeping nothing; the token
   given until the margin whatever the phone's clock; renewal, the engine told; rotation, and a
   rotated token saved after a locked Keychain; `invalid_grant` signing out, and eight other
-  answers keeping the tokens; the engine's `refresh`; one renewal shared; a locked Keychain
-  never a sign-out; signing out; a sign-out, and a sign-in, while a renewal runs; an unreadable
-  lifetime; and `cognito` read from another module. Twenty-two mutations of `SignIn` —
-  nineteen when it was written, three in review — each turn a test red. Not in them:
+  answers keeping the tokens; the engine's `refresh`; one renewal shared, whoever starts it; a
+  locked Keychain never a sign-out; signing out; a sign-out, and a sign-in, while a renewal
+  runs; an unreadable lifetime; and `cognito` read from another module. Every mutation of
+  `SignIn`'s rules tried in review turns a test red (listed in its PR). Not in them:
   `KeychainTokenStore` itself. A package's test process carries no entitlement, and the
   Keychain refuses it (`errSecMissingEntitlement`, -34018), so its first run is the app's (B4c).
 - **2026-09-24** — **B4a: the API accepts a list of app client ids, and B4 ships in three.**
