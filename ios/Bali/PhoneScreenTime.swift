@@ -1,10 +1,12 @@
 import BaliOutbox
 @preconcurrency import FamilyControls
+import Foundation
 @preconcurrency import ManagedSettings
 
 /// Screen Time on this phone (B5), for the enforcer: the app's one `ManagedSettingsStore`, named so
-/// the extensions open the same store, and Family Controls' `.individual` authorization. Thin on
-/// purpose: what to shield, and when, is `Enforcer`'s, tested on Linux.
+/// the extensions open the same store, Family Controls' `.individual` authorization, and the
+/// DeviceActivity window that wakes the monitor (B5b). Thin on purpose: what to shield, and when,
+/// is `Enforcer`'s, tested on Linux.
 @MainActor
 final class PhoneScreenTime: ScreenTime {
     private let store = ManagedSettingsStore(named: .bali)
@@ -36,9 +38,6 @@ final class PhoneScreenTime: ScreenTime {
     func requestPermission() async throws {
         try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
     }
-}
 
-extension ManagedSettingsStore.Name {
-    /// The app's one store: the extensions open it by this name.
-    static let bali = Self("bali")
+    func schedule(_ window: DateInterval?) throws { try Bell.register(window) }
 }

@@ -254,7 +254,8 @@ struct BoundTests {
     )
     func underWay() throws {
         let (began, finish) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-        let bound: TimeInterval = 1
+        // Long enough that the grant, on a thread of its own, comes well inside it, even loaded.
+        let bound: TimeInterval = 2
         Thread.detachNewThread {
             began.wait()
             Thread.sleep(forTimeInterval: bound + 0.5)

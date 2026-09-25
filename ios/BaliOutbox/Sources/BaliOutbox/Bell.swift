@@ -15,10 +15,11 @@ public enum Bell {
     public static let retry: TimeInterval = 60
 
     /// The interval iOS is asked for, to wake the monitor at `until`. It ends at the first whole
-    /// minute at or after `until` — never before, where the shields are still owed, and so never
-    /// early at any granularity iOS may keep, nor a minute late — and it is exactly the floor long:
-    /// its start moves back, never its end. So a window shorter than the floor (a tap in a session's
-    /// last ten minutes) starts in the past, which iOS takes as an interval under way.
+    /// minute at or after `until`: never before it, where the shields are still owed — so no
+    /// granularity iOS may keep wakes the monitor early — and less than a minute after. And it is
+    /// exactly the floor long: its start moves back, never its end. So a window shorter than the
+    /// floor (a tap in a session's last ten minutes) starts in the past, which iOS takes as an
+    /// interval under way.
     public static func window(until: Date) -> DateInterval {
         let end = Date(timeIntervalSince1970: (until.timeIntervalSince1970 / 60).rounded(.up) * 60)
         return DateInterval(start: end - floor, end: end)
