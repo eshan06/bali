@@ -93,7 +93,8 @@ targets:
       # The outbox file, read where the app keeps it: in the app group.
       - package: BaliOutbox
 
-  # The shield a student sees over a blocked app or website.
+  # The shield a student sees over a blocked app or website: Bali's own, in D1's look, its words
+  # from where the phone stands (B5c).
   BaliShield:
     type: app-extension
     platform: iOS
@@ -104,3 +105,6 @@ targets:
         INFOPLIST_FILE: BaliShield/Info.plist
         CODE_SIGN_ENTITLEMENTS: BaliShield/BaliShield.entitlements
         TARGETED_DEVICE_FAMILY: '1'
+    dependencies:
+      # The standing, read where the app keeps it — in the app group — as the monitor reads it.
+      - package: BaliOutbox
