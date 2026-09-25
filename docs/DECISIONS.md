@@ -18,8 +18,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the file the engine writes taps and unlocks into. **Now** (`Outbox.read`, which `ShieldWords`
   and `Bell.wake` share), GRDB's "Sharing a Database" for a process that only reads: a reading
   coordination (`coordinate(readingItemAt:options: .withoutChanges)`), which no other reader waits
-  on, and one connection opened `readonly`, which takes no write lock and writes nothing — not the
-  file, not its WAL, no checkpoint as it closes (its descriptor cannot take the lock one needs), and
+  on, and one connection opened `readonly`, which begins no write transaction and writes nothing —
+  not the file, not its WAL, no checkpoint as it closes (its descriptor cannot take the lock one
+  needs), and
   no file where there is none — the schema checked, and migrated only when this build has yet to
   (below). The standing and the queue are read in the one transaction that checks the schema, and
   the file is closed before the read returns. **One connection, found here** (GRDB's source): a `DatabasePool`'s readers are
