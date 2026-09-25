@@ -39,9 +39,7 @@ public enum Standing: Sendable, Hashable {
     case unread
 
     /// The phone's own change, at once: a state change of the session it is in. A tap changes
-    /// nothing here — it is `SyncState.pendingTap` until answered. An unlock filed under a tap
-    /// unlocks whatever session the phone is in: the shields come off at once, and the tap's answer
-    /// says where the student is.
+    /// nothing here — it is `SyncState.pendingTap` until answered; an unlock under it, any session.
     func acting(_ change: Change) -> Standing {
         guard case .inSession(let session, _) = self else { return self }
         switch change {
@@ -128,10 +126,8 @@ public struct SyncState: Sendable, Hashable {
         queued.last { if case .tap = $0.change { !$0.stuck } else { false } }
     }
 
-    /// The Emergency Unlock to record now (owner decision 11): under a tap not yet answered — the
-    /// server files it wherever that tap lands, never in the session the phone was in before it,
-    /// which the tap may have switched — else of the session the phone is in; nil when neither:
-    /// nothing the phone knows holds shields.
+    /// The Emergency Unlock to record now (decision 11): under a tap not yet answered — filed where
+    /// that tap lands — else of the session the phone is in; nil: nothing the phone knows shields.
     public func emergencyUnlock(reason: UnlockReason?) -> Change? {
         if let tap = pendingTap { return .unlockUnderTap(tap: tap.eventId, reason: reason) }
         guard case .inSession(let session, _) = standing else { return nil }
@@ -260,8 +256,8 @@ public actor SyncEngine {
 
     /// Queues what the phone just did — acted on at once — and sends it; nil when there is nothing
     /// to send (protection off already reported). Throws when it could not be written: the caller
-    /// shows it (rule 5). The student acting again ends a refusal's showing. The student's own
-    /// Emergency Unlock goes through `emergencyUnlock`, which files it where decision 11 says.
+    /// shows it (rule 5). The student acting again ends a refusal's showing. An Emergency Unlock
+    /// goes through `emergencyUnlock`, which files it where decision 11 says.
     @discardableResult
     public func record(_ change: Change) throws -> OutboxRecord? {
         // Standing focused there, the phone's row is focused again — a re-tap older than its last
@@ -288,18 +284,16 @@ public actor SyncEngine {
         return record
     }
 
-    /// A scan of the block (B6): a Bali block's code becomes the tap — recorded, acted on at once
-    /// and sent. Anything else — another tag, a scan cancelled, a phone that cannot read NFC —
-    /// records nothing.
+    /// A scan of the block (B6): a Bali block's code becomes the tap, recorded and sent; anything
+    /// else — another tag, a scan cancelled, a phone that cannot read NFC — records nothing.
     @discardableResult
     public func tap(_ read: BlockRead) throws -> OutboxRecord? {
         guard case .block(let code) = read else { return nil }
         return try record(.tap(tagId: code))
     }
 
-    /// The student's Emergency Unlock — always allowed, always recorded — filed where
-    /// `SyncState.emergencyUnlock` says (decision 11), acted on at once and sent; nil when nothing
-    /// the phone knows holds its shields.
+    /// The student's Emergency Unlock, recorded where `SyncState.emergencyUnlock` files it; nil
+    /// when nothing the phone knows holds its shields.
     @discardableResult
     public func emergencyUnlock(reason: UnlockReason? = nil) throws -> OutboxRecord? {
         guard let unlock = state.emergencyUnlock(reason: reason) else { return nil }
@@ -403,9 +397,16 @@ public actor SyncEngine {
         case .tap(.applySession)?, .unlock(.recorded)?, .stateChange(.applySession)?:
             // A live participation names its session and its state; a note (an unlock after the
             // end names the session it ended) names no window to be in.
-            guard let session = sent.session, let participation = sent.state else {
+            guard let session = sent.session, var participation = sent.state else {
                 reread()
                 break
+            }
+            // An unlock made after this tap, stuck and unrecorded, keeps its session's shields off.
+            let after = record.order?.seq ?? 0
+            if case .tap = record.change, participation == .focused,
+                stored({ try outbox.holdsUnlock(session: session.id, after: after) }) ?? true
+            {
+                participation = .unlocked
             }
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:

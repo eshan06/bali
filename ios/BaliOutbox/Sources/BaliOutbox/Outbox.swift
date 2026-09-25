@@ -246,16 +246,14 @@ public struct Outbox: Sendable {
         // table is made again — and its AUTOINCREMENT counter, A12's order, carried over: going
         // back, it would have the server place what the phone does next before what it did.
         migrator.registerMigration("v3") { db in
-            let counter =
-                try Int.fetchOne(db, sql: "SELECT seq FROM sqlite_sequence WHERE name = 'outbox'")
-                ?? 0
             let columns = """
                 seq, eventId, kind, tagId, sessionId, reason, follows, recordedAt, attempts,
                   answers, nextAttemptAt, stuck, lastStatus, lastReason, lastMessage
                 """
             try db.execute(
                 sql: """
-                    CREATE TABLE outboxV3 (
+                    ALTER TABLE outbox RENAME TO outboxV2;
+                    CREATE TABLE outbox (
                       seq INTEGER PRIMARY KEY AUTOINCREMENT, eventId TEXT NOT NULL UNIQUE,
                       kind TEXT NOT NULL
                         CHECK (kind IN ('tap', 'unlock', 'refocus', 'protection_off')),
@@ -268,16 +266,12 @@ public struct Outbox: Sendable {
                       nextAttemptAt TEXT NOT NULL, stuck INTEGER NOT NULL DEFAULT 0,
                       lastStatus INTEGER, lastReason TEXT, lastMessage TEXT,
                       CHECK (kind != 'unlock' OR sessionId IS NOT NULL OR tapId IS NOT NULL));
-                    INSERT INTO outboxV3 (\(columns)) SELECT \(columns) FROM outbox;
-                    DROP TABLE outbox;
-                    ALTER TABLE outboxV3 RENAME TO outbox;
+                    INSERT INTO outbox (\(columns)) SELECT \(columns) FROM outboxV2;
                     DELETE FROM sqlite_sequence WHERE name = 'outbox';
-                    """)
-            try db.execute(
-                sql: """
                     INSERT INTO sqlite_sequence (name, seq)
-                      SELECT 'outbox', max(?, coalesce(max(seq), 0)) FROM outbox
-                    """, arguments: [counter])
+                      SELECT 'outbox', seq FROM sqlite_sequence WHERE name = 'outboxV2';
+                    DROP TABLE outboxV2;
+                    """)
         }
         return migrator
     }
@@ -325,10 +319,14 @@ public struct Outbox: Sendable {
                 row = ("unlock", nil, nil, reason)
                 tap = tapId
             case .refocus(let session):
-                // The unlock it returns from — the latest — while it is queued, in this session.
+                // The unlock it returns from — the latest — while it is queued, in this session or
+                // under a tap whose answer names none yet.
                 follows = try String.fetchOne(
-                    db, sql: "SELECT eventId FROM outbox WHERE sessionId = ? AND eventId = ?",
-                    arguments: [session, Self.state(db, Self.lastUnlockKey)])
+                    db,
+                    sql: """
+                        SELECT eventId FROM outbox WHERE eventId = ?
+                          AND (sessionId = ? OR (tapId IS NOT NULL AND sessionId IS NULL))
+                        """, arguments: [Self.state(db, Self.lastUnlockKey), session])
                 row = ("refocus", nil, session, nil)
             case .protectionOff(let session):
                 if try Self.state(db, Self.reportedKey) == session { return nil }
@@ -462,14 +460,16 @@ public struct Outbox: Sendable {
         return records.filter { !$0.stuck && !($0.follows.map(stuck.contains) ?? false) }.count
     }
 
-    /// Whether an unrecorded unlock of `session` is queued. While one is, no read may put that
-    /// session's shields back on: the emergency unlock stands until the server has it.
-    public func holdsUnlock(session: String) throws -> Bool {
+    /// Whether an unrecorded unlock of `session`, made after the record at `seq`, is queued. While
+    /// one is, neither a read nor an older tap's answer puts that session's shields back on.
+    public func holdsUnlock(session: String, after seq: Int = 0) throws -> Bool {
         try pool.read {
             try Bool.fetchOne(
                 $0,
-                sql: "SELECT EXISTS (SELECT 1 FROM outbox WHERE kind = 'unlock' AND sessionId = ?)",
-                arguments: [session]) ?? false
+                sql: """
+                    SELECT EXISTS (SELECT 1 FROM outbox
+                      WHERE kind = 'unlock' AND sessionId = ? AND seq > ?)
+                    """, arguments: [session, seq]) ?? false
         }
     }
 

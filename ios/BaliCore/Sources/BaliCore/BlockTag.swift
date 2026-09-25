@@ -1,12 +1,10 @@
 import Foundation
 
-/// A Bali block's NFC tag, as a phone reads it (B6). What identifies a block is the code written on
-/// it, not the chip: ten letters and digits — v2 wrote `T7XK2M9QPF` on every block — in its NDEF
-/// message, as a well-known Text record, or at the end of a URI record, `bali://t/<code>` or
-/// `https://<host>/t/<code>` (v2's QR link). Read whatever its case, and sent upper-case, as v2
-/// minted and printed it: the `tagId` a tap sends (`POST /v1/taps`), and the one a teacher
-/// registers (`POST /v1/blocks`). A tag with nothing of the kind on it is not a Bali block, and
-/// nothing is recorded for it.
+/// A Bali block's NFC tag, as a phone reads it (B6): the block is the code written on it, not the
+/// chip — ten letters and digits, as v2 wrote them (`T7XK2M9QPF`), in a well-known Text record or
+/// at the end of a URI record, `bali://t/<code>` or `https://<host>/t/<code>` (v2's QR link). Read
+/// whatever its case, sent upper-case: the `tagId` a tap sends and a teacher registers. A tag with
+/// nothing of the kind is not a Bali block: nothing is recorded for it.
 public enum BlockTag {
     /// One NDEF record as the tag holds it: its type name format, its type and its payload.
     public struct Record: Sendable, Hashable {
@@ -42,8 +40,7 @@ public enum BlockTag {
         guard start <= payload.endIndex else { return nil }
         let text = Array(payload[start...])
         guard status & 0x80 != 0 else { return String(decoding: text, as: UTF8.self) }
-        // UTF-16: big-endian unless a byte order mark says otherwise, as the record's definition
-        // has it.
+        // UTF-16: big-endian unless its byte order mark says otherwise, as the record defines it.
         let little = text.starts(with: [0xFF, 0xFE])
         let bytes = Array(text.dropFirst(little || text.starts(with: [0xFE, 0xFF]) ? 2 : 0))
         guard bytes.count % 2 == 0 else { return nil }
@@ -54,11 +51,9 @@ public enum BlockTag {
         return String(decoding: units, as: UTF16.self)
     }
 
-    /// How a URI record's link begins, by its first byte: nothing, or one of the two ways a block's
-    /// link can — any other ("http://", "tel:"…) begins no block's link.
+    /// A URI record's link: its first byte abbreviates how it begins — nothing, or one of the two
+    /// ways a block's link can ("http://", "tel:" and the rest begin none) — then the rest, UTF-8.
     static let linkStarts: [UInt8: String] = [0x00: "", 0x02: "https://www.", 0x04: "https://"]
-
-    /// A URI record's link: how it begins (`linkStarts`), then the rest, UTF-8.
     static func link(_ payload: Data) -> String? {
         guard let first = payload.first, let start = linkStarts[first] else { return nil }
         return start + String(decoding: payload.dropFirst(), as: UTF8.self)
@@ -84,17 +79,9 @@ public enum BlockTag {
     }
 }
 
-/// What one scan of the phone's NFC reader found (B6): the reader's answer, which the sync engine
-/// records only when it is a block (`SyncEngine.tap(_:)`).
+/// What one scan of the phone's NFC reader found (B6), which the sync engine records only when it
+/// is a block (`SyncEngine.tap(_:)`): a Bali block's code; a tag with none; a scan the student
+/// closed; a phone that cannot read NFC; or the reader's error, in iOS's words (shown, rule 5).
 public enum BlockRead: Sendable, Hashable {
-    /// A Bali block, by its code.
-    case block(String)
-    /// A tag, but not a Bali block: nothing on it is a block's code.
-    case notBali
-    /// The student closed the scan before a tag was read.
-    case cancelled
-    /// This phone cannot read NFC tags.
-    case unsupported
-    /// The reader stopped with an error, in iOS's words: shown (rule 5), and a scan can go again.
-    case failed(String)
+    case block(String), notBali, cancelled, unsupported, failed(String)
 }

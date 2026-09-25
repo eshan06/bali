@@ -12,7 +12,8 @@ import Foundation
         private var session: NFCNDEFReaderSession?
         private var answer: CheckedContinuation<BlockRead, Never>?
 
-        /// One scan: until a tag is read, the student cancels, or iOS gives up (a minute).
+        /// One scan: until a tag is read, the student cancels, or iOS gives up (a minute). A reader
+        /// makes one scan: a new one for each, as the readout does.
         func read() async -> BlockRead {
             guard NFCNDEFReaderSession.readingAvailable else { return .unsupported }
             return await withCheckedContinuation { answer in

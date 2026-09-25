@@ -102,9 +102,10 @@ struct SchemaTests {
                             kind == "tap" ? nil : "s", kind == "unlock" ? "nurse" : nil, t0, t0,
                         ])
                 }
-                // The tap answered and gone — or everything: the counter stays at three.
+                // The first and the last answered and gone — or all three: the counter stays at
+                // three, above every seq the table still holds.
                 try db.execute(
-                    sql: "DELETE FROM outbox WHERE eventId = 'e0' OR ?", arguments: [drained])
+                    sql: "DELETE FROM outbox WHERE eventId != 'e1' OR ?", arguments: [drained])
             }
             try old.close()
 
@@ -113,11 +114,11 @@ struct SchemaTests {
             #expect(applied == ["v1", "v2", "v3"])
             let kept = try outbox.records()
             let install = try #require(try installOf(outbox))
-            let queued: [Change] = [.unlock(session: "s", reason: .nurse), .refocus(session: "s")]
+            let queued: [Change] = [.unlock(session: "s", reason: .nurse)]
             #expect(kept.map(\.change) == (drained ? [] : queued))
             #expect(
                 kept.map(\.order)
-                    == (drained ? [] : [2, 3]).map { ActionOrder(install: install, seq: $0) })
+                    == (drained ? [] : [2]).map { ActionOrder(install: install, seq: $0) })
             #expect(kept.allSatisfy { $0.attempts == 3 && $0.stuck && $0.lastStatus == 409 })
             #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
             #expect(try record(outbox, .unlockUnderTap(tap: "e9", reason: nil)).order?.seq == 5)

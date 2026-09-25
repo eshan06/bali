@@ -68,6 +68,16 @@ struct UnlockRouteTests {
     }
 
     @Test(
+        "A refocus returns from the latest unlock while it is queued — one under a tap not yet answered, its session still unnamed, included — and waits for it, stuck or not (santa's review)"
+    )
+    func refocusFollows() throws {
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "A"))
+        let unlock = try record(outbox, .unlockUnderTap(tap: tap.eventId, reason: nil))
+        #expect(try record(outbox, .refocus(session: "s")).follows == unlock.eventId)
+    }
+
+    @Test(
         "A tap not yet answered keeps its shield only until an unlock after it, of either kind (decision 11)"
     )
     func endsTheTapsShield() throws {
@@ -195,6 +205,32 @@ struct UnderTapEngineTests {
         try await rig.server.next(checkInRoute).reply(200, Answer.live(session(endsAt: 4000)))
         try await rig.sleeping([at(60)])
         #expect(await rig.engine.state.standing == .inSession(session(endsAt: 4000), .unlocked))
+        await rig.stop()
+    }
+
+    @Test(
+        "A tap's answer is older than an unlock made after it: both stuck, the tap's retry answered focused shields nothing — the unlock, still unrecorded, keeps its session's shields off (the unlock guard); a re-tap made after the unlock is a return, and does (santa's review)"
+    )
+    func tapAnswerUnderStuckUnlock() async throws {
+        let rig = try Rig()
+        let tap = try #require(try await rig.engine.tap(.block("T7XK2M9QPF")))
+        let held = try await rig.server.next(tapRoute)
+        try await rig.engine.emergencyUnlock()
+        held.reply(409, Answer.refused("session_not_running"))
+        try await rig.server.next(underTapRoute(tap)).reply(400, Answer.refused("invalid_request"))
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        await rig.until { $0.queued.count == 2 && $0.queued.allSatisfy(\.stuck) }
+        try await rig.sleeping([at(2)])
+        rig.clock.advance(by: 2)
+        try await rig.server.next(tapRoute).reply(200, Answer.joined())
+        let state = await rig.until { $0.queued.count == 1 }
+        #expect(state.standing == .inSession(session(), .unlocked))
+        #expect(state.shieldedUntil(rig.clock.now()) == nil)
+        // The unlock, due again, is refused again; the student taps again, after it: back to focus.
+        try await rig.server.next(underTapRoute(tap)).reply(400, Answer.refused("invalid_request"))
+        try await rig.engine.tap(.block("T7XK2M9QPF"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined())
+        await rig.until { $0.standing == .inSession(session(), .focused) }
         await rig.stop()
     }
 

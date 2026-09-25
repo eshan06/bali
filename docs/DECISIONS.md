@@ -57,13 +57,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   none (armed, no longer current, refused) hands it nothing. Its tap's answer does not apply while
   the unlock after it waits (B3b-2's rule), so nothing shields between the two answers; a tap that
   lands after its unlock — refused first, or stuck — answers `joined` and `unlocked` (A11), which
-  applies: no shield. **The file:** an unlock filed under its tap names no session until the answer
+  applies: no shield. And a tap's own answer never shields over an unlock the phone made after the
+  tap and has yet to have recorded (santa's review, below): its `focused` applies as `unlocked`,
+  the guard a read already had — by the phone's order, so a re-tap made after the unlock, a return,
+  still focuses. **The file:** an unlock filed under its tap names no session until the answer
   does, which v1's CHECK forbade; SQLite cannot relax a CHECK in place, so migration `v3` makes the
-  table again, with `tapId` — and carries its AUTOINCREMENT counter over. Dropped with the old
-  table, the counter started again at 1, and the server (A12) would have placed everything the
+  table again, with `tapId` — the old one renamed first, its AUTOINCREMENT counter copied to the
+  new, then dropped. Dropped with the old table, the counter started again at 1, and the server (A12) would have placed everything the
   phone did next before what it did: a new tap older than the last unlock, never applied (A13).
   Found while writing it — SQLite resets the counter of a drained, rebuilt table — and pinned: a
-  file drained and one with records queued, each migrated, go on at the next seq. **The Debug
+  file drained, and one still holding a record below its counter, each migrated, go on at the next
+  seq. **The Debug
   readout:** **Scan** (read and tap), **Read block code** (read only, for registering a block), the
   typed **Tap** kept for rounds 1–3, Emergency Unlock through `emergencyUnlock` — B5a's disclosure
   closed: it named the session the phone was in even while a tap was unanswered — `Outbox:` (what is
@@ -80,8 +84,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   tap (open decision 6). (3) Over an unread standing, an Emergency Unlock with no tap pending is
   still none, and one under a pending tap is recorded but leaves the last run's shields on (only
   the enforcer's own come off over it, B5b-2) — B6b's. (4) The reader runs on the owner's iPhone
-  only (round 4); the simulator builds it and
-  finds no NFC. (5) The app's NFC entitlement lists NDEF beside TAG, as B2 carried v2's over; App
+  only (round 4); the simulator builds it and finds no NFC. (5) The app's NFC entitlement lists NDEF beside TAG, as B2 carried v2's over; App
   Store uploads have refused NDEF for apps built against iOS 13 and later (ITMS-90778), so Phase 5's
   TestFlight may need TAG alone — an NDEF reader session runs under TAG. **Tests** (Linux and the
   iOS Simulator): `BlockTagTests` — v2's code in a Text record, whatever its case, space, language
@@ -90,10 +93,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   unlock ending the tap's hold; the tap's session handed on, and a refocus there following the
   unlock. `UnderTapEngineTests` — tapped offline then unlocked, the shields off at once and never on
   between the answers, the unlock under its tap with the next order; under a re-tap, its retry to the
-  tap still; stuck, the guard; a tap landing after its unlock; a scan that records nothing. The
+  tap still; stuck, the guard — against a read, and against its own tap's answer, both stuck, while
+  a return still focuses; a tap landing after its unlock; a scan that records nothing. The
   migration from `v2`, drained and not; the schema; the requests; `tap-unlock/*`'s fixtures and the
   generated unlock cases through the tap route; the random walk with unlocks under taps; the
-  monitor's wake. `AppTests.noNFC` (the simulator): a phone with no NFC is told so at once.
+  monitor's wake. `AppTests.noNFC` (the simulator): a phone with no NFC is told so at once. Of 25
+  mutations of the rules — the code's reading, the route, the session handed on, the guard and its
+  order, a refocus's wait, the migration's counter, what a scan records, the set-once pin — each
+  taken alone, all 25 turn a test red. **Santa** (two Claude reviewers, both the fallback — no other
+  model's CLI here; round 1): no blockers. Three WARNs fixed here, the first two red first: a tap's
+  answer applied over a stuck unlock made after it — tap and unlock both refused, the tap's retry
+  answered `focused` shielded the student over their Emergency Unlock (the guard above); a refocus
+  made while the unlock under a tap named no session yet followed nothing, and could overtake it
+  stuck (it now waits for it); and a reader asked for a second scan at once would leave the first
+  waiting (noted: one scan a reader, a new one each time, as the readout does).
 - **2026-09-25** — **B5c: Bali's own shield over a blocked app — its words from the standing the
   app keeps, read as the monitor reads it; the bell in the phone's own time format; D1's approved
   look as far as `ShieldConfiguration` carries it; "OK", and no shield action extension.** **The
