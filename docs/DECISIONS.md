@@ -10,7 +10,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-09-25** — **B5b: the bell with the app closed — the window the shields are on registered
   with iOS as a DeviceActivity schedule, and the monitor extension taking them off at its end,
-  force-quit or not (ARCHITECTURE's leaning (a)); with #84's and #90's riders.** **The window**
+  force-quit or not (ARCHITECTURE's leaning (a)); with #90's two BaliOutbox riders, and the
+  app-side ones split off as B5b-2.** **The window**
   (`Bell.window(until:)`) ends at `shieldedUntil` rounded up to the whole minute. The monitor
   decides by the phone's clock whether anything still keeps the shields on, so a wake before
   `until` finds them owed and keeps them; DeviceActivity takes its components to the second, but
@@ -66,18 +67,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Rider (#90's review), decided here:** over an unread standing, the last run's shields that a
   pending tap keeps on are its cap's — they come off at the cap — but its answer leaves them the
   last run's again: an armed answer asks the server where the phone stands, since arming ends no
-  session the phone may be in (B5a-3). **Riders:** (#84) the config reader is BaliCore's
-  `AppConfig`, and a test reads `ios/Bali/Info.plist` and `ios/project.yml` in place: every key it
-  reads is in the Info.plist as a `$(SETTING)` project.yml sets, every `Bali` key there is one it
-  reads, and the values make a config; the app's tests check the built Info.plist gives one. (#90)
-  `BaliTests`, a unit-test target hosted in the app, run by the iOS workflow after the build: it
-  pins the foreground check reading the phase as it runs, through `Phone.onPhase` (the engine's and
-  the enforcer's; a test's own there). It depends on the packages as the app does: `@testable
-  import Bali` needs every module the app imports, GRDB's C module among them, and XcodeGen's
-  `link: false` gives only a bare target dependency — so the bundle carries its own copy of the
-  packages' code, which its tests leave alone. (#90) The test rig's `cancel` resumes a sleep
+  session the phone may be in (B5a-3). **Rider (#90):** the test rig's `cancel` resumes a sleep
   `advance(by:holdingWakes:)` held, so a test that stops before `releaseWakes()` fails fast
-  instead of hanging. **For round 2 (Debug builds only):** a toggle caps a tap at the floor, 15
+  instead of hanging. **Split for size:** B5b came to 444 counted lines with all four riders, so
+  #84's Info.plist rider (the config reader moved into BaliCore, its keys pinned to the Info.plist
+  and `project.yml`) and #90's app test target (pinning the foreground check reading the phase as
+  it runs) are B5b-2, next. The version built here is kept on the branch
+  `claude/fervent-bell-8nvjcp-b5b-full` for it — Linux-checked only; a note for its worker: a
+  hosted test bundle that `@testable import`s the app needs every module the app imports, GRDB's C
+  module among them, and XcodeGen's `link: false` on a package gives only a bare target dependency,
+  so that version has the bundle depend on the packages as the app does. **For round 2 (Debug
+  builds only):** a toggle caps a tap at the floor, 15
   minutes, not 50 (`SyncEngine.setTapCap`, kept in the app group's defaults so the monitor uses it
   too), and the monitor keeps its last wake there — when, what it did, how long it took — for the
   readout, the only way to see Phase 0's answer and the stall check. **Not covered, disclosed:**
@@ -97,8 +97,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   NSFileCoordinator holding the file); the registrations through the enforcer (a tap to the bell,
   an unlock and a refocus, an extension and a re-tap, a relaunch and the device check's cap, a
   refusal shown and asked again, no shields held, an unread standing) — and `unreadCappedOverHeld`
-  and `heldSleepCancels`, each red first, `AppConfigTests`, and `BaliTests` on the simulator.
-  Of 27 mutations of the rules, each taken alone, 26 turn a test red; the 27th — the monitor's
+  and `heldSleepCancels`, each red first. Of 24 mutations of the rules, each taken alone, 23 turn
+  a test red; the 24th — the monitor's
   read without its explicit `close()` — changes nothing a caller can see: the pool is released,
   and the file closed, as the read returns (the descriptor test holds), so the close stays as the
   statement of the rule where it matters. **Santa** SANTA

@@ -44,10 +44,6 @@ final class Phone {
     private(set) var protection: Protection?
     /// Why the engine did not start, shown with a way to try again (rule 5).
     private(set) var problem: String?
-    /// What the scene's phase drives once the engine and the enforcer run: the engine's check-in,
-    /// and rule 3's check as the app comes back. Theirs — a test's own in `BaliTests`.
-    @ObservationIgnored
-    var onPhase: (engine: @MainActor (Bool) async -> Void, check: @MainActor () async -> Void)?
     private var foreground = false
     private var starting = false
 
@@ -57,7 +53,9 @@ final class Phone {
         guard engine == nil, !starting else { return }
         starting = true
         defer { starting = false }
-        guard let config = AppConfig(info: Bundle.main.infoDictionary ?? [:]) else {
+        guard let cognito = Cognito.thisBuild,
+            let api = Bundle.main.setting("BaliAPIURL").flatMap(URL.init(string:))
+        else {
             problem = "Sign-in is not set up in this build: ios/project.yml, docs/DEPLOY.md"
             return
         }
@@ -71,10 +69,9 @@ final class Phone {
         }
         problem = nil
         let transport = URLSessionTransport()
-        let signIn = SignIn(
-            cognito: config.cognito, store: KeychainTokenStore(), transport: transport)
+        let signIn = SignIn(cognito: cognito, store: KeychainTokenStore(), transport: transport)
         let engine = await SyncEngine.make(
-            outbox: outbox, api: config.api, signIn: signIn, transport: transport)
+            outbox: outbox, api: api, signIn: signIn, transport: transport)
         #if DEBUG
             await engine.setTapCap(Bell.deviceCheckCap)
         #endif
@@ -82,7 +79,6 @@ final class Phone {
         // last ran, kept in the app group — so a relaunch never takes them off (B5).
         let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())
         (self.signIn, self.engine, self.enforcer) = (signIn, engine, enforcer)
-        onPhase = ({ await engine.setForeground($0) }, { await enforcer.check() })
         Task { await engine.run() }
         Task { await enforcer.run() }
         Task { for await state in await engine.updates() { self.sync = state } }
@@ -98,9 +94,27 @@ final class Phone {
     /// a failure that is none.
     func setForeground(_ foreground: Bool) {
         self.foreground = foreground
-        guard let onPhase else { return }
-        Task { await onPhase.engine(self.foreground) }
-        if foreground { Task { if self.foreground { await onPhase.check() } } }
+        guard let engine else { return }
+        Task { await engine.setForeground(self.foreground) }
+        if foreground, let enforcer { Task { if self.foreground { await enforcer.check() } } }
+    }
+}
+
+extension Cognito {
+    /// This build's, from its Info.plist — `ios/project.yml`'s settings; nil while one is not set.
+    static var thisBuild: Cognito? {
+        guard let domain = Bundle.main.setting("BaliCognitoDomain").flatMap(URL.init(string:)),
+            let clientId = Bundle.main.setting("BaliCognitoClientID"),
+            let redirect = Bundle.main.setting("BaliCognitoRedirectURI").flatMap(URL.init(string:))
+        else { return nil }
+        return Cognito(domain: domain, clientId: clientId, redirectURI: redirect)
+    }
+}
+
+extension Bundle {
+    /// The Info.plist's `key` as the build set it; nil when it is empty.
+    func setting(_ key: String) -> String? {
+        (object(forInfoDictionaryKey: key) as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

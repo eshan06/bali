@@ -9,7 +9,6 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
 | `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine and the enforcer             |
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: at the bell, it takes the shields off, app closed   |
-| `BaliTests/`   | The app target's own tests, hosted in the app on the iOS Simulator                                                     |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
 | `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
 | `BaliOutbox/`  | The outbox store (GRDB in the app group), its sync engine and the shields' enforcer — `swift test` there too           |
@@ -152,8 +151,7 @@ what it did, and how long it took — since the monitor can show nothing itself.
 ## CI
 
 The **iOS** workflow (`.github/workflows/ios.yml`) runs on every PR that touches `ios/`: it
-generates the project, builds the app for the iOS Simulator with signing off, and runs the app's
-own tests (`BaliTests`, hosted in the app) and `BaliCore`'s and `BaliOutbox`'s on an iOS
-Simulator. Both packages' tests also run on Linux on every PR ("BaliCore Swift tests (Linux)" in
-`ci.yml`); on Linux, GRDB builds against the system SQLite, so `BaliOutbox` needs
-`libsqlite3-dev` there.
+generates the project, builds the app for the iOS Simulator with signing off, and runs
+`BaliCore`'s and `BaliOutbox`'s tests on an iOS Simulator. Both packages' tests also run on
+Linux on every PR ("BaliCore Swift tests (Linux)" in `ci.yml`); on Linux, GRDB builds against
+the system SQLite, so `BaliOutbox` needs `libsqlite3-dev` there.

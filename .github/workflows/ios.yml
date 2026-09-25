@@ -1,6 +1,6 @@
 # The iOS build (decision 9): the Xcode project generated from ios/project.yml,
-# the app built for the iOS Simulator with signing off, and the app's own tests and BaliCore's and
-# BaliOutbox's run on it — on Apple's Foundation, which parses ISO 8601 differently from the
+# the app built for the iOS Simulator with signing off, and BaliCore's and BaliOutbox's tests run
+# on it — on Apple's Foundation, which parses ISO 8601 differently from the
 # Linux one the "BaliCore Swift tests (Linux)" job in ci.yml runs on. macOS
 # minutes are the dear ones: only a PR that touches ios/ or this file builds.
 name: iOS
@@ -95,11 +95,6 @@ jobs:
 
       - name: Build the app for the simulator, signing off
         run: xcodebuild build -quiet -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO
-        working-directory: ios
-
-      # The app target's own tests (BaliTests), hosted in the app.
-      - name: The app's tests on the simulator, signing off
-        run: xcodebuild test -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO
         working-directory: ios
 
       - name: BaliCore's tests on the simulator
