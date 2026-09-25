@@ -473,6 +473,24 @@ final class LocalServer: @unchecked Sendable {
 
 @Suite("The URLSession transport, over a real socket")
 struct URLSessionTransportTests {
+    /// How long a test waits on its local server: past any stall of the loaded iOS Simulator on
+    /// GitHub's macOS runner. On #86 one froze the whole test run for 78 seconds, the server's
+    /// thread with it, and the apps' own 15-second wait ran out before the server could answer.
+    /// Answered, a request takes milliseconds; only a broken test waits this out.
+    static let stall: TimeInterval = 240
+
+    /// The apps' own session — its configuration and, on Linux, its redirect delegate — with its
+    /// waits long enough to outlast a stall.
+    static func patient() -> URLSessionTransport {
+        let apps = URLSessionTransport.makeSession()
+        let configuration = apps.configuration
+        configuration.timeoutIntervalForRequest = stall
+        configuration.timeoutIntervalForResource = stall
+        return URLSessionTransport(
+            session: URLSession(
+                configuration: configuration, delegate: apps.delegate, delegateQueue: nil))
+    }
+
     @Test("A real answer comes back: its status and body, with the token sent on the wire")
     func answers() async throws {
         let fixture = try Contract.load("me/in-session.json")
@@ -482,7 +500,8 @@ struct URLSessionTransportTests {
                 + "Content-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)")
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
-            tokens: FixedToken(token: "token-real"))
+            tokens: FixedToken(token: "token-real"), transport: Self.patient(),
+            timeout: Self.stall)
 
         let me = await client.me()
         let answer = try Contract.appDecode(MeResponse.self, fixture.body)
@@ -495,11 +514,11 @@ struct URLSessionTransportTests {
     @Test("A server that never answers times out: .networkError, and the record kept")
     func timesOut() async throws {
         let server = try LocalServer(answer: nil)
-        // A session that would wait four minutes: the request's own second must end it long
+        // A session that would wait eight minutes: the request's own second must end it long
         // before.
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 240
-        configuration.timeoutIntervalForResource = 240
+        configuration.timeoutIntervalForRequest = 2 * Self.stall
+        configuration.timeoutIntervalForResource = 2 * Self.stall
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
             tokens: FixedToken(token: "t"),
@@ -513,12 +532,11 @@ struct URLSessionTransportTests {
         #expect(response.noAnswer == .unreachable)
         #expect(unlockDisposition(response.result, response.answer) == .retry)
         // A wait, not a refusal — the server still listens, never having read a byte — and its
-        // own second, not the session's four minutes: on Linux, a timeout given to URLRequest's
-        // initializer is ignored for the session's. The bound is half the session's, not a few
-        // seconds: on GitHub's macOS runner the whole iOS Simulator has stalled for over ten
-        // seconds at a time, twice in one run, the timeout's own timer with it.
+        // own second, not the session's eight minutes: on Linux, a timeout given to URLRequest's
+        // initializer is ignored for the session's. The bound is a stall's, not a few seconds: a
+        // stall runs the timeout's own timer late with everything else.
         #expect(server.head.isEmpty)
-        #expect(waited > 0.5 && waited < 120)
+        #expect(waited > 0.5 && waited < Self.stall)
     }
 
     @Test(
@@ -533,7 +551,8 @@ struct URLSessionTransportTests {
                 + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
         let client = APIClient(
             baseURL: try #require(URL(string: "http://127.0.0.1:\(server.port)")),
-            tokens: FixedToken(token: "token-real"))
+            tokens: FixedToken(token: "token-real"), transport: Self.patient(),
+            timeout: Self.stall)
 
         let tap = await client.tap(TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: Date()))
         #expect(tap.result == .status(status))

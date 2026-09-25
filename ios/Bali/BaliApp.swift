@@ -29,22 +29,26 @@ struct BaliApp: App {
         .joined(separator: " · ")
 }
 
-/// The app's one sign-in and one sync engine, started once for the app's life, and what they say.
+/// The app's one sign-in, sync engine and enforcer, started once for the app's life, and what they
+/// say.
 @MainActor @Observable
 final class Phone {
     private(set) var signIn: SignIn?
     private(set) var engine: SyncEngine?
+    private(set) var enforcer: Enforcer?
     /// Whether someone is signed in; nil until the Keychain can be read (the phone locked).
     private(set) var signedIn: Bool?
     /// The engine's state, for the screens; nil until it starts.
     private(set) var sync: SyncState?
+    /// What a screen may claim of the shields (rule 3); nil until the enforcer starts.
+    private(set) var protection: Protection?
     /// Why the engine did not start, shown with a way to try again (rule 5).
     private(set) var problem: String?
     private var foreground = false
     private var starting = false
 
-    /// Starts the sign-in and the engine, unless they run already: a start that failed can be tried
-    /// again.
+    /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
+    /// failed can be tried again.
     func start() async {
         guard engine == nil, !starting else { return }
         starting = true
@@ -68,19 +72,26 @@ final class Phone {
         let signIn = SignIn(cognito: cognito, store: KeychainTokenStore(), transport: transport)
         let engine = await SyncEngine.make(
             outbox: outbox, api: api, signIn: signIn, transport: transport)
-        (self.signIn, self.engine) = (signIn, engine)
+        // The shields follow the engine from its first state — where the phone stood when the app
+        // last ran, kept in the app group — so a relaunch never takes them off (B5).
+        let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())
+        (self.signIn, self.engine, self.enforcer) = (signIn, engine, enforcer)
         Task { await engine.run() }
+        Task { await enforcer.run() }
         Task { for await state in await engine.updates() { self.sync = state } }
+        Task { for await protection in await enforcer.updates() { self.protection = protection } }
         Task { for await signedIn in await signIn.signedIn() { self.signedIn = signedIn } }
         await engine.setForeground(foreground)
     }
 
-    /// The scene's phase: the engine checks in only in the foreground. Each hop sends the phase as
-    /// it is then, so two in quick succession can never leave the engine on the older one.
+    /// The scene's phase: the engine checks in only in the foreground, and coming back runs rule
+    /// 3's check at once — Settings may have taken the permission. Each hop sends the phase as it is
+    /// then, so two in quick succession can never leave the engine on the older one.
     func setForeground(_ foreground: Bool) {
         self.foreground = foreground
         guard let engine else { return }
         Task { await engine.setForeground(self.foreground) }
+        if foreground, let enforcer { Task { await enforcer.check() } }
     }
 }
 
@@ -106,32 +117,42 @@ struct Placeholder: View {
     let phone: Phone
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Bali").font(.largeTitle)
-            // "BaliCore.APIClient" and "BaliOutbox.Outbox", read from the packages' own types.
-            Text(String(reflecting: APIClient.self)).font(.body.monospaced())
-            Text(String(reflecting: Outbox.self)).font(.body.monospaced())
-            Text("Build \(BaliApp.version)").font(.footnote).foregroundStyle(.secondary)
-            if let problem = phone.problem {
-                Text(problem).foregroundStyle(.red)
-                Button("Try again") { Task { await phone.start() } }
+        ScrollView {
+            VStack(spacing: 8) {
+                Text("Bali").font(.largeTitle)
+                // "BaliCore.APIClient" and "BaliOutbox.Outbox", read from the packages' own types.
+                Text(String(reflecting: APIClient.self)).font(.body.monospaced())
+                Text(String(reflecting: Outbox.self)).font(.body.monospaced())
+                Text("Build \(BaliApp.version)").font(.footnote).foregroundStyle(.secondary)
+                if let problem = phone.problem {
+                    Text(problem).foregroundStyle(.red)
+                    Button("Try again") { Task { await phone.start() } }
+                }
+                #if DEBUG
+                    if let signIn = phone.signIn, let engine = phone.engine,
+                        let enforcer = phone.enforcer
+                    {
+                        Readout(phone: phone, signIn: signIn, engine: engine, enforcer: enforcer)
+                    }
+                #endif
             }
-            #if DEBUG
-                if let signIn = phone.signIn { Readout(phone: phone, signIn: signIn) }
-            #endif
         }
     }
 }
 
 #if DEBUG
-    /// Temporary, for B5's device check, until C1–C6 draw the real screens: whether the engine
-    /// reaches the API and when it last answered, whether someone is signed in, and the sign-in's
-    /// trigger. Debug builds only.
+    /// Temporary, for B5's device check, until C1–C6 draw the real screens and B6 reads the block:
+    /// the engine's link, the sign-in, the standing and what rule 3's check found — with triggers in
+    /// place of the screens and the NFC tap. Debug builds only.
     struct Readout: View {
         let phone: Phone
         let signIn: SignIn
+        let engine: SyncEngine
+        let enforcer: Enforcer
         @Environment(\.webAuthenticationSession) private var browser
         @State private var note = ""
+        @State private var code = ""
+        @State private var tag = ""
 
         var body: some View {
             VStack(spacing: 4) {
@@ -143,11 +164,35 @@ struct Placeholder: View {
                     Button("Sign in") { Task { note = await signingIn() } }
                     Button("Sign out") { Task { note = await signingOut() } }
                 }
-                .buttonStyle(.bordered)
+                Text("Standing: \(standing)")
+                Text("Screen Time: \(shields)")
+                Button("Allow Screen Time") {
+                    run {
+                        try await enforcer.requestPermission()
+                        return "asked"
+                    }
+                }
+                HStack {
+                    TextField("Join code", text: $code)
+                    Button("Join") { run { await join() } }.disabled(code.isEmpty)
+                }
+                HStack {
+                    TextField("Block tag", text: $tag)
+                    Button("Tap") { run { try await act(.tap(tagId: tag)) } }.disabled(tag.isEmpty)
+                }
+                if case .inSession(let session, _) = phone.sync?.standing {
+                    Button("Emergency Unlock") {
+                        run { try await act(.unlock(session: session.id, reason: nil)) }
+                    }
+                }
                 Text(note)
             }
             .font(.footnote.monospaced())
-            .padding(.top)
+            .buttonStyle(.bordered)
+            .textFieldStyle(.roundedBorder)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .padding()
         }
 
         private var link: String {
@@ -166,6 +211,45 @@ struct Placeholder: View {
 
         private var signedIn: String {
             phone.signedIn.map { $0 ? "yes" : "no" } ?? "not known yet (the phone locked?)"
+        }
+
+        private var standing: String {
+            switch phone.sync?.standing {
+            case .inSession(let session, let state)?:
+                "\(state?.rawValue ?? "unknown") until \(time(session.endsAt))"
+            case .waiting?: "waiting for the teacher's Start"
+            case .out?, nil: "in no session"
+            }
+        }
+
+        /// What rule 3's check found — never the standing alone.
+        private var shields: String {
+            guard let protection = phone.protection else { return "not checked yet" }
+            return "\(protection.permission) · shields \(protection.shielded ? "on" : "off")"
+                + (protection.until.map { ", due until \(time($0))" } ?? "")
+                + (protection.unreported ? " · protection off NOT recorded" : "")
+        }
+
+        private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+
+        /// Runs a trigger, and says how it went.
+        private func run(_ trigger: @escaping @MainActor () async throws -> String) {
+            Task {
+                do { note = try await trigger() } catch { note = "Failed: \(error)" }
+            }
+        }
+
+        /// What the phone did, through the engine, as the NFC tap and the screens will record it.
+        private func act(_ change: Change) async throws -> String {
+            try await engine.record(change) == nil ? "nothing new to send" : "recorded"
+        }
+
+        private func join() async -> String {
+            let now = Date()
+            let joined = await engine.client.join(
+                EnrollmentJoinRequest(joinCode: code, eventId: EventID.mint(at: now), deviceTime: now))
+            return joined.answer.map { "joined \($0.class.name)" }
+                ?? "not joined: \(joined.result) \(joined.error?.error.message ?? "")"
         }
 
         /// Signs in through the hosted UI, in an ephemeral browser session: what happened.

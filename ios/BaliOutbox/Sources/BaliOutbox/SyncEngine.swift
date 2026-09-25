@@ -46,6 +46,9 @@ public enum Standing: Sendable, Hashable {
     }
 }
 
+/// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5).
+extension Standing: Codable {}
+
 /// What the engine knows, for the screens (C1–C6) and enforcement (B5): `SyncEngine.updates()`.
 public struct SyncState: Sendable, Hashable {
     /// The server's truth as last reconciled, with the phone's own changes over it.
@@ -103,8 +106,20 @@ public actor SyncEngine {
     let clock: any SyncClock
     let refresh: @Sendable () async -> Bool
 
-    public private(set) var state = SyncState() { didSet { if state != oldValue { publish() } } }
+    /// The standing is kept in the outbox file as it changes, so a relaunch starts where the phone
+    /// stood — shielded still, offline too — and the extensions can read it (B5).
+    public private(set) var state = SyncState() {
+        didSet {
+            if state.standing != kept { keepStanding() }
+            if state != oldValue { publish() }
+        }
+    }
+    /// The standing the file holds; nil when not known, so a write that failed — refused while the
+    /// app was suspended, say — is made again at the next change of state.
+    private var kept: Standing?
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
+    /// Rule 3's check of the shields, run before each check-in: the enforcer's (B5).
+    private var check: (@Sendable () async -> Void)?
     /// `ReconcileStamp.changes`: each change the phone makes, and each answer to one.
     private var changes = 0
     private var foreground = false
@@ -130,6 +145,15 @@ public actor SyncEngine {
         refresh: @escaping @Sendable () async -> Bool = { false }
     ) {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
+        // Where the phone stood, and what it queued, each read on its own: enforcement follows
+        // this state from the start, so it must never begin from nothing.
+        do { state.queued = try outbox.records() } catch { state.link = .storageFailed }
+        do {
+            state.standing = try outbox.standing()
+            kept = state.standing
+        } catch {
+            state.link = .storageFailed
+        }
     }
 
     /// The app's one engine, over the student's sign-in (B4): the API client's tokens are the
@@ -166,6 +190,11 @@ public actor SyncEngine {
     /// 11) — A11's endpoint, which B6 and C5 use; until then there is none to send it to.
     @discardableResult
     public func record(_ change: Change) throws -> OutboxRecord? {
+        // Standing focused there, the phone's row is focused again — a re-tap older than its last
+        // report can put it back (A13) — so protection off found now is reported again.
+        if case .protectionOff(let session) = change, state.standing.isFocused(in: session) {
+            try outbox.protectionRestored()
+        }
         guard let record = try outbox.record(change, now: clock.now()) else { return nil }
         changes += 1
         let queued = queue()
@@ -183,6 +212,11 @@ public actor SyncEngine {
     public func retryNow() {
         refreshed = false
         sendAndReadNow()
+    }
+
+    /// Runs `check` before each check-in: rule 3's check of the shields, the enforcer's (B5).
+    public func beforeEachCheckIn(_ check: @escaping @Sendable () async -> Void) {
+        self.check = check
     }
 
     /// The app entered the foreground, or left it. The check-in runs only in the foreground — iOS
@@ -290,6 +324,9 @@ public actor SyncEngine {
     private func read() async {
         while !Task.isCancelled {
             rung.remove(.read)
+            // Rule 3, before the check-in: a protection off it reports is a change, which the
+            // check-in's stamp then counts.
+            if !rereading, foreground, case .inSession = state.standing { await check?() }
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
@@ -393,6 +430,14 @@ public actor SyncEngine {
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
     private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
+
+    /// Writes the standing to the file. `kept` is set first, so the change of state a failure makes
+    /// (`failed`) writes nothing again at once; the next change does.
+    private func keepStanding() {
+        let standing = state.standing
+        kept = standing
+        if stored({ try outbox.keep(standing) }) == nil { kept = nil }
+    }
 
     /// What `read` reads from the outbox; nil when it cannot be read, which is shown (rule 5).
     private func stored<T>(_ read: () throws -> T) -> T? {

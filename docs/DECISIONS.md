@@ -8,6 +8,107 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5a: the shields follow the sync engine; the Screen Time permission; rule 3's
+  check before each check-in, which reports protection off — again whenever the phone stands
+  focused (A13's rider); and the standing kept in the app group. B5 ships in three.** **The
+  split:** B5 was more than one PR's worth. B5a is enforcement's rules and the app's wiring of
+  them; B5b the DeviceActivity schedule and the monitor extension (the bell with the app
+  force-quit, Phase 0's question), with #84's Info.plist rider, since `BaliApp` gains the
+  schedule's adapter there; B5c the custom shield. **What the shields follow**
+  (`SyncState.shieldedUntil(now)`, pure): on while the standing is `focused`, until its session's
+  `endsAt`; on for `pendingTap` — a tap not yet answered, not stuck — until decision 7's cap, 50
+  minutes after the tap by the phone's clock; the later of the two when both; off when unlocked,
+  protection off, a state this build does not know, waiting or out. A pending tap's shield ends
+  when the student unlocks after it: decision 11 has an unlock made while its tap is unanswered
+  acted on at once, and the cap would otherwise hold the shields over an Emergency Unlock for up
+  to 50 minutes. The end is the phone's own clock (data model, decision 6): the enforcer wakes at
+  it while the app runs, and B5b's monitor covers a closed app. **The enforcer** (`Enforcer`,
+  `ios/BaliOutbox`): one actor following `SyncEngine.updates()`, one pass at a time — a call
+  made during a pass has it run again on the newest state, since two passes interleaving could
+  put the shields back after an unlock — through the `ScreenTime` protocol, so every rule runs on
+  Linux. The app's `PhoneScreenTime` is thin: one named `ManagedSettingsStore` (the extensions
+  open the same name), `.all()` app categories and web domains, no picker; and Family Controls'
+  `.individual` authorization, whose request and status C1's onboarding calls as
+  `Enforcer.requestPermission()` and `Protection.permission`. **Rule 3** (`Enforcer.check()`):
+  the engine runs it before each check-in (`SyncEngine.beforeEachCheckIn`, in the read loop:
+  never before a re-read, nor behind the app), and the app as it comes to the foreground, where
+  Settings may just have taken the permission. The shields go back on if the store lost them;
+  and a permission not approved while the phone is in a session whose row is not protection off
+  already is `record(.protectionOff(session:))` — a change the check-in's stamp then counts, so
+  the check-in's answer cannot undo it. **Reported again (A13's rider):** B3a reports protection
+  off once per revocation in a session. A13 disclosed that a re-tap older than the report can put
+  the row back to focused, over a phone iOS unshielded; an armed tap converted at another
+  teacher's Start joins another session focused. So `SyncEngine.record` re-arms the report when
+  the phone stands focused in that session: the standing is what a read or an answer said, or the
+  phone's own return, so every focused stint over a revoked permission is reported, once — the
+  report turns the standing to protection off at once. Anything but focus keeps B3a's once: an
+  unlock made over protection off reports nothing new. It is reported at the check, never at
+  every change of state: a refused report re-reads the truth, and a report at every change could
+  then loop at the network's pace; at the check-in's, it cannot. **What a screen claims:**
+  `Protection` — the permission as read, and whether the store holds the shields and the
+  permission keeps them there, as checked — never the standing alone: a stuck report stops
+  holding reads (B3a), so a read can say focused over a phone iOS unshielded. A report that could
+  not be queued is shown (`unreported`) and tried again at the next check (rule 5). **The standing,
+  kept** (`Outbox.standing()`, the `standing` key of `outboxState`): the engine writes it as it
+  changes — a write the file refuses, the app suspended say, is made again at the next change of
+  state — and starts from it and from its queue before it runs, each read on its own. In B5a,
+  not B5b whose monitor reads it too, because the shields follow the engine from its first state:
+  one starting from
+  `.out` would take them off at every relaunch — a force-quit and an offline reopen would end any
+  session — while shields kept on with no session known could not be unlocked, v2's stranded
+  student. `Standing` is `Codable` (so is BaliCore's `ParticipationState`, for it), and a state
+  this build does not know is kept as none, never as focus. **The device check** (📱, the
+  owner's, after the merge): PLAN's B5a line and `ios/README.md`, B4c's six sign-in checks first.
+  A session on dev needs the portal run against dev for the teacher (dev's API lets
+  `http://localhost:3000` in, checked 2026-09-25; the dev pool's web client id is the owner's to
+  fill in — this session's AWS user cannot list the pool's clients) and a block registered once
+  by `curl`, as the portal has no block registration yet (Phase 5); the demo script drives its own
+  actors, so it cannot put the phone in a session. The phone's side is a Debug readout: the
+  standing, the claim, and triggers in place of the screens and the NFC tap — **Allow Screen
+  Time**, **Join**, **Tap** by a typed tag, **Emergency Unlock** (`EventID.mint` is public for
+  the join). **Not covered, disclosed:** until B5b, nothing takes the shields off at the bell
+  while the app is closed — opening it after the bell does, and so does Emergency Unlock; and a
+  report stuck at B3a's bound still lands after the one a focused read re-armed, a second
+  "turned protection off" in the history. A standing the file cannot give back at launch starts
+  the engine out, shown as a storage failure, so the shields come off until a read. A sign-out
+  keeps the standing — a sign-out is not an unlock — so a relaunch keeps the shields until the
+  next read or the end. And the Debug readout's Emergency Unlock names the session the phone is
+  in even while a tap is unanswered: decision 11's route is B6's and C5's. **Assumed, and
+  checked on the phone** (step 13): that Family Controls reads the permission as approved as soon
+  as the app relaunches — read as not determined, the first check would report protection off
+  that is not. **Riders (#84's review):** `docs/DEPLOY.md` lists dev's API URL, and `SignIn`'s
+  `unsaved` comment names the relaunch case — the refused refresh token read back as signed in
+  until its renewal is refused again. **Tests** (Swift Testing, Linux and the iOS Simulator,
+  `EnforcementTests.swift`): the rule's every standing, the cap and
+  its end, an unlock after the tap and a tap after that, a stuck tap; through the engine, a tap to
+  the bell, Emergency Unlock and a refocus, the cap reached, an unlock over a pending re-tap, an
+  armed and a refused tap, shields put back at the check, the claim with the permission off while
+  the standing says focused, a relaunch (the engine starting from the file, offline, never
+  taking them off), the permission asked for; protection off reported once, again after a read
+  says focused (the rider's test, red without the re-arm), not again for an unlock,
+  nothing to report out of a session or over protection off; the standing kept, a state this
+  build does not know as none, and a write refused while suspended made again; and the check
+  before each check-in only. Of 19 mutations of the rules, all 19 turn a test red. **Santa**
+  (two Claude reviewers, round 1): no blockers; the easy WARNs fixed here — the standing's write
+  retried, the queue read apart from the standing, the enforcer's wake holding it weakly — and
+  the rest disclosed above. **Found here:** the iOS job failed twice, in B4b's `TokenTests`
+  (`shared`, `sharedFromRefresh`, `signInMidRenewal`, `signOutMidRenewal`), unchanged here and
+  green on #83–#85: the simulator stalled every test 38 and 100 seconds, and their helper polled
+  a ten-second clock (`eventually`), which a stall outruns even when what it waits for has
+  happened. They now wait on the requests' own signal (`HeldEndpoint.received`), and a
+  watcher's first value on the stream itself (`first`), neither against a clock — the suites'
+  three-minute limits bound them; only the look that must see nothing (`nothingYet`) keeps its
+  moment, which a stall can only make pass. BaliOutbox's `patience` rose from 30 to 150 seconds
+  for the same stalls; a passing wait takes none of it. Checked on Linux: `TokenTests` 25 times
+  under CPU stress (eight busy loops on four cores), both whole suites 8 and 5 times under it,
+  and a test run frozen 40 seconds mid-way (`SIGSTOP`) — all green. The next run stalled 78
+  seconds as the real-socket tests (`URLSessionTransportTests`) began: the apps' own 15-second
+  wait ran out before the frozen local server could answer. `answers` and `refusesRedirects` now
+  take the apps' own session, its redirect delegate included, with 240-second waits
+  (`patient()`), and `timesOut` bounds its request's one second at 240 of its session's 480.
+  Checked on Linux with the whole process frozen 40 seconds at its first loopback connect (an
+  `LD_PRELOAD` shim): the old tests failed as on the runner, each alone and 1 of 3 whole runs;
+  the new pass, each alone and 3 of 3, and the whole suite 5 more times under CPU stress.
 - **2026-09-25** — **A13: a return the phone made before an unlock the server already has is
   recorded, never applied (owner ruling, 2026-09-24).** The ruling, "Fix it", verbatim: "The server
   uses the phone's order number that A12 added. A refocus or re-tap that is older than an unlock the
