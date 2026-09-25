@@ -460,7 +460,7 @@ public struct Outbox: Sendable {
         guard let kept = try state(db, standingKey) else { return .out }
         let standing = try BaliJSON.makeDecoder().decode(Standing.self, from: Data(kept.utf8))
         let unfiled = try Bool.fetchOne(
-            db, sql: "SELECT EXISTS (SELECT 1 FROM outbox WHERE \(unfiled))")
+            db, sql: "SELECT EXISTS (SELECT 1 FROM outbox WHERE \(Self.unfiled))")
         return unfiled == true ? standing.acting(.unlockUnfiled(reason: nil)) : standing
     }
 
