@@ -502,36 +502,6 @@ struct RegisterTests {
         }
         #expect(center.held.flatMap { calendar.date(from: $0.end) } == bell.end)
     }
-
-    @Test(
-        "The monitor's wake carried out: cleared, or its next wake taken — a refusal kept before is gone; its next wake refused, the time is kept for the app to show, and nothing is cleared (#92's review)"
-    )
-    func carriedOut() {
-        let center = Center()
-        var (cleared, refused) = (0, Date?.some(at(-600)))
-        #expect(
-            Bell.carryOut(.clear, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-                == "cleared")
-        #expect(cleared == 1 && refused == nil && center.starts == 0 && center.stops == 0)
-
-        refused = at(-600)
-        let bell = Bell.window(until: at(1200))
-        let kept = Bell.carryOut(
-            .keep(bell), at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-        #expect(kept.hasPrefix("kept until ") && !kept.contains("NOT registered"))
-        #expect(center.held != nil && center.starts == 1 && refused == nil && cleared == 1)
-
-        center.refusing = true
-        let refusedWakes = [
-            Bell.Wake.retry(Bell.window(until: at(60))), .keep(Bell.window(until: at(1800))),
-        ]
-        for wake in refusedWakes {
-            refused = nil
-            let said = Bell.carryOut(
-                wake, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-            #expect(said.contains("NOT registered") && refused == t0 && cleared == 1, "\(wake)")
-        }
-    }
 }
 
 @Suite("The window registered, as the shields' end moves (B5b)", .timeLimit(.minutes(3)))

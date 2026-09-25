@@ -192,11 +192,7 @@ struct Placeholder: View {
                 // Filed where decision 11 says: under a tap not yet answered, else the session.
                 if phone.sync?.emergencyUnlock(reason: nil) != nil {
                     Button("Emergency Unlock") {
-                        run {
-                            let unlock = try await engine.emergencyUnlock()
-                            return unlock.map { "recorded: \(words($0.change))" }
-                                ?? "nothing to unlock"
-                        }
+                        run { try await engine.emergencyUnlock() == nil ? "nothing" : "recorded" }
                     }
                 }
                 Text("Outbox: \(queue)")
@@ -289,22 +285,19 @@ struct Placeholder: View {
 
         /// What is queued, in the order the phone acted: a stuck record with its last answer.
         private var queue: String {
-            let queued = phone.sync?.queued ?? []
-            guard !queued.isEmpty else { return "empty" }
-            return queued.map { record in
+            let queued = (phone.sync?.queued ?? []).map { record in
+                let kind =
+                    switch record.change {
+                    case .tap: "tap"
+                    case .unlock: "unlock"
+                    case .unlockUnderTap: "unlock under its tap"
+                    case .refocus: "refocus"
+                    case .protectionOff: "protection off"
+                    }
                 let answer = record.lastStatus.map { "\($0)" } ?? "no answer"
-                return words(record.change) + (record.stuck ? " (stuck: \(answer))" : "")
-            }.joined(separator: " · ")
-        }
-
-        private func words(_ change: Change) -> String {
-            switch change {
-            case .tap: "tap"
-            case .unlock: "unlock"
-            case .unlockUnderTap: "unlock under its tap"
-            case .refocus: "refocus"
-            case .protectionOff: "protection off"
+                return kind + (record.stuck ? " (stuck: \(answer))" : "")
             }
+            return queued.isEmpty ? "empty" : queued.joined(separator: " · ")
         }
 
         /// The student's latest moments, as `GET /v1/me/history` gives them: newest first.
