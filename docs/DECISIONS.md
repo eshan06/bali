@@ -39,7 +39,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `endsAt > now`, the shields' own test. A session the teacher ends early stays the phone's until a
   read says so; a report made then is A2c's, as before. **Not covered, disclosed:** a protection
   off found in the session whose report the file refused right through to the bell is not made
-  after it — `unreported` showed it while the session ran. **(4) Rule 3's check skipped while a
+  after it — `unreported` showed it while the session ran; and a clock set forward past the bell
+  ends the report as it ends the shields — the changed-clock bypass family, which ARCHITECTURE
+  leaves to the server to detect, not the phone to prevent. **(4) Rule 3's check skipped while a
   re-read was outstanding.** The read loop checked only when not re-reading, and offline a re-read
   never completes — it is asked again at every wake — so the check never ran: shields lost not put
   back, a revoked permission not queued, exactly when enforcement matters. The check now runs at
@@ -99,7 +101,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   standing, the re-read naming no session, the file read back first, and the arming ended once the
   standing is known; the clock set forward, and turned back (the test now turns the clock rather
   than winding time back); the cap over an unread standing; the late alarm. Of 18 mutations of the
-  fixes, each taken out in turn, all 18 turn a test red — the one written for it.
+  fixes, each taken out in turn, all 18 turn a test red — the one written for it. **Santa** (two
+  Claude reviewers, round 1): no blockers; the easy WARN fixed here — the clock set forward past
+  the bell, disclosed above — and the rest listed in the PR.
 - **2026-09-25** — **A14: a tap the phone made before a later tap into another class, reaching
   the server after it, is recorded, never applied (owner ruling, 2026-09-25).** Asked "Should the
   same rule cover it: the phone's latest tap wins?", the owner chose "Fix it": "Same rule as A12
