@@ -78,7 +78,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   open given up on while it holds the write lock happens only where a coordinator can be given up
   on, the simulator and the phone, so the kill it may cause is pinned by what it leaves — iOS's
   window as the read begins — not staged; (3) whether iOS lets the extension call
-  `startMonitoring` at every wake stays round 2's (B5b). **Santa:** SANTA_PENDING.
+  `startMonitoring` at every wake stays round 2's (B5b); (4) the retry asked for first replaces
+  whatever window iOS holds as the monitor wakes, one the app asked for just before too: the read
+  that follows asks for it again (kept), since the engine writes a standing to the file before the
+  enforcer hears of it and registers — unless that write failed, where the monitor reads the
+  standing before it, as it always has, and a clear there now withdraws the app's window with its
+  own; (5) `Bell.holds` compares ends only, so a window the app asks for while the monitor reads,
+  ending at the retry's very minute, is withdrawn by a clear; (6) a kept window iOS refuses is kept
+  as a refusal though iOS holds the retry — the app shows it, erring on the side of saying so,
+  until a later wake's window is taken. **Santa** (two Claude reviewers, both the fallback — no
+  other model's CLI here; round 1): no blockers. Their WARNs, all fixed here as a comment or a
+  disclosure: (4) to (6).
 - **2026-09-25** — **B6c: the extensions' read, read only and within a hard 2 s ceiling; a file this
   build has yet to migrate is migrated where it is read; the monitor's refusal bookkeeping in
   `Bell`, tested on Linux (#93's Claude Review, comment 5833779234; #92's review).** **The read,

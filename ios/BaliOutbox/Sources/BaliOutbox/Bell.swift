@@ -110,6 +110,8 @@ public enum Bell {
         case .retry(let window): next = (window, "file not read — kept, again")
         }
         let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        // Refused, it is kept as a refusal even while iOS holds the retry: the window asked for was
+        // not taken, and the retry, a minute on, asks for it again.
         let refusal = ask(next.window, of: center, calendar: calendar, at: now, refused: refused)
         return said + (refusal.map { ", NOT registered: \($0)" } ?? "")
     }
