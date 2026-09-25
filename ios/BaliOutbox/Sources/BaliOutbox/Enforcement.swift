@@ -52,20 +52,25 @@ extension SyncState {
     public static let tapCap: TimeInterval = 50 * 60
 
     /// When the shields come off, while the phone's truth keeps them on at `now`; nil: off. On while
-    /// focused in a session, until its end — and for a tap not yet answered, until decision 7's cap
-    /// (`cap`), unless the student unlocked since: an unlock is acted on at once (decision 11).
-    /// Unlocked, protection off, a state this build does not know, waiting or out: off.
+    /// focused in a session, until its end — and for a tap not yet answered, until its cap
+    /// (`tapHeldUntil`). Unlocked, protection off, a state this build does not know, waiting or
+    /// out: off.
     public func shieldedUntil(_ now: Date) -> Date? {
         var ends: [Date] = []
         if case .inSession(let session, .focused?) = standing { ends.append(session.endsAt) }
-        if let tap = pendingTap,
+        if let end = tapHeldUntil { ends.append(end) }
+        return ends.filter { $0 > now }.max()
+    }
+
+    /// Until when a tap not yet answered keeps the shields on: decision 7's cap after it (`cap`) —
+    /// unless the student unlocked since, which is acted on at once (decision 11). nil: none does.
+    public var tapHeldUntil: Date? {
+        guard let tap = pendingTap,
             !queued.drop(while: { $0.eventId != tap.eventId }).contains(where: {
                 if case .unlock = $0.change { true } else { false }
             })
-        {
-            ends.append(tap.recordedAt + cap)
-        }
-        return ends.filter { $0 > now }.max()
+        else { return nil }
+        return tap.recordedAt + cap
     }
 }
 
