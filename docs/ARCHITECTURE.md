@@ -302,9 +302,11 @@ Student app:
   tap, both unlocks, the refocus, protection off — may carry `order`, `{ install, seq }`:
   its outbox file's id, minted once when the file is made, and the record's place in that
   file, a counter no clock moves. It orders the student's own unlock against their return
-  to focus (rule 1). Optional — old builds send none — and never a reason to refuse: one
-  the server cannot use (not a UUID install, not a positive safe integer seq) is taken as
-  none.
+  to focus, both ways (rule 1): an unlock their return went ahead of is late (A10, A12),
+  and so is a return — a refocus, or a tap into a session — their unlock went ahead of
+  (A13, owner ruling 2026-09-24); each is recorded, noted `superseded`, never applied.
+  Optional — old builds send none — and never a reason to refuse: one the server cannot
+  use (not a UUID install, not a positive safe integer seq) is taken as none.
 - `POST /v1/sessions/{id}/checkin` — the every-30-seconds "still here"; the response
   carries the current truth (state, end time) so the phone can reconcile.
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
@@ -312,7 +314,13 @@ Student app:
   nurse, other); one the server does not recognise is recorded as none rather than refused.
   A refocus replayed after the student's participation ended while the session runs
   (removed, left the class, switched away) is answered `replay` with no session and no
-  state (ruled 2026-09-24), never with that ended row's last state and a window.
+  state (ruled 2026-09-24), never with that ended row's last state and a window. A late
+  return — a refocus, or a tap, that the phone made before an unlock of the student's own
+  in that session the server already has, by the phone's order (A13) — is recorded but
+  never applied, so the unlock stands; it is answered as its retry is, `replay` with the
+  truth now: the session and the state the unlock left while the student is in it, none
+  once they are not. With no order to compare, or another install's, it applies as it
+  arrives. Protection off is never late: it reports the permission, not the student.
 - `POST /v1/taps/{eventId}/unlock` — an emergency unlock made while the phone's own tap is
   unanswered (owner decision 11): sent under the tap's `event_id`, with the session
   unlock's body and answer. It is filed in whatever session that tap landed in, by that
@@ -553,7 +561,9 @@ and data types, so the two apps can't drift out of type-agreement.
   actions came last — their unlock, or their return to focus — is not a clock's to say: the
   phone numbers what it does with its outbox's counter, and the server orders the two by it
   (A12, owner ruling 2026-09-24), so a clock turned back between them never undoes a real
-  unlock. The clock still decides for a build that sends no order.
+  unlock — nor does a return the phone made before it, however late it lands (A13). The
+  clock still decides for a build that sends no order, and only for a late unlock: a return
+  with none applies as it arrives.
 
 ### Decided later, on purpose
 
@@ -615,14 +625,17 @@ Each exists because v2 broke it and shipped a real bug
 1. **The server owns the clock.** Phone timestamps are accepted only for offline catch-up,
    and always clamped into the session's real window. (v2: a backdated phone clock erased
    unlocks from reports and inflated focus minutes.) The clamp orders *events*; it is not a
-   substitute for the server's own clock. One order is not the clamp's: whether a student's
-   return to focus came after their own unlock is the phone's own order to say when both
-   carry one from the same install — its outbox's counter, which no clock moves (A12) — so a
-   tampered clock can never undo a real unlock; the times stay clamped, and still order a
-   pair without one. `participations.last_seen_at` — the input to
-   silence, and so to every green chip — is stamped server-side, never from the device's
-   claim: a clock running fast would clamp to `ends_at`, a time in the future, and the phone
-   would never go silent however long it had been gone.
+   substitute for the server's own clock. One order is not the clamp's: which of a student's
+   own unlock and return to focus came last is the phone's own order to say when both carry
+   one from the same install — its outbox's counter, which no clock moves (A12) — and it
+   reads both ways: a late unlock and a late return are each recorded, never applied (A10,
+   A12, A13), so a tampered clock can never undo a real unlock, nor can a return that came
+   before it. The times stay clamped, and a pair the order cannot place still judges an
+   unlock by them — never a return, which then applies as it arrives.
+   `participations.last_seen_at` — the input to silence, and so to every green chip — is
+   stamped server-side, never from the device's claim: a clock running fast would clamp to
+   `ends_at`, a time in the future, and the phone would never go silent however long it had
+   been gone.
 2. **One shared state function.** Student app, teacher grid, and reports all compute
    "what state is this student in" with the same shared code. (v2: teacher saw
    "No device" while the student saw "Focused.")

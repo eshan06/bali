@@ -72,6 +72,12 @@ import type { Database } from './types.js';
  * (`unlocksAwaitingTap`, one probe of a partial index), inside it. Measured the
  * same way, ~5.6 ms per tap with both, ~5.0 ms with neither: about 0.6 ms for
  * the two, of which only the look holds the session's window.
+ *
+ * A13 added one more to a tap carrying the phone's order: the look for an
+ * unlock of the student's own after it (`unlockedSince`), inside the window —
+ * ~5.8 ms per tap against ~5.1 ms, measured over 30 ordered taps a round; the
+ * read itself is ~0.04 ms through `events_user_occurred_idx`, the rest its
+ * round trip.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */

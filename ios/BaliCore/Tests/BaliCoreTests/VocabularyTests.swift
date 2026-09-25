@@ -41,6 +41,7 @@ struct VocabularyTests {
         ("index.ts", "HISTORY_EVENT_TYPES", values(HistoryEventType.self)),
         ("index.ts", "UNLOCK_RECORDED_AS", values(UnlockRecordedAs.self)),
         ("index.ts", "PROTECTION_OFF_RECORDED_AS", values(ProtectionOffRecordedAs.self)),
+        ("index.ts", "RETURN_RECORDED_AS", values(ReturnRecordedAs.self)),
         ("index.ts", "UNLOCK_REASONS", values(UnlockReason.self)),
         ("errors.ts", "API_ERROR_STATUS", values(ApiErrorCode.self)),
         ("errors.ts", "API_ERROR_REASONS", values(ApiErrorReason.self)),

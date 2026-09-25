@@ -222,7 +222,8 @@ public struct HistoryEvent: Codable, Sendable, Hashable {
     public let teacher: TeacherView
     public let session: Session?
     public let reason: OrUnknown<UnlockReason>?
-    /// An unlock's note or a protection off's — whose notes are a subset of an unlock's.
+    /// An unlock's note, a protection off's or a return's (A13) — the last two are a subset of an
+    /// unlock's.
     public let recordedAs: OrUnknown<UnlockRecordedAs>?
     public let countedIn: MeClass?
 }
