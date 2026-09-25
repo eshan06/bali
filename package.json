@@ -19,6 +19,7 @@
     "start": "npm start -w @bali/api",
     "migrate": "npm run migrate -w @bali/api",
     "demo": "npm run demo -w @bali/api",
+    "dev:teacher": "npm run dev:teacher -w @bali/api --",
     "fixtures": "npm run fixtures -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
     "lint": "eslint .",
