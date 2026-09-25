@@ -91,16 +91,20 @@ public struct Outbox: Sendable {
     /// open makes them again. The file is closed before this returns, since iOS gives an extension
     /// no notice before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a
     /// newer build migrated throws (`TooNew`); one this build has yet to migrate — the app not
-    /// opened since an update — is migrated here, once, as the app's open would, within the same
-    /// bound: the bell still clears the shields, and the shield still says when. A standing it
-    /// cannot read throws: `.unread` is the app's.
+    /// opened since an update — throws too (`TooOld`), unless `migrating`: the monitor's read
+    /// migrates it here, once, as the app's open would, within the same bound, so the bell still
+    /// clears the shields. The shield's never does (#97's review): iOS asks for it synchronously,
+    /// many times a minute, and a writing coordination and the write lock there, in the process
+    /// likeliest to be suspended without notice, would buy only the bell in its words — Bali's name
+    /// alone until the monitor or the app has migrated it. A standing it cannot read throws:
+    /// `.unread` is the app's.
     static func read(_ url: URL, within bound: TimeInterval, migrating: Bool) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
             return try coordinated(url, reading: true, until: deadline) {
                 try kept(in: $0, readonly: true, until: deadline)
             }
-        } catch is TooOld {
+        } catch is TooOld where migrating {
             return try coordinated(url, reading: false, until: deadline) {
                 try kept(in: $0, readonly: false, until: deadline)
             }
@@ -113,7 +117,8 @@ public struct Outbox: Sendable {
     /// The standing and the queue in the file at `url`, read in one transaction on one connection —
     /// read only, or migrating first what this build has yet to — whose every wait on another
     /// process ends by `deadline` (a pool's readers would each wait GRDB's own 10 s instead), and
-    /// which is closed before this returns.
+    /// which is closed before this returns: best effort, since a close that fails must never take
+    /// back what was read (#97's review), and the queue closes the file as it goes all the same.
     static func kept(in url: URL, readonly: Bool, until deadline: DispatchTime) throws
         -> SyncState
     {
@@ -127,7 +132,7 @@ public struct Outbox: Sendable {
             guard let state = try file.read(current) else { throw TooOld() }
             return state
         }
-        try file.close()
+        try? file.close()
         return try read.get()
     }
 
@@ -482,17 +487,17 @@ public struct Outbox: Sendable {
     static func file(_ db: Database, _ standing: Standing) throws -> Bool {
         let tap = standing.sessionId == nil ? try state(db, lastTapKey) : nil
         // Nowhere to file it — no session named, no tap known — it matches nothing, and waits.
-        // Whether it filed one is the UPDATE's own count, read with it: a statement run between
-        // the two would count instead (#96's review) — a wrong no loses the drain that sends it.
-        let filed = try {
-            try db.execute(
-                sql: """
-                    UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL
-                    """, arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
-            return db.changesCount > 0
-        }()
+        // Whether it filed one is what the UPDATE itself returns, the rows it filed — no count
+        // another statement could stand in for (#96's review, #97's): a wrong no loses the drain
+        // that sends it.
+        let filed = try String.fetchAll(
+            db,
+            sql: """
+                UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL
+                RETURNING eventId
+                """, arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
         try keep(db, standing)
-        return filed
+        return !filed.isEmpty
     }
 
     static func keep(_ db: Database, _ standing: Standing) throws {

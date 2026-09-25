@@ -4,7 +4,7 @@ import Foundation
 /// leaning (a); B5b): the window the shields are on is registered with iOS as a DeviceActivity
 /// schedule, and iOS wakes the monitor extension at its end — the bell, or decision 7's cap — with
 /// the app open or force-quit. The rules, apart from iOS: the enforcer registers the window, and the
-/// monitor carries out `wake`.
+/// monitor carries out its `wake` (`carryOut`).
 public enum Bell {
     /// iOS's floor: no DeviceActivity interval is shorter.
     public static let floor: TimeInterval = 15 * 60
@@ -71,7 +71,18 @@ public enum Bell {
         }
     }
 
-    /// The monitor's wake at `now`, carried out. What it did, for the Debug readout.
+    /// The monitor's wake at `now` — its `wake`, with the file at `url` — carried out in an order no
+    /// kill undoes (#97's review). Its retry, the wake a minute on that a file not read asks for,
+    /// is asked of `center` first, before the file is opened: iOS may kill the monitor while it
+    /// reads — for a migration the ceiling gave up on, still holding the file's write lock
+    /// (0xdead10cc), or for its memory — and it is woken again all the same, or iOS's refusal is
+    /// kept already. Then: nothing keeps the shields on — `clear` them, and the retry withdrawn, so
+    /// nothing wakes the monitor for nothing, unless iOS holds another window by then (the app's);
+    /// else the next wake is asked for — the retry, held already, or a later one in its place. One
+    /// iOS refuses leaves nothing to wake the monitor again, so the shields it keeps outlive their
+    /// end with the app closed: `refused` is told `now` as it happens, for the app to show from its
+    /// next open (`Protection.monitorUnscheduled`), and none once a wake is taken or the shields are
+    /// cleared (#92's review). What it did, for the Debug readout.
     public static func carryOut(
         outboxAt url: URL, at now: Date, cap: TimeInterval = SyncState.tapCap,
         in center: some BellCenter, clearing clear: () -> Void, refused: (Date?) -> Void,
@@ -86,23 +97,36 @@ public enum Bell {
         at now: Date, in center: some BellCenter, calendar: Calendar = .current,
         clearing clear: () -> Void, refused: (Date?) -> Void, reading read: () throws -> SyncState
     ) -> String {
+        let retry = window(until: now + Self.retry)
+        let unasked = ask(retry, of: center, calendar: calendar, at: now, refused: refused)
         let next: (window: DateInterval, done: String)
         switch wake(now: now, reading: read) {
         case .clear:
             clear()
+            if holds(retry.end, in: center, calendar: calendar) { center.stop() }
             refused(nil)
-            return "cleared"
+            return "cleared" + (unasked.map { " (its retry NOT registered: \($0))" } ?? "")
         case .keep(let window): next = (window, "kept until")
         case .retry(let window): next = (window, "file not read — kept, again")
         }
         let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        let refusal = ask(next.window, of: center, calendar: calendar, at: now, refused: refused)
+        return said + (refusal.map { ", NOT registered: \($0)" } ?? "")
+    }
+
+    /// Asks `center` for `window` (`register`), telling `refused` how it went — taken, or held
+    /// already: none; refused: `now` — and giving iOS's refusal, if any, for the readout.
+    private static func ask(
+        _ window: DateInterval, of center: some BellCenter, calendar: Calendar, at now: Date,
+        refused: (Date?) -> Void
+    ) -> (any Error)? {
         do {
-            try register(next.window, in: center, calendar: calendar)
+            try register(window, in: center, calendar: calendar)
             refused(nil)
-            return said
+            return nil
         } catch {
             refused(now)
-            return "\(said), NOT registered: \(error)"
+            return error
         }
     }
 
@@ -114,11 +138,16 @@ public enum Bell {
         _ window: DateInterval?, in center: some BellCenter, calendar: Calendar = .current
     ) throws {
         guard let window else { return center.stop() }
-        if let held = center.heldEnd(), calendar.date(from: held) == window.end { return }
+        if holds(window.end, in: center, calendar: calendar) { return }
         let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
         try center.start(
             calendar.dateComponents(parts, from: window.start),
             calendar.dateComponents(parts, from: window.end))
+    }
+
+    /// Whether iOS holds a window ending at `end`, as it was registered in `calendar`.
+    static func holds(_ end: Date, in center: some BellCenter, calendar: Calendar) -> Bool {
+        center.heldEnd().flatMap(calendar.date(from:)) == end
     }
 }
 
