@@ -302,9 +302,8 @@ struct BoundTests {
             let (_, url) = try makeOutbox()
             let (holding, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
             Thread.detachNewThread {
-                var failure: NSError?
                 NSFileCoordinator(filePresenter: nil).coordinate(
-                    writingItemAt: url, options: .forMerging, error: &failure
+                    writingItemAt: url, options: .forMerging, error: nil
                 ) { _ in
                     holding.signal()
                     release.wait()
@@ -312,7 +311,8 @@ struct BoundTests {
             }
             // Failing rather than hanging, should the holder never get the file.
             guard holding.wait(timeout: .now() + .seconds(150)) == .success else {
-                return Issue.record("the holding coordinator was never granted the file")
+                Issue.record("the holding coordinator was never granted the file")
+                return
             }
             defer { release.signal() }
             #expect(throws: Outbox.Busy.self) {
