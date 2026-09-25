@@ -25,7 +25,8 @@ public enum Bell {
     /// The windows iOS wakes the monitor at, each an activity of its own with iOS, so that no wake
     /// of the monitor's ever asks for the window that woke it: on iOS 18, `startMonitoring` called
     /// inside `intervalDidEnd` for the same activity deadlocks (Apple's forums, FB14664238). The
-    /// app asks for the bell's and its backup; the monitor, for its own two, in turn (`next`).
+    /// app asks for the bell's and its backup; the monitor, for its own two, in turn
+    /// (`next(after:)`).
     public enum Name: String, CaseIterable, Sendable {
         /// The bell's window: the shields' end — B5b's one activity, under its name.
         case bell = "bali"

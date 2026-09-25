@@ -142,8 +142,9 @@ window, the backup wakes the monitor too — after the bell's wake, it finds not
 2. **Force-quit, the bell — Phase 0's question.** Force-quit the app while shielded and leave the
    phone until the bell. Within a minute after the bell, with the app still closed, blocked apps
    open again; `watch` showed the student silent a minute and a half after the force-quit, then
-   the session over. Open the app: `Monitor: <a time within a minute after the bell> · bell ·
-   cleared ·` and a fraction of a second — opened two minutes after that or later, with
+   the session over. Open the app: `Monitor:` shows
+   `<a time within a minute after the bell> · bell · cleared ·` and a fraction of a second —
+   opened two minutes after that or later, with
    `<that time plus two minutes> · backup · nothing to clear ·` above it — and no
    `bell NOT scheduled` on the `Screen Time:` line.
 3. **A window shorter than iOS's 15-minute floor.** `start 15`, wait 5 minutes, **Tap** (10
@@ -159,8 +160,9 @@ window, the backup wakes the monitor too — after the bell's wake, it finds not
    wake (device check)**, and force-quit. At the bell the apps stay shielded — the monitor does
    nothing at the bell's wake, as if it had died there — and two to three minutes after the bell
    they open, the app still closed. Open the app: `Monitor: <that time> · backup · cleared ·` and a
-   fraction of a second, above `<the bell's wake> · bell · lost on purpose (device check) — nothing
-   done`, and the toggle off again: it loses one wake only.
+   fraction of a second, above
+   `<the bell's wake> · bell · lost on purpose (device check) — nothing done`, and the toggle off
+   again: it loses one wake only.
 7. **Decision 7's cap with the app closed.** With no session running, turn on **Cap a tap at 15 min
    (device check)**, turn on Airplane Mode, and **Tap**: `due until` the tap's time plus 15 minutes
    (the floor, not 50). Force-quit: within a minute after that time the apps open, the tap never
