@@ -148,6 +148,10 @@ it from the portal, and re-run.
 If you run this from a network that requires an HTTPS proxy, Node's built-in `fetch`
 ignores `HTTPS_PROXY` unless you set `NODE_USE_ENV_PROXY=1`.
 
+**The teacher for the iPhone device checks** uses these same variables:
+`npm run dev:teacher -- <command>` signs in as `DEMO_USER_TEACHER` to make a class, register a
+block, and start, watch and end a session on dev — `ios/README.md`, "To run it on your iPhone".
+
 ## Web portal
 
 The teacher portal lives in `apps/web` (Next.js). It runs locally against the dev
