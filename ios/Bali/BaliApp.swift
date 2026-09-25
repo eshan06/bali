@@ -85,13 +85,15 @@ final class Phone {
     }
 
     /// The scene's phase: the engine checks in only in the foreground, and coming back runs rule
-    /// 3's check at once — Settings may have taken the permission. Each hop sends the phase as it is
-    /// then, so two in quick succession can never leave the engine on the older one.
+    /// 3's check at once — Settings may have taken the permission. Each hop reads the phase as it
+    /// is then, so two in quick succession can never leave the engine on the older one, nor run a
+    /// check once the app has gone behind: its report refused by the suspended file, it would show
+    /// a failure that is none.
     func setForeground(_ foreground: Bool) {
         self.foreground = foreground
         guard let engine else { return }
         Task { await engine.setForeground(self.foreground) }
-        if foreground, let enforcer { Task { await enforcer.check() } }
+        if foreground, let enforcer { Task { if self.foreground { await enforcer.check() } } }
     }
 }
 

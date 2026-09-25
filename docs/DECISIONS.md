@@ -8,6 +8,102 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5a-3: enforcement hardened, round 2, before the owner's first iPhone check —
+  the remaining WARNs of #86's and #88's Claude Reviews, and the cause of `ReadTests.cadence`'s
+  flake.** Eight WARNs, each checked against `main` — B5a-2 had moved some of #86's lines — and
+  each still a defect there, reproduced by its failing test first, then fixed. **(1) An Emergency
+  Unlock undone by a
+  kill.** The unlock's row and the kept standing were two writes (`outbox.record`, then
+  `keepStanding` from `state`'s `didSet`): killed between them — or the standing's write refused,
+  the file suspended — the phone relaunched focused beside the queued unlock, and the enforcer
+  shielded over the student's emergency unlock until it reached the server, offline perhaps the
+  rest of the class. The standing a change leaves is now kept in the change's own write
+  (`Outbox.record(_:now:standing:)`); the `didSet` keeps what reads and answers change, as before.
+  **Why not the review's other remedy**, `holdsUnlock` beside the kept standing at launch: a kept
+  focused standing beside a queued unlock is also the truth after a re-tap made since — answered,
+  and gone from the queue, while the unlock is stuck — and reading it as unlocked would unshield a
+  phone the server has focused, the grid green over it. One write makes the kept standing as
+  trustworthy as the one in memory, which the reconcile's guard already trusts. **(2) A false
+  "protection off NOT recorded" after backgrounding.** `Phone.setForeground` scheduled the
+  foreground check with the phase it was called with, so `.active` then `.background` could run it
+  after `Outbox.suspend()`: its report refused by the suspended file, `unreported` went up. The task
+  now reads the phase as it runs. A check already under way can still meet the suspension — the app
+  suspends the file before the engine hears the phase — so `Enforcer.check()` reads a suspension
+  refusal as no finding, `unreported` left as it was, as the engine reads one: the check as the app
+  comes back finds the permission again. The app's half has no test (the app target has none, and
+  Linux cannot build it); the enforcer's has one. **(3) Protection off for a session the phone's own
+  clock says is over.** `check()` reported in any in-session standing, whatever the time, though
+  the shields follow that clock and are off (`shieldedUntil`, data model decision 6): a phone
+  closed or offline past the bell, its permission turned off after it, wrote a protection off into
+  that session's permanent history (A2c records it, `after_session_end`). The report is gated on
+  `endsAt > now`, the shields' own test. A session the teacher ends early stays the phone's until a
+  read says so; a report made then is A2c's, as before. **Not covered, disclosed:** a protection
+  off found in the session whose report the file refused right through to the bell is not made
+  after it — `unreported` showed it while the session ran; and a clock set forward past the bell
+  ends the report as it ends the shields — the changed-clock bypass family, which ARCHITECTURE
+  leaves to the server to detect, not the phone to prevent. **(4) Rule 3's check skipped while a
+  re-read was outstanding.** The read loop checked only when not re-reading, and offline a re-read
+  never completes — it is asked again at every wake — so the check never ran: shields lost not put
+  back, a revoked permission not queued, exactly when enforcement matters. The check now runs at
+  each wake of the read loop in the foreground, in a session: before the check-in, or the re-read
+  in its place. So it also runs as the app comes to the foreground, beside the app's own check
+  there; the two are idempotent (the outbox reports once, shielding twice is shielding), and the
+  app's stays because the loop may be held by a slow read. A report refused re-reads the truth, and
+  that wake checks again — before the answer, the phone standing protection off by its own report
+  — so nothing is reported again before the next 30-second wake: never at the network's pace (B5a's
+  concern). One test's timing moved with it: never granted is reported at the first check-in, a
+  check-in interval after coming to the foreground, as the app's own foreground check already made
+  it on the phone. **(5) `Standing` kept in the enum's synthesized coding.**
+  `{"inSession":{"_0":…,"_1":…}}` moves with the enum: a later build renaming a case, or labelling
+  or adding an associated value, would read a kept standing as unread (B5a-2's safe path, the
+  shields then waiting on the server). The kept form is now its own, each key spelled out —
+  `{"standing":"in_session","sessionId","classId","endsAt","state"}`, `out`, `waiting` — additive
+  only, like `/v1`: a later build may add a key, never rename or drop one; a key this build does not
+  know is passed over, a state it does not know is none, never focus; `.unread` is never encoded.
+  No phone holds the old form — the device check is the owner's first run — and one that did would
+  read as unread, settled by the first answer. **(6) An armed tap over an unread standing lost
+  "waiting".** Over `.unread` an armed answer asks the server, since arming ends no session the
+  phone may be in, and the re-read naming no session settled on `.out`: only a standing already
+  waiting stayed waiting. The arming is now carried (`armed`) until the standing is known — onto an
+  out the file gives back meanwhile, or into the re-read naming no session: waiting. A session
+  named, or anything else settling the standing, ends it: the standing then carries the truth
+  itself, as it would have without the gap. **(7) The not-determined window collapsed by a clock
+  set forward.** The window was measured by the wall clock, guarded only against a clock turned
+  back: a phone booted with its clock behind, which then corrects itself, read a launch's passing
+  not determined as lasting — a false protection off, in the permanent history, that only a re-tap
+  leaves. It is now measured by how long the phone has run (`SyncClock.uptime()`:
+  `ProcessInfo.systemUptime`, monotonic and not counting sleep, so a run begun before the phone
+  slept does not ripen while it sleeps), which no setting of the clock moves, either way. **(8) The
+  cap not honoured over an unread standing.** Over `.unread` the enforcer never unshielded, so the
+  shields it put on itself for a pending tap outlived decision 7's cap, the tap never answered.
+  It now knows the shields it put on (`putOn`): over `.unread` those still come off at the cap —
+  and at an unlock after the tap (decision 11), once B6 and C5 can send one with no session in
+  hand. The store's own shields at launch — the last run's —
+  stay, as B5a-2 has them: nothing says whether they are owed. B5b's monitor, another process,
+  cannot tell whose they are either, and keeps B5a-2's rule. **(9) The rider: `cadence`'s flake
+  was not its budget.** #89's log reads "never came true": a wait whose condition never held in
+  150 s, while every other test ended in 3 s. The cause was in the engine: a pause's alarm going off
+  as another ring ended that pause still rang after it — leaving a ring for the next pause, or
+  waking it — so the read loop went round once more: a check-in 30 s early. In `cadence`, the
+  foreground's ring can overtake the alarm of a wake the test already moved past (its
+  `sleeping([])` holds as soon as the clock moves), and the early check-in, never answered, stalls
+  every later wait. On a phone it only costs an early check-in. No budget can wait out what never
+  happens, so the fix is the engine's: an alarm rings only its own pause. `lateAlarm` holds the
+  alarm's wake back (`TestClock.advance(by:holdingWakes:)`) until another ring has woken the loop:
+  on `main` a check-in goes 30 s early; now none. Under CPU stress here (twice as many busy loops
+  as cores), `main`'s whole suite passed 25 runs of 25 — the flake is rare — and the fixed one 25 of
+  25, and `ReadTests` alone 50 of 50. **Tests** (`EnforcementTests`, `SharingTests`,
+  `ReconcileTests`; Linux and the iOS Simulator): a relaunch started at every
+  commit the engine makes (`Relaunches`, a transaction observer) never stands focused beside the
+  unlock or protection off it holds; a check suspended mid-report; the phone's bell, its second
+  before, and after; the check offline, the shields put back and the report queued; the kept form,
+  each standing both ways, a later key and state, `.unread` refused; an armed tap over an unread
+  standing, the re-read naming no session, the file read back first, and the arming ended once the
+  standing is known; the clock set forward, and turned back (the test now turns the clock rather
+  than winding time back); the cap over an unread standing; the late alarm. Of 18 mutations of the
+  fixes, each taken out in turn, all 18 turn a test red — the one written for it. **Santa** (two
+  Claude reviewers, round 1): no blockers; the easy WARN fixed here — the clock set forward past
+  the bell, disclosed above — and the rest listed in the PR.
 - **2026-09-25** — **A14: a tap the phone made before a later tap into another class, reaching
   the server after it, is recorded, never applied (owner ruling, 2026-09-25).** Asked "Should the
   same rule cover it: the phone's latest tap wins?", the owner chose "Fix it": "Same rule as A12
