@@ -459,7 +459,10 @@ struct ProtectionOffTests {
         let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
         #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
         rig.clock.advance(by: 30)
-        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        let checkIn = try await rig.server.next(checkInRoute)
+        // Queuing nothing, it keeps nothing either: the file stands where the phone does.
+        #expect(try rig.outbox.standing() == .inSession(session(), .unlocked))
+        checkIn.reply(200, Answer.live(state: "protection_off"))
         #expect(try rig.outbox.records().map(\.eventId) == [unlock.eventId])
         await phone.stop()
     }

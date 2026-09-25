@@ -229,11 +229,14 @@ public actor SyncEngine {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
         // Where the phone stood, and what it queued, each read on its own: enforcement follows
         // this state from the start, so it must never begin from nothing.
-        do { state.queued = try outbox.records() } catch { state.link = .storageFailed }
+        let queued = try? outbox.records()
+        state.queued = queued ?? []
+        if queued == nil { state.link = .storageFailed }
         do {
             state.standing = try outbox.standing()
-            // An unlock not filed yet acts on it; the file holds it once that unlock is filed.
-            kept = state.holdsUnfiled ? nil : state.standing
+            // An unlock not filed yet acts on it, and the first change files it (`keepStanding`) —
+            // as it files whatever the file holds when its queue could not be read.
+            if queued != nil, !state.holdsUnfiled { kept = state.standing }
         } catch {
             state.standing = .unread
             state.link = .storageFailed
@@ -287,7 +290,9 @@ public actor SyncEngine {
         }
         if let keeping { kept = keeping }
         changes += 1
-        let queued = queue()
+        // A read that fails keeps the last list — with this record, which the file holds now: the
+        // phone acts on what it just did (an unlock's shields off, a tap's on) whatever the read.
+        let queued = stored(outbox.records) ?? state.queued + [record]
         update {
             $0.standing = standing
             $0.queued = queued
@@ -415,11 +420,10 @@ public actor SyncEngine {
                 reread()
                 break
             }
-            // An unlock made after this tap, stuck and unrecorded, keeps its session's shields off.
-            let after = record.order?.seq ?? 0
-            if case .tap = record.change, participation == .focused,
-                stored({ try outbox.holdsUnlock(session: session.id, after: after) }) ?? true
-            {
+            // The unlock guard, on every answer, not a tap's alone (#95's review). A tap's or a
+            // refocus's is the student's own return: an unlock made before it holds nothing back.
+            let after = record.change.isReturn ? (record.order?.seq ?? 0) : 0
+            if participation == .focused, keepsUnlocked(session.id, after: after) {
                 participation = .unlocked
             }
             if applies { next.standing = .inSession(session, participation) }
@@ -495,7 +499,8 @@ public actor SyncEngine {
     /// answer naming the session — so a file that never reads never strands the phone.
     private func readStanding() {
         guard state.standing == .unread, let standing = stored(outbox.standing) else { return }
-        kept = state.holdsUnfiled ? nil : standing
+        // Written back at once, filing whatever the file holds waiting to be (`keepStanding`).
+        kept = nil
         state.standing = armed && standing == .out ? .waiting : standing
     }
 
@@ -516,17 +521,26 @@ public actor SyncEngine {
 
     /// A read's answer — the truth as the server saw it — applied only when no change of the
     /// phone's can be newer (`readMayReconcile`). And no read turns a session's shields back on
-    /// over an unrecorded emergency unlock (`holdsUnlock`): its window applies, its focus does not.
+    /// over an unrecorded emergency unlock (`keepsUnlocked`): its window applies, not its focus.
     private func reconcile(_ sent: ReconcileStamp, _ read: Standing) {
         guard let now = stored(stamp), readMayReconcile(sent: sent, now: now) else { return }
         var read = read
-        if case .inSession(let session, .focused?) = read,
-            !state.standing.isFocused(in: session.id),
-            stored({ try outbox.holdsUnlock(session: session.id) }) ?? true
-        {
+        if case .inSession(let session, .focused?) = read, keepsUnlocked(session.id) {
             read = .inSession(session, .unlocked)
         }
         state.standing = read
+    }
+
+    /// The unlock guard (B3b-2), for every read and every answer: a focus the server names in
+    /// `session` applies as unlocked while an emergency unlock the server has yet to record is
+    /// queued there (`holdsUnlock`) — unless the student has returned there since: the phone stands
+    /// focused there already, or the answer is to their own return made after it, by the phone's
+    /// order (`after`, that return's place in it). Focused already means returned since only while
+    /// every unlock takes the phone out of focus at once (`Standing.acting`) and nothing brings it
+    /// back but a refocus or an answer or a read past this guard: keep both so.
+    private func keepsUnlocked(_ session: String, after: Int = 0) -> Bool {
+        !state.standing.isFocused(in: session)
+            && stored({ try outbox.holdsUnlock(session: session, after: after) }) ?? true
     }
 
     private func stamp() throws -> ReconcileStamp {
@@ -577,14 +591,17 @@ public actor SyncEngine {
     private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
 
     /// Writes the standing to the file — filing into it, in the same write, every unlock made where
-    /// the phone stood unread, which then goes (B6b). `kept` is set first, so the change of state a
-    /// failure makes (`failed`) writes nothing again at once; the next change does.
+    /// the phone stood unread, which then goes (B6b): whatever the file holds, never what a read of
+    /// the queue last found, which one that fails leaves behind (#95's review). `kept` is set
+    /// first, so the change of state a failure makes (`failed`) writes nothing again at once; the
+    /// next change does.
     private func keepStanding() {
-        let (standing, filing) = (state.standing, state.holdsUnfiled)
+        let standing = state.standing
         kept = standing
-        if stored({ try filing ? outbox.file(standing) : outbox.keep(standing) }) == nil {
+        let filed = stored({ try outbox.file(standing) })
+        if filed == nil {
             kept = nil
-        } else if filing {
+        } else if filed == true {
             state.queued = queue()
             ring(.drain)
         }

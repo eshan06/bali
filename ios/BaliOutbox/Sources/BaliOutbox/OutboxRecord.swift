@@ -30,6 +30,15 @@ public enum Change: Sendable, Hashable {
     }
 
     var isUnfiled: Bool { if case .unlockUnfiled = self { true } else { false } }
+
+    /// The student's own return to focus — a tap, or a refocus — whose answer an unlock made before
+    /// it, by the phone's order, never holds back (A13).
+    var isReturn: Bool {
+        switch self {
+        case .tap, .refocus: true
+        case .unlock, .unlockUnderTap, .unlockUnfiled, .protectionOff: false
+        }
+    }
 }
 
 /// One queued record.

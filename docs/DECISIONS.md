@@ -8,6 +8,59 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B6b-2: the unlock guard on every answer, not a tap's alone; an unlock not
+  filed yet filed by what the outbox file holds (#95's Claude Review, comment 5837915189, its two
+  enforcement WARNs).** **(1) The guard.** Only a tap's answer was guarded (`if case .tap`): any
+  other answer naming a session and `focused` applied as it came, and `awaiting()` leaves out an
+  unlock not filed yet, so nothing held it back. The reviewer's path: a session unlock for S stuck;
+  a re-tap into S answered focused; a relaunch reads the standing `.unread`; Emergency Unlock files
+  `unlockUnfiled` and the shields come off; the stuck unlock is answered at last `200 recorded` /
+  `superseded` / `focused` / S — and the phone shielded again over the press the server never
+  recorded. On `main` before B6b, two stuck unlocks did the same. **Decided:** ARCHITECTURE's rule
+  — "an unrecorded unlock still keeps any read from turning its own session's shields back on,
+  unless the student has refocused or re-tapped there since" — holds for every answer that would
+  set `focused` too: a tap's, an unlock's, a refocus's, protection off's. "Since" is the phone's
+  order: a tap's or a refocus's own answer is the student's return, so it passes its own `seq`
+  (`Change.isReturn`) and an unlock made before it holds nothing back; any other answer passes
+  none, so every unlock not yet recorded holds it. **And as reads already had it (B3b-2), a phone
+  focused there already applies the answer.** It stands focused in a session only by the student's
+  own return since their last unlock there — each unlock acts at once, and an answer or a read
+  focuses only past the guard — so the exception is exact; without it, an older unlock's late
+  answer would undo a re-tap made after both of two unlocks, the phone unshielded under a green chip
+  until the other one landed (found writing the tests). One guard now serves reads and answers
+  (`keepsUnlocked`). **(2) Filed from the file.** `keepStanding` chose `Outbox.file` or
+  `Outbox.keep` by the queue in memory (`holdsUnfiled`), which a failed `records()` leaves as it
+  was: a read failing right after the press left it unfiled, and unsent, until a later change of
+  the standing. **Decided: what waits is the file's to say.** `keepStanding` always calls
+  `Outbox.file` — `keep` and more: its `UPDATE` matches nothing when nothing waits — which says
+  whether it filed one, and only then reads the queue again and wakes the drain. The same choice
+  was made from memory twice more: a read of the file's standing (`readStanding`) now always writes
+  it back, and a launch keeps what it read unwritten only when its own read of the queue said
+  nothing waits — one that could not read its queue writes, and files, at its first change. A
+  change's own write files first too (`Outbox.record`, before what the change does, so a tap files
+  under the tap before it and a refocus there returns from the unlock just filed): a filing the
+  file refused is no longer left behind by the student's next act, which kept the standing without
+  it. And a read failing right after a change keeps that change in the list, which the file holds
+  now: the press takes the shields off at once (`unlockedLast` reads the list), a tap puts them on,
+  whatever the read. Protection off already reported still writes nothing (its check moved ahead
+  of the filing). **Tests** (Linux and the iOS Simulator), each red first on `main`'s code but the
+  two that pin what must not change (the re-tap after both, the refocus's answer): the reviewer's
+  path, the press then refused and still no shield; two unlocks of a session, one stuck and the
+  other answered late, either first; a re-tap after both, the late answer leaving its focus; a
+  refocus's own answer over an unread standing, an older unlock stuck; protection off's answer
+  naming focus; the press with the queue's read failing (a row no build can read); a launch that
+  cannot read its queue, learning where the phone stands at launch, from the file read again, or
+  from the server; a filing refused, then a refocus; protection off already reported keeping
+  nothing. Of 17 mutations of the rules, each alone, 16 turn a test red; the one
+  left — the guard's fail-safe (`?? true`) when its own read fails — is `main`'s, and shows only if
+  the file fails between two reads a moment apart (`awaiting` gates an answer, `stamp` a read),
+  which no test can place. **Santa** (two Claude reviewers, both the fallback — no other model's
+  CLI here; round 1): no blockers. Fixed here: `Outbox.file` said it filed one when there was
+  nowhere to file it (no session named, no tap known) — its `UPDATE` now matches nothing then,
+  pinned — and why "focused there already" is exact is written where the guard is. Left, in the
+  PR: after a failed read, the list a change keeps can still show refocuses that change deleted,
+  or an unlock it filed as not filed — the screens' only, until the next read. **Not here:** #95's
+  third WARN (`noNFC` on a device), which round 4 covers by hand; no device check changes.
 - **2026-09-25** — **B6b: Emergency Unlock over a standing the outbox file will not give back —
   the shields off at once, the last run's too, the unlock kept until the phone knows where it
   stands, then filed there; no fail-safe ceiling. With the owner's ruling on a scan that joins no

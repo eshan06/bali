@@ -336,6 +336,14 @@ public struct Outbox: Sendable {
         -> OutboxRecord?
     {
         try pool.write { db in
+            if case .protectionOff(let session) = change,
+                try Self.state(db, Self.reportedKey) == session
+            {
+                return nil
+            }
+            // Kept as `file` keeps it, before what this does: an unlock not filed yet — a filing
+            // that failed, say — goes where the phone stood, or under the last tap before this.
+            if let standing { try Self.file(db, standing) }
             let eventId = EventID.mint(at: now)
             var follows: String?
             var tap: String?
@@ -372,7 +380,6 @@ public struct Outbox: Sendable {
                         """, arguments: [Self.state(db, Self.lastUnlockKey), session])
                 row = ("refocus", nil, session, nil)
             case .protectionOff(let session):
-                if try Self.state(db, Self.reportedKey) == session { return nil }
                 try Self.setState(db, Self.reportedKey, session)
                 row = ("protection_off", nil, session, nil)
             }
@@ -385,7 +392,6 @@ public struct Outbox: Sendable {
                     eventId, row.kind, row.tagId, row.session, tap, row.reason?.rawValue, follows,
                     now, now,
                 ])
-            if let standing { try Self.keep(db, standing) }
             return try Self.fetch(db, eventId)
         }
     }
@@ -415,15 +421,23 @@ public struct Outbox: Sendable {
     /// relaunch never finds the one without the other: in the session it names, or naming none,
     /// under the phone's last tap, which the server files where that tap landed, or keeps with no
     /// session (A11) — never discarded. With no tap known either, it waits for a standing that
-    /// names one.
-    func file(_ standing: Standing) throws {
-        try pool.write { db in
-            let tap = standing.sessionId == nil ? try Self.state(db, Self.lastTapKey) : nil
-            try db.execute(
-                sql: "UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(Self.unfiled)",
-                arguments: [standing.sessionId, tap])
-            try Self.keep(db, standing)
-        }
+    /// names one. What waits is the file's to say, never a queue read before (#95's review): true
+    /// when it filed one.
+    @discardableResult
+    func file(_ standing: Standing) throws -> Bool {
+        try pool.write { try Self.file($0, standing) }
+    }
+
+    @discardableResult
+    static func file(_ db: Database, _ standing: Standing) throws -> Bool {
+        let tap = standing.sessionId == nil ? try state(db, lastTapKey) : nil
+        // Nowhere to file it — no session named, no tap known — it matches nothing, and waits.
+        try db.execute(
+            sql: "UPDATE outbox SET sessionId = ?, tapId = ? WHERE \(unfiled) AND ? IS NOT NULL",
+            arguments: [standing.sessionId, tap, standing.sessionId ?? tap])
+        let filed = db.changesCount > 0
+        try keep(db, standing)
+        return filed
     }
 
     static func keep(_ db: Database, _ standing: Standing) throws {
