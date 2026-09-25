@@ -214,4 +214,155 @@ struct UnreadUnlockTests {
         #expect(try current(outbox, second.eventId)?.change == .unlock(session: "s", reason: nil))
         #expect(try outbox.standing() == .inSession(session(), .unlocked))
     }
+
+    @Test(
+        "An unlock the last run left stuck, answered at last — recorded late, the focus a re-tap since left named — shields nothing over the press not filed yet: the phone stands unlocked there, and the press is filed there and sent (#95's Claude Review)"
+    )
+    func lateAnswerOverThePress() async throws {
+        let (outbox, _) = try makeOutbox()
+        let stuck = try record(outbox, .unlock(session: "s", reason: nil))
+        try await send(outbox, stuck, 400, Answer.refused("invalid_request"))
+        let (phone, _) = try await unreadable(outbox: outbox)
+        let rig = phone.rig
+        let press = try #require(try await rig.engine.emergencyUnlock())
+        await phone.until { !$0.shielded }
+        try await eventually { rig.clock.deadlines.contains(at(2)) }
+        rig.clock.advance(by: 2)
+        let view = session(endsAt: 1200)
+        try await rig.server.next(sessionUnlockRoute).reply(200, Answer.unlockSuperseded(view))
+        let sent = try await rig.server.next(sessionUnlockRoute)
+        #expect(sent.eventId == press.eventId)
+        #expect(await rig.engine.state.standing == .inSession(view, .unlocked))
+        // Refused, the press stays stuck, and still no shield comes back over it.
+        sent.reply(400, Answer.refused("invalid_request"))
+        await rig.until { $0.queued.count == 1 && $0.queued[0].stuck }
+        #expect(await rig.engine.state.standing == .inSession(view, .unlocked))
+        #expect(await !phone.screenTime.shielding)
+        #expect(await phone.screenTime.unshields == 1)
+        await phone.stop()
+    }
+
+    @Test(
+        "A refocus's own answer is the student's return, by the phone's order: over a standing not read, an unlock made before it and still stuck leaves its focus be"
+    )
+    func refocusAnsweredOverUnread() async throws {
+        let (outbox, _) = try makeOutbox()
+        let view = session(endsAt: 1200)
+        let stuck = try record(outbox, .unlock(session: "s", reason: nil))
+        try await send(outbox, stuck, 400, Answer.refused("invalid_request"))
+        let unlock = try record(outbox, .unlock(session: "s", reason: nil))
+        try await send(outbox, unlock, 200, Answer.unlocked(view))
+        #expect(try record(outbox, .refocus(session: "s")).follows == nil)
+        let (phone, _) = try await unreadable(outbox: outbox)
+        let rig = phone.rig
+        try await rig.server.next(refocusRoute).reply(200, Answer.refocused(view))
+        let state = await rig.until { $0.standing != .unread }
+        #expect(state.standing == .inSession(view, .focused))
+        #expect(state.queued.map(\.eventId) == [stuck.eventId])
+        await phone.stop()
+    }
+
+    @Test(
+        "A read of the queue that fails right after the press takes nothing from it: the shields come off at once, and where the server then says the phone stands the press is filed and sent (#95's Claude Review)"
+    )
+    func pressWithTheQueueUnread() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        try poison(rig.outbox)
+        let press = try #require(try await rig.engine.emergencyUnlock())
+        let pressed = await rig.engine.state
+        #expect(pressed.queued.map(\.eventId) == [press.eventId])
+        try #require(pressed.unlockedLast)
+        await phone.until { !$0.shielded }
+        try poison(rig.outbox, false)
+        let view = session(endsAt: 4000)
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(200, Answer.me(view))
+        let sent = try await rig.server.next(sessionUnlockRoute)
+        #expect(sent.eventId == press.eventId)
+        #expect(await rig.engine.state.standing == .inSession(view, .unlocked))
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    /// How the phone comes to know where it stands, after a launch that could not read its queue.
+    enum Known: CaseIterable { case atLaunch, fileReadAgain, serverSays }
+
+    @Test(
+        "A launch whose read of the queue fails, a press not filed yet in the file: it is filed all the same — where the file says the phone stood, at launch or read again, or where the server says — by what the file holds, never the list the screens hold, and sent (#95's Claude Review)",
+        arguments: Known.allCases)
+    func queueUnreadAtLaunch(known: Known) async throws {
+        let (outbox, _) = try makeOutbox()
+        let kept = Standing.inSession(session(endsAt: 1200), .focused)
+        try outbox.keep(kept)
+        let press = try record(outbox, .unlockUnfiled(reason: nil))
+        if known != .atLaunch { try spoilStanding(outbox) }
+        try poison(outbox)
+        let rig = try Rig(outbox: outbox)
+        // Every read of the queue fails at first: the drain waits a minute to read it again.
+        try await eventually { rig.clock.deadlines.contains(at(60)) }
+        try poison(outbox, false)
+        switch known {
+        case .atLaunch: rig.clock.advance(by: 60)
+        case .fileReadAgain:
+            try outbox.keep(kept)
+            rig.clock.advance(by: 60)
+        case .serverSays:
+            await rig.engine.setForeground(true)
+            try await rig.server.next(meRoute).reply(200, Answer.me(session(endsAt: 1200)))
+        }
+        let state = await rig.until { $0.standing != .unread }
+        #expect(state.standing == .inSession(session(endsAt: 1200), .unlocked))
+        try #require(
+            try current(outbox, press.eventId)?.change == .unlock(session: "s", reason: nil))
+        let sent = try await rig.server.next(sessionUnlockRoute)
+        #expect(sent.eventId == press.eventId)
+        await rig.stop()
+    }
+
+    @Test(
+        "A filing the file refused is made by the student's next act, in that act's own write — never left behind it: a refocus there returns from the press, and waits for it (#95's Claude Review)"
+    )
+    func filedByTheNextAct() async throws {
+        let (outbox, _) = try makeOutbox()
+        let (phone, kept) = try await unreadable(outbox: outbox)
+        let rig = phone.rig
+        let press = try #require(try await rig.engine.emergencyUnlock())
+        await phone.until { !$0.shielded }
+        // Readable again, but the write that would file the press there is refused.
+        try refuseUpdates(outbox)
+        try outbox.keep(kept)
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 60)
+        await rig.until { $0.standing != .unread }
+        #expect(try current(outbox, press.eventId)?.change == .unlockUnfiled(reason: nil))
+        try refuseUpdates(outbox, false)
+        let refocus = try #require(try await rig.engine.record(.refocus(session: "s")))
+        #expect(refocus.follows == press.eventId)
+        let sent = try await rig.server.next()
+        #expect(sent.route == sessionUnlockRoute && sent.eventId == press.eventId)
+        await phone.stop()
+    }
+}
+
+/// A row this build cannot read, which every read of the queue fails on while it is there: a
+/// storage failure that passes.
+func poison(_ outbox: Outbox, _ poisoned: Bool = true) throws {
+    let sql =
+        poisoned
+        ? """
+        INSERT INTO outbox (eventId, kind, sessionId, recordedAt, nextAttemptAt)
+          VALUES ('poison', 'protection_off', 's', 'garbage', 'garbage')
+        """
+        : "DELETE FROM outbox WHERE eventId = 'poison'"
+    try outbox.pool.write { try $0.execute(sql: sql) }
+}
+
+/// The file refuses to change a queued record — an unlock's filing among them — or takes it again.
+func refuseUpdates(_ outbox: Outbox, _ refused: Bool = true) throws {
+    let sql =
+        refused
+        ? "CREATE TRIGGER refuseUpdate BEFORE UPDATE ON outbox BEGIN SELECT RAISE(ABORT, 'no'); END"
+        : "DROP TRIGGER refuseUpdate"
+    try outbox.pool.write { try $0.execute(sql: sql) }
 }

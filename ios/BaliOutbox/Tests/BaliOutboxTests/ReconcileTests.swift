@@ -364,4 +364,66 @@ struct StaleReadTests {
         #expect(state.standing == .inSession(session(), .focused))
         await rig.stop()
     }
+
+    @Test(
+        "The unlock guard holds for every answer, not only a tap's: an unlock answered late — recorded, a return went ahead of it, focused named — shields nothing over another unlock still stuck, made before it or after it (#95's Claude Review: on main, two stuck unlocks)",
+        arguments: [false, true])
+    func lateUnlockOverStuckUnlock(newerLands: Bool) async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.emergencyUnlock()
+        try await rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+        await rig.until { $0.queued.first?.stuck == true }
+        try await rig.engine.emergencyUnlock()
+        let newer = try await rig.server.next(unlockRoute)
+        if newerLands {
+            newer.reply(200, Answer.unlockSuperseded())
+        } else {
+            newer.reply(400, Answer.refused("invalid_request"))
+            await rig.until { $0.queued.count == 2 && $0.queued.allSatisfy(\.stuck) }
+            rig.clock.advance(by: 2)
+            try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+        }
+        let state = await rig.until { $0.queued.count == 1 }
+        #expect(state.standing == .inSession(session(), .unlocked))
+        #expect(state.shieldedUntil(rig.clock.now()) == nil)
+        await rig.stop()
+    }
+
+    @Test(
+        "…but a re-tap made after both unlocks is the student's return: the late answer leaves the phone in the focus it came back to, the other unlock stuck still"
+    )
+    func lateUnlockAfterReturn() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        for count in 1...2 {
+            try await rig.engine.emergencyUnlock()
+            try await rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+            await rig.until { $0.queued.count == count && $0.queued.allSatisfy(\.stuck) }
+        }
+        try await rig.engine.tap(.block("T7XK2M9QPF"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined())
+        await rig.until { $0.standing == .inSession(session(), .focused) && $0.queued.count == 2 }
+        rig.clock.advance(by: 2)
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
+        let state = await rig.until { $0.queued.count == 1 }
+        #expect(state.standing == .inSession(session(), .focused))
+        await rig.stop()
+    }
+
+    @Test(
+        "Protection off is no return: its answer naming focus shields nothing over an unlock still stuck"
+    )
+    func protectionOffOverStuckUnlock() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.emergencyUnlock()
+        try await rig.server.next(unlockRoute).reply(400, Answer.refused("invalid_request"))
+        await rig.until { $0.queued.first?.stuck == true }
+        try await rig.engine.record(.protectionOff(session: "s"))
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.replay(state: "focused"))
+        let state = await rig.until { $0.queued.count == 1 }
+        #expect(state.standing == .inSession(session(), .unlocked))
+        await rig.stop()
+    }
 }
