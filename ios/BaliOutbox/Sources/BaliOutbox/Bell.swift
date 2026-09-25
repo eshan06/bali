@@ -62,6 +62,36 @@ public enum Bell {
         return state.shieldedUntil(now).map { .keep(window(until: max($0, now + retry))) } ?? .clear
     }
 
+    /// The monitor's `wake` at `now`, carried out: nothing keeps the shields on — `clear` them;
+    /// else its next wake asked of `center`. One iOS refuses leaves nothing to wake the monitor
+    /// again, so the shields it keeps outlive their end with the app closed: `refused` is set to
+    /// `now`, for the app to show from its next open (`Protection.monitorUnscheduled`), and a wake
+    /// that ends well — cleared, or its next wake taken — sets it back to none (#92's review). What
+    /// it did, for the Debug readout.
+    public static func carryOut(
+        _ wake: Wake, at now: Date, in center: some BellCenter, clearing clear: () -> Void,
+        refused: inout Date?
+    ) -> String {
+        let next: (window: DateInterval, done: String)
+        switch wake {
+        case .clear:
+            clear()
+            refused = nil
+            return "cleared"
+        case .keep(let window): next = (window, "kept until")
+        case .retry(let window): next = (window, "file not read — kept, again")
+        }
+        let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        do {
+            try register(next.window, in: center)
+            refused = nil
+            return said
+        } catch {
+            refused = now
+            return "\(said), NOT registered: \(error)"
+        }
+    }
+
     /// Asks `center` to wake the monitor at `window`'s end — or, nil, at none — replacing the window
     /// asked for before, unless iOS holds one ending there already: a replacement may itself wake
     /// the monitor, which asks again at each wake, and the two would never end. A window iOS
