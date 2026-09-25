@@ -68,7 +68,7 @@ struct ExtensionReadTests {
     }
 
     @Test(
-        "The WAL files gone — a WAL checkpointed away — the read makes them where the app group's folder lets it (SQLite's rule for a read-only connection), and writes nothing to the file"
+        "The WAL files gone — a WAL checkpointed away: SQLite's own build has a read-only connection make them where the folder lets it; Apple's does not, and the file reads as unreadable, the fail-safe, until the app's next open makes them again — nothing written to the file either way"
     )
     func companions() throws {
         let (outbox, url) = try makeOutbox()
@@ -78,8 +78,16 @@ struct ExtensionReadTests {
         let path = url.path(percentEncoded: false)
         for suffix in ["-wal", "-shm"] { try FileManager.default.removeItem(atPath: path + suffix) }
         let file = bytes(url)
+        #if canImport(Darwin)
+            // As GRDB's guide has it: a read-only connection opens them only where they are.
+            #expect(throws: (any Error).self) { try read(url) }
+            #expect(bytes(url) == file)
+            try open(url).pool.close()
+        #else
+            #expect(try read(url).standing == .inSession(class1042, .focused))
+            #expect(bytes(url) == file && bytes(url, "-wal") == Data())
+        #endif
         #expect(try read(url).standing == .inSession(class1042, .focused))
-        #expect(bytes(url) == file && bytes(url, "-wal") == Data())
     }
 
     @Test(

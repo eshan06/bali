@@ -28,14 +28,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   not public), whatever `busyMode` says — so B5b-2's "the whole open and read waits at most 2 s,
   SQLite's locks included" held for the pool's writer, not for its reads. A `DatabaseQueue` is one
   connection on the configuration it is given: every wait on another process's lock ends by the
-  deadline. The app keeps its pool, and its 5 s busy timeout. **The WAL, SQLite's rule, checked:** a
-  read-only connection needs the `-wal` and `-shm` files to exist, or to be able to make them —
-  SQLite opens both read-write, and makes them wherever the folder lets it (wal.html, "Read-Only
-  Databases") — and the app group's folder is writable by all three targets. The app keeps them past
-  its last close (persistent WAL, B3b-2), and a read-only connection can neither delete them nor
-  clear the flag, so they are there after the app has written and closed, and made again should
-  they ever be gone. GRDB's guide says read-only connections fail without them: so they do where the
-  folder is read only, which an app group's is not. **A file this build has yet to migrate — the app
+  deadline. The app keeps its pool, and its 5 s busy timeout. **The WAL, checked on both builds of
+  SQLite:** a read-only connection needs the `-wal` and `-shm` files. SQLite's own build makes them
+  wherever the folder lets it (wal.html, "Read-Only Databases"; so it does on Linux); Apple's does
+  not — found by this step's first iOS Simulator run: "unable to open database file" — as GRDB's
+  guide says. So on the phone they must already be there, and they are: every read-write connection
+  keeps them past its close (persistent WAL — the app's since B3b-2, and the migrating open's), and
+  a read-only connection neither deletes them (it cannot take the lock that checkpoints) nor clears
+  the flag — tested: after the app has written and closed, the read leaves the file and its WAL
+  byte for byte. Gone all the same (no build leaves them gone), the file reads as unreadable, the
+  fail-safe — "Focused with Bali", the shields kept and the monitor woken a minute on — until the
+  app's next open makes them again; no fallback is built for a case no build reaches. **A file
+  this build has yet to migrate — the app
   not opened since an update, B6a's `v3`, B6b's `v4` — decided here: migrated where it is read,
   once, as the app's open would** — a writing coordination, a read-write connection with persistent
   WAL, this build's migrator — within the same deadline, then read. Left unread, the monitor would
@@ -82,7 +86,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   under way at 2 s can be made on a phone by hand. **Tests** (Linux and the iOS Simulator, but
   `heldPastBound` and `closed`, Linux only, and `coordinator` and `reader`, the simulator only):
   `ExtensionReadTests` — after the app has written and closed, read with nothing written, the file
-  and its WAL byte for byte; the WAL files gone, made again, the file untouched; no file, none made,
+  and its WAL byte for byte; the WAL files gone — made on Linux, unreadable on the simulator until
+  the app's next open — the file untouched either way; no file, none made,
   "Focused with Bali" and the shields kept; a file of `v2` and of `v3` migrated where it is read,
   the shield saying the bell and the bell clearing the shields, then read only; a migration the
   bound cuts off — the app mid-write — rolled back, and the next wake migrating and clearing; a

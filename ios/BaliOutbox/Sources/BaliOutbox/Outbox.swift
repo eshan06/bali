@@ -86,13 +86,14 @@ public struct Outbox: Sendable {
     /// monitor mid-wake. Read only: a reading coordination, which never holds up another reader,
     /// and a read-only connection, which begins no write transaction and writes nothing to the file
     /// or its WAL — no migration, no checkpoint as it closes, and no file where there is none. It
-    /// needs the WAL files, which the app keeps (persistent WAL), or else makes where the app group
-    /// lets it. The file is closed before this returns, since iOS gives an extension no notice
-    /// before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a newer
-    /// build migrated throws (`TooNew`); one this build has yet to migrate — the app not opened
-    /// since an update — is migrated here, once, as the app's open would, within the same bound:
-    /// the bell still clears the shields, and the shield still says when. A standing it cannot
-    /// read throws: `.unread` is the app's.
+    /// needs the WAL files, which every read-write connection keeps (persistent WAL) and which on
+    /// the phone it cannot make: without them, the file reads as unreadable until the app's next
+    /// open makes them again. The file is closed before this returns, since iOS gives an extension
+    /// no notice before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a
+    /// newer build migrated throws (`TooNew`); one this build has yet to migrate — the app not
+    /// opened since an update — is migrated here, once, as the app's open would, within the same
+    /// bound: the bell still clears the shields, and the shield still says when. A standing it
+    /// cannot read throws: `.unread` is the app's.
     static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
