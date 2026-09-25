@@ -88,7 +88,7 @@ struct UnlockRouteTests {
     }
 
     @Test(
-        "Until its tap is answered an unlock under it guards every session — it may be any; the tap's answer naming one hands it that one, and it still goes under the tap; an answer naming none hands it none"
+        "Until its tap is answered an unlock under it guards every session — it may be any; the tap's answer naming one hands it that one, and it still goes under the tap; an answer naming none leaves it the session the phone stood in when it was made — none, where it stood in none (#94's review)"
     )
     func settleNamesTheSession() async throws {
         let (outbox, _) = try makeOutbox()
@@ -122,6 +122,14 @@ struct UnlockRouteTests {
             try record(outbox, .unlockUnderTap(tap: tap.eventId, reason: nil))
             try await send(outbox, tap, 200, answer)
             #expect(try !outbox.holdsUnlock(session: "s"), "\(answer)")
+            // Made where the phone stood in a session — the standing it leaves names it.
+            let retap = try record(outbox, .tap(tagId: "B"))
+            let unlocked = Standing.inSession(session(), .unlocked)
+            _ = try outbox.record(
+                .unlockUnderTap(tap: retap.eventId, reason: nil), now: t0, standing: unlocked)
+            try await send(outbox, retap, 200, answer)
+            #expect(try outbox.holdsUnlock(session: "s"), "\(answer)")
+            #expect(try !outbox.holdsUnlock(session: "t"), "\(answer)")
         }
     }
 }
@@ -229,6 +237,41 @@ struct UnderTapEngineTests {
         try await rig.foreground(Answer.me(session(endsAt: 4000)))
         #expect(await rig.engine.state.standing == .inSession(session(endsAt: 4000), .unlocked))
         await rig.stop()
+    }
+
+    @Test(
+        "Focused, a scan of another teacher's block — answered armed, so it names no session — and Emergency Unlock before that answer, stuck unrecorded: no read shields the session the student stood in, until they re-tap there after it (#94's review)"
+    )
+    func armedTapsUnlockGuardsWhereItStood() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        let view = session(endsAt: 4000)
+        try await rig.tapIn(view)
+        await phone.until { $0.shielded }
+        let retap = try #require(try await rig.engine.tap(.block("W3RD8K2QAN")))
+        let held = try await rig.server.next(tapRoute)
+        try await rig.engine.emergencyUnlock()
+        await phone.until { !$0.shielded }
+        held.reply(200, Answer.armed)
+        try await rig.server.next(underTapRoute(retap)).reply(400, Answer.refused("invalid_request"))
+        await rig.until { $0.queued.count == 1 && $0.queued.first?.stuck == true }
+        #expect(try rig.outbox.awaiting() == 0)
+        // The server never recorded the unlock: every read has the student focused there.
+        try await rig.foreground(Answer.me(view))
+        #expect(await rig.engine.state.standing == .inSession(view, .unlocked))
+        rig.clock.advance(by: 30)
+        // The unlock, due again, is refused again; the check-in answers focused there too.
+        try await rig.server.next(underTapRoute(retap)).reply(
+            400, Answer.refused("invalid_request"))
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(view))
+        try await rig.sleeping([at(34), at(60)])
+        #expect(await rig.engine.state.standing == .inSession(view, .unlocked))
+        #expect(await !phone.screenTime.shielding)
+        // A re-tap there, after the unlock by the phone's order, is a return: back to focus.
+        try await rig.engine.tap(.block("T7XK2M9QPF"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined(view))
+        await phone.until { $0.shielded && $0.until == view.endsAt }
+        await phone.stop()
     }
 
     @Test(

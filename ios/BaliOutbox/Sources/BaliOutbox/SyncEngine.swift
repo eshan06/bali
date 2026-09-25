@@ -53,6 +53,9 @@ public enum Standing: Sendable, Hashable {
     func isFocused(in session: String) -> Bool {
         if case .inSession(let view, .focused?) = self { view.id == session } else { false }
     }
+
+    /// The session it is in; nil: none.
+    var sessionId: String? { if case .inSession(let view, _) = self { view.id } else { nil } }
 }
 
 /// As the outbox file keeps it (`Outbox.standing()`), for a relaunch and the extensions (B5): a

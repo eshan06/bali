@@ -316,7 +316,9 @@ public struct Outbox: Sendable {
             case .unlockUnderTap(let tapId, let reason):
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
                 try Self.setState(db, Self.lastUnlockKey, eventId)
-                row = ("unlock", nil, nil, reason)
+                // It guards the session the phone stood in, which the standing it leaves names,
+                // until its tap's answer names another: one naming none leaves it that one.
+                row = ("unlock", nil, standing?.sessionId, reason)
                 tap = tapId
             case .refocus(let session):
                 // The unlock it returns from — the latest — while it is queued, in this session or
@@ -462,7 +464,8 @@ public struct Outbox: Sendable {
 
     /// Whether an unrecorded unlock of `session`, made after the record at `seq`, is queued — or
     /// one under a tap still queued, its session unnamed: it may be any. While one is, neither a
-    /// read nor an older tap's answer puts that session's shields back on.
+    /// read nor an older tap's answer puts that session's shields back on. An unlock under a tap is
+    /// of the session its tap's answer names, else of the one the phone stood in (#94's review).
     public func holdsUnlock(session: String, after seq: Int = 0) throws -> Bool {
         try pool.read {
             try Bool.fetchOne(
