@@ -11,8 +11,12 @@ import Foundation
 final class SessionMonitor: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
-        guard let url = Outbox.appGroupURL else { return }
         let started = ContinuousClock.now
+        let at = { Date().formatted(date: .omitted, time: .standard) }
+        guard let url = Outbox.appGroupURL else {
+            Bell.lastWake = "\(at()) · no app group — nothing read, kept"
+            return
+        }
         #if DEBUG
             let cap = Bell.deviceCheckCap ?? SyncState.tapCap
         #else
@@ -27,7 +31,6 @@ final class SessionMonitor: DeviceActivityMonitor {
             done = wake == .keep(window) ? "kept until \(until)" : "file not read — kept, again \(until)"
             do { try Bell.register(window) } catch { done += ", NOT registered: \(error)" }
         }
-        let at = Date().formatted(date: .omitted, time: .standard)
-        Bell.lastWake = "\(at) · \(done) · \(ContinuousClock.now - started)"
+        Bell.lastWake = "\(at()) · \(done) · \(ContinuousClock.now - started)"
     }
 }

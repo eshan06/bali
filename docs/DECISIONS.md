@@ -27,9 +27,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its start; if it does not, a tap in a session's last fifteen minutes keeps its shields past the
   bell until the app is opened — B5a's behaviour — and what then is the owner's call. **When it is
   registered** (`Enforcer.apply`, through `ScreenTime.schedule`): for the shields the store holds
-  and the permission keeps there (`Protection.shielded`) — none while the permission is off, since
-  iOS has dropped them and there is nothing to take off (a moment's not determined at a launch
-  cancels it; the next pass registers it again). It follows `shieldedUntil`, so a new session, an
+  and the permission keeps there (`Protection.shielded`) — cancelled once the permission is denied,
+  since iOS has dropped them and there is nothing to take off, but never on a read of not
+  determined: Family Controls can read it so for a moment (B5a-2) while the store's shields are
+  still on, and a cancel there, the app force-quit before the next pass, would leave them past
+  the bell (santa's round 1, pinned by `noShields`). It follows `shieldedUntil`, so a new session, an
   unlock, the bell, an extension the check-in brings and a re-tap each register or cancel it; one
   activity name, each registration replacing the last. Over an unread standing (B5a-2) it is never
   cancelled — the last run's window may be what takes the last run's shields off at a bell nobody
@@ -97,11 +99,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   NSFileCoordinator holding the file); the registrations through the enforcer (a tap to the bell,
   an unlock and a refocus, an extension and a re-tap, a relaunch and the device check's cap, a
   refusal shown and asked again, no shields held, an unread standing) — and `unreadCappedOverHeld`
-  and `heldSleepCancels`, each red first. Of 24 mutations of the rules, each taken alone, 23 turn
-  a test red; the 24th — the monitor's
-  read without its explicit `close()` — changes nothing a caller can see: the pool is released,
-  and the file closed, as the read returns (the descriptor test holds), so the close stays as the
-  statement of the rule where it matters. **Santa** SANTA
+  and `heldSleepCancels`, each red first. Of 25 mutations of the rules, each taken alone, 24 turn
+  a test red; the 25th — the monitor's read without its explicit `close()` — changes nothing a
+  caller can see: the pool is released, and the file closed, as the read returns (the descriptor
+  test holds), so the close stays as the statement of the rule where it matters. **Santa** (two
+  Claude reviewers, both the fallback — no other model's CLI here; round 1): no blockers. Fixed
+  here: a read of not determined no longer cancels the window, and the monitor records a wake
+  with no app group too. Left, in the PR: `capOf` cleared only by an unshield, which cannot matter
+  while a standing is unread only from launch; and a pending tap's window registered over an
+  unread standing, whose wake retries each minute while the file stays unreadable — kept, since
+  a read refused at launch is usually transient, and then that wake decides by the truth.
 - **2026-09-25** — **B5a-3: enforcement hardened, round 2, before the owner's first iPhone check —
   the remaining WARNs of #86's and #88's Claude Reviews, and the cause of `ReadTests.cadence`'s
   flake.** Eight WARNs, each checked against `main` — B5a-2 had moved some of #86's lines — and

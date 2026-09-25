@@ -420,21 +420,30 @@ struct ScheduleTests {
     }
 
     @Test(
-        "No shields the store holds — the permission not read approved — no window: nothing for the monitor to take off; approved again, registered again"
+        "A permission read not determined — as Family Controls can for a moment — never cancels the window the store's shields may still need; denied, iOS has dropped them, and it is cancelled; approved again, registered again"
     )
     func noShields() async throws {
         let rig = try Rig()
         let phone = Enforced(rig)
+        let bell = Bell.window(until: at(1200))
         try await rig.tapIn(session(endsAt: 1200))
-        await phone.until { $0.until == at(1200) }
+        await phone.until { $0.until == at(1200) && $0.shielded }
+        #expect(await phone.screenTime.registered == bell)
         await phone.screenTime.reads(.notDetermined)
         await phone.enforcer.check()
         await phone.until { $0.permission == .notDetermined }
+        #expect(await phone.screenTime.windows.last == .some(bell))
+        // Denied, and its report not queued, so the phone still stands focused: no shields to end.
+        try refuseRecords(rig.outbox)
+        await phone.screenTime.set(.denied)
+        await phone.enforcer.check()
+        await phone.until { $0.permission == .denied }
         #expect(await phone.screenTime.windows.last == .some(nil))
-        await phone.screenTime.reads(.approved)
+        try refuseRecords(rig.outbox, false)
+        await phone.screenTime.set(.approved)
         await phone.enforcer.check()
         await phone.until { $0.shielded }
-        #expect(await phone.screenTime.registered == Bell.window(until: at(1200)))
+        #expect(await phone.screenTime.registered == bell)
         await phone.stop()
     }
 

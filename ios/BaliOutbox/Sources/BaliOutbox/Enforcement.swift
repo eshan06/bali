@@ -187,11 +187,12 @@ public actor Enforcer {
         let shielded = await screenTime.isShielding() && permission == .approved
         // B5b: iOS wakes the monitor at the end of the shields the store holds, for a closed app —
         // asked again as the end moves (a new session, an extension, a re-tap) and cancelled once
-        // they are off; but never cancelled where the phone stood unread: the last run's window
-        // may be what takes its shields off.
+        // they are off, or denied has iOS drop them; but never cancelled over what is not known —
+        // where the phone stood unread (the last run's window may be what takes its shields off),
+        // or a permission read not determined for a moment, the store's shields still on.
         let window = shielded ? until.map(Bell.window) : nil
         var unscheduled = protection.unscheduled
-        if window == nil, state.standing == .unread {
+        if window == nil, state.standing == .unread || permission == .notDetermined {
             unscheduled = false
         } else if window != scheduled || unscheduled {
             do {
