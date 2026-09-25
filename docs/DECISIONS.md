@@ -8,6 +8,22 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **T1: the device checks' teacher on dev is a terminal command, not the portal,
+  for now.** The iPhone checks (B4c, B5a; later B5b, B5c, B6, E1) need a teacher on dev: a class to
+  join, a block to tap, a session and a view of each student. The portal cannot be that teacher on
+  dev yet: the dev pool's web client — the one `AUTH_AUDIENCE` lists — has no
+  `http://localhost:3000/auth/callback`, so a sign-in is answered `redirect_mismatch`, and no screen
+  registers a block (`POST /v1/blocks`, Phase 5). B5a's recipe papered over the second with `curl`
+  and a token copied out of the browser's storage — a credential handled by hand. The exit demo's
+  remote mode already signs the dev teacher in (its test users, `ALLOW_USER_PASSWORD_AUTH`,
+  `.env.demo`), so `npm run dev:teacher` reuses it whole — variables, sign-in, teacher check, HTTP
+  caller — for the few requests a check needs, and the token never leaves the process. `watch`
+  reads the session's snapshot every 2 s rather than holding the SSE stream: nothing is held open
+  (the stream is capped per teacher), every read is the whole truth, and it runs the portal's own
+  grid rules on each row (`apps/web/src/lib/grid-state.ts`), so its line and the portal's chip never
+  disagree (rule 2) — which took `"type": "module"` in `apps/web/package.json`, as every other
+  workspace has; the portal's build and tests are unchanged by it. Revisit once the portal reaches
+  dev (the callback added to the web client) and registers blocks: the checks can move back to it.
 - **2026-09-25** — **B5a: the shields follow the sync engine; the Screen Time permission; rule 3's
   check before each check-in, which reports protection off — again whenever the phone stands
   focused (A13's rider); and the standing kept in the app group. B5 ships in three.** **The

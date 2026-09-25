@@ -176,4 +176,10 @@ describe('createCall', () => {
 
     await expect(call('POST', '/v1/classes')).rejects.toThrow(/409 \(wanted 200\).*nope/s);
   });
+
+  it('carries the unexpected status on the error, for a caller to act on', async () => {
+    const call = createCall('https://api.example.test', responds('{"error":"expired"}', 401));
+
+    await expect(call('GET', '/v1/sessions/x')).rejects.toMatchObject({ status: 401 });
+  });
 });

@@ -53,7 +53,10 @@ export function createCall(
     }
     const want = opts.expectStatus ?? 200;
     if (status !== want) {
-      throw new Error(`${method} ${path} → ${status} (wanted ${want}): ${text}`);
+      // The status rides along, so a caller can act on it without reading the words.
+      throw Object.assign(new Error(`${method} ${path} → ${status} (wanted ${want}): ${text}`), {
+        status,
+      });
     }
     if (!text) return null as T;
     try {

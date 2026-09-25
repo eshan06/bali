@@ -61,25 +61,22 @@ the app and both extensions (2026-09-24).
 A Debug build, run from Xcode as above, against dev. `docs/PLAN.md`'s B5 step keeps the same
 list and its status.
 
-**Set up once, on dev.** A session needs a teacher, a class, a block and a student:
+**Set up once, on dev.** A session needs a teacher, a class, a block and a student. The teacher's
+side is `npm run dev:teacher`, from a checkout on your Mac (`npm ci` once): it signs in as the exit
+demo's teacher, with the demo's variables and `.env.demo` (README, "Running it against a deployed
+API"), and never prints a credential.
 
-- **The teacher's side is the portal**, run on your Mac against dev (`docs/WEB.md`):
-  `apps/web/.env.local` with `NEXT_PUBLIC_API_URL=https://bali-production-09a2.up.railway.app`,
-  `NEXT_PUBLIC_COGNITO_DOMAIN=https://bali-dev.auth.us-east-1.amazoncognito.com` and
-  `NEXT_PUBLIC_COGNITO_CLIENT_ID` = the dev pool's **web** client (not `bali-ios-dev`), then
-  `npm run dev -w @bali/web`. Dev's API already lets `http://localhost:3000` in. Sign in as a
-  teacher with a school — the exit demo's teacher is one (README, "Running it against a deployed
-  API").
-- **A class:** create one in the portal; it shows the join code.
-- **A block:** the portal cannot register one yet (Phase 5), so register one once, with the
-  portal's token — the browser's developer tools → Session Storage → `bali.access_token`:
-  ```sh
-  curl -X POST https://bali-production-09a2.up.railway.app/v1/blocks \
-    -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"tagId":"DEV-B5"}'
-  ```
-- **The phone signs in as a student** of the dev pool — not as the teacher.
+```sh
+set -a; . ./.env.demo; set +a
+read -rsp 'demo password: ' DEMO_PASSWORD && export DEMO_PASSWORD
+npm run dev:teacher -- class   # the class "Device check", made or reused: prints its join code
+npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the teacher
+```
 
-**Then, on the phone**, each with what the readout or the portal must show:
+**The phone signs in as a student** of the dev pool — one of the demo's test students, such as
+`DEMO_USER_ANA`'s account, in the hosted UI — never as the teacher.
+
+**Then, on the phone**, each with what the readout or `watch` must show:
 
 1. **Sign in** opens Cognito's hosted UI; after the password, `Signed in: yes`.
 2. Swipe the app away and open it again: still signed in.
@@ -90,25 +87,27 @@ list and its status.
 6. The Keychain works on the device: 1 saved, 2 and 5 loaded, 3 cleared. A failure shows — a
    sign-in `notKept`, "not known yet" on an unlocked phone, a sign-out's `Failure(status: …)`.
 7. **Allow Screen Time**: iOS asks for Face ID or the passcode; then `Screen Time: approved`.
-8. **Join** with the class's code: `joined <the class>`.
-9. The portal: **Start session** (25 minutes; a shorter one is
-   `curl -X POST …/v1/classes/<class id>/sessions -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"durationMinutes":5}'`).
-10. **Tap** with `DEV-B5`: `Standing: focused until` the bell, `shields on, due until` the bell,
-    and the grid shows the student focused. Every app and website is shielded — iOS's own shield
-    until B5c draws Bali's — while calls, FaceTime and Messages still work. (Tapped in Airplane
-    Mode, the shields go on at once, `due until` the tap's time plus 50 minutes — decision 7's cap
-    — until the answer comes.)
-11. **Emergency Unlock**: the shields are off at once and the apps open; the grid shows unlocked.
+8. **Join** with the code `class` printed: `joined Device check`.
+9. `npm run dev:teacher -- start` (20 minutes; `-- start 5` for five, `-- extend` adds ten), then
+   `npm run dev:teacher -- watch`, left running: it prints each student's state as the portal's
+   grid would show it — focused, unlocked with its reason, protection off, silent, left — and
+   when the phone was last seen, so each check-in shows too.
+10. **Tap** with `DEVICE-CHECK-1`: `Standing: focused until` the bell, `shields on, due until` the
+    bell, and `watch` shows the student focused. Every app and website is shielded — iOS's own
+    shield until B5c draws Bali's — while calls, FaceTime and Messages still work. (Tapped in
+    Airplane Mode, the shields go on at once, `due until` the tap's time plus 50 minutes — decision
+    7's cap — until the answer comes.)
+11. **Emergency Unlock**: the shields are off at once and the apps open; `watch` shows unlocked.
     **Tap** again: shielded and focused once more.
 12. Settings → Screen Time → Apps with Screen Time Access → turn Bali off, and go back to the
-    app: `denied · shields off` at once, and within about 30 seconds the grid shows **protection
+    app: `denied · shields off` at once, and within about 30 seconds `watch` shows **protection
     off**. **Allow Screen Time** again: still no shields — only a re-tap leaves protection off —
     and **Tap** brings the shields and focus back.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
-    `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: the grid
+    `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
     still shows focused, never protection off — the permission reads as allowed after a launch.
-14. With the app open, the bell (or **End session** in the portal, found at the next check-in)
-    takes the shields off: `Standing: in no session`.
+14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
+    the next check-in) takes the shields off: `Standing: in no session`.
 
 Still to come, with its part: the bell with the app force-quit — Phase 0's open question — and the
 50-minute cap with the app closed (B5b); Bali's own shield, "Focused with Bali until 9:42" (B5c).

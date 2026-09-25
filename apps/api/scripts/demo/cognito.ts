@@ -46,7 +46,7 @@ export interface CognitoCredentials {
  * worth reading — ENOTFOUND, ECONNREFUSED, a TLS message — on `err.cause`, so
  * the top-level message alone says nothing an operator can act on.
  */
-function detailOf(err: unknown): string {
+export function detailOf(err: unknown): string {
   const found: string[] = [];
   const visited = new Set<unknown>();
   const visit = (node: unknown, depth: number): void => {
