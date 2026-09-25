@@ -78,6 +78,12 @@ import type { Database } from './types.js';
  * ~5.8 ms per tap against ~5.1 ms, measured over 30 ordered taps a round; the
  * read itself is ~0.04 ms through `events_user_occurred_idx`, the rest its
  * round trip.
+ *
+ * A14 added two: the student's lock (`lockStudentTaps`), before the session's,
+ * and for a tap carrying the order the look for a later tap of theirs in
+ * another session (`tappedSince`, one range of `events_order_tap_idx`), inside
+ * the window — ~6.8 ms per tap against ~6.2 ms on this lane's runner the same
+ * way, medians of four alternating runs: about a round trip each.
  */
 
 /** Every refusal the engine can make — a list, so a test can walk them all (A5). */

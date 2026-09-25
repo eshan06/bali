@@ -8,6 +8,110 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **A14: a tap the phone made before a later tap into another class, reaching
+  the server after it, is recorded, never applied (owner ruling, 2026-09-25).** Asked "Should the
+  same rule cover it: the phone's latest tap wins?", the owner chose "Fix it": "Same rule as A12
+  and A13: an older tap (by the phone's order) never undoes a newer one into another class. It's
+  recorded, not applied. A small server step before B6, where taps come from the NFC reader."
+  **Why:** A13's entry disclosed it — its "Not covered (2)", closed here. A student taps into
+  class A and the request is slow; they tap into class B, which lands first and puts them in B;
+  A's older tap then lands and switched them back into A — the grid showing them in A, the
+  phone shielded to A's window, though B was their last tap. **The rule, A13's tap against
+  tap:** a tap is late when the student already has a `tap_in` recorded from the same install
+  with a higher seq in another session (`tappedSince`). By the order only: with none on either
+  side, or another install's, the arrival order stands, as before. *Another session*, not
+  another class: two sessions of one class never run at once, so a later tap in the class's
+  other session is in one that has ended, and the older tap joining the class's new session
+  would still move the student after their latest tap had; the invariant A13 keeps is the
+  same — within one install, the student is where their latest action by the phone's order
+  put them. A tap into the *same* session stays A13's to judge, unchanged: it only rejoins
+  where the later tap put them. **What counts: every later tap of theirs, whatever its note
+  and whether they are still in its session.** One noted `superseded` itself (A13: an unlock
+  went ahead of it) still says the phone's last tap was there; one whose session is over left
+  the student out, and an older tap must not pull them into another class then. A tap that
+  only armed is no later tap: arming ends nothing (decision 4 is a join's), so a tap into a
+  running session that an armed tap followed still takes — in either arrival order the
+  student ends in that session and armed — and the armed tap is judged at its Start.
+  **Late — recorded, never applied — wherever a tap takes effect:** (1) `tapIn`: A13's late
+  path, unchanged — its `tap_in` noted `superseded` (`RETURN_RECORDED_AS`: the student's own
+  later action went ahead of it; no new vocabulary, nothing for BaliCore), no join, switch or
+  reopening, contact on a row still live, answered `replay` with the truth now: the session
+  and its state while the student is live there — reached only when a later tap of theirs
+  put them back — else no session and no state. `tapDisposition` reads them `apply_session`
+  and `reread`, as does its Swift port; neither table changes. (2) `armTap`: a tap that would
+  arm, once such a later tap is recorded (any session: it has none yet), never waits — a
+  Start would convert it and switch them back. It is recorded where every arm-path tap is
+  kept, as an `armed_taps` row consumed as it lands, which no Start converts (the conversion
+  reads only waiting rows), and answered `replay` with no session (`reread`) — exactly the
+  retry of a consumed row (`answerOwnArmedTap`), so its retry answers what was recorded and is
+  never judged again; a rival delivery of it is arbitrated by the row's `event_id` index. It
+  is judged after this tap's own-retry lookups and before a standing row can answer
+  `already_armed`: that row, older than the same later tap, is declined at its Start as well.
+  (3) The Start: the gap's in-order shape — Y's block tapped before the bell (armed), then B's
+  in B's running session, then Y's Start converted the waiting tap and switched the student
+  out of B. A waiting tap older than a tap of theirs since recorded in another session is late
+  at its Start: recorded in the new session as its `tap_in`, noted `superseded`, the row
+  consumed, never joined. Not `armed_tap_skipped`, whose history names the class the armed
+  tap's own id counted in — a late tap's never counted anywhere. Decision 5 gains this as its
+  second exception (ARCHITECTURE); without an order, a waiting tap converts as before (the
+  existing "conversion ends a student who is live in another session" still passes).
+  **A late tap's kept unlocks** (A11): filed where the tap is recorded, by the unlock's rules —
+  A13's late path already did — and with the student not live there, noted
+  `no_live_participation`: the class they tapped then reads "Left · unlocked", the chip it shows
+  when the two taps land in the phone's order (joined, unlocked under that tap, switched
+  away), so both arrival orders end alike, A11's principle; an unlock sent under it after it
+  landed is filed there too (`unlockUnderTap` finds the tap). On the arm path it is kept
+  unattached, as for any armed tap: `unknown_tap` if it came first (no arm files anything —
+  A12's rider), `tap_armed` if after (the consumed row counts as armed, as a Start's consumed
+  row does). Never discarded, in no class. **Where, and a new lock:** the engine only, as
+  always. The look is one read, `tapsMadeSince`, through a new partial index,
+  `events_order_tap_idx` (`order_install, order_seq` where `type = 'tap_in'`, migration
+  `0009`): it has no time bound — the order is the phone's and not the clock's, and a stuck
+  tap can be days old — so without it every ordered tap would read the student's whole
+  history. The two taps of the gap lock two different sessions, so nothing serialised them:
+  each could judge before the other committed and switch after it, and the older one then put
+  the student back — staged on the real lane. So a student's taps serialise on
+  `lockStudentTaps`, a transaction advisory lock: `tapIn` takes it after `lockTap` and before
+  its session (tap, student, session, row), and a Start takes each converting student's, in id
+  order, after its waiting rows and before any participation — the Start then holds nothing a
+  tap waits on (its session is not visible yet, it locks no other, and its class has none
+  running). `armTap` takes none: it writes a waiting row a Start holds `FOR UPDATE`, so holding
+  a student's lock there deadlocks with a Start waiting for that student. An arm racing a
+  later tap it cannot see yet may therefore arm — and its Start judges it again, under the
+  lock. Cost: ~0.6 ms a tap for the lock and the look (~6.8 ms against ~6.2 ms, 30 ordered taps
+  a round, medians of four alternating runs), each about a round trip. **Readers:** the live
+  grid leaves the chip alone for a late `tap_in` — contact, A13's `isLateReturn` — so a student
+  never in that session reads absent and one who left reads Left; the snapshot has no row to
+  show, and its turn looks past the note; the history shows the late tap with its note.
+  **Idempotency:** `tapIn`'s replay branch answers a retry before anything is judged, and the
+  arm path's `exact` lookup does; a late tap is never judged again. **Not covered, disclosed:**
+  (1) A14 ranks a tap against later taps only: an unlock or refocus the phone made after a tap,
+  in another session, does not make it late — an unlock made while the tap is unanswered goes
+  under that tap (decision 11) anyway, so only a refocus sent to the old session while a tap
+  into another is unanswered reaches it — one the phone's screens need not offer (C4); (2) A13's other disclosed shape, a return older than a protection-off report, stays
+  open (B5a reports again); (3) an arm-path late tap leaves no history moment — nothing that
+  only armed does until its Start — while one declined at its Start is in that session's
+  history. **Tests:** the engine on PGlite (the late tap, both arrival orders, arrival order
+  for another install and for no order, every later tap counted — its session over, or noted
+  late itself — the same session A13's, contact where the student is back, the late arm and
+  its Start, a waiting tap declined and a newer one converting, the kept unlocks both ways and
+  on the arm path, the index's EXPLAIN); four real-Postgres races — a tap against the later
+  tap and a Start against it, each in both arrival orders, and each lock staged: holding the
+  older tap's or the Start's own id, a holder parks it just after it judged, and without the
+  lock the later tap commits and the student ends back in the older one's class; the API
+  (`POST /v1/taps`: the answer, its disposition, `GET /v1/me`, A's snapshot, the retry, the
+  arm path and its Start); the grid (absent stays absent; the kept unlock reads "Left ·
+  unlocked" either way); BaliCore decodes the fixtures. Seven of the gap's engine tests fail
+  without the judgment; of nine mutations of it, eight turn a test red — the ninth, `>=` for
+  `>`, changes nothing a phone can reach, since one install never numbers two records alike;
+  and removing either lock turns its staged race red. **Riders:** (1) #85's Claude Review:
+  `NOTED` in `queries.ts` holds `tap_in` since A13, and nothing pinned it — only a late
+  refocus reached the history's tests. Pinned now: the API history test shows a late re-tap
+  (A13) and a late tap (A14), each `recordedAs: 'superseded'`, and turns red without the entry;
+  `history/every-kind` gains a second `superseded` moment, a late tap, and the contract test's
+  set is `refocus` and `tap_in`. (2) The owner confirmed `bali-ios-dev`'s refresh-token
+  expiration is raised above Cognito's 30-day default (365 days was asked for): done for dev
+  in `docs/DEPLOY.md` and PLAN; production's client still needs it.
 - **2026-09-25** — **B5a-2: enforcement hardened from #86's Claude Review before the owner's first
   iPhone check — a check's finding never lost to a pass, a standing the file will not give back
   never starts the phone out, `Protection.unreported` tested, and not determined reported only once
@@ -251,7 +355,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   again until B5's check of the shields — B5 should report it again when a read says focused while
   the permission is off, or the owner can extend the rule to it; (2) a tap older than a later tap
   into another class still switches the student back: the order ranks a student's unlock against
-  their return, not two taps. **Tests:** the engine on PGlite (a late refocus and a late re-tap,
+  their return, not two taps — **closed by A14 (2026-09-25): such a tap is recorded, never
+  applied**. **Tests:** the engine on PGlite (a late refocus and a late re-tap,
   each with its replay; a newer return, another install's pair and no order, applied; protection
   off still applied; every note counted; a session left, never reopened; a late tap filing what was
   kept under it; every refusal standing; contact), a real-Postgres race of each return against the

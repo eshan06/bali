@@ -304,7 +304,9 @@ export const armedTaps = pgTable(
     /**
      * Set at the session start that took this tap: it became a participation,
      * or was declined because its tap had already landed (decision 5,
-     * recorded as `armed_tap_skipped`). NULL = still waiting.
+     * recorded as `armed_tap_skipped`) or a later tap went ahead of it (A14,
+     * its `tap_in` noted `superseded`). Set as it lands for a tap already late
+     * then (A14): it never waits. NULL = still waiting.
      */
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
     createdAt: createdAt(),
