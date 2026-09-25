@@ -60,10 +60,13 @@ final class TestClock: SyncClock, @unchecked Sendable {
         }
     }
 
+    /// A cancelled sleep ends at once, throwing — a held one too: nothing else would resume it once
+    /// a test stopped before `releaseWakes()`, and its task would hang.
     private func cancel(_ id: UUID) {
         lock.lock()
-        let index = sleepers.firstIndex { $0.id == id }
-        let sleeper = index.map { sleepers.remove(at: $0) }
+        let sleeper =
+            sleepers.firstIndex { $0.id == id }.map { sleepers.remove(at: $0) }
+            ?? held.firstIndex { $0.id == id }.map { held.remove(at: $0) }
         lock.unlock()
         sleeper?.wake.resume(throwing: CancellationError())
     }
@@ -375,5 +378,32 @@ enum Answer {
     }
     static func refused(_ reason: String) -> String {
         #"{"error":{"code":"conflict","reason":"\#(reason)","message":"\#(reason)"}}"#
+    }
+}
+
+@Suite("The rig's clock", .timeLimit(.minutes(3)))
+struct TestClockTests {
+    @Test(
+        "A sleep `advance(by:holdingWakes:)` holds back can still be cancelled: its task ends at once, never waiting on `releaseWakes()` — a test that returns early fails fast instead of hanging (#90's review)"
+    )
+    func heldSleepCancels() async throws {
+        let clock = TestClock()
+        let sleeper = Task { try await clock.sleep(until: at(10)) }
+        try await eventually { clock.deadlines == [at(10)] }
+        clock.advance(by: 10, holdingWakes: true)
+        sleeper.cancel()
+        let ended = await withTaskGroup(of: Bool.self) { group in
+            group.addTask { (try? await sleeper.value) == nil }
+            group.addTask {
+                // Not ended in time: woken, so this test fails rather than hangs.
+                try? await Task.sleep(for: .seconds(5))
+                if !Task.isCancelled { clock.releaseWakes() }
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+        #expect(ended, "the cancelled sleep ended, throwing")
     }
 }

@@ -873,6 +873,23 @@ struct StandingKeptTests {
     }
 
     @Test(
+        "Over a standing not read, the last run's shields a tap not yet answered keeps on are that tap's cap's: they come off at it (#90's review)"
+    )
+    func unreadCappedOverHeld() async throws {
+        let (phone, _) = try await unreadable()
+        let rig = phone.rig
+        // Offline: the tap is never answered.
+        try await rig.engine.record(.tap(tagId: "tag"))
+        await phone.until { $0.shielded && $0.until == at(SyncState.tapCap) }
+        try await rig.server.next(tapRoute).reply(nil)
+        rig.clock.advance(by: SyncState.tapCap)
+        await phone.until { !$0.shielded }
+        #expect(await !phone.screenTime.shielding)
+        #expect(await rig.engine.state.standing == .unread)
+        await phone.stop()
+    }
+
+    @Test(
         "Rule 3's check runs at each wake of the read loop in the foreground, in a session — the read of the truth coming back makes, and each check-in — never behind the app"
     )
     func checkAtEachWake() async throws {

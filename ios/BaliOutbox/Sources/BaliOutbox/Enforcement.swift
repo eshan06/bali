@@ -79,6 +79,10 @@ public actor Enforcer {
     /// Whether the store's shields are ones this enforcer put on, not the last run's: over a
     /// standing not read, those — a pending tap's — still come off at the cap.
     private var putOn = false
+    /// The pending tap that took over the last run's shields, over a standing not read, by keeping
+    /// them on itself: they come off at its cap — but its answer leaves them the last run's again
+    /// (arming ends no session the phone may be in).
+    private var capOf: String?
 
     public init(engine: SyncEngine, screenTime: any ScreenTime, clock: any SyncClock = SystemClock()) {
         (self.engine, self.screenTime, self.clock) = (engine, screenTime, clock)
@@ -158,14 +162,17 @@ public actor Enforcer {
     private func apply() async {
         let state = await engine.state
         let until = state.shieldedUntil(clock.now())
-        if await screenTime.isShielding() != (until != nil) {
-            if until != nil {
-                await screenTime.shield()
-                putOn = true
-            } else if state.standing != .unread || putOn {
-                await screenTime.unshield()
-                putOn = false
-            }
+        let shielding = await screenTime.isShielding()
+        if until != nil, !shielding {
+            await screenTime.shield()
+            putOn = true
+        } else if until != nil, state.standing == .unread, !putOn {
+            capOf = state.pendingTap?.eventId
+        } else if until == nil, shielding,
+            state.standing != .unread || putOn || capOf.map({ $0 == state.pendingTap?.eventId }) == true
+        {
+            await screenTime.unshield()
+            (putOn, capOf) = (false, nil)
         }
         let permission = await screenTime.permission()
         if permission != .notDetermined { undetermined = nil }
