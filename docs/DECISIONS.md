@@ -51,11 +51,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   naming focus; the press with the queue's read failing (a row no build can read); a launch that
   cannot read its queue, learning where the phone stands at launch, from the file read again, or
   from the server; a filing refused, then a refocus; protection off already reported keeping
-  nothing. Of 16 mutations of the rules, each alone, 15 turn a test red; the one
+  nothing. Of 17 mutations of the rules, each alone, 16 turn a test red; the one
   left — the guard's fail-safe (`?? true`) when its own read fails — is `main`'s, and shows only if
   the file fails between two reads a moment apart (`awaiting` gates an answer, `stamp` a read),
-  which no test can place. **Not here:** #95's third WARN (`noNFC` on a device), which round 4
-  covers by hand; no device check changes.
+  which no test can place. **Santa** (two Claude reviewers, both the fallback — no other model's
+  CLI here; round 1): no blockers. Fixed here: `Outbox.file` said it filed one when there was
+  nowhere to file it (no session named, no tap known) — its `UPDATE` now matches nothing then,
+  pinned — and why "focused there already" is exact is written where the guard is. Left, in the
+  PR: after a failed read, the list a change keeps can still show refocuses that change deleted,
+  or an unlock it filed as not filed — the screens' only, until the next read. **Not here:** #95's
+  third WARN (`noNFC` on a device), which round 4 covers by hand; no device check changes.
 - **2026-09-25** — **B6b: Emergency Unlock over a standing the outbox file will not give back —
   the shields off at once, the last run's too, the unlock kept until the phone knows where it
   stands, then filed there; no fail-safe ceiling. With the owner's ruling on a scan that joins no
