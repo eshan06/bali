@@ -217,6 +217,18 @@ export const PROTECTION_OFF_RECORDED_AS = ['after_session_end'] as const;
 export type ProtectionOffRecordedAs = (typeof PROTECTION_OFF_RECORDED_AS)[number];
 
 /**
+ * Why a return to focus — a refocus, or a tap into a session — was recorded
+ * without being applied. It lands in the event's `payload.recorded_as`, the key
+ * and value a late unlock carries for the mirror case. `superseded`: the
+ * student's own unlock in that session came after it by the phone's own order
+ * (A12): the phone made the return, then the unlock, and the return reached the
+ * server last — so the unlock stands (owner ruling, 2026-09-24; A13).
+ * Additive-only like the other vocab.
+ */
+export const RETURN_RECORDED_AS = ['superseded'] as const;
+export type ReturnRecordedAs = (typeof RETURN_RECORDED_AS)[number];
+
+/**
  * Why a student unlocked, when they chose to say — the launch stand-in for real
  * passes (PLAN.md: unlock with an optional, skippable reason). It lands in the
  * unlock event's `payload.reason`, so it reaches the teacher with the unlock.

@@ -4,6 +4,7 @@ import type {
   ParticipationEndedReason,
   ParticipationState,
   ProtectionOffRecordedAs,
+  ReturnRecordedAs,
   UnlockReason,
   UnlockRecordedAs,
   UnlockRecordedOutcome,
@@ -1453,7 +1454,9 @@ async function lockTap(tx: Database, tapEventId: string): Promise<void> {
  * participation in a session the student previously left updates the existing
  * row (there is one row per student per session), never a duplicate. An
  * unlock sent under this tap that reached the server before it is filed here
- * (decision 11).
+ * (decision 11). A tap the phone made before an unlock of the student's own in
+ * this session that the server already has is late (A13): recorded, noted
+ * `superseded`, never applied, and answered as its retry is.
  */
 export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
   // Retry on deadlock: a cross-session switch-tap ends the student's other-session
@@ -1607,6 +1610,11 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+      const order = knownOrder(input.order);
+      // A tap the phone made before an unlock of the student's own here that
+      // the server already has — the tap stuck at the phone's retry bound while
+      // the unlock went ahead — is late: noted as it is recorded (A13).
+      const late = await unlockedSince(tx, session, input.studentId, order);
 
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,
@@ -1615,7 +1623,8 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         classId: session.classId,
         userId: input.studentId,
         occurredAt,
-        order: knownOrder(input.order),
+        payload: late ? LATE_RETURN : null,
+        order,
       });
       if (!isNew) {
         // On record for exactly this session and student — insertEvent
@@ -1627,6 +1636,34 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // join wearing a spent id: always safe, since the phone then re-reads
         // the truth. DISCLOSED SURVIVOR: nothing can stage it.
         return { outcome: 'replay', state: null, participationId: null, session: null };
+      }
+
+      if (late) {
+        // Never applied: nothing joins, switches or reopens — the unlock after
+        // it stands. On a row still live it is contact, as a late unlock is,
+        // and it still files what was kept under it. Answered as its retry is:
+        // the truth now, naming no session the student is not live in.
+        const live = await loadLiveParticipation(tx, session.id, input.studentId);
+        if (!live) {
+          await fileKeptUnlocks(tx, session, input, null);
+          return { outcome: 'replay', state: null, participationId: null, session: null };
+        }
+        await closeOpenSilence(
+          tx,
+          {
+            id: live.id,
+            sessionId: session.id,
+            classId: session.classId,
+            studentId: live.studentId,
+          },
+          occurredAt,
+        );
+        await tx
+          .update(participations)
+          .set({ lastSeenAt: heardNow() })
+          .where(eq(participations.id, live.id));
+        const state = await fileKeptUnlocks(tx, session, input, live.state);
+        return { outcome: 'replay', state, participationId: live.id, session };
       }
 
       // Decision 4: end any live participation in a DIFFERENT session first, so
@@ -1687,41 +1724,53 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       );
       if (!upserted) throw new Error('tapIn: upsert returned no row');
 
-      // Decision 11: an unlock sent under this tap that reached the server
-      // first — the tap stuck on the phone, the unlock sent past it — was kept
-      // unattached, noted `unknown_tap`. The tap has landed, so it is filed
-      // here now by the unlock's rules, as it would have been had the tap come
-      // first: under a fresh id naming the kept record (history is
-      // append-only), and the tap's answer carries the state it leaves. The id
-      // is the server's, as a switch's or a Start's derived events are: the
-      // phone's ids are the tap's and the kept unlock's, and this runs only
-      // with the tap's first insert, so once. The unlock keeps its own order
-      // (A12): made while this tap was unanswered, it is numbered after it, so
-      // the tap just recorded is never a return after it.
-      let state: ParticipationState = 'focused';
-      for (const kept of await unlocksAwaitingTap(tx, input.studentId, input.eventId)) {
-        const payload = (kept.payload ?? {}) as Record<string, unknown>;
-        const claimed = new Date(String(payload.device_time));
-        const filed = await unlockIn(
-          tx,
-          session,
-          {
-            sessionId: session.id,
-            studentId: input.studentId,
-            eventId: newUuidV7(),
-            // Always the claim the kept record stored; were it unreadable, a
-            // tap must not fail for it, so the server's time of that record.
-            deviceTime: Number.isNaN(claimed.getTime()) ? kept.occurredAt : claimed,
-            reason: knownReason(payload.reason),
-            order: knownOrder({ install: kept.orderInstall, seq: kept.orderSeq }),
-          },
-          { tap_event_id: input.eventId, unattached_event_id: kept.eventId },
-        );
-        state = filed.state ?? state;
-      }
+      const state = await fileKeptUnlocks(tx, session, input, 'focused');
       return { outcome, state, participationId: upserted.id, session };
     }),
   );
+}
+
+/**
+ * Decision 11: an unlock sent under this tap that reached the server first —
+ * the tap stuck on the phone, the unlock sent past it — was kept unattached,
+ * noted `unknown_tap`. The tap has landed, so it is filed here now by the
+ * unlock's rules, as it would have been had the tap come first: under a fresh
+ * id naming the kept record (history is append-only), and the tap's answer
+ * carries the state it leaves — `state`, unless one flips it. The id is the
+ * server's, as a switch's or a Start's derived events are: the phone's ids are
+ * the tap's and the kept unlock's, and this runs only with the tap's first
+ * insert, so once. The unlock keeps its own order (A12): made while this tap
+ * was unanswered, it is numbered after it, so the tap just recorded is never a
+ * return after it — and was judged before it (A13), the kept unlock in no
+ * session then.
+ */
+async function fileKeptUnlocks(
+  tx: Database,
+  session: SessionRow,
+  tap: TapInput,
+  state: ParticipationState | null,
+): Promise<ParticipationState | null> {
+  for (const kept of await unlocksAwaitingTap(tx, tap.studentId, tap.eventId)) {
+    const payload = (kept.payload ?? {}) as Record<string, unknown>;
+    const claimed = new Date(String(payload.device_time));
+    const filed = await unlockIn(
+      tx,
+      session,
+      {
+        sessionId: session.id,
+        studentId: tap.studentId,
+        eventId: newUuidV7(),
+        // Always the claim the kept record stored; were it unreadable, a tap
+        // must not fail for it, so the server's time of that record.
+        deviceTime: Number.isNaN(claimed.getTime()) ? kept.occurredAt : claimed,
+        reason: knownReason(payload.reason),
+        order: knownOrder({ install: kept.orderInstall, seq: kept.orderSeq }),
+      },
+      { tap_event_id: tap.eventId, unattached_event_id: kept.eventId },
+    );
+    state = filed.state ?? state;
+  }
+  return state;
 }
 
 /**
@@ -1801,9 +1850,11 @@ async function changeState<Ended = never>(
     replayNeedsLive?: boolean;
     /** Answer a change that reaches an ended session instead of refusing it; runs under the session lock. */
     afterEnd?: (tx: Database, session: SessionRow) => Promise<Ended>;
+    /** A return to focus: late, recorded but never applied, when an unlock came after it (A13). */
+    returning?: boolean;
   } = {},
 ): Promise<StateChangeResult | Ended> {
-  const { cannotLeave, replayNeedsLive = false, afterEnd } = rules;
+  const { cannotLeave, replayNeedsLive = false, afterEnd, returning = false } = rules;
   // Retry on deadlock: this locks the session first and the participation row
   // second, while the silence sweep, a tap switching the student out of this
   // session, and an armed tap converting at another Start take the row first —
@@ -1825,6 +1876,16 @@ async function changeState<Ended = never>(
       }
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
+      const order = knownOrder(input.order);
+      const row = await loadParticipation(tx, session.id, input.studentId);
+      // A return the student's own later unlock went ahead of is noted as it
+      // is recorded — history is append-only — and judged only where it would
+      // otherwise apply, so every refusal below stands as it was (A13).
+      const late =
+        returning &&
+        row?.endedAt === null &&
+        row.state !== cannotLeave?.state &&
+        (await unlockedSince(tx, session, input.studentId, order));
 
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,
@@ -1833,10 +1894,9 @@ async function changeState<Ended = never>(
         classId: session.classId,
         userId: input.studentId,
         occurredAt,
-        order: knownOrder(input.order),
+        payload: late ? LATE_RETURN : null,
+        order,
       });
-
-      const row = await loadParticipation(tx, session.id, input.studentId);
 
       if (!isNew) {
         // Replay: return the current truth.
@@ -1881,11 +1941,15 @@ async function changeState<Ended = never>(
         },
         occurredAt,
       );
+      // Late, it is contact and nothing more: the unlock after it stands, and
+      // the answer is its retry's — the truth now, which the phone applies.
       await tx
         .update(participations)
-        .set({ state: nextState, lastSeenAt: heardNow() })
+        .set(late ? { lastSeenAt: heardNow() } : { state: nextState, lastSeenAt: heardNow() })
         .where(eq(participations.id, row.id));
-      return { outcome: 'applied', state: nextState, participationId: row.id, session };
+      return late
+        ? { outcome: 'replay', state: row.state, participationId: row.id, session }
+        : { outcome: 'applied', state: nextState, participationId: row.id, session };
     }),
   );
 }
@@ -2011,6 +2075,46 @@ async function returnedSince(
         eq(events.sessionId, session.id),
         inArray(events.type, ['tap_in', 'refocus']),
         after,
+      ),
+    )
+    .limit(1);
+  return later.length > 0;
+}
+
+/** What a late return is noted as: the unlock after it stands (A13). */
+const LATE_RETURN = { recorded_as: 'superseded' satisfies ReturnRecordedAs };
+
+/**
+ * Whether the student has an unlock in this session that their phone made after
+ * this return — a refocus, or a tap in — by its own order: then the return is
+ * late, its request outliving the phone's wait or its tap stuck while the unlock
+ * went ahead, and applying it would put the shields back over their emergency
+ * unlock (owner ruling, 2026-09-24; A13 — `returnedSince`'s mirror). Every such
+ * unlock counts, whatever its note: the order says which of the student's own
+ * actions came last, a note only why an unlock flipped nothing. Only the order
+ * says so, never the times: with none, or another install's, the return applies
+ * as it arrives — a clock running fast at an unlock would clamp it to the bell,
+ * and no return could ever come after it.
+ */
+async function unlockedSince(
+  tx: Database,
+  session: SessionRow,
+  studentId: string,
+  order: ActionOrder | null,
+): Promise<boolean> {
+  if (order === null) return false;
+  const later = await tx
+    .select({ id: events.id })
+    .from(events)
+    .where(
+      and(
+        eq(events.userId, studentId),
+        // Every unlock here is clamped into the window: `returnedSince`'s read.
+        between(events.occurredAt, session.startedAt, session.endsAt),
+        eq(events.sessionId, session.id),
+        eq(events.type, 'unlock'),
+        eq(events.orderInstall, order.install),
+        gt(events.orderSeq, order.seq),
       ),
     )
     .limit(1);
@@ -2427,7 +2531,9 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
  * every shield when the permission went, so claiming focus without re-shielding
  * would put a green chip over an unshielded phone. Only a re-tap — which
  * re-shields — leaves protection off (ARCHITECTURE, iOS rules). A replay after
- * the participation ended while the session runs names no session (A4).
+ * the participation ended while the session runs names no session (A4). One
+ * the phone made before an unlock the server already has is late: recorded,
+ * noted `superseded`, never applied, and answered as its retry is (A13).
  */
 export function refocus(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
   return changeState(db, input, 'refocus', 'focused', {
@@ -2436,6 +2542,7 @@ export function refocus(db: Database, input: StateChangeInput): Promise<StateCha
       code: 'PROTECTION_OFF',
       message: 'protection is off; only a re-tap returns to focus',
     },
+    returning: true,
   });
 }
 
