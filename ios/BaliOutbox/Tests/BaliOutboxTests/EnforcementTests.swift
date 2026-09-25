@@ -61,12 +61,11 @@ actor FakeScreenTime: ScreenTime {
 
 /// The outbox refuses to queue a record — a write the file will not take — or takes them again.
 func refuseRecords(_ outbox: Outbox, _ refused: Bool = true) throws {
-    try outbox.pool.write {
-        try $0.execute(
-            sql: refused
-                ? "CREATE TRIGGER refuse BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'no'); END"
-                : "DROP TRIGGER refuse")
-    }
+    let sql =
+        refused
+        ? "CREATE TRIGGER refuse BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'no'); END"
+        : "DROP TRIGGER refuse"
+    try outbox.pool.write { try $0.execute(sql: sql) }
 }
 
 /// The standing the file keeps, made unreadable: this build cannot decode it.
@@ -503,13 +502,35 @@ struct ProtectionOffTests {
         rig.clock.advance(by: 30)
         try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
-        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
+        }
         try await rig.checkInDue(at(90))
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         try await rig.sleeping([at(120)])
         #expect(await rig.server.waiting.isEmpty)
         #expect(try rig.outbox.records().isEmpty)
+        await phone.stop()
+    }
+
+    @Test(
+        "A clock turned back between the checks starts the run again rather than stalling it: never granted is still reported, a check-in later"
+    )
+    func notDeterminedClockBack() async throws {
+        let rig = try Rig()
+        let screenTime = FakeScreenTime()
+        await screenTime.set(.notDetermined)
+        let phone = Enforced(rig, screenTime)
+        try await rig.tapIn()
+        await phone.enforcer.check()
+        // The student turns the phone's clock back ten minutes.
+        rig.clock.advance(by: -600)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().isEmpty)
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
         await phone.stop()
     }
 

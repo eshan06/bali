@@ -100,12 +100,14 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 11. **Emergency Unlock**: the shields are off at once and the apps open; `watch` shows unlocked.
     **Tap** again: shielded and focused once more.
 12. Settings → Screen Time → Apps with Screen Time Access → turn Bali off, and go back to the
-    app: `denied · shields off` at once, and within about 30 seconds `watch` shows **protection
-    off**. **Allow Screen Time** again: still no shields — only a re-tap leaves protection off —
-    and **Tap** brings the shields and focus back.
+    app: `denied · shields off` at once (`notDetermined`, if iOS reads it so: reported all the
+    same, a check-in later), and within about 30 seconds `watch` shows **protection off**.
+    **Allow Screen Time** again: still no shields — only a re-tap leaves protection off — and
+    **Tap** brings the shields and focus back.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
     `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
-    still shows focused, never protection off — the permission reads as allowed after a launch.
+    still shows focused — no false protection off after a relaunch: a permission Family Controls
+    reads as `notDetermined` for a moment is reported only if it still reads so a check-in later.
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
 
