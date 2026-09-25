@@ -450,7 +450,7 @@ struct BoundTests {
                 return
             }
             defer { release.signal() }
-            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1) }
+            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1, migrating: true) }
             #expect(Bell.wake(outboxAt: url, now: t0) == .retry(Bell.window(until: at(60))))
         }
 
@@ -479,7 +479,7 @@ struct BoundTests {
             // a stall of the simulator's never reads as the file held.
             let bound = TimeInterval(patience.components.seconds)
             #expect(
-                try Outbox.read(url, within: bound).standing
+                try Outbox.read(url, within: bound, migrating: false).standing
                     == .inSession(session(endsAt: 1200), .focused))
         }
     #endif
@@ -547,34 +547,108 @@ struct RegisterTests {
         #expect(center.held.flatMap { calendar.date(from: $0.end) } == bell.end)
     }
 
+    /// The end of the window `center` holds, registered in `calendar`; nil: none.
+    static func heldEnd(_ center: Center, in calendar: Calendar = RegisterTests.calendar) -> Date? {
+        center.held.flatMap { calendar.date(from: $0.end) }
+    }
+
+    /// The phone stood focused in a session until `bell`.
+    static func focused(until bell: TimeInterval) -> SyncState {
+        var state = SyncState()
+        state.standing = .inSession(session(endsAt: bell), .focused)
+        return state
+    }
+
     @Test(
         "The monitor's wake carried out: cleared, or its next wake taken — a refusal kept before is gone; its next wake refused, the time is kept for the app to show, and nothing is cleared (#92's review)"
     )
     func carriedOut() {
         let center = Center()
-        var (cleared, refused) = (0, Date?.some(at(-600)))
-        #expect(
-            Bell.carryOut(.clear, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-                == "cleared")
-        #expect(cleared == 1 && refused == nil && center.starts == 0 && center.stops == 0)
+        var (cleared, refusals) = (0, [Date?]())
+        func carryOut(_ state: SyncState?) -> String {
+            Bell.carryOut(
+                at: t0, in: center, calendar: Self.calendar, clearing: { cleared += 1 },
+                refused: { refusals.append($0) }
+            ) {
+                guard let state else { throw Outbox.Busy() }
+                return state
+            }
+        }
+        #expect(carryOut(SyncState()) == "cleared")
+        #expect(cleared == 1 && refusals.last == .some(nil) && center.held == nil)
 
-        refused = at(-600)
-        let bell = Bell.window(until: at(1200))
-        let kept = Bell.carryOut(
-            .keep(bell), at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
+        refusals = []
+        let kept = carryOut(Self.focused(until: 1200))
         #expect(kept.hasPrefix("kept until ") && !kept.contains("NOT registered"))
-        #expect(center.held != nil && center.starts == 1 && refused == nil && cleared == 1)
+        #expect(Self.heldEnd(center) == Bell.window(until: at(1200)).end)
+        #expect(refusals.last == .some(nil) && cleared == 1)
 
         center.refusing = true
-        let refusedWakes = [
-            Bell.Wake.retry(Bell.window(until: at(60))), .keep(Bell.window(until: at(1800))),
-        ]
-        for wake in refusedWakes {
-            refused = nil
-            let said = Bell.carryOut(
-                wake, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-            #expect(said.contains("NOT registered") && refused == t0 && cleared == 1, "\(wake)")
+        for state in [nil, Self.focused(until: 1800)] {
+            refusals = []
+            let said = carryOut(state)
+            #expect(said.contains("NOT registered") && refusals.last == t0, "\(said)")
+            #expect(cleared == 1 && Self.heldEnd(center) == Bell.window(until: at(1200)).end)
         }
+    }
+
+    @Test(
+        "The monitor's next wake is asked for before the file is read: a read that fails, one given up at the ceiling, or a wake iOS kills while it reads — a migration left holding the file's write lock (0xdead10cc) — leaves a wake a minute on registered, or iOS's refusal kept for the app to show (#97's review)"
+    )
+    func retryFirst() {
+        let retry = Bell.window(until: at(60))
+        // Taken: as the read begins — where a kill would leave it — iOS holds the retry.
+        let center = Center()
+        var heldAtRead: Date?
+        let said = Bell.carryOut(
+            at: t0, in: center, calendar: Self.calendar, clearing: { Issue.record("cleared") },
+            refused: { _ in }
+        ) {
+            heldAtRead = Self.heldEnd(center)
+            throw Outbox.Busy()
+        }
+        #expect(heldAtRead == retry.end)
+        #expect(said.hasPrefix("file not read — kept, again ") && !said.contains("NOT registered"))
+        #expect(Self.heldEnd(center) == retry.end && center.starts == 1)
+
+        // Refused: as the read begins, the refusal is kept already.
+        let refusing = Center()
+        refusing.refusing = true
+        var (refusals, keptAtRead) = ([Date?](), [Date?]())
+        let refused = Bell.carryOut(
+            at: t0, in: refusing, calendar: Self.calendar, clearing: { Issue.record("cleared") },
+            refused: { refusals.append($0) }
+        ) {
+            keptAtRead = refusals
+            throw Outbox.Busy()
+        }
+        #expect(keptAtRead == [t0])
+        #expect(refused.contains("NOT registered") && refusals.last == t0 && refusing.held == nil)
+    }
+
+    @Test(
+        "A wake that clears withdraws the retry it asked for — no stray wake is left to wake the monitor for nothing — but never a window iOS holds by then that is not its own: the app's, asked for since (#97's review)"
+    )
+    func clearWithdraws() {
+        let center = Center()
+        let said = Bell.carryOut(
+            at: t0, in: center, calendar: Self.calendar, clearing: {}, refused: { _ in }
+        ) { SyncState() }
+        #expect(said == "cleared")
+        #expect(center.starts == 1 && center.stops == 1 && center.held == nil)
+
+        // The app, a tap just made, asks for its window while the monitor reads the file as it
+        // stood before: that window stays.
+        let app = Center()
+        let tapped = Bell.window(until: at(SyncState.tapCap))
+        let cleared = Bell.carryOut(
+            at: t0, in: app, calendar: Self.calendar, clearing: {}, refused: { _ in }
+        ) {
+            try Bell.register(tapped, in: app, calendar: Self.calendar)
+            return SyncState()
+        }
+        #expect(cleared == "cleared")
+        #expect(app.stops == 0 && Self.heldEnd(app) == tapped.end)
     }
 }
 

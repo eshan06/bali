@@ -23,7 +23,7 @@ public struct ShieldWords: Sendable, Hashable {
         outboxAt url: URL?, over: Over, now: Date, cap: TimeInterval = SyncState.tapCap,
         time: Date.FormatStyle = ShieldWords.time, within bound: TimeInterval = Bell.patience
     ) {
-        var state = url.flatMap { try? Outbox.read($0, within: bound) }
+        var state = url.flatMap { try? Outbox.read($0, within: bound, migrating: false) }
         state?.cap = cap
         self.init(state, over: over, now: now, time: time)
     }

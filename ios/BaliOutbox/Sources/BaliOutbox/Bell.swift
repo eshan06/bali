@@ -47,15 +47,11 @@ public enum Bell {
     /// The monitor's wake at `now`: the outbox file opened within `patience` (`bound`, for the tests),
     /// where the phone stood and what it queued read — with `cap`, decision 7's or a device check's —
     /// and the file closed, then decided by the phone's own clock (data model, decision 6).
-    public static func wake(
+    static func wake(
         outboxAt url: URL, now: Date, cap: TimeInterval = SyncState.tapCap,
         within bound: TimeInterval = patience
     ) -> Wake {
-        wake(now: now) {
-            var state = try Outbox.read(url, within: bound)
-            state.cap = cap
-            return state
-        }
+        wake(now: now, reading: reading(url, cap: cap, within: bound))
     }
 
     static func wake(now: Date, reading read: () throws -> SyncState) -> Wake {
@@ -63,32 +59,49 @@ public enum Bell {
         return state.shieldedUntil(now).map { .keep(window(until: max($0, now + retry))) } ?? .clear
     }
 
-    /// The monitor's `wake` at `now`, carried out: nothing keeps the shields on — `clear` them;
-    /// else its next wake asked of `center`. One iOS refuses leaves nothing to wake the monitor
-    /// again, so the shields it keeps outlive their end with the app closed: `refused` is set to
-    /// `now`, for the app to show from its next open (`Protection.monitorUnscheduled`), and a wake
-    /// that ends well — cleared, or its next wake taken — sets it back to none (#92's review). What
-    /// it did, for the Debug readout.
+    /// The monitor's read of the file at `url`: the one extension read that migrates a file this
+    /// build has yet to (`Outbox.read`) — the shield's never does.
+    private static func reading(_ url: URL, cap: TimeInterval, within bound: TimeInterval)
+        -> () throws -> SyncState
+    {
+        {
+            var state = try Outbox.read(url, within: bound, migrating: true)
+            state.cap = cap
+            return state
+        }
+    }
+
+    /// The monitor's wake at `now`, carried out. What it did, for the Debug readout.
     public static func carryOut(
-        _ wake: Wake, at now: Date, in center: some BellCenter, clearing clear: () -> Void,
-        refused: inout Date?
+        outboxAt url: URL, at now: Date, cap: TimeInterval = SyncState.tapCap,
+        in center: some BellCenter, clearing clear: () -> Void, refused: (Date?) -> Void,
+        within bound: TimeInterval = patience
+    ) -> String {
+        carryOut(
+            at: now, in: center, clearing: clear, refused: refused,
+            reading: reading(url, cap: cap, within: bound))
+    }
+
+    static func carryOut(
+        at now: Date, in center: some BellCenter, calendar: Calendar = .current,
+        clearing clear: () -> Void, refused: (Date?) -> Void, reading read: () throws -> SyncState
     ) -> String {
         let next: (window: DateInterval, done: String)
-        switch wake {
+        switch wake(now: now, reading: read) {
         case .clear:
             clear()
-            refused = nil
+            refused(nil)
             return "cleared"
         case .keep(let window): next = (window, "kept until")
         case .retry(let window): next = (window, "file not read — kept, again")
         }
         let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
         do {
-            try register(next.window, in: center)
-            refused = nil
+            try register(next.window, in: center, calendar: calendar)
+            refused(nil)
             return said
         } catch {
-            refused = now
+            refused(now)
             return "\(said), NOT registered: \(error)"
         }
     }

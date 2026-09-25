@@ -94,7 +94,7 @@ public struct Outbox: Sendable {
     /// opened since an update — is migrated here, once, as the app's open would, within the same
     /// bound: the bell still clears the shields, and the shield still says when. A standing it
     /// cannot read throws: `.unread` is the app's.
-    static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
+    static func read(_ url: URL, within bound: TimeInterval, migrating: Bool) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
             return try coordinated(url, reading: true, until: deadline) {
