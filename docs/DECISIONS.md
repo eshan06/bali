@@ -71,7 +71,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `WakeTests.bound`; `heldPastBound`; `unreadCappedOverHeld`, now the other way round. (5)'s and
   (6)'s were red on `main`'s code first, (1)'s and (2)'s on `main`'s behaviour in `granted`'s new
   shape; of 9 mutations, each taken alone — one per fix, two for (3), and two for the config pin (a
-  key misspelt in the Info.plist, a setting in `project.yml`) — all 9 turn a test red.
+  key misspelt in the Info.plist, a setting in `project.yml`) — all 9 turn a test red. **Santa**
+  (two Claude reviewers, both the fallback — no other model's CLI here; round 1): no blockers; the
+  easy WARN fixed — `bound`'s comment says an outbox made with it is never kept, its deadline
+  spent — and the rest listed in the PR.
 - **2026-09-25** — **B5b: the bell with the app closed — the window the shields are on registered
   with iOS as a DeviceActivity schedule, and the monitor extension taking them off at its end,
   force-quit or not (ARCHITECTURE's leaning (a)); with #90's two BaliOutbox riders, and the

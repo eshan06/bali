@@ -33,10 +33,11 @@ public struct Outbox: Sendable {
     /// outlive the last connection, so a process that only reads can always open it; and the setup
     /// is coordinated, so two processes never migrate at once. A file a newer build has migrated is
     /// refused, never written through a schema this one does not know. `suspends` is for the tests:
-    /// the notifications reach every database in the process. `bound` is the monitor's: from now on,
-    /// everything this outbox waits for another process — the coordinated open (then `Busy`), and
-    /// each of SQLite's locks, the open's and the reads' (then SQLite's busy error) — ends within it,
-    /// never a busy timeout at each (#91's review).
+    /// the notifications reach every database in the process. `bound` is the monitor's, for the one
+    /// open and read of a wake (`read`): from now on, everything this outbox waits for another
+    /// process — the coordinated open (then `Busy`), and each of SQLite's locks, the open's and the
+    /// reads' (then SQLite's busy error) — ends within it, never a busy timeout at each (#91's
+    /// review). Past it, every lock wait fails at once: an outbox made with it is never kept.
     init(
         at url: URL, random: @escaping @Sendable () -> Double, suspends: Bool,
         within bound: TimeInterval? = nil
