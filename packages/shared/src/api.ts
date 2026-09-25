@@ -513,8 +513,8 @@ export interface SnapshotStudent {
   endedAt: string | null;
   /**
    * The student's latest emergency unlock in this session since they last
-   * tapped in or returned to focus — a late one (`superseded`) never counts —
-   * or null. `state` does not always show it:
+   * tapped in or returned to focus — a late record (`superseded`), an unlock or
+   * a return, never counts — or null. `state` does not always show it:
    * the engine records an unlock without flipping the row when protection is
    * off (never softened into an unlock), when no participation is live, and
    * after the end — the grid reads it here as it reads the unlock event.

@@ -3,7 +3,6 @@ import {
   endEnrollment,
   endSession,
   enrollments,
-  events,
   protectionOff,
   refocus,
   renameStudent,
@@ -272,22 +271,21 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
     expect(after?.endedAt).not.toBeNull();
   });
 
-  it('looks past a late note on an unlock only: a return is never late', async () => {
-    // #76's review: the filter read `recorded_as` off every turn. No return
-    // carries that note today, so one is written here by hand.
-    const { teacher, student, session } = await seedRunning('a10-note-scope');
-    await tapIn(db, change(session.id, student.id));
-    await unlock(db, { ...change(session.id, student.id), reason: 'bathroom' });
-    await db.insert(events).values({
-      eventId: randomUUID(),
-      type: 'refocus',
-      sessionId: session.id,
-      classId: session.classId,
-      userId: student.id,
-      occurredAt: new Date(),
-      payload: { recorded_as: 'superseded' },
+  it('looks past a late return too (A13): the unlock it came before stays on the chip', async () => {
+    // A refocus (#3) and a re-tap (#4) the phone made before its unlock (#5),
+    // each landing after it: recorded, noted, never applied — and no turn.
+    const { teacher, student, session } = await seedRunning('a13-late-return');
+    const install = randomUUID();
+    const nth = (seq: number) => ({ ...change(session.id, student.id), order: { install, seq } });
+    await tapIn(db, nth(1));
+    await unlock(db, nth(2));
+    await unlock(db, { ...nth(5), reason: 'bathroom' });
+    expect((await refocus(db, nth(3))).outcome).toBe('replay');
+    expect((await tapIn(db, nth(4))).outcome).toBe('replay');
+    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)).toMatchObject({
+      state: 'unlocked',
+      unlock: { reason: 'bathroom', recordedAs: null },
     });
-    expect(row(await snapshotOf(teacher.cognitoId, session.id), student.id)?.unlock).toBeNull();
   });
 
   it('carries the late records a session end leaves the row without', async () => {

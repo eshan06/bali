@@ -478,6 +478,45 @@ describe('a late unlock turns no chip (A10)', () => {
   });
 });
 
+describe('a late return turns no chip (A13)', () => {
+  // A tap or a refocus the phone made before an unlock the engine already had:
+  // the unlock stands, on the row and on the chip.
+  const lateReturn = (seq: number, type: 'tap_in' | 'refocus', id: string, at = T0) =>
+    evt(seq, type, id, at, { recorded_as: 'superseded' });
+
+  it('leaves an unlocked chip unlocked, with its reason, and reads as the refresh does', () => {
+    for (const type of ['tap_in', 'refocus'] as const) {
+      let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+      s = applyEvent(s, evt(6, 'unlock', 'ana', T0, { reason: 'nurse' }));
+      s = applyEvent(s, lateReturn(7, type, 'ana'));
+      expect(chip(s, 'ana'), type).toEqual({ display: 'unlocked', note: 'nurse' });
+      // The refresh's turn looks past the late return to the unlock before it.
+      const unlock: SnapshotUnlock = { reason: 'nurse', recordedAs: null, occurredAt: T0 };
+      const booted = fromSnapshot(snapshot(7, [{ id: 'ana', state: 'unlocked', unlock }]));
+      expect(chip(s, 'ana'), type).toEqual(chip(booted, 'ana'));
+    }
+  });
+
+  it('never brings back a chip that has left, nor lifts protection off', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, evt(6, 'left_for_other_session', 'ana'));
+    s = applyEvent(s, lateReturn(7, 'tap_in', 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'ended', note: null });
+    s = applyEvent(s, evt(8, 'protection_off', 'ben'));
+    s = applyEvent(s, evt(9, 'unlock', 'ben', T1, { recorded_as: 'protection_off' }));
+    s = applyEvent(s, lateReturn(10, 'tap_in', 'ben'));
+    expect(chip(s, 'ben')).toEqual({ display: 'protection_off', note: 'unlocked' });
+  });
+
+  it('is contact: last seen moves on, and nothing else does', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'unlock', 'ana', T0));
+    const before = s.ana;
+    s = applyEvent(s, lateReturn(7, 'refocus', 'ana', T1));
+    expect(s.ana).toEqual({ ...before, lastSeenAt: new Date(T1) });
+  });
+});
+
 describe('a student the snapshot does not carry (A9)', () => {
   it('whose phone unlocks with no live participation reads Left · unlocked, not Unlocked', () => {
     // Removed before this tab opened — outside the overlap, so it never saw
