@@ -5,7 +5,8 @@ import Testing
 
 @testable import BaliOutbox
 
-@Suite("Emergency Unlock over a standing the file will not give back (B6b)", .timeLimit(.minutes(3)))
+@Suite(
+    "Emergency Unlock over a standing the file will not give back (B6b)", .timeLimit(.minutes(3)))
 struct UnreadUnlockTests {
     @Test(
         "No tap pending, it takes the last run's shields off at once and is kept — sent nowhere, holding back nothing behind it, guarding every session, nothing written over the file's standing — until the phone knows where it stands"

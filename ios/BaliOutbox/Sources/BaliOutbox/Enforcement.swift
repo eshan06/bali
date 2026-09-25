@@ -72,10 +72,11 @@ extension SyncState {
     }
 
     /// Whether the student's Emergency Unlock has the last word on the shields: one after the tap
-    /// not yet answered, or with none, one made where the phone stood unread. Over a standing not
-    /// read, it takes the last run's shields off too — the way out of shields the phone can no
-    /// longer justify (B6b). An unlock the last run left queued does not: a tap since may have put
-    /// them back on.
+    /// not yet answered — this run's or the last's: that tap holds the queue, so nothing since can
+    /// have put them back on — or with none, one made where the phone stood unread. Over a standing
+    /// not read, it takes the last run's shields off too — the way out of shields the phone can no
+    /// longer justify (B6b). A session's unlock the last run left queued alone does not: a tap
+    /// answered since may have put them back on.
     public var unlockedLast: Bool { pendingTap == nil ? holdsUnfiled : tapHeldUntil == nil }
 }
 

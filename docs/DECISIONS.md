@@ -68,7 +68,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   it late (`superseded`, recorded, never applied), one landing after it applies — and the phone
   reads it in the press's place too: the queue orders by it, and a tap's answer is held back only
   by an unlock after that tap by it, so a re-tap made after the press keeps its shields and its
-  focus. **Riders (#94's round-2 Claude Review).** (1) The guard evaporated when a tap's answer
+  focus; a refocus there returns from the follow-up, the unlock of its session, and waits for it. **Riders (#94's round-2 Claude Review).** (1) The guard evaporated when a tap's answer
   named no session: armed or no longer current, the tap row went and the unlock under it guarded
   nothing, so, stuck, a read shielded the session the student stood in over an unlock the server
   never recorded. Now the press keeps the session the phone stood in, which the standing it leaves
@@ -87,7 +87,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   writes as well keeps no record, so no unlock: the press fails, shown (rule 5), the shields as
   they were — as for any Emergency Unlock; a file a newer build migrated starts no engine at all.
   (4) With the app closed after such an unlock, the monitor still wakes each minute while the file
-  stays unreadable, clearing nothing — the shields are off already (B6c's bookkeeping). **Device
+  stays unreadable, clearing nothing — the shields are off already (B6c's bookkeeping). (5) A scan
+  refused, or stuck at the bound, is kept and retried, and may land in a class after all — a 409
+  that raced a session's end, a block registered since: the server then files the press there as
+  well (A11), beside the follow-up where the phone stood — two records of one press, both kept, as
+  the ruling allows, the student then where the scan put them (pinned by `refusedThenLanded`). **Device
   check:** round 4 gains step 6, the ruling (a scan of a block no teacher registered, in Airplane
   Mode, Emergency Unlock before its answer); the unread standing has none — a phone cannot be made
   to lose its standing by hand — so tests cover it. **Tests** (Linux and the iOS Simulator):
@@ -99,8 +103,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never back on; joined, none; the follow-up guarding its class; a re-tap after the press, by
   order; minted once; kept while the scan is stuck at the bound, and not after a scan that landed.
   `SchemaTests.fromV3`, the rows the schema takes, the route from an unread standing, and the
-  random walk with unlocks filed and followed up (which found the last case). Of 23 mutations of
-  the rules, each taken alone, all 23 turn a test red.
+  random walk with unlocks filed and followed up (which found the last case). Of 25 mutations of
+  the rules, each taken alone, all 25 turn a test red. **Santa** (two Claude reviewers, both the
+  fallback — no other model's CLI here; round 1): no blockers. The easy WARNs fixed here: a
+  refocus made after the press returned from the press, not from the follow-up that is its
+  session's unlock (it now follows the follow-up); `unlockedLast`'s comment says why an unlock under
+  a tap the last run left pending counts; and a refused or stuck scan landing later, pinned and
+  disclosed as (5). Left, in the PR: `OutboxRecord.request` and `send(through:)` are optional now,
+  a Swift API change inside the app, not `/v1`.
 - **2026-09-25** — **B6a: the NFC tap — a block is the code written on it, read into the tap —
   and decision 11 on the phone: an Emergency Unlock made while the phone's own tap is unanswered
   is filed under that tap, always, and guards every session until that answer names one. B6 ships

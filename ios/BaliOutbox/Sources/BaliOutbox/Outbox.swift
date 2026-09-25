@@ -509,7 +509,8 @@ public struct Outbox: Sendable {
     /// class — each unlock under `condition` still holding the session the phone stood in when it
     /// was made — is filed again in that session: a session unlock of its own, with the press's
     /// reason, time and order, so the server places it against whatever the phone did since (A12,
-    /// A13). Once: the press gives its session up to it, in the same write.
+    /// A13). Once: the press gives its session up to it, in the same write — and a refocus there
+    /// returns from it, the unlock of its session, now.
     static func refile(_ db: Database, _ condition: String, _ id: String, now: Date) throws {
         let presses = try Row.fetchAll(
             db,
@@ -519,18 +520,24 @@ public struct Outbox: Sendable {
                   AND \(condition)
                 """, arguments: [id])
         for press in presses {
+            let (followUp, pressId) = (EventID.mint(at: now), press["eventId"] as String)
             try db.execute(
                 sql: """
                     INSERT INTO outbox (eventId, kind, sessionId, reason, recordedAt,
                       nextAttemptAt, orderSeq) VALUES (?, 'unlock', ?, ?, ?, ?, ?)
                     """,
                 arguments: [
-                    EventID.mint(at: now), press["sessionId"], press["reason"],
-                    press["recordedAt"], now, press["seq"],
+                    followUp, press["sessionId"], press["reason"], press["recordedAt"], now,
+                    press["seq"],
                 ])
             try db.execute(
-                sql: "UPDATE outbox SET sessionId = NULL WHERE eventId = ?",
-                arguments: [press["eventId"]])
+                sql: "UPDATE outbox SET sessionId = NULL WHERE eventId = ?", arguments: [pressId])
+            try db.execute(
+                sql: "UPDATE outbox SET follows = ? WHERE follows = ?",
+                arguments: [followUp, pressId])
+            if try state(db, lastUnlockKey) == pressId {
+                try setState(db, lastUnlockKey, followUp)
+            }
         }
     }
 

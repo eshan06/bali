@@ -453,6 +453,8 @@ struct RefiledTests {
         let followUp = try #require(try followUps(outbox).first)
         #expect(followUp.eventId != press.eventId && followUp.recordedAt == press.recordedAt)
         #expect(followUp.order == press.order)
+        // A refocus there returns from the follow-up now, the unlock of its session (santa).
+        #expect(try current(outbox, refocus.eventId)?.follows == followUp.eventId)
         #expect(
             try outbox.records().map(\.eventId)
                 == [scan.eventId, press.eventId, followUp.eventId, refocus.eventId])
@@ -460,6 +462,28 @@ struct RefiledTests {
         try await send(outbox, retried, 404, Answer.unknownBlock)
         try await send(outbox, press, 200, Answer.unlockKept("unknown_tap"))
         #expect(try followUps(open(url)).map(\.eventId) == [followUp.eventId])
+        #expect(try record(outbox, .refocus(session: "s")).follows == followUp.eventId)
+    }
+
+    @Test(
+        "A refused scan whose retry lands in a class after all has the press filed there by the server too: two records of one press — the follow-up where the phone stood, the press where the scan landed — both kept, nothing discarded (santa's review, disclosed)"
+    )
+    func refusedThenLanded() async throws {
+        let (outbox, _) = try makeOutbox()
+        let scan = try record(outbox, .tap(tagId: "W3RD8K2QAN"))
+        let press = try #require(
+            try outbox.record(
+                .unlockUnderTap(tap: scan.eventId, reason: nil), now: t0,
+                standing: .inSession(session(), .unlocked)))
+        try await send(outbox, scan, 409, Answer.refused("session_not_running"))
+        let retried = try #require(try current(outbox, scan.eventId))
+        try await send(outbox, retried, 200, Answer.joined(session("t")))
+        let both: [Change] = [
+            .unlockUnderTap(tap: scan.eventId, reason: nil), .unlock(session: "s", reason: nil),
+        ]
+        #expect(try outbox.records().map(\.change) == both)
+        #expect(try current(outbox, press.eventId) != nil)
+        #expect(try outbox.holdsUnlock(session: "s") && outbox.holdsUnlock(session: "t"))
     }
 
     @Test(
