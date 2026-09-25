@@ -88,19 +88,28 @@ a real decision? Add a dated entry at the top: what was decided and why.
   next never the name that woke it, nor the app's), `backup` (two minutes on, whole minute, the
   floor long, after the monitor's own next wake), `once` (both windows to the second, skipped while
   held, replaced, none stopping all four), `cleanup` (an extension and a new window over the
-  monitor's own, then the end), `refused` (either window refused: iOS keeps what it held, the
+  monitor's own, then the end), `sameWindows` (the same windows again: the monitor's own left),
+  `refused` (either window refused: iOS keeps what it held, the
   monitor's own too), `ownCallback` (every name and wake: no call of the running name nor the
   app's, no stop, a clear asking nothing), `carriedOut` (`nothing to clear`, a refusal ended by the
   backup), `logged`, `monitorsCalls` (the monitor's source: no DeviceActivity call but through
   `carryOut`, no `activities` anywhere); `MonitorFileTests.backup` (after a force-quit, the backup
   clears, then finds nothing to clear, asking iOS nothing) and `cap` (the cap's backup and the
-  device check's); `ScheduleTests.signOut`; `writerWaitedOut`. Of 19 mutations of the rules — the next name always `tick`, or the one that woke it; the monitor
-  asking under the bell's name, or under the one that woke it (`main`'s behaviour); no backup, one
-  at the bell's end, one a minute after; the monitor's own not stopped, or stopped before the app's
-  are taken; no window stopping the bell's alone; no skip; a clear always `cleared`, or asking iOS
-  something; a refusal kept past a clear, or past a next wake taken; the log never replacing its
-  note, or keeping four; the monitor asking for `activities`, or registering as the app does —
-  each taken alone, all 19 turn a test red. SANTA_PLACEHOLDER
+  device check's); `ScheduleTests.signOut`; `writerWaitedOut`. Of 20 mutations of the rules — the
+  next name always `tick`, or the one that woke it; the monitor asking under the bell's name, or
+  under the one that woke it (`main`'s behaviour); no backup, one at the bell's end, one a minute
+  after; the monitor's own not stopped, stopped before the app's are taken, or stopped though none
+  of the app's is new (`sameWindows`); no window stopping the bell's alone; no skip; a clear always
+  `cleared`, or asking iOS something; a refusal kept past a clear, or past a next wake taken; the
+  log never replacing its note, or keeping four; the monitor asking for `activities`, or
+  registering as the app does — each taken alone, all 20 turn a test red. **Santa** (two Claude
+  reviewers, both the fallback — no other model's CLI here; round 1): no blockers. Fixed here: the
+  app's registration stops the monitor's own only once a window of its own is new (Reviewer B: a
+  relaunch's first pass stopped a `tick` an early wake had asked for, and the shields waited for
+  the backup); and this entry's placeholder. Left, in the PR: a `tick` asked for while the app was
+  only in the background stays until the window moves, one wake for nothing; `clearShields` counts
+  either category as held, the enforcer's check both; the Debug log matches a note by its text;
+  `writerWaitedOut` may take ~72 s on a stalled simulator.
 - **2026-09-25** — **B6c-2: the monitor's migrating open waited out, never given up on; the shield
   never migrates the file; a close that fails never discards a read; and whether an unlock was filed
   is its UPDATE's own answer (#97's Claude Review, comment 5840115460).** **The bell's guarantee
