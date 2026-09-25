@@ -709,6 +709,25 @@ struct RegisterTests {
     }
 
     @Test(
+        "While iOS holds the app's windows as they are — a relaunch's first pass — the monitor's own next wake stays: the bell's window may have woken it early already, and its own is then the one still to come (santa's review)"
+    )
+    func sameWindows() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center, calendar: calendar)
+        // The app closed, the bell's window woke the monitor before the bell: kept, a minute on.
+        var refused: Date?
+        _ = Bell.carryOut(
+            .keep(Bell.window(until: at(1250))), woken: .bell, at: at(1190), in: center,
+            clearing: { true }, refused: &refused)
+        // Opened before that wake, then force-quit again: the same windows, nothing stopped.
+        center.calls = []
+        try Bell.register(bell, in: center, calendar: calendar)
+        #expect(center.window(.tick) == Bell.window(until: at(1250)))
+        #expect(center.calls.allSatisfy { if case .held = $0 { true } else { false } })
+    }
+
+    @Test(
         "A window iOS refuses throws, and iOS keeps what it held — the next wake the monitor asked for itself too, stopped only once the app's windows are taken"
     )
     func refused() throws {

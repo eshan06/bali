@@ -130,31 +130,37 @@ public enum Bell {
 
     /// The app's windows (the enforcer's, through `ScreenTime.schedule`): the bell's at `window`,
     /// and its backup — or, nil, none — asked of `center`, each by `ask`'s rule, replacing those
-    /// asked for before; then none of the monitor's own, which the app's truth leaves stale — only
-    /// once the app's are taken, so a refusal leaves a wake the monitor asked for in place. A window
-    /// iOS refuses throws, and iOS keeps the one it held. No callback of the monitor's runs in the
-    /// app, so every name is the app's to ask for.
+    /// asked for before. Once either is new, none of the monitor's own: aimed at the truth the app
+    /// has just replaced, they are stale — stopped only once the app's are taken, so a refusal
+    /// leaves a wake the monitor asked for in place. While iOS holds the app's windows as they are,
+    /// the monitor's own stays: the bell's may have woken it early already, and its own next wake
+    /// is then the one still to come. A window iOS refuses throws, and iOS keeps the one it held.
+    /// No callback of the monitor's runs in the app, so every name is the app's to ask for.
     public static func register(
         _ window: DateInterval?, in center: some BellCenter, calendar: Calendar = .current
     ) throws {
         guard let window else { return center.stop(Name.allCases) }
-        try ask(window, as: .bell, in: center, calendar: calendar)
-        try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
-        center.stop([.tick, .tock])
+        let asked = [
+            try ask(window, as: .bell, in: center, calendar: calendar),
+            try ask(backup(of: window), as: .backup, in: center, calendar: calendar),
+        ]
+        if asked.contains(true) { center.stop([.tick, .tock]) }
     }
 
     /// Asks `center` to wake the monitor at `window`'s end under `name`, replacing the window it
     /// holds there, unless it holds one ending there already: a replacement may itself wake the
-    /// monitor, which asks again at each wake, and the two would never end.
+    /// monitor, which asks again at each wake, and the two would never end. Whether it asked.
+    @discardableResult
     static func ask(
         _ window: DateInterval, as name: Name, in center: some BellCenter,
         calendar: Calendar = .current
-    ) throws {
-        if let held = center.heldEnd(name), calendar.date(from: held) == window.end { return }
+    ) throws -> Bool {
+        if let held = center.heldEnd(name), calendar.date(from: held) == window.end { return false }
         let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
         try center.start(
             name, calendar.dateComponents(parts, from: window.start),
             calendar.dateComponents(parts, from: window.end))
+        return true
     }
 
     /// The monitor's last wakes, newest first, as the Debug readout shows them: `line` in place of

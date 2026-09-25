@@ -43,9 +43,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   whether the store held any), and iOS asked nothing; with the app closed nothing cancels it, so it
   wakes once for nothing. **The app's cleanup:** its registration (`Bell.register`, through
   `ScreenTime.schedule`; the enforcer's rules unchanged) asks for the bell's window and its backup,
-  each skipped while iOS holds one ending there, then stops `tick` and `tock`, which the app's truth
-  leaves stale — only once its own are taken, so a refusal leaves the monitor's next wake in place
-  (and shows `bell NOT scheduled`, the backup's refusal too, asked for again at the next pass). No
+  each skipped while iOS holds one ending there; once either is new, it stops `tick` and `tock`,
+  aimed at the truth it has just replaced — only once its own are taken, so a refusal leaves the
+  monitor's next wake in place (and shows `bell NOT scheduled`, the backup's refusal too, asked for
+  again at the next pass). While iOS holds its windows as they are — a relaunch's first pass — the
+  monitor's own stays: the bell's window may have woken it early already, and its own next wake is
+  then the one still to come (santa's review: stopped there, the shields waited for the backup). No
   window — an unlock, the bell with the app open, the permission denied — stops all four. So a new
   window and an extension replace the bell's and its backup and stop the monitor's own; the end
   leaves none; a sign-out changes none — it keeps the standing (B5a), the shields and their windows
