@@ -48,8 +48,14 @@ actor FakeScreenTime: ScreenTime {
     func schedule(_ window: DateInterval?) throws {
         if refusing, window != nil { throw Refused() }
         windows.append(window)
+        if window != nil { refusedMonitor = nil }
     }
     func refuse(_ refusing: Bool = true) { self.refusing = refusing }
+
+    /// When iOS refused the monitor its next window, the app closed, as the app group keeps it.
+    private var refusedMonitor: Date?
+    func monitorUnscheduled() -> Date? { refusedMonitor }
+    func refuseMonitor(at date: Date) { refusedMonitor = date }
 
     /// The student changes the permission in Settings: iOS drops every shield when it goes.
     func set(_ permission: Permission) {
@@ -753,12 +759,14 @@ struct StandingKeptTests {
         await rig.stop()
     }
 
-    /// A relaunch over a file that holds where the phone stood — focused until 1200 — in a form
+    /// A relaunch over a file that holds where the phone stood — focused until `endsAt` — in a form
     /// this build cannot read, the store holding the shields (`held`, the last run's) or none: the
     /// engine and its enforcer.
-    func unreadable(held: Bool = true) async throws -> (Enforced, Standing) {
+    func unreadable(held: Bool = true, endsAt: TimeInterval = 1200) async throws -> (
+        Enforced, Standing
+    ) {
         let (outbox, _) = try makeOutbox()
-        let kept = Standing.inSession(session(endsAt: 1200), .focused)
+        let kept = Standing.inSession(session(endsAt: endsAt), .focused)
         try outbox.keep(kept)
         try spoilStanding(outbox)
         let screenTime = FakeScreenTime()
@@ -886,19 +894,29 @@ struct StandingKeptTests {
     }
 
     @Test(
-        "Over a standing not read, the last run's shields a tap not yet answered keeps on are that tap's cap's: they come off at it (#90's review)"
+        "Over a standing not read, the last run's shields — a session's, perhaps still running — are never taken off at the cap of a tap not yet answered: only where the phone stood, once known, takes them off (#91's review)"
     )
     func unreadCappedOverHeld() async throws {
-        let (phone, _) = try await unreadable()
+        // Where the phone stood, unread: focused in a session ending ten minutes after the cap.
+        let (phone, kept) = try await unreadable(endsAt: SyncState.tapCap + 600)
         let rig = phone.rig
         // Offline: the tap is never answered.
         try await rig.engine.record(.tap(tagId: "tag"))
-        await phone.until { $0.shielded && $0.until == at(SyncState.tapCap) }
+        await phone.until { $0.until == at(SyncState.tapCap) }
         try await rig.server.next(tapRoute).reply(nil)
+        await rig.until { $0.retryAt == at(2) }
         rig.clock.advance(by: SyncState.tapCap)
+        await phone.until { $0.until == nil }
+        #expect(await phone.screenTime.shielding)
+        #expect(await phone.screenTime.unshields == 0)
+        // Read again, the file says the session still runs: its shields stay to its bell.
+        try rig.outbox.keep(kept)
+        try await eventually { rig.clock.deadlines.contains(at(SyncState.tapCap + 60)) }
+        rig.clock.advance(by: 60)
+        await phone.until { $0.until == at(SyncState.tapCap + 600) && $0.shielded }
+        #expect(await phone.screenTime.unshields == 0)
+        rig.clock.advance(by: 540)
         await phone.until { !$0.shielded }
-        #expect(await !phone.screenTime.shielding)
-        #expect(await rig.engine.state.standing == .unread)
         await phone.stop()
     }
 

@@ -33,14 +33,16 @@ public struct Outbox: Sendable {
     /// outlive the last connection, so a process that only reads can always open it; and the setup
     /// is coordinated, so two processes never migrate at once. A file a newer build has migrated is
     /// refused, never written through a schema this one does not know. `suspends` is for the tests:
-    /// the notifications reach every database in the process. `bound` is the monitor's: the
-    /// coordinated open waits at most that long for another process, then throws `Busy`.
+    /// the notifications reach every database in the process. `bound` is the monitor's: from now on,
+    /// everything this outbox waits for another process — the coordinated open (then `Busy`), and
+    /// each of SQLite's locks, the open's and the reads' (then SQLite's busy error) — ends within it,
+    /// never a busy timeout at each (#91's review).
     init(
         at url: URL, random: @escaping @Sendable () -> Double, suspends: Bool,
         within bound: TimeInterval? = nil
     ) throws {
         var configuration = Configuration()
-        configuration.busyMode = .timeout(Self.busyTimeout)
+        configuration.busyMode = bound.map(Self.busy(within:)) ?? .timeout(Self.busyTimeout)
         configuration.observesSuspensionNotifications = suspends
         configuration.prepareDatabase { db in
             guard !db.configuration.readonly else { return }
@@ -64,6 +66,16 @@ public struct Outbox: Sendable {
 
     /// The file was not free within the bound: another process held it.
     public struct Busy: Error {}
+
+    /// SQLite's waits on another process's locks, all ending by one deadline, `bound` from now.
+    static func busy(within bound: TimeInterval) -> Database.BusyMode {
+        let deadline = ContinuousClock.now + .seconds(bound)
+        return .callback { _ in
+            guard ContinuousClock.now < deadline else { return false }
+            Thread.sleep(forTimeInterval: 0.01)
+            return true
+        }
+    }
 
     /// Where the phone stood and what it queued, as the monitor reads them (B5b): the file opened
     /// within `bound` — never longer: iOS would kill the monitor mid-wake — read, and closed before
@@ -110,13 +122,13 @@ public struct Outbox: Sendable {
             nonisolated(unsafe) let coordinator = NSFileCoordinator(filePresenter: nil)
             return try granted(
                 within: bound,
-                request: { granted in
+                request: { grant, over in
                     let ask: @Sendable () -> Void = {
                         var failure: NSError?
                         coordinator.coordinate(
-                            writingItemAt: url, options: .forMerging, error: &failure
-                        ) { granted(.success($0)) }
-                        if let failure { granted(.failure(failure)) }
+                            writingItemAt: url, options: .forMerging, error: &failure,
+                            byAccessor: grant)
+                        over(failure)
                     }
                     if bound == nil { ask() } else { Thread.detachNewThread(ask) }
                 },
@@ -126,50 +138,71 @@ public struct Outbox: Sendable {
         #endif
     }
 
-    /// Runs `open` once `request` grants the access it asks for — `request` calls back when it is
-    /// granted, with the file's URL, or with the error that ends the asking, and `open` runs inside
-    /// that call, while the access is held — waiting at most `bound` (nil: as long as it takes).
-    /// Past the bound, the asking is cancelled and `Busy` thrown, and a grant that comes after opens
-    /// nothing. An open already under way at the bound is waited for — SQLite's busy timeout bounds
-    /// it — since returning then would leave the file locked behind a process iOS may suspend.
+    /// Runs `open` once `request` grants the access it asks for — `request` calls `grant` with the
+    /// file's URL when it is, and `open` runs inside that call, while the access is held; then
+    /// `over` once the asking has ended, with its error, if any — waiting at most `bound` (nil: as
+    /// long as it takes). An asking over with no grant is a refusal — its error, or one of its own
+    /// when it gave none — never a wait with no end (rule 5: the app shows it, with a retry). Past
+    /// the bound, the asking is cancelled and `Busy` thrown, and a grant that comes after opens
+    /// nothing. An open already under way at the bound is waited for — the monitor's deadline on
+    /// SQLite's locks bounds it — since returning then would leave the file locked behind a process
+    /// iOS may suspend. The first of the grant, the refusal and the giving up settles it: nothing
+    /// after it opens the file again or answers.
     static func granted<T>(
         within bound: TimeInterval?,
-        request: (@escaping @Sendable (Result<URL, any Error>) -> Void) -> Void,
+        request: (
+            _ grant: @escaping @Sendable (URL) -> Void,
+            _ over: @escaping @Sendable ((any Error)?) -> Void
+        ) -> Void,
         cancel: () -> Void,
         open: @escaping @Sendable (URL) throws -> T
     ) throws -> T {
         let access = Access<T>()
-        request { grant in
-            guard access.claim(opening: true) else { return }
-            access.result = Result { try open(grant.get()) }
-            access.done.signal()
+        request(
+            { url in access.settle { Result { try open(url) } } },
+            { failure in access.settle { .failure(failure ?? CocoaError(.fileWriteUnknown)) } })
+        if let settled = access.wait(bound) { return try settled.get() }
+        // Past the bound: given up — unless the open is under way, which is waited for.
+        if access.claim() {
+            cancel()
+            throw Busy()
         }
-        if let bound, access.done.wait(timeout: .now() + bound) == .timedOut {
-            if access.claim(opening: false) {
-                cancel()
-                throw Busy()
-            }
-            access.done.wait()
-        } else if bound == nil {
-            access.done.wait()
-        }
-        return try access.result!.get()
+        return try access.wait(nil)!.get()
     }
 
     /// One wait for access to the file, between the thread that asks and the one it is granted
-    /// on: the open and the giving up race for it, and the first to claim it has it.
+    /// on: the grant, a refusal and the giving up race for it, and only the first to claim it has it.
     final class Access<T>: @unchecked Sendable {
-        let done = DispatchSemaphore(value: 0)
-        /// Written before `done` is signalled, read after it is waited for.
-        var result: Result<T, any Error>?
+        private let done = DispatchSemaphore(value: 0)
         private let lock = NSLock()
-        private var opening: Bool?
+        private var claimed = false
+        private var result: Result<T, any Error>?
 
-        func claim(opening: Bool) -> Bool {
+        /// Whether this is the first claim: every later one has nothing.
+        func claim() -> Bool {
             lock.withLock {
-                if self.opening == nil { self.opening = opening }
-                return self.opening == opening
+                defer { claimed = true }
+                return !claimed
             }
+        }
+
+        /// Settles it with `outcome`, made while the claim is held — unless another claimed it first.
+        func settle(_ outcome: () -> Result<T, any Error>) {
+            guard claim() else { return }
+            let settled = outcome()
+            lock.withLock { result = settled }
+            done.signal()
+        }
+
+        /// What settled it, once it is — waiting at most `bound` (nil: as long as it takes); nil
+        /// past the bound.
+        func wait(_ bound: TimeInterval?) -> Result<T, any Error>? {
+            if let bound {
+                guard done.wait(timeout: .now() + bound) == .success else { return nil }
+            } else {
+                done.wait()
+            }
+            return lock.withLock { result }
         }
     }
 

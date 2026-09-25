@@ -241,10 +241,15 @@ struct Placeholder: View {
         /// What rule 3's check found — never the standing alone.
         private var shields: String {
             guard let protection = phone.protection else { return "not checked yet" }
-            return "\(protection.permission) · shields \(protection.shielded ? "on" : "off")"
+            var line =
+                "\(protection.permission) · shields \(protection.shielded ? "on" : "off")"
                 + (protection.until.map { ", due until \(time($0))" } ?? "")
                 + (protection.unreported ? " · protection off NOT recorded" : "")
                 + (protection.unscheduled ? " · bell NOT scheduled" : "")
+            if let refused = protection.monitorUnscheduled {
+                line += " · the monitor's bell NOT scheduled at \(time(refused)), app closed"
+            }
+            return line
         }
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }

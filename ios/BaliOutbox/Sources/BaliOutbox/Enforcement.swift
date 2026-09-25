@@ -19,8 +19,13 @@ public protocol ScreenTime: Sendable {
     /// Asks the student for the permission, with iOS's own prompt.
     func requestPermission() async throws
     /// Asks iOS to wake the monitor at `window`'s end — the bell with the app closed (B5b) —
-    /// replacing the window asked for before; nil: at none.
+    /// replacing the window asked for before; nil: at none. A window iOS takes ends the monitor's
+    /// refusal (`monitorUnscheduled`).
     func schedule(_ window: DateInterval?) async throws
+    /// When iOS refused the monitor the window it asked for, woken with the app closed — so nothing
+    /// woke it again, and the shields it kept outlived their end — until a window is registered
+    /// again; nil: none. The monitor keeps it in the app group, for the app's next open.
+    func monitorUnscheduled() async -> Date?
 }
 
 /// What a screen may claim of the shields: what the last check found (rule 3), never the standing
@@ -36,6 +41,10 @@ public struct Protection: Sendable, Hashable {
     /// iOS refused the window the shields are on (B5b): with the app closed, nothing would take
     /// them off at its end. Shown, and asked for again at the next pass.
     public var unscheduled = false
+    /// When iOS refused the monitor its next window, the app closed (B5b): nothing woke it again,
+    /// so the shields it kept outlived their end until the app was opened. Shown from the app's
+    /// next open until a window is registered again (rule 5).
+    public var monitorUnscheduled: Date?
 }
 
 extension SyncState {
@@ -83,12 +92,9 @@ public actor Enforcer {
     /// check's, or a pass's.
     private var undetermined: TimeInterval?
     /// Whether the store's shields are ones this enforcer put on, not the last run's: over a
-    /// standing not read, those — a pending tap's — still come off at the cap.
+    /// standing not read, those — a pending tap's — still come off at the cap. The last run's never
+    /// do: a session they may be for may still be running (#91's review).
     private var putOn = false
-    /// The pending tap that took over the last run's shields, over a standing not read, by keeping
-    /// them on itself: they come off at its cap — but its answer leaves them the last run's again
-    /// (arming ends no session the phone may be in).
-    private var capOf: String?
     /// The window iOS was last asked to wake the monitor at, by this enforcer; nil: none.
     private var scheduled: DateInterval?
 
@@ -174,13 +180,9 @@ public actor Enforcer {
         if until != nil, !shielding {
             await screenTime.shield()
             putOn = true
-        } else if until != nil, state.standing == .unread, !putOn {
-            capOf = state.pendingTap?.eventId
-        } else if until == nil, shielding,
-            state.standing != .unread || putOn || capOf.map({ $0 == state.pendingTap?.eventId }) == true
-        {
+        } else if until == nil, shielding, state.standing != .unread || putOn {
             await screenTime.unshield()
-            (putOn, capOf) = (false, nil)
+            putOn = false
         }
         let permission = await screenTime.permission()
         if permission != .notDetermined { undetermined = nil }
@@ -202,10 +204,11 @@ public actor Enforcer {
                 unscheduled = true
             }
         }
+        let monitorUnscheduled = await screenTime.monitorUnscheduled()
         // Read after the last wait, so a check made meanwhile keeps what it found (`unreported`).
         var next = protection
         (next.permission, next.shielded, next.until) = (permission, shielded, until)
-        next.unscheduled = unscheduled
+        (next.unscheduled, next.monitorUnscheduled) = (unscheduled, monitorUnscheduled)
         protection = next
         alarm?.cancel()
         alarm = until.map { until in

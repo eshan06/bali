@@ -25,11 +25,18 @@ final class SessionMonitor: DeviceActivityMonitor {
         let wake = Bell.wake(outboxAt: url, now: Date(), cap: cap)
         var done = "cleared"
         switch wake {
-        case .clear: Bell.clearShields()
+        case .clear:
+            Bell.clearShields()
+            Bell.monitorUnscheduled = nil
         case .keep(let window), .retry(let window):
             let until = window.end.formatted(date: .omitted, time: .shortened)
             done = wake == .keep(window) ? "kept until \(until)" : "file not read — kept, again \(until)"
-            do { try Bell.register(window) } catch { done += ", NOT registered: \(error)" }
+            do { try Bell.register(window) } catch {
+                // Nothing wakes the monitor again: the shields it keeps outlive their end, the app
+                // closed. Kept for the app to show at its next open (rule 5).
+                Bell.monitorUnscheduled = Date()
+                done += ", NOT registered: \(error)"
+            }
         }
         Bell.lastWake = "\(at()) · \(done) · \(ContinuousClock.now - started)"
     }

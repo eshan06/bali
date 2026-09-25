@@ -40,4 +40,6 @@ final class PhoneScreenTime: ScreenTime {
     }
 
     func schedule(_ window: DateInterval?) throws { try Bell.register(window) }
+
+    func monitorUnscheduled() -> Date? { Bell.monitorUnscheduled }
 }
