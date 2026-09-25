@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B4c: the app's one sync engine starts over the student's sign-in, with dev's
+  sign-in in its build settings — and a locked phone's Keychain is never a sign-out.**
+  `SyncEngine.make` (`ios/BaliOutbox`) keeps B4's contract with the engine in one place: the API
+  client's tokens are `SignIn`'s, a 401's `refresh` is `SignIn.refresh()`, and every other token
+  the sign-in gets (a sign-in, a renewal of its own) runs the engine's `retryNow()` through
+  `whenTokenArrives`, so what waited on sign-in goes at once. `BaliApp` starts it once (`Phone`),
+  over `KeychainTokenStore` and one `URLSessionTransport` for the app's life: `run()` until the app
+  ends, `setForeground` from the scene phase beside `Outbox.suspend()`/`resume()`, each hop
+  sending the phase as it is then. A start that fails — a build with no sign-in set, an outbox that
+  will not open — says so with Try again (rule 5) instead of latching. **Dev's values, public, in
+  `ios/project.yml`:** the API, the pool's hosted-UI domain and the phone's client `bali-ios-dev`,
+  read from Info.plist; dev's `AUTH_AUDIENCE` lists the client since 2026-09-25 (appended once #81
+  had deployed; `/healthz` 200 after the redeploy). Checked from outside: an authorize request
+  with `bali://auth/callback`, `openid email profile` and PKCE S256 reaches the hosted login page,
+  and a wrong redirect is refused (`redirect_mismatch`). **A Debug-only readout, temporary:** until
+  C1–C6 draw the screens (the owner reviews those first), the placeholder shows the engine's link
+  (reached, unreachable, sign-in, storage failed), when the server last answered, and whether
+  someone is signed in — "not known yet" while the Keychain cannot be read — with Sign in (the
+  hosted UI in an ephemeral `WebAuthenticationSession`) and Sign out, so B5's device check sees the
+  phone reach dev (PLAN, B5's checklist). **The Keychain on a locked phone:** a read iOS refuses —
+  the phone locked, or the app launched before its first unlock (`errSecInteractionNotAllowed`) —
+  is no token right now: `SignIn` reads again at the next ask, never signs out and never clears.
+  Only an item that is not there (`errSecItemNotFound`) is nobody signed in. B4b had it so; now it
+  is pinned from both sides: `KeychainTokenStore.read` maps the statuses (a success with no data
+  throws too, rather than read as signed out), tested where there is a Keychain — the iOS
+  Simulator job, since a package's tests cannot reach the Keychain itself (-34018) — and `SignIn`
+  over a store whose read fails asks no write of it, tested on Linux too. **#83's riders:** the
+  PKCE verifier and state are generated as a key is (`SymmetricKey`: CryptoKit, or swift-crypto on
+  Linux), not by the standard library's generator, which promises a secure one only "whenever
+  possible"; a sign-out Cognito's `invalid_grant` caused but the locked Keychain could not make
+  then is made at the next ask (`unsaved` now covers a clear too), so the refused refresh token is
+  never read back as someone signed in — lost only if iOS ends the app before that ask, and then
+  the next launch's renewal is refused again; and the token the API refused is marked so in the
+  store as well, so a relaunch before a renewal renews first instead of sending it again. Of 5
+  mutations of `SignIn` tried, 5 turn a test red. **Found here:** `ownRenewalSendsAtOnce` (the
+  engine over the sign-in, from the combined B4 branch) failed about half its runs — the
+  sign-in's re-read could ask for a token after the test moved the clock, so the test answered
+  that renewal and the drain's own went unanswered; it now takes the re-read, sent with the old
+  token, before the clock moves. The BaliOutbox suites' limits rose to 3 minutes, as BaliCore's:
+  a test waiting on several steps, each allowed 30 s (`patience`), on a simulator that stalls up
+  to 13 s at a time (B2), could outrun one minute while passing.
 - **2026-09-25** — **B4b: the student's sign-in, in BaliCore — Cognito's hosted UI with PKCE,
   the tokens in the Keychain, and one sign-out.** `SignIn` (`ios/BaliCore`), an actor, is B1c's
   `TokenProvider` and the sync engine's `refresh`. It signs the student in through Cognito's

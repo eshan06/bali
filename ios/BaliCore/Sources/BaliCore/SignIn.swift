@@ -76,10 +76,12 @@ struct Attempt: Sendable {
     var challenge: String { base64url(Data(SHA256.hash(data: Data(verifier.utf8)))) }
 }
 
-/// `count` bytes from the system's cryptographically secure generator, as base64url: 32 of them
-/// make a 43-character verifier (§4.1).
+/// `count` random bytes as base64url, generated as a key is — by CryptoKit, or swift-crypto where
+/// there is none — so they are cryptographically random by contract, where the standard library's
+/// generator promises it only "whenever possible". 32 of them make a 43-character verifier (§4.1).
 func random(bytes count: Int) -> String {
-    base64url(Data((0..<count).map { _ in UInt8.random(in: .min ... .max) }))
+    let key = SymmetricKey(size: SymmetricKeySize(bitCount: count * 8))
+    return base64url(key.withUnsafeBytes { Data($0) })
 }
 
 /// base64url, unpadded (RFC 4648 §5).
@@ -152,8 +154,10 @@ public actor SignIn: TokenProvider {
     /// The tokens, once the store could be read (`loaded`); nil when nobody is signed in.
     private var tokens: Tokens?
     private var loaded = false
-    /// The store is behind `tokens`: a renewal's that the Keychain could not take then (the phone
-    /// locked), saved at the next ask — a refresh token Cognito rotated is kept nowhere else.
+    /// The store is behind `tokens`, and catches up at the next ask: what the Keychain could not
+    /// take then (the phone locked) is saved — a refresh token Cognito rotated is kept nowhere
+    /// else — and a sign-out it could not make then is made, so a refresh token Cognito refused is
+    /// never read back as someone signed in.
     private var unsaved = false
     /// The renewal under way, which every caller shares.
     private var renewing: Task<Bool, Never>?
@@ -184,11 +188,12 @@ public actor SignIn: TokenProvider {
     }
 
     /// The engine's `refresh`, after the API refused the token it sent: that token is not given
-    /// again, and a renewal is tried — true once a fresh one is ready. It never waits on the
-    /// student: false when only a sign-in can give one.
+    /// again — nor after a relaunch, so the store is told too — and a renewal is tried: true once a
+    /// fresh one is ready. It never waits on the student: false when only a sign-in can give one.
     public func refresh() async -> Bool {
         guard current() != nil else { return false }
         tokens?.until = .distantPast
+        unsaved = !keep(tokens)
         return await renew(telling: false)
     }
 
@@ -241,12 +246,13 @@ public actor SignIn: TokenProvider {
 
     private func unwatch(_ id: UUID) { watchers[id] = nil }
 
-    /// The tokens, read from the store the first time it can be read. One that cannot be read right
-    /// now — the Keychain while the phone is locked — is read again next time: never a sign-out.
-    /// Tokens it cannot decode are none: the student signs in again.
+    /// The tokens, read from the store the first time it can be read. Only a store with nothing in
+    /// it is nobody signed in: one that cannot be read right now — the Keychain while the phone is
+    /// locked, or before its first unlock — is read again next time, never a sign-out and never
+    /// cleared. Tokens it cannot decode are none: the student signs in again.
     private func current() -> Tokens? {
         if loaded {
-            if unsaved, let tokens { unsaved = !keep(tokens) }
+            if unsaved { unsaved = !keep(tokens) }
             return tokens
         }
         do {
@@ -263,9 +269,10 @@ public actor SignIn: TokenProvider {
         for watcher in watchers.values { watcher.yield(tokens != nil) }
     }
 
-    /// Whether the store took `tokens`.
-    private func keep(_ tokens: Tokens) -> Bool {
-        (try? store.save(JSONEncoder().encode(tokens))) != nil
+    /// Whether the store now holds `tokens`; nil forgets what it had.
+    private func keep(_ tokens: Tokens?) -> Bool {
+        guard let tokens else { return (try? store.clear()) != nil }
+        return (try? store.save(JSONEncoder().encode(tokens))) != nil
     }
 
     /// A renewal with the refresh token, one at a time, which every caller shares — `telling` the
@@ -297,8 +304,8 @@ public actor SignIn: TokenProvider {
         case .failure(.refused("invalid_grant")):
             // The one real "no": Cognito refused the refresh token — revoked, expired, the account
             // gone. Signed out, and nothing else: every queued record waits for the next sign-in.
-            _ = try? store.clear()
-            adopt(nil)
+            // A Keychain that cannot forget the tokens right now forgets them at the next ask.
+            adopt(nil, saved: keep(nil))
             return false
         case .failure:
             // No answer, a server error, another refusal: no "no" about this student. The tokens

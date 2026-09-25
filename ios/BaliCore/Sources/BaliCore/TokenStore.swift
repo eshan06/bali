@@ -2,7 +2,9 @@ import Foundation
 
 /// Where `SignIn` keeps its tokens between launches: the Keychain on the phone, memory in the tests.
 public protocol TokenStore: Sendable {
-    /// What was saved; nil when nothing is. Throws when it cannot be read right now.
+    /// What was saved; nil only when nothing is — nobody signed in. Throws when it cannot be read
+    /// right now (the phone locked, or not unlocked since it started): `SignIn` then has no token
+    /// right now and reads again at the next ask — never a sign-out.
     func load() throws -> Data?
     func save(_ tokens: Data) throws
     /// Forgets what was saved; nothing saved is no failure.
@@ -19,7 +21,7 @@ public protocol TokenStore: Sendable {
     /// locked phone would need `AfterFirstUnlock`); and the extensions only record to the outbox,
     /// never send, so no access group is shared with them.
     public struct KeychainTokenStore: TokenStore {
-        public struct Failure: Error { public let status: OSStatus }
+        public struct Failure: Error, Equatable { public let status: OSStatus }
 
         public init() {}
 
@@ -34,29 +36,37 @@ public protocol TokenStore: Sendable {
         public func load() throws -> Data? {
             var query = item
             query[kSecReturnData as String] = true
-            var data: CFTypeRef?
-            let status = SecItemCopyMatching(query as CFDictionary, &data)
+            var found: CFTypeRef?
+            return try Self.read(SecItemCopyMatching(query as CFDictionary, &found), found)
+        }
+
+        /// What a read that answered `status` holds. Only an item that is not there
+        /// (`errSecItemNotFound`) is nothing saved — nobody signed in. Any other failure throws:
+        /// the phone locked, or not unlocked since it started (`errSecInteractionNotAllowed`), is
+        /// no token right now, never a sign-out. So does a success with no data in it.
+        static func read(_ status: OSStatus, _ found: CFTypeRef?) throws -> Data? {
             if status == errSecItemNotFound { return nil }
             try check(status)
-            return data as? Data
+            guard let data = found as? Data else { throw Failure(status: errSecDecode) }
+            return data
         }
 
         public func save(_ tokens: Data) throws {
             let status = SecItemUpdate(
                 item as CFDictionary, [kSecValueData as String: tokens] as CFDictionary)
-            guard status == errSecItemNotFound else { return try check(status) }
+            guard status == errSecItemNotFound else { return try Self.check(status) }
             var add = item
             add[kSecValueData as String] = tokens
             add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            try check(SecItemAdd(add as CFDictionary, nil))
+            try Self.check(SecItemAdd(add as CFDictionary, nil))
         }
 
         public func clear() throws {
             let status = SecItemDelete(item as CFDictionary)
-            if status != errSecItemNotFound { try check(status) }
+            if status != errSecItemNotFound { try Self.check(status) }
         }
 
-        private func check(_ status: OSStatus) throws {
+        private static func check(_ status: OSStatus) throws {
             guard status == errSecSuccess else { throw Failure(status: status) }
         }
     }

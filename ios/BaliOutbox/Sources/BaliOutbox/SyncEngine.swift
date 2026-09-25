@@ -132,9 +132,9 @@ public actor SyncEngine {
         (self.outbox, self.client, self.clock, self.refresh) = (outbox, client, clock, refresh)
     }
 
-    /// The app's one engine, over the student's sign-in (B4): the API client's tokens are its, a
-    /// 401's `refresh` is its, and every token it gets otherwise — a sign-in, a renewal of its own —
-    /// sends everything again at once.
+    /// The app's one engine, over the student's sign-in (B4): the API client's tokens are the
+    /// sign-in's, and so is a 401's `refresh`; every token it gets otherwise — a sign-in, a renewal
+    /// of its own — sends everything again at once.
     public static func make(
         outbox: Outbox, api: URL, signIn: SignIn,
         transport: any HTTPTransport = URLSessionTransport(), clock: any SyncClock = SystemClock()

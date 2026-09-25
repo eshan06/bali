@@ -41,7 +41,8 @@ final class MemoryKeychain: TokenStore, @unchecked Sendable {
 
 /// The hosted UI, handing back a code for the attempt it was opened for.
 let hostedUI: @Sendable (URL) async throws -> URL = { url in
-    let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+    let state =
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
         .first { $0.name == "state" }?.value ?? ""
     return URL(string: "bali://auth/callback?code=the-code&state=\(state)")!
 }
@@ -125,7 +126,9 @@ struct SignInEngineTests {
         await rig.stop()
     }
 
-    @Test("A 401: the sign-in renews the token with its refresh token, and everything goes again at once")
+    @Test(
+        "A 401: the sign-in renews the token with its refresh token, and everything goes again at once"
+    )
     func reauthRenews() async throws {
         let rig = try await SignedRig()
         try await rig.signStudentIn(accessToken("a1"))
@@ -134,7 +137,8 @@ struct SignInEngineTests {
 
         let renewal = try await rig.server.next(tokenRoute)
         let form = String(decoding: renewal.request.httpBody ?? Data(), as: UTF8.self)
-        #expect(form.contains("grant_type=refresh_token") && form.contains("refresh_token=refresh-1"))
+        #expect(
+            form.contains("grant_type=refresh_token") && form.contains("refresh_token=refresh-1"))
         renewal.reply(200, grant(accessToken("a2")))
         let again = try await rig.server.next(unlockRoute)
         #expect(again.eventId == unlock.eventId && again.token == "Bearer \(accessToken("a2"))")
@@ -173,6 +177,9 @@ struct SignInEngineTests {
     func ownRenewalSendsAtOnce() async throws {
         let rig = try await SignedRig()
         try await rig.signStudentIn(accessToken("a1"))
+        // The sign-in's re-read goes out with a1 before the clock moves: the only renewal next is
+        // the drain's, not one the re-read would start and the test answer in its place.
+        _ = try await rig.server.next(meRoute)
         rig.clock.advance(by: 3600)  // a1 has expired
         let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
         // The drain's own request found it expired and renewed it first: Cognito out of reach, so
