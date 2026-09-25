@@ -42,7 +42,7 @@ struct LockedKeychainTests {
 
         #expect(await signIn.accessToken() == nil)
         #expect(await signIn.refresh() == false)
-        #expect(await first(signIn.signedIn()) == nil)  // not known: neither in nor out
+        #expect(await nothingYet(signIn.signedIn()))  // not known: neither in nor out
         #expect(store.writes == 0)  // nothing cleared, nothing saved over what is there
         #expect(await endpoint.sent.isEmpty)
     }

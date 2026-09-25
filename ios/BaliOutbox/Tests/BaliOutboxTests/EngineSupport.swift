@@ -9,8 +9,9 @@ import Testing
 #endif
 
 /// How long, in real time, a test waits for the engine before it fails instead of hanging: well
-/// past the iOS Simulator's stalls on GitHub's runner (up to thirteen seconds, DECISIONS B2).
-let patience = Duration.seconds(30)
+/// past the iOS Simulator's stalls on GitHub's runner — thirteen seconds in B2, then 38 and 100 on
+/// #86's runs — and inside the suites' three-minute limits. Only a failing wait takes it all.
+let patience = Duration.seconds(150)
 
 /// A clock that moves only when the test moves it.
 final class TestClock: SyncClock, @unchecked Sendable {

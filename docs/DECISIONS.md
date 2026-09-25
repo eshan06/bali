@@ -91,7 +91,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   before each check-in only. Of 19 mutations of the rules, all 19 turn a test red. **Santa**
   (two Claude reviewers, round 1): no blockers; the easy WARNs fixed here — the standing's write
   retried, the queue read apart from the standing, the enforcer's wake holding it weakly — and
-  the rest disclosed above.
+  the rest disclosed above. **Found here:** the iOS job failed twice, in B4b's `TokenTests`
+  (`shared`, `sharedFromRefresh`, `signInMidRenewal`, `signOutMidRenewal`), unchanged here and
+  green on #83–#85: the simulator stalled every test 38 and 100 seconds, and their helper polled
+  a ten-second clock (`eventually`), which a stall outruns even when what it waits for has
+  happened. They now wait on the requests' own signal (`HeldEndpoint.received`), and a
+  watcher's first value on the stream itself (`first`), neither against a clock — the suites'
+  three-minute limits bound them; only the look that must see nothing (`nothingYet`) keeps its
+  moment, which a stall can only make pass. BaliOutbox's `patience` rose from 30 to 150 seconds
+  for the same stalls; a passing wait takes none of it. Checked on Linux: `TokenTests` 25 times
+  under CPU stress (eight busy loops on four cores), both whole suites 8 and 5 times under it,
+  and a test run frozen 40 seconds mid-way (`SIGSTOP`) — all green.
 - **2026-09-25** — **A13: a return the phone made before an unlock the server already has is
   recorded, never applied (owner ruling, 2026-09-24).** The ruling, "Fix it", verbatim: "The server
   uses the phone's order number that A12 added. A refocus or re-tap that is older than an unlock the
