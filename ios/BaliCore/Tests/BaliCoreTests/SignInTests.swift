@@ -384,6 +384,47 @@ struct TokenTests {
     }
 
     @Test(
+        "a sign-out the Keychain cannot make right then is made at the next ask: the refused refresh token is never read back"
+    )
+    func refusedUnforgotten() async throws {
+        let endpoint = TransportDouble { _ in (400, Data(refusal("invalid_grant").utf8)) }
+        let (store, now) = (try MemoryStore.holding(jwt("a1")), Now())
+        let phone = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await phone.accessToken() == jwt("a1"))  // read while the phone is unlocked
+
+        store.setLocked(true)
+        now.set(4000)
+        #expect(await phone.accessToken() == nil)  // Cognito's no
+        #expect(await first(phone.signedIn()) == false)
+        #expect(store.tokens?.refresh == "refresh-1")  // the Keychain could not forget it then
+
+        store.setLocked(false)
+        #expect(await phone.accessToken() == nil)
+        #expect(store.data == nil)  // forgotten at this ask
+        let relaunched = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await first(relaunched.signedIn()) == false)
+        #expect(await endpoint.sent.count == 1)
+    }
+
+    @Test("the token the API refused is not given after a relaunch either, though no renewal came")
+    func refusedAcrossLaunch() async throws {
+        let answers = Answers(nil)  // Cognito out of reach
+        let endpoint = TransportDouble { _ in
+            let (status, body) = try answers.next()
+            return (status, Data(body.utf8))
+        }
+        let store = try MemoryStore.holding(jwt("a1"))
+        let before = await signIn(store, endpoint, told: Told())
+        #expect(await before.refresh() == false)
+
+        let relaunched = await signIn(store, endpoint, told: Told())
+        #expect(await relaunched.accessToken() == nil)  // renewed first, never a1 again
+        answers.set((200, granted(jwt("a2"))))
+        #expect(await relaunched.accessToken() == jwt("a2"))
+        #expect(await endpoint.sent.count == 3)
+    }
+
+    @Test(
         "no answer, a server error, throttling or another refusal keeps the tokens: no one said no",
         arguments: [
             nil, (500, "{}"), (503, "<html>"), (429, refusal("too_many_requests")),

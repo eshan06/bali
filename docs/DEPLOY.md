@@ -69,6 +69,8 @@ checked with a public authorize request (`bali://auth/callback`, scope
 
 - **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
 - **The phone's app client:** `bali-ios-dev`, id `33qr62dl4ee4inigneidmfe2s9`
+- **In place** (2026-09-25): both are in `ios/project.yml` (B4c), and the
+  client id is on dev's `AUTH_AUDIENCE`, appended after B4a deployed.
 - **Still to confirm:** its refresh-token expiration (step 3 below), which no
   request from outside can show.
 
@@ -99,14 +101,15 @@ console → Cognito → that user pool:
 **Where the values go** (each environment's own):
 
 - **The domain and the client id:** `ios/project.yml`'s build settings,
-  `BALI_COGNITO_DOMAIN` and `BALI_COGNITO_CLIENT_ID` — dev's with B4c,
-  production's once it exists (Phase 5).
+  `BALI_COGNITO_DOMAIN` and `BALI_COGNITO_CLIENT_ID` — dev's are in (B4c);
+  production's go there once it exists (Phase 5). A build with either empty
+  says sign-in is not set up.
 - **The client id, again:** appended to that environment's `AUTH_AUDIENCE`,
   after the id already there (`<that id>,<the phone's>`) — **only once B4a is
   deployed there.** Before it, the API reads `AUTH_AUDIENCE` as a single id,
   so a list matches no token and locks every sign-in out. The same holds the
   other way: trim the list back to one id before rolling the API back past
-  B4a. Dev's is appended by the planning session once #81 (B4a) has deployed.
+  B4a. Dev's was appended on 2026-09-25, after #81 (B4a) had deployed.
 
 ## Local run
 

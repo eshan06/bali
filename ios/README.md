@@ -7,7 +7,7 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | Folder         | What it is                                                                                                             |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
-| `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6                                                            |
+| `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine over the sign-in             |
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: iOS runs it at a session's edges                    |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: the shield over a blocked app                          |
 | `BaliCore/`    | The API's wire types, the outbox tables, the API client and the sign-in — `swift test` there runs its tests, Linux too |
@@ -43,6 +43,12 @@ with Xcode 26.6 — and [Homebrew](https://brew.sh).
 4. Run on your iPhone: connect it, turn on Developer Mode on it (Settings → Privacy & Security
    → Developer Mode, then restart), pick it as the run destination for the **Bali** scheme,
    and press Run (⌘R). The extensions are built and installed inside the app.
+
+The build talks to dev: `project.yml` names dev's API and its sign-in (`docs/DEPLOY.md`, "The
+phone's sign-in"). Until C1 draws the sign-in screen, a Debug build's placeholder shows a
+temporary readout — the engine's link to the API, when the server last answered, whether someone
+is signed in — with **Sign in** and **Sign out**; `docs/PLAN.md`'s B5 step lists what to check
+with it.
 
 NFC and Screen Time shields need a real iPhone, which is why B5 and B6 are device checkpoints;
 the simulator only proves it builds. Family Controls works in development builds already —
