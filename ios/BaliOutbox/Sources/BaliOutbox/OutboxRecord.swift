@@ -8,10 +8,22 @@ public enum Change: Sendable, Hashable {
     case tap(tagId: String)
     /// `POST /v1/sessions/{id}/unlock`, with the student's reason, if any.
     case unlock(session: String, reason: UnlockReason?)
+    /// `POST /v1/taps/{eventId}/unlock`: an unlock made while the phone's own tap `tap` was
+    /// unanswered, filed under it (owner decision 11) — sent there always, even once the tap's
+    /// answer names a session, whose shields it then guards (`Outbox.holdsUnlock`).
+    case unlockUnderTap(tap: String, reason: UnlockReason?)
     /// `POST /v1/sessions/{id}/refocus`.
     case refocus(session: String)
     /// `POST /v1/sessions/{id}/protection-off`: the Screen Time permission was found revoked.
     case protectionOff(session: String)
+
+    /// Either unlock: a session's, or one filed under a tap.
+    var isUnlock: Bool {
+        switch self {
+        case .unlock, .unlockUnderTap: true
+        case .tap, .refocus, .protectionOff: false
+        }
+    }
 }
 
 /// One queued record.
@@ -42,6 +54,7 @@ public struct OutboxRecord: Sendable, Hashable {
     public enum Request: Sendable, Hashable {
         case tap(TapRequest)
         case unlock(session: String, UnlockRequest)
+        case unlockUnderTap(tap: String, UnlockRequest)
         case refocus(session: String, RefocusRequest)
         case protectionOff(session: String, ProtectionOffRequest)
     }
@@ -49,13 +62,14 @@ public struct OutboxRecord: Sendable, Hashable {
     /// The request to send, built from what was stored: every attempt sends the same.
     public var request: Request {
         let (id, time) = (eventId, recordedAt)
+        func unlock(_ reason: UnlockReason?) -> UnlockRequest {
+            UnlockRequest(eventId: id, deviceTime: time, reason: reason, order: order)
+        }
         return switch change {
         case .tap(let tagId):
             .tap(TapRequest(tagId: tagId, eventId: id, deviceTime: time, order: order))
-        case .unlock(let session, let reason):
-            .unlock(
-                session: session,
-                UnlockRequest(eventId: id, deviceTime: time, reason: reason, order: order))
+        case .unlock(let session, let reason): .unlock(session: session, unlock(reason))
+        case .unlockUnderTap(let tap, let reason): .unlockUnderTap(tap: tap, unlock(reason))
         case .refocus(let session):
             .refocus(session: session, RefocusRequest(eventId: id, deviceTime: time, order: order))
         case .protectionOff(let session):
@@ -70,10 +84,15 @@ extension OutboxRecord: FetchableRecord {
         switch try row.decode(String.self, forColumn: "kind") {
         case "tap": change = .tap(tagId: try row.decode(forColumn: "tagId"))
         case "unlock":
-            change = .unlock(
-                session: try row.decode(forColumn: "sessionId"),
-                reason: try row.decode(String?.self, forColumn: "reason")
-                    .flatMap(UnlockReason.init(rawValue:)))
+            let reason = try row.decode(String?.self, forColumn: "reason")
+                .flatMap(UnlockReason.init(rawValue:))
+            // Filed under its tap, it stays so once the tap's answer names a session (decision 11).
+            change =
+                if let tap = try row.decode(String?.self, forColumn: "tapId") {
+                    .unlockUnderTap(tap: tap, reason: reason)
+                } else {
+                    .unlock(session: try row.decode(forColumn: "sessionId"), reason: reason)
+                }
         case "refocus": change = .refocus(session: try row.decode(forColumn: "sessionId"))
         case "protection_off":
             change = .protectionOff(session: try row.decode(forColumn: "sessionId"))
@@ -109,9 +128,9 @@ extension OutboxRecord {
             let response = await client.tap(request)
             return Sent(eventId, response, .tap(tapDisposition(response.result, response.answer)))
         case .unlock(let session, let request):
-            let response = await client.unlock(session: session, request)
-            return Sent(
-                eventId, response, .unlock(unlockDisposition(response.result, response.answer)))
+            return unlocked(await client.unlock(session: session, request))
+        case .unlockUnderTap(let tap, let request):
+            return unlocked(await client.unlock(tap: tap, request))
         case .refocus(let session, let request):
             let response = await client.refocus(session: session, request)
             let disposition = stateChangeDisposition(response.result, response.answer)
@@ -121,6 +140,11 @@ extension OutboxRecord {
             let disposition = stateChangeDisposition(response.result, response.answer)
             return Sent(eventId, response, .stateChange(disposition))
         }
+    }
+
+    /// Either unlock's answer, by the unlock's table.
+    private func unlocked(_ response: APIResponse<UnlockResponse>) -> Sent {
+        Sent(eventId, response, .unlock(unlockDisposition(response.result, response.answer)))
     }
 }
 

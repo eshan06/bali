@@ -15,6 +15,7 @@ struct SettleTests {
         "On every result and body the TypeScript's tables answer, the record goes exactly when its disposition ends it — an unlock only when recorded — and a refusal is stuck at once",
         arguments: [
             ("tap", Change.tap(tagId: "tag")), ("unlock", .unlock(session: "s", reason: nil)),
+            ("unlock", .unlockUnderTap(tap: "t", reason: nil)),
             ("state-change", .refocus(session: "s")),
             ("state-change", .protectionOff(session: "s")),
         ])
@@ -39,7 +40,7 @@ struct SettleTests {
                     #expect(disposition?.rawValue == expected, "\(context)")
                     let kept = try current(outbox, queued.eventId)
                     #expect((kept == nil) == Self.ending.contains(expected), "\(context)")
-                    if case .unlock = change {
+                    if change.isUnlock {
                         #expect((kept == nil) == (expected == "recorded"), "\(context)")
                     }
                     if let kept {

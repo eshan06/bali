@@ -8,6 +8,117 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B6a: the NFC tap — a block is the code written on it, read into the tap —
+  and decision 11 on the phone: an Emergency Unlock made while the phone's own tap is unanswered
+  is filed under that tap, always, and guards every session until that answer names one. B6 ships
+  in three.**
+  **The split:** B6 came to about 470 counted lines with its riders. B6a is the read and decision
+  11, with #92's `firstMatch` rider (a test); B6b is Emergency Unlock over an unread standing
+  (#92's review: the engine's path, the Debug button, and whether a fail-safe ceiling applies to
+  shields the phone can no longer justify); B6c is the extensions' read — read-only, and its 2 s
+  bound a hard ceiling (#93's review, comment 5833779234) — with #92's other rider, the monitor's
+  refusal bookkeeping moved into `Bell` and tested on Linux (built here, then moved for size; kept
+  on the branch `claude/fervent-bell-8nvjcp-b6c-monitor` for B6c's worker). **What identifies a
+  block, decided here: the code written on it, not the chip.** Ten letters and digits — v2's
+  teacher app wrote one on every block
+  (`T7XK2M9QPF`), the owner's among them — in the tag's NDEF message: a well-known Text record
+  holding it, or a URI record ending in it, `bali://t/<code>` or `https://<host>/t/<code>` (v2's QR
+  link, which v2's reader took too). Read whatever its case and the space around it, and sent
+  upper-case, as v2 minted and printed it. It is the `tagId` both endpoints already take:
+  `POST /v1/blocks` registers it (trimmed, up to 200 characters) and `POST /v1/taps` resolves it
+  exactly — the data model's "the ID its NFC tag broadcasts". Not the UID: an NDEF reader session,
+  v2's and the step's, never gives one (reading it takes a tag reader session, polling per tag
+  family, and ISO 7816 application ids in the Info.plist); a code can be printed (a QR) and typed
+  (Phase 5's register-by-code fallback), and a worn sticker is replaced by writing the same code on
+  a new one. Neither is a secret — a UID clones as easily. **Not a Bali block:** a tag with no such
+  record — a web link, other text, a code of another shape (`DEVICE-CHECK-1`, typed in rounds 1–3,
+  is no block's), a blank tag — is said so and records nothing, so a random sticker never shields
+  the phone. A code the server does not know is its `404`: the tap kept, shown and retried like any
+  refused tap (B3a), its shield ended with the refusal. **The rule is pure** (`BlockTag`,
+  BaliCore): the Text and URI records read from their bytes — the language code skipped, UTF-8, or
+  UTF-16 by its byte order mark, the URI's abbreviated start — so all of it runs on Linux. **The
+  reader** (`BlockReader`, the app) is a thin adapter over `NFCNDEFReaderSession`, as v2's was: iOS's
+  sheet, one tag a scan, and its outcome (`BlockRead`) — a block, not a block, cancelled, a phone
+  with no NFC, or iOS's own error (shown, rule 5). **The tap** (`SyncEngine.tap(_:)`): a block read
+  is the tap B5a's typed one was — recorded with its order (A12), shielded at once to decision 7's
+  cap, sent by the outbox; any other read records nothing. **Decision 11 on the phone:**
+  `SyncEngine.emergencyUnlock(reason:)` files the student's Emergency Unlock where
+  `SyncState.emergencyUnlock` says — under the latest tap not yet answered (not a stuck one: its
+  refusal ended its shield), else in the session the phone is in; with neither, nothing the phone
+  knows holds shields, and nothing is recorded (over an unread standing, B6b's). Filed under the tap
+  (`Change.unlockUnderTap`), it acts at once — the tap's hold ends, and the session the phone stood
+  in stands unlocked, so the shields come off whatever it stood in — and it goes to
+  `POST /v1/taps/{eventId}/unlock` (`APIClient.unlock(tap:_:)`) always, retries included, even once
+  the tap's answer names a session: the server answers a retry where it was recorded, and the
+  session route would refuse an id another session holds. It carries its record's order like every
+  record, so the server orders it after its tap whatever the clock says, and is answered as any
+  unlock (`unlockDisposition`). **The guard, decided here (PLAN's lean, widened by #94's Claude
+  Review):** until its tap is answered, the unlock's session is not known — any session the phone
+  stands or reads in may be the tap's — so it guards every one: stuck, it keeps every read from
+  shielding any session again (`holdsUnlock`); a tap made after it, a return, still focuses (by the
+  phone's order). A refused tap stays queued, stuck, and so does that guard. The tap's answer names
+  the session: `settle` hands it to the unlocks filed under the tap, which guard that one only from
+  then on; an answer naming none (armed, no longer current) hands them nothing — the server keeps
+  such an unlock with no session. Its tap's answer does not apply while
+  the unlock after it waits (B3b-2's rule), so nothing shields between the two answers; a tap that
+  lands after its unlock — refused first, or stuck — answers `joined` and `unlocked` (A11), which
+  applies: no shield. And a tap's own answer never shields over an unlock the phone made after the
+  tap and has yet to have recorded (santa's review, below): its `focused` applies as `unlocked`,
+  the guard a read already had — by the phone's order, so a re-tap made after the unlock, a return,
+  still focuses. **The file:** an unlock filed under its tap names no session until the answer
+  does, which v1's CHECK forbade; SQLite cannot relax a CHECK in place, so migration `v3` makes the
+  table again, with `tapId` — the old one renamed first, its AUTOINCREMENT counter copied to the
+  new, then dropped. Dropped with the old table, the counter started again at 1, and the server (A12) would have placed everything the
+  phone did next before what it did: a new tap older than the last unlock, never applied (A13).
+  Found while writing it — SQLite resets the counter of a drained, rebuilt table — and pinned: a
+  file drained, and one still holding a record below its counter, each migrated, go on at the next
+  seq. **The Debug
+  readout:** **Scan** (read and tap), **Read block code** (read only, for registering a block), the
+  typed **Tap** kept for rounds 1–3, Emergency Unlock through `emergencyUnlock` — B5a's disclosure
+  closed: it named the session the phone was in even while a tap was unanswered — `Outbox:` (what is
+  queued) and **History** (`GET /v1/me/history`). **Rider (#92's review):** `AppConfigTests` pins
+  each setting to be set once in `project.yml`, so a Release override cannot go unpinned. **Not
+  covered, disclosed:** (1) An unlock under a tap that only arms — another teacher's block, scanned
+  mid-session — is kept with no session (`tap_armed`, A11), and the session the phone was in, where
+  the server still has the student focused, shields again at the next read: decision 11 files an
+  unlock where its tap lands, never where the phone stood before it. The student's next Emergency
+  Unlock, no tap pending, goes to that session. Likewise a tap refused or stuck while its unlock
+  lands first (`unknown_tap`): that session shields again until the tap lands and files it — or, a
+  code never registered, until the student unlocks again. (2) After such an armed answer the phone
+  stands out, not waiting: the answer stood under the unlock after it, and no read shows an armed
+  tap (open decision 6). (3) Over an unread standing, an Emergency Unlock with no tap pending is
+  still none, and one under a pending tap is recorded but leaves the last run's shields on (only
+  the enforcer's own come off over it, B5b-2) — B6b's. (4) The reader runs on the owner's iPhone
+  only (round 4); the simulator builds it and finds no NFC. (5) The app's NFC entitlement lists NDEF beside TAG, as B2 carried v2's over; App
+  Store uploads have refused NDEF for apps built against iOS 13 and later (ITMS-90778), so Phase 5's
+  TestFlight may need TAG alone — an NDEF reader session runs under TAG. **Tests** (Linux and the
+  iOS Simulator): `BlockTagTests` — v2's code in a Text record, whatever its case, space, language
+  code or reserved bit; UTF-16 by its mark; the links; 30 tags that are not a block; the first code
+  wins. `UnlockRouteTests` — the route from every standing, a stuck tap, the latest of two; either
+  unlock ending the tap's hold; every session guarded until the tap is answered, then the tap's
+  session handed on, and a refocus there following the unlock. `UnderTapEngineTests` — tapped
+  offline then unlocked, the shields off at once and never on between the answers, the unlock under
+  its tap with the next order; under a re-tap, its retry to the tap still; stuck, the guard —
+  against a read, before its tap is answered and after, and against its own tap's answer, both
+  stuck, while a return still focuses; a tap landing after its unlock; a scan that records nothing.
+  The
+  migration from `v2`, drained and not; the schema; the requests; `tap-unlock/*`'s fixtures and the
+  generated unlock cases through the tap route; the random walk with unlocks under taps; the
+  monitor's wake. `AppTests.noNFC` (the simulator): a phone with no NFC is told so at once. Of 29
+  mutations of the rules — the code's reading, the route, the session handed on, the guard, its
+  order and its reach before the tap's answer, a refocus's wait, the migration's counter, what a
+  scan records, the set-once pin — each taken alone, all 29 turn a test red. **Claude Review**
+  (#94): one BLOCKER, fixed here, red first — an unlock under a tap not yet answered named no
+  session, so, both stuck, a read answering `focused` shielded the student again over their
+  Emergency Unlock (the guard above, now every session's until the tap's answer). Its two WARNs
+  fixed: a reader asked for a second scan mid-scan says one is under way (it left the first
+  waiting), and a link's `/T/` reads as `/t/`. **Santa** (two Claude reviewers, both the fallback — no other
+  model's CLI here; round 1): no blockers. Three WARNs fixed here, the first two red first: a tap's
+  answer applied over a stuck unlock made after it — tap and unlock both refused, the tap's retry
+  answered `focused` shielded the student over their Emergency Unlock (the guard above); a refocus
+  made while the unlock under a tap named no session yet followed nothing, and could overtake it
+  stuck (it now waits for it); and a reader asked for a second scan at once would leave the first
+  waiting (noted then; guarded since, the Claude Review's WARN above).
 - **2026-09-25** — **B5c: Bali's own shield over a blocked app — its words from the standing the
   app keeps, read as the monitor reads it; the bell in the phone's own time format; D1's approved
   look as far as `ShieldConfiguration` carries it; "OK", and no shield action extension.** **The

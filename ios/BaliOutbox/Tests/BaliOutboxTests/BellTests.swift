@@ -114,6 +114,8 @@ struct WakeTests {
     func capEnds() throws {
         let unlocked = try kept(.out, [.tap(tagId: "tag"), .unlock(session: "s", reason: nil)])
         #expect(wake(unlocked, at: t0) == .clear)
+        let underTap = try kept(.out, [.tap(tagId: "tag"), .unlockUnderTap(tap: "t", reason: nil)])
+        #expect(wake(underTap, at: t0) == .clear)
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "tag"))
         try outbox.pool.write {

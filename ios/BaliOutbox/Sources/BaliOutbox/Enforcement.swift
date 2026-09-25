@@ -66,9 +66,7 @@ extension SyncState {
     /// unless the student unlocked since, which is acted on at once (decision 11). nil: none does.
     public var tapHeldUntil: Date? {
         guard let tap = pendingTap,
-            !queued.drop(while: { $0.eventId != tap.eventId }).contains(where: {
-                if case .unlock = $0.change { true } else { false }
-            })
+            !queued.drop(while: { $0.eventId != tap.eventId }).contains(where: \.change.isUnlock)
         else { return nil }
         return tap.recordedAt + cap
     }

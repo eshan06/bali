@@ -223,8 +223,15 @@ struct UnlockSafetyTests {
                 case 2: try outbox.record(.protectionOff(session: session), now: now)
                 case 3: try outbox.protectionRestored()
                 case 4:
-                    let unlock = try #require(
-                        try outbox.record(.unlock(session: session, reason: nil), now: now))
+                    // Of the session, or filed under the latest tap queued (decision 11).
+                    let tap = try outbox.records().last {
+                        if case .tap = $0.change { true } else { false }
+                    }
+                    let change: Change =
+                        if let tap, Bool.random(using: &random) {
+                            .unlockUnderTap(tap: tap.eventId, reason: nil)
+                        } else { .unlock(session: session, reason: nil) }
+                    let unlock = try #require(try outbox.record(change, now: now))
                     unrecorded.insert(unlock.eventId)
                 case 5...7:
                     guard case .send(let due) = try outbox.nextDue(now: now) else { break }
@@ -241,9 +248,7 @@ struct UnlockSafetyTests {
                         unrecorded.remove(any.eventId)
                     }
                 }
-                let queued = try outbox.records().compactMap { record -> String? in
-                    if case .unlock = record.change { record.eventId } else { nil }
-                }
+                let queued = try outbox.records().filter(\.change.isUnlock).map(\.eventId)
                 #expect(Set(queued) == unrecorded, "seed \(seed), step \(step)")
             }
         }

@@ -241,6 +241,38 @@ public struct Outbox: Sendable {
         migrator.registerMigration("v2") { db in
             try Self.setState(db, Self.installKey, UUID().uuidString.lowercased())
         }
+        // Decision 11 (B6): an unlock filed under the phone's own unanswered tap, `tapId`, names no
+        // session until the tap's answer does. SQLite cannot relax v1's CHECK in place, so the
+        // table is made again — and its AUTOINCREMENT counter, A12's order, carried over: going
+        // back, it would have the server place what the phone does next before what it did.
+        migrator.registerMigration("v3") { db in
+            let columns = """
+                seq, eventId, kind, tagId, sessionId, reason, follows, recordedAt, attempts,
+                  answers, nextAttemptAt, stuck, lastStatus, lastReason, lastMessage
+                """
+            try db.execute(
+                sql: """
+                    ALTER TABLE outbox RENAME TO outboxV2;
+                    CREATE TABLE outbox (
+                      seq INTEGER PRIMARY KEY AUTOINCREMENT, eventId TEXT NOT NULL UNIQUE,
+                      kind TEXT NOT NULL
+                        CHECK (kind IN ('tap', 'unlock', 'refocus', 'protection_off')),
+                      tagId TEXT CHECK ((kind = 'tap') = (tagId IS NOT NULL)),
+                      sessionId TEXT
+                        CHECK (kind = 'unlock' OR (kind = 'tap') = (sessionId IS NULL)),
+                      tapId TEXT CHECK (tapId IS NULL OR kind = 'unlock'),
+                      reason TEXT, follows TEXT, recordedAt TEXT NOT NULL,
+                      attempts INTEGER NOT NULL DEFAULT 0, answers INTEGER NOT NULL DEFAULT 0,
+                      nextAttemptAt TEXT NOT NULL, stuck INTEGER NOT NULL DEFAULT 0,
+                      lastStatus INTEGER, lastReason TEXT, lastMessage TEXT,
+                      CHECK (kind != 'unlock' OR sessionId IS NOT NULL OR tapId IS NOT NULL));
+                    INSERT INTO outbox (\(columns)) SELECT \(columns) FROM outboxV2;
+                    DELETE FROM sqlite_sequence WHERE name = 'outbox';
+                    INSERT INTO sqlite_sequence (name, seq)
+                      SELECT 'outbox', seq FROM sqlite_sequence WHERE name = 'outboxV2';
+                    DROP TABLE outboxV2;
+                    """)
+        }
         return migrator
     }
 
@@ -270,6 +302,7 @@ public struct Outbox: Sendable {
         try pool.write { db in
             let eventId = EventID.mint(at: now)
             var follows: String?
+            var tap: String?
             let row: (kind: String, tagId: String?, session: String?, reason: UnlockReason?)
             switch change {
             case .tap(let tagId):
@@ -280,11 +313,20 @@ public struct Outbox: Sendable {
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
                 try Self.setState(db, Self.lastUnlockKey, eventId)
                 row = ("unlock", nil, session, reason)
+            case .unlockUnderTap(let tapId, let reason):
+                try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
+                try Self.setState(db, Self.lastUnlockKey, eventId)
+                row = ("unlock", nil, nil, reason)
+                tap = tapId
             case .refocus(let session):
-                // The unlock it returns from — the latest — while it is queued, in this session.
+                // The unlock it returns from — the latest — while it is queued, in this session or
+                // under a tap whose answer names none yet.
                 follows = try String.fetchOne(
-                    db, sql: "SELECT eventId FROM outbox WHERE sessionId = ? AND eventId = ?",
-                    arguments: [session, Self.state(db, Self.lastUnlockKey)])
+                    db,
+                    sql: """
+                        SELECT eventId FROM outbox WHERE eventId = ?
+                          AND (sessionId = ? OR (tapId IS NOT NULL AND sessionId IS NULL))
+                        """, arguments: [Self.state(db, Self.lastUnlockKey), session])
                 row = ("refocus", nil, session, nil)
             case .protectionOff(let session):
                 if try Self.state(db, Self.reportedKey) == session { return nil }
@@ -293,12 +335,12 @@ public struct Outbox: Sendable {
             }
             try db.execute(
                 sql: """
-                    INSERT INTO outbox (eventId, kind, tagId, sessionId, reason, follows,
-                      recordedAt, nextAttemptAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, reason, follows,
+                      recordedAt, nextAttemptAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 arguments: [
-                    eventId, row.kind, row.tagId, row.session, row.reason?.rawValue, follows, now,
-                    now,
+                    eventId, row.kind, row.tagId, row.session, tap, row.reason?.rawValue, follows,
+                    now, now,
                 ])
             if let standing { try Self.keep(db, standing) }
             return try Self.fetch(db, eventId)
@@ -358,13 +400,18 @@ public struct Outbox: Sendable {
     /// deletes it; any other keeps it, due after `backoff`, with its answer for a screen: stuck at a
     /// refusal, or at `bound` answers that left it unsettled (any status but 401, 408 and 429, none
     /// of them this record's). Stuck stays stuck, and never deletes: an unlock leaves only once
-    /// recorded.
+    /// recorded. A tap's session is handed to the unlocks filed under it, to guard (decision 11).
     @discardableResult
     public func settle(_ sent: Sent, now: Date) throws -> Disposition? {
         try pool.write { db in
             guard let record = try Self.fetch(db, sent.eventId) else { return nil }
             let disposition = sent.disposition
             guard disposition.keeps else {
+                if disposition == .tap(.applySession), let session = sent.session {
+                    try db.execute(
+                        sql: "UPDATE outbox SET sessionId = ? WHERE tapId = ?",
+                        arguments: [session.id, sent.eventId])
+                }
                 try db.execute(
                     sql: "DELETE FROM outbox WHERE eventId = ?", arguments: [sent.eventId])
                 return disposition
@@ -413,14 +460,17 @@ public struct Outbox: Sendable {
         return records.filter { !$0.stuck && !($0.follows.map(stuck.contains) ?? false) }.count
     }
 
-    /// Whether an unrecorded unlock of `session` is queued. While one is, no read may put that
-    /// session's shields back on: the emergency unlock stands until the server has it.
-    public func holdsUnlock(session: String) throws -> Bool {
+    /// Whether an unrecorded unlock of `session`, made after the record at `seq`, is queued — or
+    /// one under a tap still queued, its session unnamed: it may be any. While one is, neither a
+    /// read nor an older tap's answer puts that session's shields back on.
+    public func holdsUnlock(session: String, after seq: Int = 0) throws -> Bool {
         try pool.read {
             try Bool.fetchOne(
                 $0,
-                sql: "SELECT EXISTS (SELECT 1 FROM outbox WHERE kind = 'unlock' AND sessionId = ?)",
-                arguments: [session]) ?? false
+                sql: """
+                    SELECT EXISTS (SELECT 1 FROM outbox WHERE kind = 'unlock' AND seq > ? AND
+                      (sessionId = ? OR tapId IN (SELECT eventId FROM outbox WHERE kind = 'tap')))
+                    """, arguments: [seq, session]) ?? false
         }
     }
 

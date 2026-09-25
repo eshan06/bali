@@ -46,9 +46,11 @@ struct AppConfigTests {
         for key in AppConfig.Key.allCases {
             let value = try #require(plist[key.rawValue] as? String, "\(key)")
             let setting = try #require(value.wholeMatch(of: /\$\((\w+)\)/)?.1, "\(key): \(value)")
+            let setIn = try Regex("\\n\\s+\(setting):\\s*'?([^'\\n]+?)'?[ \\t]*(?=\\n)")
             let line = try #require(
-                project.firstMatch(of: try Regex("\\n\\s+\(setting):\\s*'?([^'\\n]+?)'?\\s*\\n")),
-                "\(setting) is not set in project.yml")
+                project.firstMatch(of: setIn), "\(setting) is not set in project.yml")
+            // Set once: a second, a Release configuration's say, would go unpinned (#92's review).
+            #expect(project.matches(of: setIn).count == 1, "\(setting) is set more than once")
             built[key.rawValue] = line.output[1].substring.map(String.init)
         }
         let config = try #require(AppConfig(info: built))

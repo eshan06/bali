@@ -21,12 +21,12 @@ struct SchemaTests {
                 try db.columns(in: "outboxState").map(\.name)
             )
         }
-        #expect(applied == ["v1", "v2"])
+        #expect(applied == ["v1", "v2", "v3"])
         #expect(
             columns == [
-                "seq", "eventId", "kind", "tagId", "sessionId", "reason", "follows", "recordedAt",
-                "attempts", "answers", "nextAttemptAt", "stuck", "lastStatus", "lastReason",
-                "lastMessage",
+                "seq", "eventId", "kind", "tagId", "sessionId", "tapId", "reason", "follows",
+                "recordedAt", "attempts", "answers", "nextAttemptAt", "stuck", "lastStatus",
+                "lastReason", "lastMessage",
             ])
         #expect(state == ["key", "value"])
         #expect(try outbox.records().isEmpty)
@@ -50,24 +50,78 @@ struct SchemaTests {
         // Protection off was reported for this session: reopening does not report it again.
         #expect(try reopened.record(.protectionOff(session: "s"), now: t0) == nil)
         let applied = try await reopened.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2"])
+        #expect(applied == ["v1", "v2", "v3"])
     }
 
     @Test("The schema refuses a row its kind could not send")
     func refusesMalformedRows() throws {
         let (outbox, _) = try makeOutbox()
         let insert =
-            "INSERT INTO outbox (eventId, kind, tagId, sessionId, recordedAt, nextAttemptAt)"
+            "INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, recordedAt, nextAttemptAt)"
         for values in [
-            "('a', 'tap', NULL, NULL, 0, 0)",  // a tap with no tag
-            "('b', 'tap', 'tag', 's', 0, 0)",  // a tap with a session
-            "('c', 'unlock', NULL, NULL, 0, 0)",  // an unlock with no session
-            "('d', 'refocus', 'tag', 's', 0, 0)",  // a refocus with a tag
-            "('e', 'checkin', NULL, 's', 0, 0)",  // not an outbox kind
+            "('a', 'tap', NULL, NULL, NULL, 0, 0)",  // a tap with no tag
+            "('b', 'tap', 'tag', 's', NULL, 0, 0)",  // a tap with a session
+            "('c', 'unlock', NULL, NULL, NULL, 0, 0)",  // an unlock with no session, nor tap
+            "('d', 'refocus', 'tag', 's', NULL, 0, 0)",  // a refocus with a tag
+            "('e', 'checkin', NULL, 's', NULL, 0, 0)",  // not an outbox kind
+            "('f', 'tap', 'tag', NULL, 't', 0, 0)",  // a tap filed under a tap
+            "('g', 'refocus', NULL, 's', 't', 0, 0)",  // a refocus filed under a tap
+            "('h', 'protection_off', NULL, NULL, 't', 0, 0)",  // protection off with no session
         ] {
             #expect(throws: DatabaseError.self, "\(values)") {
                 try outbox.pool.write { try $0.execute(sql: "\(insert) VALUES \(values)") }
             }
+        }
+        // An unlock filed under its tap (decision 11): no session until the tap's answer names one.
+        try outbox.pool.write {
+            try $0.execute(sql: "\(insert) VALUES ('i', 'unlock', NULL, NULL, 't', 0, 0)")
+            try $0.execute(sql: "\(insert) VALUES ('j', 'unlock', NULL, 's', 't', 0, 0)")
+        }
+    }
+
+    @Test(
+        "A file the last build made keeps what it queued, and its counter: what the phone does next still comes after everything it did, the queue drained or not (A12)"
+    )
+    func fromV2() throws {
+        for drained in [true, false] {
+            let url = temporaryFile()
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let old = try DatabasePool(path: url.path(percentEncoded: false))
+            try Outbox.migrator.migrate(old, upTo: "v2")
+            try old.write { db in
+                for (index, kind) in ["tap", "unlock", "refocus"].enumerated() {
+                    try db.execute(
+                        sql: """
+                            INSERT INTO outbox (eventId, kind, tagId, sessionId, reason, recordedAt,
+                              nextAttemptAt, attempts, stuck, lastStatus)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 3, 1, 409)
+                            """,
+                        arguments: [
+                            "e\(index)", kind, kind == "tap" ? "tag" : nil,
+                            kind == "tap" ? nil : "s", kind == "unlock" ? "nurse" : nil, t0, t0,
+                        ])
+                }
+                // The first and the last answered and gone — or all three: the counter stays at
+                // three, above every seq the table still holds.
+                try db.execute(
+                    sql: "DELETE FROM outbox WHERE eventId != 'e1' OR ?", arguments: [drained])
+            }
+            try old.close()
+
+            let outbox = try open(url)
+            let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
+            #expect(applied == ["v1", "v2", "v3"])
+            let kept = try outbox.records()
+            let install = try #require(try installOf(outbox))
+            let queued: [Change] = [.unlock(session: "s", reason: .nurse)]
+            #expect(kept.map(\.change) == (drained ? [] : queued))
+            #expect(
+                kept.map(\.order)
+                    == (drained ? [] : [2]).map { ActionOrder(install: install, seq: $0) })
+            #expect(kept.allSatisfy { $0.attempts == 3 && $0.stuck && $0.lastStatus == 409 })
+            #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
+            #expect(try record(outbox, .unlockUnderTap(tap: "e9", reason: nil)).order?.seq == 5)
         }
     }
 }
@@ -81,13 +135,13 @@ struct RecordTests {
         let (outbox, _) = try makeOutbox()
         let at = t0.addingTimeInterval(7)
         let changes: [Change] = [
-            .tap(tagId: "04:A2:1B"), .unlock(session: "s", reason: .bathroom),
-            .unlock(session: "s", reason: nil), .refocus(session: "s"),
-            .protectionOff(session: "s"),
+            .tap(tagId: "04:A2:1B"), .unlockUnderTap(tap: "t", reason: .nurse),
+            .unlock(session: "s", reason: .bathroom), .unlock(session: "s", reason: nil),
+            .refocus(session: "s"), .protectionOff(session: "s"),
         ]
         var records: [OutboxRecord] = []
         for change in changes { records.append(try record(outbox, change, at: at)) }
-        // The unlock after the first superseded nothing; the refocus follows the second.
+        // The unlocks superseded nothing; the refocus follows the last.
         #expect(try outbox.records() == records)
         for record in records {
             #expect(record.eventId.wholeMatch(of: Self.uuidV7) != nil, "\(record.eventId)")
@@ -108,13 +162,20 @@ struct RecordTests {
         #expect(
             records.map(\.request) == [
                 .tap(TapRequest(tagId: "04:A2:1B", eventId: id[0], deviceTime: at, order: nth(1))),
+                // Filed under its tap (decision 11), with its own order like every record.
+                .unlockUnderTap(
+                    tap: "t",
+                    UnlockRequest(eventId: id[1], deviceTime: at, reason: .nurse, order: nth(2))),
                 .unlock(
                     session: "s",
-                    UnlockRequest(eventId: id[1], deviceTime: at, reason: .bathroom, order: nth(2))),
-                .unlock(session: "s", UnlockRequest(eventId: id[2], deviceTime: at, order: nth(3))),
-                .refocus(session: "s", RefocusRequest(eventId: id[3], deviceTime: at, order: nth(4))),
+                    UnlockRequest(
+                        eventId: id[2], deviceTime: at, reason: .bathroom, order: nth(3))),
+                .unlock(session: "s", UnlockRequest(eventId: id[3], deviceTime: at, order: nth(4))),
+                .refocus(
+                    session: "s", RefocusRequest(eventId: id[4], deviceTime: at, order: nth(5))),
                 .protectionOff(
-                    session: "s", ProtectionOffRequest(eventId: id[4], deviceTime: at, order: nth(5))),
+                    session: "s",
+                    ProtectionOffRequest(eventId: id[5], deviceTime: at, order: nth(6))),
             ])
         #expect(records.map(\.change) == changes)
     }
@@ -134,8 +195,11 @@ struct RecordTests {
     }
 
     @Test(
-        "A later tap or unlock supersedes every queued refocus: deleted, never sent",
-        arguments: [Change.tap(tagId: "tag"), .unlock(session: "s", reason: nil)])
+        "A later tap or unlock — one filed under a tap too — supersedes every queued refocus: deleted, never sent",
+        arguments: [
+            Change.tap(tagId: "tag"), .unlock(session: "s", reason: nil),
+            .unlockUnderTap(tap: "t", reason: nil),
+        ])
     func supersedes(later: Change) async throws {
         let (outbox, _) = try makeOutbox()
         let unlock = try record(outbox, .unlock(session: "s", reason: nil))
@@ -250,7 +314,7 @@ struct ActionOrderTests {
         let install = try #require(try installOf(outbox))
         #expect(try outbox.records().map(\.order) == [ActionOrder(install: install, seq: 1)])
         let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2"])
+        #expect(applied == ["v1", "v2", "v3"])
     }
 
     static var uuid: Regex<Substring> {
