@@ -293,7 +293,9 @@ struct BoundTests {
             return 7
         }
         func granted(within bound: TimeInterval?) throws -> Int {
-            try Outbox.granted(within: bound, request: request, cancel: cancel) { self.open($0) }
+            try Outbox.granted(until: bound.map { .now() + $0 }, request: request, cancel: cancel) {
+                self.open($0)
+            }
         }
     }
 
@@ -318,28 +320,42 @@ struct BoundTests {
     }
 
     @Test(
-        "An open already under way at the bound is waited for, never left running: returning then would leave the file locked behind a monitor iOS may suspend"
+        "The bound is a ceiling: an open already under way at it is waited for no longer — `Busy`, and the shields kept — while it runs on, on its own thread, and its outcome is dropped; iOS waits on the shield, and would kill the monitor mid-wake (#93's review)"
     )
     func underWay() throws {
-        let began = DispatchSemaphore(value: 0)
-        let bound: TimeInterval = 0.5
-        let value = try Outbox.granted(
-            within: bound,
-            request: { grant, over in
-                Thread.detachNewThread {
-                    grant(Asking.file)
-                    over(nil)
+        let (began, release, ended) = (
+            DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
+        )
+        let returned = Returned<Int>()
+        // On a thread of its own, so that a wait with no end fails the test rather than hang it.
+        Thread.detachNewThread {
+            returned.result = Result {
+                try Outbox.granted(
+                    until: .now() + 0.2,
+                    request: { grant, over in
+                        Thread.detachNewThread {
+                            grant(Asking.file)
+                            over(nil)
+                        }
+                        // The open has begun before the wait for it does: no stall can put them
+                        // the other way.
+                        began.wait()
+                    },
+                    cancel: { Issue.record("an open under way was cancelled") }
+                ) { _ in
+                    began.signal()
+                    // Held past the bound — until the test lets it go, not for a time.
+                    release.wait()
+                    ended.signal()
+                    return 7
                 }
-                // The open has begun before the wait for it does: no stall can put them the other way.
-                began.wait()
-            },
-            cancel: { Issue.record("an open under way was cancelled") }
-        ) { _ in
-            began.signal()
-            Thread.sleep(forTimeInterval: bound * 3)
-            return 7
+            }
         }
-        #expect(value == 7)
+        let result = returned.wait()
+        release.signal()
+        #expect(throws: Outbox.Busy.self) { try #require(result, "waited with no end").get() }
+        // The open, let go, ends on its own thread: nothing waits for it, nothing takes its value.
+        #expect(ended.wait(timeout: .now() + .seconds(Int(patience.components.seconds))) == .success)
     }
 
     @Test("Unbounded — the app's own open — it waits as long as the file takes")
@@ -368,7 +384,7 @@ struct BoundTests {
         Thread.detachNewThread {
             opened.result = Result {
                 try Outbox.granted(
-                    within: nil, request: { _, over in over(nil) }, cancel: {}, open: { _ in 7 })
+                    until: nil, request: { _, over in over(nil) }, cancel: {}, open: { _ in 7 })
             }
         }
         let result = try #require(opened.wait(), "the open never returned")
@@ -381,7 +397,7 @@ struct BoundTests {
     func grantedTwice() throws {
         let asking = Asking(atOnce: false)
         let value = try Outbox.granted(
-            within: nil,
+            until: nil,
             request: { grant, over in
                 grant(Asking.file)
                 grant(Asking.file)
@@ -433,10 +449,37 @@ struct BoundTests {
                 return
             }
             defer { release.signal() }
-            #expect(throws: Outbox.Busy.self) {
-                try Outbox(at: url, random: { 0 }, suspends: false, within: 1)
-            }
+            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1) }
             #expect(Bell.wake(outboxAt: url, now: t0) == .retry(Bell.window(until: at(60))))
+        }
+
+        @Test(
+            "On the phone, the extensions' read coordinates as a reader: another process reading the file holds it up not at all (#93's review)"
+        )
+        func reader() throws {
+            let (outbox, url) = try makeOutbox()
+            try outbox.keep(.inSession(session(endsAt: 1200), .focused))
+            try outbox.pool.close()
+            let (holding, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
+            Thread.detachNewThread {
+                NSFileCoordinator(filePresenter: nil).coordinate(
+                    readingItemAt: url, options: .withoutChanges, error: nil
+                ) { _ in
+                    holding.signal()
+                    release.wait()
+                }
+            }
+            guard holding.wait(timeout: .now() + .seconds(150)) == .success else {
+                Issue.record("the reading coordinator was never granted the file")
+                return
+            }
+            defer { release.signal() }
+            // A writer's claim would wait out the reader's, to the bound: the tests' own, so that
+            // a stall of the simulator's never reads as the file held.
+            let bound = TimeInterval(patience.components.seconds)
+            #expect(
+                try Outbox.read(url, within: bound).standing
+                    == .inSession(session(endsAt: 1200), .focused))
         }
     #endif
 }
