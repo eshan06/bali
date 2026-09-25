@@ -125,6 +125,28 @@ struct SharingTests {
         await rig.stop()
     }
 
+    @Test(
+        "A standing the file could not take while the app was suspended is written at the next change of state, once it can be"
+    )
+    func standingKeptAfterSuspension() async throws {
+        let rig = try Rig(outbox: try suspending(temporaryFile()))
+        try await rig.tapIn()
+        #expect(try rig.outbox.standing() == .inSession(session(), .focused))
+        Outbox.suspend()
+        defer { Outbox.resume() }
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        await rig.until { $0.standing == .out }
+        #expect(try rig.outbox.standing() == .inSession(session(), .focused))
+        Outbox.resume()
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        await rig.until { $0.heardAt == at(1) }
+        #expect(try rig.outbox.standing() == .out)
+        await rig.stop()
+    }
+
     /// An outbox that hears the suspension notifications, as the app's does.
     func suspending(_ url: URL) throws -> Outbox {
         try FileManager.default.createDirectory(

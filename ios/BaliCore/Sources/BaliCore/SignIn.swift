@@ -156,8 +156,10 @@ public actor SignIn: TokenProvider {
     private var loaded = false
     /// The store is behind `tokens`, and catches up at the next ask: what the Keychain could not
     /// take then (the phone locked) is saved — a refresh token Cognito rotated is kept nowhere
-    /// else — and a sign-out it could not make then is made, so a refresh token Cognito refused is
-    /// never read back as someone signed in.
+    /// else — and a sign-out it could not make then is made. Only while the app runs: ended before
+    /// that ask, it leaves the refresh token Cognito refused in the Keychain, and the next launch
+    /// reads someone signed in until that token's renewal is refused again — the same no, one
+    /// round trip late, and no queued record touched.
     private var unsaved = false
     /// The renewal under way, which every caller shares.
     private var renewing: Task<Bool, Never>?

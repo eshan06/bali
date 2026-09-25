@@ -110,8 +110,16 @@ func signIn(_ store: MemoryStore, _ endpoint: any HTTPTransport, now: Now = Now(
     return signIn
 }
 
-/// The first value `stream` has within a moment; nil when it has none.
+/// The first value `stream` gives, waited for on the stream itself, never raced against a clock: a
+/// loaded simulator can stall a test for longer than any moment (38 and 100 seconds on #86's runs),
+/// so the suite's time limit is the wait's only bound.
 func first(_ stream: AsyncStream<Bool>) async -> Bool? {
+    await stream.first { _ in true }
+}
+
+/// Whether `stream` has nothing to give within a moment — a look that cannot wait, so it ends the
+/// stream. A stall can only make it see nothing, never make it see a value that is not there.
+func nothingYet(_ stream: AsyncStream<Bool>) async -> Bool {
     await withTaskGroup(of: Bool?.self) { group in
         group.addTask { await stream.first { _ in true } }
         group.addTask {
@@ -120,7 +128,7 @@ func first(_ stream: AsyncStream<Bool>) async -> Bool? {
         }
         let value = await group.next() ?? nil
         group.cancelAll()
-        return value
+        return value == nil
     }
 }
 
@@ -376,7 +384,7 @@ struct TokenTests {
 
         #expect(await signIn.accessToken() == nil)
         #expect(store.data == nil)
-        #expect(await first(watching) == false)  // the newest a watcher was told, within a moment
+        #expect(await first(watching) == false)  // the newest a watcher was told
         // Signed out: only a sign-in can give a token, so the engine's refresh is false at once.
         #expect(await signIn.refresh() == false)
         #expect(await endpoint.sent.count == 1)
@@ -494,7 +502,7 @@ struct TokenTests {
         now.set(4000)
 
         let one = Task { await signIn.accessToken() }
-        try await eventually { await endpoint.sent == 1 }
+        await endpoint.received(1)
         let two = Task { await signIn.accessToken() }
         let three = Task { await signIn.refresh() }
         try await Task.sleep(for: .milliseconds(100))
@@ -513,7 +521,7 @@ struct TokenTests {
         let signIn = await signIn(try .holding(jwt("a1")), endpoint, told: told)
 
         let refreshing = Task { await signIn.refresh() }
-        try await eventually { await endpoint.sent == 1 }
+        await endpoint.received(1)
         let asking = Task { await signIn.accessToken() }
         try await Task.sleep(for: .milliseconds(100))
         #expect(await endpoint.sent == 1)
@@ -535,7 +543,7 @@ struct TokenTests {
         #expect(await signIn.refresh() == false)
         // A watcher's first look cannot wait, so it ends that stream: each look gets its own.
         let (now, later) = (await signIn.signedIn(), await signIn.signedIn())
-        #expect(await first(now) == nil)  // not known yet: neither in nor out
+        #expect(await nothingYet(now))  // not known yet: neither in nor out
 
         store.setLocked(false)
         #expect(await signIn.accessToken() == jwt("a1"))
@@ -569,7 +577,7 @@ struct TokenTests {
         now.set(4000)
 
         let renewal = Task { await signIn.accessToken() }
-        try await eventually { await endpoint.sent == 1 }
+        await endpoint.received(1)
         try await signIn.signOut()
         await endpoint.answer(200, granted(jwt("a2")))
         #expect(await renewal.value == nil)
@@ -586,9 +594,9 @@ struct TokenTests {
         now.set(4000)
 
         let renewal = Task { await signIn.accessToken() }
-        try await eventually { await endpoint.sent == 1 }
+        await endpoint.received(1)
         let signingIn = Task { try await signIn.signIn(through: signsIn) }
-        try await eventually { await endpoint.sent == 2 }
+        await endpoint.received(2)
         await endpoint.answer(200, granted(jwt("b1"), refresh: "refresh-b"), newestOnly: true)
         try await signingIn.value
         await endpoint.answer(400, refusal("invalid_grant"))  // the renewal's, about refresh-1
@@ -627,14 +635,27 @@ final class Answers: @unchecked Sendable {
 actor HeldEndpoint: HTTPTransport {
     private(set) var sent = 0
     private var waiting: [CheckedContinuation<(Int, String), Never>] = []
+    private var arrivals: [(count: Int, wake: CheckedContinuation<Void, Never>)] = []
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         sent += 1
-        let (status, body) = await withCheckedContinuation { waiting.append($0) }
+        let (status, body) = await withCheckedContinuation {
+            waiting.append($0)
+            let due = arrivals.filter { $0.count <= sent }
+            arrivals.removeAll { $0.count <= sent }
+            for arrival in due { arrival.wake.resume() }
+        }
         let response = HTTPURLResponse(
             url: try #require(request.url), statusCode: status, httpVersion: "HTTP/1.1",
             headerFields: nil)
         return (Data(body.utf8), try #require(response))
+    }
+
+    /// Returns once `count` requests have come, each held for its answer: the requests' own signal,
+    /// never a clock a loaded simulator can outrun (#86) — the suite's time limit bounds the wait.
+    func received(_ count: Int) async {
+        guard sent < count else { return }
+        await withCheckedContinuation { arrivals.append((count, $0)) }
     }
 
     /// Answers every request waiting, or only the newest.
@@ -643,14 +664,4 @@ actor HeldEndpoint: HTTPTransport {
         if !newestOnly { waiting = [] }
         for request in answering { request.resume(returning: (status, body)) }
     }
-}
-
-/// Waits, in real time, for `condition`; never true within ten seconds fails the test.
-func eventually(_ condition: () async -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(10)
-    while ContinuousClock.now < deadline {
-        if await condition() { return }
-        try await Task.sleep(for: .milliseconds(1))
-    }
-    Issue.record("never came true")
 }
