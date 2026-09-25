@@ -8,6 +8,117 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5b: the bell with the app closed — the window the shields are on registered
+  with iOS as a DeviceActivity schedule, and the monitor extension taking them off at its end,
+  force-quit or not (ARCHITECTURE's leaning (a)); with #90's two BaliOutbox riders, and the
+  app-side ones split off as B5b-2.** **The window**
+  (`Bell.window(until:)`) ends at `shieldedUntil` rounded up to the whole minute. The monitor
+  decides by the phone's clock whether anything still keeps the shields on, so a wake before
+  `until` finds them owed and keeps them; DeviceActivity takes its components to the second, but
+  whether it wakes to the second or on the minute is not documented, and a whole-minute end is
+  honoured alike either way — never early, and less than a minute past the bell with the app
+  closed (open, the app still ends them to the second, by its own alarm). It is exactly iOS's
+  floor long, 15 minutes: **the start moves back, never the end.** So a window shorter than the
+  floor — a tap in a session's last ten minutes — starts in the past: iOS measures an interval as
+  defined (a daily schedule registered mid-interval is legal) and takes one already under way at
+  registration. Moving the end instead would keep the shields up to 15 minutes past the promise,
+  and a window under the floor is refused (`intervalTooShort`). **Assumed, and checked on the
+  phone** (round 2, step 3): that iOS wakes the monitor at the end of an interval registered after
+  its start; if it does not, a tap in a session's last fifteen minutes keeps its shields past the
+  bell until the app is opened — B5a's behaviour — and what then is the owner's call. **When it is
+  registered** (`Enforcer.apply`, through `ScreenTime.schedule`): for the shields the store holds
+  and the permission keeps there (`Protection.shielded`) — cancelled once the permission is denied,
+  since iOS has dropped them and there is nothing to take off, but never on a read of not
+  determined: Family Controls can read it so for a moment (B5a-2) while the store's shields are
+  still on, and a cancel there, the app force-quit before the next pass, would leave them past
+  the bell (santa's round 1, pinned by `noShields`). It follows `shieldedUntil`, so a new session, an
+  unlock, the bell, an extension the check-in brings and a re-tap each register or cancel it; one
+  activity name, each registration replacing the last. Over an unread standing (B5a-2) it is never
+  cancelled — the last run's window may be what takes the last run's shields off at a bell nobody
+  can read — and only a pending tap's cap is registered. A stale window only wakes the monitor,
+  which reads the truth and does nothing wrong. A registration iOS refuses is shown
+  (`Protection.unscheduled`, the readout's `bell NOT scheduled`: rule 5) and asked for again at
+  every pass — the window iOS still holds too, so the claim never goes on saying otherwise. **The
+  monitor** (`Bell.wake`; `SessionMonitor.intervalDidEnd`, synchronous, since iOS may suspend the
+  extension the moment it returns) opens the outbox file, reads the standing and the queue — the
+  `SyncState` the engine starts from — closes the file, and decides by the phone's clock (data
+  model, decision 6): nothing keeps the shields on — it clears the store (`clearAllSettings` on
+  the app's named store, which holds only the shields); something does — a session the standing
+  says still runs, a pending tap's cap — it keeps them and asks iOS to wake it again at their end,
+  which also mends a window the app could not register before it was closed. One guard: it
+  registers nothing when iOS holds a window ending there already
+  (`DeviceActivityCenter.schedule(for:)`), since a replacement may itself wake the monitor
+  (undocumented either way), and the two would never end. So the next wake is never less than a
+  minute on: a wake that came early — iOS keeping its own time — would otherwise ask for the very
+  window that woke it, which the guard skips while iOS still lists it, and nothing would wake the
+  monitor again (found in this step's own review, pinned by `bell`). `intervalDidStart` does nothing: the app
+  shields at the tap (B5a) and registers the window after. **The fail-safe, decided here:** the
+  file not free within 2 s, or not readable at all — a standing this build cannot decode, a newer
+  build's schema, a phone not unlocked since it started — keeps the shields: nothing is cleared
+  over what the monitor cannot read (B5a-2 wrote that rule for B5b), and iOS is asked to wake it
+  again a minute on. Not "clear at the registered end": an early or spurious wake cannot be told
+  from the real end without the truth, and clearing on a guess ends a running session early — the
+  one failure the teacher's grid cannot show (it says "app closed" either way). A minute: another
+  process's coordinated open is over in milliseconds, and a locked phone reads again once unlocked.
+  **The bound:** NSFileCoordinator's wait has no timeout of its own, so the monitor makes its
+  blocking call — the one the app has always made — on a thread of its own, and waits at most 2 s:
+  far more than an open takes, far less than iOS lets an extension run. Past it the coordinator is
+  cancelled (`cancel()`, which returns a blocked call) and `Busy` thrown, and a grant that comes
+  later opens nothing (`Outbox.granted`). An open that has begun is waited for, SQLite's busy
+  timeout bounding its steps: returning while it runs would leave the file locked behind an
+  extension iOS may suspend (0xdead10cc). The app's own open makes the call inline, as before.
+  **Found on the iOS Simulator** (this PR's first run): the asynchronous call
+  (`coordinate(with:queue:byAccessor:)` on an `OperationQueue`) never ran its accessor there
+  while the asking thread waited for it, so every open hung and the whole BaliOutbox suite with
+  them, pure tests included — its threads all blocked — until the job's 30 minutes ran out.
+  Linux, which has no NSFileCoordinator, could not show it. And the simulator on GitHub's runner
+  freezes for seconds at a time (B2, B5a), so no test races the bound against a thread that must
+  run first: the monitor's reads of a free file wait with the tests' own patience (the bound is a
+  parameter, `within`, the monitor's 2 s by default), and the test of an open under way at the bound
+  has the open begin before the bounded wait does.
+  **Rider (#90's review), decided here:** over an unread standing, the last run's shields that a
+  pending tap keeps on are its cap's — they come off at the cap — but its answer leaves them the
+  last run's again: an armed answer asks the server where the phone stands, since arming ends no
+  session the phone may be in (B5a-3). **Rider (#90):** the test rig's `cancel` resumes a sleep
+  `advance(by:holdingWakes:)` held, so a test that stops before `releaseWakes()` fails fast
+  instead of hanging. **Split for size:** B5b came to 444 counted lines with all four riders, so
+  #84's Info.plist rider (the config reader moved into BaliCore, its keys pinned to the Info.plist
+  and `project.yml`) and #90's app test target (pinning the foreground check reading the phase as
+  it runs) are B5b-2, next. The version built here is kept on the branch
+  `claude/fervent-bell-8nvjcp-b5b-full` for it — Linux-checked only; a note for its worker: a
+  hosted test bundle that `@testable import`s the app needs every module the app imports, GRDB's C
+  module among them, and XcodeGen's `link: false` on a package gives only a bare target dependency,
+  so that version has the bundle depend on the packages as the app does. **For round 2 (Debug
+  builds only):** a toggle caps a tap at the floor, 15
+  minutes, not 50 (`SyncEngine.setTapCap`, kept in the app group's defaults so the monitor uses it
+  too), and the monitor keeps its last wake there — when, what it did, how long it took — for the
+  readout, the only way to see Phase 0's answer and the stall check. **Not covered, disclosed:**
+  iOS behaviour round 2 settles — a window starting in the past, a wake no earlier than a
+  whole-minute end, `startMonitoring` from the extension, and the monitor's memory with GRDB linked
+  in (iOS runs DeviceActivity monitors under a tight limit; one killed for it clears nothing, which
+  step 2 would show); a clear at the bell racing a re-tap in that same second can land after the
+  app's shield, which rule 3's check puts back within 30 s in the foreground; with the app closed,
+  a standing the file cannot give back keeps the shields past a tap's cap (the monitor keeps
+  B5a-2's rule), where the app would take them off; and a time zone changed after registration
+  moves the wake — the components are wall-clock — as any changed clock does: detected by the
+  server, not prevented. **Tests** (Linux and the iOS Simulator): `BellTests.swift` — the window
+  and the floor; the wake, pure and through the app's own file after a force-quit (the bell, the
+  cap and the device check's, an unlock after the tap, a stuck tap, a spoiled standing, a newer
+  schema, and on Linux the file's descriptors all closed after it); the bound (free, held past it
+  and a late grant, an open under way, unbounded, an error; on the simulator, a real
+  NSFileCoordinator holding the file); the registrations through the enforcer (a tap to the bell,
+  an unlock and a refocus, an extension and a re-tap, a relaunch and the device check's cap, a
+  refusal shown and asked again, no shields held, an unread standing) — and `unreadCappedOverHeld`
+  and `heldSleepCancels`, each red first. Of 25 mutations of the rules, each taken alone, 24 turn
+  a test red; the 25th — the monitor's read without its explicit `close()` — changes nothing a
+  caller can see: the pool is released, and the file closed, as the read returns (the descriptor
+  test holds), so the close stays as the statement of the rule where it matters. **Santa** (two
+  Claude reviewers, both the fallback — no other model's CLI here; round 1): no blockers. Fixed
+  here: a read of not determined no longer cancels the window, and the monitor records a wake
+  with no app group too. Left, in the PR: `capOf` cleared only by an unshield, which cannot matter
+  while a standing is unread only from launch; and a pending tap's window registered over an
+  unread standing, whose wake retries each minute while the file stays unreadable — kept, since
+  a read refused at launch is usually transient, and then that wake decides by the truth.
 - **2026-09-25** — **B5a-3: enforcement hardened, round 2, before the owner's first iPhone check —
   the remaining WARNs of #86's and #88's Claude Reviews, and the cause of `ReadTests.cadence`'s
   flake.** Eight WARNs, each checked against `main` — B5a-2 had moved some of #86's lines — and

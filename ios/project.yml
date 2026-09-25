@@ -59,8 +59,8 @@ targets:
       - target: BaliShield
     scheme: {}
 
-  # The DeviceActivity monitor: iOS runs it at the edges of a session's window, with the
-  # app open or not (decision 2).
+  # The DeviceActivity monitor: iOS wakes it at the end of the window the shields are on, with
+  # the app open or not (decision 2), and it takes them off when nothing keeps them on (B5b).
   BaliMonitor:
     type: app-extension
     platform: iOS
@@ -71,6 +71,9 @@ targets:
         INFOPLIST_FILE: BaliMonitor/Info.plist
         CODE_SIGN_ENTITLEMENTS: BaliMonitor/BaliMonitor.entitlements
         TARGETED_DEVICE_FAMILY: '1'
+    dependencies:
+      # The outbox file, read where the app keeps it: in the app group.
+      - package: BaliOutbox
 
   # The shield a student sees over a blocked app or website.
   BaliShield:

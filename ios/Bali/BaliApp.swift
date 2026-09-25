@@ -72,6 +72,9 @@ final class Phone {
         let signIn = SignIn(cognito: cognito, store: KeychainTokenStore(), transport: transport)
         let engine = await SyncEngine.make(
             outbox: outbox, api: api, signIn: signIn, transport: transport)
+        #if DEBUG
+            await engine.setTapCap(Bell.deviceCheckCap)
+        #endif
         // The shields follow the engine from its first state — where the phone stood when the app
         // last ran, kept in the app group — so a relaunch never takes them off (B5).
         let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())
@@ -155,6 +158,7 @@ struct Placeholder: View {
         @State private var note = ""
         @State private var code = ""
         @State private var tag = ""
+        @State private var shortCap = Bell.deviceCheckCap != nil
 
         var body: some View {
             VStack(spacing: 4) {
@@ -187,6 +191,15 @@ struct Placeholder: View {
                         run { try await act(.unlock(session: session.id, reason: nil)) }
                     }
                 }
+                // B5b's device check: a tap not yet answered capped at the floor, not 50 minutes —
+                // kept where the monitor reads it too — and what the monitor did at its last wake,
+                // since it can show nothing itself.
+                Toggle("Cap a tap at 15 min (device check)", isOn: $shortCap)
+                    .onChange(of: shortCap) { _, on in
+                        Bell.deviceCheckCap = on ? Bell.floor : nil
+                        Task { await engine.setTapCap(Bell.deviceCheckCap) }
+                    }
+                Text("Monitor: \(Bell.lastWake ?? "not woken yet")")
                 Text(note)
             }
             .font(.footnote.monospaced())
@@ -231,6 +244,7 @@ struct Placeholder: View {
             return "\(protection.permission) · shields \(protection.shielded ? "on" : "off")"
                 + (protection.until.map { ", due until \(time($0))" } ?? "")
                 + (protection.unreported ? " · protection off NOT recorded" : "")
+                + (protection.unscheduled ? " · bell NOT scheduled" : "")
         }
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }

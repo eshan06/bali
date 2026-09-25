@@ -38,6 +38,19 @@ actor FakeScreenTime: ScreenTime {
     func permission() -> Permission { granted }
     func requestPermission() { granted = .approved }
 
+    /// Each window iOS took, in order — nil for a cancel — and the one it holds now.
+    private(set) var windows: [DateInterval?] = []
+    var registered: DateInterval? { windows.last ?? nil }
+    /// Whether iOS refuses the windows asked for.
+    private var refusing = false
+    struct Refused: Error {}
+
+    func schedule(_ window: DateInterval?) throws {
+        if refusing, window != nil { throw Refused() }
+        windows.append(window)
+    }
+    func refuse(_ refusing: Bool = true) { self.refusing = refusing }
+
     /// The student changes the permission in Settings: iOS drops every shield when it goes.
     func set(_ permission: Permission) {
         granted = permission
@@ -860,6 +873,23 @@ struct StandingKeptTests {
     )
     func unreadCapped() async throws {
         let (phone, _) = try await unreadable(held: false)
+        let rig = phone.rig
+        // Offline: the tap is never answered.
+        try await rig.engine.record(.tap(tagId: "tag"))
+        await phone.until { $0.shielded && $0.until == at(SyncState.tapCap) }
+        try await rig.server.next(tapRoute).reply(nil)
+        rig.clock.advance(by: SyncState.tapCap)
+        await phone.until { !$0.shielded }
+        #expect(await !phone.screenTime.shielding)
+        #expect(await rig.engine.state.standing == .unread)
+        await phone.stop()
+    }
+
+    @Test(
+        "Over a standing not read, the last run's shields a tap not yet answered keeps on are that tap's cap's: they come off at it (#90's review)"
+    )
+    func unreadCappedOverHeld() async throws {
+        let (phone, _) = try await unreadable()
         let rig = phone.rig
         // Offline: the tap is never answered.
         try await rig.engine.record(.tap(tagId: "tag"))

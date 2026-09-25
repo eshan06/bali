@@ -117,6 +117,9 @@ public struct SyncState: Sendable, Hashable {
     /// The last state change the server refused, dropped and never sent again: shown (rule 5)
     /// until the phone's next change.
     public var refused: Refusal?
+    /// How long a tap not yet answered is shielded for: decision 7's `tapCap`, or the shorter one a
+    /// Debug build sets for B5b's device check (`SyncEngine.setTapCap`).
+    public var cap = SyncState.tapCap
 
     /// A tap the server has not answered yet: shielded for at once, to decision 7's cap (B5).
     public var pendingTap: OutboxRecord? {
@@ -285,6 +288,10 @@ public actor SyncEngine {
     public func beforeEachCheckIn(_ check: @escaping @Sendable () async -> Void) {
         self.check = check
     }
+
+    /// A shorter cap than decision 7's on a tap not yet answered — nil: decision 7's — for B5b's
+    /// device check, which a Debug build runs at the floor, 15 minutes, rather than wait out 50.
+    public func setTapCap(_ cap: TimeInterval?) { state.cap = cap ?? SyncState.tapCap }
 
     /// The app entered the foreground, or left it. The check-in runs only in the foreground — iOS
     /// won't run a timer forever behind it — and coming back reads the truth at once.
