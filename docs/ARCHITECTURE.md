@@ -437,7 +437,7 @@ with no finer meaning than its status carries none.
   check-in, `GET /v1/me` — never overrides a newer state change of the phone's
   (`readMayReconcile`). The one exception is a record stuck after repeated failures
   (refused, or left unsettled by 8 answers): it stops holding reads back, so the phone
-  can reconcile again — while an unrecorded unlock still keeps any read from turning its
+  can reconcile again — while an unrecorded unlock still keeps any read or answer from turning its
   own session's shields back on, unless the student has refocused or re-tapped there
   since (ruled 2026-09-24; B3a, B3b-2).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
