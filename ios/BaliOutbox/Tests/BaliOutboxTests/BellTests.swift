@@ -162,6 +162,29 @@ struct MonitorFileTests {
     }
 
     @Test(
+        "The bell's backup, after a force-quit: it reads the same file and clears — the shields taken off when the bell's wake was lost, and nothing to clear once it was not — asking iOS nothing (B5b-3)"
+    )
+    func backup() async throws {
+        let (outbox, url) = try makeOutbox()
+        let rig = try Rig(outbox: outbox)
+        try await rig.tapIn(session(endsAt: 1200))
+        await rig.stop()
+        let backup = Bell.backup(of: Bell.window(until: at(1200)))
+        let center = RegisterTests.Center()
+        var (shielded, refused) = (true, Date?.some(at(1190)))
+        func woken() -> String {
+            Bell.carryOut(
+                wakeFree(url, at: backup.end), woken: .backup, at: backup.end, in: center,
+                clearing: {
+                    defer { shielded = false }
+                    return shielded
+                }, refused: &refused)
+        }
+        #expect(woken() == "cleared" && !shielded && refused == nil)
+        #expect(woken() == "nothing to clear" && center.calls.isEmpty)
+    }
+
+    @Test(
         "A tap offline, force-quit before its answer: kept to the cap — the device check's, when the monitor is given it — and cleared at it"
     )
     func cap() async throws {
@@ -173,10 +196,13 @@ struct MonitorFileTests {
         let cap = at(SyncState.tapCap)
         #expect(wakeFree(url, at: cap - 600) == .keep(Bell.window(until: cap)))
         #expect(wakeFree(url, at: cap) == .clear)
+        #expect(wakeFree(url, at: Bell.backup(of: Bell.window(until: cap)).end) == .clear)
         #expect(
             wakeFree(url, at: at(300), cap: Bell.floor)
                 == .keep(Bell.window(until: at(Bell.floor))))
         #expect(wakeFree(url, at: at(Bell.floor), cap: Bell.floor) == .clear)
+        let checkBackup = Bell.backup(of: Bell.window(until: at(Bell.floor)))
+        #expect(wakeFree(url, at: checkBackup.end, cap: Bell.floor) == .clear)
     }
 
     @Test(
@@ -522,44 +548,74 @@ struct BoundTests {
         )
         func writerWaitedOut() throws {
             let (_, url) = try makeOutbox()
-            let began = Returned<Bool>()
             // Far enough off for the coordinator to grant the open first; the open outlasts it.
-            let deadline = DispatchTime.now() + 1
-            let result = Result {
-                try Outbox.coordinated(url, reading: false, until: deadline) { _ in
-                    began.result = .success(true)
-                    let done = deadline + 0.5
-                    while DispatchTime.now() < done { Thread.sleep(forTimeInterval: 0.01) }
-                    return 7
+            // Granted only past the bound — a stall of the simulator's — the open never runs, and
+            // there is nothing to tell: then again, further off, and never passed untold (#98's
+            // review), so no stall hides a writer given up on.
+            for bound in [1.0, 10, 60] {
+                let began = Returned<Bool>()
+                let deadline = DispatchTime.now() + bound
+                let result = Result {
+                    try Outbox.coordinated(url, reading: false, until: deadline) { _ in
+                        began.result = .success(true)
+                        let done = deadline + 0.5
+                        while DispatchTime.now() < done { Thread.sleep(forTimeInterval: 0.01) }
+                        return 7
+                    }
                 }
+                guard began.result != nil else { continue }
+                #expect(try result.get() == 7)
+                return
             }
-            // Granted only past the bound — a stall of the simulator's — the open never ran:
-            // nothing to tell.
-            guard began.result != nil else { return }
-            #expect(try result.get() == 7)
+            Issue.record("granted only past every bound: the writer's wait-out never ran")
         }
     #endif
 }
 
-@Suite("The window asked of iOS's DeviceActivity center (B5b)")
+@Suite("The windows asked of iOS's DeviceActivity center, and under which names (B5b, B5b-3)")
 struct RegisterTests {
-    /// The center as a test holds it: the window iOS holds, and each time it was asked.
+    /// The center as a test holds it: the window iOS holds under each name, and every call made of
+    /// it, in order.
     final class Center: BellCenter {
         struct Refused: Error {}
-        var held: (start: DateComponents, end: DateComponents)?
-        var starts = 0
-        var stops = 0
-        var refusing = false
+        enum Call: Hashable {
+            case held(Bell.Name)
+            case start(Bell.Name)
+            case stop([Bell.Name])
 
-        func heldEnd() -> DateComponents? { held?.end }
-        func start(_ start: DateComponents, _ end: DateComponents) throws {
-            if refusing { throw Refused() }
-            starts += 1
-            held = (start, end)
+            var names: [Bell.Name] {
+                switch self {
+                case .held(let name), .start(let name): [name]
+                case .stop(let names): names
+                }
+            }
         }
-        func stop() {
-            stops += 1
-            held = nil
+        var held: [Bell.Name: (start: DateComponents, end: DateComponents)] = [:]
+        var calls: [Call] = []
+        /// The names iOS refuses a window under.
+        var refusing: Set<Bell.Name> = []
+
+        func heldEnd(_ name: Bell.Name) -> DateComponents? {
+            calls.append(.held(name))
+            return held[name]?.end
+        }
+        func start(_ name: Bell.Name, _ start: DateComponents, _ end: DateComponents) throws {
+            calls.append(.start(name))
+            if refusing.contains(name) { throw Refused() }
+            held[name] = (start, end)
+        }
+        func stop(_ names: [Bell.Name]) {
+            calls.append(.stop(names))
+            for name in names { held[name] = nil }
+        }
+
+        var starts: Int { calls.count { if case .start = $0 { true } else { false } } }
+        /// The window iOS holds under `name`, read back in `calendar`.
+        func window(_ name: Bell.Name, in calendar: Calendar = .current) -> DateInterval? {
+            guard let held = held[name], let start = calendar.date(from: held.start),
+                let end = calendar.date(from: held.end)
+            else { return nil }
+            return DateInterval(start: start, end: end)
         }
     }
 
@@ -571,65 +627,262 @@ struct RegisterTests {
     }()
 
     @Test(
-        "A window is asked for to the second, in the phone's calendar; asked again while iOS holds it, it is not — a replacement may itself wake the monitor, and the two would never end; another end replaces it; none stops it (#91's review)"
+        "Four windows, each an activity of its own with iOS: the bell's under B5b's name, its backup, and the monitor's own two — whose next wake is never under the name that woke it, nor the app's (B5b-3)"
+    )
+    func names() {
+        // A window the build before registered is the bell's.
+        #expect(Bell.Name.bell.rawValue == "bali")
+        #expect(Set(Bell.Name.allCases.map(\.rawValue)).count == 4)
+        for woken in Bell.Name.allCases.map(Optional.some) + [nil] {
+            let next = Bell.next(after: woken)
+            #expect(next != woken && [.tick, .tock].contains(next), "\(String(describing: woken))")
+        }
+    }
+
+    @Test(
+        "The backup's window ends two minutes after the bell's — past the monitor's own next wake, a minute on at most — on a whole minute, and is the floor long: under the floor, it starts in the past as the bell's does (B5b-3)"
+    )
+    func backup() {
+        #expect(Bell.backupAfter == 2 * 60)
+        for until in [at(40), at(41), at(600), at(3000)] {
+            let bell = Bell.window(until: until)
+            let backup = Bell.backup(of: bell)
+            #expect(backup.end == bell.end + Bell.backupAfter, "\(until)")
+            #expect(backup.duration == Bell.floor && minuteOf(backup.end) == 0, "\(until)")
+            // The monitor's own next wake, asked for at the bell's window: before the backup's.
+            let early = Bell.wake(now: bell.end - 0.5) { throw Outbox.Busy() }
+            #expect(early == .retry(Bell.window(until: bell.end + Bell.retry)), "\(until)")
+            #expect(bell.end + Bell.retry < backup.end, "\(until)")
+        }
+        #expect(Bell.backup(of: Bell.window(until: at(600))).start < t0)
+    }
+
+    @Test(
+        "The app's windows: the bell's, asked for to the second in the phone's calendar, and its backup — each not asked for again while iOS holds it, since a replacement may itself wake the monitor and the two would never end; another end replaces both; none stops every name (#91's review, B5b-3)"
     )
     func once() throws {
         let (center, calendar) = (Center(), Self.calendar)
         let bell = Bell.window(until: at(1200))
         try Bell.register(bell, in: center, calendar: calendar)
-        let held = try #require(center.held)
-        #expect(calendar.date(from: held.start) == bell.start)
-        #expect(calendar.date(from: held.end) == bell.end)
-        #expect(center.starts == 1)
+        #expect(center.window(.bell, in: calendar) == bell)
+        #expect(center.window(.backup, in: calendar) == Bell.backup(of: bell))
+        #expect(center.starts == 2)
         try Bell.register(bell, in: center, calendar: calendar)
-        #expect(center.starts == 1)
+        #expect(center.starts == 2)
         let later = Bell.window(until: at(1800))
         try Bell.register(later, in: center, calendar: calendar)
-        #expect(center.starts == 2)
-        #expect(center.held.flatMap { calendar.date(from: $0.end) } == later.end)
+        #expect(center.starts == 4)
+        #expect(center.window(.bell, in: calendar) == later)
+        #expect(center.window(.backup, in: calendar) == Bell.backup(of: later))
         try Bell.register(nil, in: center, calendar: calendar)
-        #expect(center.stops == 1 && center.held == nil)
+        #expect(center.held.isEmpty && center.calls.last == .stop(Bell.Name.allCases))
     }
 
-    @Test("A window iOS refuses throws, and the one iOS held stays")
+    @Test(
+        "The app's truth leaves no stale wake: a new window or an extension replaces the bell's and its backup and stops the next wake the monitor asked for itself, the app closed; the end stops every one (B5b-3)"
+    )
+    func cleanup() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        try Bell.register(Bell.window(until: at(1200)), in: center, calendar: calendar)
+        // The app closed, the monitor woken early: the shields kept, its next wake its own.
+        var (state, refused) = (SyncState(), Date?.none)
+        state.standing = .inSession(session(endsAt: 1200), .focused)
+        _ = Bell.carryOut(
+            Bell.wake(now: at(1199)) { state }, woken: .bell, at: at(1199), in: center,
+            clearing: { true }, refused: &refused)
+        #expect(center.window(.tick) == Bell.window(until: at(1259)))
+        // Opened: an extension, then a new session's tap — the monitor's own stopped, each time.
+        for until in [at(1800), at(2400)] {
+            let window = Bell.window(until: until)
+            try Bell.register(window, in: center, calendar: calendar)
+            #expect(Set(center.held.keys) == [.bell, .backup], "\(until)")
+            #expect(center.window(.bell, in: calendar) == window, "\(until)")
+            #expect(center.window(.backup, in: calendar) == Bell.backup(of: window), "\(until)")
+            _ = Bell.carryOut(
+                .retry(Bell.window(until: at(60))), woken: .tick, at: t0, in: center,
+                clearing: { true }, refused: &refused)
+            #expect(center.held[.tock] != nil, "\(until)")
+        }
+        // The end — the bell with the app open, an unlock, protection off: nothing left to wake it.
+        try Bell.register(nil, in: center, calendar: calendar)
+        #expect(center.held.isEmpty)
+    }
+
+    @Test(
+        "While iOS holds the app's windows as they are — a relaunch's first pass — the monitor's own next wake stays: the bell's window may have woken it early already, and its own is then the one still to come (santa's review)"
+    )
+    func sameWindows() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center, calendar: calendar)
+        // The app closed, the bell's window woke the monitor before the bell: kept, a minute on.
+        var refused: Date?
+        _ = Bell.carryOut(
+            .keep(Bell.window(until: at(1250))), woken: .bell, at: at(1190), in: center,
+            clearing: { true }, refused: &refused)
+        // Opened before that wake, then force-quit again: the same windows, nothing stopped.
+        center.calls = []
+        try Bell.register(bell, in: center, calendar: calendar)
+        #expect(center.window(.tick) == Bell.window(until: at(1250)))
+        #expect(center.calls.allSatisfy { if case .held = $0 { true } else { false } })
+    }
+
+    @Test(
+        "A window iOS refuses throws, and iOS keeps what it held — the next wake the monitor asked for itself too, stopped only once the app's windows are taken"
+    )
     func refused() throws {
         let (center, calendar) = (Center(), Self.calendar)
         let bell = Bell.window(until: at(1200))
         try Bell.register(bell, in: center, calendar: calendar)
-        center.refusing = true
-        #expect(throws: Center.Refused.self) {
-            try Bell.register(Bell.window(until: at(1800)), in: center, calendar: calendar)
+        var noted: Date?
+        _ = Bell.carryOut(
+            .retry(Bell.window(until: at(60))), woken: .bell, at: t0, in: center,
+            clearing: { true }, refused: &noted)
+        let later = Bell.window(until: at(1800))
+        for refusing in [Bell.Name.bell, .backup] {
+            center.refusing = [refusing]
+            #expect(throws: Center.Refused.self, "\(refusing)") {
+                try Bell.register(later, in: center, calendar: calendar)
+            }
+            #expect(center.window(.backup, in: calendar) == Bell.backup(of: bell), "\(refusing)")
+            #expect(center.held[.tick] != nil, "\(refusing)")
         }
-        #expect(center.held.flatMap { calendar.date(from: $0.end) } == bell.end)
+        #expect(center.window(.bell, in: calendar) == later)
+        center.refusing = []
+        try Bell.register(later, in: center, calendar: calendar)
+        #expect(Set(center.held.keys) == [.bell, .backup])
     }
 
     @Test(
-        "The monitor's wake carried out: cleared, or its next wake taken — a refusal kept before is gone; its next wake refused, the time is kept for the app to show, and nothing is cleared (#92's review)"
+        "No wake of the monitor's asks iOS anything of the window that woke it — on iOS 18, `startMonitoring` for it inside its own `intervalDidEnd` deadlocks (FB14664238) — nor of the app's, nor stops any: its next wake asked for under one of its own, in turn; a clear asks nothing at all (B5b-3)"
+    )
+    func ownCallback() throws {
+        let wakes: [Bell.Wake] = [
+            .clear, .keep(Bell.window(until: at(1200))), .retry(Bell.window(until: at(60))),
+        ]
+        for woken in Bell.Name.allCases.map(Optional.some) + [nil] {
+            for wake in wakes {
+                let center = Center()
+                // What iOS holds as it wakes the monitor: the app's windows, the monitor's own.
+                try Bell.register(Bell.window(until: at(600)), in: center)
+                center.held[.tick] = center.held[.bell]
+                center.held[.tock] = center.held[.bell]
+                center.calls = []
+                var refused: Date?
+                _ = Bell.carryOut(
+                    wake, woken: woken, at: t0, in: center, clearing: { true }, refused: &refused)
+                let asked = center.calls.flatMap(\.names)
+                let said = "\(String(describing: woken)) \(wake)"
+                #expect(
+                    !asked.contains { $0 == woken }
+                        && asked.allSatisfy { $0 == .tick || $0 == .tock }, "\(said)")
+                #expect(
+                    !center.calls.contains { if case .stop = $0 { true } else { false } }, "\(said)"
+                )
+                #expect(
+                    wake == .clear
+                        ? center.calls.isEmpty
+                        : center.calls.last == .start(Bell.next(after: woken)),
+                    "\(said)")
+            }
+        }
+    }
+
+    @Test(
+        "The monitor's wake carried out: cleared — or nothing to clear, the shields off already, as the bell's backup finds them after the bell's own wake — or its next wake taken: a refusal kept before is gone; its next wake refused, the time is kept for the app to show, and nothing is cleared (#92's review, B5b-3)"
     )
     func carriedOut() {
         let center = Center()
         var (cleared, refused) = (0, Date?.some(at(-600)))
         #expect(
-            Bell.carryOut(.clear, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-                == "cleared")
-        #expect(cleared == 1 && refused == nil && center.starts == 0 && center.stops == 0)
+            Bell.carryOut(
+                .clear, woken: .bell, at: t0, in: center,
+                clearing: {
+                    cleared += 1
+                    return true
+                }, refused: &refused) == "cleared")
+        #expect(cleared == 1 && refused == nil && center.calls.isEmpty)
+
+        // The bell's own next wake refused, then its backup woken: the shields off — the note ends.
+        refused = at(-600)
+        #expect(
+            Bell.carryOut(
+                .clear, woken: .backup, at: t0, in: center,
+                clearing: {
+                    cleared += 1
+                    return false
+                }, refused: &refused) == "nothing to clear")
+        #expect(cleared == 2 && refused == nil && center.calls.isEmpty)
 
         refused = at(-600)
         let bell = Bell.window(until: at(1200))
         let kept = Bell.carryOut(
-            .keep(bell), at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
+            .keep(bell), woken: .bell, at: t0, in: center, clearing: { true }, refused: &refused)
         #expect(kept.hasPrefix("kept until ") && !kept.contains("NOT registered"))
-        #expect(center.held != nil && center.starts == 1 && refused == nil && cleared == 1)
+        #expect(center.held[.tick] != nil && center.starts == 1 && refused == nil)
 
-        center.refusing = true
+        center.refusing = Set(Bell.Name.allCases)
         let refusedWakes = [
             Bell.Wake.retry(Bell.window(until: at(60))), .keep(Bell.window(until: at(1800))),
         ]
         for wake in refusedWakes {
-            refused = nil
-            let said = Bell.carryOut(
-                wake, at: t0, in: center, clearing: { cleared += 1 }, refused: &refused)
-            #expect(said.contains("NOT registered") && refused == t0 && cleared == 1, "\(wake)")
+            for woken in [Bell.Name.bell, .backup, .tick] {
+                refused = nil
+                let said = Bell.carryOut(
+                    wake, woken: woken, at: t0, in: center,
+                    clearing: {
+                        cleared += 1
+                        return true
+                    }, refused: &refused)
+                #expect(
+                    said.contains("NOT registered") && refused == t0 && cleared == 2,
+                    "\(wake) \(woken)")
+            }
+        }
+    }
+
+    @Test(
+        "The monitor's log keeps its last three wakes, newest first, each outcome in place of the note it began with — so a wake iOS ended before it finished still shows"
+    )
+    func logged() {
+        var log = Bell.logged("1 bell · not finished", in: [])
+        log = Bell.logged("1 bell · cleared", replacing: "1 bell · not finished", in: log)
+        log = Bell.logged("2 backup · not finished", in: log)
+        log = Bell.logged("3 tick · not finished", in: log)
+        log = Bell.logged("3 tick · kept", replacing: "3 tick · not finished", in: log)
+        #expect(log == ["3 tick · kept", "2 backup · not finished", "1 bell · cleared"])
+        log = Bell.logged("4 tock · not finished", in: log)
+        #expect(log == ["4 tock · not finished", "3 tick · kept", "2 backup · not finished"])
+        #expect(Bell.logged("5", replacing: "gone", in: log).first == "5")
+    }
+
+    @Test(
+        "The monitor extension asks DeviceActivity nothing but through `Bell.carryOut`, whose rules hold above — never the app's registration — and no code of the app's or the extensions' asks for `activities`, on which the monitor deadlocked on iOS 18 (B5b-3)"
+    )
+    func monitorsCalls() throws {
+        let ios = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        /// A source file with its comments left out.
+        func code(_ path: String) throws -> String {
+            try String(contentsOf: ios.appending(path: path), encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map {
+                    $0.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0]
+                }
+                .joined(separator: "\n")
+        }
+        let monitor = try code("BaliMonitor/SessionMonitor.swift")
+        #expect(monitor.contains("Bell.carryOut("))
+        for call in [
+            "startMonitoring", "stopMonitoring", "schedule(for", "Bell.register", ".activities",
+        ] {
+            #expect(!monitor.contains(call), "the monitor calls \(call)")
+        }
+        for path in [
+            "BaliOutbox/Sources/BaliOutbox/PhoneBell.swift", "Bali/PhoneScreenTime.swift",
+            "Bali/BaliApp.swift", "BaliShield/ShieldConfigurationExtension.swift",
+        ] {
+            #expect(try !code(path).contains(".activities"), "\(path)")
         }
     }
 }
@@ -686,6 +939,28 @@ struct ScheduleTests {
         try await rig.engine.record(.tap(tagId: "tag"))
         await phone.until { $0.until == at(30 + SyncState.tapCap) }
         #expect(await phone.screenTime.registered == Bell.window(until: at(30 + SyncState.tapCap)))
+        await phone.stop()
+    }
+
+    @Test(
+        "A sign-out keeps the standing — a sign-out is not an unlock — so it leaves the windows as they were, and the bell still takes the shields off and cancels them (B5b-3)"
+    )
+    func signOut() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn(session(endsAt: 1200))
+        await phone.until { $0.until == at(1200) }
+        let registered = await phone.screenTime.windows
+        // Signed out: no token to send, and the engine waits on sign-in (B4).
+        await rig.tokens.set(nil)
+        await rig.engine.setForeground(true)
+        await rig.until { $0.link == .signIn }
+        await phone.enforcer.check()
+        await phone.until { $0.shielded && $0.until == at(1200) }
+        #expect(await phone.screenTime.windows == registered)
+        rig.clock.advance(by: 1200)
+        await phone.until { !$0.shielded }
+        #expect(await phone.screenTime.windows == registered + [nil])
         await phone.stop()
     }
 

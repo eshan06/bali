@@ -215,7 +215,9 @@ public struct Outbox: Sendable {
     /// the one that takes the write lock, the monitor's migration (#97's review). Left running, it
     /// would hold that lock once the read had answered, as the monitor asks iOS for its next wake —
     /// and iOS kills an extension suspended holding it (0xdead10cc), the wake never asked for. Its
-    /// waits end by the deadline all the same, so only its own work, milliseconds, outlasts it.
+    /// waits end by the deadline all the same, so only its own work, milliseconds, outlasts it —
+    /// with no second ceiling (B5b-3): a stall of it past iOS's patience costs this wake alone,
+    /// which the bell's backup makes again, where giving up would leave the lock held.
     /// The first of the grant, the refusal and the giving up settles it: nothing after it opens the
     /// file again or answers.
     static func granted<T>(
@@ -282,8 +284,9 @@ public struct Outbox: Sendable {
 
     /// The file's schema, migration by migration. Each may run in the monitor extension, after an
     /// update, waited out past its 2 s ceiling once it holds the write lock (`granted`, B6c-2): so
-    /// each must stay cheap — the outbox is a queue of the few records not yet answered, and a
-    /// migration rewrites nothing larger.
+    /// each must stay cheap — the bell's backup makes a wake lost to a stall again, not one lost to
+    /// a migration too heavy for any wake — and the outbox is a queue of the few records not yet
+    /// answered, which a migration rewrites nothing larger than.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         // Records go in `seq` order; `outboxState` holds the rules' own state.

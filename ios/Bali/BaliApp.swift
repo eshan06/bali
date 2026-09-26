@@ -149,6 +149,7 @@ struct Placeholder: View {
         @State private var code = ""
         @State private var tag = ""
         @State private var shortCap = Bell.deviceCheckCap != nil
+        @State private var losesBell = Bell.deviceCheckLosesBell
 
         var body: some View {
             VStack(spacing: 4) {
@@ -198,14 +199,17 @@ struct Placeholder: View {
                 Text("Outbox: \(queue)")
                 Button("History") { run { await history() } }
                 // B5b's device check: a tap not yet answered capped at the floor, not 50 minutes —
-                // kept where the monitor reads it too — and what the monitor did at its last wake,
+                // kept where the monitor reads it too — the bell's next wake lost on purpose, for
+                // its backup (B5b-3), and what the monitor did at its last wakes, newest first,
                 // since it can show nothing itself.
                 Toggle("Cap a tap at 15 min (device check)", isOn: $shortCap)
                     .onChange(of: shortCap) { _, on in
                         Bell.deviceCheckCap = on ? Bell.floor : nil
                         Task { await engine.setTapCap(Bell.deviceCheckCap) }
                     }
-                Text("Monitor: \(Bell.lastWake ?? "not woken yet")")
+                Toggle("Lose the bell's next wake (device check)", isOn: $losesBell)
+                    .onChange(of: losesBell) { _, on in Bell.deviceCheckLosesBell = on }
+                Text("Monitor: \(monitor)")
                 Text(note)
             }
             .font(.footnote.monospaced())
@@ -259,6 +263,11 @@ struct Placeholder: View {
         }
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+
+        /// What the monitor did at its last wakes, newest first — which window woke it, too.
+        private var monitor: String {
+            Bell.wakes.isEmpty ? "not woken yet" : Bell.wakes.joined(separator: "\n")
+        }
 
         /// Runs a trigger, and says how it went.
         private func run(_ trigger: @escaping @MainActor () async throws -> String) {

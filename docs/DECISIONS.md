@@ -8,6 +8,108 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-25** — **B5b-3: the bell's wakes off iOS 18's DeviceActivity deadlock, and a lost wake
+  survivable — each window an activity of its own, a backup window beside the bell's, no second
+  ceiling on the waited-out migration, and `writerWaitedOut` never passing untold (#98's Claude
+  Review, comment 5840859167, its three WARNs; B6c-2's "To know, for the owner", closed).** **The
+  deadlock (its third WARN).** On iOS 18 (beta 3 on; not 17.6), `DeviceActivityCenter
+  .startMonitoring` called inside `intervalDidEnd` for the same activity name never returns (Apple
+  Developer Forums, thread 761299; FB14664238 — no fix or workaround reported as of March 2025),
+  and the reporter's extension also hung on `DeviceActivityCenter.activities`. B5b's monitor made
+  that very call — `Bell.register` of `.bali` inside `intervalDidEnd(for: .bali)` — whenever it kept
+  the shields (woken before the bell) or could not read the file: there it could hang, keeping the
+  shields past the bell until the app was opened, with no `Monitor:` line to say so. **Decided:
+  each window an activity of its own, and no wake asks iOS anything of the one that woke it**
+  (`Bell.Name`): `bell` — B5b's `bali`, so a window an older build registered is still the bell's —
+  and `backup`, the app's; `tick` and `tock`, the monitor's own, asked for in turn
+  (`Bell.next(after:)`: `tock` after `tick`, `tick` after anything else, a name this build does not
+  know included). A wake that clears asks iOS nothing, as before (B6c-2); one that keeps the
+  shields, or cannot read the file, asks for its next wake under the other name — reading back that
+  name's window alone, for `ask`'s skip (B5b's guard against a replacement waking the monitor for
+  ever, now across two names) — and stops nothing. Nothing asks for `activities`: `BellCenter` has
+  no such call, and a test reads the monitor's source. Four activities, well under the limit iOS
+  keeps on an app's (`excessiveActivities`), each exactly the floor long (`Bell.window`, B5b).
+  **A lost wake, survivable (its first WARN's end state).** A backup window, registered by the app
+  beside the bell's — never from a callback — and ending `backupAfter`, two minutes, after it: a
+  wake of the bell's that dies — hung, killed by the watchdog or for a lock (0xdead10cc), its next
+  wake refused — is made again, and the backup's wake reads and clears exactly as the bell's does
+  (`Bell.wake` never looks at the name). Two minutes: past the monitor's own next wake, a minute on
+  when it was woken early or could not read the file, so that one has cleared first; and no more,
+  since a lost wake keeps the shields that long past the bell — less than three minutes, where it
+  was until the app was opened. **One backup, not more:** it makes one lost wake survivable, and
+  what kills two in a row — the monitor over its memory limit, a migration too heavy for any wake —
+  kills every one, which no number of backups mends, while each adds a wake at every bell. After
+  the bell's wake, the backup's finds the shields off: `nothing to clear` (`clearShields` says now
+  whether the store held any), and iOS asked nothing; with the app closed nothing cancels it, so it
+  wakes once for nothing. **The app's cleanup:** its registration (`Bell.register`, through
+  `ScreenTime.schedule`; the enforcer's rules unchanged) asks for the bell's window and its backup,
+  each skipped while iOS holds one ending there; once either is new, it stops `tick` and `tock`,
+  aimed at the truth it has just replaced — only once its own are taken, so a refusal leaves the
+  monitor's next wake in place (and shows `bell NOT scheduled`, the backup's refusal too, asked for
+  again at the next pass). While iOS holds its windows as they are — a relaunch's first pass — the
+  monitor's own stays: the bell's window may have woken it early already, and its own next wake is
+  then the one still to come (santa's review: stopped there, the shields waited for the backup). No
+  window — an unlock, the bell with the app open, the permission denied — stops all four. So a new
+  window and an extension replace the bell's and its backup and stop the monitor's own; the end
+  leaves none; a sign-out changes none — it keeps the standing (B5a), the shields and their windows
+  stand, and the bell still clears them. **B5b-2's bookkeeping, kept honest:** a next wake iOS
+  refuses is kept for the app to show (`monitorUnscheduled`) unless a wake since ended well — the
+  backup's clear among them, the shields then off two minutes after the bell, not left until the
+  app was opened. **The waited-out migration (its first WARN): no second ceiling, decided.** B6c-2
+  waits the monitor's migrating open out past the 2 s ceiling, with no end, and a stalled fsync or a
+  heavier future migration could outlast iOS's patience with the extension. A finite ceiling could
+  only give up on the one open that holds the write lock — B6c-2's case, the monitor suspended or
+  killed holding it — and what it would buy, the monitor reaching its next wake before iOS's
+  patience ran out, the backup now buys holding no lock: a wake killed mid-migration rolls back, and
+  the backup's migrates from the start. A migration that outlasts every wake is a build defect no
+  ceiling mends — given up on each time, the file never migrates and the monitor never clears — so
+  the migrator's comment keeps each cheap, and the app's own open, unbounded in the foreground,
+  migrates at the next open. **`writerWaitedOut` (its second WARN)** returned untold when the
+  coordinator granted the open only past the bound — a stall of the simulator's — so a flipped
+  `waitsOut:` could pass there. Now it asks again further off (1, 10 and 60 s) and records an issue
+  when every bound was missed: never passed untold. **For round 2 (Debug builds only):** the
+  readout's `Monitor:` shows the last three wakes, newest first, naming the window that woke each —
+  noted `not finished` before the read, so a wake iOS ends before it finishes still shows, the
+  monitor's memory limit among the causes (B5b's open question) — and **Lose the bell's next wake
+  (device check)** makes the monitor do nothing at the bell's next wake, once, so the owner sees the
+  backup clear (round 2's new step 6; the cap step and the stall check are 7 and 8 now). **Not
+  covered, disclosed:** (1) that a call of another name inside a callback — `startMonitoring` of
+  `tick` inside `bell`'s `intervalDidEnd`, `schedule(for:)` of it — is free of the deadlock is the
+  thread's reading (the same name deadlocked), not verified here: round 2 shows it whenever a wake
+  keeps the shields or reads nothing (a `tick` line); (2) the backup reaches a monitor that hangs
+  only if iOS ends the hung one, since its callbacks may queue behind it — the one hang known is
+  gone; (3) whether iOS wakes the monitor as a window is replaced or stopped is still B5b's open
+  question: if it does, such a wake reads the truth, clears nothing owed, and may leave a `tick`
+  beside the bell's window, one more wake for nothing; (4) two wakes lost in a row keep the shields
+  until the app is opened; (5) iOS's own — the adapter never stopping with no name (iOS reads none as
+  every activity), `clearShields`'s answer, the Debug toggle — is unpinned on Linux, and
+  `writerWaitedOut`'s wiring is pinned on the simulator only, where no mutation runs. **Tests**
+  (Linux and the iOS Simulator): `RegisterTests` — `names` (four, the bell's under B5b's name; the
+  next never the name that woke it, nor the app's), `backup` (two minutes on, whole minute, the
+  floor long, after the monitor's own next wake), `once` (both windows to the second, skipped while
+  held, replaced, none stopping all four), `cleanup` (an extension and a new window over the
+  monitor's own, then the end), `sameWindows` (the same windows again: the monitor's own left),
+  `refused` (either window refused: iOS keeps what it held, the
+  monitor's own too), `ownCallback` (every name and wake: no call of the running name nor the
+  app's, no stop, a clear asking nothing), `carriedOut` (`nothing to clear`, a refusal ended by the
+  backup), `logged`, `monitorsCalls` (the monitor's source: no DeviceActivity call but through
+  `carryOut`, no `activities` anywhere); `MonitorFileTests.backup` (after a force-quit, the backup
+  clears, then finds nothing to clear, asking iOS nothing) and `cap` (the cap's backup and the
+  device check's); `ScheduleTests.signOut`; `writerWaitedOut`. Of 20 mutations of the rules — the
+  next name always `tick`, or the one that woke it; the monitor asking under the bell's name, or
+  under the one that woke it (`main`'s behaviour); no backup, one at the bell's end, one a minute
+  after; the monitor's own not stopped, stopped before the app's are taken, or stopped though none
+  of the app's is new (`sameWindows`); no window stopping the bell's alone; no skip; a clear always
+  `cleared`, or asking iOS something; a refusal kept past a clear, or past a next wake taken; the
+  log never replacing its note, or keeping four; the monitor asking for `activities`, or
+  registering as the app does — each taken alone, all 20 turn a test red. **Santa** (two Claude
+  reviewers, both the fallback — no other model's CLI here; round 1): no blockers. Fixed here: the
+  app's registration stops the monitor's own only once a window of its own is new (Reviewer B: a
+  relaunch's first pass stopped a `tick` an early wake had asked for, and the shields waited for
+  the backup); and this entry's placeholder. Left, in the PR: a `tick` asked for while the app was
+  only in the background stays until the window moves, one wake for nothing; `clearShields` counts
+  either category as held, the enforcer's check both; the Debug log matches a note by its text;
+  `writerWaitedOut` may take ~72 s on a stalled simulator.
 - **2026-09-25** — **B6c-2: the monitor's migrating open waited out, never given up on; the shield
   never migrates the file; a close that fails never discards a read; and whether an unlock was filed
   is its UPDATE's own answer (#97's Claude Review, comment 5840115460).** **The bell's guarantee
@@ -38,7 +140,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   bell) or cannot read the file — so there it may hang, keeping the shields past the bell until the
   app is opened, with no `Monitor:` line to say so. Round 2 is where it shows; registering the
   monitor's own wakes under a second activity name, or a backup window the app registers beside the
-  bell's, would take the monitor off that call — the owner's decision, not this step's. **The shield
+  bell's, would take the monitor off that call — the owner's decision, not this step's (closed by
+  B5b-3, above: both, the monitor's own wakes under two names of their own). **The shield
   never migrates (its second WARN).** iOS asks for `configuration(shielding:)` synchronously, many
   times a minute, and B6c had it migrate a file this build had yet to — a writing coordination and
   the write lock on the engine's file, in the process likeliest to be suspended without notice — for
