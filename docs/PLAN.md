@@ -241,11 +241,13 @@ _Last updated: 2026-09-26 — **The owner's device check has begun (round 1, ste
   pool's hosted-UI domain, `https://bali-dev.auth.us-east-1.amazoncognito.com`,
   and the phone's public client `bali-ios-dev-public` (`7u6trs6gv805oi35ima29em6oe`; its first client, `bali-ios-dev`, had a secret and was replaced 2026-09-26),
   checked with an authorize request — `docs/DEPLOY.md`, "The phone's
-  sign-in". Both are in place (2026-09-25): the client id is on dev's
-  `AUTH_AUDIENCE` (appended once B4a had deployed), and both values are in
-  `ios/project.yml` (B4c). The client's refresh-token expiration is raised
-  above Cognito's 30-day default, at which every student would be signed
-  out monthly — done for dev (owner, 2026-09-25; 365 days was asked for).
+  sign-in". Both are in place (2026-09-25 for the first client, 2026-09-26
+  for its replacement): the client id is on dev's `AUTH_AUDIENCE` (appended
+  once B4a had deployed), and both values are in `ios/project.yml` (B4c). The
+  client's refresh-token expiration is raised above Cognito's 30-day default,
+  at which every student would be signed out monthly — done for dev (owner,
+  2026-09-25; 365 days was asked for, and the replacement client was made
+  with 365 days, read back).
   Production's client and domain are still to make (Phase 5), that setting
   with them.
 - **BaliCore signs the student in** (B4b ✅, 2026-09-25): `SignIn` runs
