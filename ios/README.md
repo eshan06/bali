@@ -70,7 +70,7 @@ API"), and never prints a credential.
 
 ```sh
 set -a; . ./.env.demo; set +a
-read -rsp 'demo password: ' DEMO_PASSWORD && export DEMO_PASSWORD
+printf 'demo password: ' && read -rs DEMO_PASSWORD && echo && export DEMO_PASSWORD
 npm run dev:teacher -- class   # the class "Device check", made or reused: prints its join code
 npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the teacher
 ```

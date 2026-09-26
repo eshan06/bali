@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-26** — **The device check's first finding: dev's phone app client replaced (round 1,
+  step 1).** Every sign-in from the phone ended `Sign-in failed: refused("invalid_client")` after
+  the hosted UI had accepted the password. Cognito's token endpoint answered `invalid_client_secret`
+  for that client and `invalid_grant` for a bogus code on a public one — so the client `bali-ios-dev`
+  (`33qr62dl4ee4inigneidmfe2s9`) had been created with a client secret (the console's "traditional
+  web app" type, not "mobile app"), which Cognito then demands on every exchange and which a phone
+  never holds (auth decision 2; DEPLOY.md, "The phone's sign-in"). A secret cannot be removed from a
+  Cognito client. **Decided:** a new public client, `bali-ios-dev-public`
+  (`7u6trs6gv805oi35ima29em6oe`), made with the old one's settings and no secret; the build and the
+  docs name it, and its id was appended to dev's `AUTH_AUDIENCE`. The old client stays until the
+  owner deletes it (nothing here deletes). The alternatives — sending a secret from the phone, or a
+  second token path with one — were not considered: the architecture rules them out. Also found and
+  re-provisioned, cause unknown: dev's demo teacher row had reverted to `role = 'student'` (no code
+  path writes `users.role`); the printed SQL was run again by the owner in Railway's query tab.
+
 - **2026-09-25** — **B5b-3: the bell's wakes off iOS 18's DeviceActivity deadlock, and a lost wake
   survivable — each window an activity of its own, a backup window beside the bell's, no second
   ceiling on the waited-out migration, and `writerWaitedOut` never passing untold (#98's Claude

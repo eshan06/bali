@@ -91,7 +91,7 @@ A remote run therefore takes a few minutes and prints progress while it waits.
 # `.env.demo` (already gitignored by the `.env.*` rule) and source it, prompting
 # for the password itself. DEMO_INTERNAL_KEY is a real secret — never commit it.
 set -a; . ./.env.demo; set +a
-read -rsp 'demo password: ' DEMO_PASSWORD && export DEMO_PASSWORD
+printf 'demo password: ' && read -rs DEMO_PASSWORD && echo && export DEMO_PASSWORD
 npm run demo
 ```
 

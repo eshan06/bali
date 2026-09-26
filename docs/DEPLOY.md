@@ -68,13 +68,15 @@ checked with a public authorize request (`bali://auth/callback`, scope
 `openid email profile`, PKCE S256 → the hosted sign-in page):
 
 - **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
-- **The phone's app client:** `bali-ios-dev`, id `33qr62dl4ee4inigneidmfe2s9`
+- **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check)
 - **Dev's API:** `https://bali-production-09a2.up.railway.app` — dev's, despite
   the name: Railway named the service before the environment was renamed dev.
   No production API exists yet (Phase 5).
-- **In place** (2026-09-25): all three are in `ios/project.yml` (B4c), and the
-  client id is on dev's `AUTH_AUDIENCE`, appended after B4a deployed.
-- **Refresh-token expiration — done** (owner, 2026-09-25): raised above
+- **In place** (2026-09-26, for the replacement client; the first was in place
+  2026-09-25): all three are in `ios/project.yml` (B4c), and the client id is on
+  dev's `AUTH_AUDIENCE`, appended after B4a deployed.
+- **Refresh-token expiration — done** (owner, 2026-09-25 on the first client; the
+  replacement was made with 365 days, read back the same day): raised above
   Cognito's 30-day default (step 3 below; 365 days was asked for), which no
   request from outside can show.
 
@@ -114,7 +116,15 @@ console → Cognito → that user pool:
   deployed there.** Before it, the API reads `AUTH_AUDIENCE` as a single id,
   so a list matches no token and locks every sign-in out. The same holds the
   other way: trim the list back to one id before rolling the API back past
-  B4a. Dev's was appended on 2026-09-25, after #81 (B4a) had deployed.
+  B4a. Dev's was appended on 2026-09-25, after #81 (B4a) had deployed, and
+  the replacement client's on 2026-09-26.
+- **Check the client is public before any phone signs in:** send the token
+  endpoint a made-up code —
+  `curl -sS -X POST <domain>/oauth2/token -H 'Content-Type: application/x-www-form-urlencoded' --data 'grant_type=authorization_code&client_id=<the id>&code=x&redirect_uri=bali%3A%2F%2Fauth%2Fcallback&code_verifier=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'`.
+  A public client answers `invalid_grant`; one made with a secret answers
+  `invalid_client`, and every sign-in from the phone will fail the same way
+  (dev's first client did, found at the device check; the authorize request
+  above passes either way, so it proves nothing about the secret).
 
 ## Local run
 
