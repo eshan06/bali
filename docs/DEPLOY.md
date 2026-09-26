@@ -120,7 +120,7 @@ console → Cognito → that user pool:
   the replacement client's on 2026-09-26.
 - **Check the client is public before any phone signs in:** send the token
   endpoint a made-up code —
-  `curl -s -X POST https://<domain>/oauth2/token -H 'Content-Type: application/x-www-form-urlencoded' --data 'grant_type=authorization_code&client_id=<the id>&code=x&redirect_uri=bali%3A%2F%2Fauth%2Fcallback&code_verifier=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'`.
+  `curl -sS -X POST <domain>/oauth2/token -H 'Content-Type: application/x-www-form-urlencoded' --data 'grant_type=authorization_code&client_id=<the id>&code=x&redirect_uri=bali%3A%2F%2Fauth%2Fcallback&code_verifier=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'`.
   A public client answers `invalid_grant`; one made with a secret answers
   `invalid_client`, and every sign-in from the phone will fail the same way
   (dev's first client did, found at the device check; the authorize request
