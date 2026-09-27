@@ -173,6 +173,21 @@ struct BaliMark: View {
     }
 }
 
+/// A screen's content laid out in its whole height — centred, or held apart by its spacers — and
+/// scrolling only once the phone's text size outgrows it, so no line is ever cut off.
+struct PageScroll<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                content().frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+}
+
 /// A screen as D1 lays one out: the page colour to the edges, 24-pt gutters, and 16 pt between
 /// the status bar and the content (D1's 64 from the top of its 390 × 844 frame).
 struct ScreenScaffold<Content: View>: View {

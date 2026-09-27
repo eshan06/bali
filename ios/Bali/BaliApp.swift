@@ -63,7 +63,9 @@ final class Phone {
     /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
     /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
     /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
-    /// phone that gave it. A read of denied clears it.
+    /// phone that gave it. The check judging the permission off clears it — denied, or not
+    /// determined for a check-in interval: a grant taken back, or one that did not come back with
+    /// a restored backup, which restores these defaults — so the grant screen returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
@@ -103,12 +105,14 @@ final class Phone {
         UserDefaults.standard.set(true, forKey: Phone.introSeenKey)
     }
 
-    /// Keeps `everApproved` as a pass read the permission: set at approved, cleared at denied,
-    /// left at not determined — the read it is there to see past.
-    func remember(_ permission: Permission) {
-        guard permission != .notDetermined, everApproved != (permission == .approved) else { return }
-        everApproved = permission == .approved
-        UserDefaults.standard.set(everApproved, forKey: Phone.everApprovedKey)
+    /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
+    /// judges it off, left at a read not determined for a moment — the read it is there to see
+    /// past.
+    func remember(_ protection: Protection) {
+        let approved = protection.permission == .approved
+        guard approved || protection.permissionOff, everApproved != approved else { return }
+        everApproved = approved
+        UserDefaults.standard.set(approved, forKey: Phone.everApprovedKey)
     }
 
     /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
@@ -159,7 +163,7 @@ final class Phone {
         Task {
             for await protection in await enforcer.updates() {
                 self.protection = protection
-                self.remember(protection.permission)
+                self.remember(protection)
             }
         }
         Task { for await signedIn in await signIn.signedIn() { self.signedIn = signedIn } }

@@ -38,6 +38,11 @@ public struct Protection: Sendable, Hashable {
     /// determined, as a phone never asked does.
     public var checked = false
     public var permission = Permission.notDetermined
+    /// The permission as the check judges it — off: denied, or read not determined for a check-in
+    /// interval of the phone's running (B5a-2) — a phone never granted it, or whose grant did not
+    /// come back with a restored backup — never a launch's moment. What is reported as protection
+    /// off in a session, and what ends `Phone.everApproved` (C1b).
+    public var permissionOff = false
     /// Verified: the store holds the shields, and the permission keeps them there.
     public var shielded = false
     /// When they come off, while the engine's truth keeps them on.
@@ -137,11 +142,8 @@ public actor Enforcer {
     /// and a phone never granted the permission reads it so for good.
     public func check() async {
         let permission = await screenTime.permission()
-        let running = clock.uptime()
-        undetermined = permission == .notDetermined ? undetermined ?? running : nil
-        let off =
-            permission == .denied
-            || undetermined.map { running - $0 >= SyncEngine.checkInInterval } == true
+        undetermined = permission == .notDetermined ? undetermined ?? clock.uptime() : nil
+        let off = permission == .denied || undeterminedLasting
         var unreported: Bool? = false
         if off, case .inSession(let session, let state) = await engine.state.standing,
             state != .protectionOff, session.endsAt > clock.now()
@@ -154,6 +156,12 @@ public actor Enforcer {
         }
         if let unreported { protection.unreported = unreported }
         await enforce()
+    }
+
+    /// Whether checks have read the permission not determined for a check-in interval of the
+    /// phone's running: not a launch's moment (B5a-2).
+    private var undeterminedLasting: Bool {
+        undetermined.map { clock.uptime() - $0 >= SyncEngine.checkInInterval } == true
     }
 
     /// Asks the student for the Screen Time permission — C1's onboarding — and enforces with what
@@ -237,6 +245,7 @@ public actor Enforcer {
         // Read after the last wait, so a check made meanwhile keeps what it found (`unreported`).
         var next = protection
         (next.checked, next.permission, next.shielded) = (true, permission, shielded)
+        next.permissionOff = permission == .denied || undeterminedLasting
         (next.until, next.unscheduled, next.monitorUnscheduled) =
             (until, unscheduled, monitorUnscheduled)
         protection = next

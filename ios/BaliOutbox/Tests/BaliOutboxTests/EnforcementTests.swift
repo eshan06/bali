@@ -424,12 +424,15 @@ struct EnforcerTests {
         let screenTime = FakeScreenTime()
         await screenTime.set(.notDetermined)
         let phone = Enforced(rig, screenTime)
-        await phone.until { $0.permission == .notDetermined }
+        // Its first pass made — the claim before it is the defaults, which read not determined
+        // too — so nothing but the ask's own pass is running when it returns.
+        await phone.until { $0.checked && $0.permission == .notDetermined }
         await screenTime.refuseAsk()
         await #expect(throws: FakeScreenTime.Refused.self) {
             try await phone.enforcer.requestPermission()
         }
-        #expect(await phone.enforcer.protection.permission == .denied)
+        let claim = await phone.enforcer.protection
+        #expect(claim.permission == .denied && claim.permissionOff)
         await phone.stop()
     }
 }
@@ -573,6 +576,7 @@ struct ProtectionOffTests {
         rig.clock.advance(by: 1)
         await phone.enforcer.check()
         #expect(try rig.outbox.records().isEmpty)
+        #expect(await !phone.enforcer.protection.permissionOff)
         // The check before the next check-in reads it approved: nothing reported, nothing owed.
         await phone.screenTime.reads(.approved)
         rig.clock.advance(by: 29)
@@ -587,7 +591,7 @@ struct ProtectionOffTests {
     }
 
     @Test(
-        "Never granted — not determined at two checks a check-in apart, coming to the foreground and at the check-in — is reported, once: a phone that cannot shield is never shown focused"
+        "Never granted — not determined at two checks a check-in apart, coming to the foreground and at the check-in — is reported, once: a phone that cannot shield is never shown focused; and the claim says the permission is off from then (C1b), not before"
     )
     func notDeterminedLasting() async throws {
         let rig = try Rig()
@@ -597,12 +601,14 @@ struct ProtectionOffTests {
         try await rig.tapIn()
         try await rig.foreground()
         #expect(try rig.outbox.records().isEmpty)
+        #expect(await !phone.enforcer.protection.permissionOff)
         rig.clock.advance(by: 30)
         try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         await rig.until {
             $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
         }
+        await phone.until { $0.permissionOff && $0.permission == .notDetermined }
         try await rig.checkInDue(at(60))
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))

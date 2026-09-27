@@ -1,4 +1,7 @@
+import AuthenticationServices
 import BaliCore
+import BaliOutbox
+import FamilyControls
 import Foundation
 import SwiftUI
 import Testing
@@ -84,16 +87,42 @@ struct AppTests {
         let before = defaults.object(forKey: Phone.everApprovedKey)
         defer { defaults.set(before, forKey: Phone.everApprovedKey) }
         defaults.removeObject(forKey: Phone.everApprovedKey)
+        /// What a pass read: `permission`, judged off or not.
+        func read(_ permission: Permission, off: Bool = false) -> Protection {
+            var protection = Protection()
+            (protection.checked, protection.permission, protection.permissionOff) =
+                (true, permission, off)
+            return protection
+        }
         let phone = Phone(fixture: try #require(PreviewFixtures.all["screenTime"]))
         #expect(!phone.everApproved && phone.screen == .screenTime)
-        phone.remember(.notDetermined)
+        phone.remember(read(.notDetermined))
         #expect(!phone.everApproved && !Phone().everApproved)
-        phone.remember(.approved)
+        phone.remember(read(.approved))
         #expect(phone.everApproved && Phone().everApproved && phone.screen == .home)
-        phone.remember(.notDetermined)
+        phone.remember(read(.notDetermined))
         #expect(phone.everApproved && phone.screen == .home)
-        phone.remember(.denied)
+        // Not determined for a check-in interval: never granted, or a grant that did not come back
+        // with a restored backup, which restores these defaults.
+        phone.remember(read(.notDetermined, off: true))
         #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
+        phone.remember(read(.approved))
+        phone.remember(read(.denied, off: true))
+        #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
+    }
+
+    @Test(
+        "The student's own no is the only cancel (C1b): the browser session's canceledLogin is the sign-in's cancelled, and Family Controls' authorizationCanceled the ask's; any other failure is said, what the platform said kept"
+    )
+    func cancels() {
+        #expect(SignInError(browser: ASWebAuthenticationSessionError(.canceledLogin)) == .cancelled)
+        let unopened = SignInError(browser: ASWebAuthenticationSessionError(.presentationContextInvalid))
+        guard case .notOpened(let why) = unopened else { return Issue.record("\(unopened)") }
+        #expect(why.contains("ASWebAuthenticationSessionError"))
+        #expect(ScreenTimeAskError(familyControls: FamilyControlsError.authorizationCanceled) == .cancelled)
+        let failed = ScreenTimeAskError(familyControls: FamilyControlsError.invalidAccountType)
+        #expect(failed == .failed("\(FamilyControlsError.invalidAccountType)"))
+        #expect(ScreenTimeAskError(familyControls: URLError(.notConnectedToInternet)).words != nil)
     }
 
     @Test(

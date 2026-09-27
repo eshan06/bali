@@ -17,36 +17,41 @@ struct ScreenTimeView: View {
     var body: some View {
         let words = permission.screenTimeWords
         ScreenScaffold {
-            Spacer()
-            VStack(spacing: 24) {
-                Image(systemName: "checkmark.shield")
-                    .font(.system(size: 56, weight: .light)).foregroundStyle(Theme.brand)
-                    .accessibilityHidden(true)
-                VStack(spacing: 12) {
-                    Text("Let Bali pause apps during class").textStyle(.h1)
-                    Text(words.body).textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
-                }
-            }
-            .frame(maxWidth: .infinity).multilineTextAlignment(.center)
-            Spacer()
-            VStack(spacing: 12) {
-                Button(busy ? "Asking…" : words.button) { Task { await ask() } }
-                    .buttonStyle(PrimaryButtonStyle()).disabled(busy)
-                if permission == .denied {
-                    Button("Open Settings") {
-                        if let settings = URL(string: UIApplication.openSettingsURLString) {
-                            openURL(settings)
+            PageScroll {
+                VStack(spacing: 0) {
+                    Spacer()
+                    VStack(spacing: 24) {
+                        Image(systemName: "checkmark.shield")
+                            .font(.system(size: 56, weight: .light)).foregroundStyle(Theme.brand)
+                            .accessibilityHidden(true)
+                        VStack(spacing: 12) {
+                            Text("Let Bali pause apps during class").textStyle(.h1)
+                            Text(words.body).textStyle(.bodyLg)
+                                .foregroundStyle(Theme.textSecondary)
                         }
                     }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-                if let failure = phone.askFailed?.words {
-                    Text(failure).textStyle(.body)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text("You can change this any time in Settings.")
-                    .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                     .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Button(busy ? "Asking…" : words.button) { Task { await ask() } }
+                            .buttonStyle(PrimaryButtonStyle()).disabled(busy)
+                        if permission == .denied {
+                            Button("Open Settings") {
+                                if let settings = URL(string: UIApplication.openSettingsURLString) {
+                                    openURL(settings)
+                                }
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                        }
+                        if let failure = phone.askFailed?.words {
+                            Text(failure).textStyle(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Text("You can change this any time in Settings.")
+                            .textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                            .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    }
+                }
             }
         }
     }

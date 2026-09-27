@@ -17,9 +17,9 @@ struct IntroView: View {
     var body: some View {
         ScreenScaffold {
             TabView(selection: $page) {
-                IntroPage { first }.tag(0)
-                IntroPage { second }.tag(1)
-                IntroPage { third }.tag(2)
+                PageScroll { first }.tag(0)
+                PageScroll { second }.tag(1)
+                PageScroll { third }.tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             HStack(spacing: 8) {
@@ -108,20 +108,6 @@ struct IntroView: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
             Text(text).textStyle(.body).foregroundStyle(ink)
-        }
-    }
-}
-
-/// One page: its content centred, scrolling once the phone's text size outgrows the page.
-private struct IntroPage<Content: View>: View {
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                content().frame(maxWidth: .infinity, minHeight: geometry.size.height)
-            }
-            .scrollBounceBehavior(.basedOnSize)
         }
     }
 }
