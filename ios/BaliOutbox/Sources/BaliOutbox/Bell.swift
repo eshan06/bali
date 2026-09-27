@@ -66,8 +66,9 @@ public enum Bell {
         case clear
         /// Something does — a session the standing says still runs, a later tap's cap — so they
         /// stay, and iOS is to wake the monitor again at this window's end: theirs, but never
-        /// less than `retry` on, so a wake that came early never asks for the window it just ended
-        /// again — which iOS may hold still, and `ask` would skip.
+        /// less than `retry` on, so a wake that came early asks for a window a whole minute on,
+        /// never for the end it was just woken at — which iOS, keeping its own time, ended early
+        /// once already.
         case keep(DateInterval)
         /// The file could not be read in time: the shields stay — never cleared over what the
         /// monitor cannot read — and iOS is to wake it again at this window's end, to try again.
@@ -98,7 +99,13 @@ public enum Bell {
     /// The monitor's `wake` at `now`, woken under `woken`, carried out: nothing keeps the shields on
     /// — `clear` them, which says whether the store held any, and ask iOS nothing; else its next
     /// wake asked of `center` under `next(after:)` — never the name that woke it — and nothing else
-    /// asked of it. One iOS refuses leaves nothing to wake the monitor again — but the bell's
+    /// asked of it. Asked for anew, every time, replacing whatever iOS holds under that name: a
+    /// window of the monitor's own, which its wake there spent — iOS holds a window it has ended
+    /// still — or one that is stale, since the truth read now decides. Skipped for one ending
+    /// there already, as the app's are (`ask`), a wake would be dropped, and recorded nowhere: iOS
+    /// ending its windows a minute early, the bell's wake asks for `tick` at the bell, `tick`'s
+    /// for `tock` there, and `tock`'s would find `tick` — spent — ending there already (#99's
+    /// review). One iOS refuses leaves nothing to wake the monitor again — but the bell's
     /// backup, when it is still to come — so the shields it keeps may outlive their end with the
     /// app closed: `refused` is set to `now`, for the app to show from its next open
     /// (`Protection.monitorUnscheduled`), and a wake that ends well — cleared, or its next wake
@@ -119,7 +126,7 @@ public enum Bell {
         }
         let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
         do {
-            try ask(next.window, as: self.next(after: woken), in: center)
+            try start(next.window, as: self.next(after: woken), in: center)
             refused = nil
             return said
         } catch {
@@ -130,37 +137,48 @@ public enum Bell {
 
     /// The app's windows (the enforcer's, through `ScreenTime.schedule`): the bell's at `window`,
     /// and its backup — or, nil, none — asked of `center`, each by `ask`'s rule, replacing those
-    /// asked for before. Once either is new, none of the monitor's own: aimed at the truth the app
-    /// has just replaced, they are stale — stopped only once the app's are taken, so a refusal
-    /// leaves a wake the monitor asked for in place. While iOS holds the app's windows as they are,
-    /// the monitor's own stays: the bell's may have woken it early already, and its own next wake
-    /// is then the one still to come. A window iOS refuses throws, and iOS keeps the one it held.
-    /// No callback of the monitor's runs in the app, so every name is the app's to ask for.
+    /// asked for before. Once the bell's is new, none of the monitor's own: aimed at the truth the
+    /// app has just replaced, they are stale — stopped only once the app's are taken, so a refusal
+    /// leaves a wake the monitor asked for in place. While iOS holds the bell's window as it is —
+    /// a relaunch's first pass, a pass that takes the backup alone, refused before — the monitor's
+    /// own stays: the bell's window may have woken it early already, spent, and its own next wake
+    /// is then the one still to come, at the bell (#99's review: stopped over the backup alone, it
+    /// left none there). A window iOS refuses throws, and iOS keeps the one it held. No callback of
+    /// the monitor's runs in the app, so every name is the app's to ask for.
     public static func register(
         _ window: DateInterval?, in center: some BellCenter, calendar: Calendar = .current
     ) throws {
         guard let window else { return center.stop(Name.allCases) }
-        let asked = [
-            try ask(window, as: .bell, in: center, calendar: calendar),
-            try ask(backup(of: window), as: .backup, in: center, calendar: calendar),
-        ]
-        if asked.contains(true) { center.stop([.tick, .tock]) }
+        let bellIsNew = try ask(window, as: .bell, in: center, calendar: calendar)
+        _ = try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
+        if bellIsNew { center.stop([.tick, .tock]) }
     }
 
-    /// Asks `center` to wake the monitor at `window`'s end under `name`, replacing the window it
-    /// holds there, unless it holds one ending there already: a replacement may itself wake the
-    /// monitor, which asks again at each wake, and the two would never end. Whether it asked.
-    @discardableResult
+    /// The app's ask of `center`, to wake the monitor at `window`'s end under `name`, replacing the
+    /// window it holds there — unless it holds one ending there already: the app asks at every pass
+    /// that finds nothing scheduled, a relaunch's first among them, and a window iOS holds is
+    /// asked for nothing new (B5b's guard, #91's review). Whether it asked — the bell's being new
+    /// is what `register` stops the monitor's own by. The monitor's own asks never skip
+    /// (`carryOut`).
     static func ask(
         _ window: DateInterval, as name: Name, in center: some BellCenter,
         calendar: Calendar = .current
     ) throws -> Bool {
         if let held = center.heldEnd(name), calendar.date(from: held) == window.end { return false }
+        try start(window, as: name, in: center, calendar: calendar)
+        return true
+    }
+
+    /// Asks `center` to wake the monitor at `window`'s end under `name`, to the second in
+    /// `calendar`, replacing the window it holds there.
+    static func start(
+        _ window: DateInterval, as name: Name, in center: some BellCenter,
+        calendar: Calendar = .current
+    ) throws {
         let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
         try center.start(
             name, calendar.dateComponents(parts, from: window.start),
             calendar.dateComponents(parts, from: window.end))
-        return true
     }
 
     /// The monitor's last wakes, newest first, as the Debug readout shows them: `line` in place of
@@ -183,7 +201,9 @@ public enum Bell {
 /// `DeviceActivityCenter`, one activity for each name. No `activities`: on iOS 18 the monitor
 /// deadlocked on it (FB14664238's thread), and nothing here needs it.
 public protocol BellCenter {
-    /// The end of the window iOS holds under `name`, as it was registered; nil: none.
+    /// The end of the window iOS holds under `name`, as it was registered — held past its end too,
+    /// spent, until it is stopped or replaced; nil: none. The app's to read (`Bell.ask`), never the
+    /// monitor's.
     func heldEnd(_ name: Bell.Name) -> DateComponents?
     /// Asks iOS to wake the monitor at the end of the interval from `start` to `end`, under `name`,
     /// replacing the window it holds there.

@@ -594,6 +594,9 @@ struct RegisterTests {
         var calls: [Call] = []
         /// The names iOS refuses a window under.
         var refusing: Set<Bell.Name> = []
+        /// The names whose window iOS has ended — the monitor woken under it — and holds still,
+        /// spent, until it is stopped or replaced.
+        var spent: Set<Bell.Name> = []
 
         func heldEnd(_ name: Bell.Name) -> DateComponents? {
             calls.append(.held(name))
@@ -603,10 +606,14 @@ struct RegisterTests {
             calls.append(.start(name))
             if refusing.contains(name) { throw Refused() }
             held[name] = (start, end)
+            spent.remove(name)
         }
         func stop(_ names: [Bell.Name]) {
             calls.append(.stop(names))
-            for name in names { held[name] = nil }
+            for name in names {
+                held[name] = nil
+                spent.remove(name)
+            }
         }
 
         var starts: Int { calls.count { if case .start = $0 { true } else { false } } }
@@ -616,6 +623,19 @@ struct RegisterTests {
                 let end = calendar.date(from: held.end)
             else { return nil }
             return DateInterval(start: start, end: end)
+        }
+        /// The window iOS holds under `name` and is still to end; nil: none, or spent.
+        func live(_ name: Bell.Name, in calendar: Calendar = .current) -> DateInterval? {
+            spent.contains(name) ? nil : window(name, in: calendar)
+        }
+        /// iOS ends `name`'s window at `now` — the monitor woken under it, `wake` carried out —
+        /// and holds the window still, spent.
+        func wakes(_ name: Bell.Name, _ wake: Bell.Wake, at now: Date, refused: inout Date?)
+            -> String
+        {
+            spent.insert(name)
+            return Bell.carryOut(
+                wake, woken: name, at: now, in: self, clearing: { true }, refused: &refused)
         }
     }
 
@@ -658,7 +678,7 @@ struct RegisterTests {
     }
 
     @Test(
-        "The app's windows: the bell's, asked for to the second in the phone's calendar, and its backup — each not asked for again while iOS holds it, since a replacement may itself wake the monitor and the two would never end; another end replaces both; none stops every name (#91's review, B5b-3)"
+        "The app's windows: the bell's, asked for to the second in the phone's calendar, and its backup — each not asked for again while iOS holds it, asked at every pass that finds nothing scheduled; another end replaces both; none stops every name (#91's review, B5b-3)"
     )
     func once() throws {
         let (center, calendar) = (Center(), Self.calendar)
@@ -728,7 +748,50 @@ struct RegisterTests {
     }
 
     @Test(
-        "A window iOS refuses throws, and iOS keeps what it held — the next wake the monitor asked for itself too, stopped only once the app's windows are taken"
+        "The monitor's next wake is asked for anew at every wake, never skipped for a window iOS holds under that name — one its own earlier wake spent: woken a minute early at the bell's window, then at each of its own, all ending at the bell, a live wake at the bell remains (#99's review)"
+    )
+    func spent() throws {
+        let center = Center()
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center)
+        var state = SyncState()
+        state.standing = .inSession(session(endsAt: 1200), .focused)
+        // iOS ends each window a minute early, the app closed: the shields kept, and the next
+        // wake asked for at the bell — the end the spent window under that name has too.
+        let early = bell.end - Bell.retry
+        var refused: Date?
+        for woken in [Bell.Name.bell, .tick, .tock] {
+            let wake = Bell.wake(now: early) { state }
+            #expect(wake == .keep(bell), "\(woken)")
+            let said = center.wakes(woken, wake, at: early, refused: &refused)
+            #expect(center.live(Bell.next(after: woken)) == bell, "\(woken): \(said)")
+            #expect(!said.contains("NOT registered") && refused == nil, "\(woken): \(said)")
+        }
+    }
+
+    @Test(
+        "A pass that takes the backup alone — refused before, the bell's window the same — stops none of the monitor's own: the bell's window may have woken it early already, spent, and its own is then the one wake aimed at the bell (#99's review)"
+    )
+    func backupAloneNew() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        center.refusing = [.backup]
+        #expect(throws: Center.Refused.self) {
+            try Bell.register(bell, in: center, calendar: calendar)
+        }
+        // The app closed, iOS ends the bell's window a minute early: kept, its next wake its own.
+        var refused: Date?
+        _ = center.wakes(.bell, .keep(bell), at: bell.end - Bell.retry, refused: &refused)
+        #expect(center.live(.tick) == bell)
+        // Opened before the bell, iOS taking the backup now: the monitor's wake at the bell stays.
+        center.refusing = []
+        try Bell.register(bell, in: center, calendar: calendar)
+        #expect(center.window(.backup, in: calendar) == Bell.backup(of: bell))
+        #expect(center.live(.tick) == bell)
+    }
+
+    @Test(
+        "A window iOS refuses throws, and iOS keeps what it held — the next wake the monitor asked for itself too, stopped only once the bell's window is taken anew; a pass that then takes the backup alone stops none"
     )
     func refused() throws {
         let (center, calendar) = (Center(), Self.calendar)
@@ -750,11 +813,14 @@ struct RegisterTests {
         #expect(center.window(.bell, in: calendar) == later)
         center.refusing = []
         try Bell.register(later, in: center, calendar: calendar)
-        #expect(Set(center.held.keys) == [.bell, .backup])
+        #expect(center.window(.backup, in: calendar) == Bell.backup(of: later))
+        // The bell's window taken a pass before: the monitor's own stays, and its wake reads the
+        // truth as any does.
+        #expect(center.held[.tick] != nil)
     }
 
     @Test(
-        "No wake of the monitor's asks iOS anything of the window that woke it — on iOS 18, `startMonitoring` for it inside its own `intervalDidEnd` deadlocks (FB14664238) — nor of the app's, nor stops any: its next wake asked for under one of its own, in turn; a clear asks nothing at all (B5b-3)"
+        "No wake of the monitor's asks iOS anything of the window that woke it — on iOS 18, `startMonitoring` for it inside its own `intervalDidEnd` deadlocks (FB14664238) — nor of the app's, nor stops any, nor reads any back: its next wake asked for under one of its own, in turn, and nothing else; a clear asks nothing at all (B5b-3)"
     )
     func ownCallback() throws {
         let wakes: [Bell.Wake] = [
@@ -779,10 +845,9 @@ struct RegisterTests {
                 #expect(
                     !center.calls.contains { if case .stop = $0 { true } else { false } }, "\(said)"
                 )
+                // And nothing read back: the window iOS holds under its own name is spent.
                 #expect(
-                    wake == .clear
-                        ? center.calls.isEmpty
-                        : center.calls.last == .start(Bell.next(after: woken)),
+                    center.calls == (wake == .clear ? [] : [.start(Bell.next(after: woken))]),
                     "\(said)")
             }
         }
