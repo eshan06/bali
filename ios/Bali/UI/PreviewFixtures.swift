@@ -42,9 +42,18 @@
         /// The fixture `arguments` name — `-bali-screen <name>` — or nil: none named, or a name
         /// not known, and the live app shows.
         static func chosen(from arguments: [String] = CommandLine.arguments) -> State? {
-            guard let flag = arguments.firstIndex(of: "-bali-screen"), flag + 1 < arguments.count
-            else { return nil }
-            return all[arguments[flag + 1]]
+            value(of: "-bali-screen", in: arguments).flatMap { all[$0] }
+        }
+
+        /// What follows `flag` in `arguments`, if anything does: `-bali-screen <name>`, or the
+        /// intro's `-bali-intro-page <n>`.
+        static func value(of flag: String, in arguments: [String] = CommandLine.arguments)
+            -> String?
+        {
+            guard let at = arguments.firstIndex(of: flag), at + 1 < arguments.count else {
+                return nil
+            }
+            return arguments[at + 1]
         }
 
         /// A class whose bell is 27 minutes away.

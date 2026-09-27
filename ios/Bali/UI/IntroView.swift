@@ -7,7 +7,12 @@ import SwiftUI
 /// list is the consent preview's (C2), so the two never say different things.
 struct IntroView: View {
     let done: () -> Void
-    @State private var page = 0
+    #if DEBUG
+        /// The page a Debug launch opens on — `-bali-intro-page 2` — for a screenshot of each.
+        @State private var page = Int(PreviewFixtures.value(of: "-bali-intro-page") ?? "") ?? 0
+    #else
+        @State private var page = 0
+    #endif
 
     var body: some View {
         ScreenScaffold {
