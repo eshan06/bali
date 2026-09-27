@@ -38,10 +38,20 @@ export function registerMeRoute(app: FastifyInstance, db: Database): void {
       displayNameFromClaims(identity.claims),
     );
 
-    const classes =
+    // Each class names its teacher (C2a): a teacher's own, the caller — already
+    // in hand; a student's, read with the class in one query.
+    const classes: MeResponse['classes'] =
       user.role === 'teacher'
-        ? await getTaughtClasses(db, user.id)
-        : await getEnrolledClasses(db, user.id);
+        ? (await getTaughtClasses(db, user.id)).map((c) => ({
+            id: c.id,
+            name: c.name,
+            teacher: { displayName: user.displayName },
+          }))
+        : (await getEnrolledClasses(db, user.id)).map((c) => ({
+            id: c.id,
+            name: c.name,
+            teacher: { displayName: c.teacherDisplayName },
+          }));
 
     let session: MeResponse['session'] = null;
     if (user.role === 'student') {
@@ -66,7 +76,7 @@ export function registerMeRoute(app: FastifyInstance, db: Database): void {
 
     return {
       user: { id: user.id, role: user.role, displayName: user.displayName },
-      classes: classes.map((c) => ({ id: c.id, name: c.name })),
+      classes,
       session,
     };
   });

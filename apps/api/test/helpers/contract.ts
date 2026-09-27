@@ -15,6 +15,7 @@ import {
   type HistoryPage,
   type JoinCodePreviewResponse,
   type MeClass,
+  type MeClassWithTeacher,
   type MeResponse,
   type MeUser,
   PARTICIPATION_STATES,
@@ -28,6 +29,7 @@ import {
   TAP_OUTCOMES,
   tapDisposition,
   type TapResponse,
+  type TeacherView,
   UNLOCK_REASONS,
   UNLOCK_RECORDED_AS,
   UNLOCK_RECORDED_OUTCOMES,
@@ -90,6 +92,8 @@ const sessionView = object<SessionView>()({
   endsAt: z.iso.datetime(),
 });
 const meClass = object<MeClass>()({ id: z.uuid(), name: z.string() });
+const teacherView = object<TeacherView>()({ displayName: z.string().nullable() });
+const meClassWithTeacher = object<MeClassWithTeacher>()({ ...meClass.shape, teacher: teacherView });
 const meUser = object<MeUser>()({
   id: z.uuid(),
   role: z.enum(USER_ROLES),
@@ -100,7 +104,7 @@ const historyEvent = object<HistoryEvent>()({
   type: z.enum(HISTORY_EVENT_TYPES),
   occurredAt: z.iso.datetime(),
   class: meClass,
-  teacher: object<HistoryEvent['teacher']>()({ displayName: z.string().nullable() }),
+  teacher: teacherView,
   session: object<NonNullable<HistoryEvent['session']>>()({
     id: z.uuid(),
     startedAt: z.iso.datetime(),
@@ -121,7 +125,7 @@ const historyEvent = object<HistoryEvent>()({
 export const SCHEMAS = {
   MeResponse: object<MeResponse>()({
     user: meUser,
-    classes: z.array(meClass),
+    classes: z.array(meClassWithTeacher),
     session: object<NonNullable<MeResponse['session']>>()({
       ...sessionView.shape,
       state: z.enum([...PARTICIPATION_STATES, 'ended', 'silent']),
@@ -167,7 +171,7 @@ export const SCHEMAS = {
   }),
   JoinCodePreviewResponse: object<JoinCodePreviewResponse>()({
     class: meClass,
-    teacher: object<JoinCodePreviewResponse['teacher']>()({ displayName: z.string().nullable() }),
+    teacher: teacherView,
     alreadyEnrolled: z.boolean(),
   }),
   HistoryPage: object<HistoryPage>()({

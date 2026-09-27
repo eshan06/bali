@@ -104,12 +104,16 @@ export async function findOrCreateStudent(
   return fillMissingDisplayName(db, row, displayName);
 }
 
-/** A student's active classes. */
-export async function getEnrolledClasses(db: Database, studentId: string): Promise<ClassRow[]> {
+/** A student's active classes, each with its teacher's display name — one query (C2a). */
+export async function getEnrolledClasses(
+  db: Database,
+  studentId: string,
+): Promise<(ClassRow & { teacherDisplayName: string | null })[]> {
   return db
-    .select({ ...classesColumns })
+    .select({ ...classesColumns, teacherDisplayName: users.displayName })
     .from(classes)
     .innerJoin(enrollments, eq(enrollments.classId, classes.id))
+    .innerJoin(users, eq(users.id, classes.teacherId))
     .where(
       and(
         eq(enrollments.studentId, studentId),

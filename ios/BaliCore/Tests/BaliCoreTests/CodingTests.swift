@@ -90,6 +90,17 @@ struct ForwardCompatibilityTests {
         #expect(checkIn.status == .known(.gone))
     }
 
+    @Test("A class named without its teacher — a join's, or an older API's boot call — decodes")
+    func classWithoutTeacher() throws {
+        let unnamed = try decode(MeClass.self, #"{"id":"c","name":"Algebra"}"#)
+        #expect(unnamed.teacher == nil)
+        let named = try decode(
+            MeClass.self, #"{"id":"c","name":"Algebra","teacher":{"displayName":"Ms. Rivera"}}"#)
+        #expect(named.teacher?.displayName == "Ms. Rivera")
+        // Sent back as received: a class without a teacher names none.
+        #expect(try encoded(unnamed) == #"{"id":"c","name":"Algebra"}"#)
+    }
+
     @Test("An error's reason this build does not know reads as none; a known one as itself")
     func errorReason() throws {
         let unknown = try decode(

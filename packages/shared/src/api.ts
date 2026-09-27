@@ -61,6 +61,19 @@ export interface MeClass {
   id: string;
   name: string;
 }
+/** A teacher as a student's phone names them ("with Ms. Rivera"). */
+export interface TeacherView {
+  /** Null when their account carries none. */
+  displayName: string | null;
+}
+/**
+ * A class as `/v1/me` lists it (C2a, additive): with its teacher, whom Home
+ * and Me name under it and Focus says "with". A teacher's own classes name the
+ * caller themself.
+ */
+export interface MeClassWithTeacher extends MeClass {
+  teacher: TeacherView;
+}
 export interface MeUser {
   id: string;
   role: UserRole;
@@ -69,7 +82,7 @@ export interface MeUser {
 }
 export interface MeResponse {
   user: MeUser;
-  classes: MeClass[];
+  classes: MeClassWithTeacher[];
   /** The caller's live session, if any, with its derived display state. */
   session: (SessionView & { state: DisplayState }) | null;
 }
@@ -362,7 +375,7 @@ export interface JoinCodePreviewResponse {
    * Its teacher, as the consent screen names them ("What Ms. Rivera sees").
    * `displayName` is null when their account carries none.
    */
-  teacher: { displayName: string | null };
+  teacher: TeacherView;
   /** True when the caller is in this class already: a join would answer `already_enrolled`. */
   alreadyEnrolled: boolean;
 }
@@ -382,7 +395,7 @@ export interface HistoryEvent {
   occurredAt: string;
   class: MeClass;
   /** `displayName` is null when the teacher's account carries none. */
-  teacher: { displayName: string | null };
+  teacher: TeacherView;
   /**
    * Its window: `endsAt` the scheduled end a time is clamped to, `endedAt` the
    * real one (null while it runs). Null for leaving a class while none of its
