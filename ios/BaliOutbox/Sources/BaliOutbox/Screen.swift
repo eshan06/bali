@@ -29,6 +29,9 @@ public enum Screen: Sendable, Hashable {
         // focus before anything else, the intro seen or not, signed out or not: the focus screen
         // holds Emergency Unlock, always allowed.
         if let sync, sync.shieldedUntil(now) != nil { return .focus }
+        // Where the phone stood not read, the last run's shields kept on (B6b): home, which holds
+        // Emergency Unlock there, before the intro and the sign-in too.
+        if sync?.standing == .unread, protection?.shielded == true { return .home }
         if !introSeen { return .intro }
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }

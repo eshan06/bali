@@ -9,15 +9,16 @@ import Testing
 /// sign-in, an enforcer or an engine that has not spoken.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
-    permission: Permission? = .approved, checked: Bool = true, standing: Standing? = .out,
-    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil,
-    now: Date = t0
+    permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
+    standing: Standing? = .out, queued: [OutboxRecord] = [], hasClasses: Bool? = nil,
+    lastSessionOver: SessionView? = nil, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
         protection = Protection()
         protection?.permission = permission
         protection?.checked = checked
+        protection?.shielded = shielded
     }
     var sync: SyncState?
     if let standing {
@@ -126,11 +127,15 @@ struct ScreenTests {
     }
 
     @Test(
-        "Where the phone stood not read yet: home, whatever the permission reads — Emergency Unlock works there. Waiting for the teacher's Start: waiting"
+        "Where the phone stood not read yet: home, whatever the permission reads — Emergency Unlock works there — and, the last run's shields found on, before the intro and the sign-in too (B6b). Waiting for the teacher's Start: waiting"
     )
     func unreadAndWaiting() {
         #expect(screen(standing: .unread) == .home)
         #expect(screen(permission: .denied, standing: .unread) == .home)
+        #expect(screen(signedIn: false, shielded: true, standing: .unread) == .home)
+        #expect(screen(introSeen: false, checked: false, shielded: true, standing: .unread) == .home)
+        #expect(screen(signedIn: false, standing: .unread) == .signIn)
+        #expect(screen(signedIn: false, shielded: true) == .signIn)
         #expect(screen(standing: .waiting) == .waiting)
     }
 

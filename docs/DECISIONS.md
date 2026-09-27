@@ -23,8 +23,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   shields (B4c; Cognito refusing the refresh token signs the student out by itself), so ranked
   below the sign-in it would have been unreachable until an online sign-in or the bell (an unlock
   recorded there needs no token and is sent under the next sign-in, as every queued record is —
-  B4's rule, noted for the owner); the intro not seen → `intro`, before the sign-in is known, since
-  it needs nothing; the sign-in, the enforcer or the engine silent, or the enforcer's first pass not
+  B4's rule, noted for the owner); where the phone stood not read and the last run's shields found
+  on (`Protection.shielded`, verified) → `home`, before the intro and the sign-in too, since that is
+  where Emergency Unlock is over an unread standing (B6b; santa's round 2); the intro not seen →
+  `intro`, before the sign-in is known, since it needs nothing; the sign-in, the enforcer or the engine silent, or the enforcer's first pass not
   made (`Protection.checked`, below) → `starting`; not signed in → `signIn`; then the standing:
   `unread` → `home` (which says so; Emergency Unlock works there, B6b), whatever the permission
   reads; in a session still running by the phone's clock, unlocked → `unlocked` and protection off
