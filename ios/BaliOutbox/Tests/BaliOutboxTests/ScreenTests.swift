@@ -5,13 +5,14 @@ import Testing
 @testable import BaliOutbox
 
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
-/// and checked, and the engine standing `standing` with `queued`, unless said otherwise — nil for a
-/// sign-in, an enforcer or an engine that has not spoken.
+/// and checked (never read approved before, `everApproved`), and the engine standing `standing`
+/// with `queued`, unless said otherwise — nil for a sign-in, an enforcer or an engine that has not
+/// spoken.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
-    standing: Standing? = .out, queued: [OutboxRecord] = [], hasClasses: Bool? = nil,
-    lastSessionOver: SessionView? = nil, now: Date = t0
+    everApproved: Bool = false, standing: Standing? = .out, queued: [OutboxRecord] = [],
+    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -28,7 +29,8 @@ private func screen(
     }
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-        sync: sync, hasClasses: hasClasses, lastSessionOver: lastSessionOver, now: now)
+        everApproved: everApproved, sync: sync, hasClasses: hasClasses,
+        lastSessionOver: lastSessionOver, now: now)
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -182,19 +184,68 @@ struct ScreenTests {
     }
 
     @Test(
-        "What the Sign in screen says of a sign-in that did not finish: its kind in plain words and another try — nothing for one the student closed"
+        "The permission once read approved (C1b): a read not determined — Family Controls' for a moment after a launch — routes as approved, out of any session and past the bell; denied still routes to Screen Time, and so does not determined on a phone that never gave it; nothing else moves"
+    )
+    func everApproved() {
+        #expect(screen(permission: .notDetermined, everApproved: true) == .home)
+        #expect(screen(permission: .notDetermined, everApproved: true, standing: .waiting) == .waiting)
+        #expect(
+            screen(permission: .notDetermined, everApproved: true, hasClasses: false) == .join)
+        #expect(
+            screen(
+                permission: .notDetermined, everApproved: true,
+                standing: .inSession(session(), .focused), now: at(3000)) == .home)
+        #expect(screen(permission: .denied, everApproved: true) == .screenTime)
+        #expect(screen(permission: .notDetermined, everApproved: false) == .screenTime)
+        #expect(screen(permission: .notDetermined, checked: false, everApproved: true) == .starting)
+        #expect(screen(introSeen: false, permission: .notDetermined, everApproved: true) == .intro)
+        #expect(screen(signedIn: false, permission: .notDetermined, everApproved: true) == .signIn)
+    }
+
+    @Test(
+        "What the Sign in screen says of a sign-in that did not finish: its kind in plain words and another try — nothing for one the student closed, and never a refusal's OAuth code (C1b)"
     )
     func words() {
         #expect(SignInError.cancelled.words == nil)
+        #expect(
+            SignInError.notOpened("ASWebAuthenticationSessionError 3").words
+                == "The sign-in page couldn't open. Try again, or ask your teacher.")
         #expect(
             SignInError.unreachable.words
                 == "Can't reach the sign-in server. Check your connection and try again.")
         #expect(
             SignInError.refused("access_denied").words
-                == "The sign-in was refused (access_denied). Try again, or ask your teacher.")
-        #expect(
-            SignInError.refused(nil).words
-                == "The sign-in was refused. Try again, or ask your teacher.")
+                == "The sign-in server didn't allow this sign-in. Ask your teacher.")
+        for code in ["server_error", "temporarily_unavailable"] {
+            #expect(
+                SignInError.refused(code).words
+                    == "The sign-in server isn't working right now. Try again in a moment.",
+                "\(code)")
+        }
+        let refused = "The sign-in was refused. Try again, or ask your teacher."
+        for code in ["invalid_client", "invalid_grant", "invalid_request", "some_new_code"] {
+            #expect(SignInError.refused(code).words == refused, "\(code)")
+        }
+        #expect(SignInError.refused(nil).words == refused)
         #expect(SignInError.notKept.words == "Your phone couldn't keep the sign-in. Try again.")
+    }
+
+    @Test(
+        "What the Screen Time screen says (C1b): the ask, and once denied — at the prompt or in Settings — that nothing pauses and how back, with the button asking again; an ask iOS could not make says so and offers another try, never what iOS said; Don't Allow says nothing more"
+    )
+    func screenTimeWords() {
+        let asked = Permission.notDetermined.screenTimeWords
+        #expect(asked.button == "Ask me")
+        #expect(asked.body.hasPrefix("iOS asks once. Bali uses Screen Time only to pause apps"))
+        #expect(asked.body.hasSuffix("your teacher simply sees 'Screen Time off'."))
+        #expect(Permission.approved.screenTimeWords == asked)
+        let denied = Permission.denied.screenTimeWords
+        #expect(denied.button == "Ask again")
+        #expect(denied.body.hasPrefix("Screen Time access is turned off for Bali"))
+        #expect(denied.body.contains("Settings → Screen Time → Apps with Screen Time Access"))
+        #expect(ScreenTimeAskError.cancelled.words == nil)
+        #expect(
+            ScreenTimeAskError.failed("FamilyControlsError.invalidAccountType").words
+                == "Bali couldn't ask iOS for Screen Time. Try again, or ask your teacher.")
     }
 }

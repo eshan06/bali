@@ -42,7 +42,7 @@ func refusal(_ error: String) -> String { #"{"error":"\#(error)"}"# }
 
 /// The hosted UI, as the browser session hands it back: the student signed in and sent back to
 /// the redirect URI with a code for the attempt the page was opened for.
-let signsIn: @Sendable (URL) async throws -> URL = { url in
+let signsIn: @Sendable (URL) async throws(SignInError) -> URL = { url in
     let state =
         URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
         .first { $0.name == "state" }?.value ?? ""
@@ -208,7 +208,7 @@ struct SignInTests {
         let opened = Opened()
         let signIn = await signIn(store, endpoint, told: told)
 
-        try await signIn.signIn { url in
+        try await signIn.signIn { url throws(SignInError) in
             await opened.set(url)
             return try await signsIn(url)
         }
@@ -240,9 +240,10 @@ struct SignInTests {
     }
 
     @Test(
-        "a sign-in that does not finish keeps nothing and tells nobody",
+        "a sign-in that does not finish keeps nothing and tells nobody — the browser's own word for why it gave no answer, cancelled or not opened, passed on as it is (C1b)",
         arguments: [
             (nil, nil, SignInError.cancelled),
+            (nil, nil, .notOpened("no window to open it in")),
             ("error=access_denied", nil, .refused("access_denied")),
             (nil, (400, refusal("invalid_grant")), .refused("invalid_grant")),
             (nil, (500, "oops"), .unreachable),
@@ -256,8 +257,8 @@ struct SignInTests {
         let (store, told) = (MemoryStore(), Told())
         let signIn = await signIn(store, endpoint, told: told)
         await #expect(throws: error) {
-            try await signIn.signIn { url in
-                guard reply != nil || answer != nil else { throw CancellationError() }
+            try await signIn.signIn { url throws(SignInError) in
+                guard reply != nil || answer != nil else { throw error }
                 let state =
                     URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
                     .first { $0.name == "state" }?.value ?? ""

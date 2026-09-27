@@ -156,10 +156,19 @@ public actor Enforcer {
         await enforce()
     }
 
-    /// Asks the student for the Screen Time permission — C1's onboarding — and enforces with it.
+    /// Asks the student for the Screen Time permission — C1's onboarding — and enforces with what
+    /// it reads after, given or not: Don't Allow is a throw and a read of denied, which the screen
+    /// shows at once, not a check-in later.
     public func requestPermission() async throws {
-        try await screenTime.requestPermission()
+        let asked: Result<Void, any Error>
+        do {
+            try await screenTime.requestPermission()
+            asked = .success(())
+        } catch {
+            asked = .failure(error)
+        }
         await enforce()
+        try asked.get()
     }
 
     /// What a screen may claim, now and at each change.

@@ -36,7 +36,16 @@ actor FakeScreenTime: ScreenTime {
         unshields += 1
     }
     func permission() -> Permission { granted }
-    func requestPermission() { granted = .approved }
+    /// Given — or, once `refusesAsk`, not: the student's Don't Allow, a throw and denied.
+    func requestPermission() throws {
+        if refusesAsk {
+            granted = .denied
+            throw Refused()
+        }
+        granted = .approved
+    }
+    private var refusesAsk = false
+    func refuseAsk() { refusesAsk = true }
 
     /// Each window iOS took, in order — nil for a cancel — and the one it holds now.
     private(set) var windows: [DateInterval?] = []
@@ -404,6 +413,23 @@ struct EnforcerTests {
         await phone.until { $0.permission == .notDetermined }
         try await phone.enforcer.requestPermission()
         await phone.until { $0.permission == .approved }
+        await phone.stop()
+    }
+
+    @Test(
+        "Asked for and not given — Don't Allow — the throw comes after a pass: what a screen claims reads denied as the ask returns, not a check-in later (C1b)"
+    )
+    func requestPermissionRefused() async throws {
+        let rig = try Rig()
+        let screenTime = FakeScreenTime()
+        await screenTime.set(.notDetermined)
+        let phone = Enforced(rig, screenTime)
+        await phone.until { $0.permission == .notDetermined }
+        await screenTime.refuseAsk()
+        await #expect(throws: FakeScreenTime.Refused.self) {
+            try await phone.enforcer.requestPermission()
+        }
+        #expect(await phone.enforcer.protection.permission == .denied)
         await phone.stop()
     }
 }

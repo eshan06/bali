@@ -40,7 +40,7 @@ final class MemoryKeychain: TokenStore, @unchecked Sendable {
 }
 
 /// The hosted UI, handing back a code for the attempt it was opened for.
-let hostedUI: @Sendable (URL) async throws -> URL = { url in
+let hostedUI: @Sendable (URL) async throws(SignInError) -> URL = { url in
     let state =
         URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
         .first { $0.name == "state" }?.value ?? ""

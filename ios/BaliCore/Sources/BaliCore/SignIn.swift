@@ -97,8 +97,11 @@ func form(_ fields: [(String, String)]) -> String {
 
 /// Why a sign-in did not finish, for C1's screen, which says so and offers another try (rule 5).
 public enum SignInError: Error, Sendable, Hashable {
-    /// The student closed the sign-in page, or it could not open.
+    /// The student closed the sign-in page: nothing changed.
     case cancelled
+    /// The sign-in page could not open, or ended on its own — what the browser said, for the
+    /// readout. The app's browser tells the two apart (C1b): only its own cancel is `cancelled`.
+    case notOpened(String)
     /// Cognito did not answer: no network, a timeout, a server error.
     case unreachable
     /// Cognito said no — its OAuth error, such as `access_denied` — or answered another attempt.
@@ -201,16 +204,17 @@ public actor SignIn: TokenProvider {
 
     /// Signs the student in through Cognito's hosted UI, replacing any tokens the phone had.
     /// `browser` opens the sign-in page and returns where the hosted UI sent the student back —
-    /// C1's ephemeral `ASWebAuthenticationSession`; the code in that answer is exchanged for tokens.
-    public func signIn(through browser: @Sendable (URL) async throws -> URL)
+    /// C1's ephemeral `ASWebAuthenticationSession` — or throws why it did not, in its own words:
+    /// the student's close `cancelled`, anything else `notOpened`; the code in that answer is
+    /// exchanged for tokens.
+    public func signIn(through browser: @Sendable (URL) async throws(SignInError) -> URL)
         async throws(SignInError)
     {
         let attempt = Attempt()
         // It cannot fail — the domain is a URL and the rest is escaped — but were it to, nothing
         // is sent.
         guard let url = cognito.authorizeURL(attempt) else { throw .unreachable }
-        let callback: URL
-        do { callback = try await browser(url) } catch { throw .cancelled }
+        let callback = try await browser(url)
         let code = try cognito.code(from: callback, for: attempt)
         let grant = try await exchange([
             ("grant_type", "authorization_code"), ("client_id", cognito.clientId), ("code", code),
