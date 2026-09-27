@@ -339,8 +339,9 @@ Student app:
   unlock's body and answer. It is filed in whatever session that tap landed in, by that
   session's unlock rules — the tap looked up among the caller's own taps only, so another
   student's id files nothing into their session — or, with no session to file it in, kept
-  unattached as an unknown session's is: `tap_armed` (the tap waits for Start, which then
-  joins the student without it) or `unknown_tap` (no tap of the caller's has that id). A tap
+  unattached as an unknown session's is: `tap_armed` (the tap is on the arm path: waiting
+  for Start, which then joins the student without it — or a late one, A14, kept consumed,
+  which no Start converts) or `unknown_tap` (no tap of the caller's has that id). A tap
   landing after an unlock sent under it files it then, so both arrival orders end alike;
   the two serialise on the tap. Never refused; a retry is answered where it was recorded.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
