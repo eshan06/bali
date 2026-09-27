@@ -2592,11 +2592,13 @@ export function unlocksAwaitingTap(db: Database, studentId: string, tapEventId: 
  * notes, A10's `superseded`, the clamp to that session's window (rule 1). Its
  * payload names the tap (`tap_event_id`). With no session to file it in, it is
  * kept unattached, as an unknown session's is, and noted:
- *   - `tap_armed`: the tap waits for its teacher's Start (decision 5). The
- *     unlock came before any session did, so the Start does not file it: the
- *     tap joins the student, as it asked. (An armed tap converted under a fresh
- *     id, its own collided — `convertArmedTaps`, no honest phone — is known
- *     here only as armed.)
+ *   - `tap_armed`: the tap is on the arm path — waiting for its teacher's
+ *     Start (decision 5), or late (A14): kept there consumed, so no Start ever
+ *     converts it. The unlock came before any session did, so a Start does not
+ *     file it: a waiting tap joins the student, as it asked; a late one never
+ *     joins them anywhere, and this unlock stays in no class. (An armed tap
+ *     converted under a fresh id, its own collided — `convertArmedTaps`, no
+ *     honest phone — is known here only as armed.)
  *   - `unknown_tap`: no tap of the caller's has that id — refused, another
  *     student's, or not arrived yet. Looked up among the caller's own taps
  *     only, so another's tap id never files this unlock into their session.
