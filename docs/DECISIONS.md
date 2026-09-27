@@ -56,8 +56,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   shield's asset and samples both at the same four points, so the two cannot drift apart unnoticed.
   **The screens scroll:** the intro's pages, Sign in and Screen Time lay their content out in the
   whole height and scroll once the phone's text size outgrows it (`PageScroll`; #102's review
-  noted Sign in did not, and the denied body holds the Settings path). **The split:** #101's tokens-file rider is C1c — the JSON alone is ~190 lines, and C1b stands at
-  ~430 without it.
+  noted Sign in did not, and the denied body holds the Settings path). **The split:** #101's
+  tokens-file rider is C1c — the JSON alone is ~190 lines, and C1b stands at ~460 without it,
+  ~50 of them santa's round 1.
 - **2026-09-26** — **B5b-4: the monitor's next wake asked for anew at every wake, and the app stopping
   the monitor's own only at a new bell window (#99's Claude Review, comment 5841401154, its two
   WARNs).** **The skip, off the monitor's side.** B5b's guard — register nothing when iOS holds a
