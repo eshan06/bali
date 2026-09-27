@@ -8,6 +8,35 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-26** — **B5b-4: the monitor's next wake asked for anew at every wake, and the app stopping
+  the monitor's own only at a new bell window (#99's Claude Review, comment 5841401154, its two
+  WARNs).** **The skip, off the monitor's side.** B5b's guard — register nothing when iOS holds a
+  window ending there already, since a replacement may itself wake the monitor and the two would
+  never end — was written for one name that re-registered itself. Under B5b-3's alternation the
+  window iOS holds under `tick` or `tock` is one the monitor's own earlier wake spent (iOS holds a
+  window it has ended until it is stopped or replaced, and the earlier wake under that name is what
+  asked for the one running now), and the skip compared ends alone: iOS ending its windows a minute
+  early, `bell`'s wake asks for `tick` at the bell, `tick`'s for `tock` there, and `tock`'s finds
+  `tick` ending there — spent — and asks nothing, with no refusal to record; nothing wakes the
+  monitor at the bell but the backup, two minutes on. Whether a held window is spent cannot be read
+  from iOS (its end may still be ahead, the wake early) nor from the name that woke the monitor (a
+  `tick` the bell's wake asked for after `tock` fired is live), so **decided: the monitor never
+  skips** — `carryOut` asks for its next wake anew, replacing whatever iOS holds under the other name
+  (`Bell.start`); `ask`'s skip stays the app's, where it tells `register` whether the bell's window
+  is new. The guard's hypothetical — a replacement waking the monitor at once, undocumented either
+  way — is bounded by the `retry` floor and the bell: each ask ends a whole minute on at the
+  soonest, and a wake at or after the shields' end clears and asks nothing. Kept on purpose: the
+  monitor now makes one DeviceActivity call per kept wake and reads nothing back — `schedule(for:)`
+  is plumbing of the kind that hung on iOS 18 (`activities`). **The stop, at a new bell window
+  alone (the owner's ruling).** `register` stopped `tick` and `tock` once either of the app's
+  windows was new, so a pass that took the backup alone — refused at the pass before, the bell's
+  window the same — cancelled the one wake the monitor had aimed at the bell after an early bell
+  wake (`sameWindows`' case, one pass on). Now the bell's window being new is the signal, applied as
+  before only once both are taken, so a refusal leaves the monitor's wake in place. Accepted: a wake
+  the monitor asked for before a pass whose backup was refused outlives the bell's window's
+  replacement — stale, harmless: its wake reads the file's truth and clears or re-arms by it — until
+  the bell's window next moves or every window is stopped.
+
 - **2026-09-26** — **C1a: the student app's skeleton — one pure router of its screens, D1's theme
   in the system font, light in every appearance, the mark drawn in SwiftUI — in two PRs for size,
   the Sign in screen its second.** **The router** (`Screen.choose`, `ios/BaliOutbox`): the one
@@ -77,6 +106,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   held tap through the real outbox; `EnforcerTests.checked`; `AppTests.fixtures` (the simulator):
   an unknown name is the live app, a known one its fixture, a fixture never starts, and every
   fixture shows the screen it is named for; `AppTests.introSeen`: the flag kept and read back.
+
 - **2026-09-26** — **The device check's first finding: dev's phone app client replaced (round 1,
   step 1).** Every sign-in from the phone ended `Sign-in failed: refused("invalid_client")` after
   the hosted UI had accepted the password. Cognito's token endpoint answered `invalid_client_secret`
