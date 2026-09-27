@@ -7,7 +7,7 @@ The student app and its two extensions, `BaliCore`, the Swift package they share
 | Folder         | What it is                                                                                                             |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `project.yml`  | The Xcode project, as [XcodeGen](https://github.com/yonaskolb/XcodeGen)'s spec                                         |
-| `Bali/`        | The app, `com.bali.Bali` — a placeholder screen until C1–C6, which starts the sync engine and the enforcer             |
+| `Bali/`        | The app, `com.bali.Bali` — its screens (C1–C6, `Bali/UI/`) over `Phone`, which starts the sync engine and the enforcer |
 | `BaliMonitor/` | The DeviceActivity monitor extension, `com.bali.Bali.BaliMonitor`: at the bell, it takes the shields off, app closed   |
 | `BaliTests/`   | The app target's own tests, hosted in the app on the iOS Simulator                                                     |
 | `BaliShield/`  | The shield configuration extension, `com.bali.Bali.BaliShield`: Bali's own shield over a blocked app, in D1's look     |
@@ -46,12 +46,15 @@ with Xcode 26.6 — and [Homebrew](https://brew.sh).
    and press Run (⌘R). The extensions are built and installed inside the app.
 
 The build talks to dev: `project.yml` names dev's API and its sign-in (`docs/DEPLOY.md`, "The
-phone's sign-in"). Until C1–C6 draw the screens, a Debug build's placeholder shows a temporary
-readout — the engine's link to the API, when the server last answered, whether someone is signed
-in, where the phone stands, what rule 3's check found of the shields and what the outbox holds —
-with **Sign in**, **Sign out**, **Allow Screen Time**, **Join** (a class's code), **Scan** (the
-block, read over NFC: B6), **Read block code** (read only), **Tap** (a block's tag, typed — rounds
-1–3), **Emergency Unlock** and **History** in their place.
+phone's sign-in"). In a Debug build, the device check's readout sits behind the **Readout** button
+at the top right of every screen, in a sheet — the engine's link to the API, when the server last
+answered, whether someone is signed in, where the phone stands, what rule 3's check found of the
+shields and what the outbox holds — with **Sign in**, **Sign out**, **Allow Screen Time**, **Join**
+(a class's code), **Scan** (the block, read over NFC: B6), **Read block code** (read only), **Tap**
+(a block's tag, typed — rounds 1–3), **Emergency Unlock** and **History** beside the screens. A
+screen a later step draws shows a placeholder naming that step meanwhile. A Debug build launched
+with `-bali-screen <name>` — `xcrun simctl launch booted com.bali.Bali -bali-screen signIn` — shows
+that named state with no server, frozen (`Bali/UI/PreviewFixtures.swift` lists the names).
 
 NFC and Screen Time shields need a real iPhone, which is why B5 and B6 are device checkpoints;
 the simulator only proves it builds. Family Controls works in development builds already —
