@@ -121,7 +121,8 @@ struct AppTests {
             Issue.record("\(unopened)")
             return
         }
-        #expect(why.contains("ASWebAuthenticationSessionError"))
+        // The bridged error's own description — its domain and code — kept for the readout.
+        #expect(why.contains("WebAuthenticationSession") && why.contains("Code=3"))
         #expect(ScreenTimeAskError(familyControls: FamilyControlsError.authorizationCanceled) == .cancelled)
         let failed = ScreenTimeAskError(familyControls: FamilyControlsError.invalidAccountType)
         #expect(failed == .failed("\(FamilyControlsError.invalidAccountType)"))
