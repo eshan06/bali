@@ -117,7 +117,10 @@ struct AppTests {
     func cancels() {
         #expect(SignInError(browser: ASWebAuthenticationSessionError(.canceledLogin)) == .cancelled)
         let unopened = SignInError(browser: ASWebAuthenticationSessionError(.presentationContextInvalid))
-        guard case .notOpened(let why) = unopened else { return Issue.record("\(unopened)") }
+        guard case .notOpened(let why) = unopened else {
+            Issue.record("\(unopened)")
+            return
+        }
         #expect(why.contains("ASWebAuthenticationSessionError"))
         #expect(ScreenTimeAskError(familyControls: FamilyControlsError.authorizationCanceled) == .cancelled)
         let failed = ScreenTimeAskError(familyControls: FamilyControlsError.invalidAccountType)
