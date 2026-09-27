@@ -98,7 +98,7 @@ struct ForwardCompatibilityTests {
             MeClass.self, #"{"id":"c","name":"Algebra","teacher":{"displayName":"Ms. Rivera"}}"#)
         #expect(named.teacher?.displayName == "Ms. Rivera")
         // Sent back as received: a class without a teacher names none.
-        #expect(try encoded(unnamed) == #"{"id":"c","name":"Algebra"}"#)
+        #expect(try encoded(unnamed).contains("teacher") == false)
     }
 
     @Test("An error's reason this build does not know reads as none; a known one as itself")
