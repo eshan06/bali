@@ -150,7 +150,7 @@ public enum Bell {
     ) throws {
         guard let window else { return center.stop(Name.allCases) }
         let bellIsNew = try ask(window, as: .bell, in: center, calendar: calendar)
-        try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
+        _ = try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
         if bellIsNew { center.stop([.tick, .tock]) }
     }
 
