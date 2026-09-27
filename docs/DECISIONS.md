@@ -8,6 +8,56 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-26** — **C1b: the intro's three pages and the Screen Time grant, and the C1 riders —
+  the intro's words v3's, an "ever approved" flag beside the router, the browser's own word for a
+  sign-in that gave no answer, and a refused ask that reads denied at once.** **The intro's words**
+  (`IntroView`): D1's reference onboarding sheet is v2's — dark, "quiets every app except the ones
+  your class allows" — so it is drawn in D1's light tokens with v3's words: every app pauses until
+  the bell, no allow-list (ARCHITECTURE, "What Bali is"; ruled 2026-09-24), and page 2's list is
+  exactly the consent preview's (`ConsentPreview.dc.html`, C2's), so the intro and the preview never
+  say different things; two stacked lists in one card rather than the sheet's two columns, since
+  v3's items are longer and must survive Dynamic Type. The Continue is the primary action again
+  (#102's review: the placeholder's was demoted only to give `SecondaryButtonStyle` a caller).
+  **The "ever approved" flag**
+  (`Phone.everApproved`, `Screen.choose`'s input; #101's review): Family Controls can read not
+  determined for a moment after a launch (B5a-2), which sent an approved phone to the Screen Time
+  screen until the next pass. Decided: a flag in the phone's own defaults, set whenever a pass
+  reads approved, and the router treats a read not determined as approved while it is set, denied
+  never. It is cleared once the check judges the permission off — `Protection.permissionOff`,
+  the enforcer's own B5a-2 judgement, denied or not determined for a check-in interval of the
+  phone's running, now published on the claim (santa's round 1) — which covers a permission taken
+  back in Settings however iOS reads it after, and a grant that did not come back with a restored
+  backup, which restores these defaults: the grant screen returns within a check-in interval of
+  the app running in front. Alternatives: the router reading the judgement directly (it would
+  wait a pass on every launch — the flag answers at once); keeping the flag out of backups (a
+  ThisDeviceOnly Keychain item, a file excluded from backup: the restore path only, and a Keychain
+  read can fail while the phone is locked). Known limit: on such a phone the first launch shows
+  home for up to a check-in interval before the grant screen. **The browser's word**
+  (`SignIn.signIn(through:)`; #102's review): BaliCore turned every browser failure into
+  `cancelled`, which says nothing, so a sign-in page that could not open was a dead end. Decided:
+  the closure is typed `throws(SignInError)`, so the app's browser must translate —
+  `ASWebAuthenticationSessionError.canceledLogin` is `cancelled`; anything else the new
+  `notOpened(String)`, said with another try, its text kept for the readout only — and BaliCore
+  rethrows what it gets, mapping nothing (`WebAuthenticationSession.hostedUI`, one place for the
+  screen and the readout). Alternatives: an untyped closure with `CancellationError` as the cancel
+  (the browser session does not throw that, and the mapping would sit in BaliCore, which must not
+  know the browser); reusing `unreachable` (its words blame the connection). **A refusal's words:**
+  an OAuth code is never shown to a student — `access_denied` (the server did not allow this
+  sign-in; ask your teacher), `server_error` and `temporarily_unavailable` (try again in a moment),
+  every other code one line; the readout keeps the code. **The ask** (`Enforcer.requestPermission`,
+  `PhoneScreenTime`, `ScreenTimeAskError`): Don't Allow makes Family Controls throw
+  `authorizationCanceled` and read denied, and the enforcer skipped its pass on a throw, so the
+  screen would have read denied a check-in later; now the pass runs first and the throw comes
+  after. The app reads the error — `cancelled` for Don't Allow, which the denied body covers
+  (nothing pauses, how back: Settings, or ask again); `failed` for anything else, one line ("Bali
+  couldn't ask iOS for Screen Time. Try again, or ask your teacher.") with what iOS said kept for
+  the readout — rather than words per kind for a child's account or a phone with no passcode: added
+  when a school hits one. **The mark:** `AppTests.mark` renders `BaliMark(size: 64)` beside the
+  shield's asset and samples both at the same four points, so the two cannot drift apart unnoticed.
+  **The screens scroll:** the intro's pages, Sign in and Screen Time lay their content out in the
+  whole height and scroll once the phone's text size outgrows it (`PageScroll`; #102's review
+  noted Sign in did not, and the denied body holds the Settings path). **The split:** #101's tokens-file rider is C1c — the JSON alone is ~190 lines, and C1b stands at
+  ~430 without it.
 - **2026-09-26** — **B5b-4: the monitor's next wake asked for anew at every wake, and the app stopping
   the monitor's own only at a new bell window (#99's Claude Review, comment 5841401154, its two
   WARNs).** **The skip, off the monitor's side.** B5b's guard — register nothing when iOS holds a
