@@ -69,7 +69,21 @@ struct AppTests {
             let screen = String(describing: Phone(fixture: state).screen)
             #expect(screen.hasPrefix(name), "\(name): \(screen)")
         }
-        #expect(Phone().introSeen == UserDefaults.standard.bool(forKey: Phone.introSeenKey))
+    }
+
+    @Test(
+        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a); the flag as it was before is put back after"
+    )
+    func introSeen() {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.introSeenKey)
+        defer { defaults.set(before, forKey: Phone.introSeenKey) }
+        defaults.removeObject(forKey: Phone.introSeenKey)
+        let phone = Phone()
+        #expect(!phone.introSeen && phone.screen == .intro)
+        phone.sawIntro()
+        #expect(phone.introSeen && Phone().introSeen)
+        #expect(phone.screen == .starting)
     }
 
     @Test(

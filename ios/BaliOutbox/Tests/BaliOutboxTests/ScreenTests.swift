@@ -5,17 +5,19 @@ import Testing
 @testable import BaliOutbox
 
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
-/// and the engine standing `standing` with `queued`, unless said otherwise — nil for a sign-in, an
-/// enforcer or an engine that has not spoken.
+/// and checked, and the engine standing `standing` with `queued`, unless said otherwise — nil for a
+/// sign-in, an enforcer or an engine that has not spoken.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
-    permission: Permission? = .approved, standing: Standing? = .out, queued: [OutboxRecord] = [],
-    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, now: Date = t0
+    permission: Permission? = .approved, checked: Bool = true, standing: Standing? = .out,
+    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil,
+    now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
         protection = Protection()
         protection?.permission = permission
+        protection?.checked = checked
     }
     var sync: SyncState?
     if let standing {
@@ -28,14 +30,18 @@ private func screen(
         sync: sync, hasClasses: hasClasses, lastSessionOver: lastSessionOver, now: now)
 }
 
+/// A session whose bell is a thousand seconds ahead of `t0`'s cap.
+private let later = session(endsAt: 4000)
+
 @Suite("Which screen the app shows (C1a)")
 struct ScreenTests {
     @Test(
-        "Nothing known yet — the sign-in, the enforcer or the engine silent — is starting; the intro not seen comes before any of it"
+        "Nothing known yet — the sign-in, the enforcer or the engine silent, or the enforcer's first pass not made — is starting; the intro not seen comes before any of it"
     )
     func starting() {
         #expect(screen(signedIn: nil) == .starting)
         #expect(screen(permission: nil) == .starting)
+        #expect(screen(checked: false) == .starting)
         #expect(screen(standing: nil) == .starting)
         #expect(screen(introSeen: false, signedIn: nil, permission: nil, standing: nil) == .intro)
     }
@@ -50,7 +56,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "Onboarding, in order: the intro not seen; then not signed in; then the permission not approved — denied or not determined — whatever the phone stands in"
+        "Onboarding, in order: the intro not seen; then not signed in; then the permission not approved — denied or not determined — out of any running session"
     )
     func onboarding() {
         #expect(screen(introSeen: false) == .intro)
@@ -59,22 +65,72 @@ struct ScreenTests {
         #expect(screen(signedIn: false, permission: .notDetermined) == .signIn)
         #expect(screen(permission: .notDetermined) == .screenTime)
         #expect(screen(permission: .denied) == .screenTime)
-        #expect(screen(permission: .denied, standing: .inSession(session(), .focused)) == .screenTime)
+        #expect(screen(permission: .denied, standing: .waiting) == .screenTime)
+        #expect(screen(permission: .denied, hasClasses: false) == .screenTime)
     }
 
     @Test(
-        "In a session: focused, unlocked and protection off have their screens; a state this build does not know is home — never focus, never unlocked"
+        "The shields on — focused in a session the phone's clock says still runs, or a tap held — is focus before the intro, the sign-in and the permission: the focus screen holds Emergency Unlock, always allowed. Once they are off, those rules again"
+    )
+    func shieldedFirst() throws {
+        let focused = Standing.inSession(session(), .focused)
+        #expect(screen(signedIn: false, standing: focused) == .focus)
+        #expect(screen(introSeen: false, signedIn: nil, permission: nil, standing: focused) == .focus)
+        #expect(screen(permission: .denied, standing: focused) == .focus)
+        #expect(screen(permission: .notDetermined, checked: false, standing: focused) == .focus)
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .tap(tagId: "tag"))
+        let held = try outbox.records()
+        #expect(screen(signedIn: false, queued: held) == .focus)
+        #expect(screen(introSeen: false, permission: .denied, queued: held) == .focus)
+        #expect(screen(signedIn: false, queued: held, now: at(SyncState.tapCap)) == .signIn)
+        #expect(screen(signedIn: false, standing: focused, now: at(3000)) == .signIn)
+        #expect(screen(signedIn: false, standing: .inSession(session(), .unlocked)) == .signIn)
+        #expect(screen(introSeen: false, standing: .inSession(session(), .unlocked)) == .intro)
+    }
+
+    @Test(
+        "In a running session: unlocked and protection off have their screens, whatever the permission reads — taken back mid-session, the check reports protection off, whose screen says how back; a state this build does not know is home — never focus, never unlocked"
     )
     func inSession() {
         #expect(screen(standing: .inSession(session(), .focused)) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked)) == .unlocked)
         #expect(screen(standing: .inSession(session(), .protectionOff)) == .protectionOff)
         #expect(screen(standing: .inSession(session(), nil)) == .home)
+        #expect(screen(permission: .denied, standing: .inSession(session(), .unlocked)) == .unlocked)
+        #expect(
+            screen(permission: .denied, standing: .inSession(session(), .protectionOff))
+                == .protectionOff)
+        #expect(screen(permission: .notDetermined, standing: .inSession(session(), nil)) == .home)
     }
 
-    @Test("Where the phone stood not read yet: home. Waiting for the teacher's Start: waiting")
+    @Test(
+        "The bell rung by the phone's own clock (decision 6), no read yet: the shields are off, so home — never focus, unlocked or protection off over them — and Screen Time when the permission is not approved; a second before it, the session's screen"
+    )
+    func bellRung() {
+        for state in [ParticipationState.focused, .unlocked, .protectionOff] {
+            let standing = Standing.inSession(session(), state)
+            #expect(screen(standing: standing, now: at(3000)) == .home, "\(state)")
+            #expect(screen(standing: standing, now: at(9000)) == .home, "\(state)")
+            #expect(
+                screen(permission: .denied, standing: standing, now: at(3000)) == .screenTime,
+                "\(state)")
+        }
+        #expect(screen(standing: .inSession(session(), .focused), now: at(2999)) == .focus)
+        #expect(screen(standing: .inSession(session(), .unlocked), now: at(2999)) == .unlocked)
+        #expect(
+            screen(standing: .inSession(session(), .protectionOff), now: at(2999)) == .protectionOff)
+        #expect(
+            screen(standing: .inSession(session(), .focused), hasClasses: false, now: at(3000))
+                == .home)
+    }
+
+    @Test(
+        "Where the phone stood not read yet: home, whatever the permission reads — Emergency Unlock works there. Waiting for the teacher's Start: waiting"
+    )
     func unreadAndWaiting() {
         #expect(screen(standing: .unread) == .home)
+        #expect(screen(permission: .denied, standing: .unread) == .home)
         #expect(screen(standing: .waiting) == .waiting)
     }
 
@@ -99,14 +155,14 @@ struct ScreenTests {
         let tap = try record(outbox, .tap(tagId: "tag"))
         let held = try outbox.records()
         let standings: [Standing] = [
-            .out, .waiting, .unread, .inSession(session(), .unlocked), .inSession(session(), nil),
+            .out, .waiting, .unread, .inSession(later, .unlocked), .inSession(later, nil),
         ]
         for standing in standings {
             #expect(screen(standing: standing, queued: held) == .focus, "\(standing)")
         }
         #expect(screen(queued: held, now: at(SyncState.tapCap - 1)) == .focus)
         #expect(screen(queued: held, now: at(SyncState.tapCap)) == .home)
-        let unlocked = Standing.inSession(session(), .unlocked)
+        let unlocked = Standing.inSession(later, .unlocked)
         #expect(screen(standing: unlocked, queued: held, now: at(SyncState.tapCap)) == .unlocked)
         try record(outbox, .unlockUnderTap(tap: tap.eventId, reason: nil))
         let unlockedAfter = try outbox.records()

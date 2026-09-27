@@ -14,7 +14,7 @@
             var problem: String?
             var introSeen = true
             var signedIn: Bool? = true
-            var protection: Protection? = approved
+            var protection: Protection? = permission(.approved)
             var sync: SyncState? = standing(.out)
         }
 
@@ -23,7 +23,7 @@
             "starting": State(signedIn: nil, protection: nil, sync: nil),
             "intro": State(introSeen: false),
             "signIn": State(signedIn: false),
-            "screenTime": State(protection: Protection()),
+            "screenTime": State(protection: permission(.notDetermined)),
             "home": State(),
             "waiting": State(sync: standing(.waiting)),
             "focus": State(sync: standing(.inSession(period3, .focused))),
@@ -46,11 +46,12 @@
         private static let period3 = SessionView(
             id: "session", classId: "class", endsAt: Date() + 27 * 60)
 
-        private static let approved = {
+        /// What rule 3's check found: `permission`, checked.
+        private static func permission(_ permission: Permission) -> Protection {
             var protection = Protection()
-            protection.permission = .approved
+            (protection.checked, protection.permission) = (true, permission)
             return protection
-        }()
+        }
 
         /// The engine's truth, standing `standing`, the server reached a moment ago.
         private static func standing(_ standing: Standing) -> SyncState {

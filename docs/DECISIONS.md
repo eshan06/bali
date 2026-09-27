@@ -12,21 +12,42 @@ a real decision? Add a dated entry at the top: what was decided and why.
   in the system font, light in every appearance, the mark drawn in SwiftUI — in two PRs for size,
   the Sign in screen its second.** **The router** (`Screen.choose`, `ios/BaliOutbox`): the one
   place that decides which screen shows, from what the phone knows, so no rule lives in a view and
-  every rule runs on Linux. Its order, decided here: the app could not start (`Phone.problem`) →
-  `storage`, before anything, since nothing else is known then; the intro not seen → `intro`,
-  before the sign-in is known, since it needs nothing; the sign-in, the enforcer or the engine
-  silent → `starting`; not signed in → `signIn`; the permission not approved → `screenTime`; a tap
-  not yet answered holding the shields (`SyncState.tapHeldUntil` ahead of `now` — the enforcer's
-  own rule, so the screen and the shields agree: decision 7's cap, and not after decision 11's
-  unlock, nor refused) → `focus`, whatever the phone stood in, unread included — the shields are
-  on, and the focus screen holds Emergency Unlock; then the standing: `unread` → `home` (which says
-  so; Emergency Unlock works there, B6b), focused → `focus`, unlocked → `unlocked`, protection off
-  → `protectionOff`, a state this build does not know → `home` — never `focus`, which the enforcer
-  does not shield for, and never `unlocked`, an unlock the student did not make; `waiting` →
-  `waiting`; `out` → `sessionOver` while a session just ended (`lastSessionOver`, C5's input, nil
-  until then), `join` once the phone knows it has no classes (`hasClasses == false`; nil —
-  `/v1/me` not answered, C2's input — is `home`, which says what it knows), else `home`. `now` is
-  an input, as `shieldedUntil`'s is. **The font:** the system font (SF Pro; its rounded design and
+  every rule runs on Linux. Its order, decided here (santa's round 1 moved the shields to the
+  front and added the bell and the first pass): the app could not start (`Phone.problem`) →
+  `storage`, before anything, since nothing else is known then; **the shields on → `focus`, before
+  anything else** — `SyncState.shieldedUntil(now)`, the enforcer's own rule, so the screen and the
+  shields agree: focused in a session the phone's own clock says still runs (decision 6), or a tap
+  not yet answered holding them (decision 7's cap; not after decision 11's unlock, nor refused),
+  whatever else the phone stood in, unread included, the intro seen or not, signed out or not — the
+  focus screen holds Emergency Unlock, always allowed, and a sign-out keeps the standing and its
+  shields (B4c; Cognito refusing the refresh token signs the student out by itself), so ranked
+  below the sign-in it would have been unreachable until an online sign-in or the bell (an unlock
+  recorded there needs no token and is sent under the next sign-in, as every queued record is —
+  B4's rule, noted for the owner); the intro not seen → `intro`, before the sign-in is known, since
+  it needs nothing; the sign-in, the enforcer or the engine silent, or the enforcer's first pass not
+  made (`Protection.checked`, below) → `starting`; not signed in → `signIn`; then the standing:
+  `unread` → `home` (which says so; Emergency Unlock works there, B6b), whatever the permission
+  reads; in a session still running by the phone's clock, unlocked → `unlocked` and protection off
+  → `protectionOff`, whatever the permission reads — taken back mid-session, rule 3's check reports
+  protection off within a moment, and that screen says how back (Settings, then a re-tap), where
+  Screen Time's would not — and a state this build does not know → `home`, never `focus`, which the
+  enforcer does not shield for, and never `unlocked`, an unlock the student did not make; with no
+  session running — the bell rung by the phone's clock and no read yet, `waiting`, `out` — the
+  permission not approved → `screenTime`, then `waiting` → `waiting`, `out` → `sessionOver` while a
+  session just ended (`lastSessionOver`, C5's input, nil until then), `join` once the phone knows
+  it has no classes (`hasClasses == false`; nil — `/v1/me` not answered, C2's input — is `home`,
+  which says what it knows), else `home` — past the bell too, the shields off (decision 6: the
+  enforcer, the monitor and the shield's words all read the bell so), until a read says where the
+  phone stands; C5 decides whether that is session over. `now` is an input, as `shieldedUntil`'s
+  is. **`Protection.checked`:** the enforcer's `updates()` gives its current claim at once, which
+  before its first pass is the defaults — the permission not determined, as a phone never asked
+  reads — so the router, fed that, would have sent an approved phone to Screen Time for a moment at
+  every launch; a pass marks the claim checked, and the router treats an unchecked one as the
+  enforcer silent. Family Controls can read not determined for a moment after a launch (B5a-2),
+  which the enforcer tolerates for a check-in interval: with the shields on the router follows the
+  standing, so no Screen Time shows over them; out of any session such a read still shows Screen
+  Time until the next pass reads approved — disclosed, not fixed here (C1's Screen Time step can
+  keep whether the permission was ever granted). **The font:** the system font (SF Pro; its rounded design and
   one-width digits for large numerals, with the first screen that counts) at D1's sizes, scaled
   with Dynamic Type through `@ScaledMetric`, rather than Instrument Sans bundled. Alternatives:
   bundling Instrument Sans (an OFL file in the app — but `ShieldConfiguration` takes no font, so
@@ -46,10 +67,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   intro placeholder carries a Continue that sets `introSeen`, since the readout has no such toggle
   and nothing else could pass it; a fixture's `Phone` is frozen — never started, so
   `-bali-screen storage`'s Try again does nothing, and the Debug Readout button shows only over a
-  live engine. **Tests:** `ScreenTests` (Linux and the iOS Simulator), every rule and the held tap
-  through the real outbox; `AppTests.fixtures` (the simulator): an unknown name is the live app, a
-  known one its fixture, a fixture never starts, and every fixture shows the screen it is named
-  for.
+  live engine. **Tests:** `ScreenTests` (Linux and the iOS Simulator), every rule — the shields
+  first over the intro, the sign-in and the permission; the bell rung; a claim unchecked — and the
+  held tap through the real outbox; `EnforcerTests.checked`; `AppTests.fixtures` (the simulator):
+  an unknown name is the live app, a known one its fixture, a fixture never starts, and every
+  fixture shows the screen it is named for; `AppTests.introSeen`: the flag kept and read back.
 - **2026-09-26** — **The device check's first finding: dev's phone app client replaced (round 1,
   step 1).** Every sign-in from the phone ended `Sign-in failed: refused("invalid_client")` after
   the hosted UI had accepted the password. Cognito's token endpoint answered `invalid_client_secret`
