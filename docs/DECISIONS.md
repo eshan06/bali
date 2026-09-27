@@ -69,7 +69,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   intro placeholder carries a Continue that sets `introSeen`, since the readout has no such toggle
   and nothing else could pass it; a fixture's `Phone` is frozen — never started, so
   `-bali-screen storage`'s Try again does nothing, and the Debug Readout button shows only over a
-  live engine. **Tests:** `ScreenTests` (Linux and the iOS Simulator), every rule — the shields
+  live engine. **The words of a sign-in that did not finish** (`SignInError.words`, BaliOutbox,
+  tested on Linux; C1a's second PR) name the kind in the design system's voice — no exclamation
+  points, another try as the way, "ask your teacher" for a refusal — and a cancelled sign-in says
+  nothing: nothing changed. **Tests:** `ScreenTests` (Linux and the iOS Simulator), every rule — the shields
   first over the intro, the sign-in and the permission; the bell rung; a claim unchecked — and the
   held tap through the real outbox; `EnforcerTests.checked`; `AppTests.fixtures` (the simulator):
   an unknown name is the live app, a known one its fixture, a fixture never starts, and every

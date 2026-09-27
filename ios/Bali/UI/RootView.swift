@@ -33,9 +33,9 @@ struct RootView: View {
             }
         case .intro:
             StepPlaceholder("Intro — C1") {
-                Button("Continue") { phone.sawIntro() }.buttonStyle(PrimaryButtonStyle())
+                Button("Continue") { phone.sawIntro() }.buttonStyle(SecondaryButtonStyle())
             }
-        case .signIn: StepPlaceholder("Sign in — C1a")
+        case .signIn: SignInView(signIn: phone.signIn)
         case .screenTime: StepPlaceholder("Screen Time — C1")
         case .join: StepPlaceholder("Join — C2")
         case .home: StepPlaceholder("Home — C3")

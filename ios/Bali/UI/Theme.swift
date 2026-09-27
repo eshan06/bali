@@ -92,6 +92,67 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// D1's secondary action: the primary's shape, white with a strong border and the primary ink —
+/// pressed, the sunken fill.
+struct SecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.textStyle(.button).foregroundStyle(Theme.text)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(
+                configuration.isPressed ? Theme.sunken : Theme.card,
+                in: .rect(cornerRadius: Theme.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong))
+    }
+}
+
+/// A card: white, radius 20, shadow-1, D1's 20-pt padding unless a screen packs rows into it.
+struct Card<Content: View>: View {
+    var padding: CGFloat = 20
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content().padding(padding).frame(maxWidth: .infinity)
+            .background(Theme.card, in: .rect(cornerRadius: Theme.Radius.lg))
+            .shadow(color: Theme.shadow, radius: 1, y: 1)
+    }
+}
+
+/// A state chip, as every surface shows a student's state: its colour, an icon and a label,
+/// never the colour alone. D1's fill and ink per kind; 6 × 12 padding, radius 14, the label style
+/// in uppercase.
+struct Chip: View {
+    enum Kind {
+        case focused, unlocked, protectionOff, ended, notIn
+
+        /// The design system's fill and ink — red for protection off alone — and its SF Symbol.
+        var look: (fill: Color, ink: Color, icon: String) {
+            switch self {
+            case .focused: (Color(hex: 0xDCEDE3), Theme.brand, "checkmark.circle.fill")
+            case .unlocked: (Color(hex: 0xF7E6D2), Color(hex: 0x6F3F1B), "lock.open")
+            case .protectionOff: (Color(hex: 0xFAE3E0), Color(hex: 0x8C342B), "shield.slash")
+            case .ended: (Theme.sunken, Theme.textTertiary, "flag")
+            case .notIn: (Theme.sunken, Color(hex: 0x524E47), "circle")
+            }
+        }
+    }
+
+    let kind: Kind
+    /// An SF Symbol in place of the kind's own.
+    var icon: String?
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon ?? kind.look.icon)
+            Text(text)
+        }
+        .textStyle(.label).textCase(.uppercase).foregroundStyle(kind.look.ink)
+        .padding(.vertical, 6).padding(.horizontal, 12)
+        .background(kind.look.fill, in: .rect(cornerRadius: Theme.Radius.md))
+    }
+}
+
 /// The Bali mark: the session arc as emblem — green-200's track ring, and green-600's arc with
 /// round caps, open at the upper left, 296° of the ring (about 330° with its caps), stroked 10 of
 /// 64 — drawn as the shield's `BaliMark` asset and D1's SVG draw it, at `size`.
