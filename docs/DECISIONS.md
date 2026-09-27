@@ -27,12 +27,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the enforcer's own B5a-2 judgement, denied or not determined for a check-in interval of the
   phone's running, now published on the claim (santa's round 1) — which covers a permission taken
   back in Settings however iOS reads it after, and a grant that did not come back with a restored
-  backup, which restores these defaults: the grant screen returns within a check-in interval of
-  the app running in front. Alternatives: the router reading the judgement directly (it would
+  backup, which restores these defaults: the grant screen returns at the first check a check-in
+  interval of running after the one that first read not determined — the app coming to the
+  front again (out of a session, rule 3's check runs only then), or in a session its next
+  check-in. Alternatives: the router reading the judgement directly (it would
   wait a pass on every launch — the flag answers at once); keeping the flag out of backups (a
   ThisDeviceOnly Keychain item, a file excluded from backup: the restore path only, and a Keychain
-  read can fail while the phone is locked). Known limit: on such a phone the first launch shows
-  home for up to a check-in interval before the grant screen. **The browser's word**
+  read can fail while the phone is locked). Known limit: on such a phone home shows until that
+  check — with the app left open out of a session, until it next comes to the front, at least
+  30 s of running on. **The browser's word**
   (`SignIn.signIn(through:)`; #102's review): BaliCore turned every browser failure into
   `cancelled`, which says nothing, so a sign-in page that could not open was a dead end. Decided:
   the closure is typed `throws(SignInError)`, so the app's browser must translate —

@@ -80,7 +80,7 @@ struct AppTests {
     }
 
     @Test(
-        "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared at one of denied, left at not determined — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
+        "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for a check-in interval), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
         let defaults = UserDefaults.standard
