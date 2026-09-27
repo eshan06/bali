@@ -54,7 +54,8 @@ shields and what the outbox holds — with **Sign in**, **Sign out**, **Allow Sc
 (a block's tag, typed — rounds 1–3), **Emergency Unlock** and **History** beside the screens. A
 screen a later step draws shows a placeholder naming that step meanwhile. A Debug build launched
 with `-bali-screen <name>` — `xcrun simctl launch booted com.bali.Bali -bali-screen signIn` — shows
-that named state with no server, frozen (`Bali/UI/PreviewFixtures.swift` lists the names).
+that named state with no server, frozen (`Bali/UI/PreviewFixtures.swift` lists the names); with
+`-bali-intro-page 1` or `2` beside `-bali-screen intro`, the intro opens on its second or third page.
 
 NFC and Screen Time shields need a real iPhone, which is why B5 and B6 are device checkpoints;
 the simulator only proves it builds. Family Controls works in development builds already —

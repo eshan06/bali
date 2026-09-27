@@ -60,6 +60,17 @@ final class Phone {
     /// not the app group's, which the extensions read.
     private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
     static let introSeenKey = "introSeen"
+    /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
+    /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
+    /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
+    /// phone that gave it. The check judging the permission off clears it — denied, or not
+    /// determined for a check-in interval: a grant taken back, or one that did not come back with
+    /// a restored backup, which restores these defaults — so the grant screen returns.
+    private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
+    static let everApprovedKey = "screenTimeApproved"
+    /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
+    /// until the next ask (rule 5).
+    private(set) var askFailed: ScreenTimeAskError?
 
     init() {}
 
@@ -76,6 +87,7 @@ final class Phone {
         init(fixture: PreviewFixtures.State) {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
+            (everApproved, askFailed) = (false, fixture.askFailed)
         }
     #endif
 
@@ -84,12 +96,33 @@ final class Phone {
     var screen: Screen {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-            sync: sync, hasClasses: nil, lastSessionOver: nil, now: Date())
+            everApproved: everApproved, sync: sync, hasClasses: nil, lastSessionOver: nil,
+            now: Date())
     }
 
     func sawIntro() {
         introSeen = true
         UserDefaults.standard.set(true, forKey: Phone.introSeenKey)
+    }
+
+    /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check
+    /// judges it off, left at a read not determined for a moment — the read it is there to see
+    /// past.
+    func remember(_ protection: Protection) {
+        let approved = protection.permission == .approved
+        guard approved || protection.permissionOff, everApproved != approved else { return }
+        everApproved = approved
+        UserDefaults.standard.set(approved, forKey: Phone.everApprovedKey)
+    }
+
+    /// Asks iOS for the Screen Time permission — its own prompt, through the enforcer — and keeps
+    /// why it did not finish. Nothing on a frozen phone.
+    func askScreenTime() async {
+        guard let enforcer else { return }
+        askFailed = nil
+        do { try await enforcer.requestPermission() } catch {
+            askFailed = error as? ScreenTimeAskError ?? .failed("\(error)")
+        }
     }
 
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
@@ -127,7 +160,12 @@ final class Phone {
         Task { await engine.run() }
         Task { await enforcer.run() }
         Task { for await state in await engine.updates() { self.sync = state } }
-        Task { for await protection in await enforcer.updates() { self.protection = protection } }
+        Task {
+            for await protection in await enforcer.updates() {
+                self.protection = protection
+                self.remember(protection)
+            }
+        }
         Task { for await signedIn in await signIn.signedIn() { self.signedIn = signedIn } }
         await engine.setForeground(foreground)
     }
@@ -343,9 +381,8 @@ final class Phone {
         private func signingIn() async -> String {
             let (browser, scheme) = (browser, signIn.cognito.redirectURI.scheme ?? "")
             do {
-                try await signIn.signIn { @MainActor url in
-                    try await browser.authenticate(
-                        using: url, callbackURLScheme: scheme, preferredBrowserSession: .ephemeral)
+                try await signIn.signIn { @MainActor url throws(SignInError) in
+                    try await browser.hostedUI(url, scheme: scheme)
                 }
                 return "Signed in"
             } catch {

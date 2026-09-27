@@ -35,11 +35,29 @@ final class PhoneScreenTime: ScreenTime {
         }
     }
 
+    /// iOS's own prompt; what it threw in the screen's words (C1b).
     func requestPermission() async throws {
-        try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+        do {
+            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+        } catch {
+            throw ScreenTimeAskError(familyControls: error)
+        }
     }
 
     func schedule(_ window: DateInterval?) throws { try Bell.register(window) }
 
     func monitorUnscheduled() -> Date? { Bell.monitorUnscheduled }
+}
+
+extension ScreenTimeAskError {
+    /// Family Controls' error from the ask, in the screen's words: Don't Allow — the permission
+    /// reads denied then — is `cancelled`; anything else `failed`, what iOS said kept for the
+    /// readout (C1b).
+    init(familyControls error: any Error) {
+        if case .authorizationCanceled? = error as? FamilyControlsError {
+            self = .cancelled
+        } else {
+            self = .failed("\(error)")
+        }
+    }
 }

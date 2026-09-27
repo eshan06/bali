@@ -16,28 +16,32 @@ struct SignInView: View {
 
     var body: some View {
         ScreenScaffold {
-            Spacer()
-            VStack(alignment: .leading, spacing: 24) {
-                BaliMark(size: 72)
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Sign in").textStyle(.h1)
-                    Text(
-                        "Use the account your school gave you. You only do this once — after that, Bali remembers you."
-                    )
-                    .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
+            PageScroll {
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 24) {
+                        BaliMark(size: 72)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Sign in").textStyle(.h1)
+                            Text(
+                                "Use the account your school gave you. You only do this once — after that, Bali remembers you."
+                            )
+                            .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Button(busy ? "Signing in…" : "Sign in") { Task { await go() } }
+                            .buttonStyle(PrimaryButtonStyle()).disabled(busy)
+                        if let failure {
+                            Text(failure).textStyle(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Text("Trouble signing in? Ask your teacher.")
+                            .textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                            .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    }
                 }
-            }
-            Spacer()
-            VStack(spacing: 12) {
-                Button(busy ? "Signing in…" : "Sign in") { Task { await go() } }
-                    .buttonStyle(PrimaryButtonStyle()).disabled(busy)
-                if let failure {
-                    Text(failure).textStyle(.body)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text("Trouble signing in? Ask your teacher.")
-                    .textStyle(.caption).foregroundStyle(Theme.textTertiary)
-                    .frame(maxWidth: .infinity).multilineTextAlignment(.center)
             }
         }
     }
@@ -49,12 +53,37 @@ struct SignInView: View {
         defer { busy = false }
         let (browser, scheme) = (browser, signIn.cognito.redirectURI.scheme ?? "")
         do {
-            try await signIn.signIn { @MainActor url in
-                try await browser.authenticate(
-                    using: url, callbackURLScheme: scheme, preferredBrowserSession: .ephemeral)
+            try await signIn.signIn { @MainActor url throws(SignInError) in
+                try await browser.hostedUI(url, scheme: scheme)
             }
         } catch {
             failure = error.words
+        }
+    }
+}
+
+extension WebAuthenticationSession {
+    /// The hosted UI at `url`, in an ephemeral session, for `SignIn.signIn(through:)`: where it
+    /// sent the student back, or why not, in the sign-in's words (C1b).
+    func hostedUI(_ url: URL, scheme: String) async throws(SignInError) -> URL {
+        do {
+            return try await authenticate(
+                using: url, callbackURLScheme: scheme, preferredBrowserSession: .ephemeral)
+        } catch {
+            throw SignInError(browser: error)
+        }
+    }
+}
+
+extension SignInError {
+    /// The browser session's error in the sign-in's words: its own cancel — the student closed the
+    /// page — is `cancelled`, which says nothing; anything else `notOpened`, which is said, what
+    /// the browser said kept for the readout (rule 5; C1b).
+    init(browser error: any Error) {
+        if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+            self = .cancelled
+        } else {
+            self = .notOpened("\(error)")
         }
     }
 }

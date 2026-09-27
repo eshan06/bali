@@ -36,7 +36,16 @@ actor FakeScreenTime: ScreenTime {
         unshields += 1
     }
     func permission() -> Permission { granted }
-    func requestPermission() { granted = .approved }
+    /// Given — or, once `refusesAsk`, not: the student's Don't Allow, a throw and denied.
+    func requestPermission() throws {
+        if refusesAsk {
+            granted = .denied
+            throw Refused()
+        }
+        granted = .approved
+    }
+    private var refusesAsk = false
+    func refuseAsk() { refusesAsk = true }
 
     /// Each window iOS took, in order — nil for a cancel — and the one it holds now.
     private(set) var windows: [DateInterval?] = []
@@ -406,6 +415,26 @@ struct EnforcerTests {
         await phone.until { $0.permission == .approved }
         await phone.stop()
     }
+
+    @Test(
+        "Asked for and not given — Don't Allow — the throw comes after a pass: what a screen claims reads denied as the ask returns, not a check-in later (C1b)"
+    )
+    func requestPermissionRefused() async throws {
+        let rig = try Rig()
+        let screenTime = FakeScreenTime()
+        await screenTime.set(.notDetermined)
+        let phone = Enforced(rig, screenTime)
+        // Its first pass made — the claim before it is the defaults, which read not determined
+        // too — so nothing but the ask's own pass is running when it returns.
+        await phone.until { $0.checked && $0.permission == .notDetermined }
+        await screenTime.refuseAsk()
+        await #expect(throws: FakeScreenTime.Refused.self) {
+            try await phone.enforcer.requestPermission()
+        }
+        let claim = await phone.enforcer.protection
+        #expect(claim.permission == .denied && claim.permissionOff)
+        await phone.stop()
+    }
 }
 
 @Suite("Rule 3: protection off, found and reported", .timeLimit(.minutes(3)))
@@ -547,6 +576,7 @@ struct ProtectionOffTests {
         rig.clock.advance(by: 1)
         await phone.enforcer.check()
         #expect(try rig.outbox.records().isEmpty)
+        #expect(await !phone.enforcer.protection.permissionOff)
         // The check before the next check-in reads it approved: nothing reported, nothing owed.
         await phone.screenTime.reads(.approved)
         rig.clock.advance(by: 29)
@@ -561,7 +591,7 @@ struct ProtectionOffTests {
     }
 
     @Test(
-        "Never granted — not determined at two checks a check-in apart, coming to the foreground and at the check-in — is reported, once: a phone that cannot shield is never shown focused"
+        "Never granted — not determined at two checks a check-in apart, coming to the foreground and at the check-in — is reported, once: a phone that cannot shield is never shown focused; and the claim says the permission is off from then (C1b), not before"
     )
     func notDeterminedLasting() async throws {
         let rig = try Rig()
@@ -571,12 +601,14 @@ struct ProtectionOffTests {
         try await rig.tapIn()
         try await rig.foreground()
         #expect(try rig.outbox.records().isEmpty)
+        #expect(await !phone.enforcer.protection.permissionOff)
         rig.clock.advance(by: 30)
         try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
         await rig.until {
             $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
         }
+        await phone.until { $0.permissionOff && $0.permission == .notDetermined }
         try await rig.checkInDue(at(60))
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
