@@ -7,6 +7,7 @@ import {
   ENROLLMENT_JOIN_OUTCOMES,
   HISTORY_EVENT_TYPES,
   type HistoryPage,
+  type MeResponse,
   PROTECTION_OFF_OUTCOMES,
   REFOCUS_OUTCOMES,
   TAP_OUTCOMES,
@@ -292,6 +293,8 @@ async function captureAll() {
 
   // One student's lesson in one session, to its end and past it.
   const c = await seedClassroom(db, 'fx');
+  // Its teacher named, so one boot call names a class's teacher (C2a); fx-arm's has none.
+  await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, c.teacher.id));
   const s = await start(c.klass.id);
   const ana = await token(c.student.cognitoId);
   const landed = randomUUID();
@@ -703,6 +706,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       displayName: unknown;
     }[];
     expect(new Set(teachers.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
+    // A boot call's classes each name their teacher (C2a), one named and one not.
+    const boots = all.filter((f) => f.type === 'MeResponse');
+    const named = boots.flatMap((f) => (f.body as MeResponse).classes).map((c) => c.teacher);
+    expect(new Set(named.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
     // Every kind of moment a history shows (A7) — the declined tap naming
     // where it counted, both late notes, `superseded` on a refocus and on a
     // tap (A13, A14) — and fields BaliCore decodes as optional, present and

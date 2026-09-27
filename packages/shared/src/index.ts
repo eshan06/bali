@@ -189,8 +189,10 @@ export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
  * ahead of it (owner ruling, 2026-09-24), whether or not they are still in the
  * session. An unlock sent under its tap (`POST /v1/taps/{eventId}/unlock`,
  * owner decision 11) whose tap has no session to file it in is kept with no
- * session: `tap_armed`, the tap waits for its teacher's Start; `unknown_tap`,
- * no tap of the caller's has that id — not arrived yet, refused, or another's.
+ * session: `tap_armed`, the tap is on the arm path — waiting for its teacher's
+ * Start, or a late one (A14) kept there consumed, which no Start converts, so
+ * the unlock stays in no class; `unknown_tap`, no tap of the caller's has that
+ * id — not arrived yet, refused, or another's.
  * Additive-only like the other vocab.
  */
 export const UNLOCK_RECORDED_AS = [

@@ -28,6 +28,10 @@ public struct SessionView: Codable, Sendable, Hashable {
 public struct MeClass: Codable, Sendable, Hashable {
     public let id: String
     public let name: String
+    /// Its teacher, as `GET /v1/me` names one under every class (C2a). Nil where a class is
+    /// named without one — a join's, a preview's, a history moment's — or from an older API:
+    /// the wire is additive, and a field this build knows but was not sent is never a refusal.
+    public let teacher: TeacherView?
 }
 
 public struct MeUser: Codable, Sendable, Hashable {

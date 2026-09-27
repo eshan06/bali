@@ -290,7 +290,10 @@ get designed; edits land here as they're decided.
 Student app:
 - `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
   call quietly creates the student's `users` row; a later call fills in a display name
-  the row was created without, and never changes one it has.
+  the row was created without, and never changes one it has. Each class carries its
+  teacher (`teacher.displayName`, null when their account has none — the preview's and
+  the history's shape; added 2026-09-26, C2a, additive): what Home and Me show under a
+  class, and Focus says "with".
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
@@ -336,8 +339,9 @@ Student app:
   unlock's body and answer. It is filed in whatever session that tap landed in, by that
   session's unlock rules — the tap looked up among the caller's own taps only, so another
   student's id files nothing into their session — or, with no session to file it in, kept
-  unattached as an unknown session's is: `tap_armed` (the tap waits for Start, which then
-  joins the student without it) or `unknown_tap` (no tap of the caller's has that id). A tap
+  unattached as an unknown session's is: `tap_armed` (the tap is on the arm path: waiting
+  for Start, which then joins the student without it — or a late one, A14, kept consumed,
+  which no Start converts) or `unknown_tap` (no tap of the caller's has that id). A tap
   landing after an unlock sent under it files it then, so both arrival orders end alike;
   the two serialise on the tap. Never refused; a retry is answered where it was recorded.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked

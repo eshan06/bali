@@ -1830,15 +1830,6 @@ async function waitForBackendOnArmedTaps(timeoutMs = 1_500): Promise<void> {
 }
 
 /**
- * Fail rather than proceed if nothing ever blocks — the staging must be real.
- *
- * Held-transaction tests that gate on the 5 s default carry an explicit 20 s
- * budget, and must: this package has no vitest config, so the test budget is
- * vitest's own 5 s, and a round that never staged died as "Test timed out" —
- * naming nothing — before the gate could throw the error that says what went
- * wrong. Measured, with the gate forced to miss.
- */
-/**
  * Stage the interleaving a student's lock exists for (A14): a holder owns
  * `eventId` on the events index, so `parkFirst`, which records it, parks there
  * after its judgment; `thenRace` runs meanwhile and parks behind the student's
@@ -1899,6 +1890,15 @@ async function behindHolder<P, R>(
   return [first.value, second.value as R];
 }
 
+/**
+ * Fail rather than proceed if nothing ever blocks — the staging must be real.
+ *
+ * Held-transaction tests that gate on the 5 s default carry an explicit 20 s
+ * budget, and must: this package has no vitest config, so the test budget is
+ * vitest's own 5 s, and a round that never staged died as "Test timed out" —
+ * naming nothing — before the gate could throw the error that says what went
+ * wrong. Measured, with the gate forced to miss.
+ */
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

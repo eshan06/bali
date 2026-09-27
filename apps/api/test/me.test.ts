@@ -465,11 +465,20 @@ describe('GET /v1/me', () => {
     expect(second.body.user.id).toBe(first.body.user.id);
   });
 
-  it('returns a student their enrolled classes', async () => {
-    const { student, klass } = await seedClassroom(db, 'me-student');
+  it('returns a student their enrolled classes, each naming its teacher (C2a)', async () => {
+    const { student, klass, teacher } = await seedClassroom(db, 'me-student');
+    await db.update(users).set({ displayName: 'Ms. Rivera' }).where(eq(users.id, teacher.id));
+    // A second class, whose teacher's account carries no name.
+    const other = await seedClassroom(db, 'me-student-other');
+    await db.insert(enrollments).values({ classId: other.klass.id, studentId: student.id });
     const { body } = await me(await ctx.tokenFor(student.cognitoId));
     expect(body.user.role).toBe('student');
-    expect(body.classes.map((c) => c.id)).toEqual([klass.id]);
+    expect(new Map(body.classes.map((c) => [c.id, c.teacher.displayName]))).toEqual(
+      new Map([
+        [klass.id, 'Ms. Rivera'],
+        [other.klass.id, null],
+      ]),
+    );
   });
 
   it('returns a teacher their taught classes (existing role preserved)', async () => {
@@ -477,6 +486,8 @@ describe('GET /v1/me', () => {
     const { body } = await me(await ctx.tokenFor(teacher.cognitoId));
     expect(body.user.role).toBe('teacher');
     expect(body.classes.map((c) => c.id)).toEqual([klass.id]);
+    // A teacher's own classes name the caller — here, one with no name yet.
+    expect(body.classes.map((c) => c.teacher)).toEqual([{ displayName: null }]);
   });
 
   it('fills a teacher’s missing display name too, and keeps the role', async () => {
@@ -492,6 +503,8 @@ describe('GET /v1/me', () => {
 
     expect(body.user.role).toBe('teacher');
     expect(body.user.displayName).toBe('ms.rivera');
+    // The name just filled reaches their classes in the same answer (C2a).
+    expect(body.classes.map((c) => c.teacher.displayName)).toEqual(['ms.rivera']);
     expect((await findUserByCognitoId(db, teacher.cognitoId))?.displayName).toBe('ms.rivera');
   });
 

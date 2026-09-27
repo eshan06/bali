@@ -53,6 +53,19 @@ touching infra, CI, git plumbing, or the dev environment.
   not Actions secrets.** A secret needed in those runs must exist in both
   stores (`CLAUDE_CODE_OAUTH_TOKEN` does).
 
+## The owner's Mac
+
+- **`npm run demo` runs against dev there, not in memory.** The shell profile
+  exports `DEMO_API_URL` and the demo accounts, and the demo picks remote mode
+  whenever `DEMO_API_URL` is set — so the run exercises the deployed `main`,
+  not your branch, and its silence step waits on dev's cron. For the in-memory
+  run CLAUDE.md's verify step asks for: `env -u DEMO_API_URL npm run demo`.
+- **A worktree under `.claude/worktrees/` starts with no `node_modules`.** Node
+  then resolves `@bali/shared` and `@bali/db` up the tree to the main
+  checkout's packages — another branch — so typecheck, lint and vitest compile
+  your branch against the wrong sources ("has no exported member" for a type
+  you just added). Run `npm ci` in the worktree before the first check.
+
 ## Cloud sessions / dev environment
 
 - **Egress is allowlisted by the cloud environment's network policy.** Any
