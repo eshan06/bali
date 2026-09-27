@@ -290,7 +290,10 @@ get designed; edits land here as they're decided.
 Student app:
 - `GET /v1/me` — boot call: who am I, my classes, my live session if any. The first-ever
   call quietly creates the student's `users` row; a later call fills in a display name
-  the row was created without, and never changes one it has.
+  the row was created without, and never changes one it has. Each class carries its
+  teacher (`teacher.displayName`, null when their account has none — the preview's and
+  the history's shape; added 2026-09-26, C2a, additive): what Home and Me show under a
+  class, and Focus says "with".
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
