@@ -180,4 +180,21 @@ struct ScreenTests {
         #expect(stuck.first?.stuck == true)
         #expect(screen(queued: stuck) == .home)
     }
+
+    @Test(
+        "What the Sign in screen says of a sign-in that did not finish: its kind in plain words and another try — nothing for one the student closed"
+    )
+    func words() {
+        #expect(SignInError.cancelled.words == nil)
+        #expect(
+            SignInError.unreachable.words
+                == "Can't reach the sign-in server. Check your connection and try again.")
+        #expect(
+            SignInError.refused("access_denied").words
+                == "The sign-in was refused (access_denied). Try again, or ask your teacher.")
+        #expect(
+            SignInError.refused(nil).words
+                == "The sign-in was refused. Try again, or ask your teacher.")
+        #expect(SignInError.notKept.words == "Your phone couldn't keep the sign-in. Try again.")
+    }
 }

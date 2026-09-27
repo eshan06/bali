@@ -62,3 +62,19 @@ public enum Screen: Sendable, Hashable {
         }
     }
 }
+
+extension SignInError {
+    /// What the Sign in screen says under its button when a sign-in did not finish (rule 5): the
+    /// kind of failure in plain words, and another try as the way — nil for a sign-in the student
+    /// closed: nothing changed, nothing to say.
+    public var words: String? {
+        switch self {
+        case .cancelled: nil
+        case .unreachable: "Can't reach the sign-in server. Check your connection and try again."
+        case .refused(let reason):
+            "The sign-in was refused" + (reason.map { " (\($0))" } ?? "")
+                + ". Try again, or ask your teacher."
+        case .notKept: "Your phone couldn't keep the sign-in. Try again."
+        }
+    }
+}
