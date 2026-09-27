@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-26** — **C1a: the student app's skeleton — one pure router of its screens, D1's theme
+  in the system font, light in every appearance, the mark drawn in SwiftUI — and the Sign in
+  screen.** **The router** (`Screen.choose`, `ios/BaliOutbox`): the one place that decides which
+  screen shows, from what the phone knows, so no rule lives in a view and every rule runs on
+  Linux. Its order, decided here: the app could not start (`Phone.problem`) → `storage`, before
+  anything, since nothing else is known then; the intro not seen → `intro`, before the sign-in is
+  known, since it needs nothing; the sign-in, the enforcer or the engine silent → `starting`; not
+  signed in → `signIn`; the permission not approved → `screenTime`; a tap not yet answered holding
+  the shields (`SyncState.tapHeldUntil` ahead of `now` — the enforcer's own rule, so the screen and
+  the shields agree: decision 7's cap, and not after decision 11's unlock, nor refused) → `focus`,
+  whatever the phone stood in, unread included — the shields are on, and the focus screen holds
+  Emergency Unlock; then the standing: `unread` → `home` (which says so; Emergency Unlock works
+  there, B6b), focused → `focus`, unlocked → `unlocked`, protection off → `protectionOff`, a state
+  this build does not know → `home` — never `focus`, which the enforcer does not shield for, and
+  never `unlocked`, an unlock the student did not make; `waiting` → `waiting`; `out` → `sessionOver`
+  while a session just ended (`lastSessionOver`, C5's input, nil until then), `join` once the phone
+  knows it has no classes (`hasClasses == false`; nil — `/v1/me` not answered, C2's input — is
+  `home`, which says what it knows), else `home`. `now` is an input, as `shieldedUntil`'s is.
+  **The font:** the system font (SF Pro; its rounded design and one-width digits for large
+  numerals) at D1's sizes, scaled with Dynamic Type through `@ScaledMetric`, rather than Instrument
+  Sans bundled. Alternatives: bundling Instrument Sans (an OFL file in the app — but
+  `ShieldConfiguration` takes no font, so Bali's shield would stay in SF Pro and the two would
+  differ; and B5c already chose SF Pro there); iOS's own text styles (`.title`, `.body`: Dynamic
+  Type for free, but D1's sizes and line heights lost). **Light in every appearance**
+  (`preferredColorScheme(.light)` on `RootView`), as the shield extension already renders: D1 was
+  approved light-only. Alternatives: the design system's dark tokens (designed, in `tokens.json`,
+  but no student screen was approved in them — a later product decision); following the system with
+  the light tokens (iOS's own sheets and materials would go dark around light content). **The
+  mark** is drawn in SwiftUI (`BaliMark(size:)`: green-200's track ring, green-600's arc with round
+  caps — the SVG's, 296° of the ring, about 330° with its caps — open at the upper left, stroked 10
+  of 64) rather than sharing the shield's asset catalog. Alternatives: a second copy of the SVG in
+  the app (two files to drift); a resource bundle in BaliOutbox for both (heavier, and the
+  extension's asset is pinned by `AppTests.mark` as it is); reading the extension's bundle from the
+  app at run time (fragile). Drawn, it renders at any size D1 uses (28, 40, 72) with no raster.
+  **Also decided here:** the intro placeholder carries a Continue that sets `introSeen`, since the
+  readout has no such toggle and nothing else could pass it; a fixture's `Phone` is frozen — never
+  started, so `-bali-screen storage`'s Try again does nothing, and the Debug Readout button shows
+  only over a live engine; the words of a sign-in that did not finish (`SignInError.words`,
+  BaliOutbox, tested on Linux) name the kind in the design system's voice — no exclamation points,
+  another try as the way, "ask your teacher" for a refusal — and a cancelled sign-in says nothing:
+  nothing changed. **Tests:** `ScreenTests` (Linux and the iOS Simulator), every rule, the held
+  tap through the real outbox, and the words; `AppTests.fixtures` (the simulator): an unknown
+  name is the live app, a known one its fixture, a fixture never starts, and every fixture shows
+  the screen it is named for.
 - **2026-09-25** — **B5b-3: the bell's wakes off iOS 18's DeviceActivity deadlock, and a lost wake
   survivable — each window an activity of its own, a backup window beside the bell's, no second
   ceiling on the waited-out migration, and `writerWaitedOut` never passing untold (#98's Claude
