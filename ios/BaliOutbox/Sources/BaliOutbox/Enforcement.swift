@@ -31,6 +31,12 @@ public protocol ScreenTime: Sendable {
 /// What a screen may claim of the shields: what the last check found (rule 3), never the standing
 /// alone — a stuck report stops holding reads (B3a), so a read can say focused over no shield.
 public struct Protection: Sendable, Hashable {
+    public init() {}
+
+    /// A pass has read the phone: what follows is what it found, not these defaults. Until then no
+    /// screen is chosen on it (C1a) — the first value is the defaults, whose permission reads not
+    /// determined, as a phone never asked does.
+    public var checked = false
     public var permission = Permission.notDetermined
     /// Verified: the store holds the shields, and the permission keeps them there.
     public var shielded = false
@@ -221,8 +227,9 @@ public actor Enforcer {
         let monitorUnscheduled = await screenTime.monitorUnscheduled()
         // Read after the last wait, so a check made meanwhile keeps what it found (`unreported`).
         var next = protection
-        (next.permission, next.shielded, next.until) = (permission, shielded, until)
-        (next.unscheduled, next.monitorUnscheduled) = (unscheduled, monitorUnscheduled)
+        (next.checked, next.permission, next.shielded) = (true, permission, shielded)
+        (next.until, next.unscheduled, next.monitorUnscheduled) =
+            (until, unscheduled, monitorUnscheduled)
         protection = next
         alarm?.cancel()
         alarm = until.map { until in

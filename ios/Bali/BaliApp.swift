@@ -3,17 +3,17 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-// The student app (ARCHITECTURE, "iOS app structure"). A placeholder until its screens (C1–C6): it
-// shows that BaliCore and BaliOutbox are linked in and which build this is, and it starts the app's
-// one sync engine over the student's Cognito sign-in (B4).
+// The student app (ARCHITECTURE, "iOS app structure"): its screens (C1–C6, `RootView`) over
+// `Phone`, which starts the app's one sync engine over the student's Cognito sign-in (B4) and the
+// shields' enforcer (B5).
 @main
 struct BaliApp: App {
     @Environment(\.scenePhase) private var phase
-    @State private var phone = Phone()
+    @State private var phone = Phone.launched()
 
     var body: some Scene {
         WindowGroup {
-            Placeholder(phone: phone).task { await phone.start() }
+            RootView(phone: phone).task { await phone.start() }
         }
         // The outbox is in the app group, shared with the extensions: suspended holding a lock on
         // it, the app would be killed (0xdead10cc). So it takes none behind the app, and takes them
@@ -54,11 +54,48 @@ final class Phone {
         )?
     private var foreground = false
     private var starting = false
+    /// A fixture's, frozen as it was made (Debug): never started.
+    private var frozen = false
+    /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
+    /// not the app group's, which the extensions read.
+    private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
+    static let introSeenKey = "introSeen"
+
+    init() {}
+
+    /// The app's phone: the live one — or, in a Debug build launched with `-bali-screen <name>`,
+    /// one frozen in that fixture (`PreviewFixtures`).
+    static func launched() -> Phone {
+        #if DEBUG
+            if let fixture = PreviewFixtures.chosen() { return Phone(fixture: fixture) }
+        #endif
+        return Phone()
+    }
+
+    #if DEBUG
+        init(fixture: PreviewFixtures.State) {
+            (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
+            (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
+        }
+    #endif
+
+    /// The screen to show now: `Screen.choose`, the one place that decides, over what the phone
+    /// knows. Its classes and a session just over are later steps' (C2, C5): nil until then.
+    var screen: Screen {
+        Screen.choose(
+            problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
+            sync: sync, hasClasses: nil, lastSessionOver: nil, now: Date())
+    }
+
+    func sawIntro() {
+        introSeen = true
+        UserDefaults.standard.set(true, forKey: Phone.introSeenKey)
+    }
 
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
     /// failed can be tried again.
     func start() async {
-        guard engine == nil, !starting else { return }
+        guard engine == nil, !starting, !frozen else { return }
         starting = true
         defer { starting = false }
         guard let config = AppConfig(info: Bundle.main.infoDictionary ?? [:]) else {
@@ -108,37 +145,11 @@ final class Phone {
     }
 }
 
-struct Placeholder: View {
-    let phone: Phone
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                Text("Bali").font(.largeTitle)
-                // "BaliCore.APIClient" and "BaliOutbox.Outbox", read from the packages' own types.
-                Text(String(reflecting: APIClient.self)).font(.body.monospaced())
-                Text(String(reflecting: Outbox.self)).font(.body.monospaced())
-                Text("Build \(BaliApp.version)").font(.footnote).foregroundStyle(.secondary)
-                if let problem = phone.problem {
-                    Text(problem).foregroundStyle(.red)
-                    Button("Try again") { Task { await phone.start() } }
-                }
-                #if DEBUG
-                    if let signIn = phone.signIn, let engine = phone.engine,
-                        let enforcer = phone.enforcer
-                    {
-                        Readout(phone: phone, signIn: signIn, engine: engine, enforcer: enforcer)
-                    }
-                #endif
-            }
-        }
-    }
-}
-
 #if DEBUG
-    /// Temporary, for the device checks (B5, B6), until C1–C6 draw the real screens: the engine's
-    /// link, the sign-in, the standing, what rule 3's check found and the queue — with triggers in
-    /// place of the screens: the block's scan, and a typed tag for rounds 1–3. Debug builds only.
+    /// The device checks' (B5, B6; ios/README.md, rounds 1–4), in a sheet behind `RootView`'s
+    /// Readout button: the engine's link, the sign-in, the standing, what rule 3's check found and
+    /// the queue — with triggers beside the screens: the block's scan, and a typed tag for rounds
+    /// 1–3. Debug builds only.
     struct Readout: View {
         let phone: Phone
         let signIn: SignIn

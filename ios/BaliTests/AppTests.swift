@@ -54,6 +54,39 @@ struct AppTests {
     }
 
     @Test(
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started. A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a)"
+    )
+    func fixtures() async throws {
+        #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
+        #expect(PreviewFixtures.chosen(from: ["Bali", "-bali-screen"]) == nil)
+        #expect(PreviewFixtures.chosen(from: ["Bali", "-bali-screen", "nope"]) == nil)
+        let chosen = try #require(PreviewFixtures.chosen(from: ["Bali", "-bali-screen", "signIn"]))
+        let phone = Phone(fixture: chosen)
+        #expect(phone.screen == .signIn)
+        await phone.start()
+        #expect(phone.engine == nil && phone.screen == .signIn)
+        for (name, state) in PreviewFixtures.all {
+            let screen = String(describing: Phone(fixture: state).screen)
+            #expect(screen.hasPrefix(name), "\(name): \(screen)")
+        }
+    }
+
+    @Test(
+        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a); the flag as it was before is put back after"
+    )
+    func introSeen() {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.introSeenKey)
+        defer { defaults.set(before, forKey: Phone.introSeenKey) }
+        defaults.removeObject(forKey: Phone.introSeenKey)
+        let phone = Phone()
+        #expect(!phone.introSeen && phone.screen == .intro)
+        phone.sawIntro()
+        #expect(phone.introSeen && Phone().introSeen)
+        #expect(phone.screen == .starting)
+    }
+
+    @Test(
         "The shield extension ships D1's ring mark, the icon of Bali's shield (B5c): drawn as D1 has it — the arc, and the track in its gap at the upper left, around nothing — and never tinted"
     )
     func mark() throws {

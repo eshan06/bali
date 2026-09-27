@@ -251,6 +251,19 @@ struct ShieldedUntilTests {
 @Suite("The shields follow the engine", .timeLimit(.minutes(3)))
 struct EnforcerTests {
     @Test(
+        "What a screen may claim is checked only once a pass has read the phone (C1a): the enforcer's first value is the defaults, unchecked — no screen is chosen on it — and a check makes it so"
+    )
+    func checked() async throws {
+        let rig = try Rig()
+        let enforcer = Enforcer(engine: rig.engine, screenTime: FakeScreenTime(), clock: rig.clock)
+        #expect(await !enforcer.protection.checked)
+        await enforcer.check()
+        let found = await enforcer.protection
+        #expect(found.checked && found.permission == .approved)
+        await rig.stop()
+    }
+
+    @Test(
         "A tap shields at once, before its answer; the answer keeps them on to the bell, when they come off by the phone's own clock"
     )
     func tapToBell() async throws {
