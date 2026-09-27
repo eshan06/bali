@@ -31,6 +31,8 @@ public protocol ScreenTime: Sendable {
 /// What a screen may claim of the shields: what the last check found (rule 3), never the standing
 /// alone — a stuck report stops holding reads (B3a), so a read can say focused over no shield.
 public struct Protection: Sendable, Hashable {
+    public init() {}
+
     public var permission = Permission.notDetermined
     /// Verified: the store holds the shields, and the permission keeps them there.
     public var shielded = false

@@ -107,6 +107,8 @@ extension Standing: Codable {
 
 /// What the engine knows, for the screens (C1–C6) and enforcement (B5): `SyncEngine.updates()`.
 public struct SyncState: Sendable, Hashable {
+    public init() {}
+
     /// The server's truth as last reconciled, with the phone's own changes over it; `.unread` while
     /// the file has not given back where the phone stood.
     public var standing = Standing.out
