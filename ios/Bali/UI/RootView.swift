@@ -31,12 +31,9 @@ struct RootView: View {
             ScreenScaffold {
                 BaliMark(size: 72).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        case .intro:
-            StepPlaceholder("Intro — C1") {
-                Button("Continue") { phone.sawIntro() }.buttonStyle(SecondaryButtonStyle())
-            }
+        case .intro: IntroView { phone.sawIntro() }
         case .signIn: SignInView(signIn: phone.signIn)
-        case .screenTime: StepPlaceholder("Screen Time — C1")
+        case .screenTime: ScreenTimeView(phone: phone)
         case .join: StepPlaceholder("Join — C2")
         case .home: StepPlaceholder("Home — C3")
         case .waiting: StepPlaceholder("Waiting — C3")
@@ -49,22 +46,17 @@ struct RootView: View {
     }
 }
 
-/// What a screen a later step draws shows meanwhile: the mark, the step's name, and any action the
-/// flow cannot do without yet.
-struct StepPlaceholder<Actions: View>: View {
+/// What a screen a later step draws shows meanwhile: the mark and the step's name.
+struct StepPlaceholder: View {
     let step: String
-    @ViewBuilder let actions: () -> Actions
 
-    init(_ step: String, @ViewBuilder actions: @escaping () -> Actions = { EmptyView() }) {
-        (self.step, self.actions) = (step, actions)
-    }
+    init(_ step: String) { self.step = step }
 
     var body: some View {
         ScreenScaffold {
             VStack(spacing: 24) {
                 BaliMark(size: 40)
                 Text(step).textStyle(.caption).foregroundStyle(Theme.textTertiary)
-                actions()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

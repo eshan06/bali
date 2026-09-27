@@ -49,12 +49,27 @@ struct SignInView: View {
         defer { busy = false }
         let (browser, scheme) = (browser, signIn.cognito.redirectURI.scheme ?? "")
         do {
-            try await signIn.signIn { @MainActor url in
-                try await browser.authenticate(
-                    using: url, callbackURLScheme: scheme, preferredBrowserSession: .ephemeral)
+            try await signIn.signIn { @MainActor url throws(SignInError) in
+                try await browser.hostedUI(url, scheme: scheme)
             }
         } catch {
             failure = error.words
+        }
+    }
+}
+
+extension WebAuthenticationSession {
+    /// The hosted UI at `url`, in an ephemeral session, for `SignIn.signIn(through:)`: where it
+    /// sent the student back — or why not, in the sign-in's words: the student's own close is
+    /// `cancelled`, which says nothing; anything else `notOpened`, which is said (rule 5; C1b).
+    func hostedUI(_ url: URL, scheme: String) async throws(SignInError) -> URL {
+        do {
+            return try await authenticate(
+                using: url, callbackURLScheme: scheme, preferredBrowserSession: .ephemeral)
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            throw .cancelled
+        } catch {
+            throw .notOpened("\(error)")
         }
     }
 }

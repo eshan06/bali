@@ -9,21 +9,26 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
-        /// any session, unless said otherwise.
+        /// any session, no ask for the permission failed, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
             var signedIn: Bool? = true
             var protection: Protection? = permission(.approved)
             var sync: SyncState? = standing(.out)
+            var askFailed: ScreenTimeAskError?
         }
 
-        /// Each named for the screen it shows (`AppTests.fixtures` pins that).
+        /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
         static let all: [String: State] = [
             "starting": State(signedIn: nil, protection: nil, sync: nil),
             "intro": State(introSeen: false),
             "signIn": State(signedIn: false),
             "screenTime": State(protection: permission(.notDetermined)),
+            "screenTimeDenied": State(protection: permission(.denied)),
+            "screenTimeError": State(
+                protection: permission(.notDetermined),
+                askFailed: .failed("FamilyControlsError.networkError")),
             "home": State(),
             "waiting": State(sync: standing(.waiting)),
             "focus": State(sync: standing(.inSession(period3, .focused))),
