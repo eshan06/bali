@@ -35,7 +35,7 @@
 
     extension Bell {
         /// The app's windows: the bell's at `window`'s end and its backup — or, nil, none — the
-        /// monitor's own stopped once either is new, by `register(_:in:)`'s rule. A window iOS
+        /// monitor's own stopped once the bell's is new, by `register(_:in:)`'s rule. A window iOS
         /// takes ends the monitor's refusal: one is registered again.
         public static func register(_ window: DateInterval?) throws {
             try register(window, in: DeviceActivityCenter())
