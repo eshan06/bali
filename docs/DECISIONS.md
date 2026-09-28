@@ -8,6 +8,48 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C3a: the classes from `GET /v1/me` in the engine, open decision 6's default
+  — the conductor's recommendation, adopted unless the owner overrules — and #106's review WARNs.**
+  **The classes**
+  (`SyncState.me`, `hasClasses`): the engine keeps `GET /v1/me`'s last answer — read as before, at
+  every return to the foreground (the launch's among them) and whenever an answer names no live
+  session — so the router's `hasClasses` is fed at last (C1a's hand-off): nil until a read answers,
+  Join while it says none. A read that gives no answer leaves the classes as they were — not known
+  at first, never none — and says why until one answers (`meFailed`, rule 5), tried again at the
+  next wake. The classes apply in the step the read's standing does; they are no change of the
+  phone's, so `readMayReconcile` does not hold them back — only a join does: a read sent before the
+  phone's own join never applies its classes (the engine counts joins), which would take the class
+  away. **The join and the look-up go through the engine** (`SyncEngine.join`, `lookUp`; decision
+  4's one owner of the phone's server communication), the token renewed once on a 401 as before
+  (`Joining.send`): once in, the class — the join's answer names it, with no teacher — is in `me`
+  at once, so the router moves on, and the truth is read again for its teacher's name. That is the
+  seam #106's review found missing (`hasClasses` after a join, untested): `JoinEngineTests`.
+  Alternative: `Phone` keeping "true once a join says so" beside the engine's read — one fact in
+  two places, where a read sent before the join and answered after it would show Join again for a
+  round trip. **Open decision 6, how a waiting phone learns of the Start — the conductor's
+  recommended default, explained to the owner on 2026-09-29 (load and trade-off), adopted unless
+  the owner overrules:** while the phone stands waiting — a tap answered armed (decision 5) — the
+  engine reads the truth (`GET /v1/me`) at each wake in the foreground, every 30 s, the check-in's
+  cadence, and never behind the app; the Start converts the armed tap into a participation, the
+  read names its session, and the phone shields. No push: push notifications are a later upgrade
+  (APNs rides the fast-follow push work). The load, as the owner was told: one `GET /v1/me` every
+  30 s per waiting phone with Bali open — about one request a second for a waiting class of 30 —
+  never above the check-in's own peak once that class is in session. Known limit:
+  with Bali behind another app or closed, the phone learns of the Start only when it next comes to
+  the front — D1's Waiting says "Keep Bali open so it can start right away" (C3b draws it). And, as
+  before, a phone never learns that its armed tap expired at the end of the school day: it waits,
+  reading, until a session or its next tap. **A session over by the phone's clock is not the
+  Start:** waiting, a read naming a session whose end has passed by the phone's own clock (data
+  model, decision 6) leaves the phone waiting — the sweep that ends it on the server can run late
+  (dev's did, 2026-09-27), and that session, an earlier class's, would end the wait with no class
+  to be in, so the phone would never learn of the Start it waits for. Accepted: a phone whose armed
+  tap was converted into a session that then ended while it could not reach the server keeps
+  waiting until its next tap — a stale screen, where the other way a phone misses a Start. **#106's
+  review WARNs:** the code stays as sent while its look-up is under way (`Joining.busy`: `type` and
+  `back` change nothing meanwhile, and the field is disabled, its keyboard back once the answer is
+  in), so no answer is dropped for an edit with nothing said; and a look-up or a join on a phone
+  whose engine has not started says so (`Joining.notStarted`), never nothing (rule 5).
+
 - **2026-09-29** — **B5c-2: Bali's shield reads nothing — iOS's sandbox refuses a
   ShieldConfiguration extension the outbox file, its file coordinator and SQLite's own locks alike —
   so it says "Focused with Bali", with no time, and D1's line sends the student to Bali for the time

@@ -369,12 +369,22 @@ enum Answer {
         #"{"status":"live","state":"\#(state)","session":\#(json(view))}"#
     }
     static let gone = #"{"status":"gone","state":null,"session":null}"#
-    static func me(_ view: SessionView? = session(), state: String = "focused") -> String {
+    static func me(
+        _ view: SessionView? = session(), state: String = "focused", classes: [String] = []
+    ) -> String {
         let live = view.map {
             #"{"id":"\#($0.id)","classId":"\#($0.classId)","endsAt":"\#(iso($0.endsAt))","state":"\#(state)"}"#
         }
         return
-            #"{"user":{"id":"u","role":"student","displayName":null},"classes":[],"session":\#(live ?? "null")}"#
+            #"{"user":{"id":"u","role":"student","displayName":null},"classes":[\#(classes.joined(separator: ","))],"session":\#(live ?? "null")}"#
+    }
+    /// Class `id` as `GET /v1/me` names it, with its teacher.
+    static func inClass(_ id: String) -> String {
+        #"{"id":"\#(id)","name":"Class \#(id)","teacher":{"displayName":"Ms. Rivera"}}"#
+    }
+    /// The join of class `id`, as `POST /v1/enrollments` answers it: a class named with no teacher.
+    static func joinedClass(_ id: String, outcome: String = "joined") -> String {
+        #"{"outcome":"\#(outcome)","enrollmentId":"e","class":{"id":"\#(id)","name":"Class \#(id)"}}"#
     }
     static func refused(_ reason: String) -> String {
         #"{"error":{"code":"conflict","reason":"\#(reason)","message":"\#(reason)"}}"#
