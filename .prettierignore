@@ -15,6 +15,9 @@ contracts/outbox/
 # Hand-written design docs — formatter churn there is pure diff noise
 docs/
 
+# D1's tokens, copied as the design system exports them — copy again, never reformat
+ios/Bali/UI/bali-tokens.json
+
 # Locally patched vendored skill docs — excluded so formatter churn on
 # upstream text (and future re-vendors) never turns format:check red on an
 # unrelated PR

@@ -100,6 +100,73 @@ struct AppTests {
     }
 
     @Test(
+        "Every colour `Theme` draws, and each chip's, is D1's light value of its token in `bali-tokens.json` — the design system's own file, a token's reference to another followed — shadow-1's opacity too, so the two cannot drift apart unnoticed (#101's review)"
+    )
+    func tokens() throws {
+        let url = try #require(
+            Bundle(for: TestsBundle.self).url(forResource: "bali-tokens", withExtension: "json"))
+        let file = try #require(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        /// A group's tokens, by name: each one's value.
+        func values(_ group: String) throws -> [String: Any] {
+            let group = file[group] as? [String: Any]
+            let tokens = try #require(group?["tokens"] as? [[String: Any]])
+            var values: [String: Any] = [:]
+            for token in tokens {
+                if let name = token["name"] as? String { values[name] = token["value"] }
+            }
+            return values
+        }
+        let colours = try values("color")
+        /// `name`'s light value — a primitive's one value, or another token's through "{name}".
+        func light(_ name: String) -> String? {
+            let value = colours[name]
+            guard let raw = (value as? [String: Any])?["light"] as? String ?? value as? String
+            else { return nil }
+            return raw.hasPrefix("{") ? light(String(raw.dropFirst().dropLast())) : raw.uppercased()
+        }
+        /// `colour` as sRGB bytes, red to blue — and as the file writes one, "#RRGGBB" — with its
+        /// opacity.
+        func drawn(_ colour: Color) -> (bytes: [Int], hex: String, opacity: Float) {
+            let resolved = colour.resolve(in: EnvironmentValues())
+            let bytes = [resolved.red, resolved.green, resolved.blue].map {
+                Int(($0 * 255).rounded())
+            }
+            let hex = "#" + bytes.map { String(format: "%02X", $0) }.joined()
+            return (bytes, hex, resolved.opacity)
+        }
+        let pinned: [(token: String, colour: Color)] = [
+            ("surface-page", Theme.page), ("surface-card", Theme.card),
+            ("surface-sunken", Theme.sunken), ("border-default", Theme.border),
+            ("border-strong", Theme.borderStrong), ("text-primary", Theme.text),
+            ("text-secondary", Theme.textSecondary), ("text-tertiary", Theme.textTertiary),
+            ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
+            ("arc-fill", Theme.arc), ("arc-track", Theme.arcTrack), ("green-200", Theme.markTrack),
+            ("state-focused-bg", Chip.Kind.focused.look.fill),
+            ("state-focused-fg", Chip.Kind.focused.look.ink),
+            ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
+            ("state-emergency-fg", Chip.Kind.unlocked.look.ink),
+            ("state-revoked-bg", Chip.Kind.protectionOff.look.fill),
+            ("state-revoked-fg", Chip.Kind.protectionOff.look.ink),
+            ("state-ended-bg", Chip.Kind.ended.look.fill),
+            ("state-ended-fg", Chip.Kind.ended.look.ink),
+            ("state-notjoined-bg", Chip.Kind.notIn.look.fill),
+            ("state-notjoined-fg", Chip.Kind.notIn.look.ink),
+        ]
+        for (token, colour) in pinned {
+            let found = drawn(colour)
+            #expect(found.hex == light(token), "\(token): \(found.hex)")
+            #expect(found.opacity == 1, "\(token)")
+        }
+        // shadow-1, a resting card's: "0 1px 2px rgba(33,28,21,0.06)".
+        let shadow = drawn(Theme.shadow)
+        let shadows = try values("shadow")
+        let resting = try #require((shadows["shadow-1"] as? [String: Any])?["light"] as? String)
+        let rgba = shadow.bytes.map(String.init) + [String(format: "%g", shadow.opacity)]
+        #expect(resting.hasSuffix("rgba(\(rgba.joined(separator: ",")))"), "\(resting): \(rgba)")
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for a check-in interval), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -241,3 +308,6 @@ struct AppTests {
         return { x, y in (0..<4).map { Int(bytes[(y * 64 + x) * 4 + $0]) } }
     }
 }
+
+/// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
+private final class TestsBundle {}

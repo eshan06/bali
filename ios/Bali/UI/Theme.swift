@@ -5,8 +5,10 @@ import SwiftUI
 // appearance — in the system font at D1's sizes, and only the atoms the screens use.
 
 enum Theme {
-    // Colours, `ds/bali/tokens.json`'s light values: the page and cards; the borders; the inks; the
-    // brand and its pressed shade; the countdown arc's fill and track, and the mark's own track.
+    // Colours, D1's light values in `bali-tokens.json`, beside this file — `AppTests.tokens` pins
+    // each, the chips' too, and a colour added here joins its list: the page and cards; the
+    // borders; the inks; the brand and its pressed shade; the countdown arc's fill and track, and
+    // the mark's own track.
     static let page = Color(hex: 0xF7F5F2)
     static let card = Color.white
     static let sunken = Color(hex: 0xEFECE7)
