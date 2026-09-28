@@ -19,11 +19,14 @@ public enum Screen: Sendable, Hashable {
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
     /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `lastSessionOver`, a
-    /// session the phone was in that ended, until the student dismisses it (C5).
+    /// session the phone was in that ended, until the student dismisses it (C5); `opened`, a screen
+    /// the student opened over the one chosen (C3) — Join over Home (Home's Join a class, with a
+    /// way back), Home over Waiting (Waiting's Back to home) — shown only while the router would
+    /// show the one it was opened over, never over anything else.
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, lastSessionOver: SessionView?,
-        now: Date
+        opened: Screen?, now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
@@ -38,6 +41,19 @@ public enum Screen: Sendable, Hashable {
         if !introSeen { return .intro }
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }
+        let chosen = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
+        switch (chosen, opened) {
+        case (.home, .join?): return .join
+        case (.waiting, .home?): return .home
+        default: return chosen
+        }
+    }
+
+    /// The screen of where the phone stands, signed in and its permission checked.
+    private static func settled(
+        _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ hasClasses: Bool?,
+        _ lastSessionOver: SessionView?, _ now: Date
+    ) -> Screen {
         switch sync.standing {
         // Not read from the phone yet: home says so, and Emergency Unlock works there (B6b).
         case .unread: return .home
@@ -67,6 +83,35 @@ public enum Screen: Sendable, Hashable {
             }
         }
     }
+}
+
+extension SyncState {
+    /// Whether a screen the student opened over another (C3) stays open once the engine's state is
+    /// this, after `before`: not once where the phone stands changes, nor once a tap is made or
+    /// answered — a new arming is Waiting's again.
+    public func keepsOpened(from before: SyncState?) -> Bool {
+        standing == before?.standing && pendingTap?.eventId == before?.pendingTap?.eventId
+    }
+
+    /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in
+    /// the Join screen's words; nil while none failed.
+    public var meWords: String? { meFailed.map { Joining.words($0, nil) } }
+}
+
+extension BlockRead {
+    /// What Home says under Tap in when a scan recorded no tap (rule 5): nil for a block's code —
+    /// the tap — and for a scan the student closed, which changed nothing.
+    public var words: String? {
+        switch self {
+        case .block, .cancelled: nil
+        case .notBali: "That isn't a Bali block. Hold your phone to your teacher's block."
+        case .unsupported: "This iPhone can't read NFC, so it can't tap in. Ask your teacher."
+        case .failed: "The scan didn't finish. Try again."
+        }
+    }
+
+    /// What Home says when a block was read but the phone could not keep its tap (rule 5).
+    public static let notKept = "Your phone couldn't keep the tap. Try again."
 }
 
 extension SignInError {

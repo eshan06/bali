@@ -87,6 +87,31 @@ struct AppTests {
         await refused.lookUp()
         #expect(refused.joining.failure == Joining.notStarted && refused.joining.preview == nil)
         #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).hasClasses == true)
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"])).opened == .join)
+    }
+
+    @Test(
+        "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it; either ends once where the phone stands changes (C3). A frozen phone's Tap in says it has not started, never nothing"
+    )
+    func opened() async throws {
+        let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        home.open(.join)
+        home.joining.type("KWX")
+        #expect(home.screen == .join)
+        home.open(nil)
+        #expect(home.screen == .home && home.joining.code.isEmpty)
+        let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
+        let state = try #require(waiting.sync)
+        waiting.open(.home)
+        waiting.synced(state)
+        #expect(waiting.screen == .home)
+        var out = state
+        out.standing = .out
+        waiting.synced(out)
+        waiting.synced(state)
+        #expect(waiting.opened == nil && waiting.screen == .waiting)
+        await home.tapIn()
+        #expect(home.tapFailed == Joining.notStarted && !home.scanning)
     }
 
     @Test(

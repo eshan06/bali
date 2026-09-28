@@ -35,8 +35,8 @@ struct RootView: View {
         case .signIn: SignInView(signIn: phone.signIn)
         case .screenTime: ScreenTimeView(phone: phone)
         case .join: JoinView(phone: phone)
-        case .home: StepPlaceholder("Home — C3")
-        case .waiting: StepPlaceholder("Waiting — C3")
+        case .home: HomeView(phone: phone)
+        case .waiting: WaitingView(phone: phone)
         case .focus: StepPlaceholder("Focus — C4")
         case .unlocked: StepPlaceholder("Unlocked — C5")
         case .protectionOff: StepPlaceholder("Protection off — C5")
@@ -101,6 +101,5 @@ struct StorageView: View {
         }
     }
 
-    #Preview("Home (placeholder)") { RootView(phone: Phone(fixture: PreviewFixtures.all["home"]!)) }
     #Preview("Storage") { RootView(phone: Phone(fixture: PreviewFixtures.all["storage"]!)) }
 #endif

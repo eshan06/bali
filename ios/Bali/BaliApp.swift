@@ -73,6 +73,13 @@ final class Phone {
     private(set) var askFailed: ScreenTimeAskError?
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
+    /// A screen the student opened over the router's (C3): Join, from Home's Join a class — Back
+    /// closes it — or Home, from Waiting's Back to home. It ends once where the phone stands
+    /// changes, or a tap is made or answered (`SyncState.keepsOpened`).
+    private(set) var opened: Screen?
+    /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
+    private(set) var scanning = false
+    private(set) var tapFailed: String?
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -94,6 +101,7 @@ final class Phone {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
+            opened = fixture.opened
         }
     #endif
 
@@ -103,8 +111,41 @@ final class Phone {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
             everApproved: everApproved, sync: sync, hasClasses: hasClasses, lastSessionOver: nil,
-            now: Date())
+            opened: opened, now: Date())
     }
+
+    /// Opens `screen` over the router's — nil closes it. A Join closed starts over.
+    func open(_ screen: Screen?) {
+        if opened == .join, screen == nil, !joining.busy { joining = Joining() }
+        opened = screen
+    }
+
+    /// The engine's state as it comes: a screen opened over another ends once where the phone
+    /// stands changes, or a tap is made or answered.
+    func synced(_ state: SyncState) {
+        if !state.keepsOpened(from: sync) { opened = nil }
+        sync = state
+    }
+
+    /// Home's Tap in (B6's scan): a Bali block's code is the tap — recorded, shielded at once and
+    /// sent — and anything else is said under the button (rule 5), nothing recorded. A phone whose
+    /// engine has not started says so.
+    func tapIn() async {
+        guard !scanning else { return }
+        guard let engine else { return tapFailed = Joining.notStarted }
+        (tapFailed, scanning) = (nil, true)
+        defer { scanning = false }
+        let read = await BlockReader().read()
+        do {
+            try await engine.tap(read)
+            tapFailed = read.words
+        } catch {
+            tapFailed = BlockRead.notKept
+        }
+    }
+
+    /// The student's Try again (rule 5): everything queued goes now, and the truth is read again.
+    func retry() async { await engine?.retryNow() }
 
     /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the engine: what it opens, or
     /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes.
@@ -132,7 +173,7 @@ final class Phone {
         (joining.failure, joining.busy) = (nil, true)
         let answer = await engine.join(request)
         joining.busy = false
-        _ = joining.joined(answer)
+        if joining.joined(answer) { opened = nil }
     }
 
     func sawIntro() {
@@ -194,7 +235,7 @@ final class Phone {
         onPhase = ({ await engine.setForeground($0) }, { await enforcer.check() })
         Task { await engine.run() }
         Task { await enforcer.run() }
-        Task { for await state in await engine.updates() { self.sync = state } }
+        Task { for await state in await engine.updates() { self.synced(state) } }
         Task {
             for await protection in await enforcer.updates() {
                 self.protection = protection

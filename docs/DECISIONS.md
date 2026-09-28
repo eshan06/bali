@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C3b: Home and Waiting drawn (D1's artboards), Join opened from Home with a
+  way back, and Home's Tap in.** **Home** (`HomeView`): the mark and name, "Hi, <name>" (`GET
+  /v1/me`'s display name; "Hi there" with none); D1's hero card, whose **Tap in** is B6's scan
+  (`Phone.tapIn`) — a block's code recorded as the tap, whose shields then send the router to
+  focus, and anything else said under the button (`BlockRead.words`: not a Bali block, an iPhone
+  that cannot read NFC, a scan that did not finish; `BlockRead.notKept`, a tap the phone could not
+  keep; nothing for a scan the student closed); the classes, each with its teacher (C2a — a teacher
+  with no name gets no line); and **Join a class**. What the phone could not read is said with
+  **Try again** (`Retry`: `Phone.retry`, the engine's `retryNow`, everything queued sent now and
+  the truth read again): its classes, until a read answers them (`SyncState.meWords`, the Join
+  screen's words; "Reading your classes…" before any answer), and where the phone stood, when
+  unread. Not drawn here: D1's tab bar, whose History and Me are C6's; and Emergency Unlock over
+  the last run's shields where the phone stood unread (B6b's case, which the router sends to
+  Home) — it comes with C4's control, the one the focus screen holds; the live app has none
+  either way until then. **Waiting** (`WaitingView`): the ring with its dot, "Ready — waiting for
+  your teacher", D1's "Keep Bali open so it can start right away." — decision 6's ruling made
+  plain — a read with no answer said with Try again, and **Back to home**. An armed tap's
+  answer names no teacher, so the body says "your teacher's block" where D1 named Ms. Rivera.
+  **A screen opened over another** (`Phone.opened`, `Screen.choose`'s new input): Join over Home
+  (Home's Join a class; Join's code page draws Back when Home opened it — #106's rider) and Home
+  over Waiting (Back to home). The router shows one only while it would show the screen it was
+  opened over — never over the shields, a session's screens, session over, Screen Time, the
+  sign-in, nor the Home the last run's shields keep over an unread standing — and it ends once
+  where the phone stands changes, or a tap is made or answered (`SyncState.keepsOpened`), so a new
+  arming is Waiting's again; a tap's retry closes nothing. Alternatives: a sheet over Home (no
+  Linux test, and no fixture could show it); a flag per screen as the router's inputs (one input
+  says the same).
+
 - **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
   backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's
   device check, 2026-09-27, on Railway dev): the dev teacher's `watch` saw "the session is over"

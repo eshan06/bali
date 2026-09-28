@@ -12,7 +12,8 @@ private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
     everApproved: Bool = false, standing: Standing? = .out, queued: [OutboxRecord] = [],
-    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, now: Date = t0
+    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, opened: Screen? = nil,
+    now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -30,7 +31,7 @@ private func screen(
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
         everApproved: everApproved, sync: sync, hasClasses: hasClasses,
-        lastSessionOver: lastSessionOver, now: now)
+        lastSessionOver: lastSessionOver, opened: opened, now: now)
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -152,6 +153,71 @@ struct ScreenTests {
         #expect(screen(hasClasses: false, lastSessionOver: session()) == .sessionOver)
         #expect(screen(standing: .waiting, lastSessionOver: session()) == .waiting)
         #expect(screen(standing: .unread, hasClasses: false) == .home)
+    }
+
+    @Test(
+        "A screen the student opened over another (C3): Join over Home — wherever Home is chosen, past the bell too — and Home over Waiting; never over anything else: the shields, a session's own screens, session over, Screen Time, the sign-in, the intro, nor the home the last run's shields keep over a standing not read (B6b)"
+    )
+    func opened() {
+        #expect(screen(hasClasses: true, opened: .join) == .join)
+        #expect(screen(opened: .join) == .join)
+        let rung = Standing.inSession(session(), .focused)
+        #expect(screen(standing: rung, opened: .join, now: at(3000)) == .join)
+        #expect(screen(standing: .waiting, opened: .home) == .home)
+        #expect(screen(standing: .waiting, opened: .join) == .waiting)
+        #expect(screen(hasClasses: false, opened: .home) == .join)
+        #expect(screen(hasClasses: true, opened: .focus) == .home)
+        #expect(screen(standing: .inSession(session(), .focused), opened: .join) == .focus)
+        #expect(screen(standing: .inSession(session(), .unlocked), opened: .join) == .unlocked)
+        #expect(screen(lastSessionOver: session(), opened: .join) == .sessionOver)
+        #expect(screen(permission: .denied, standing: .waiting, opened: .home) == .screenTime)
+        #expect(screen(signedIn: false, opened: .join) == .signIn)
+        #expect(screen(introSeen: false, opened: .join) == .intro)
+        #expect(screen(signedIn: false, shielded: true, standing: .unread, opened: .join) == .home)
+    }
+
+    @Test(
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, or a tap is made or answered (C3)"
+    )
+    func keepsOpened() async throws {
+        var before = SyncState()
+        before.standing = .waiting
+        var after = before
+        (after.link, after.meFailed, after.heardAt) = (.unreachable, .networkError, t0)
+        #expect(after.keepsOpened(from: before))
+        after.standing = .out
+        #expect(!after.keepsOpened(from: before) && !before.keepsOpened(from: nil))
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        var tapped = before
+        tapped.queued = try outbox.records()
+        #expect(!tapped.keepsOpened(from: before) && !before.keepsOpened(from: tapped))
+        try await send(outbox, tap, 503)
+        var retried = tapped
+        retried.queued = try outbox.records()
+        #expect(retried.queued.first?.attempts == 1 && retried.keepsOpened(from: tapped))
+    }
+
+    @Test(
+        "What Home says of a scan that recorded no tap (C3), each with the way on — not a Bali block, a phone that cannot read NFC, a scan that did not finish, a tap the phone could not keep — and nothing for a block's code, the tap, nor for a scan the student closed; what Home and Waiting say while `GET /v1/me` gives no answer, in the Join screen's words"
+    )
+    func homeWords() {
+        #expect(BlockRead.block("T7XK2M9QPF").words == nil && BlockRead.cancelled.words == nil)
+        #expect(
+            BlockRead.notBali.words
+                == "That isn't a Bali block. Hold your phone to your teacher's block.")
+        #expect(
+            BlockRead.unsupported.words
+                == "This iPhone can't read NFC, so it can't tap in. Ask your teacher.")
+        #expect(
+            BlockRead.failed("A scan is under way.").words == "The scan didn't finish. Try again.")
+        #expect(BlockRead.notKept == "Your phone couldn't keep the tap. Try again.")
+        var state = SyncState()
+        #expect(state.meWords == nil)
+        state.meFailed = .networkError
+        #expect(state.meWords == "Can't reach the server. Check your connection and try again.")
+        state.meFailed = .status(503)
+        #expect(state.meWords == "Something went wrong at Bali. Try again in a moment.")
     }
 
     @Test(
