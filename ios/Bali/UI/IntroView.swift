@@ -4,7 +4,7 @@ import SwiftUI
 /// the teacher sees and never sees, how a class starts — swiped, or advanced with Continue, whose
 /// last press is `done` (`Phone.sawIntro()`). D1's reference onboarding sheet in its light tokens;
 /// the words are v3's: every app pauses, no allow-list (ARCHITECTURE, "What Bali is"), and the
-/// list is the consent preview's (C2), so the two never say different things.
+/// list is the consent preview's own (`ConsentCard`, C2b), so the two never say different things.
 struct IntroView: View {
     let done: () -> Void
     #if DEBUG
@@ -50,19 +50,7 @@ struct IntroView: View {
     private var second: some View {
         VStack(spacing: 24) {
             Text("What your teacher sees").textStyle(.h1).multilineTextAlignment(.center)
-            Card(padding: 16) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Sees").textStyle(.label).textCase(.uppercase).foregroundStyle(Theme.brand)
-                    ForEach(IntroView.sees, id: \.self) {
-                        row("checkmark.circle", Theme.brand, $0, Theme.text)
-                    }
-                    Text("Never sees").textStyle(.label).textCase(.uppercase)
-                        .foregroundStyle(Theme.textTertiary).padding(.top, 8)
-                    ForEach(IntroView.neverSees, id: \.self) {
-                        row("eye.slash", Theme.textTertiary, $0, Theme.textSecondary)
-                    }
-                }
-            }
+            ConsentCard(title: "Sees")
             Text("This is the whole list. It never grows without asking you again.")
                 .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 .multilineTextAlignment(.center)
@@ -85,30 +73,12 @@ struct IntroView: View {
         }
     }
 
-    /// The consent preview's list (C2; D1's ConsentPreview artboard), the whole of it.
-    static let sees = [
-        "Your focus status — focused, unlocked, or Screen Time off",
-        "When you tap in, and when class ends for you",
-        "When you unlock, and the reason if you share one",
-        "If you leave this class",
-    ]
-    static let neverSees = [
-        "Your screen, your apps, or what's in them", "Your messages or where you are",
-    ]
-
     private func words(_ title: String, _ body: String) -> some View {
         VStack(spacing: 12) {
             Text(title).textStyle(.h1)
             Text(body).textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
         }
         .multilineTextAlignment(.center)
-    }
-
-    private func row(_ icon: String, _ tint: Color, _ text: String, _ ink: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
-            Text(text).textStyle(.body).foregroundStyle(ink)
-        }
     }
 }
 

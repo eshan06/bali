@@ -9,7 +9,8 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
-        /// any session, no ask for the permission failed, unless said otherwise.
+        /// any session, no ask for the permission failed, its classes not known yet and nothing
+        /// typed to join, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -17,6 +18,8 @@
             var protection: Protection? = permission(.approved)
             var sync: SyncState? = standing(.out)
             var askFailed: ScreenTimeAskError?
+            var hasClasses: Bool?
+            var joining = Joining()
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -29,6 +32,11 @@
             "screenTimeError": State(
                 protection: permission(.notDetermined),
                 askFailed: .failed("FamilyControlsError.networkError")),
+            "join": State(hasClasses: false, joining: joining()),
+            "joinPreview": State(hasClasses: false, joining: joining(opens: period3Preview)),
+            "joinError": State(
+                hasClasses: false,
+                joining: joining(failure: Joining.words(.status(404), .classNotFound))),
             "home": State(),
             "waiting": State(sync: standing(.waiting)),
             "focus": State(sync: standing(.inSession(period3, .focused))),
@@ -59,6 +67,22 @@
         /// A class whose bell is 27 minutes away.
         private static let period3 = SessionView(
             id: "session", classId: "class", endsAt: Date() + 27 * 60)
+
+        /// What `KWX49Q` opens, as `GET /v1/join-codes/{code}` answers: Period 3, with Ms. Rivera.
+        private static let period3Preview = try? BaliJSON.makeDecoder().decode(
+            JoinCodePreviewResponse.self,
+            from: Data(
+                #"{"class":{"id":"class","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
+                    .utf8))
+
+        /// The Join screen with `KWX49Q` typed: what it `opens`, once looked up, or why not.
+        private static func joining(opens: JoinCodePreviewResponse? = nil, failure: String? = nil)
+            -> Joining
+        {
+            var joining = Joining()
+            (joining.code, joining.preview, joining.failure) = ("KWX49Q", opens, failure)
+            return joining
+        }
 
         /// What rule 3's check found: `permission`, checked.
         private static func permission(_ permission: Permission) -> Protection {
