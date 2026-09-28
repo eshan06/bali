@@ -94,7 +94,8 @@ extension SyncState {
 
 /// Keeps the shields where the engine's truth says (B5): it follows `SyncEngine.updates()`, takes
 /// them off at the end or the cap by the phone's own clock (data model, decision 6), and runs rule
-/// 3's check before each check-in. The app has one.
+/// 3's check at each foreground wake of the engine — before each check-in, and out of a session
+/// too (C1c). The app has one.
 public actor Enforcer {
     let engine: SyncEngine
     let screenTime: any ScreenTime

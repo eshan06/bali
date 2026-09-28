@@ -201,7 +201,8 @@ public actor SyncEngine {
     /// names no session — since no read shows an armed tap.
     private var armed = false
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
-    /// Rule 3's check of the shields, run before each check-in: the enforcer's (B5).
+    /// Rule 3's check of the shields, run at each wake in the foreground — before each check-in,
+    /// and out of a session too (C1c): the enforcer's (B5).
     private var check: (@Sendable () async -> Void)?
     /// `ReconcileStamp.changes`: each change the phone makes, and each answer to one.
     private var changes = 0
@@ -327,7 +328,8 @@ public actor SyncEngine {
         sendAndReadNow()
     }
 
-    /// Runs `check` before each check-in: rule 3's check of the shields, the enforcer's (B5).
+    /// Runs `check` at each wake of the read loop in the foreground — before each check-in, and out
+    /// of a session too (C1c): rule 3's check of the shields, the enforcer's (B5).
     public func beforeEachCheckIn(_ check: @escaping @Sendable () async -> Void) {
         self.check = check
     }
@@ -458,8 +460,10 @@ public actor SyncEngine {
             readStanding()
             // Rule 3, at each wake in the foreground: before the check-in, or the read of the truth
             // in its place — offline, one that never completes. A protection off it reports is a
-            // change, which the read's stamp then counts.
-            if foreground, case .inSession = state.standing { await check?() }
+            // change, which the read's stamp then counts. Out of a session too (C1c): with the app
+            // left open there, a grant taken back is found at a wake, not at the app's next return
+            // to the front — and reported nowhere, which the check's own rules see to.
+            if foreground { await check?() }
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
