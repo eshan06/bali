@@ -95,8 +95,10 @@ struct PrimaryButtonStyle: ButtonStyle {
 }
 
 /// D1's secondary action: the primary's shape, white with a strong border and the primary ink —
-/// pressed, the sunken fill.
+/// pressed, the sunken fill; dimmed while disabled, as the primary is.
 struct SecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.textStyle(.button).foregroundStyle(Theme.text)
             .frame(maxWidth: .infinity, minHeight: 56)
@@ -105,6 +107,7 @@ struct SecondaryButtonStyle: ButtonStyle {
                 in: .rect(cornerRadius: Theme.Radius.md))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong))
+            .opacity(enabled ? 1 : 0.6)
     }
 }
 

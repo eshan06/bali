@@ -329,8 +329,9 @@ public actor SyncEngine {
     }
 
     /// Runs `check` at each wake of the read loop in the foreground — before each check-in, and out
-    /// of a session too (C1c): rule 3's check of the shields, the enforcer's (B5).
-    public func beforeEachCheckIn(_ check: @escaping @Sendable () async -> Void) {
+    /// of a session too (C1c; B5a's `beforeEachCheckIn`): rule 3's check of the shields, the
+    /// enforcer's (B5).
+    public func atEachWake(_ check: @escaping @Sendable () async -> Void) {
         self.check = check
     }
 

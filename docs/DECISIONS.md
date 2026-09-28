@@ -49,7 +49,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   so out of a session it moves only the claim (`permission`, `permissionOff`), which clears
   `Phone.everApproved` and brings the grant screen back. The cost is what a session already pays:
   one Family Controls read and one enforcer pass every 30 s while the app is open. Test first, red
-  before the change: `ProtectionOffTests.checkOutOfSession`.
+  before the change: `ProtectionOffTests.checkOutOfSession`. The hook is renamed for what it now
+  does, `SyncEngine.atEachWake` (B5a's `beforeEachCheckIn`; santa's round 1).
 
 - **2026-09-27** — **C2b: the Join screen and its class preview, and the owner's two rulings on
   the consent list.** **The rulings (owner, 2026-09-27; C1b's open questions, santa's round 1):**

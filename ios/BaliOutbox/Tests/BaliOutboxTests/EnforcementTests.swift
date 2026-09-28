@@ -1009,7 +1009,7 @@ struct StandingKeptTests {
         }
         let checks = Count()
         let rig = try Rig()
-        await rig.engine.beforeEachCheckIn { checks.add() }
+        await rig.engine.atEachWake { checks.add() }
         try await rig.tapIn()
         #expect(checks.value == 0)
         try await rig.foreground()

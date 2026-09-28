@@ -1,8 +1,9 @@
 import Foundation
 
 // Enforcement (ARCHITECTURE, "iOS app structure"; B5): the shields follow the sync engine's truth,
-// and rule 3's check runs before each check-in. Screen Time itself is the app's, behind
-// `ScreenTime`, so every rule here runs on Linux too.
+// and rule 3's check runs at each foreground wake of the engine — before each check-in, and out of
+// a session too (C1c). Screen Time itself is the app's, behind `ScreenTime`, so every rule here
+// runs on Linux too.
 
 /// The Screen Time permission, Family Controls' `.individual`: the student grants it with Face ID
 /// or their passcode, and can take it back in Settings, where iOS drops every shield at once.
@@ -128,7 +129,7 @@ public actor Enforcer {
 
     /// Hands the engine rule 3's check, then follows its truth until cancelled.
     public func run() async {
-        await engine.beforeEachCheckIn { [weak self] in await self?.check() }
+        await engine.atEachWake { [weak self] in await self?.check() }
         for await _ in await engine.updates() { await enforce() }
         alarm?.cancel()
     }
