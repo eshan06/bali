@@ -34,7 +34,7 @@ struct RootView: View {
         case .intro: IntroView { phone.sawIntro() }
         case .signIn: SignInView(signIn: phone.signIn)
         case .screenTime: ScreenTimeView(phone: phone)
-        case .join: StepPlaceholder("Join — C2")
+        case .join: JoinView(phone: phone)
         case .home: StepPlaceholder("Home — C3")
         case .waiting: StepPlaceholder("Waiting — C3")
         case .focus: StepPlaceholder("Focus — C4")

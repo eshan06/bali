@@ -71,6 +71,11 @@ final class Phone {
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
     /// until the next ask (rule 5).
     private(set) var askFailed: ScreenTimeAskError?
+    /// Whether the student is in any class: nil until the phone knows — `GET /v1/me` is C3's to
+    /// read — and true once a join says so. The router shows Join while it is false.
+    private(set) var hasClasses: Bool?
+    /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
+    var joining = Joining()
 
     init() {}
 
@@ -88,16 +93,44 @@ final class Phone {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed) = (false, fixture.askFailed)
+            (hasClasses, joining) = (fixture.hasClasses, fixture.joining)
         }
     #endif
 
     /// The screen to show now: `Screen.choose`, the one place that decides, over what the phone
-    /// knows. Its classes and a session just over are later steps' (C2, C5): nil until then.
+    /// knows. A session just over is a later step's (C5): nil until then.
     var screen: Screen {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-            everApproved: everApproved, sync: sync, hasClasses: nil, lastSessionOver: nil,
+            everApproved: everApproved, sync: sync, hasClasses: hasClasses, lastSessionOver: nil,
             now: Date())
+    }
+
+    /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the app's one client: what
+    /// it opens, or why not — the last try's words gone meanwhile. Nothing on a frozen phone.
+    func lookUp() async {
+        guard let client = engine?.client, let signIn else { return }
+        let code = joining.code
+        joining.failure = nil
+        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
+            await client.previewJoinCode(code)
+        }
+        joining.looked(answer, for: code)
+    }
+
+    /// Joins the class the code opens (`POST /v1/enrollments`) — its event id minted per press, as
+    /// the server knows a join's retry by its enrollment: once in, the phone has a class, so the
+    /// router moves on; else why not, said. Nothing on a frozen phone.
+    func join() async {
+        guard let client = engine?.client, let signIn else { return }
+        let now = Date()
+        let request = EnrollmentJoinRequest(
+            joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
+        joining.failure = nil
+        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
+            await client.join(request)
+        }
+        if joining.joined(answer) { hasClasses = true }
     }
 
     func sawIntro() {

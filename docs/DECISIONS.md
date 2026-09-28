@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-27** — **C2b: the Join screen and its class preview, and the owner's two rulings on
+  the consent list.** **The rulings (owner, 2026-09-27; C1b's open questions, santa's round 1):**
+  the student app keeps "Screen Time off" for the state the portal's grid labels "Protection off"
+  (and D1's chip "Permission off") — a student's words name the setting they turned off; and the
+  one "what your teacher sees" list names what the grid shows that it left out, the phone gone
+  silent and the last-seen time: "If Bali stops hearing from your phone during class, and when it
+  last did" ("silent" is kept out of a student's words: on a phone it reads as the ringer). **One
+  list:** `ConsentCard` holds it and draws it, as D1's ConsentPreview does — a divider between
+  the halves, one icon column — on the intro's second page and before joining, so the two never
+  say different things. **The screen** (`JoinView`, D1's JoinCode and ConsentPreview): the field
+  keeps a code as codes are written — letters and digits, upper case, at most `JOIN_CODE_LENGTH`
+  (a test pins it to the TypeScript's) — and Continue looks up only a whole one; the preview names
+  the class, its teacher ("your teacher" when their account has none, A6), what that teacher
+  sees, **Join <class>** and **Not my class**; a class the student is in already says so, with
+  Continue. **The rules are pure** (`Joining`, BaliOutbox, tested on Linux against A6's fixtures
+  and the join's): every failure in words keyed on the status and the error's `reason`, never its
+  message — no class has that code, can't reach the server (no answer, or no token to send), a
+  teacher's account (403), too many tries (429), else something went wrong — said under the button
+  that tries again (rule 5); an answer for a code typed over since is dropped, its class not the
+  one the student would join; a join refused `class_not_found` (the code archived or made anew
+  since the preview) goes back to the code; and a join once sent is never cancelled — the way back
+  waits for its answer. **The calls** (`Phone.lookUp`, `Phone.join`), through the engine's one
+  client: a screen's own call never passes the engine's `reauth`, so a 401 renews the token
+  (`SignIn.refresh`) and sends once more, as the engine does for its own (`Joining.send`, on the
+  caller's actor, tested on Linux; santa's round 1) — at worst one renewal more than the engine's
+  own next 401 would make; a join's event id is minted per press — the server knows a join's
+  retry by its enrollment, not its id (`joinClassByCode`), and a fresh id can never be stuck on a
+  `409`. **The router's input:**
+  `Phone.hasClasses`, nil until the phone knows — reading `GET /v1/me` is C3's — and true once a
+  join says so; so the live app reaches Join from C3, and the fixtures (`join`, `joinPreview`,
+  `joinError`) reach it now. **Not built:** a way back from the code's page — at the router's root
+  there is nowhere to go back to; C3 adds one when Home opens Join.
 - **2026-09-26** — **C1b: the intro's three pages and the Screen Time grant, and the C1 riders —
   the intro's words v3's, an "ever approved" flag beside the router, the browser's own word for a
   sign-in that gave no answer, and a refused ask that reads denied at once.** **The intro's words**
