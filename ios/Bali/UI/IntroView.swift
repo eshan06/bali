@@ -7,11 +7,21 @@ import SwiftUI
 /// list is the consent preview's own (`ConsentCard`, C2b), so the two never say different things.
 struct IntroView: View {
     let done: () -> Void
+    /// The pages' tags, first to last.
+    static let pages = 0...2
     #if DEBUG
-        /// The page a Debug launch opens on — `-bali-intro-page 2` — for a screenshot of each.
-        @State private var page = Int(PreviewFixtures.value(of: "-bali-intro-page") ?? "") ?? 0
+        @State private var page = IntroView.page(from: CommandLine.arguments)
+
+        /// The page a Debug launch opens on — `-bali-intro-page 2` — for a screenshot of each: the
+        /// page named, the nearest one that exists to a number past either end (#105's review), and
+        /// the first when none is named.
+        static func page(from arguments: [String]) -> Int {
+            let named = PreviewFixtures.value(of: "-bali-intro-page", in: arguments)
+            let page = named.flatMap { Int($0) } ?? pages.lowerBound
+            return min(max(page, pages.lowerBound), pages.upperBound)
+        }
     #else
-        @State private var page = 0
+        @State private var page = IntroView.pages.lowerBound
     #endif
 
     var body: some View {
@@ -23,7 +33,7 @@ struct IntroView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             HStack(spacing: 8) {
-                ForEach(0..<3) { dot in
+                ForEach(Self.pages, id: \.self) { dot in
                     Circle().fill(dot == page ? Theme.brand : Theme.borderStrong)
                         .frame(width: 8, height: 8)
                 }
@@ -31,7 +41,7 @@ struct IntroView: View {
             .frame(maxWidth: .infinity).padding(.bottom, 24)
             .accessibilityHidden(true)
             Button("Continue") {
-                if page < 2 { withAnimation { page += 1 } } else { done() }
+                if page < Self.pages.upperBound { withAnimation { page += 1 } } else { done() }
             }
             .buttonStyle(PrimaryButtonStyle())
         }

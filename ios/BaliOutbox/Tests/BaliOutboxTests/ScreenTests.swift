@@ -231,21 +231,32 @@ struct ScreenTests {
     }
 
     @Test(
-        "What the Screen Time screen says (C1b): the ask, and once denied — at the prompt or in Settings — that nothing pauses and how back, with the button asking again; an ask iOS could not make says so and offers another try, never what iOS said; Don't Allow says nothing more"
+        "What the Screen Time screen says (C1b): the ask, and once denied — at the prompt or in Settings — that nothing pauses and how back, Open Settings first and asking again second, never promising iOS will ask (#105's review); an ask iOS could not make says so, never what iOS said, with another try — or, over denied, Settings; Don't Allow says nothing more"
     )
     func screenTimeWords() {
         let asked = Permission.notDetermined.screenTimeWords
-        #expect(asked.button == "Ask me")
+        #expect(asked.ask == "Ask me" && asked.settings == nil)
         #expect(asked.body.hasPrefix("iOS asks once. Bali uses Screen Time only to pause apps"))
         #expect(asked.body.hasSuffix("your teacher simply sees 'Screen Time off'."))
         #expect(Permission.approved.screenTimeWords == asked)
         let denied = Permission.denied.screenTimeWords
-        #expect(denied.button == "Ask again")
+        #expect(denied.settings == "Open Settings" && denied.ask == "Ask again")
         #expect(denied.body.hasPrefix("Screen Time access is turned off for Bali"))
-        #expect(denied.body.contains("Settings → Screen Time → Apps with Screen Time Access"))
-        #expect(ScreenTimeAskError.cancelled.words == nil)
-        #expect(
-            ScreenTimeAskError.failed("FamilyControlsError.invalidAccountType").words
-                == "Bali couldn't ask iOS for Screen Time. Try again, or ask your teacher.")
+        #expect(denied.body.contains("Settings → Screen Time → Apps with Screen Time Access."))
+        #expect(denied.body.hasSuffix("iOS may not ask again here."))
+        #expect(!denied.body.contains("or ask again"))
+        for permission in [Permission.approved, .denied, .notDetermined] {
+            #expect(ScreenTimeAskError.cancelled.words(permission) == nil, "\(permission)")
+        }
+        let failed = ScreenTimeAskError.failed("FamilyControlsError.invalidAccountType")
+        for permission in [Permission.approved, .notDetermined] {
+            #expect(
+                failed.words(permission)
+                    == "Bali couldn't ask iOS for Screen Time. Try again, or ask your teacher.",
+                "\(permission)")
+        }
+        let toSettings =
+            "Bali couldn't ask iOS for Screen Time. Turn it on in Settings, or ask your teacher."
+        #expect(failed.words(.denied) == toSettings)
     }
 }

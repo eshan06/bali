@@ -4,9 +4,10 @@ import UIKit
 
 /// The Screen Time grant (C1b), after the sign-in, until the permission reads approved: iOS's own
 /// prompt, through the enforcer (`Phone.askScreenTime()`), and what stands in the way said in
-/// place (rule 5) — the permission denied, at the prompt or in Settings, with the way back; an ask
-/// iOS could not make, with another try. The reference onboarding sheet's last page, in D1's
-/// light tokens; the words are `Permission.screenTimeWords` and `ScreenTimeAskError.words`.
+/// place (rule 5) — the permission denied, at the prompt or in Settings, with the way back:
+/// **Open Settings** first, the ask second, since iOS may not prompt again (#105's review); an ask
+/// iOS could not make, with the way on. The reference onboarding sheet's last page, in D1's light
+/// tokens; the words are `Permission.screenTimeWords` and `ScreenTimeAskError.words`.
 struct ScreenTimeView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
@@ -33,17 +34,18 @@ struct ScreenTimeView: View {
                     .frame(maxWidth: .infinity).multilineTextAlignment(.center)
                     Spacer()
                     VStack(spacing: 12) {
-                        Button(busy ? "Asking…" : words.button) { Task { await ask() } }
-                            .buttonStyle(PrimaryButtonStyle()).disabled(busy)
-                        if permission == .denied {
-                            Button("Open Settings") {
-                                if let settings = URL(string: UIApplication.openSettingsURLString) {
-                                    openURL(settings)
+                        if let settings = words.settings {
+                            Button(settings) {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    openURL(url)
                                 }
                             }
-                            .buttonStyle(SecondaryButtonStyle())
+                            .buttonStyle(PrimaryButtonStyle())
+                            askButton(words.ask).buttonStyle(SecondaryButtonStyle())
+                        } else {
+                            askButton(words.ask).buttonStyle(PrimaryButtonStyle())
                         }
-                        if let failure = phone.askFailed?.words {
+                        if let failure = phone.askFailed?.words(permission) {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -54,6 +56,11 @@ struct ScreenTimeView: View {
                 }
             }
         }
+    }
+
+    /// The ask's button, labelled `label` — busy while iOS's prompt is up.
+    private func askButton(_ label: String) -> some View {
+        Button(busy ? "Asking…" : label) { Task { await ask() } }.disabled(busy)
     }
 
     /// One ask: iOS's prompt, the button busy meanwhile.

@@ -93,18 +93,21 @@ extension SignInError {
 extension Permission {
     /// What the Screen Time screen says (C1b) under "Let Bali pause apps during class", from the
     /// permission as rule 3's check last read it — nothing granted yet, or taken back, at the
-    /// prompt or in Settings, with the way back — and how its button reads.
-    public var screenTimeWords: (body: String, button: String) {
+    /// prompt or in Settings, with the way back — and its buttons: the ask, and once denied
+    /// Settings before it, as the primary action. iOS may not prompt again from denied, so Settings
+    /// is the sure way back and the body never promises a prompt; the ask stays, second — should
+    /// iOS not prompt, the screen reads denied again (#105's review).
+    public var screenTimeWords: (body: String, ask: String, settings: String?) {
         switch self {
         case .denied:
             (
-                "Screen Time access is turned off for Bali, so nothing pauses during class and your teacher sees 'Screen Time off'. Turn it on in Settings → Screen Time → Apps with Screen Time Access, or ask again here.",
-                "Ask again"
+                "Screen Time access is turned off for Bali, so nothing pauses during class and your teacher sees 'Screen Time off'. Turn it on in Settings → Screen Time → Apps with Screen Time Access. iOS may not ask again here.",
+                "Ask again", "Open Settings"
             )
         case .approved, .notDetermined:
             (
                 "iOS asks once. Bali uses Screen Time only to pause apps while your class is in focus. Turning it off later is always possible, and your teacher simply sees 'Screen Time off'.",
-                "Ask me"
+                "Ask me", nil
             )
         }
     }
@@ -120,10 +123,14 @@ public enum ScreenTimeAskError: Error, Sendable, Hashable {
     /// restriction, no network): what it said, for the readout, never for the student.
     case failed(String)
 
-    public var words: String? {
-        switch self {
-        case .cancelled: nil
-        case .failed: "Bali couldn't ask iOS for Screen Time. Try again, or ask your teacher."
+    /// What the screen says of it, over `permission` as read now: once denied, Settings is the way
+    /// on — another try may never prompt (#105's review).
+    public func words(_ permission: Permission) -> String? {
+        switch (self, permission) {
+        case (.cancelled, _): nil
+        case (.failed, .denied):
+            "Bali couldn't ask iOS for Screen Time. Turn it on in Settings, or ask your teacher."
+        case (.failed, _): "Bali couldn't ask iOS for Screen Time. Try again, or ask your teacher."
         }
     }
 }

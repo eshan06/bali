@@ -74,9 +74,9 @@ struct AppTests {
             #expect(name.hasPrefix(screen), "\(name): \(screen)")
         }
         let failed = Phone(fixture: try #require(PreviewFixtures.all["screenTimeError"]))
-        #expect(failed.screen == .screenTime && failed.askFailed?.words != nil)
+        #expect(failed.screen == .screenTime && failed.askFailed?.words(.notDetermined) != nil)
         await failed.askScreenTime()
-        #expect(failed.askFailed?.words != nil)
+        #expect(failed.askFailed?.words(.notDetermined) != nil)
         let previewing = Phone(fixture: try #require(PreviewFixtures.all["joinPreview"]))
         #expect(previewing.joining.preview?.teacher.displayName == "Ms. Rivera")
         await previewing.join()
@@ -85,6 +85,18 @@ struct AppTests {
         #expect(refused.joining.preview == nil && refused.joining.code == "KWX49Q")
         await refused.lookUp()
         #expect(refused.joining.failure == Joining.words(.status(404), .classNotFound))
+    }
+
+    @Test(
+        "A Debug launch's `-bali-intro-page` opens a page that exists (#105's review): the one named, the nearest one to a number past either end, and the first when none is named or it is no number"
+    )
+    func introPage() {
+        func page(_ named: String?) -> Int {
+            IntroView.page(from: ["Bali"] + (named.map { ["-bali-intro-page", $0] } ?? []))
+        }
+        #expect(IntroView.pages == 0...2)
+        #expect([nil, "0", "1", "2"].map(page) == [0, 0, 1, 2])
+        #expect(["3", "99", "-1", "two", ""].map(page) == [2, 2, 0, 0, 0])
     }
 
     @Test(
@@ -120,10 +132,22 @@ struct AppTests {
     }
 
     @Test(
-        "The student's own no is the only cancel (C1b): the browser session's canceledLogin is the sign-in's cancelled, and Family Controls' authorizationCanceled the ask's; any other failure is said, what the platform said kept"
+        "The student's own no is the only cancel (C1b): the browser session's canceledLogin is the sign-in's cancelled — typed, the NSError behind it, or another error type carrying its domain and code, however SwiftUI's session hands it over (#105's review) — and Family Controls' authorizationCanceled the ask's; any other failure is said, what the platform said kept: the session's other codes, its cancel's code in another domain, a cancel of another kind"
     )
     func cancels() {
+        let (session, canceledLogin) = (
+            ASWebAuthenticationSessionError.errorDomain,
+            ASWebAuthenticationSessionError.canceledLogin.rawValue
+        )
+        /// An error of another type, bridging to the session's domain: the typed error's cast
+        /// misses it.
+        struct Carried: CustomNSError {
+            static var errorDomain: String { ASWebAuthenticationSessionError.errorDomain }
+            let errorCode: Int
+        }
         #expect(SignInError(browser: ASWebAuthenticationSessionError(.canceledLogin)) == .cancelled)
+        #expect(SignInError(browser: NSError(domain: session, code: canceledLogin)) == .cancelled)
+        #expect(SignInError(browser: Carried(errorCode: canceledLogin)) == .cancelled)
         let unopened = SignInError(browser: ASWebAuthenticationSessionError(.presentationContextInvalid))
         guard case .notOpened(let why) = unopened else {
             Issue.record("\(unopened)")
@@ -131,10 +155,23 @@ struct AppTests {
         }
         // The bridged error's own description — its domain and code — kept for the readout.
         #expect(why.contains("WebAuthenticationSession") && why.contains("Code=3"))
+        let notProvided = ASWebAuthenticationSessionError.presentationContextNotProvided.rawValue
+        let others: [any Error] = [
+            NSError(domain: session, code: notProvided), Carried(errorCode: notProvided),
+            NSError(domain: NSURLErrorDomain, code: canceledLogin), URLError(.cancelled),
+            CancellationError(),
+        ]
+        for error in others {
+            let said = SignInError(browser: error)
+            if case .notOpened = said { continue }
+            Issue.record("\(error): \(said)")
+        }
         #expect(ScreenTimeAskError(familyControls: FamilyControlsError.authorizationCanceled) == .cancelled)
         let failed = ScreenTimeAskError(familyControls: FamilyControlsError.invalidAccountType)
         #expect(failed == .failed("\(FamilyControlsError.invalidAccountType)"))
-        #expect(ScreenTimeAskError(familyControls: URLError(.notConnectedToInternet)).words != nil)
+        #expect(
+            ScreenTimeAskError(familyControls: URLError(.notConnectedToInternet))
+                .words(.notDetermined) != nil)
     }
 
     @Test(
