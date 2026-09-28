@@ -53,6 +53,19 @@ public struct Joining: Sendable, Hashable {
     /// Back, or "Not my class": the code again, as typed.
     public mutating func back() { (preview, failure) = (nil, nil) }
 
+    /// A screen's own call, `send`: sent once more when the API refused its token and `refresh` —
+    /// the sign-in's — renewed it, as the engine does for its own calls, which a screen's never
+    /// passes through; a refresh that gives none leaves the 401, said. Nothing else refreshes. It
+    /// runs on its caller's actor, so the two closures never leave it.
+    public static func send<Answer: Decodable & Sendable>(
+        renewing refresh: () async -> Bool, _ send: () async -> APIResponse<Answer>,
+        isolation: isolated (any Actor)? = #isolation
+    ) async -> APIResponse<Answer> {
+        let answer = await send()
+        guard answer.result == .status(401), await refresh() else { return answer }
+        return await send()
+    }
+
     /// What the screen says when a look or a join gave no class (rule 5): the kind of failure in
     /// plain words, and the way on — keyed on the status and the error's `reason`, never its
     /// message.

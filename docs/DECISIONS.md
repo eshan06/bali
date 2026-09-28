@@ -31,9 +31,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   since the preview) goes back to the code; and a join once sent is never cancelled — the way back
   waits for its answer. **The calls** (`Phone.lookUp`, `Phone.join`), through the engine's one
   client: a screen's own call never passes the engine's `reauth`, so a 401 renews the token
-  (`SignIn.refresh`) and sends once more, as the engine does for its own; a join's event id is
-  minted per press — the server knows a join's retry by its enrollment, not its id
-  (`joinClassByCode`), and a fresh id can never be stuck on a `409`. **The router's input:**
+  (`SignIn.refresh`) and sends once more, as the engine does for its own (`Joining.send`, on the
+  caller's actor, tested on Linux; santa's round 1) — at worst one renewal more than the engine's
+  own next 401 would make; a join's event id is minted per press — the server knows a join's
+  retry by its enrollment, not its id (`joinClassByCode`), and a fresh id can never be stuck on a
+  `409`. **The router's input:**
   `Phone.hasClasses`, nil until the phone knows — reading `GET /v1/me` is C3's — and true once a
   join says so; so the live app reaches Join from C3, and the fixtures (`join`, `joinPreview`,
   `joinError`) reach it now. **Not built:** a way back from the code's page — at the router's root

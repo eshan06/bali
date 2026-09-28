@@ -106,11 +106,15 @@ final class Phone {
             now: Date())
     }
 
-    /// Looks the typed code up (`GET /v1/join-codes/{code}`): what it opens, or why not. Nothing
-    /// on a frozen phone.
+    /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the app's one client: what
+    /// it opens, or why not — the last try's words gone meanwhile. Nothing on a frozen phone.
     func lookUp() async {
+        guard let client = engine?.client, let signIn else { return }
         let code = joining.code
-        guard let answer = await call({ await $0.previewJoinCode(code) }) else { return }
+        joining.failure = nil
+        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
+            await client.previewJoinCode(code)
+        }
         joining.looked(answer, for: code)
     }
 
@@ -118,23 +122,15 @@ final class Phone {
     /// the server knows a join's retry by its enrollment: once in, the phone has a class, so the
     /// router moves on; else why not, said. Nothing on a frozen phone.
     func join() async {
+        guard let client = engine?.client, let signIn else { return }
         let now = Date()
         let request = EnrollmentJoinRequest(
             joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
-        guard let answer = await call({ await $0.join(request) }) else { return }
+        joining.failure = nil
+        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
+            await client.join(request)
+        }
         if joining.joined(answer) { hasClasses = true }
-    }
-
-    /// A screen's own call, through the app's one client: sent once more when the API refused its
-    /// token and the sign-in renewed it — as the engine's `reauth` does for its own, which this
-    /// call never passes through; nil on a frozen phone, where nothing is sent.
-    private func call<Answer: Decodable & Sendable>(
-        _ send: (APIClient) async -> APIResponse<Answer>
-    ) async -> APIResponse<Answer>? {
-        guard let engine, let signIn else { return nil }
-        let answer = await send(engine.client)
-        guard answer.result == .status(401), await signIn.refresh() else { return answer }
-        return await send(engine.client)
     }
 
     func sawIntro() {

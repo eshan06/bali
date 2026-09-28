@@ -145,6 +145,45 @@ struct JoinTests {
     }
 
     @Test(
+        "A screen's own call whose token the API refused (401): the sign-in's refresh asked once, and a fresh token sends it once more — once only; no fresh token leaves the 401, said; any other answer, or none, never refreshes"
+    )
+    func renewing() async throws {
+        let (refused, found) = (client(401), try fixture("join-codes/found.json"))
+        /// `send` over answers in turn — the last again once they run out — and the refresh
+        /// giving `fresh`: the answer, how many sends, how many refreshes.
+        func run(_ answers: [APIClient], fresh: Bool) async
+            -> (APIResponse<JoinCodePreviewResponse>, sends: Int, refreshes: Int)
+        {
+            var (sends, refreshes) = (0, 0)
+            let answer = await Joining.send(
+                renewing: {
+                    refreshes += 1
+                    return fresh
+                },
+                {
+                    sends += 1
+                    return await answers[min(sends, answers.count) - 1].previewJoinCode("6BVZA5")
+                })
+            return (answer, sends, refreshes)
+        }
+        let renewed = await run([refused, found], fresh: true)
+        #expect(renewed.0.answer?.class.name == "Class fx-enroll")
+        #expect(renewed.sends == 2 && renewed.refreshes == 1)
+        let again = await run([refused], fresh: true)
+        #expect(again.0.result == .status(401) && again.sends == 2 && again.refreshes == 1)
+        let none = await run([refused, found], fresh: false)
+        #expect(none.0.result == .status(401) && none.sends == 1 && none.refreshes == 1)
+        var joining = Joining()
+        joining.type("6BVZA5")
+        joining.looked(none.0, for: "6BVZA5")
+        #expect(joining.failure == "Bali couldn't check your sign-in. Try again.")
+        for others in [[found], [client(404)], [client(nil)], [client(500)]] {
+            let other = await run(others, fresh: true)
+            #expect(other.sends == 1 && other.refreshes == 0, "\(other.0.result)")
+        }
+    }
+
+    @Test(
         "Every refusal in words keyed on its status and reason, never its message: a teacher's account, too many tries, and anything else the way on"
     )
     func words() {
