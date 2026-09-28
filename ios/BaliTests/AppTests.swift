@@ -74,9 +74,9 @@ struct AppTests {
             #expect(name.hasPrefix(screen), "\(name): \(screen)")
         }
         let failed = Phone(fixture: try #require(PreviewFixtures.all["screenTimeError"]))
-        #expect(failed.screen == .screenTime && failed.askFailed?.words != nil)
+        #expect(failed.screen == .screenTime && failed.askFailed?.words(.notDetermined) != nil)
         await failed.askScreenTime()
-        #expect(failed.askFailed?.words != nil)
+        #expect(failed.askFailed?.words(.notDetermined) != nil)
         let previewing = Phone(fixture: try #require(PreviewFixtures.all["joinPreview"]))
         #expect(previewing.joining.preview?.teacher.displayName == "Ms. Rivera")
         await previewing.join()
@@ -85,6 +85,85 @@ struct AppTests {
         #expect(refused.joining.preview == nil && refused.joining.code == "KWX49Q")
         await refused.lookUp()
         #expect(refused.joining.failure == Joining.words(.status(404), .classNotFound))
+    }
+
+    @Test(
+        "A Debug launch's `-bali-intro-page` opens a page that exists (#105's review): the one named, the nearest one to a number past either end, and the first when none is named or it is no number"
+    )
+    func introPage() {
+        func page(_ named: String?) -> Int {
+            IntroView.page(from: ["Bali"] + (named.map { ["-bali-intro-page", $0] } ?? []))
+        }
+        #expect(IntroView.pages == 0...2)
+        #expect([nil, "0", "1", "2"].map(page) == [0, 0, 1, 2])
+        #expect(["3", "99", "-1", "two", ""].map(page) == [2, 2, 0, 0, 0])
+    }
+
+    @Test(
+        "Every colour `Theme` draws, and each chip's, is D1's light value of its token in `bali-tokens.json` — the design system's own file, a token's reference to another followed — shadow-1's opacity too, so the two cannot drift apart unnoticed (#101's review)"
+    )
+    func tokens() throws {
+        let url = try #require(
+            Bundle(for: TestsBundle.self).url(forResource: "bali-tokens", withExtension: "json"))
+        let file = try #require(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        /// A group's tokens, by name: each one's value.
+        func values(_ group: String) throws -> [String: Any] {
+            let group = file[group] as? [String: Any]
+            let tokens = try #require(group?["tokens"] as? [[String: Any]])
+            var values: [String: Any] = [:]
+            for token in tokens {
+                if let name = token["name"] as? String { values[name] = token["value"] }
+            }
+            return values
+        }
+        let colours = try values("color")
+        /// `name`'s light value — a primitive's one value, or another token's through "{name}".
+        func light(_ name: String) -> String? {
+            let value = colours[name]
+            guard let raw = (value as? [String: Any])?["light"] as? String ?? value as? String
+            else { return nil }
+            return raw.hasPrefix("{") ? light(String(raw.dropFirst().dropLast())) : raw.uppercased()
+        }
+        /// `colour` as sRGB bytes, red to blue — and as the file writes one, "#RRGGBB" — with its
+        /// opacity.
+        func drawn(_ colour: Color) -> (bytes: [Int], hex: String, opacity: Float) {
+            let resolved = colour.resolve(in: EnvironmentValues())
+            let bytes = [resolved.red, resolved.green, resolved.blue].map {
+                Int(($0 * 255).rounded())
+            }
+            let hex = "#" + bytes.map { String(format: "%02X", $0) }.joined()
+            return (bytes, hex, resolved.opacity)
+        }
+        let pinned: [(token: String, colour: Color)] = [
+            ("surface-page", Theme.page), ("surface-card", Theme.card),
+            ("surface-sunken", Theme.sunken), ("border-default", Theme.border),
+            ("border-strong", Theme.borderStrong), ("text-primary", Theme.text),
+            ("text-secondary", Theme.textSecondary), ("text-tertiary", Theme.textTertiary),
+            ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
+            ("arc-fill", Theme.arc), ("arc-track", Theme.arcTrack), ("green-200", Theme.markTrack),
+            ("state-focused-bg", Chip.Kind.focused.look.fill),
+            ("state-focused-fg", Chip.Kind.focused.look.ink),
+            ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
+            ("state-emergency-fg", Chip.Kind.unlocked.look.ink),
+            ("state-revoked-bg", Chip.Kind.protectionOff.look.fill),
+            ("state-revoked-fg", Chip.Kind.protectionOff.look.ink),
+            ("state-ended-bg", Chip.Kind.ended.look.fill),
+            ("state-ended-fg", Chip.Kind.ended.look.ink),
+            ("state-notjoined-bg", Chip.Kind.notIn.look.fill),
+            ("state-notjoined-fg", Chip.Kind.notIn.look.ink),
+        ]
+        for (token, colour) in pinned {
+            let found = drawn(colour)
+            #expect(found.hex == light(token), "\(token): \(found.hex)")
+            #expect(found.opacity == 1, "\(token)")
+        }
+        // shadow-1, a resting card's: "0 1px 2px rgba(33,28,21,0.06)".
+        let shadow = drawn(Theme.shadow)
+        let shadows = try values("shadow")
+        let resting = try #require((shadows["shadow-1"] as? [String: Any])?["light"] as? String)
+        let rgba = shadow.bytes.map(String.init) + [String(format: "%g", shadow.opacity)]
+        #expect(resting.hasSuffix("rgba(\(rgba.joined(separator: ",")))"), "\(resting): \(rgba)")
     }
 
     @Test(
@@ -120,10 +199,22 @@ struct AppTests {
     }
 
     @Test(
-        "The student's own no is the only cancel (C1b): the browser session's canceledLogin is the sign-in's cancelled, and Family Controls' authorizationCanceled the ask's; any other failure is said, what the platform said kept"
+        "The student's own no is the only cancel (C1b): the browser session's canceledLogin is the sign-in's cancelled — typed, the NSError behind it, or another error type carrying its domain and code, however SwiftUI's session hands it over (#105's review) — and Family Controls' authorizationCanceled the ask's; any other failure is said, what the platform said kept: the session's other codes, its cancel's code in another domain, a cancel of another kind"
     )
     func cancels() {
+        let (session, canceledLogin) = (
+            ASWebAuthenticationSessionError.errorDomain,
+            ASWebAuthenticationSessionError.canceledLogin.rawValue
+        )
+        /// An error of another type, bridging to the session's domain: the typed error's cast
+        /// misses it.
+        struct Carried: CustomNSError {
+            static var errorDomain: String { ASWebAuthenticationSessionError.errorDomain }
+            let errorCode: Int
+        }
         #expect(SignInError(browser: ASWebAuthenticationSessionError(.canceledLogin)) == .cancelled)
+        #expect(SignInError(browser: NSError(domain: session, code: canceledLogin)) == .cancelled)
+        #expect(SignInError(browser: Carried(errorCode: canceledLogin)) == .cancelled)
         let unopened = SignInError(browser: ASWebAuthenticationSessionError(.presentationContextInvalid))
         guard case .notOpened(let why) = unopened else {
             Issue.record("\(unopened)")
@@ -131,10 +222,23 @@ struct AppTests {
         }
         // The bridged error's own description — its domain and code — kept for the readout.
         #expect(why.contains("WebAuthenticationSession") && why.contains("Code=3"))
+        let notProvided = ASWebAuthenticationSessionError.presentationContextNotProvided.rawValue
+        let others: [any Error] = [
+            NSError(domain: session, code: notProvided), Carried(errorCode: notProvided),
+            NSError(domain: NSURLErrorDomain, code: canceledLogin), URLError(.cancelled),
+            CancellationError(),
+        ]
+        for error in others {
+            let said = SignInError(browser: error)
+            if case .notOpened = said { continue }
+            Issue.record("\(error): \(said)")
+        }
         #expect(ScreenTimeAskError(familyControls: FamilyControlsError.authorizationCanceled) == .cancelled)
         let failed = ScreenTimeAskError(familyControls: FamilyControlsError.invalidAccountType)
         #expect(failed == .failed("\(FamilyControlsError.invalidAccountType)"))
-        #expect(ScreenTimeAskError(familyControls: URLError(.notConnectedToInternet)).words != nil)
+        #expect(
+            ScreenTimeAskError(familyControls: URLError(.notConnectedToInternet))
+                .words(.notDetermined) != nil)
     }
 
     @Test(
@@ -204,3 +308,6 @@ struct AppTests {
         return { x, y in (0..<4).map { Int(bytes[(y * 64 + x) * 4 + $0]) } }
     }
 }
+
+/// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
+private final class TestsBundle {}

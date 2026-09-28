@@ -1,0 +1,167 @@
+{
+  "name": "Bali",
+  "version": 1,
+  "meta": { "source": "bali repo v2-archive: apps/web/src/styles/tokens.css + bali-tokens.cjs (exact values, no invention)" },
+  "color": {
+    "themes": [
+      { "id": "light", "name": "Light" },
+      { "id": "dark", "name": "Dark" }
+    ],
+    "tokens": [
+      { "name": "green-50", "value": "#F0F7F3", "usage": "Evergreen primitive. Brand + focused state family." },
+      { "name": "green-100", "value": "#DCEDE3", "usage": "Evergreen primitive. Light focused-chip fill." },
+      { "name": "green-200", "value": "#BCDCCA", "usage": "Evergreen primitive. Mark's track ring." },
+      { "name": "green-300", "value": "#92C3A9", "usage": "Evergreen primitive. Dark-mode brand text / focus ring." },
+      { "name": "green-400", "value": "#62A483", "usage": "Evergreen primitive. Dark-mode primary action." },
+      { "name": "green-500", "value": "#3F8765", "usage": "Evergreen primitive. Mid brand." },
+      { "name": "green-600", "value": "#2C6F51", "usage": "Evergreen primitive. Light focus ring, arc fill, the mark's arc." },
+      { "name": "green-700", "value": "#245A43", "usage": "Evergreen primitive. Light brand surface + primary action." },
+      { "name": "green-800", "value": "#1E4936", "usage": "Evergreen primitive. Primary hover (light); brand surface (dark)." },
+      { "name": "green-900", "value": "#18392B", "usage": "Evergreen primitive." },
+      { "name": "green-950", "value": "#0E251C", "usage": "Evergreen primitive. Deepest brand." },
+      { "name": "stone-50", "value": "#F7F5F2", "usage": "Warm stone primitive. Light page background." },
+      { "name": "stone-100", "value": "#EFECE7", "usage": "Warm stone primitive. Sunken wells, neutral chip fills." },
+      { "name": "stone-200", "value": "#E3DFD8", "usage": "Warm stone primitive. Default borders, arc track." },
+      { "name": "stone-300", "value": "#D2CCC2", "usage": "Warm stone primitive. Strong borders." },
+      { "name": "stone-400", "value": "#ABA59A", "usage": "Warm stone primitive. Disabled text." },
+      { "name": "stone-500", "value": "#8A847A", "usage": "Warm stone primitive. (AA fail for small text — see text-tertiary note.)" },
+      { "name": "stone-600", "value": "#6B665D", "usage": "Warm stone primitive. Tertiary text, ended/no-device ink." },
+      { "name": "stone-700", "value": "#524E47", "usage": "Warm stone primitive. Not-joined chip ink." },
+      { "name": "stone-800", "value": "#3A3733", "usage": "Warm stone primitive." },
+      { "name": "stone-900", "value": "#26241F", "usage": "Warm stone primitive." },
+      { "name": "stone-950", "value": "#161513", "usage": "Warm stone primitive. Near-black warm." },
+      { "name": "orange-50", "value": "#FBF4EC", "usage": "Warm orange primitive. Emergency family — supportive, never alarm." },
+      { "name": "orange-100", "value": "#F7E6D2", "usage": "Warm orange primitive. Light emergency-chip fill." },
+      { "name": "orange-200", "value": "#EFCEA4", "usage": "Warm orange primitive." },
+      { "name": "orange-300", "value": "#E5AF6F", "usage": "Warm orange primitive. Dark-mode emergency ink." },
+      { "name": "orange-400", "value": "#DB9347", "usage": "Warm orange primitive. Soft-pulse glow." },
+      { "name": "orange-500", "value": "#C97A2D", "usage": "Warm orange primitive." },
+      { "name": "orange-600", "value": "#AE6322", "usage": "Warm orange primitive." },
+      { "name": "orange-700", "value": "#8C4F1E", "usage": "Warm orange primitive." },
+      { "name": "orange-800", "value": "#6F3F1B", "usage": "Warm orange primitive. Light emergency-chip ink." },
+      { "name": "orange-900", "value": "#5A3418", "usage": "Warm orange primitive." },
+      { "name": "blue-50", "value": "#EFF4FC", "usage": "Calm blue primitive. Pass-state family only." },
+      { "name": "blue-100", "value": "#E0EBFA", "usage": "Calm blue primitive. Light pass-chip fill." },
+      { "name": "blue-200", "value": "#BDD4F2", "usage": "Calm blue primitive." },
+      { "name": "blue-300", "value": "#8FB4E8", "usage": "Calm blue primitive. Dark-mode pass ink." },
+      { "name": "blue-400", "value": "#5E90D9", "usage": "Calm blue primitive." },
+      { "name": "blue-500", "value": "#3D77C9", "usage": "Calm blue primitive." },
+      { "name": "blue-600", "value": "#2F62AC", "usage": "Calm blue primitive." },
+      { "name": "blue-700", "value": "#28528E", "usage": "Calm blue primitive. Light pass-chip ink." },
+      { "name": "blue-800", "value": "#224371", "usage": "Calm blue primitive." },
+      { "name": "blue-900", "value": "#1C3659", "usage": "Calm blue primitive." },
+      { "name": "red-50", "value": "#FCF0EE", "usage": "Red primitive. RESERVED: revoked state + destructive actions. Nowhere else." },
+      { "name": "red-100", "value": "#FAE3E0", "usage": "Red primitive. Light revoked-chip fill." },
+      { "name": "red-200", "value": "#F2C3BD", "usage": "Red primitive." },
+      { "name": "red-300", "value": "#E89B92", "usage": "Red primitive. Dark-mode revoked ink." },
+      { "name": "red-400", "value": "#D96E61", "usage": "Red primitive." },
+      { "name": "red-500", "value": "#C44A3C", "usage": "Red primitive. Dark-mode destructive action." },
+      { "name": "red-600", "value": "#A93D31", "usage": "Red primitive. Light destructive action." },
+      { "name": "red-700", "value": "#8C342B", "usage": "Red primitive. Light revoked-chip ink." },
+      { "name": "red-800", "value": "#702B24", "usage": "Red primitive." },
+      { "name": "red-900", "value": "#59241F", "usage": "Red primitive." },
+      { "name": "surface-page", "value": { "light": "{stone-50}", "dark": "#141312" }, "usage": "App/page background. Warm paper in light; true warm dark at night." },
+      { "name": "surface-card", "value": { "light": "#FFFFFF", "dark": "#1D1B19" }, "usage": "Cards and sheets. Dark elevates by lightening, not shadows." },
+      { "name": "surface-sunken", "value": { "light": "{stone-100}", "dark": "#100F0E" }, "usage": "Wells, inputs, code backgrounds." },
+      { "name": "surface-raised", "value": { "light": "#FFFFFF", "dark": "#262421" }, "usage": "Popovers. Pair with shadow-2 in light, hairline border in dark." },
+      { "name": "surface-brand", "value": { "light": "{green-700}", "dark": "{green-800}" }, "usage": "Brand-solid blocks. Text on it uses text-on-brand." },
+      { "name": "border-default", "value": { "light": "{stone-200}", "dark": "#2E2B27" }, "usage": "Hairlines, dividers, card edges (dark relies on these instead of shadows)." },
+      { "name": "border-strong", "value": { "light": "{stone-300}", "dark": "#3C3934" }, "usage": "Emphasis borders, input focus companions." },
+      { "name": "text-primary", "value": { "light": "#211F1B", "dark": "#F1EFEB" }, "usage": "Primary ink. Warm near-black, never pure #000." },
+      { "name": "text-secondary", "value": { "light": "#5B564E", "dark": "#B0AAA1" }, "usage": "Secondary ink for supporting copy." },
+      { "name": "text-tertiary", "value": { "light": "{stone-600}", "dark": "#837D74" }, "usage": "Captions and labels. stone-600, not 500 — 500 fails WCAG AA at small sizes." },
+      { "name": "text-disabled", "value": { "light": "{stone-400}", "dark": "#5C574F" }, "usage": "Disabled text only — never for content someone must read." },
+      { "name": "text-on-brand", "value": { "light": "#FFFFFF", "dark": "#FFFFFF" }, "usage": "Text on surface-brand and primary buttons (light)." },
+      { "name": "text-brand", "value": { "light": "{green-700}", "dark": "{green-300}" }, "usage": "Brand-colored text and links." },
+      { "name": "action-primary-bg", "value": { "light": "{green-700}", "dark": "{green-400}" }, "usage": "Primary button fill. Dark uses green-400 + dark ink — green-500 fails AA with either fg." },
+      { "name": "action-primary-bg-hover", "value": { "light": "{green-800}", "dark": "{green-300}" }, "usage": "Primary button hover." },
+      { "name": "action-primary-fg", "value": { "light": "#FFFFFF", "dark": "#06130D" }, "usage": "Primary button label." },
+      { "name": "action-destructive-bg", "value": { "light": "{red-600}", "dark": "{red-500}" }, "usage": "Destructive actions ONLY (remove student, delete class)." },
+      { "name": "action-destructive-fg", "value": { "light": "#FFFFFF", "dark": "#FFFFFF" }, "usage": "Destructive button label." },
+      { "name": "state-notjoined-fg", "value": { "light": "{stone-700}", "dark": "#B0AAA1" }, "usage": "'Not in' chip ink. Every state chip = color + icon + label, never color alone." },
+      { "name": "state-notjoined-bg", "value": { "light": "{stone-100}", "dark": "#242220" }, "usage": "'Not in' chip fill." },
+      { "name": "state-focused-fg", "value": { "light": "{green-700}", "dark": "{green-300}" }, "usage": "'Focused' chip ink. The good green — earned, calm." },
+      { "name": "state-focused-bg", "value": { "light": "{green-100}", "dark": "#1E2F27" }, "usage": "'Focused' chip fill. Dark tints are hand-mixed, never alpha overlays." },
+      { "name": "state-pass-fg", "value": { "light": "{blue-700}", "dark": "{blue-300}" }, "usage": "'Pass' chip ink (bathroom/nurse). Calm blue, only place blue appears." },
+      { "name": "state-pass-bg", "value": { "light": "{blue-100}", "dark": "#1D2938" }, "usage": "'Pass' chip fill." },
+      { "name": "state-emergency-fg", "value": { "light": "{orange-800}", "dark": "{orange-300}" }, "usage": "'Unlocked' chip ink. Warm, supportive orange — NEVER alarm red; the exit is sanctioned." },
+      { "name": "state-emergency-bg", "value": { "light": "{orange-100}", "dark": "#38291A" }, "usage": "'Unlocked' chip fill." },
+      { "name": "state-revoked-fg", "value": { "light": "{red-700}", "dark": "{red-300}" }, "usage": "'Protection off' chip ink. One of red's two permitted uses." },
+      { "name": "state-revoked-bg", "value": { "light": "{red-100}", "dark": "#341F1C" }, "usage": "'Protection off' chip fill." },
+      { "name": "state-nodevice-fg", "value": { "light": "{stone-600}", "dark": "#A39D94" }, "usage": "'No device' ink. No fill — dashed outline instead (state-nodevice-bg)." },
+      { "name": "state-nodevice-bg", "value": { "light": "rgba(0,0,0,0)", "dark": "rgba(0,0,0,0)" }, "usage": "'No device' is outlined, not filled: transparent + dashed border-default." },
+      { "name": "state-ended-fg", "value": { "light": "{stone-600}", "dark": "#A39D94" }, "usage": "'Ended' chip ink. Neutral rest state." },
+      { "name": "state-ended-bg", "value": { "light": "{stone-100}", "dark": "#242220" }, "usage": "'Ended' chip fill." },
+      { "name": "arc-track", "value": { "light": "{stone-200}", "dark": "#2E2B27" }, "usage": "SessionCountdown arc track (the unfilled ring)." },
+      { "name": "arc-fill", "value": { "light": "{green-600}", "dark": "{green-400}" }, "usage": "SessionCountdown arc progress — the brand's signature motion." },
+      { "name": "arc-final2", "value": { "light": "{green-400}", "dark": "{green-300}" }, "usage": "Final-2-minutes arc emphasis: LIGHTER and thicker, never red." },
+      { "name": "focus-ring-color", "value": { "light": "{green-600}", "dark": "{green-300}" }, "usage": "Keyboard focus ring color; composed in shadow token focus-ring." }
+    ]
+  },
+  "type": {
+    "fonts": [],
+    "families": {
+      "sans": "\"Instrument Sans\", -apple-system, \"SF Pro Text\", \"Segoe UI\", sans-serif",
+      "num": "ui-rounded, \"SF Pro Rounded\", \"Instrument Sans\", sans-serif",
+      "mono": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", Menlo, monospace"
+    },
+    "groups": [
+      {
+        "name": "Text",
+        "family": "sans",
+        "styles": [
+          { "name": "display", "fontSize": "56px", "lineHeight": "60px", "fontWeight": 600, "letterSpacing": "-0.02em", "usage": "Marketing hero only.", "sample": "Tap the desk." },
+          { "name": "h1", "fontSize": "32px", "lineHeight": "38px", "fontWeight": 600, "letterSpacing": "-0.01em", "usage": "Page titles." },
+          { "name": "h2", "fontSize": "24px", "lineHeight": "30px", "fontWeight": 600, "usage": "Section titles, sheet headers." },
+          { "name": "h3", "fontSize": "18px", "lineHeight": "24px", "fontWeight": 600, "usage": "Card titles." },
+          { "name": "body-lg", "fontSize": "17px", "lineHeight": "26px", "fontWeight": 400, "usage": "Lead paragraphs, student-facing copy." },
+          { "name": "body", "fontSize": "15px", "lineHeight": "22px", "fontWeight": 400, "usage": "Default body. The app reads at 15px." },
+          { "name": "caption", "fontSize": "13px", "lineHeight": "18px", "fontWeight": 400, "usage": "Timestamps, helper text — text-tertiary or darker." },
+          { "name": "label", "fontSize": "12px", "lineHeight": "16px", "fontWeight": 600, "letterSpacing": "0.06em", "usage": "UPPERCASE micro-labels and chip text." }
+        ]
+      },
+      {
+        "name": "Data and code",
+        "family": "sans",
+        "styles": [
+          { "name": "data", "fontSize": "14px", "lineHeight": "20px", "fontWeight": 500, "usage": "Tables and stats — always tabular-nums.", "sample": "07:42" },
+          { "name": "data-lg", "family": "num", "fontSize": "28px", "lineHeight": "32px", "fontWeight": 600, "usage": "Medium countdowns — rounded numerals, tabular-nums.", "sample": "24:00" },
+          { "name": "code", "family": "mono", "fontSize": "14px", "lineHeight": "20px", "fontWeight": 500, "usage": "Join codes only.", "sample": "KWX4-92QF" }
+        ]
+      }
+    ]
+  },
+  "spacing": {
+    "note": "4pt base grid — px on web, pt on iOS. Nothing sits off-grid.",
+    "tokens": [
+      { "name": "space-1", "value": "4px", "usage": "Icon-to-label gaps." },
+      { "name": "space-2", "value": "8px", "usage": "Chip padding-y, tight stacks." },
+      { "name": "space-3", "value": "12px", "usage": "Chip padding-x, list gaps." },
+      { "name": "space-4", "value": "16px", "usage": "Card padding, default gap." },
+      { "name": "space-5", "value": "20px", "usage": "Sheet padding." },
+      { "name": "space-6", "value": "24px", "usage": "Section gaps." },
+      { "name": "space-8", "value": "32px", "usage": "Block separation." },
+      { "name": "space-10", "value": "40px", "usage": "Page gutters (desktop)." },
+      { "name": "space-12", "value": "48px", "usage": "Hero spacing." },
+      { "name": "space-16", "value": "64px", "usage": "Marketing sections." }
+    ]
+  },
+  "radius": {
+    "tokens": [
+      { "name": "radius-xs", "value": "6px", "usage": "Small controls, badges." },
+      { "name": "radius-sm", "value": "10px", "usage": "Buttons, inputs." },
+      { "name": "radius-md", "value": "14px", "usage": "Cards, chips." },
+      { "name": "radius-lg", "value": "20px", "usage": "Sheets, hero containers." },
+      { "name": "radius-full", "value": "999px", "usage": "Pills — and the EmergencyUnlock control." }
+    ]
+  },
+  "shadow": {
+    "note": "Light mode: soft warm shadows (warm-black, never blue-gray). Dark mode: elevation via lighter surfaces + hairline borders; shadow-1 disappears entirely.",
+    "tokens": [
+      { "name": "shadow-1", "value": { "light": "0 1px 2px rgba(33,28,21,0.06)", "dark": "none" }, "usage": "Resting cards (light only)." },
+      { "name": "shadow-2", "value": { "light": "0 2px 8px rgba(33,28,21,0.08), 0 1px 2px rgba(33,28,21,0.05)", "dark": "0 2px 8px rgba(0,0,0,0.4)" }, "usage": "Popovers, raised surfaces." },
+      { "name": "shadow-3", "value": { "light": "0 8px 24px rgba(33,28,21,0.12), 0 2px 6px rgba(33,28,21,0.06)", "dark": "0 8px 24px rgba(0,0,0,0.5)" }, "usage": "Modals, sheets." },
+      { "name": "focus-ring", "value": { "light": "0 0 0 2px #F7F5F2, 0 0 0 4px #2C6F51", "dark": "0 0 0 2px #141312, 0 0 0 4px #92C3A9" }, "usage": "Keyboard focus, everywhere, no exceptions: 2px page-color gap + 2px ring." }
+    ]
+  }
+}

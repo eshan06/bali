@@ -744,6 +744,35 @@ struct ProtectionOffTests {
         #expect(try rig.outbox.records().isEmpty)
         await phone.stop()
     }
+
+    @Test(
+        "Out of a session too, with the app left open, rule 3's check runs at each wake of the read loop (C1c), not only as the app comes to the front: a grant taken back is found at the next wake — denied at once, not determined only once two wakes a check-in apart read it (B5a-2) — and nothing is reported, there being no session"
+    )
+    func checkOutOfSession() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.foreground(Answer.me(nil))
+        await phone.until { $0.checked && $0.permission == .approved }
+        // Taken back in Settings, and nothing else happens: no session, no read, no change.
+        await phone.screenTime.set(.denied)
+        rig.clock.advance(by: 30)
+        await phone.until { $0.permission == .denied && $0.permissionOff }
+        await phone.screenTime.set(.approved)
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        await phone.until { $0.permission == .approved && !$0.permissionOff }
+        // Not determined: a launch's moment at one wake, off once it lasts to the next.
+        await phone.screenTime.set(.notDetermined)
+        try await rig.checkInDue(at(90))
+        rig.clock.advance(by: 30)
+        await phone.until { $0.permission == .notDetermined && !$0.permissionOff }
+        try await rig.checkInDue(at(120))
+        rig.clock.advance(by: 30)
+        await phone.until { $0.permission == .notDetermined && $0.permissionOff }
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await rig.server.waiting.isEmpty)
+        await phone.stop()
+    }
 }
 
 @Suite("The engine keeps its standing, and runs rule 3's check", .timeLimit(.minutes(3)))
@@ -980,7 +1009,7 @@ struct StandingKeptTests {
         }
         let checks = Count()
         let rig = try Rig()
-        await rig.engine.beforeEachCheckIn { checks.add() }
+        await rig.engine.atEachWake { checks.add() }
         try await rig.tapIn()
         #expect(checks.value == 0)
         try await rig.foreground()

@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-27** — **C1c: D1's tokens file in the repo, pinned by a test; #105's three review WARNs;
+  and rule 3's check at every foreground wake (the owner's word).** **The tokens file** (#101's
+  review: Theme.swift cited `ds/bali/tokens.json`, a path in D1's artifact, not the repo):
+  `ios/Bali/UI/bali-tokens.json`, beside the one file that draws from it, byte for byte the design
+  system's export so the next copy is a clean diff — prettier skips it (`.prettierignore`) — and in
+  `ios/project.yml` a resource of `BaliTests` alone: the app target excludes it, since the app needs
+  none of it at run time and XcodeGen would otherwise copy a `.json` in `Bali/` into the app's
+  bundle. `AppTests.tokens` pins each `Theme` colour and each chip's fill and ink to one named
+  token's light value — a `{stone-50}`-style reference followed — and shadow-1's colour and opacity.
+  Alternatives: reading the file in place through `#filePath`, as the packages' tests read
+  `contracts/` (tried: the Simulator may not read a checkout in a Mac's `~/Downloads`, macOS's
+  privacy protection refusing it — the owner's is there — so the test would pass on CI and fail on
+  the owner's Mac; that also ruled out scanning Theme.swift for a hex added unpinned, so a colour
+  added there joins the test's list by hand, as its comment says); a Linux test parsing
+  Theme.swift's hexes (it cannot resolve `Color.white`, an alias or an opacity — the Simulator
+  resolves the real colours). The shield extension's four hexes are not pinned here: not `Theme`'s,
+  another target. **The browser's cancel (WARN 1):** read off the bridged error's domain and code,
+  so it is known however SwiftUI's `WebAuthenticationSession` hands it over — the typed
+  `ASWebAuthenticationSessionError`, the `NSError` behind it (C1b's cast took that too: Swift
+  bridges it by domain), or another error type bridging to that domain and code, which the cast
+  missed (`AppTests.cancels` holds all three). That code in another domain, a `URLError(.cancelled)`
+  or a task's `CancellationError` is not the student's cancel — `notOpened`, said (rule 5). **The
+  denied Screen Time screen (WARN 2):** Family Controls may not prompt again from denied, so **Open
+  Settings** is the primary action and **Ask again** the secondary — kept, since the device check's
+  step 12, which asks again after a revoke in Settings, passed on the owner's iPhone, and harmless
+  where iOS does not prompt (the screen reads denied again). The body names the Settings path and
+  says "iOS may not ask again here", never promising a prompt, and an ask that failed over denied
+  says to turn it on in Settings rather than to try again (`ScreenTimeAskError.words(_:)` takes the
+  permission as read). `Permission.screenTimeWords` stays the one source of the screen's words: it
+  gains `settings`, whose presence makes Settings the primary action. **The intro's Debug page (WARN
+  3):** `-bali-intro-page` clamped to the pages that exist, which `IntroView.pages` names once for
+  the dots, Continue and the clamp. **Rule 3's check at every foreground wake (owner, 2026-09-27;
+  left as a follow-up by C1b's santa round 2):** out of a session the read loop did not run it, so
+  with the app left open on home a grant taken back showed only at the app's next return to the
+  front. Now `SyncEngine.read` runs it at every wake in the foreground, in a session or out of one —
+  one condition. The check's rules already hold for it: it reports protection off only in a session
+  the phone's clock says is running whose row is not protection off already, and a read not
+  determined counts only once it lasts a check-in interval of the phone's running (B5a-2, B5a-3) —
+  so out of a session it moves only the claim (`permission`, `permissionOff`), which clears
+  `Phone.everApproved` and brings the grant screen back. The cost is what a session already pays:
+  one Family Controls read and one enforcer pass every 30 s while the app is open. Test first, red
+  before the change: `ProtectionOffTests.checkOutOfSession`. The hook is renamed for what it now
+  does, `SyncEngine.atEachWake` (B5a's `beforeEachCheckIn`; santa's round 1).
+
 - **2026-09-27** — **C2b: the Join screen and its class preview, and the owner's two rulings on
   the consent list.** **The rulings (owner, 2026-09-27; C1b's open questions, santa's round 1):**
   the student app keeps "Screen Time off" for the state the portal's grid labels "Protection off"
@@ -40,6 +84,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   join says so; so the live app reaches Join from C3, and the fixtures (`join`, `joinPreview`,
   `joinError`) reach it now. **Not built:** a way back from the code's page — at the router's root
   there is nowhere to go back to; C3 adds one when Home opens Join.
+
 - **2026-09-26** — **C1b: the intro's three pages and the Screen Time grant, and the C1 riders —
   the intro's words v3's, an "ever approved" flag beside the router, the browser's own word for a
   sign-in that gave no answer, and a refused ask that reads denied at once.** **The intro's words**

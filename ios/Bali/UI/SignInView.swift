@@ -78,9 +78,15 @@ extension WebAuthenticationSession {
 extension SignInError {
     /// The browser session's error in the sign-in's words: its own cancel — the student closed the
     /// page — is `cancelled`, which says nothing; anything else `notOpened`, which is said, what
-    /// the browser said kept for the readout (rule 5; C1b).
+    /// the browser said kept for the readout (rule 5; C1b). The cancel is read off the error's
+    /// domain and code, so it is known however SwiftUI's session hands it over: the typed error,
+    /// the `NSError` behind it, or another error type bridging to both, which a cast to the typed
+    /// error misses (#105's review).
     init(browser error: any Error) {
-        if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+        let bridged = error as NSError
+        if bridged.domain == ASWebAuthenticationSessionError.errorDomain,
+            bridged.code == ASWebAuthenticationSessionError.canceledLogin.rawValue
+        {
             self = .cancelled
         } else {
             self = .notOpened("\(error)")

@@ -32,7 +32,11 @@ targets:
   Bali:
     type: application
     platform: iOS
-    sources: [Bali]
+    sources:
+      - path: Bali
+        # D1's tokens, which Theme.swift's colours are: the app needs none of it, so it ships in
+        # the tests' bundle alone (BaliTests, below).
+        excludes: [UI/bali-tokens.json]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.Bali
@@ -67,7 +71,12 @@ targets:
   BaliTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [BaliTests]
+    sources:
+      - BaliTests
+      # D1's tokens, for AppTests.tokens to pin Theme.swift's colours to: a copy in the bundle, since
+      # the Simulator may not read the checkout in place (macOS keeps it out of ~/Downloads).
+      - path: Bali/UI/bali-tokens.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.BaliTests
