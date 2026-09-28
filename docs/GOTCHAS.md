@@ -65,6 +65,14 @@ touching infra, CI, git plumbing, or the dev environment.
   checkout's packages — another branch — so typecheck, lint and vitest compile
   your branch against the wrong sources ("has no exported member" for a type
   you just added). Run `npm ci` in the worktree before the first check.
+- **The Simulator cannot read the checkout in place.** The repo lives under
+  `~/Downloads`, which macOS's privacy protection keeps from the Simulator: a
+  test hosted there that reads a repo file through `#filePath` fails with
+  `EPERM` (Cocoa error 257) — here only; CI's runner passes. So BaliOutbox's
+  contract tests (`contracts/`) and `BellTests.monitorsCalls` fail on this
+  Mac's Simulator: run the packages with `swift test` here. A test of the
+  app's that needs a file carries it as a `BaliTests` resource
+  (`ios/project.yml`, as `bali-tokens.json` is).
 
 ## Cloud sessions / dev environment
 
