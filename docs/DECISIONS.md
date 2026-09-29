@@ -31,36 +31,42 @@ a real decision? Add a dated entry at the top: what was decided and why.
   read is untouched. **Weighed:** (a) the shield shows no time; (b) a copy of the bell the app
   writes for the shield after each committed change — a small file replaced whole, or the app
   group's defaults. **The owner's ruling: (a).** (b) is one fact in two places, v2's disease
-  (ARCHITECTURE, data model, decision 1); iOS keeps a shield's words until the shields change (B5c's
-  disclosure (1), which round 3 was to check), so a time on a shield could go stale after an
-  extension anyway — the wrong time B5c's words were built never to show; and C4's Focus screen
-  shows the countdown, where the student opens Bali. **Decided:** `ShieldWords(over:)` — one title,
-  "Focused with Bali", whatever the phone stands in, and D1's line with its end changed to say where
-  the time is: "This app is paused for class. Calls, FaceTime, Messages and Emergency SOS always
-  work. Open Bali to see when class ends — Emergency Unlock is always there." ("This website…" over
-  a website). The extension reads nothing: no outbox, no app group defaults — its Debug read of the
-  device check's cap goes, since that cap only moved a time the shield no longer shows — and no
-  clock. **Deleted**, deletion over addition: the shield's read — `ShieldWords`' outbox init, its
-  words from the standing (the bell in the phone's time format, "waiting for your class") and
-  `ShieldWords.time` — and `Outbox.read`'s `migrating`, whose `false` was the shield's alone. The
-  monitor's read is `Outbox.read(_:within:)`, the code `migrating: true` ran — a reading
-  coordination and a read-only connection, then, over a file this build has yet to migrate, a
-  writing coordination and the migration, waited out once granted — with every B6c and B6c-2
-  guarantee as it was. **Superseded:** B5c's words from the standing, the shield's half of B6c's
-  extensions' read, and B6c-2's "the shield never migrates", moot now it never reads. **Tests**
-  (Linux and the iOS Simulator): `ShieldWordsTests.words` — the title and the line, over an app and
-  over a website; `readsNothing` — the shield extension's code, comments left out, asks for
-  `ShieldWords(over: over)` and names no `Outbox.`, `Bell.`, `SyncState`, `UserDefaults`,
-  `FileManager`, `contentsOf`, `NSFileCoordinator` or `Date(` (read as `monitorsCalls` reads the
-  monitor's, through one helper now, `sourceCode`); `ExtensionReadTests` pin B6c's guarantees on the
-  monitor's read, the shield's halves deleted with it; `BoundTests.coordinator` and `reader` on the
-  monitor's read. Red on `main` first: `readsNothing` against main's extension, which read the
-  outbox, the defaults and the clock at every shield. Of 9 mutations — main's extension put back; a
-  time in the title; D1's old line; the website's words the app's; the extension reading the
-  defaults again; the extension asking for an app's words whatever it shields; the monitor never
-  migrating; its first open not read only; a newer build's schema read as this one's — each taken
-  alone, all 9 turn a test red (on macOS). **To know:** the shield never shows a time again, nor
-  "waiting for your class"; round 3's steps 1 and 3 now expect "Focused with Bali" and the new line.
+  (ARCHITECTURE, data model, decision 1); iOS may keep a shield's words until the shields change —
+  not documented (B5c's disclosure (1), which round 3 was to check, and now cannot: the shield shows
+  no time) — so a time on a shield could go stale after an extension — the wrong time B5c's words
+  were built never to show; and C4's Focus screen shows the countdown, where the student opens Bali.
+  **Decided:** `ShieldWords(over:)` — one title, "Focused with Bali", whatever the phone stands in,
+  and D1's line with its end changed to say where the time is: "This app is paused for class. Calls,
+  FaceTime, Messages and Emergency SOS always work. Open Bali to see when class ends — Emergency
+  Unlock is always there." ("This website…" over a website). The extension reads nothing: no outbox,
+  no app group defaults — its Debug read of the device check's cap goes, since that cap only moved a
+  time the shield no longer shows — and no clock. **Deleted**, deletion over addition: the shield's
+  read — `ShieldWords`' outbox init, its words from the standing (the bell in the phone's time
+  format, "waiting for your class") and `ShieldWords.time` — and `Outbox.read`'s `migrating`, whose
+  `false` was the shield's alone. The monitor's read is `Outbox.read(_:within:)`, the code
+  `migrating: true` ran — a reading coordination and a read-only connection, then, over a file this
+  build has yet to migrate, a writing coordination and the migration, waited out once granted — with
+  every B6c and B6c-2 guarantee as it was. **Superseded:** B5c's words from the standing, the
+  shield's half of B6c's extensions' read, and B6c-2's "the shield never migrates", moot now it
+  never reads. **Tests** (Linux and the iOS Simulator): `ShieldWordsTests.words` — the title and the
+  line, over an app and over a website; `readsNothing` — the shield extension's code, comments left
+  out, asks for `ShieldWords(over: over)` and names no `Outbox.`, `Bell.`, `SyncState`,
+  `UserDefaults`, `FileManager`, `contentsOf`, `NSFileCoordinator` or `Date(` (read as
+  `monitorsCalls` reads the monitor's, through one helper now, `sourceCode`); `ExtensionReadTests`
+  pin B6c's guarantees on the monitor's read, the shield's halves deleted with it;
+  `BoundTests.coordinator` and `reader` on the monitor's read. Red on `main` first: `readsNothing`
+  against main's extension, which read the outbox, the defaults and the clock at every shield. Of 9
+  mutations — main's extension put back; a time in the title; D1's old line; the website's words the
+  app's; the extension reading the defaults again; the extension asking for an app's words whatever
+  it shields; the monitor never migrating; its first open not read only; a newer build's schema read
+  as this one's — each taken alone, all 9 turn a test red (on macOS). **To know:** the shield never
+  shows a time again, nor "waiting for your class"; round 3's steps 1 and 3 now expect "Focused with
+  Bali" and the new line. **Santa** (two Claude reviewers, both the fallback — the Codex CLI cannot
+  run on this Mac, so both share a model family; round 1): no blockers. Fixed here, their three
+  WARNs: iOS *may* keep a shield's words until the shields change — not documented, B5c's (1) —
+  where the code's comment and both docs said it does; B6c-2's PLAN paragraph noted moot, as B6c's
+  is; and `project.yml`'s comment on the shield's BaliOutbox dependency, which still said it read
+  the standing.
 - **2026-09-29** — **A design framework for user-facing UI, on the owner's word: taste-skill,
   Vercel's web interface guidelines, and `docs/DESIGN.md`.** The owner wants Bali's pages to read
   as designed, not as AI "slop", and is open to redesigning the student screens. **What landed:**

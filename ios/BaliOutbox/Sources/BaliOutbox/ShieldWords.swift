@@ -2,8 +2,8 @@
 /// the phone stands in. The shield extension (`ios/BaliShield`) draws them in D1's look and reads
 /// nothing to say them (B5c-2, the owner's ruling): iOS's sandbox refuses a shield extension the
 /// outbox file — the file coordinator, then SQLite's own locks — so the bell is Bali's to show,
-/// where the student opens it, and never a shield's: iOS keeps a shield's words until the shields
-/// change, so a time there could go stale after an extension anyway.
+/// where the student opens it, and never a shield's: iOS may keep a shield's words until the
+/// shields change (not documented, B5c), so a time there could go stale after an extension.
 public struct ShieldWords: Sendable, Hashable {
     public let title: String
     public let subtitle: String
