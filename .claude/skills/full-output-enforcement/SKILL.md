@@ -1,6 +1,6 @@
 ---
 name: full-output-enforcement
-description: 'Bali: UI work only; never API, packages/ or backend tasks. Overrides default LLM truncation behavior. Enforces complete code generation, bans placeholder patterns, and handles token-limit splits cleanly.'
+description: 'Bali: user-facing UI work only (screens and the words users see); never API or backend logic. Overrides default LLM truncation behavior. Enforces complete code generation, bans placeholder patterns, and handles token-limit splits cleanly.'
 ---
 
 > **Bali, read this first.** Copied from Leonxlnx/taste-skill@ce26fc25c0e5e8cab638f883de62d9a86ee5e45b, `skills/output-skill/SKILL.md` (MIT, `LICENSE` beside this file). Only this block and the `description` line differ from upstream.

@@ -36,7 +36,7 @@ git diff --stat origin/main...HEAD
 
 ### Step 1: The blocking rules — one source
 
-What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`. Give both reviewers its rules verbatim — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. The one exception is Step 2's design check, which is advice only: its findings are WARNs, never blockers. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
+What blocks is defined in one place: the reviewer prompt in `.github/workflows/claude-review.yml`. Give both reviewers its rules verbatim — the text from "Judge the diff against the repository's own rules" through "do NOT demand work outside this PR's scope", plus its "BLOCKER is reserved for: …" line — but not its instructions for writing `claude-review.md`: reviewers here answer in the Step 2 format and write no files. Don't add criteria here — santa must never be stricter than the final gate. The one added criterion is Step 2's design check, which is advice only: its findings are WARNs, never blockers, so santa stays no stricter than the gate. Changing the rules means editing that workflow, which is an owner decision (see GOTCHAS).
 
 ### Step 2: Dual independent review
 
@@ -152,4 +152,4 @@ Rounds:    [N]/2
 - External reviewers run read-only (`--sandbox read-only` for Codex).
 - Fresh reviewers each round keep them from anchoring on earlier findings; round 2's narrow scope keeps them off code that's already settled.
 - Fixes are committed each round, so an interrupted loop keeps them.
-- Reviewers flagging style as blockers, or rubber-stamping? Fix the rules in `claude-review.yml`, never a santa-only rubric (the WARN-only design check in Step 2 is the one sanctioned exception).
+- Reviewers flagging style as blockers, or rubber-stamping? Fix the rules in `claude-review.yml`, never a santa-only rubric (the WARN-only design check in Step 2 is the one sanctioned added criterion).
