@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -102,6 +102,23 @@ struct AppTests {
             let words = FocusWords(try #require(fixture.sync), fixture.protection, now: Date())
             #expect(words.title == title && words.claim == claim, "\(name)")
         }
+        let late = try #require(PreviewFixtures.all["focusSuperseded"])
+        #expect(FocusWords(try #require(late.sync), late.protection, now: Date()).superseded != nil)
+        // Unlocked (C5a): each fixture's reason card and way back, and the bell the router chooses
+        // again at; a frozen phone's reason and Back to focus say it has not started.
+        let unlockedCases: [(String, UnlockedWords.Picker?, Bool)] = [
+            ("unlocked", .open, false), ("unlockedReason", .given(.bathroom), false),
+            ("unlockedRecorded", nil, false), ("unlockedRetap", nil, true),
+        ]
+        for (name, picker, retap) in unlockedCases {
+            let words = UnlockedWords(try #require(PreviewFixtures.all[name]?.sync))
+            #expect(words?.picker == picker && (words?.retap != nil) == retap, "\(name)")
+        }
+        let unlocked = Phone(fixture: try #require(PreviewFixtures.all["unlocked"]))
+        #expect(await unlocked.explain(.bathroom) == Joining.notStarted)
+        #expect(await unlocked.backToFocus() == Joining.notStarted)
+        let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        #expect(unlocked.bell != nil && home.bell == nil)
     }
 
     @Test(
