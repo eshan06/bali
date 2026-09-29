@@ -28,7 +28,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `ScreenTests.waitingWords` reads `WaitingView.swift` for it, and for D1's "the moment class
   starts" gone — red on `main` — as `FocusTests.releaseHasBoth` reads the screens. Alternative:
   the line as a constant pinned by an app test, which a redraw writing D1's words back beside it
-  would leave green.
+  would leave green. **Santa** (two Claude reviewers — Codex refuses every model on this Mac, so
+  they share a model family — and the design check): round 1, no findings.
 
 - **2026-09-29** — **The device check's round 2 found that stopping or replacing a DeviceActivity
   window fires `intervalDidEnd` for it at once, so the monitor wakes whenever the app stops or
