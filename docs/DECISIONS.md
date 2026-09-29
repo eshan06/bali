@@ -16,7 +16,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   over no shields (C1a's hand-off): verified on is the Focused chip, the ring and D1's "Every app
   is paused"; the permission judged off (`permissionOff` — denied, or not determined for a
   check-in interval, never a launch's moment) is the Screen Time off chip, no ring, the words and
-  the way back (Settings); nothing verified yet claims nothing and draws no ring. The chip follows
+  the way back (Settings); nothing verified yet draws no ring and says only "Checking Screen
+  Time…" (santa's design check: a blank for up to a check-in interval). The chip follows
   the claim, not the standing. Why: rule 3 — v2 ticked a focus timer over nothing shielded.
   Alternative: the standing's chip and ring whatever the check found (v2's bug). **The
   countdown** is to `shieldedUntil(now)`, the phone's own clock (decision 6): the bell, or a tap's
@@ -39,7 +40,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   VoiceOver's default action unlocks in one step. `Phone.emergencyUnlock()` records it through
   `SyncEngine.emergencyUnlock` (decision 11: under a tap not yet answered, else the session), so
   the shields come off at once and the record queues; a write the outbox refuses is said, the
-  shields as they were (B6b's disclosed (3)); no reason asked — D1's Focus draws none (C5a's).
+  shields as they were (B6b's disclosed (3)) — the apps "still paused" only where the check
+  verified them so (santa's round 1: a constant said it over Screen Time off, rule 3) — and
+  VoiceOver, left on the control, is told; no reason asked — D1's Focus draws none (C5a's).
+  **Home's too, and Tap in in every build** (C3b's plan and its review's rider): Home over the
+  last run's shields where the phone stood unread (B6b) holds the same control (`EmergencyUnlock`),
+  and Home's Tap in, Debug-only until a live Emergency Unlock existed, ships in every build.
+  `FocusTests.releaseHasBoth` reads both screens as a Release build compiles them — every `#if
+  DEBUG` out — so Tap in, which shields a phone, never ships without Emergency Unlock wherever
+  the shields can be on (red before: Tap in was Debug-only and Home had no unlock).
   **A conflict, disclosed for the owner:** DESIGN.md §4 has the control "one tap, always … never a
   hold", citing ARCHITECTURE's "one-tap sanctioned exit"; D1's approved Focus artboards draw a
   hold, and the design system's own README names the spring the "hold-release spring-back".
@@ -57,8 +66,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   only on a window it did not hold. **Not covered, disclosed:** `Protection.unreported` (protection
   off found and not queued) is not said on Focus — its Screen Time off claim is; the digits tick
   on a one-second timeline from the screen's appearance, up to a second behind the bell's own
-  (the enforcer's alarm, not the digits, ends the shields); Home's Emergency Unlock over an unread
-  standing (B6b) waits for C3b's follow-up, `UnlockControl` ready for it.
+  (the enforcer's alarm, not the digits, ends the shields); a link waiting on sign-in or refused
+  by storage is not said on Focus, which the router ranks above Sign in (santa's WARN: a
+  follow-up for the owner). **Santa** (two Claude reviewers, both the fallback — Codex refuses
+  every model on this Mac, so they share a model family — and the design check): round 1, one
+  blocker, fixed (the failure's words above) and eleven design WARNs, the easy ones fixed — D1's
+  24-pt gaps, Settings primary as D1's ProtectionOff draws it, Voice Control's labels, the ring
+  spoken as a length of time; round 2, none (a still pressed look under Reduce Motion, fixed).
 - **2026-09-29** — **C3b: Home and Waiting drawn (D1's artboards), Join opened from Home with a
   way back, and Home's Tap in.** **Home** (`HomeView`): the mark and name, "Hi, <name>" (`GET
   /v1/me`'s display name; "Hi there" with none); D1's hero card, whose **Tap in** is B6's scan

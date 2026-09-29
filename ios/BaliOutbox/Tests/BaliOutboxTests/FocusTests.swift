@@ -158,16 +158,36 @@ struct FocusTests {
     )
     func unlockFailed() throws {
         let focused = try synced(.inSession(bell1042, .focused))
+        /// What the screen says of `failure` under `protection`'s claim, as the Focus screen asks.
+        func said(_ failure: UnlockFailure, _ protection: Protection? = checked()) -> String {
+            failure.words(paused: focus(focused, protection).claim == .paused)
+        }
         #expect(
-            focus(focused).words(.notSaved)
+            said(.notSaved)
                 == "Bali couldn't save your unlock, so your apps are still paused. Hold to try again.")
         for protection in [checked(shielded: false, off: true), nil, checked(shielded: false)] {
             #expect(
-                focus(focused, protection).words(.notSaved)
-                    == "Bali couldn't save your unlock. Hold to try again.",
+                said(.notSaved, protection) == "Bali couldn't save your unlock. Hold to try again.",
                 "\(String(describing: protection))")
         }
-        #expect(focus(focused).words(.notStarted) == Joining.notStarted)
+        #expect(said(.notStarted) == Joining.notStarted)
+    }
+
+    @Test(
+        "A Release build holds Emergency Unlock wherever the shields can be on — the Focus screen, and Home over the last run's shields where the phone stood unread — beside Home's Tap in, which shields a phone: both or neither, never Tap in alone (C3b's rider; ARCHITECTURE: nothing shields a phone with no way out)"
+    )
+    func releaseHasBoth() throws {
+        /// `path`'s code as a Release build compiles it: every `#if DEBUG` block out.
+        func release(_ path: String) throws -> String {
+            try sourceCode(path).replacing(try Regex("#if DEBUG[\\s\\S]*?#endif"), with: "")
+        }
+        let home = try release("Bali/UI/HomeView.swift")
+        let tapIn = home.split(separator: "\n").contains {
+            $0.trimmingCharacters(in: .whitespaces) == "tapIn"
+        }
+        #expect(tapIn, "Home's Tap in is not in a Release build")
+        #expect(home.contains("EmergencyUnlock("), "Home over an unread standing has no unlock")
+        #expect(try release("Bali/UI/FocusView.swift").contains("EmergencyUnlock("))
     }
 
     @Test(

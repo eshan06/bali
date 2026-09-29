@@ -44,6 +44,7 @@
             "homeLoading": State(sync: standing(.out, me: nil)),
             "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),
             "homeUnread": State(sync: standing(.unread)),
+            "homeUnreadShielded": State(protection: shielded(), sync: standing(.unread)),
             "waiting": State(sync: standing(.waiting)),
             "waitingError": State(sync: standing(.waiting, failed: .networkError)),
             "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),

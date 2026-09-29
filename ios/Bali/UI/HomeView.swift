@@ -2,10 +2,10 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-/// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan; Debug builds
-/// until C4), their classes with each teacher (`GET /v1/me`), and Join a class, opened over Home
-/// with a way back. What the phone could not read or record is said with Try again (rule 5). Not
-/// here yet: History and Me (C6); Emergency Unlock over an unread standing's shields (with C4).
+/// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan), their classes
+/// with each teacher (`GET /v1/me`), and Join a class, opened over Home with a way back. What the
+/// phone could not read or record is said with Try again (rule 5); where it stood unread with the
+/// last run's shields on, Emergency Unlock is here (B6b, C4). Not here yet: History and Me (C6).
 struct HomeView: View {
     let phone: Phone
 
@@ -29,12 +29,17 @@ struct HomeView: View {
                             words:
                                 "Bali can't tell right now whether you're in a class. It keeps checking.",
                             phone: phone)
+                        // The router keeps Home over the last run's shields: their way out.
+                        if phone.protection?.shielded == true {
+                            EmergencyUnlock(
+                                phone: phone,
+                                caption: "Works without Wi-Fi. Letting go early does nothing.",
+                                paused: true)
+                        }
                     }
-                    // Debug builds only until C4 draws Emergency Unlock (the readout holds one):
-                    // nothing may shield a phone with no way out (ARCHITECTURE). C4 lifts this.
-                    #if DEBUG
-                        tapIn
-                    #endif
+                    // In every build, as Emergency Unlock is wherever the shields can be on:
+                    // nothing may shield a phone with no way out (ARCHITECTURE; FocusTests).
+                    tapIn
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }

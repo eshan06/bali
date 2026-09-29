@@ -8,8 +8,6 @@ import UIKit
 /// ticks over nothing shielded — in `FocusWords`' words (BaliOutbox, tested on Linux).
 struct FocusView: View {
     let phone: Phone
-    /// Why the last Emergency Unlock did not go through (rule 5): holding again is the way on.
-    @State private var failed: UnlockFailure?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -76,8 +74,7 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// Offline, D1's card; a wake iOS refused; then Emergency Unlock and its line — or why the
-    /// last press did not go through, which VoiceOver, left on the control, is told as well.
+    /// Offline, D1's card; a wake iOS refused; then Emergency Unlock and its line.
     private func lower(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             if let offline = focus.offline {
@@ -94,19 +91,34 @@ struct FocusView: View {
             if let note = focus.unscheduled {
                 Text(note).textStyle(.caption).foregroundStyle(Theme.textSecondary)
             }
-            VStack(spacing: 12) {
-                UnlockControl {
-                    Task {
-                        let failure = await phone.emergencyUnlock()
-                        failed = failure
-                        if let failure {
-                            AccessibilityNotification.Announcement(focus.words(failure)).post()
-                        }
+            EmergencyUnlock(phone: phone, caption: focus.caption, paused: focus.claim == .paused)
+        }
+    }
+}
+
+/// Emergency Unlock and the line under it — or why the last press did not go through, which
+/// VoiceOver, left on the control, is told as well (rule 5): the Focus screen's, and Home's over
+/// the last run's shields where the phone stood unread (B6b). `paused`: the check verified the
+/// shields on, all a failure may say of them.
+struct EmergencyUnlock: View {
+    let phone: Phone
+    let caption: String
+    let paused: Bool
+    @State private var failed: UnlockFailure?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            UnlockControl {
+                Task {
+                    let failure = await phone.emergencyUnlock()
+                    failed = failure
+                    if let words = failure?.words(paused: paused) {
+                        AccessibilityNotification.Announcement(words).post()
                     }
                 }
-                Text(failed.map(focus.words) ?? focus.caption).textStyle(.caption)
-                    .foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
             }
+            Text(failed?.words(paused: paused) ?? caption).textStyle(.caption)
+                .foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
         }
     }
 }

@@ -92,19 +92,22 @@ public struct FocusWords: Sendable, Hashable {
         }
     }
 
-    /// Why an Emergency Unlock did not go through (rule 5), in words: the outbox refused the write,
-    /// so nothing changed — its apps "still paused" only where the check verified them so (rule 3)
-    /// — or the phone has not started; holding again is the way on.
-    public func words(_ failure: UnlockFailure) -> String {
-        switch failure {
+}
+
+/// Why an Emergency Unlock did not go through: the phone's engine has not started (a frozen
+/// fixture's), or the outbox refused to keep it.
+public enum UnlockFailure: Sendable, Hashable {
+    case notStarted, notSaved
+
+    /// In words (rule 5): the outbox refused the write, so nothing changed — the apps "still
+    /// paused" only where the check verified them so (`paused`: rule 3) — or the phone has not
+    /// started; holding again is the way on.
+    public func words(paused: Bool) -> String {
+        switch self {
         case .notStarted: Joining.notStarted
-        case .notSaved where claim == .paused:
+        case .notSaved where paused:
             "Bali couldn't save your unlock, so your apps are still paused. Hold to try again."
         case .notSaved: "Bali couldn't save your unlock. Hold to try again."
         }
     }
 }
-
-/// Why an Emergency Unlock did not go through: the phone's engine has not started (a frozen
-/// fixture's), or the outbox refused to keep it.
-public enum UnlockFailure: Sendable, Hashable { case notStarted, notSaved }
