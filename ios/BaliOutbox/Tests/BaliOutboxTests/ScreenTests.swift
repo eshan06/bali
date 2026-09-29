@@ -240,6 +240,33 @@ struct ScreenTests {
     }
 
     @Test(
+        "A stuck tap whose last answer the outbox only retries — 401, 408, 429: a sign-in to renew, a timeout, a limit — is still being sent where the retry bound stuck it, never 'tap in again' while it is on its way (#114's review); where a refusal stuck it, a retry's answer says nothing new and the refusal's words stand (santa's review)"
+    )
+    func retriedTap() async throws {
+        for status in [401, 408, 429] {
+            let (unsettled, _) = try makeOutbox()
+            let lost = try record(unsettled, .tap(tagId: "tag"))
+            for _ in 1...Outbox.bound { try await send(unsettled, lost, 503) }
+            try await send(unsettled, lost, status)
+            var state = SyncState()
+            state.queued = try unsettled.records()
+            #expect(state.queued.first?.stuck == true && state.queued.first?.lastStatus == status)
+            #expect(
+                state.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.",
+                "\(status)")
+            let (outbox, _) = try makeOutbox()
+            let tap = try record(outbox, .tap(tagId: "tag"))
+            try await send(outbox, tap, 409, Answer.refused("event_id_conflict"))
+            try await send(outbox, tap, status)
+            state.queued = try outbox.records()
+            #expect(
+                state.refusedTapWords
+                    == "Bali couldn't record a tap. Tap in again, or ask your teacher.",
+                "\(status)")
+        }
+    }
+
+    @Test(
         "A tap the server refused is said on Home (rule 5; santa's round 1) — kept and retried until one is recorded, its shields off meanwhile: an unknown block with who can set it up, any other refusal with the way on, one left unsettled by the retry bound as still tried; the latest such tap, and nothing while none is stuck, nor for another kind of record"
     )
     func refusedTap() async throws {

@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C4b: C3b's two other review riders.** **Home's way back to Waiting:** a
+  student who pressed Waiting's Back to home had no way back to "Ready — waiting for your teacher"
+  until the Start or another change. A screen opened over another now draws Back when the router
+  shows it (`Phone.canGoBack`: the screen shown is the one opened last — never where the router
+  shows another over it, the shields on), Home's as Join's already did; one `BackButton` for both.
+  Alternative: a card on Home naming the wait (new words in a place D1 draws none). **A tap still
+  being sent is never called refused:** `refusedTapWords` said "Tap in again" for any 4xx last
+  answer, but the outbox only retries 401 (a sign-in to renew), 408 and 429 — which count toward
+  no bound, so they last show on a tap stuck already (refused, then rate-limited) — so a student
+  was told to tap again while the first tap was still on its way. "Refused" now follows
+  `tapDisposition`'s own table (`retry_and_surface`), never a list of statuses kept beside it;
+  and a retry's answer says nothing of why a tap is stuck, so it is read by the record's count
+  of answers: short of the bound, only a refusal stuck it and its words stand (santa's review: a
+  409 answered 429 next would otherwise say "keeps trying" of a tap that never lands); at the
+  bound, it keeps trying. Waiting's own body stays D1's (the owner has its wording). Home's Back
+  sits above its scroll, as Join's does, so it never scrolls away; D1's Home draws none, so it is
+  for the owner's canvas too (santa's design check).
+
 - **2026-09-29** — **C4: the Focus screen — D1's three states over what the enforcer verified,
   its countdown by the phone's clock, and Emergency Unlock on the live screen; and #103's
   rider.** **What it claims** (`FocusWords`, BaliOutbox, tested on Linux): of the shields,

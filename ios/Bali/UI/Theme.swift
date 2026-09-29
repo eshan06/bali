@@ -190,6 +190,19 @@ struct BaliMark: View {
     }
 }
 
+/// Back, at a screen's top left: an arrow in a 44-pt target, "Back" to VoiceOver.
+struct BackButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.left").font(.system(size: 20, weight: .semibold))
+                .frame(width: 44, height: 44)
+        }
+        .foregroundStyle(Theme.text).padding(.leading, -10).accessibilityLabel("Back")
+    }
+}
+
 /// A screen's content laid out in its whole height — centred, or held apart by its spacers — and
 /// scrolling only once the phone's text size outgrows it, so no line is ever cut off.
 struct PageScroll<Content: View>: View {

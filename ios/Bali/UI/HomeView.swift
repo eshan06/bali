@@ -13,6 +13,9 @@ struct HomeView: View {
 
     var body: some View {
         ScreenScaffold {
+            // Opened over Waiting: back to "Ready — waiting for your teacher" (#114's review),
+            // above the scroll as Join's is, so it never scrolls away.
+            if phone.canGoBack { BackButton { phone.back() } }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(spacing: 8) {

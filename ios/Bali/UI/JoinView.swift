@@ -31,7 +31,7 @@ struct JoinView: View {
     /// The code (D1's JoinCode): back to Home when Home opened it (C3) — at the router's root, a
     /// phone in no class, there is nowhere to go back to.
     @ViewBuilder private var entry: some View {
-        if phone.opened.last == .join { back { phone.back() } }
+        if phone.canGoBack { back { phone.back() } }
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -121,12 +121,7 @@ struct JoinView: View {
 
     /// D1's back arrow: `action`, once nothing is under way.
     private func back(_ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "arrow.left").font(.system(size: 20, weight: .semibold))
-                .frame(width: 44, height: 44)
-        }
-        .foregroundStyle(Theme.text).padding(.leading, -10).accessibilityLabel("Back")
-        .disabled(busy)
+        BackButton(action: action).disabled(busy)
     }
 
     /// `call` — one at a time, `Phone`'s to see to, the screen busy meanwhile.

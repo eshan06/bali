@@ -99,17 +99,23 @@ extension SyncState {
 
     /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried
     /// until recorded, ARCHITECTURE tap step 10) or the retry bound left unsettled: keyed on its
-    /// last answer; nil while none is stuck.
+    /// last answer — a refusal where `tapDisposition` says one; nil while none is stuck. An answer
+    /// the outbox only retries (401, 408, 429, a server error, none) says nothing of why it is
+    /// stuck: short of the bound's count of answers only a refusal stuck it, whose words stand;
+    /// at the bound, it is still being sent (#114's review) — never "tap in again" then.
     public var refusedTapWords: String? {
-        let refused = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
-        guard let refused else { return nil }
-        switch refused.lastStatus {
+        let stuck = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
+        guard let stuck else { return nil }
+        let tapAgain = "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        switch stuck.lastStatus {
         case 404?:
             return
                 "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
-        case let status? where (400..<500).contains(status):
-            return "Bali couldn't record a tap. Tap in again, or ask your teacher."
-        default: return "Bali couldn't record a tap yet. It keeps trying."
+        case let status? where tapDisposition(.status(status), nil) == .retryAndSurface:
+            return tapAgain
+        default:
+            return stuck.answers < Outbox.bound
+                ? tapAgain : "Bali couldn't record a tap yet. It keeps trying."
         }
     }
 
