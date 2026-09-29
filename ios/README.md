@@ -130,7 +130,10 @@ bell; `backup`, registered beside it and ending two minutes later, in case the b
 and `tick` and `tock`, the ones the monitor asks for itself, in turn — never the one that woke it,
 since on iOS 18 asking for that one can hang the monitor. A wake that takes the shields off says
 `cleared`; one that finds them off already — the backup, after the bell's wake — says
-`nothing to clear`; one iOS ended before it finished stays `not finished`. Should iOS refuse the
+`nothing to clear`; one iOS ended before it finished stays `not finished`. iOS also wakes the monitor
+the moment the app stops or replaces a window — at an Emergency Unlock, the end, an extension — and
+such a wake is like any other: it reads the truth, and with the shields already off says
+`nothing to clear` (`docs/DECISIONS.md`, 2026-09-29). Should iOS refuse the
 monitor its next wake, the `Screen Time:` line says so from the next open, unless a later wake
 ended well: `the monitor's bell NOT scheduled at <time>, app closed`. Its `bell NOT scheduled` is
 a window the app asked for — the bell's or its backup — refused, and asked for again.
@@ -140,6 +143,15 @@ the first whole minute on or after the bell. If iOS wakes it early, before the b
 keeps the shields and asks to be woken again the next whole minute on: they come off less than
 _two_ minutes after the bell, and that second wake's line is `tick`'s. Two minutes after the bell's
 window, the backup wakes the monitor too — after the bell's wake, it finds nothing to clear.
+
+**Short classes work.** Every window is exactly 15 minutes long, iOS's floor, and ends at the bell
+rounded up to the whole minute; the backup's ends two minutes after that — a bell at 10:04:00.4 ends
+its window at 10:05 and the backup's at 10:07. So a class shorter than 15 minutes starts its window
+in the past: steps 3–6 run in 3-minute classes. Steps 1–2's 20-minute class, tapped promptly, starts
+it in the future, as a real class does. On dev a class closes within a minute of its bell since A15
+(#111), the API's own sweep — verified there: a 1-minute class closed 22 s after its bell, where
+Railway's cron had taken minutes. Let `watch` show it over before the next `start`, which otherwise
+hands the old session back.
 
 1. **The window is registered.** `npm run dev:teacher -- start 20`, then **Tap** with
    `DEVICE-CHECK-1`: `shields on, due until` the bell, and no `bell NOT scheduled` on that line.
@@ -151,16 +163,20 @@ window, the backup wakes the monitor too — after the bell's wake, it finds not
    opened two minutes after that or later, with
    `<that time plus two minutes> · backup · nothing to clear ·` above it — and no
    `bell NOT scheduled` on the `Screen Time:` line.
-3. **A window shorter than iOS's 15-minute floor.** `start 15`, wait 5 minutes, **Tap** (10
-   minutes left), force-quit: as step 2 — off within a minute after the bell, `bell · cleared`.
-4. **An Emergency Unlock cancels the windows.** `start 15`, **Tap**, **Emergency Unlock**,
-   force-quit: the apps stay open, and after the bell, and two minutes on, the `Monitor:` lines are
-   still step 3's — nothing woke it.
-5. **An extension moves the windows.** `start 15`, **Tap**, then `npm run dev:teacher -- extend 10`
-   with the app open until the next check-in moves `due until` 10 minutes on (still no
+3. **A class shorter than iOS's 15-minute floor.** `start 3`, **Tap** (its window starts in the
+   past), force-quit: as step 2 — off within a minute after the bell, `bell · cleared`.
+4. **An Emergency Unlock cancels the windows.** `start 3`, **Tap**, **Emergency Unlock**,
+   force-quit: the apps stay open. The unlock's stop of both windows wakes the monitor at once:
+   `<the unlock's time> · bell · nothing to clear ·` and the same for `backup`, each a fraction of a
+   second. After the bell, and two minutes on, those are still the newest `Monitor:` lines —
+   nothing woke it since.
+5. **An extension moves the windows.** `start 3`, **Tap**, then `npm run dev:teacher -- extend 3`
+   with the app open until the next check-in moves `due until` 3 minutes on (still no
    `bell NOT scheduled`). Force-quit: still shielded past the first bell, and nothing woke the
-   monitor then; off within a minute after the new one, `bell · cleared`.
-6. **A lost wake: the backup clears (B5b-3).** `start 15`, **Tap**, turn on **Lose the bell's next
+   monitor then; off within a minute after the new one, `bell · cleared` — with a `tick` or `tock`
+   line beside it, `nothing to clear`: moving the windows at the check-in woke the monitor there,
+   and it asked for that extra wake (`docs/DECISIONS.md`, 2026-09-29).
+6. **A lost wake: the backup clears (B5b-3).** `start 3`, **Tap**, turn on **Lose the bell's next
    wake (device check)**, and force-quit. At the bell the apps stay shielded — the monitor does
    nothing at the bell's wake, as if it had died there — and two to three minutes after the bell
    they open, the app still closed. Open the app: `Monitor: <that time> · backup · cleared ·` and a

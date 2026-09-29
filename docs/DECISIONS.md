@@ -8,6 +8,41 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **The device check's round 2 found that stopping or replacing a DeviceActivity
+  window fires `intervalDidEnd` for it at once, so the monitor wakes whenever the app stops or
+  moves its windows. Harmless: recorded, no code change.** **Seen** on the owner's iPhone 15 Pro
+  (iOS 18.6.2, 2026-09-27) in the readout's `Monitor:` lines, each at the moment the app stopped or
+  replaced a window, not at its end: at Emergency Unlock, both windows, the bell's and its backup
+  (9:10:47 PM, round 2's step 4); at `end`, the check-in that found the session over (8:18:35);
+  and at an extension, the bell's window replaced at the 9:20:41 PM check-in (step 5). B5b left
+  this open — its guard's premise, "a replacement may itself wake the monitor" — and B5b-3
+  disclosed it as its (3), with the very outcome seen here. Such a wake is like any other: the
+  monitor reads the truth and does what it says. The enforcer takes the shields off before it
+  stops the windows, so with the phone unlocked or out of session the wake clears nothing
+  (`nothing to clear`); in a session still running, as at an extension, it keeps them and asks for
+  its next wake at the bell. **Two consequences.** (1) Round 2 step 4's expected result — after
+  the unlock, "the `Monitor:` lines are still step 3's — nothing woke it" — was wrong: the unlock's
+  stop wakes the monitor at once, so the step now expects `bell` and `backup` lines at the unlock,
+  each `nothing to clear`, and none at the bell or the backup (PLAN and `ios/README.md`, fixed
+  here). (2) B5b-4's rule — the app stops `tick` and `tock` only when the bell's window is new,
+  since the monitor's own are then aimed at a truth just replaced — is undone by that stop's own
+  wake. At the extension, the bell's window, replaced, woke the monitor, which kept the shields and
+  asked for `tick` at the new bell; the app then stopped `tick`, which woke the monitor again,
+  before the bell, and it asked for `tock` there. So the bell costs one wake for nothing: at
+  9:27:02, `bell · cleared` and `tock · nothing to clear` together. **Decided: no code change
+  now.** The extra wake reads the truth, clears nothing owed and takes a fraction of a second —
+  B5b's "a stale window only wakes the monitor, which reads the truth and does nothing wrong".
+  **Also answered, B5b-3's (1):** a DeviceActivity call of another name inside a callback does not
+  deadlock on iOS 18.6.2 — the monitor asked for `tick` inside `bell`'s `intervalDidEnd` and for
+  `tock` inside `tick`'s, both wakes finished (none `not finished`), and that `tock`, which only a
+  `tick` wake asks for, woke it at the bell. **Round 2's timing, now in both checklists:** every
+  window is exactly 15 minutes long (`Bell.window`), ending at the bell rounded up to the whole
+  minute, and the backup's two minutes after that (a bell at 10:04:00.4: 10:05, the backup 10:07).
+  So a class under 15 minutes starts its window in the past — steps 3–6 now run in 3-minute
+  classes, as the owner ran them — and steps 1–2's 20-minute class, tapped promptly, in the future
+  (tapped at 8:23 PM, the window from 8:27), as a real class does. Each step's result, rounds 1–3,
+  is on its line in PLAN; round 3's step 1 found B5c-2 (its entry, below).
+
 - **2026-09-29** — **C4b: C3b's two other review riders.** **Home's way back to Waiting:** a
   student who pressed Waiting's Back to home had no way back to "Ready — waiting for your teacher"
   until the Start or another change. A screen opened over another now draws Back when the router
