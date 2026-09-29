@@ -46,7 +46,16 @@
             "homeUnread": State(sync: standing(.unread)),
             "waiting": State(sync: standing(.waiting)),
             "waitingError": State(sync: standing(.waiting, failed: .networkError)),
-            "focus": State(sync: standing(.inSession(period3, .focused))),
+            "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),
+            "focusFinal": State(
+                protection: shielded(), sync: standing(.inSession(lastMinutes, .focused))),
+            "focusOffline": State(
+                protection: shielded(), sync: offline(standing(.inSession(period3, .focused)))),
+            "focusTapHeld": State(protection: shielded(), sync: offline(heldTap())),
+            "focusNoShields": State(protection: screenTimeOff(), sync: heldTap()),
+            "focusUnscheduled": State(
+                protection: shielded(unscheduled: true),
+                sync: standing(.inSession(period3, .focused))),
             "unlocked": State(sync: standing(.inSession(period3, .unlocked))),
             "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
             "storage": State(
@@ -71,9 +80,11 @@
             return arguments[at + 1]
         }
 
-        /// A class whose bell is 27 minutes away.
-        private static let period3 = SessionView(
-            id: "session", classId: "class", endsAt: Date() + 27 * 60)
+        /// A class whose bell is 27 minutes away — Period 3's, with Ms. Rivera — and one whose bell
+        /// is 1:52 away (D1's FocusFinal).
+        private static let period3 = SessionView(id: "session", classId: "p3", endsAt: Date() + 27 * 60)
+        private static let lastMinutes = SessionView(
+            id: "session", classId: "p3", endsAt: Date() + 112)
 
         /// What `KWX49Q` opens, as `GET /v1/join-codes/{code}` answers: Period 3, with Ms. Rivera.
         private static let period3Preview = try? BaliJSON.makeDecoder().decode(
@@ -96,6 +107,39 @@
             var protection = Protection()
             (protection.checked, protection.permission) = (true, permission)
             return protection
+        }
+
+        /// The check found the shields on — and, `unscheduled`, iOS refusing the wake at the bell.
+        private static func shielded(unscheduled: Bool = false) -> Protection {
+            var protection = permission(.approved)
+            (protection.shielded, protection.unscheduled) = (true, unscheduled)
+            return protection
+        }
+
+        /// The check judged the permission taken back: iOS dropped every shield.
+        private static func screenTimeOff() -> Protection {
+            var protection = permission(.denied)
+            protection.permissionOff = true
+            return protection
+        }
+
+        /// `state` with no answer from the server.
+        private static func offline(_ state: SyncState) -> SyncState {
+            var state = state
+            state.link = .unreachable
+            return state
+        }
+
+        /// Out of any session, a tap made as the fixture was, not answered yet (decision 7's cap) —
+        /// kept in an outbox of the fixture's own, since only an outbox makes one.
+        private static func heldTap() -> SyncState {
+            var state = standing(.out)
+            let url = FileManager.default.temporaryDirectory.appending(
+                path: "fixture-\(UUID().uuidString).sqlite")
+            let outbox = try? Outbox(at: url)
+            _ = try? outbox?.record(.tap(tagId: "fixture"), now: Date())
+            state.queued = (try? outbox?.records()) ?? []
+            return state
         }
 
         /// The engine's truth, standing `standing`, the server reached a moment ago, `GET /v1/me`

@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -89,6 +89,17 @@ struct AppTests {
         #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).hasClasses == true)
         let fromHome = Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"]))
         #expect(fromHome.opened == [.join])
+        // Focus (C4): a frozen phone's Emergency Unlock says it has not started, never nothing;
+        // the held tap's fixtures hold one, and the one over no shields claims none.
+        #expect(await Phone(fixture: try #require(PreviewFixtures.all["focus"])).emergencyUnlock() == Joining.notStarted)
+        for (name, title, claim) in [
+            ("focus", "Period 3 — Algebra II", FocusWords.Claim.paused),
+            ("focusTapHeld", "You're in", .paused), ("focusNoShields", "You're in", .screenTimeOff),
+        ] {
+            let fixture = try #require(PreviewFixtures.all[name])
+            let words = FocusWords(try #require(fixture.sync), fixture.protection, now: Date())
+            #expect(words.title == title && words.claim == claim, "\(name)")
+        }
     }
 
     @Test(
@@ -236,7 +247,8 @@ struct AppTests {
             ("border-strong", Theme.borderStrong), ("text-primary", Theme.text),
             ("text-secondary", Theme.textSecondary), ("text-tertiary", Theme.textTertiary),
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
-            ("arc-fill", Theme.arc), ("arc-track", Theme.arcTrack), ("green-200", Theme.markTrack),
+            ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
+            ("green-200", Theme.markTrack),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
