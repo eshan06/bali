@@ -9,11 +9,11 @@ import Testing
     import GRDBSQLite
 #endif
 
-/// The extensions' read of the file at `url`, read only — as the shield's is — waiting for it as
-/// long as the tests wait for anything: a stall of the iOS Simulator's never reads as the file held
-/// (`BoundTests` has the bound).
+/// The monitor's read of the file at `url`, waiting for it as long as the tests wait for
+/// anything: a stall of the iOS Simulator's never reads as the file held (`BoundTests` has the
+/// bound).
 private func read(_ url: URL) throws -> SyncState {
-    try Outbox.read(url, within: TimeInterval(patience.components.seconds), migrating: false)
+    try Outbox.read(url, within: TimeInterval(patience.components.seconds))
 }
 
 /// The file's bytes, or its WAL's (`suffix` "-wal"); nil when there is no such file.
@@ -53,7 +53,7 @@ private func applied(_ url: URL) throws -> [String] {
 /// A session whose bell is at 10:42 AM in New York, where `t0` is 10:13:20 AM.
 private let class1042 = session(endsAt: 1720)
 
-@Suite("The extensions' read: read only, whatever the file (B6c)", .timeLimit(.minutes(3)))
+@Suite("The monitor's read: read only, whatever the file (B6c)", .timeLimit(.minutes(3)))
 struct ExtensionReadTests {
     @Test(
         "After the app has written and closed: read with a read-only connection — the WAL files the app keeps are there — and nothing written, neither the file nor its WAL (#93's review)"
@@ -95,7 +95,7 @@ struct ExtensionReadTests {
     }
 
     @Test(
-        "No file: nothing read, and none made — the shield says Bali's name alone, and the monitor keeps the shields and tries again a minute on"
+        "No file: nothing read, and none made — the monitor keeps the shields and tries again a minute on"
     )
     func missing() throws {
         let url = temporaryFile()
@@ -103,29 +103,21 @@ struct ExtensionReadTests {
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         #expect(throws: (any Error).self) { try read(url) }
         let bound = TimeInterval(patience.components.seconds)
-        let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
-        #expect(words.title == "Focused with Bali")
         let wake = Bell.wake(outboxAt: url, now: t0, within: bound)
         #expect(wake == .retry(Bell.window(until: at(60))))
         #expect(bytes(url) == nil && bytes(url, "-wal") == nil)
     }
 
     @Test(
-        "A file this build has yet to migrate — the app not opened since an update, B6a's v3 and B6b's v4 — is migrated where the monitor reads it, once, as the app's open would: the bell clears the shields, and every read after is read only. The shield never migrates it (#97's review): Bali's name alone, the file left as it is, until the monitor or the app has"
+        "A file this build has yet to migrate — the app not opened since an update, B6a's v3 and B6b's v4 — is migrated where the monitor reads it, once, as the app's open would: the bell clears the shields, and every read after is read only"
     )
     func older() throws {
         let bound = TimeInterval(patience.components.seconds)
         for version in ["v2", "v3"] {
             let url = try madeBy(version)
-            let (before, migrations) = (bytes(url), try applied(url))
-            let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
-            #expect(words.title == "Focused with Bali", "\(version)")
-            #expect(try applied(url) == migrations && bytes(url) == before, "\(version)")
             #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear, "\(version)")
             #expect(try applied(url) == ["v1", "v2", "v3", "v4"], "\(version)")
             let (file, wal) = (bytes(url), bytes(url, "-wal"))
-            let shield = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
-            #expect(shield.title.hasPrefix("Focused with Bali until "), "\(version)")
             let state = try read(url)
             #expect(state.standing == .inSession(class1042, .focused), "\(version)")
             #expect(state.queued.map(\.eventId) == ["e0"], "\(version)")
@@ -188,7 +180,7 @@ struct ExtensionReadTests {
 
     #if os(Linux)
         @Test(
-            "A close that fails never takes back a read that went through: the shield says the bell it read, and the monitor keeps the shields to it — the queue closes the file as it goes all the same (#97's review)"
+            "A close that fails never takes back a read that went through: the monitor keeps the shields to the bell it read — the queue closes the file as it goes all the same (#97's review)"
         )
         func closeFails() throws {
             let (outbox, url) = try makeOutbox()
@@ -202,8 +194,6 @@ struct ExtensionReadTests {
                 #expect(throws: DatabaseError.self) { try probe.close() }
                 #expect(try read(url).standing == .inSession(class1042, .focused))
                 let bound = TimeInterval(patience.components.seconds)
-                let words = ShieldWords(outboxAt: url, over: .app, now: t0, within: bound)
-                #expect(words.title.hasPrefix("Focused with Bali until "))
                 #expect(
                     Bell.wake(outboxAt: url, now: t0, within: bound)
                         == .keep(Bell.window(until: at(1720))))

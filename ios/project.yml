@@ -115,5 +115,6 @@ targets:
         CODE_SIGN_ENTITLEMENTS: BaliShield/BaliShield.entitlements
         TARGETED_DEVICE_FAMILY: '1'
     dependencies:
-      # The standing, read where the app keeps it — in the app group — as the monitor reads it.
+      # The shield's words (`ShieldWords`): it reads nothing — its sandbox refuses the outbox
+      # file (B5c-2).
       - package: BaliOutbox

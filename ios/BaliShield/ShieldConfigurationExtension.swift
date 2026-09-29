@@ -1,5 +1,4 @@
 import BaliOutbox
-import Foundation
 import ManagedSettings
 import ManagedSettingsUI
 import UIKit
@@ -7,8 +6,9 @@ import UIKit
 // Bali's own shield over a blocked app or website (ARCHITECTURE, "iOS app structure"; B5c), in
 // D1's approved look — light, the ring mark — as far as `ShieldConfiguration` carries it: a
 // background, an icon, a title and a subtitle, and a button. What it says is `ShieldWords`, tested
-// on Linux; this only carries it out. The shield blocks every app and website a third party can
-// (`.all()`), so iOS asks for each of these four. Its principal class, named in its Info.plist.
+// on Linux; this only carries it out, reading nothing: iOS's sandbox refuses it the outbox file
+// (B5c-2). The shield blocks every app and website a third party can (`.all()`), so iOS asks for
+// each of these four. Its principal class, named in its Info.plist.
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         shield(over: .app)
@@ -31,12 +31,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     }
 
     private func shield(over: ShieldWords.Over) -> ShieldConfiguration {
-        #if DEBUG
-            let cap = Bell.deviceCheckCap ?? SyncState.tapCap
-        #else
-            let cap = SyncState.tapCap
-        #endif
-        let words = ShieldWords(outboxAt: Outbox.appGroupURL, over: over, now: Date(), cap: cap)
+        let words = ShieldWords(over: over)
         // D1's light tokens, whatever the phone's appearance: the page (stone-50) over a light
         // material, so no dark default shows through; text-primary and text-secondary; and the
         // primary action, green-700 and white. D1's font, sizes and layout are iOS's to choose.

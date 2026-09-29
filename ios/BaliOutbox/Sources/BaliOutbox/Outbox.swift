@@ -79,12 +79,12 @@ public struct Outbox: Sendable {
         }
     }
 
-    /// Where the phone stood and what it queued, as the extensions read them — the monitor at a
-    /// wake (B5b), the shield at each blocked app (B5c) — read only (#93's review), and all of it
-    /// within `bound`, a ceiling: the coordinated open, SQLite's locks and an open under way (then
-    /// `Busy`, or SQLite's busy error) — all but a migration's own work, which is waited out
-    /// (`granted`). Never longer: iOS waits on the shield, and would kill the monitor mid-wake.
-    /// Read only: a reading coordination, which never holds up another reader,
+    /// Where the phone stood and what it queued, as the monitor reads them at a wake (B5b) — the
+    /// one extension that reads the file: iOS's sandbox refuses the shield it (B5c-2) — read only
+    /// (#93's review), and all of it within `bound`, a ceiling: the coordinated open, SQLite's
+    /// locks and an open under way (then `Busy`, or SQLite's busy error) — all but a migration's
+    /// own work, which is waited out (`granted`). Never longer: iOS would kill the monitor
+    /// mid-wake. Read only: a reading coordination, which never holds up another reader,
     /// and a read-only connection, which begins no write transaction and writes nothing to the file
     /// or its WAL — no migration, no checkpoint as it closes, and no file where there is none. It
     /// needs the WAL files, which every read-write connection keeps (persistent WAL) and which on
@@ -92,20 +92,16 @@ public struct Outbox: Sendable {
     /// open makes them again. The file is closed before this returns, since iOS gives an extension
     /// no notice before it suspends it, and a lock held then gets it killed (0xdead10cc). A file a
     /// newer build migrated throws (`TooNew`); one this build has yet to migrate — the app not
-    /// opened since an update — throws too (`TooOld`), unless `migrating`: the monitor's read
-    /// migrates it here, once, as the app's open would, within the same bound, so the bell still
-    /// clears the shields. The shield's never does (#97's review): iOS asks for it synchronously,
-    /// many times a minute, and a writing coordination and the write lock there, in the process
-    /// likeliest to be suspended without notice, would buy only the bell in its words — Bali's name
-    /// alone until the monitor or the app has migrated it. A standing it cannot read throws:
-    /// `.unread` is the app's.
-    static func read(_ url: URL, within bound: TimeInterval, migrating: Bool) throws -> SyncState {
+    /// opened since an update — is migrated here, once, as the app's open would, within the same
+    /// bound, so the bell still clears the shields. A standing it cannot read throws: `.unread` is
+    /// the app's.
+    static func read(_ url: URL, within bound: TimeInterval) throws -> SyncState {
         let deadline = DispatchTime.now() + bound
         do {
             return try coordinated(url, reading: true, until: deadline) {
                 try kept(in: $0, readonly: true, until: deadline)
             }
-        } catch is TooOld where migrating {
+        } catch is TooOld {
             return try coordinated(url, reading: false, until: deadline) {
                 try kept(in: $0, readonly: false, until: deadline)
             }
@@ -210,7 +206,7 @@ public struct Outbox: Sendable {
     /// retry). The deadline is a ceiling (#93's review): past it, `Busy` is thrown. Not granted
     /// yet, the asking is cancelled, and a grant that comes after opens nothing; an open under way
     /// runs on, on the thread it was granted on, and its outcome is dropped — so an `open` given a
-    /// deadline holds nothing once it returns (the extensions' read closes the file first), and its
+    /// deadline holds nothing once it returns (the monitor's read closes the file first), and its
     /// own waits on SQLite's locks end by the same deadline. All but one open, which `waitsOut`:
     /// the one that takes the write lock, the monitor's migration (#97's review). Left running, it
     /// would hold that lock once the read had answered, as the monitor asks iOS for its next wake —

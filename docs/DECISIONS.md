@@ -8,6 +8,66 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **B5c-2: Bali's shield reads nothing — iOS's sandbox refuses a
+  ShieldConfiguration extension the outbox file, its file coordinator and SQLite's own locks alike —
+  so it says "Focused with Bali", with no time, and D1's line sends the student to Bali for the time
+  (the owner's ruling, 2026-09-27, after round 3 of the device check).** **Found, twice** (the
+  owner's iPhone 15 Pro, iOS 18.6.2, round 3, step 1). On `main` at 25a58ef, in a running session,
+  focused, every blocked app's shield said "Focused with Bali" alone — never the bell, nor "waiting
+  for your class" — and the shield extension's log said why at each shield: the kernel's `Sandbox:
+  BaliShield deny(1) mach-lookup com.apple.FileCoordination`, Foundation's `grantAccessClaim message
+  failed … Sandbox restriction`, a `-[NSFileCoordinator coordinate...]` call returning an error:
+  B6c's reading coordination failed at every shield, and `ShieldWords`, having read nothing, said
+  Bali's name. #108's first head (f0c5470) read the file with no coordinator, straight through
+  SQLite. On the phone the FileCoordination deny was gone, and SQLite's locks were refused instead:
+  `deny(1) system-fcntl 95` (Apple's libsqlite3: "Failed to confine fd 3 … Operation not
+  permitted"), then `deny(1) system-fcntl 63` and `deny(1) system-fcntl 90`, and `access permission
+  denied in "SELECT * FROM sqlite_master LIMIT 1"` — the fd confinement, the protection-class query
+  and the open-file-description lock (as xnu numbers them), the last the one Apple's SQLite takes
+  its locks with. So no read of the outbox file works from a shield extension, coordinated or not;
+  SQLite's lockless opens (`nolock=1`, `immutable=1`) would read the WAL file without the locks that
+  keep a read whole — a write missed, or half seen: a wrong bell, which B5c ruled out. The monitor
+  extension's sandbox allows both — its claim granted, its reads working on the same phone — so its
+  read is untouched. **Weighed:** (a) the shield shows no time; (b) a copy of the bell the app
+  writes for the shield after each committed change — a small file replaced whole, or the app
+  group's defaults. **The owner's ruling: (a).** (b) is one fact in two places, v2's disease
+  (ARCHITECTURE, data model, decision 1); iOS may keep a shield's words until the shields change —
+  not documented (B5c's disclosure (1), which round 3 was to check, and now cannot: the shield shows
+  no time) — so a time on a shield could go stale after an extension — the wrong time B5c's words
+  were built never to show; and C4's Focus screen shows the countdown, where the student opens Bali.
+  **Decided:** `ShieldWords(over:)` — one title, "Focused with Bali", whatever the phone stands in,
+  and D1's line with its end changed to say where the time is: "This app is paused for class. Calls,
+  FaceTime, Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency
+  Unlock is always there." ("This website…" over a website) — the ruling's example line, its em-dash
+  made a full stop: DESIGN.md, landed since (#109), adds no new em-dash to a user-facing string. The
+  extension reads nothing: no outbox, no app group defaults — its Debug read of the device check's
+  cap goes, since that cap only moved a time the shield no longer shows — and no clock. **Deleted**,
+  deletion over addition: the shield's read — `ShieldWords`' outbox init, its words from the
+  standing (the bell in the phone's time format, "waiting for your class") and `ShieldWords.time` —
+  and `Outbox.read`'s `migrating`, whose `false` was the shield's alone. The monitor's read is
+  `Outbox.read(_:within:)`, the code `migrating: true` ran — a reading coordination and a read-only
+  connection, then, over a file this build has yet to migrate, a writing coordination and the
+  migration, waited out once granted — with every B6c and B6c-2 guarantee as it was. **Superseded:**
+  B5c's words from the standing, the shield's half of B6c's extensions' read, and B6c-2's "the
+  shield never migrates", moot now it never reads. **Tests** (Linux and the iOS Simulator):
+  `ShieldWordsTests.words` — the title and the line, over an app and over a website; `readsNothing`
+  — the shield extension's code, comments left out, asks for `ShieldWords(over: over)` and names no
+  `Outbox.`, `Bell.`, `SyncState`, `UserDefaults`, `FileManager`, `contentsOf`, `NSFileCoordinator`
+  or `Date(` (read as `monitorsCalls` reads the monitor's, through one helper now, `sourceCode`);
+  `ExtensionReadTests` pin B6c's guarantees on the monitor's read, the shield's halves deleted with
+  it; `BoundTests.coordinator` and `reader` on the monitor's read. Red on `main` first:
+  `readsNothing` against main's extension, which read the outbox, the defaults and the clock at
+  every shield. Of 10 mutations — main's extension put back; a time in the title; D1's old line; the
+  ruling's line verbatim, its em-dash back; the website's words the app's; the extension reading the
+  defaults again; the extension asking for an app's words whatever it shields; the monitor never
+  migrating; its first open not read only; a newer build's schema read as this one's — each taken
+  alone, all 10 turn a test red (on macOS). **To know:** the shield never shows a time again, nor
+  "waiting for your class"; round 3's steps 1 and 3 now expect "Focused with Bali" and the new line.
+  **Santa** (two Claude reviewers, both the fallback — the Codex CLI cannot run on this Mac, so both
+  share a model family; round 1): no blockers. Fixed here, their three WARNs: iOS *may* keep a
+  shield's words until the shields change — not documented, B5c's (1) — where the code's comment and
+  both docs said it does; B6c-2's PLAN paragraph noted moot, as B6c's is; and `project.yml`'s
+  comment on the shield's BaliOutbox dependency, which still said it read the standing.
 - **2026-09-29** — **A design framework for user-facing UI, on the owner's word: taste-skill,
   Vercel's web interface guidelines, and `docs/DESIGN.md`.** The owner wants Bali's pages to read
   as designed, not as AI "slop", and is open to redesigning the student screens. **What landed:**
