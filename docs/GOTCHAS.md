@@ -76,6 +76,13 @@ touching infra, CI, git plumbing, or the dev environment.
 
 ## Cloud sessions / dev environment
 
+- **Dev's demo teacher can turn back into a student.** Provisioned 2026-09-22, the row read
+  `role = 'student'` again on 2026-09-26, cause unknown: no code path writes `users.role` (a first
+  sign-in makes a student row). `npm run dev:teacher` then refuses every command, `class` and
+  `block` included — `… signed in as "student" but the demo needs "teacher"` — and prints the SQL
+  that fixes it, the teacher's id filled in (README, "Running it against a deployed API", step 3).
+  The owner pastes it into Railway's query tab on dev's Postgres; a session cannot reach that
+  database.
 - **Egress is allowlisted by the cloud environment's network policy.** Any
   new external host a session needs (an API, a registry) must first be added
   by the owner in the environment settings. A proxy 403 is an org policy
