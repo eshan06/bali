@@ -157,10 +157,14 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
   `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
 - **Destructive button:** `action-destructive-*`, only for removing a student
   or deleting a class.
-- **Emergency Unlock control:** one tap, always (ARCHITECTURE: the one-tap
-  sanctioned exit); never a hold, a confirmation or a delay in front of it.
-  Warm orange, `radius-full`; the `spring` easing is only its press feedback,
-  springing back on release. Always reachable when the shields are on.
+- **Emergency Unlock control:** a one-second hold, always (the owner's ruling,
+  2026-09-29; D1's "Hold to unlock"). The second stops a pocket touch or a
+  stray tap from filing an unlock the teacher sees, and still keeps it quick;
+  letting go early does nothing. Never a confirmation, and no wait beyond that
+  second. VoiceOver's action unlocks in one step, so the hold never stands
+  between anyone and the exit. Warm orange, `radius-full`; the hold's progress
+  is a ring, and the `spring` easing is its spring-back on an early release.
+  Always reachable when the shields are on.
 - **Card:** `surface-card`, `shadow-1`; `radius-md` and `space-4` padding per
   the tokens (the web), and D1's `radius-lg` with 20 pt padding on iOS. Use a
   card only when elevation means hierarchy; otherwise group with spacing or a

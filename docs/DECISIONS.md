@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **The owner's two rulings: Emergency Unlock is a one-second hold, and Waiting
+  promises the lock only while Bali is open.** **The hold:** D1's approved Focus draws "Hold to
+  unlock" and C4 built it — held one second, VoiceOver unlocking in one step — while DESIGN.md §4
+  said "one tap, always … never a hold" and ARCHITECTURE called Emergency Unlock "the one-tap
+  sanctioned exit"; C4 disclosed the conflict, and #116's Claude Review warned that a later UI
+  step could follow those two and undo the hold. The owner ruled: keep it. Why: a second stops a
+  pocket touch or a stray tap from filing an unlock the teacher sees — on the grid, in the
+  reports, never discarded — while staying quick; VoiceOver's single step keeps it accessible.
+  DESIGN.md §4 and ARCHITECTURE now say a one-second hold; no code changed, the app already
+  holds. Alternative: one tap, as §4 had it — the fastest exit, and every brush of a pocket an
+  unlock on the record. **Waiting's body** (left D1's by C4b, its wording the owner's): D1's
+  "Your phone locks the moment class starts — no need to tap again" overpromised. Once a tap is
+  answered armed, nothing is shielded (`.waiting`: nothing to shield yet), and the phone locks
+  only when it learns of the Start — within 30 s with Bali open (decision 6), or at Bali's next
+  open. The owner's words replace that sentence, D1's wording changed by the ruling: "Your phone
+  locks when class starts, as long as Bali is open. No need to tap again." ("You tapped your
+  teacher's block before class started." stays before it.) No words function holds the line, so
+  `ScreenTests.waitingWords` reads `WaitingView.swift` for it, and for D1's "the moment class
+  starts" gone — red on `main` — as `FocusTests.releaseHasBoth` reads the screens. Alternative:
+  the line as a constant pinned by an app test, which a redraw writing D1's words back beside it
+  would leave green.
+
 - **2026-09-29** — **The device check's round 2 found that stopping or replacing a DeviceActivity
   window fires `intervalDidEnd` for it at once, so the monitor wakes whenever the app stops or
   moves its windows. Harmless as seen: recorded, no code change here — and one path, not seen,
