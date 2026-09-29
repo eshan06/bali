@@ -2,13 +2,10 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-/// Home (C3; D1's Home artboard), where the router sends a phone in no running class: the student
-/// greeted by name, Tap in — the block's scan (B6), in Debug builds until C4 — their classes, each
-/// with its teacher (`GET /v1/me`, C2a), and Join a class, which opens Join over Home with a way
-/// back. What the phone could not read or record is said, with Try again (rule 5): its classes,
-/// until a read answers them; where it stood; a tap the server refused. Not here yet: History and
-/// Me's tabs (C6), and Emergency Unlock over the last run's shields where the phone stood unread
-/// (B6b), which comes with C4's control.
+/// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan; Debug builds until
+/// C4), their classes with each teacher (`GET /v1/me`), and Join a class, opened over Home with a
+/// way back. What the phone could not read or record is said with Try again (rule 5). Not here yet:
+/// History and Me's tabs (C6); Emergency Unlock over an unread standing's shields (B6b, with C4).
 struct HomeView: View {
     let phone: Phone
 
@@ -33,9 +30,8 @@ struct HomeView: View {
                                 "Bali can't tell right now whether you're in a class. It keeps checking.",
                             phone: phone)
                     }
-                    // Until C4 draws the focus screen's Emergency Unlock, only a Debug build, whose
-                    // readout holds one, may shield a phone from here: nothing may shield it with
-                    // no way out (ARCHITECTURE: Emergency Unlock, always allowed). C4 lifts this.
+                    // Debug builds only until C4 draws Emergency Unlock (the readout holds one):
+                    // nothing may shield a phone with no way out (ARCHITECTURE). C4 lifts this.
                     #if DEBUG
                         tapIn
                     #endif
