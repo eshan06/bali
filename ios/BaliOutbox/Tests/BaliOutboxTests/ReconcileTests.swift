@@ -427,3 +427,148 @@ struct StaleReadTests {
         await rig.stop()
     }
 }
+
+@Suite("The classes, and the wait for the Start (C3)", .timeLimit(.minutes(3)))
+struct ClassesTests {
+    /// A tap answered armed: the phone waits for the Start.
+    private func armed(_ rig: Rig) async throws {
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await rig.until { $0.standing == .waiting && $0.queued.isEmpty }
+    }
+
+    @Test(
+        "The classes come with the read of the truth: not known (nil) until one answers; none is no classes — the Join screen's — and some, their teachers named, is in class"
+    )
+    func classes() async throws {
+        let rig = try Rig()
+        #expect(await rig.engine.state.hasClasses == nil)
+        try await rig.foreground(Answer.me(nil))
+        #expect(await rig.engine.state.hasClasses == false)
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(nil, classes: [Answer.inClass("c")]))
+        let state = await rig.until { $0.hasClasses == true }
+        #expect(state.me?.classes.first?.teacher?.displayName == "Ms. Rivera")
+        await rig.stop()
+    }
+
+    @Test(
+        "A read of the truth that gives no answer — none, a status, a body this build cannot read — leaves the classes as they were, unknown too, never none, and says why until one answers (rule 5)"
+    )
+    func failed() async throws {
+        let rig = try Rig()
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(nil)
+        var state = await rig.until { $0.meFailed != nil }
+        #expect(state.meFailed == .networkError && state.hasClasses == nil)
+        // Each wait for the loop's sleep first: the time moved before it, the wake would slip.
+        try await rig.sleeping([at(30)])
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(503)
+        state = await rig.until { $0.meFailed == .status(503) }
+        #expect(state.hasClasses == nil)
+        try await rig.sleeping([at(60)])
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, "{}")
+        await rig.until { $0.meFailed == .status(200) }
+        try await rig.sleeping([at(90)])
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil))
+        state = await rig.until { $0.meFailed == nil }
+        #expect(state.hasClasses == false)
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(nil)
+        state = await rig.until { $0.meFailed != nil }
+        #expect(state.hasClasses == false)
+        await rig.stop()
+    }
+
+    @Test(
+        "Waiting for the Start (decision 6, the owner's ruling): in the foreground the phone reads the truth at each wake, every 30 s, and the Start found puts it in the session, shielded; behind the app it reads nothing"
+    )
+    func waitingReads() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(nil))
+        #expect(await rig.engine.state.standing == .waiting)
+        rig.clock.advance(by: 30)
+        let first = try await rig.server.next()
+        #expect(first.route == meRoute)
+        first.reply(200, Answer.me(nil))
+        try await rig.sleeping([at(60)])
+        #expect(await rig.engine.state.standing == .waiting)
+        await rig.engine.setForeground(false)
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([])
+        rig.clock.advance(by: 600)
+        #expect(await rig.server.waiting.isEmpty)
+        try await rig.foreground(Answer.me(nil))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, Answer.me(session(endsAt: 4000)))
+        let state = await rig.until { $0.standing != .waiting }
+        #expect(state.standing == .inSession(session(endsAt: 4000), .focused))
+        #expect(state.shieldedUntil(rig.clock.now()) == at(4000))
+        await rig.stop()
+    }
+
+    @Test(
+        "An arm answered while the phone stands in a session its own clock says is over — the sweep running late, so the server armed the tap — is the wait for the Start, read for as any (santa's round 1): arming ends no session still running (decision 4), and past its bell the phone is in none"
+    )
+    func armedPastTheBell() async throws {
+        let rig = try Rig()
+        try await rig.tapIn(session(endsAt: 60))
+        rig.clock.advance(by: 90)
+        try await rig.engine.record(.tap(tagId: "the next class's"))
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await rig.until { $0.standing == .waiting && $0.queued.isEmpty }
+        try await rig.foreground(Answer.me(nil))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, Answer.me(session("t", endsAt: 4000)))
+        await rig.until { $0.standing == .inSession(session("t", endsAt: 4000), .focused) }
+        await rig.stop()
+    }
+
+    @Test(
+        "A read's classes apply though its standing may not — a change of the phone's awaits its answer, so the read may be older than it — for no change of the phone's moves the classes; only a join does"
+    )
+    func classesOverStaleStanding() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        let unlock = try await rig.server.next(unlockRoute)
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(session(endsAt: 4000), classes: [Answer.inClass("c")]))
+        let state = await rig.until { $0.me != nil }
+        #expect(state.hasClasses == true)
+        #expect(state.standing == .inSession(session(), .unlocked))
+        unlock.reply(200, Answer.unlocked())
+        await rig.until { $0.queued.isEmpty }
+        await rig.stop()
+    }
+
+    @Test(
+        "Out, not waiting, a read naming a session its clock says is over still takes it — the router's bell rule shows home, and the check-in finds it gone; only a waiting phone's wait is kept from it"
+    )
+    func outTakesPastSession() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(session(endsAt: -60)))
+        #expect(await rig.engine.state.standing == .inSession(session(endsAt: -60), .focused))
+        await rig.stop()
+    }
+
+    @Test(
+        "Waiting, a session the phone's own clock says is over — the server's sweep running late — is not the Start: the wait goes on, and a live session then ends it (data model, decision 6)"
+    )
+    func overIsNoStart() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(session(endsAt: -60)))
+        #expect(await rig.engine.state.standing == .waiting)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, Answer.me(session("t")))
+        await rig.until { $0.standing == .inSession(session("t"), .focused) }
+        await rig.stop()
+    }
+}

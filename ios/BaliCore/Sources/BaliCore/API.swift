@@ -57,6 +57,10 @@ public struct MeResponse: Codable, Sendable, Hashable {
     public let user: MeUser
     public let classes: [MeClass]
     public let session: Session?
+    /// An answer as the phone keeps it: a class it joined since the read, added (C3).
+    public init(user: MeUser, classes: [MeClass], session: Session?) {
+        (self.user, self.classes, self.session) = (user, classes, session)
+    }
 }
 
 /// `PATCH /v1/me` — a student sets their own display name.

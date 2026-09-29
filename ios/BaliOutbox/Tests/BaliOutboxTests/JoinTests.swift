@@ -112,6 +112,27 @@ struct JoinTests {
     }
 
     @Test(
+        "While a look-up or a join is under way the code cannot change, nor can the preview be left — the answer is for the code as sent, and is never dropped with nothing said (#106's review); once it is over, both again"
+    )
+    func busy() async throws {
+        var joining = try await previewing()
+        joining.busy = true
+        joining.type("ZZZZZZ")
+        joining.back()
+        #expect(joining.code == "6BVZA5" && joining.preview != nil)
+        joining.busy = false
+        joining.back()
+        joining.busy = true
+        joining.type("ZZZZZZ")
+        let answer = try await fixture("join-codes/found.json").previewJoinCode("6BVZA5")
+        joining.busy = false
+        joining.looked(answer, for: "6BVZA5")
+        #expect(joining.code == "6BVZA5" && joining.preview != nil && joining.failure == nil)
+        joining.type("ZZZZZZ")
+        #expect(joining.code == "ZZZZZZ")
+    }
+
+    @Test(
         "An answer for a code the student has typed over since is dropped: its class is not the one they would join"
     )
     func stale() async throws {
@@ -199,5 +220,91 @@ struct JoinTests {
         {
             #expect(Joining.words(.status(status), reason) == generic, "\(status)")
         }
+    }
+}
+
+private let (joinRoute, lookUpRoute) = ("POST /v1/enrollments", "GET /v1/join-codes/6BVZA5")
+
+@Suite("Joining through the engine: the class at once (C3)", .timeLimit(.minutes(3)))
+struct JoinEngineTests {
+    @Test(
+        "A join answered in is the engine's at once — the class in `me`, so `hasClasses` is true and the router moves on — and the truth is read again, which names its teacher; a join into a class already there adds it no second time"
+    )
+    func joined() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil))
+        #expect(await rig.engine.state.hasClasses == false)
+        async let answer = rig.engine.join(request)
+        try await rig.server.next(joinRoute).reply(200, Answer.joinedClass("c"))
+        #expect(await answer.answer?.class.id == "c")
+        var state = await rig.engine.state
+        #expect(state.hasClasses == true && state.me?.classes.map(\.id) == ["c"])
+        #expect(state.me?.classes.first?.teacher == nil)
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(nil, classes: [Answer.inClass("c")]))
+        state = await rig.until { $0.me?.classes.first?.teacher != nil }
+        #expect(state.me?.classes.map(\.id) == ["c"])
+        async let again = rig.engine.join(request)
+        try await rig.server.next(joinRoute)
+            .reply(200, Answer.joinedClass("c", outcome: "already_enrolled"))
+        _ = await again
+        #expect(await rig.engine.state.me?.classes.count == 1)
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(nil, classes: [Answer.inClass("c")]))
+        await rig.stop()
+    }
+
+    @Test(
+        "A read of the truth sent before the join and answered after it never takes the class away — its classes are older than the join; the read the join asks for then applies"
+    )
+    func staleRead() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil))
+        await rig.engine.setForeground(true)
+        let before = try await rig.server.next(meRoute)
+        async let answer = rig.engine.join(request)
+        try await rig.server.next(joinRoute).reply(200, Answer.joinedClass("c"))
+        _ = await answer
+        before.reply(200, Answer.me(nil))
+        // Sent once the stale answer is in: it has taken nothing away.
+        let after = try await rig.server.next(meRoute)
+        #expect(await rig.engine.state.me?.classes.map(\.id) == ["c"])
+        after.reply(200, Answer.me(nil, classes: [Answer.inClass("c"), Answer.inClass("d")]))
+        let state = await rig.until { $0.me?.classes.count == 2 }
+        #expect(state.hasClasses == true)
+        await rig.stop()
+    }
+
+    @Test("A join refused adds no class and reads nothing: why is the screen's to say")
+    func refused() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil))
+        async let answer = rig.engine.join(request)
+        try await rig.server.next(joinRoute).reply(404, Answer.refused("class_not_found"))
+        #expect(await answer.error?.error.reason == .classNotFound)
+        #expect(await rig.engine.state.hasClasses == false)
+        // A read asked for would have gone by the loop's next wake, and kept it from sleeping on.
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([at(60)])
+        #expect(await rig.server.waiting.isEmpty)
+        await rig.stop()
+    }
+
+    @Test(
+        "A look-up goes through the engine's one client, its token renewed once on a 401 by the engine's own refresh"
+    )
+    func lookUp() async throws {
+        let rig = try Rig()
+        async let answer = rig.engine.lookUp("6BVZA5")
+        try await rig.server.next(lookUpRoute).reply(401)
+        let again = try await rig.server.next(lookUpRoute)
+        #expect(again.token == "Bearer token-2")
+        again.reply(
+            200,
+            #"{"class":{"id":"c","name":"Class c"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
+        )
+        #expect(await answer.answer?.teacher.displayName == "Ms. Rivera")
+        #expect(await rig.tokens.refreshes == 1)
+        await rig.stop()
     }
 }

@@ -71,11 +71,12 @@ final class Phone {
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
     /// until the next ask (rule 5).
     private(set) var askFailed: ScreenTimeAskError?
-    /// Whether the student is in any class: nil until the phone knows — `GET /v1/me` is C3's to
-    /// read — and true once a join says so. The router shows Join while it is false.
-    private(set) var hasClasses: Bool?
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
+
+    /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
+    /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
+    var hasClasses: Bool? { sync?.hasClasses }
 
     init() {}
 
@@ -92,8 +93,7 @@ final class Phone {
         init(fixture: PreviewFixtures.State) {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
-            (everApproved, askFailed) = (false, fixture.askFailed)
-            (hasClasses, joining) = (fixture.hasClasses, fixture.joining)
+            (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
         }
     #endif
 
@@ -106,31 +106,33 @@ final class Phone {
             now: Date())
     }
 
-    /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the app's one client: what
-    /// it opens, or why not — the last try's words gone meanwhile. Nothing on a frozen phone.
+    /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the engine: what it opens, or
+    /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes.
+    /// A phone whose engine has not started — a frozen one too — says so (rule 5).
     func lookUp() async {
-        guard let client = engine?.client, let signIn else { return }
+        guard !joining.busy else { return }
+        guard let engine else { return joining.failure = Joining.notStarted }
         let code = joining.code
-        joining.failure = nil
-        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
-            await client.previewJoinCode(code)
-        }
+        (joining.failure, joining.busy) = (nil, true)
+        let answer = await engine.lookUp(code)
+        joining.busy = false
         joining.looked(answer, for: code)
     }
 
-    /// Joins the class the code opens (`POST /v1/enrollments`) — its event id minted per press, as
-    /// the server knows a join's retry by its enrollment: once in, the phone has a class, so the
-    /// router moves on; else why not, said. Nothing on a frozen phone.
+    /// Joins the class the code opens (`POST /v1/enrollments`), through the engine — its event id
+    /// minted per press, as the server knows a join's retry by its enrollment: once in, the class
+    /// is the engine's at once, so the router moves on; else why not, said. A phone whose engine
+    /// has not started — a frozen one too — says so (rule 5).
     func join() async {
-        guard let client = engine?.client, let signIn else { return }
+        guard !joining.busy else { return }
+        guard let engine else { return joining.failure = Joining.notStarted }
         let now = Date()
         let request = EnrollmentJoinRequest(
             joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
-        joining.failure = nil
-        let answer = await Joining.send(renewing: { await signIn.refresh() }) {
-            await client.join(request)
-        }
-        if joining.joined(answer) { hasClasses = true }
+        (joining.failure, joining.busy) = (nil, true)
+        let answer = await engine.join(request)
+        joining.busy = false
+        _ = joining.joined(answer)
     }
 
     func sawIntro() {
@@ -402,9 +404,10 @@ final class Phone {
                 .joined(separator: " · ")
         }
 
+        /// A class joined through the engine, as the Join screen joins one: in `me` at once.
         private func join() async -> String {
             let now = Date()
-            let joined = await engine.client.join(
+            let joined = await engine.join(
                 EnrollmentJoinRequest(joinCode: code, eventId: EventID.mint(at: now), deviceTime: now))
             return joined.answer.map { "joined \($0.class.name)" }
                 ?? "not joined: \(joined.result) \(joined.error?.error.message ?? "")"

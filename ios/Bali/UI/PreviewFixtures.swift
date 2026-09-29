@@ -9,8 +9,8 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
-        /// any session, no ask for the permission failed, its classes not known yet and nothing
-        /// typed to join, unless said otherwise.
+        /// any session and in two classes, no ask for the permission failed and nothing typed to
+        /// join, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -18,7 +18,6 @@
             var protection: Protection? = permission(.approved)
             var sync: SyncState? = standing(.out)
             var askFailed: ScreenTimeAskError?
-            var hasClasses: Bool?
             var joining = Joining()
         }
 
@@ -32,10 +31,12 @@
             "screenTimeError": State(
                 protection: permission(.notDetermined),
                 askFailed: .failed("FamilyControlsError.networkError")),
-            "join": State(hasClasses: false, joining: joining()),
-            "joinPreview": State(hasClasses: false, joining: joining(opens: period3Preview)),
+            "join": State(sync: standing(.out, me: ana(newcomer: true)), joining: joining()),
+            "joinPreview": State(
+                sync: standing(.out, me: ana(newcomer: true)),
+                joining: joining(opens: period3Preview)),
             "joinError": State(
-                hasClasses: false,
+                sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound))),
             "home": State(),
             "waiting": State(sync: standing(.waiting)),
@@ -91,11 +92,26 @@
             return protection
         }
 
-        /// The engine's truth, standing `standing`, the server reached a moment ago.
-        private static func standing(_ standing: Standing) -> SyncState {
+        /// The engine's truth, standing `standing`, the server reached a moment ago, `GET /v1/me`
+        /// answering `me`.
+        private static func standing(_ standing: Standing, me: MeResponse? = ana()) -> SyncState {
             var state = SyncState()
-            (state.standing, state.link, state.heardAt) = (standing, .reached, Date())
+            (state.standing, state.link, state.heardAt, state.me) = (standing, .reached, Date(), me)
             return state
+        }
+
+        /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
+        /// Okafor — or, a `newcomer`, in no class yet.
+        private static func ana(newcomer: Bool = false) -> MeResponse? {
+            let classes =
+                newcomer
+                ? ""
+                : #"{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"}},{"id":"p5","name":"Period 5 — Chemistry","teacher":{"displayName":"Mr. Okafor"}}"#
+            return try? BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[\#(classes)],"session":null}"#
+                        .utf8))
         }
     }
 #endif
