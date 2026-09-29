@@ -36,10 +36,10 @@
     extension Bell {
         /// The app's windows: the bell's at `window`'s end and its backup — or, nil, none — the
         /// monitor's own stopped once the bell's is new, by `register(_:in:)`'s rule. A window iOS
-        /// takes ends the monitor's refusal: one is registered again.
+        /// takes ends the monitor's refusal: one is registered again — never a pass that asked for
+        /// none, iOS holding both as they are (#103's review).
         public static func register(_ window: DateInterval?) throws {
-            try register(window, in: DeviceActivityCenter())
-            if window != nil { monitorUnscheduled = nil }
+            if try register(window, in: DeviceActivityCenter()) { monitorUnscheduled = nil }
         }
 
         /// Takes the shields off, as the monitor does when nothing keeps them on: whether the store

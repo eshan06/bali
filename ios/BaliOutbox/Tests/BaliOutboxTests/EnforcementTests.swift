@@ -56,8 +56,9 @@ actor FakeScreenTime: ScreenTime {
 
     func schedule(_ window: DateInterval?) throws {
         if refusing, window != nil { throw Refused() }
+        // Only a window iOS takes anew ends the monitor's refusal: one it holds asks nothing (#103).
+        if window != nil, window != registered { refusedMonitor = nil }
         windows.append(window)
-        if window != nil { refusedMonitor = nil }
     }
     func refuse(_ refusing: Bool = true) { self.refusing = refusing }
 
