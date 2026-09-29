@@ -96,6 +96,15 @@ rm -f "$PROMPT_FILE"
 
 **Claude fallback** (neither CLI installed): a second Agent with `subagent_type: code-reviewer` and `model: opus`. Say in the report that both reviewers share a model family — context isolation still holds, model diversity doesn't.
 
+#### Design check (only when the diff touches user-facing UI)
+
+Runs beside the reviewers; skip it when the diff has no user-facing UI.
+
+- The diff touches `apps/web/src/app` or `apps/web/src/components`: run the `web-design-guidelines` skill over those changed files.
+- The diff touches `ios/Bali/UI` or `ios/BaliShield`: check the changed screens against `docs/DESIGN.md` (its tokens and its do's and don'ts).
+
+Every design finding is a **WARN, never a blocker**: santa is never stricter than the final gate (Step 1). They go through Step 4, item 3, like any WARN.
+
 ### Step 3: Verdict
 
 - **No blockers** from either reviewer → **NICE**: fix the easy WARNs (Step 4, item 3), then go to Step 5.
@@ -129,6 +138,7 @@ SANTA VERDICT: NICE / SKIPPED (docs-only) / PARKED
 
 Reviewer A (Claude Opus):   [n] blockers · [m] warns
 Reviewer B ([model used]):  [n] blockers · [m] warns
+Design check:               [k] warns / skipped (no user-facing UI)
 
 Blockers:  [x] fixed · [y] dismissed (reasons in the PR)
 WARNs:     [a] fixed · [b] listed in the PR

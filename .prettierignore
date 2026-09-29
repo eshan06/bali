@@ -22,3 +22,14 @@ ios/Bali/UI/bali-tokens.json
 # upstream text (and future re-vendors) never turns format:check red on an
 # unrelated PR
 .claude/skills/graphify/
+
+# Vendored design skills (docs/DESIGN.md, Design tooling) — upstream text plus
+# a Bali block; excluded so a re-vendor stays a clean diff
+.claude/skills/design-taste-frontend/
+.claude/skills/redesign-existing-projects/
+.claude/skills/minimalist-ui/
+.claude/skills/high-end-visual-design/
+.claude/skills/industrial-brutalist-ui/
+.claude/skills/full-output-enforcement/
+.claude/skills/image-to-code/
+.claude/skills/web-design-guidelines/
