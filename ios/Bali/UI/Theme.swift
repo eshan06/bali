@@ -7,8 +7,8 @@ import SwiftUI
 enum Theme {
     // Colours, D1's light values in `bali-tokens.json`, beside this file — `AppTests.tokens` pins
     // each, the chips' too, and a colour added here joins its list: the page and cards; the
-    // borders; the inks; the brand and its pressed shade; the countdown arc's fill and track, and
-    // the mark's own track.
+    // borders; the inks; the brand and its pressed shade; the countdown arc's fill, its last two
+    // minutes' and its track, and the mark's own track — which D1's Focus ring draws too.
     static let page = Color(hex: 0xF7F5F2)
     static let card = Color.white
     static let sunken = Color(hex: 0xEFECE7)
@@ -20,6 +20,7 @@ enum Theme {
     static let brand = Color(hex: 0x245A43)
     static let brandPressed = Color(hex: 0x1E4936)
     static let arc = Color(hex: 0x2C6F51)
+    static let arcFinal = Color(hex: 0x62A483)
     static let arcTrack = border
     static let markTrack = Color(hex: 0xBCDCCA)
     /// shadow-1, a resting card's: 0 1px 2px, warm black at 6 %.
@@ -41,13 +42,15 @@ extension Color {
     }
 }
 
-/// D1's type scale — a size, a line height, a weight and a tracking in ems — in the system font.
-/// Its numerals (rounded, each digit one width) come with the first screen that counts (C4).
+/// D1's type scale — a size, a line height, a weight and a tracking in ems — in the system font;
+/// its numerals rounded where the design system's are, and each digit one width (`tabular-nums`).
 struct TextStyle {
     let size: CGFloat
     let line: CGFloat
     var weight = Font.Weight.regular
     var tracking: CGFloat = 0
+    var design = Font.Design.default
+    var tabular = false
 
     static let h1 = TextStyle(size: 32, line: 38, weight: .semibold, tracking: -0.01)
     static let h2 = TextStyle(size: 24, line: 30, weight: .semibold)
@@ -59,6 +62,13 @@ struct TextStyle {
     static let label = TextStyle(size: 12, line: 16, weight: .semibold, tracking: 0.06)
     /// A button's label.
     static let button = TextStyle(size: 17, line: 22, weight: .semibold)
+    /// Tables and stats; medium countdowns, rounded.
+    static let data = TextStyle(size: 14, line: 20, weight: .medium, tabular: true)
+    static let dataLg = TextStyle(
+        size: 28, line: 32, weight: .semibold, design: .rounded, tabular: true)
+    /// D1's Focus countdown, inside its ring.
+    static let countdown = TextStyle(
+        size: 64, line: 68, weight: .semibold, tracking: -0.02, design: .rounded, tabular: true)
 }
 
 extension View {
@@ -74,7 +84,9 @@ private struct Styled: ViewModifier {
 
     func body(content: Content) -> some View {
         let size = style.size * scale
-        content.font(.system(size: size, weight: style.weight)).tracking(size * style.tracking)
+        let font = Font.system(size: size, weight: style.weight, design: style.design)
+        content.font(style.tabular ? font.monospacedDigit() : font)
+            .tracking(size * style.tracking)
             .lineSpacing(max(0, (style.line - style.size * 1.2) * scale))
     }
 }

@@ -8,6 +8,71 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C4: the Focus screen — D1's three states over what the enforcer verified,
+  its countdown by the phone's clock, and Emergency Unlock on the live screen; and #103's
+  rider.** **What it claims** (`FocusWords`, BaliOutbox, tested on Linux): of the shields,
+  `Protection` alone, never the standing. The router chooses focus by the enforcer's intent
+  (`shieldedUntil`), so a tap held out of any session with the permission taken back is focus
+  over no shields (C1a's hand-off): verified on is the Focused chip, the ring and D1's "Every app
+  is paused"; the permission judged off (`permissionOff` — denied, or not determined for a
+  check-in interval, never a launch's moment) is the Screen Time off chip, no ring, the words and
+  the way back (Settings); nothing verified yet draws no ring and says only "Checking Screen
+  Time…" (santa's design check: a blank for up to a check-in interval). The chip follows
+  the claim, not the standing. Why: rule 3 — v2 ticked a focus timer over nothing shielded.
+  Alternative: the standing's chip and ring whatever the check found (v2's bug). **The
+  countdown** is to `shieldedUntil(now)`, the phone's own clock (decision 6): the bell, or a tap's
+  cap, said "at most until" — its answer may move it; the header names the session whose bell
+  ends the shields, so a re-tap whose cap outlasts the bell is "You're in", its class not known
+  until the answer. Rounded up, it reads 0:00 only at the bell. **The ring** is full with 50
+  minutes left or more, then drains: the phone knows the bell, not the start — its `SessionView`
+  has no `startedAt` — and 50 is decision 7's cap and v2's scale. Alternatives: an additive
+  `startedAt` on the phone's session (an API change for a drawing); the time left when the screen
+  first showed (full again at every relaunch). D1's track is green-200, the mark's, not
+  `arc-track`; the last two minutes arc-final2 at 16 pt — never red. **Offline** is `link ==
+  .unreachable` only: waiting on sign-in, storage refused or no exchange yet is no "no
+  connection". **iOS's refused wake** — this run's window (`unscheduled`) or the monitor's with
+  the app closed (`monitorUnscheduled`) — is one line with the way on: "If your apps are still
+  paused after class, open Bali." Until now only the Debug readout showed either (rule 5).
+  **Emergency Unlock** (`UnlockControl`): D1's control as drawn — "Hold to unlock — your teacher
+  will see it", "Letting go early does nothing" — held one second (`onLongPressGesture`, v2's
+  length; D1 gives none), its progress a ring around the lock in the control's own ink, springing
+  back on an early release with the design system's `spring`; no motion under Reduce Motion;
+  VoiceOver's default action unlocks in one step. `Phone.emergencyUnlock()` records it through
+  `SyncEngine.emergencyUnlock` (decision 11: under a tap not yet answered, else the session), so
+  the shields come off at once and the record queues; a write the outbox refuses is said, the
+  shields as they were (B6b's disclosed (3)) — the apps "still paused" only where the check
+  verified them so (santa's round 1: a constant said it over Screen Time off, rule 3) — and
+  VoiceOver, left on the control, is told; no reason asked — D1's Focus draws none (C5a's).
+  **Home's too, and Tap in in every build** (C3b's plan and its review's rider): Home over the
+  last run's shields where the phone stood unread (B6b) holds the same control (`EmergencyUnlock`),
+  and Home's Tap in, Debug-only until a live Emergency Unlock existed, ships in every build.
+  `FocusTests.releaseHasBoth` reads both screens as a Release build compiles them — every `#if
+  DEBUG` out — so Tap in, which shields a phone, never ships without Emergency Unlock wherever
+  the shields can be on (red before: Tap in was Debug-only and Home had no unlock).
+  **A conflict, disclosed for the owner:** DESIGN.md §4 has the control "one tap, always … never a
+  hold", citing ARCHITECTURE's "one-tap sanctioned exit"; D1's approved Focus artboards draw a
+  hold, and the design system's own README names the spring the "hold-release spring-back".
+  DESIGN.md's precedence lets D1 win for the screens it draws, so the screen is D1's; reconciling
+  the two (DESIGN.md §4, or D1) is the owner's call. **Type:** `TextStyle` gains a design and
+  tabular digits, the scale's `data` and `dataLg`, and D1's 64/68 countdown, which the scale lacks;
+  the ring's digits stop growing at the largest size short of the accessibility ones — 64 pt
+  already, in a ring that does not grow — and VoiceOver reads its label. **Layout:** each group at
+  its own height and only the spacers giving: offered an equal share smaller than the ring, the
+  stack cut the claim to one line (the offline state, at the default size, on the simulator).
+  **Rider (#103's review):** `Bell.register` says whether it asked iOS for a window, and
+  `PhoneBell` ends the monitor's refusal only then: a relaunch's first pass, iOS holding both
+  windows as they were, cleared it before any screen could show it. `RegisterTests.asked`, red on
+  `main` (it does not build: `register` returned nothing); the fake Screen Time clears the refusal
+  only on a window it did not hold. **Not covered, disclosed:** `Protection.unreported` (protection
+  off found and not queued) is not said on Focus — its Screen Time off claim is; the digits tick
+  on a one-second timeline from the screen's appearance, up to a second behind the bell's own
+  (the enforcer's alarm, not the digits, ends the shields); a link waiting on sign-in or refused
+  by storage is not said on Focus, which the router ranks above Sign in (santa's WARN: a
+  follow-up for the owner). **Santa** (two Claude reviewers, both the fallback — Codex refuses
+  every model on this Mac, so they share a model family — and the design check): round 1, one
+  blocker, fixed (the failure's words above) and eleven design WARNs, the easy ones fixed — D1's
+  24-pt gaps, Settings primary as D1's ProtectionOff draws it, Voice Control's labels, the ring
+  spoken as a length of time; round 2, none (a still pressed look under Reduce Motion, fixed).
 - **2026-09-29** — **C3b: Home and Waiting drawn (D1's artboards), Join opened from Home with a
   way back, and Home's Tap in.** **Home** (`HomeView`): the mark and name, "Hi, <name>" (`GET
   /v1/me`'s display name; "Hi there" with none); D1's hero card, whose **Tap in** is B6's scan

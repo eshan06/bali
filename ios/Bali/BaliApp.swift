@@ -206,6 +206,19 @@ final class Phone {
         }
     }
 
+    /// Emergency Unlock (C4), always allowed: recorded where decision 11 files it — the shields off
+    /// at once, the record queued, never waiting on the network — or why not (rule 5), which the
+    /// screen says: a phone whose engine has not started, a frozen one too, or an outbox refusing.
+    func emergencyUnlock() async -> UnlockFailure? {
+        guard let engine else { return .notStarted }
+        do {
+            try await engine.emergencyUnlock()
+            return nil
+        } catch {
+            return .notSaved
+        }
+    }
+
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
     /// failed can be tried again.
     func start() async {

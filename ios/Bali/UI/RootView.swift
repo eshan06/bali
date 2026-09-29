@@ -37,7 +37,7 @@ struct RootView: View {
         case .join: JoinView(phone: phone)
         case .home: HomeView(phone: phone)
         case .waiting: WaitingView(phone: phone)
-        case .focus: StepPlaceholder("Focus — C4")
+        case .focus: FocusView(phone: phone)
         case .unlocked: StepPlaceholder("Unlocked — C5")
         case .protectionOff: StepPlaceholder("Protection off — C5")
         case .sessionOver: StepPlaceholder("Session over — C5")

@@ -699,6 +699,24 @@ struct RegisterTests {
     }
 
     @Test(
+        "Whether a pass asked iOS for a window, which the monitor's refusal ends by (#103's review): a relaunch's first pass, iOS holding both windows as they are, asks none — so a refusal kept while the app was closed still shows — a new end asks both, a backup refused before asks it alone, and none asks nothing"
+    )
+    func asked() throws {
+        let (center, calendar) = (Center(), Self.calendar)
+        let bell = Bell.window(until: at(1200))
+        #expect(try Bell.register(bell, in: center, calendar: calendar))
+        #expect(try !Bell.register(bell, in: center, calendar: calendar))
+        #expect(try Bell.register(Bell.window(until: at(1800)), in: center, calendar: calendar))
+        center.refusing = [.backup]
+        #expect(throws: Center.Refused.self) {
+            try Bell.register(bell, in: center, calendar: calendar)
+        }
+        center.refusing = []
+        #expect(try Bell.register(bell, in: center, calendar: calendar))
+        #expect(try !Bell.register(nil, in: center, calendar: calendar))
+    }
+
+    @Test(
         "The app's truth leaves no stale wake: a new window or an extension replaces the bell's and its backup and stops the next wake the monitor asked for itself, the app closed; the end stops every one (B5b-3)"
     )
     func cleanup() throws {

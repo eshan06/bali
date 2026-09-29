@@ -144,14 +144,21 @@ public enum Bell {
     /// own stays: the bell's window may have woken it early already, spent, and its own next wake
     /// is then the one still to come, at the bell (#99's review: stopped over the backup alone, it
     /// left none there). A window iOS refuses throws, and iOS keeps the one it held. No callback of
-    /// the monitor's runs in the app, so every name is the app's to ask for.
+    /// the monitor's runs in the app, so every name is the app's to ask for. Whether it asked for
+    /// a window, which iOS took: a pass that asked none — iOS holding both as they are — registered
+    /// nothing, so it ends no refusal of the monitor's (#103's review).
+    @discardableResult
     public static func register(
         _ window: DateInterval?, in center: some BellCenter, calendar: Calendar = .current
-    ) throws {
-        guard let window else { return center.stop(Name.allCases) }
+    ) throws -> Bool {
+        guard let window else {
+            center.stop(Name.allCases)
+            return false
+        }
         let bellIsNew = try ask(window, as: .bell, in: center, calendar: calendar)
-        _ = try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
+        let backupIsNew = try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
         if bellIsNew { center.stop([.tick, .tock]) }
+        return bellIsNew || backupIsNew
     }
 
     /// The app's ask of `center`, to wake the monitor at `window`'s end under `name`, replacing the
