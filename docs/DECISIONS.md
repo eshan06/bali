@@ -10,7 +10,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-09-29** — **The device check's round 2 found that stopping or replacing a DeviceActivity
   window fires `intervalDidEnd` for it at once, so the monitor wakes whenever the app stops or
-  moves its windows. Harmless: recorded, no code change.** **Seen** on the owner's iPhone 15 Pro
+  moves its windows. Harmless as seen: recorded, no code change here — and one path, not seen,
+  left open and disclosed below.** **Seen** on the owner's iPhone 15 Pro
   (iOS 18.6.2, 2026-09-27) in the readout's `Monitor:` lines, each at the moment the app stopped or
   replaced a window, not at its end: at Emergency Unlock, both windows, the bell's and its backup
   (9:10:47 PM, round 2's step 4); at `end`, the check-in that found the session over (8:18:35);
@@ -29,9 +30,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   wake. At the extension, the bell's window, replaced, woke the monitor, which kept the shields and
   asked for `tick` at the new bell; the app then stopped `tick`, which woke the monitor again,
   before the bell, and it asked for `tock` there. So the bell costs one wake for nothing: at
-  9:27:02, `bell · cleared` and `tock · nothing to clear` together. **Decided: no code change
-  now.** The extra wake reads the truth, clears nothing owed and takes a fraction of a second —
-  B5b's "a stale window only wakes the monitor, which reads the truth and does nothing wrong".
+  9:27:02, `bell · cleared` and `tock · nothing to clear` together. **Decided: no code change in
+  this docs step.** Every wake round 2 saw read the truth, cleared nothing owed and took a fraction
+  of a second — B5b's "a stale window only wakes the monitor, which reads the truth and does
+  nothing wrong". **Open, not seen (#113's Claude Review):** the monitor's own asks replace too.
+  Since B5b-4 a kept or unread wake asks for its next anew under the other name, replacing
+  whatever iOS holds there, and a replacement wakes the monitor at once — so a wake that finds the
+  other name's window held can wake the monitor again at once, and `tick` and `tock` can wake each
+  other back to back, a wake each time instead of one a minute: until a wake at or after the
+  shields' end clears and asks nothing, or for as long as the file stays unread. Two ways in: the
+  fail-safe's third unread wake in a row — `tock`'s asking for `tick` over the one that ended a
+  minute before — if replacing a window that has already ended wakes the monitor too (every
+  replacement round 2 saw was of a window under way); and two asks under one name while the other
+  name's window is under way — a second extension, say, whose bell and backup replacements each
+  wake the monitor to ask for `tick`. Round 2 extended once and saw no loop: at 9:27:02 the bell's
+  own wake was the one that cleared, 59 s after the new bell. B5b's guard was written against
+  exactly this ("the two would never end"), and B5b-4 took it off the monitor to stop a dropped
+  wake; a rule that keeps both, and a test center that wakes on a replacement or a stop
+  (`RegisterTests.Center` does neither), are a code step for the owner to schedule.
   **Also answered, B5b-3's (1):** a DeviceActivity call of another name inside a callback does not
   deadlock on iOS 18.6.2 — the monitor asked for `tick` inside `bell`'s `intervalDidEnd` and for
   `tock` inside `tick`'s, both wakes finished (none `not finished`), and that `tock`, which only a
