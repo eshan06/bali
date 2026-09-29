@@ -169,6 +169,15 @@ enum Contract {
     struct Unreadable: Error { let result: JSONValue }
 }
 
+/// The iOS project's source file at `path`, under `ios/`, its comments left out: for the tests that
+/// pin what an extension's code may call.
+func sourceCode(_ path: String) throws -> String {
+    try String(contentsOf: Contract.repoRoot.appending(path: "ios/\(path)"), encoding: .utf8)
+        .split(separator: "\n", omittingEmptySubsequences: false)
+        .map { $0.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0] }
+        .joined(separator: "\n")
+}
+
 /// A seeded generator, so a random walk that fails fails again.
 struct SplitMix64: RandomNumberGenerator {
     var state: UInt64

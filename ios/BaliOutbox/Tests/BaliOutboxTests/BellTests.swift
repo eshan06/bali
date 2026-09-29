@@ -510,12 +510,12 @@ struct BoundTests {
                 return
             }
             defer { release.signal() }
-            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1, migrating: true) }
+            #expect(throws: Outbox.Busy.self) { try Outbox.read(url, within: 1) }
             #expect(Bell.wake(outboxAt: url, now: t0) == .retry(Bell.window(until: at(60))))
         }
 
         @Test(
-            "On the phone, the extensions' read coordinates as a reader: another process reading the file holds it up not at all (#93's review)"
+            "On the phone, the monitor's read coordinates as a reader: another process reading the file holds it up not at all (#93's review)"
         )
         func reader() throws {
             let (outbox, url) = try makeOutbox()
@@ -539,7 +539,7 @@ struct BoundTests {
             // a stall of the simulator's never reads as the file held.
             let bound = TimeInterval(patience.components.seconds)
             #expect(
-                try Outbox.read(url, within: bound, migrating: false).standing
+                try Outbox.read(url, within: bound).standing
                     == .inSession(session(endsAt: 1200), .focused))
         }
 
@@ -925,18 +925,7 @@ struct RegisterTests {
         "The monitor extension asks DeviceActivity nothing but through `Bell.carryOut`, whose rules hold above — never the app's registration — and no code of the app's or the extensions' asks for `activities`, on which the monitor deadlocked on iOS 18 (B5b-3)"
     )
     func monitorsCalls() throws {
-        let ios = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        /// A source file with its comments left out.
-        func code(_ path: String) throws -> String {
-            try String(contentsOf: ios.appending(path: path), encoding: .utf8)
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .map {
-                    $0.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false)[0]
-                }
-                .joined(separator: "\n")
-        }
-        let monitor = try code("BaliMonitor/SessionMonitor.swift")
+        let monitor = try sourceCode("BaliMonitor/SessionMonitor.swift")
         #expect(monitor.contains("Bell.carryOut("))
         for call in [
             "startMonitoring", "stopMonitoring", "schedule(for", "Bell.register", ".activities",
@@ -947,7 +936,7 @@ struct RegisterTests {
             "BaliOutbox/Sources/BaliOutbox/PhoneBell.swift", "Bali/PhoneScreenTime.swift",
             "Bali/BaliApp.swift", "BaliShield/ShieldConfigurationExtension.swift",
         ] {
-            #expect(try !code(path).contains(".activities"), "\(path)")
+            #expect(try !sourceCode(path).contains(".activities"), "\(path)")
         }
     }
 }
