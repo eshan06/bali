@@ -105,13 +105,13 @@ extension BlockRead {
         switch self {
         case .block, .cancelled: nil
         case .notBali: "That isn't a Bali block. Hold your phone to your teacher's block."
-        case .unsupported: "This iPhone can't read NFC, so it can't tap in. Ask your teacher."
+        case .unsupported: "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher."
         case .failed: "The scan didn't finish. Try again."
         }
     }
 
     /// What Home says when a block was read but the phone could not keep its tap (rule 5).
-    public static let notKept = "Your phone couldn't keep the tap. Try again."
+    public static let notKept = "Your phone couldn't save the tap. Try again."
 }
 
 extension SignInError {

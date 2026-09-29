@@ -208,10 +208,10 @@ struct ScreenTests {
                 == "That isn't a Bali block. Hold your phone to your teacher's block.")
         #expect(
             BlockRead.unsupported.words
-                == "This iPhone can't read NFC, so it can't tap in. Ask your teacher.")
+                == "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher.")
         #expect(
             BlockRead.failed("A scan is under way.").words == "The scan didn't finish. Try again.")
-        #expect(BlockRead.notKept == "Your phone couldn't keep the tap. Try again.")
+        #expect(BlockRead.notKept == "Your phone couldn't save the tap. Try again.")
         var state = SyncState()
         #expect(state.meWords == nil)
         state.meFailed = .networkError

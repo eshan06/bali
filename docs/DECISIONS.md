@@ -13,8 +13,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   /v1/me`'s display name; "Hi there" with none); D1's hero card, whose **Tap in** is B6's scan
   (`Phone.tapIn`) — a block's code recorded as the tap, whose shields then send the router to
   focus, and anything else said under the button (`BlockRead.words`: not a Bali block, an iPhone
-  that cannot read NFC, a scan that did not finish; `BlockRead.notKept`, a tap the phone could not
-  keep; nothing for a scan the student closed); the classes, each with its teacher (C2a — a teacher
+  that cannot read one, a scan that did not finish; `BlockRead.notKept`, a tap the phone could not
+  save; nothing for a scan the student closed); the classes, each with its teacher (C2a — a teacher
   with no name gets no line); and **Join a class**. What the phone could not read is said with
   **Try again** (`Retry`: `Phone.retry`, the engine's `retryNow`, everything queued sent now and
   the truth read again): its classes, until a read answers them (`SyncState.meWords`, the Join
@@ -34,7 +34,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   where the phone stands changes, or a tap is made or answered (`SyncState.keepsOpened`), so a new
   arming is Waiting's again; a tap's retry closes nothing. Alternatives: a sheet over Home (no
   Linux test, and no fixture could show it); a flag per screen as the router's inputs (one input
-  says the same).
+  says the same). **Built to the design framework (#109):** `docs/DESIGN.md` first, then
+  `design-taste-frontend`'s product-safe parts. The design read: Home and Waiting as D1 drew them,
+  for a student before the bell, calm and airy, light. Every state is drawn — loading ("Reading
+  your classes…"), empty ("No classes yet.", Join a class beneath), error (said, with Try again);
+  contrast and one intent per action checked; and the copy audit rewrote three of this step's own
+  lines in a student's words ("where this phone stands", "NFC", "keep the tap"). D1's layout is
+  unchanged: restyling an approved screen is a planned step, never a skill's side effect.
 
 - **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
   backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's

@@ -29,7 +29,7 @@ struct HomeView: View {
                     if phone.sync?.standing == .unread {
                         Retry(
                             words:
-                                "Bali couldn't read where this phone stands, so it can't tell if you're in class. It keeps trying.",
+                                "Bali can't tell right now whether you're in a class. It keeps checking.",
                             phone: phone)
                     }
                     tapIn
@@ -55,7 +55,7 @@ struct HomeView: View {
                 Button {
                     Task { await phone.tapIn() }
                 } label: {
-                    Label(phone.scanning ? "Reading…" : "Tap in", systemImage: "wave.3.right")
+                    Label(phone.scanning ? "Scanning…" : "Tap in", systemImage: "wave.3.right")
                 }
                 .buttonStyle(PrimaryButtonStyle()).disabled(phone.scanning).padding(.top, 8)
                 if let failed = phone.tapFailed { Text(failed).textStyle(.body) }
