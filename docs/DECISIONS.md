@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **A design framework for user-facing UI, on the owner's word: taste-skill,
+  Vercel's web interface guidelines, and `docs/DESIGN.md`.** The owner wants Bali's pages to read
+  as designed, not as AI "slop", and is open to redesigning the student screens. **What landed:**
+  seven taste-skill skills (Leonxlnx/taste-skill, MIT) and Vercel's `web-design-guidelines`
+  (MIT) copied into `.claude/skills/` at a pinned upstream commit, each with a Bali block on top;
+  `docs/DESIGN.md`, the Bali Design System written up in Google Stitch's nine-section DESIGN.md
+  format (the one VoltAgent/awesome-design-md collects); a CLAUDE.md working rule; and a design
+  check in `/santa-loop`. **Scope: user-facing UI only** (the portal's pages and components,
+  `ios/Bali/UI`, the shield, a demo site), the owner's condition: the skills never apply to the
+  API, `packages/`, `apps/web/src/lib` or the iOS engine. **DESIGN.md wins** over every skill,
+  and the tokens (`ios/Bali/UI/bali-tokens.json`) win over DESIGN.md on a value. **Why each:**
+  taste-skill pushes design away from generic AI output while it is made, but its own scope note
+  says it is for landing pages, not dashboards or native mobile, so the portal and the app take
+  only its product-safe parts (colour and shape discipline, states, contrast, forms, the tells,
+  the copy audit) at Bali's dials (variance 3, motion 2, density 7 on the grid and 4 elsewhere);
+  the demo site will take all of it. Its three style options (minimalist, soft/premium,
+  brutalist) are kept only for the owner to compare on a design canvas; the pick goes into
+  DESIGN.md and the other two are deleted. The redesign audit informs a design step, never
+  changes a shipped screen by itself. `image-to-code` is dormant until the owner sets up an
+  image-generation tool, for the demo site only. Vercel's guidelines check the portal's code
+  (accessibility, focus, forms, content handling); `/santa-loop` runs them as WARNs, never
+  blockers, since santa is never stricter than the final gate. **Pinned, not installed:** copied
+  rather than `npx skills add`, and Vercel's rules kept as a local `rules.md` rather than fetched
+  live on every review, so nothing changes under the repo without a PR; prettier skips the
+  folders so a re-vendor is a clean diff. **Held for later, the owner's word:** the em-dash
+  cleanup (taste-skill bans them; until the cleanup, new user-facing strings avoid them and
+  existing ones stay); dark mode (D1 is light-only); bringing the tokens into the portal.
+  **Not taken:** awesome-design-md's brand files (another company's look, and imitating their
+  brand; only its format is used); image-to-code-pro (mcpmarket; a repackage of taste-skill's
+  own `image-to-code`); taste-skill's `gpt-taste` (tuned for GPT/Codex), its v1 (superseded) and
+  its Stitch skill (used once, as the reference for DESIGN.md's format); a screenshot script
+  (the owner: not needed; a worker screenshots the portal with Playwright when it looks).
+
 - **2026-09-27** — **C1c: D1's tokens file in the repo, pinned by a test; #105's three review WARNs;
   and rule 3's check at every foreground wake (the owner's word).** **The tokens file** (#101's
   review: Theme.swift cited `ds/bali/tokens.json`, a path in D1's artifact, not the repo):
