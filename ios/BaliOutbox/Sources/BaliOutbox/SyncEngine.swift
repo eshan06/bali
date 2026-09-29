@@ -26,8 +26,8 @@ public enum Standing: Sendable, Hashable {
     /// In no session: nothing to shield.
     case out
     /// Armed, waiting for the teacher's Start (decision 5): nothing to shield yet. No read shows an
-    /// armed tap, so one naming no session leaves the phone waiting (open decision 6 is how it
-    /// learns of the Start).
+    /// armed tap, so one naming no session leaves the phone waiting; in the foreground it reads the
+    /// truth every 30 s for the Start (decision 6, the owner's ruling, 2026-09-29; C3a).
     case waiting
     /// In `session`: shielded only while `focused` (nil is a state this build does not know), and
     /// only until its `endsAt`, which the phone's own clock keeps (data model, decision 6).
@@ -127,6 +127,16 @@ public struct SyncState: Sendable, Hashable {
     /// How long a tap not yet answered is shielded for: decision 7's `tapCap`, or the shorter one a
     /// Debug build sets for B5b's device check (`SyncEngine.setTapCap`).
     public var cap = SyncState.tapCap
+    /// Who the student is and their classes, as `GET /v1/me` last answered — with a class the
+    /// phone joined since, at once (`SyncEngine.join`) — for Home and the router (C3); nil until a
+    /// read answers.
+    public var me: MeResponse?
+    /// Why the last read of `GET /v1/me` gave no answer — none came, or a status with no body this
+    /// build reads — until one does: said where its classes would be (rule 5), never read as none.
+    public var meFailed: SendResult?
+
+    /// Whether the student is in any class, as `me` says: nil until a read answers (C3).
+    public var hasClasses: Bool? { me.map { !$0.classes.isEmpty } }
 
     /// A tap the server has not answered yet: shielded for at once, to decision 7's cap (B5).
     public var pendingTap: OutboxRecord? {
@@ -208,6 +218,9 @@ public actor SyncEngine {
     private var changes = 0
     private var foreground = false
     private var rereading = false
+    /// The joins the phone has made (`join`): a read of `GET /v1/me` sent before one never applies
+    /// its classes, which are older than it.
+    private var joins = 0
     /// Whether a fresh token was already tried since the last answer that was not a 401.
     private var refreshed = false
     /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
@@ -319,6 +332,30 @@ public actor SyncEngine {
     public func emergencyUnlock(reason: UnlockReason? = nil) throws -> OutboxRecord? {
         guard let unlock = state.emergencyUnlock(reason: reason) else { return nil }
         return try record(unlock)
+    }
+
+    /// What a join code opens (`GET /v1/join-codes/{code}`): the Join screen's own call (C2b), its
+    /// token renewed once on a 401 (`Joining.send`).
+    public func lookUp(_ code: String) async -> APIResponse<JoinCodePreviewResponse> {
+        await Joining.send(renewing: refresh) { await client.previewJoinCode(code) }
+    }
+
+    /// Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), its
+    /// token renewed once on a 401. Once in, the class is in `me` at once — so the router moves
+    /// on — and the truth is read again for the rest, its teacher's name; a read sent before the
+    /// join never takes the class away (C3).
+    public func join(_ request: EnrollmentJoinRequest) async
+        -> APIResponse<EnrollmentJoinResponse>
+    {
+        let answer = await Joining.send(renewing: refresh) { await client.join(request) }
+        guard let joined = answer.answer?.class else { return answer }
+        joins += 1
+        if let me = state.me, !me.classes.contains(where: { $0.id == joined.id }) {
+            state.me = MeResponse(
+                user: me.user, classes: me.classes + [joined], session: me.session)
+        }
+        reread()
+        return answer
     }
 
     /// Everything queued goes now, and the truth is read again: the student's "retry" (rule 5), and
@@ -434,13 +471,15 @@ public actor SyncEngine {
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:
             switch next.standing {
-            // Arming ends nothing: a session the phone is in stays (decision 4) — and one it may
-            // be in, where it stood unread, is asked of the server, the arming carried meanwhile.
-            case .inSession: break
+            // Arming ends nothing: a session the phone is in stays (decision 4) while it runs by
+            // the phone's own clock (data model, decision 6) — past its bell the phone is in none,
+            // and waits as from out: the sweep that ends it on the server may run late (C3a). One
+            // it may be in, where it stood unread, is asked of the server, the arming carried.
+            case .inSession(let session, _) where session.endsAt > clock.now(): break
             case .unread:
                 if applies { armed = true }
                 reread()
-            case .out, .waiting: if applies { next.standing = .waiting }
+            case .inSession, .out, .waiting: if applies { next.standing = .waiting }
             }
         case .tap(.reread)?, .tap(.retryAndSurface)?, .stateChange(.reread)?: reread()
         case .stateChange(.drop)?:
@@ -453,8 +492,9 @@ public actor SyncEngine {
     }
 
     /// Reads the truth: where the phone stood, from the file, while that is unread; then a re-read
-    /// (`GET /v1/me`) when one was asked for — tried again at the next wake until it is answered —
-    /// or, in the foreground, the check-in of the session the phone is in; then waits for the next.
+    /// (`GET /v1/me`) when one was asked for — tried again at the next wake until it is answered,
+    /// and at each wake in the foreground while waiting for the Start — or, in the foreground, the
+    /// check-in of the session the phone is in; then waits for the next.
     private func read() async {
         while !Task.isCancelled {
             rung.remove(.read)
@@ -465,15 +505,26 @@ public actor SyncEngine {
             // left open there, a grant taken back is found at a wake, not at the app's next return
             // to the front — and reported nowhere, which the check's own rules see to.
             if foreground { await check?() }
+            // Decision 6, the owner's ruling (2026-09-29; C3a): waiting for the teacher's Start,
+            // the phone reads the truth at each wake in the foreground — the check-in's cadence —
+            // since no answer of its own brings the Start, and no feed does.
+            if foreground, state.standing == .waiting { rereading = true }
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
+                    let joinsThen = joins
                     let response = await client.me()
                     await heard(response.result, response.noAnswer)
                     if let me = response.answer {
-                        reconcile(sent, standing(me))
+                        // Its classes, unless the phone joined one since it was sent.
+                        let current = joins == joinsThen
+                        reconcile(sent, standing(me)) {
+                            if current { $0.me = me }
+                            $0.meFailed = nil
+                        }
                     } else {
                         rereading = true
+                        state.meFailed = response.result
                     }
                 } else if foreground, case .inSession(let session, _) = state.standing {
                     let response = await client.checkIn(
@@ -511,10 +562,14 @@ public actor SyncEngine {
         state.standing = armed && standing == .out ? .waiting : standing
     }
 
-    /// `GET /v1/me`'s answer, as a standing: its live session, or none — waiting, while armed.
+    /// `GET /v1/me`'s answer, as a standing: its live session, or none — waiting, while armed. A
+    /// session over by the phone's own clock (data model, decision 6) is not the Start a waiting
+    /// phone waits for: the sweep that ends it on the server may run late, and it would end the
+    /// wait with no class to be in (C3).
     private func standing(_ me: MeResponse) -> Standing {
-        guard let session = me.session else {
-            return state.standing == .waiting || armed ? .waiting : .out
+        let waiting = state.standing == .waiting || armed
+        guard let session = me.session, !waiting || session.endsAt > clock.now() else {
+            return waiting ? .waiting : .out
         }
         let view = SessionView(id: session.id, classId: session.classId, endsAt: session.endsAt)
         return switch session.state.known {
@@ -529,13 +584,21 @@ public actor SyncEngine {
     /// A read's answer — the truth as the server saw it — applied only when no change of the
     /// phone's can be newer (`readMayReconcile`). And no read turns a session's shields back on
     /// over an unrecorded emergency unlock (`keepsUnlocked`): its window applies, not its focus.
-    private func reconcile(_ sent: ReconcileStamp, _ read: Standing) {
-        guard let now = stored(stamp), readMayReconcile(sent: sent, now: now) else { return }
-        var read = read
-        if case .inSession(let session, .focused?) = read, keepsUnlocked(session.id) {
-            read = .inSession(session, .unlocked)
+    /// What else it answers (`also`: `GET /v1/me`'s classes) goes in the same step.
+    private func reconcile(
+        _ sent: ReconcileStamp, _ read: Standing, also: (inout SyncState) -> Void = { _ in }
+    ) {
+        var standing: Standing?
+        if let now = stored(stamp), readMayReconcile(sent: sent, now: now) {
+            standing = read
+            if case .inSession(let session, .focused?) = read, keepsUnlocked(session.id) {
+                standing = .inSession(session, .unlocked)
+            }
         }
-        state.standing = read
+        update {
+            if let standing { $0.standing = standing }
+            also(&$0)
+        }
     }
 
     /// The unlock guard (B3b-2), for every read and every answer: a focus the server names in

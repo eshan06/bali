@@ -11,8 +11,10 @@ struct JoinView: View {
     let phone: Phone
     /// The field's text, kept as a code is written (`Joining.type`) at every keystroke.
     @State private var text: String
-    @State private var busy = false
     @FocusState private var typing: Bool
+
+    /// A look-up or a join under way: the code, the buttons and the way back wait for its answer.
+    private var busy: Bool { phone.joining.busy }
 
     init(phone: Phone) {
         self.phone = phone
@@ -46,7 +48,9 @@ struct JoinView: View {
                         .multilineTextAlignment(.center).foregroundStyle(Theme.text)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
                         .keyboardType(.asciiCapable).submitLabel(.continue)
-                        .focused($typing)
+                        // Fixed while its look-up is under way; the keyboard back once it is over.
+                        .focused($typing).disabled(busy)
+                        .onChange(of: busy) { _, busy in if !busy { typing = true } }
                         .onChange(of: text) { _, typed in
                             phone.joining.type(typed)
                             text = phone.joining.code
@@ -117,15 +121,8 @@ struct JoinView: View {
         }
     }
 
-    /// `call`, one at a time, the screen busy meanwhile.
-    private func run(_ call: @escaping @MainActor () async -> Void) {
-        guard !busy else { return }
-        busy = true
-        Task {
-            await call()
-            busy = false
-        }
-    }
+    /// `call` — one at a time, `Phone`'s to see to, the screen busy meanwhile.
+    private func run(_ call: @escaping @MainActor () async -> Void) { Task { await call() } }
 }
 
 /// What a teacher sees of a student in their class, and never sees — the intro's second page (C1b)

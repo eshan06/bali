@@ -13,13 +13,21 @@ public struct Joining: Sendable, Hashable {
     /// What the code opens: the preview shows while it is set, the code's entry while it is nil.
     public var preview: JoinCodePreviewResponse?
     public var failure: String?
+    /// A look-up or a join under way, one at a time: the code stays as sent until its answer comes
+    /// — typed over, the answer would be dropped with nothing said (#106's review).
+    public var busy = false
+
+    /// What the screen says when the phone's engine has not started — so nothing can be sent — in
+    /// place of a press that did nothing (rule 5; #106's review).
+    public static let notStarted = "Bali is still starting. Try again in a moment."
 
     public init() {}
 
     /// The student typed `text`: kept as a code is written — letters and digits, upper case, at
     /// most a code's length — so a pasted `kwx 49q` is `KWX49Q`. What went wrong with the code
-    /// before no longer applies.
+    /// before no longer applies. Nothing changes while a look-up or a join is under way.
     public mutating func type(_ text: String) {
+        guard !busy else { return }
         let kept = text.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.uppercased()
         (code, failure) = (String(kept.prefix(Self.codeLength)), nil)
     }
@@ -50,8 +58,11 @@ public struct Joining: Sendable, Hashable {
         return false
     }
 
-    /// Back, or "Not my class": the code again, as typed.
-    public mutating func back() { (preview, failure) = (nil, nil) }
+    /// Back, or "Not my class": the code again, as typed — once a join under way has its answer.
+    public mutating func back() {
+        guard !busy else { return }
+        (preview, failure) = (nil, nil)
+    }
 
     /// A screen's own call, `send`: sent once more when the API refused its token and `refresh` —
     /// the sign-in's — renewed it, as the engine does for its own calls, which a screen's never

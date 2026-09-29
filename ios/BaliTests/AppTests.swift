@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -81,10 +81,12 @@ struct AppTests {
         #expect(previewing.joining.preview?.teacher.displayName == "Ms. Rivera")
         await previewing.join()
         #expect(previewing.joining.preview != nil && previewing.hasClasses == false)
+        #expect(previewing.joining.failure == Joining.notStarted && !previewing.joining.busy)
         let refused = Phone(fixture: try #require(PreviewFixtures.all["joinError"]))
         #expect(refused.joining.preview == nil && refused.joining.code == "KWX49Q")
         await refused.lookUp()
-        #expect(refused.joining.failure == Joining.words(.status(404), .classNotFound))
+        #expect(refused.joining.failure == Joining.notStarted && refused.joining.preview == nil)
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).hasClasses == true)
     }
 
     @Test(
