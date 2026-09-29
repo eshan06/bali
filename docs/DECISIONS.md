@@ -41,6 +41,23 @@ a real decision? Add a dated entry at the top: what was decided and why.
   contrast and one intent per action checked; and the copy audit rewrote three of this step's own
   lines in a student's words ("where this phone stands", "NFC", "keep the tap"). D1's layout is
   unchanged: restyling an approved screen is a planned step, never a skill's side effect.
+  **Santa's round 1** (two blockers, fixed test first): the opened screens are a stack
+  (`Phone.opened`, `Screen.choose`'s `opened: [Screen]`), each shown only over the one under it —
+  a Home opened over Waiting now opens Join in turn, where the one slot put Join over Waiting, which
+  the router refused, and the student fell back to Waiting (Back pops one; a Join closed, by Back
+  or by the state, starts over unless a try is under way); and a tap the server refused is said on
+  Home (`SyncState.refusedTapWords`, with Try again): kept and retried until one is recorded, its
+  shields off meanwhile (ARCHITECTURE, tap step 10: "kept, retried and shown"), where Home said
+  nothing — the latest such tap, keyed on its last answer, so a block no teacher registered says
+  to ask the teacher to set it up. Riders: the opened screens end once the phone knows it has no
+  classes too (Join is the router's own then, with no Back to draw); Join a class is not offered
+  while where the phone stands is unread (the router keeps Home there, B6b); Tap in's glue is the
+  engine's (`SyncEngine.tapIn`), tested on Linux; and a join's answer closing a Join opened over
+  Home is `Phone.joined`, tested in the app. **Tap in in Debug builds only, until C4:** with Home's
+  Tap in, a Release build could shield a phone whose focus screen is still a placeholder, with no
+  Emergency Unlock anywhere but the Debug readout — so a Release build shows no Tap in until C4
+  draws the focus screen's Emergency Unlock, which lifts it (ARCHITECTURE: Emergency Unlock,
+  always allowed); no Release build exists before Phase 5, and the device checks run Debug.
 
 - **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
   backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's

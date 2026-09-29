@@ -19,14 +19,14 @@ public enum Screen: Sendable, Hashable {
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
     /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `lastSessionOver`, a
-    /// session the phone was in that ended, until the student dismisses it (C5); `opened`, a screen
-    /// the student opened over the one chosen (C3) — Join over Home (Home's Join a class, with a
-    /// way back), Home over Waiting (Waiting's Back to home) — shown only while the router would
-    /// show the one it was opened over, never over anything else.
+    /// session the phone was in that ended, until the student dismisses it (C5); `opened`, the
+    /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
+    /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
+    /// the one under it shows, never over anything else.
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, lastSessionOver: SessionView?,
-        opened: Screen?, now: Date
+        opened: [Screen], now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
@@ -41,12 +41,14 @@ public enum Screen: Sendable, Hashable {
         if !introSeen { return .intro }
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }
-        let chosen = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
-        switch (chosen, opened) {
-        case (.home, .join?): return .join
-        case (.waiting, .home?): return .home
-        default: return chosen
+        var shown = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
+        for screen in opened {
+            switch (shown, screen) {
+            case (.home, .join), (.waiting, .home): shown = screen
+            default: return shown
+            }
         }
+        return shown
     }
 
     /// The screen of where the phone stands, signed in and its permission checked.
@@ -86,11 +88,30 @@ public enum Screen: Sendable, Hashable {
 }
 
 extension SyncState {
-    /// Whether a screen the student opened over another (C3) stays open once the engine's state is
-    /// this, after `before`: not once where the phone stands changes, nor once a tap is made or
-    /// answered — a new arming is Waiting's again.
+    /// Whether the screens the student opened over another (C3) stay open once the engine's state
+    /// is this, after `before`: not once where the phone stands changes, nor once a tap is made or
+    /// answered — a new arming is Waiting's again — nor once the phone knows it has no classes:
+    /// Join is the router's own then, with no way back to draw.
     public func keepsOpened(from before: SyncState?) -> Bool {
         standing == before?.standing && pendingTap?.eventId == before?.pendingTap?.eventId
+            && hasClasses != false
+    }
+
+    /// What Home says of the latest tap the server refused (rule 5) — kept and retried until one
+    /// is recorded (`tapDisposition`'s `retryAndSurface`; ARCHITECTURE, tap step 10), its shields
+    /// off meanwhile — in words keyed on its last answer; nil while none is stuck. A tap left
+    /// unsettled by the retry bound (no answer, a 5xx) is stuck too, and still tried.
+    public var refusedTapWords: String? {
+        let refused = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
+        guard let refused else { return nil }
+        switch refused.lastStatus {
+        case 404?:
+            return
+                "Bali doesn't know that block yet, so the tap hasn't counted. Ask your teacher to set it up."
+        case let status? where (400..<500).contains(status):
+            return "Bali couldn't record the tap. Tap in again, or ask your teacher."
+        default: return "Bali couldn't record the tap yet. It keeps trying."
+        }
     }
 
     /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in

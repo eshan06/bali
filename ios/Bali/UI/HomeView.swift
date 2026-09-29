@@ -3,11 +3,12 @@ import BaliOutbox
 import SwiftUI
 
 /// Home (C3; D1's Home artboard), where the router sends a phone in no running class: the student
-/// greeted by name, Tap in — the block's scan (B6) — their classes, each with its teacher
-/// (`GET /v1/me`, C2a), and Join a class, which opens Join over Home with a way back. What the
-/// phone could not read is said, with Try again (rule 5): its classes, until a read answers them,
-/// and where it stood. Not here yet: History and Me's tabs (C6), and Emergency Unlock over the last
-/// run's shields where the phone stood unread (B6b), which comes with C4's control.
+/// greeted by name, Tap in — the block's scan (B6), in Debug builds until C4 — their classes, each
+/// with its teacher (`GET /v1/me`, C2a), and Join a class, which opens Join over Home with a way
+/// back. What the phone could not read or record is said, with Try again (rule 5): its classes,
+/// until a read answers them; where it stood; a tap the server refused. Not here yet: History and
+/// Me's tabs (C6), and Emergency Unlock over the last run's shields where the phone stood unread
+/// (B6b), which comes with C4's control.
 struct HomeView: View {
     let phone: Phone
 
@@ -32,7 +33,15 @@ struct HomeView: View {
                                 "Bali can't tell right now whether you're in a class. It keeps checking.",
                             phone: phone)
                     }
-                    tapIn
+                    // Until C4 draws the focus screen's Emergency Unlock, only a Debug build, whose
+                    // readout holds one, may shield a phone from here: nothing may shield it with
+                    // no way out (ARCHITECTURE: Emergency Unlock, always allowed). C4 lifts this.
+                    #if DEBUG
+                        tapIn
+                    #endif
+                    if let refused = phone.sync?.refusedTapWords {
+                        Retry(words: refused, phone: phone)
+                    }
                     classes
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
@@ -96,13 +105,16 @@ struct HomeView: View {
                 Text("Reading your classes…").textStyle(.body)
                     .foregroundStyle(Theme.textTertiary)
             }
-            Button {
-                phone.open(.join)
-            } label: {
-                Label("Join a class", systemImage: "plus")
+            // Not while where the phone stands is unread: the router keeps Home then (B6b).
+            if phone.sync?.standing != .unread {
+                Button {
+                    phone.open(.join)
+                } label: {
+                    Label("Join a class", systemImage: "plus")
+                }
+                .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                .foregroundStyle(Theme.brand).frame(minHeight: 44)
             }
-            .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-            .foregroundStyle(Theme.brand).frame(minHeight: 44)
         }
     }
 }

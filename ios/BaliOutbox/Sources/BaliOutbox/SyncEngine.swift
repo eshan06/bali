@@ -326,6 +326,18 @@ public actor SyncEngine {
         return try record(.tap(tagId: code))
     }
 
+    /// Home's Tap in (C3b): the scan `read`, as `tap` records it — and what Home says under the
+    /// button when it recorded no tap (rule 5): the scan's own words, or that the tap could not be
+    /// saved; nil once recorded, and for a scan the student closed.
+    public func tapIn(_ read: BlockRead) -> String? {
+        do {
+            try tap(read)
+            return read.words
+        } catch {
+            return BlockRead.notKept
+        }
+    }
+
     /// The student's Emergency Unlock, recorded where `SyncState.emergencyUnlock` files it; nil
     /// when nothing the phone knows holds its shields.
     @discardableResult

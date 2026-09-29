@@ -73,10 +73,11 @@ final class Phone {
     private(set) var askFailed: ScreenTimeAskError?
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
-    /// A screen the student opened over the router's (C3): Join, from Home's Join a class — Back
-    /// closes it — or Home, from Waiting's Back to home. It ends once where the phone stands
-    /// changes, or a tap is made or answered (`SyncState.keepsOpened`).
-    private(set) var opened: Screen?
+    /// The screens the student opened over the router's, in order (C3): Home, from Waiting's Back
+    /// to home; Join, from Home's Join a class — Back closes the last. They end once where the
+    /// phone stands changes, a tap is made or answered, or the phone knows it has no classes
+    /// (`SyncState.keepsOpened`).
+    private(set) var opened: [Screen] = []
     /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
     private(set) var scanning = false
     private(set) var tapFailed: String?
@@ -114,34 +115,34 @@ final class Phone {
             opened: opened, now: Date())
     }
 
-    /// Opens `screen` over the router's — nil closes it. A Join closed starts over.
-    func open(_ screen: Screen?) {
-        if opened == .join, screen == nil, !joining.busy { joining = Joining() }
-        opened = screen
+    /// Opens `screen` over what shows.
+    func open(_ screen: Screen) { opened.append(screen) }
+
+    /// Back from the screen opened last. A Join closed starts over, unless a try is under way.
+    func back() {
+        guard let closed = opened.popLast() else { return }
+        if closed == .join, !joining.busy { joining = Joining() }
     }
 
-    /// The engine's state as it comes: a screen opened over another ends once where the phone
-    /// stands changes, or a tap is made or answered.
+    /// The engine's state as it comes: the screens opened over another end once where the phone
+    /// stands changes, a tap is made or answered, or the phone knows it has no classes — a Join
+    /// among them closed as Back closes it.
     func synced(_ state: SyncState) {
-        if !state.keepsOpened(from: sync) { opened = nil }
+        if !state.keepsOpened(from: sync) {
+            while !opened.isEmpty { back() }
+        }
         sync = state
     }
 
-    /// Home's Tap in (B6's scan): a Bali block's code is the tap — recorded, shielded at once and
-    /// sent — and anything else is said under the button (rule 5), nothing recorded. A phone whose
-    /// engine has not started says so.
+    /// Home's Tap in (B6's scan, `SyncEngine.tapIn`): a Bali block's code is the tap — recorded,
+    /// shielded at once and sent — and anything else is said under the button (rule 5), nothing
+    /// recorded. A phone whose engine has not started says so.
     func tapIn() async {
         guard !scanning else { return }
         guard let engine else { return tapFailed = Joining.notStarted }
         (tapFailed, scanning) = (nil, true)
         defer { scanning = false }
-        let read = await BlockReader().read()
-        do {
-            try await engine.tap(read)
-            tapFailed = read.words
-        } catch {
-            tapFailed = BlockRead.notKept
-        }
+        tapFailed = await engine.tapIn(await BlockReader().read())
     }
 
     /// The student's Try again (rule 5): everything queued goes now, and the truth is read again.
@@ -171,9 +172,14 @@ final class Phone {
         let request = EnrollmentJoinRequest(
             joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
         (joining.failure, joining.busy) = (nil, true)
-        let answer = await engine.join(request)
+        joined(await engine.join(request))
+    }
+
+    /// A join's answer: in, a Join opened over Home closes, back to what it was opened over; else
+    /// why not, said on it.
+    func joined(_ answer: APIResponse<EnrollmentJoinResponse>) {
         joining.busy = false
-        if joining.joined(answer) { opened = nil }
+        if joining.joined(answer), opened.last == .join { opened.removeLast() }
     }
 
     func sawIntro() {

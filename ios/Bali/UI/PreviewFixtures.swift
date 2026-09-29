@@ -19,7 +19,7 @@
             var sync: SyncState? = standing(.out)
             var askFailed: ScreenTimeAskError?
             var joining = Joining()
-            var opened: Screen?
+            var opened: [Screen] = []
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -39,7 +39,7 @@
             "joinError": State(
                 sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound))),
-            "joinFromHome": State(joining: joining(), opened: .join),
+            "joinFromHome": State(joining: joining(), opened: [.join]),
             "home": State(),
             "homeLoading": State(sync: standing(.out, me: nil)),
             "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),

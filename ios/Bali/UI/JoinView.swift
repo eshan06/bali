@@ -31,7 +31,7 @@ struct JoinView: View {
     /// The code (D1's JoinCode): back to Home when Home opened it (C3) — at the router's root, a
     /// phone in no class, there is nowhere to go back to.
     @ViewBuilder private var entry: some View {
-        if phone.opened == .join { back { phone.open(nil) } }
+        if phone.opened.last == .join { back { phone.back() } }
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 12) {
