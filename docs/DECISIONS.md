@@ -19,7 +19,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   no bound, so they last show on a tap stuck already (refused, then rate-limited) — so a student
   was told to tap again while the first tap was still on its way. "Refused" now follows
   `tapDisposition`'s own table (`retry_and_surface`), never a list of statuses kept beside it;
-  the rest say it keeps trying. Waiting's own body stays D1's (the owner has its wording).
+  and a retry's answer says nothing of why a tap is stuck, so it is read by the record's count
+  of answers: short of the bound, only a refusal stuck it and its words stand (santa's review: a
+  409 answered 429 next would otherwise say "keeps trying" of a tap that never lands); at the
+  bound, it keeps trying. Waiting's own body stays D1's (the owner has its wording). Home's Back
+  sits above its scroll, as Join's does, so it never scrolls away; D1's Home draws none, so it is
+  for the owner's canvas too (santa's design check).
 
 - **2026-09-29** — **C4: the Focus screen — D1's three states over what the enforcer verified,
   its countdown by the phone's clock, and Emergency Unlock on the live screen; and #103's
