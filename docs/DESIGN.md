@@ -226,7 +226,9 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 - Use red for anything but protection off and destructive actions, or blue for
   anything but passes.
 - Pulse or loop anything. The emergency chip may pulse softly exactly twice
-  (`bali-softpulse`, 1.2 s × 2), never forever.
+  (`bali-softpulse`, 1.2 s × 2), never forever. `bali-softpulse` is named
+  but not yet defined anywhere: it is to be designed in D2, so don't invent
+  its keyframes before then.
 - Use pure black, blue-grey neutrals, purple-to-blue gradients, neon glows,
   glassmorphism for decoration, or emoji in the UI.
 - Paint silence or staleness green, or show a state the server can't vouch for.
