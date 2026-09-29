@@ -1,8 +1,9 @@
-import { type Database, expireDueSessions, markSilentParticipations } from '@bali/db';
+import type { Database } from '@bali/db';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 
 import { ApiError } from '../errors.js';
+import { sweep } from '../sweep.js';
 
 /**
  * Constant-time secret comparison. Both sides are hashed to a fixed length
@@ -17,31 +18,21 @@ function secretMatches(presented: string, expected: string): boolean {
 
 /**
  * Internal, server-to-server routes — guarded by a shared secret, not a user
- * JWT. POST /internal/sweep is the target of the Railway cron (hosting decision
- * 3), the one minute-tick that keeps derived truth honest: it ends every session
- * past its end time, then opens a silence episode for every focused phone that
- * has gone quiet. Both duties are idempotent, so a double-fire (or two overlapping
- * cron runs) is harmless (decision 6 / decision 3).
+ * JWT. POST /internal/sweep runs the sweep (`../sweep.ts`) — the same one the API
+ * runs itself every minute — for the Railway cron, its backup (hosting decision
+ * 3). Idempotent, so a run beside the API's own, or a double-fire, is harmless.
  */
 export function registerInternalRoutes(app: FastifyInstance, db: Database, apiKey: string): void {
-  const sweep = async (request: { headers: Record<string, unknown> }) => {
+  const handler = async (request: { headers: Record<string, unknown> }) => {
     const presented = request.headers['x-internal-key'];
     if (typeof presented !== 'string' || !secretMatches(presented, apiKey)) {
       throw ApiError.unauthorized('invalid internal key');
     }
-    const now = new Date();
-    // Expire first: a session ending here also ends its live participations, so
-    // the silence pass never opens an episode on a phone that just left.
-    const expired = await expireDueSessions(db, now);
-    const wentSilent = await markSilentParticipations(db, now);
-    return { expired: expired.length, wentSilent };
+    return sweep(db);
   };
 
-  app.post('/internal/sweep', sweep);
-  // The Phase 1 path, kept as an alias onto the same handler. Without it, the
-  // window between this deploy and someone repointing the Railway cron is one
-  // where the cron 404s and nothing expires: startSession keeps handing back a
-  // stale running session, so a teacher cannot start the next class and every
-  // grid shows a session that never ends.
-  app.post('/internal/sessions/expire', sweep);
+  app.post('/internal/sweep', handler);
+  // The Phase 1 path, kept as an alias onto the same handler: a cron still
+  // pointed at it keeps working, and nothing shipped 404s.
+  app.post('/internal/sessions/expire', handler);
 }

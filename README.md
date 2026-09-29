@@ -102,8 +102,8 @@ npm run demo
 | `DEMO_COGNITO_REGION`    | Defaults to `AWS_REGION`, then `us-east-1`.                                                                                                                                                           |
 | `DEMO_USER_<ACTOR>`      | The Cognito username per actor: `TEACHER`, `ANA`, `BEN`, `CAL`, `DANA`.                                                                                                                               |
 | `DEMO_PASSWORD`          | Their password. `DEMO_PASSWORD_<ACTOR>` overrides it for one actor.                                                                                                                                   |
-| `DEMO_INTERNAL_KEY`      | Optional. The deployment's `INTERNAL_API_KEY`, which lets the demo run the sweep itself instead of waiting for the platform's cron — minutes faster. Read from the environment only; never commit it. |
-| `DEMO_SWEEP_WAIT_MS`     | How long an incident waits for a sweep-produced event. Defaults to 150s (a per-minute cron plus margin).                                                                                              |
+| `DEMO_INTERNAL_KEY`      | Optional. The deployment's `INTERNAL_API_KEY`, which lets the demo run the sweep itself instead of waiting for the API's own sweep — up to a minute. Read from the environment only; never commit it. |
+| `DEMO_SWEEP_WAIT_MS`     | How long an incident waits for a sweep-produced event. Defaults to 150s (a per-minute sweep plus margin).                                                                                             |
 
 Credentials are read from the environment and never logged — a failed sign-in reports
 Cognito's own error type, not the password.
@@ -172,7 +172,7 @@ behavior for the native apps.
 
 `npm run migrate` applies migrations to `DATABASE_URL`; `npm start` serves the API. The
 container builds from the root `Dockerfile` and runs both. Full deploy steps (Railway,
-Cognito, the session-expiry cron, required env vars) are in [docs/DEPLOY.md](docs/DEPLOY.md).
+Cognito, the backup sweep cron, required env vars) are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Database
 

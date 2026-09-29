@@ -19,6 +19,10 @@ export interface ShutdownOptions {
  * genuinely stuck close (e.g. a hung onClose hook): log and exit non-zero on
  * our own terms instead of being SIGKILLed mid-mystery. Both timers are
  * unref'd so neither ever holds an otherwise-finished process open.
+ *
+ * close() also runs the onClose hooks — the live streams' teardown and the
+ * minute sweep's stop (`startSweeping`), which waits out a sweep in flight —
+ * so the process never exits under a sweep's write, and none starts after.
  */
 export function makeShutdown(
   app: FastifyInstance,

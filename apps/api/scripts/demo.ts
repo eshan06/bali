@@ -386,10 +386,10 @@ async function main(): Promise<void> {
         teacherToken: teacher.token,
       });
       // Local mode runs the sweep itself; against a deployment without the sweep
-      // key, the platform's own per-minute cron does it and we wait for the event.
+      // key, the API's own per-minute sweep does it and we wait for the event.
       // Deliberately not asserted: /internal/sweep reports what THIS call did,
       // both duties are idempotent, and the deployment runs the same sweep every
-      // minute — so whether our call or the cron opened the episode is a coin
+      // minute — so whether our call or its own opened the episode is a coin
       // flip. The event below is the proof either way.
       const swept = await world.sweep();
       if (swept) console.log(`  our sweep: ${swept.wentSilent} silence episode(s) opened`);
@@ -642,7 +642,7 @@ async function main(): Promise<void> {
       startedAt: new Date(second.session.startedAt),
       endsAt: new Date(second.session.endsAt),
     });
-    // Same race as the silence sweep: the cron may have expired it first.
+    // Same race as the silence sweep: the deployment's own may have expired it first.
     const expirySweep = await world.sweep();
     if (expirySweep) console.log(`  our sweep: ${expirySweep.expired} session(s) expired`);
     const expiredEvent = await expiryStream.waitFor((e) => e.type === 'session_expired', {

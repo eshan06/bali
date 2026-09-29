@@ -81,7 +81,7 @@ export interface DemoWorld {
   compressSessionEnd(where: { sessionId: string; startedAt: Date; endsAt: Date }): Promise<void>;
   /**
    * Run the minute sweep, or return null when this world cannot run it itself
-   * and the deployment's own cron must — the caller then polls for the effect
+   * and the deployment's own sweep must — the caller then polls for the effect
    * rather than the count.
    */
   sweep(): Promise<SweepResult | null>;
@@ -250,14 +250,14 @@ export interface RemoteConfig {
   /**
    * The deployment's sweep key, when the operator supplied it. Optional on
    * purpose: the key lives in the platform's service variables, and the demo is
-   * perfectly able to wait for the deployment's own cron instead.
+   * perfectly able to wait for the deployment's own sweep instead.
    */
   internalKey?: string;
   sweepWaitMs: number;
   liveWaitMs: number;
 }
 
-const DEFAULT_REMOTE_SWEEP_WAIT_MS = 150_000; // a per-minute cron, plus margin
+const DEFAULT_REMOTE_SWEEP_WAIT_MS = 150_000; // the API's own per-minute sweep, plus margin
 /** Comfortably past the hub's 20s production re-poll, plus WAN round trips. */
 const REMOTE_LIVE_WAIT_MS = 45_000;
 /** Slack for clock skew between this machine and the deployment. */
@@ -411,7 +411,7 @@ export function createRemoteWorld(config: RemoteConfig, deps: RemoteWorldDeps = 
     },
 
     sweep: async () => {
-      if (!config.internalKey) return null; // the deployment's cron will do it
+      if (!config.internalKey) return null; // the deployment's own sweep will do it
       return call<SweepResult>('POST', '/internal/sweep', { internalKey: config.internalKey });
     },
 
