@@ -58,7 +58,7 @@ touching infra, CI, git plumbing, or the dev environment.
 - **`npm run demo` runs against dev there, not in memory.** The shell profile
   exports `DEMO_API_URL` and the demo accounts, and the demo picks remote mode
   whenever `DEMO_API_URL` is set — so the run exercises the deployed `main`,
-  not your branch, and its silence step waits on dev's cron. For the in-memory
+  not your branch, and its silence step waits on dev's sweep. For the in-memory
   run CLAUDE.md's verify step asks for: `env -u DEMO_API_URL npm run demo`.
 - **A worktree under `.claude/worktrees/` starts with no `node_modules`.** Node
   then resolves `@bali/shared` and `@bali/db` up the tree to the main
@@ -85,7 +85,8 @@ touching infra, CI, git plumbing, or the dev environment.
   `.claude/hooks/session-start.sh`'s header comment (the source of truth for
   this trap — this entry exists only because the field is configured outside
   the repo, on claude.ai).
-- **Sessions on dev really expire.** The Railway cron POSTs `/internal/sweep`
-  every minute (session expiry + silence detection). Timing-sensitive steps
-  against dev must account for it. `/internal/sessions/expire` is a live
-  alias of the same handler — nothing 404s.
+- **Sessions on dev really expire.** The API sweeps every minute by itself
+  (session expiry + silence detection), and a Railway cron POSTs
+  `/internal/sweep` as its backup. Timing-sensitive steps against dev must
+  account for it. `/internal/sessions/expire` is a live alias of the same
+  handler — nothing 404s.

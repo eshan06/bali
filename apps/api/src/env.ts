@@ -63,7 +63,7 @@ const envSchema = z.object({
   /** Postgres connection string. Required; the client connects lazily so boot needs no live DB. */
   DATABASE_URL: z.string().min(1),
   /**
-   * Shared secret the session-expiry cron presents to the internal sweep
+   * Shared secret the backup sweep cron presents to the internal sweep
    * endpoint (hosting decision 3). Server-to-server, not a user JWT; long enough
    * that it can't be guessed.
    */

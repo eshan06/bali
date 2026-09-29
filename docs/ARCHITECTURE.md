@@ -505,8 +505,15 @@ platforms are ruled out by our long-lived SSE connections.
 **2. Two environments: production and dev.** Each has its own API and database, so a
 bad change can never touch a real school's data.
 
-**3. The session-expiry sweep runs as a Railway cron job** calling an internal
-endpoint. The sweep is idempotent, so an accidental double-run is harmless.
+**3. The API runs the sweep itself, every minute; a Railway cron is its backup** (amended
+2026-09-29, A15). The sweep ends each session past its end time and opens a silence episode
+for each phone gone quiet, so it must run every minute — and Railway's cron runs at most every
+5 minutes, and not to the minute (a session on dev closed 19 minutes after its bell). So each
+API process sweeps every 60 s on its own clock: a run still going when the next is due makes
+that tick skip, a failed run is logged and the next tick runs as usual, and shutdown stops the
+ticks and waits out a run in flight. A Railway cron still calls the internal endpoint, every 5
+minutes, as the backup. The sweep is idempotent, so two instances, or the API and the cron,
+sweeping at once is harmless.
 
 **4. Database safety from day one.** Automatic daily backups with point-in-time
 recovery, and the database in the same region as the API.

@@ -3,9 +3,16 @@ import { createDb } from '@bali/db';
 import { buildApp } from './app.js';
 import { env } from './env.js';
 import { makeShutdown } from './shutdown.js';
+import { startSweeping, sweep } from './sweep.js';
 
 // postgres.js connects lazily, so this makes no network call at boot.
-const app = buildApp(env, { db: createDb(env.DATABASE_URL) });
+const db = createDb(env.DATABASE_URL);
+const app = buildApp(env, { db });
+
+// The sweep every minute, run by this process itself (hosting decision 3):
+// sessions end at their bell and a quiet phone shows within the minute.
+// Railway's cron, at most every five minutes, is only its backup.
+startSweeping(app, () => sweep(db));
 
 // SIGTERM is how deploy platforms ask a process to stop; the shutdown handler
 // drains in-flight requests instead of dropping them mid-response.

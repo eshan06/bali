@@ -8,6 +8,45 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
+  backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's
+  device check, 2026-09-27, on Railway dev): the dev teacher's `watch` saw "the session is over"
+  19 min 24 s after a 20-minute class's bell (8:41:29 → 9:00:53 PM), and 2–4 min late on later
+  ones. Hosting decision 3 and DEPLOY.md's step 4 assumed a Railway cron POSTing
+  `/internal/sweep` every minute, but Railway's cron docs (docs.railway.com/reference/cron-jobs)
+  say: "Scheduled runs must be at least 5 minutes apart in UTC."; "Railway does not guarantee
+  execution times to the minute as they can vary by a few minutes."; and "If a previous execution
+  is still running when the next scheduled execution is due, Railway will skip the new cron job."
+  A late sweep costs more than a late chip: the grid shows a class running past its bell,
+  `startSession` keeps handing back the stale running session — so a teacher cannot start the
+  next class until a sweep lands — and a quiet phone's `went_silent` is recorded late. **Options
+  weighed:** (1) the API ticking itself — chosen; (2) lazy expiry on read and on Start — a due
+  session ended wherever it is read or a Start finds it: it would free the next class, but every
+  read path (the snapshot, the stream, `GET /v1/me`, a check-in, a tap) must remember to do it, a
+  write hides inside reads, and silence cannot be lazy at all — `went_silent` is the absence of a
+  request, which no read sees; (3) an outside per-minute pinger — GitHub Actions' schedule is also
+  at best every 5 minutes and often later, and an uptime service or a second Railway service
+  looping is one more vendor or deploy holding `INTERNAL_API_KEY`, one more thing to go quiet.
+  **Why the ticker:** a few lines beside the code it runs, no new service or secret, every 60 s
+  to the second on the clock the server owns. **How** (`apps/api/src/sweep.ts`): `sweep(db)` is
+  the one sweep — expire, then silence — which `/internal/sweep` and the ticker both call;
+  `startSweeping(app, run)` runs it every 60 s (a constant: no knob — the tests fake the
+  interval), started by the process entry (`server.ts`), never by `buildApp`, so a test's app
+  sweeps only when it asks; `unref`'d; a run still in flight makes the tick skip, logged at warn
+  — runs never stack, and a sweep that hangs is seen; a failed run is logged at error through
+  pino with its cause, never thrown, and the next tick runs as usual (rule 5); and
+  `app.close()`, the shutdown's, stops the ticks and waits out a run in flight (an `onClose`
+  hook, beside the streams' teardown), so the process never exits under a sweep's write and none
+  starts after. The first tick is a minute after boot: a deploy delays a
+  sweep by at most that, and the old process sweeps until its SIGTERM. **Two sweeps at once**
+  are harmless — each duty is idempotent, and two expiries and two silence passes racing were
+  already pinned on real Postgres. The pairing the ticker makes routine is new: one run's expiry
+  meeting another run's silence pass (a run whose clock found the session not yet due goes
+  straight to it), which take the session and the participation in opposite orders; both sides
+  already retried 40P01, and a real-Postgres race now pins it. **The cron stays** as the backup,
+  every 5 minutes (Railway's floor), still authenticated by `INTERNAL_API_KEY`; setting dev's
+  schedule to `*/5 * * * *` is the owner's, in the dashboard (DEPLOY.md step 4).
+
 - **2026-09-29** — **C3a: the classes from `GET /v1/me` in the engine, open decision 6 — the
   owner's ruling — and #106's review WARNs.** **The classes**
   (`SyncState.me`, `hasClasses`): the engine keeps `GET /v1/me`'s last answer — read as before, at
@@ -114,6 +153,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   shield's words until the shields change — not documented, B5c's (1) — where the code's comment and
   both docs said it does; B6c-2's PLAN paragraph noted moot, as B6c's is; and `project.yml`'s
   comment on the shield's BaliOutbox dependency, which still said it read the standing.
+
 - **2026-09-29** — **A design framework for user-facing UI, on the owner's word: taste-skill,
   Vercel's web interface guidelines, and `docs/DESIGN.md`.** The owner wants Bali's pages to read
   as designed, not as AI "slop", and is open to redesigning the student screens. **What landed:**

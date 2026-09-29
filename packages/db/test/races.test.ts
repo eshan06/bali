@@ -267,6 +267,46 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   });
 
+  it('an expiry racing another sweep’s silence pass ends the session once, never failing on a deadlock', async () => {
+    // A15: every API process sweeps each minute and Railway's cron is its
+    // backup, each on its own phase, so one run's expiry can meet another
+    // run's silence pass on the same session — a run whose clock found the
+    // session not yet due goes straight to that pass. Opposite lock orders:
+    // the expiry (endSession) locks the session, then its participations; the
+    // silence pass locks a participation, then the session's key-share for its
+    // went_silent. Postgres aborts one side with 40P01, and both retry it.
+    // Whichever wins, the session ends once, every row with it, and the phone
+    // goes silent at most once.
+    const stale = new Date(Date.now() - 5 * 60_000);
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-sweeps-${round}`);
+      const session = await openSession(classId, { due: true });
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      await db
+        .update(participations)
+        .set({ lastSeenAt: stale })
+        .where(eq(participations.sessionId, session.id));
+
+      const now = new Date();
+      const [ended] = await Promise.all([
+        expireDueSessions(db, now),
+        markSilentParticipations(db, now),
+      ]);
+
+      // A lost expiry is swallowed by the pass (logged, retried next minute),
+      // so "ended" is what shows it retried rather than gave up.
+      expect(ended).toContain(session.id);
+      expect(await eventsOfType(session.id, 'session_expired')).toHaveLength(1);
+      expect(await liveParticipations(session.id)).toHaveLength(0);
+      expect((await eventsOfType(session.id, 'went_silent')).length).toBeLessThanOrEqual(1);
+    }
+  }, 120_000);
+
   it('an unlock racing endSession always commits the unlock event (ISSUES #2)', async () => {
     // The headline never-discard function under contention. unlock and endSession
     // both lock the session FOR UPDATE, so they serialize either way: unlock then
