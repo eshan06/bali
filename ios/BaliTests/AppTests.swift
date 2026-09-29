@@ -157,6 +157,24 @@ struct AppTests {
     }
 
     @Test(
+        "Home opened over Waiting has a way back to it while the phone waits (#114's review), as Join opened over Home has; the router's own Home and Waiting have none, nor one the router shows over it"
+    )
+    func wayBack() throws {
+        let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
+        #expect(!waiting.canGoBack)
+        waiting.open(.home)
+        #expect(waiting.screen == .home && waiting.canGoBack)
+        waiting.back()
+        #expect(waiting.screen == .waiting && !waiting.canGoBack)
+        #expect(!Phone(fixture: try #require(PreviewFixtures.all["home"])).canGoBack)
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"])).canGoBack)
+        // Opened over Home, but the shields on: focus, which has no way back.
+        let focused = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
+        focused.open(.join)
+        #expect(focused.screen == .focus && !focused.canGoBack)
+    }
+
+    @Test(
         "A join's answer (santa's round 1): refused, a Join opened over Home stays, its words said; in, it closes, back to that Home — the class the engine's then"
     )
     func joined() async throws {

@@ -15,6 +15,8 @@ struct HomeView: View {
         ScreenScaffold {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    // Opened over Waiting: back to "Ready — waiting for your teacher" (#114's review).
+                    if phone.canGoBack { BackButton { phone.back() } }
                     HStack(spacing: 8) {
                         BaliMark(size: 28).accessibilityHidden(true)
                         Text("Bali").textStyle(TextStyle(size: 20, line: 28, weight: .semibold))

@@ -116,6 +116,9 @@ final class Phone {
     /// Opens `screen` over what shows.
     func open(_ screen: Screen) { opened.append(screen) }
 
+    /// Whether the screen shown was opened over another, so it draws a way back to it (C3).
+    var canGoBack: Bool { opened.last == screen }
+
     /// Back from the screen opened last. A Join closed starts over, unless a try is under way.
     func back() {
         guard let closed = opened.popLast() else { return }
