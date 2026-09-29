@@ -58,7 +58,8 @@ them fully separate):
    (hosting decision 3). The cron's service must exit once the POST returns:
    Railway skips a run while the last one is still running.
 5. **Verify** — `GET /healthz` returns `{"status":"ok"}`; a signed request to
-   `GET /v1/me` returns the caller; the cron shows `{"expired":N,"wentSilent":M}`.
+   `GET /v1/me` returns the caller; the API's log says `sweeping every minute`
+   at boot; the cron shows `{"expired":N,"wentSilent":M}`.
 
 ## The phone's sign-in — owner action (needs the AWS console)
 

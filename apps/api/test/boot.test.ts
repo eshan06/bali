@@ -143,5 +143,8 @@ describe('boot contracts', () => {
     expect(result.signal).toBeNull();
     const shutdownLogs = result.output.match(/"msg":"shutting down"/g) ?? [];
     expect(shutdownLogs).toHaveLength(1);
+    // The process entry starts the minute sweep (A15) — the one line that
+    // fixes sessions ending late; sweep.test.ts pins what the ticker does.
+    expect(result.output).toContain('"msg":"sweeping every minute"');
   }, 30_000);
 });

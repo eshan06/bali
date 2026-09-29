@@ -53,6 +53,9 @@ export function startSweeping(app: FastifyInstance, run: () => Promise<unknown>)
       });
   }, SWEEP_INTERVAL_MS);
   timer.unref();
+  // Said once, at start: the deploy's log shows the ticker is on, and the boot
+  // test pins the process entry starting it.
+  app.log.info({ everyMs: SWEEP_INTERVAL_MS }, 'sweeping every minute');
 
   app.addHook('onClose', async () => {
     clearInterval(timer);

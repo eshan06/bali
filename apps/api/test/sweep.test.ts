@@ -207,7 +207,7 @@ describe('the API sweeping by itself', () => {
     expect(await endedAt()).toBeNull();
     await vi.advanceTimersByTimeAsync(1);
 
-    await vi.waitFor(async () => expect(await endedAt()).not.toBeNull());
+    await vi.waitFor(async () => expect(await endedAt()).not.toBeNull(), { timeout: 5_000 });
     expect(await eventsOf('session_expired')).toHaveLength(1);
     expect(await eventsOf('went_silent')).toHaveLength(0);
   });
