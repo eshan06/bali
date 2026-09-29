@@ -326,9 +326,8 @@ public actor SyncEngine {
         return try record(.tap(tagId: code))
     }
 
-    /// Home's Tap in (C3b): the scan `read`, as `tap` records it — and what Home says under the
-    /// button when it recorded no tap (rule 5): the scan's own words, or that the tap could not be
-    /// saved; nil once recorded, and for a scan the student closed.
+    /// Home's Tap in (C3b): the scan `read`, as `tap` records it, and what Home says when it
+    /// recorded no tap (rule 5) — the scan's words, or that it could not be saved; nil once it did.
     public func tapIn(_ read: BlockRead) -> String? {
         do {
             try tap(read)

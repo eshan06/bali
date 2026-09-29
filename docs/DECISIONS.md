@@ -58,6 +58,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Emergency Unlock anywhere but the Debug readout — so a Release build shows no Tap in until C4
   draws the focus screen's Emergency Unlock, which lifts it (ARCHITECTURE: Emergency Unlock,
   always allowed); no Release build exists before Phase 5, and the device checks run Debug.
+  **Santa's round 2** (one blocker, fixed test first): round 1's no-classes end of the opened
+  screens held while the phone was waiting too, where the router shows Waiting whatever the
+  classes — and an armed tap needs no enrollment, while the Start converts only enrolled
+  students', so the armed student with no class, who needs Join most, lost Home and Join at every
+  30 s read. It ends them only out, where Join is the router's own; and a Join still showing then
+  keeps what was typed (`Phone.synced` asks the router). Riders: a refused tap is said on Waiting
+  too, and its words say "a tap" — a stuck tap is kept until one is recorded, so they stay true
+  after a later tap lands.
 
 - **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
   backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's

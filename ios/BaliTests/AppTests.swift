@@ -121,6 +121,24 @@ struct AppTests {
         waiting.synced(state)
         #expect(waiting.opened.isEmpty && waiting.screen == .waiting)
         #expect(waiting.joining.code.isEmpty)
+        // No classes: waiting, Home and Join over it stay — an armed tap needs no enrollment;
+        // out, Join is the router's own, keeping what was typed there (santa's round 2).
+        let none = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(#"{"user":{"id":"u","role":"student","displayName":null},"classes":[],"session":null}"#.utf8))
+        var armed = state
+        armed.me = none
+        waiting.open(.home)
+        waiting.open(.join)
+        waiting.synced(armed)
+        #expect(waiting.opened == [.home, .join] && waiting.screen == .join)
+        let reading = Phone(fixture: try #require(PreviewFixtures.all["homeLoading"]))
+        reading.open(.join)
+        reading.joining.type("KWX")
+        var noClasses = try #require(reading.sync)
+        noClasses.me = none
+        reading.synced(noClasses)
+        #expect(reading.opened.isEmpty && reading.screen == .join && reading.joining.code == "KWX")
         await home.tapIn()
         #expect(home.tapFailed == Joining.notStarted && !home.scanning)
     }

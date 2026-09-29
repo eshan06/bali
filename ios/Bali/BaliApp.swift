@@ -74,9 +74,7 @@ final class Phone {
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
     /// The screens the student opened over the router's, in order (C3): Home, from Waiting's Back
-    /// to home; Join, from Home's Join a class — Back closes the last. They end once where the
-    /// phone stands changes, a tap is made or answered, or the phone knows it has no classes
-    /// (`SyncState.keepsOpened`).
+    /// to home; Join, from Home's Join a class. Back closes the last; `synced`, as the state says.
     private(set) var opened: [Screen] = []
     /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
     private(set) var scanning = false
@@ -124,14 +122,15 @@ final class Phone {
         if closed == .join, !joining.busy { joining = Joining() }
     }
 
-    /// The engine's state as it comes: the screens opened over another end once where the phone
-    /// stands changes, a tap is made or answered, or the phone knows it has no classes — a Join
-    /// among them closed as Back closes it.
+    /// The engine's state as it comes: the screens opened over another end as `keepsOpened` says,
+    /// a Join among them starting over unless it still shows, the router's own now (santa, 2).
     func synced(_ state: SyncState) {
-        if !state.keepsOpened(from: sync) {
-            while !opened.isEmpty { back() }
-        }
+        let keeps = state.keepsOpened(from: sync)
         sync = state
+        guard !keeps, !opened.isEmpty else { return }
+        let hadJoin = opened.contains(.join)
+        opened = []
+        if hadJoin, screen != .join, !joining.busy { joining = Joining() }
     }
 
     /// Home's Tap in (B6's scan, `SyncEngine.tapIn`): a Bali block's code is the tap — recorded,

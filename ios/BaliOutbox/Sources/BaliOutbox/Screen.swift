@@ -89,28 +89,27 @@ public enum Screen: Sendable, Hashable {
 
 extension SyncState {
     /// Whether the screens the student opened over another (C3) stay open once the engine's state
-    /// is this, after `before`: not once where the phone stands changes, nor once a tap is made or
-    /// answered — a new arming is Waiting's again — nor once the phone knows it has no classes:
-    /// Join is the router's own then, with no way back to draw.
+    /// is this, after `before`: not once the standing changes, nor once a tap is made or answered
+    /// (a new arming is Waiting's again), nor, out, once the phone knows it has no classes (Join is
+    /// the router's own then). Waiting's whatever the classes: arming needs no enrollment.
     public func keepsOpened(from before: SyncState?) -> Bool {
         standing == before?.standing && pendingTap?.eventId == before?.pendingTap?.eventId
-            && hasClasses != false
+            && !(standing == .out && hasClasses == false)
     }
 
-    /// What Home says of the latest tap the server refused (rule 5) — kept and retried until one
-    /// is recorded (`tapDisposition`'s `retryAndSurface`; ARCHITECTURE, tap step 10), its shields
-    /// off meanwhile — in words keyed on its last answer; nil while none is stuck. A tap left
-    /// unsettled by the retry bound (no answer, a 5xx) is stuck too, and still tried.
+    /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried
+    /// until recorded, ARCHITECTURE tap step 10) or the retry bound left unsettled: keyed on its
+    /// last answer; nil while none is stuck.
     public var refusedTapWords: String? {
         let refused = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
         guard let refused else { return nil }
         switch refused.lastStatus {
         case 404?:
             return
-                "Bali doesn't know that block yet, so the tap hasn't counted. Ask your teacher to set it up."
+                "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
         case let status? where (400..<500).contains(status):
-            return "Bali couldn't record the tap. Tap in again, or ask your teacher."
-        default: return "Bali couldn't record the tap yet. It keeps trying."
+            return "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        default: return "Bali couldn't record a tap yet. It keeps trying."
         }
     }
 
@@ -126,7 +125,8 @@ extension BlockRead {
         switch self {
         case .block, .cancelled: nil
         case .notBali: "That isn't a Bali block. Hold your phone to your teacher's block."
-        case .unsupported: "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher."
+        case .unsupported:
+            "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher."
         case .failed: "The scan didn't finish. Try again."
         }
     }

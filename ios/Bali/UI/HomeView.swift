@@ -2,10 +2,10 @@ import BaliCore
 import BaliOutbox
 import SwiftUI
 
-/// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan; Debug builds until
-/// C4), their classes with each teacher (`GET /v1/me`), and Join a class, opened over Home with a
-/// way back. What the phone could not read or record is said with Try again (rule 5). Not here yet:
-/// History and Me's tabs (C6); Emergency Unlock over an unread standing's shields (B6b, with C4).
+/// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan; Debug builds
+/// until C4), their classes with each teacher (`GET /v1/me`), and Join a class, opened over Home
+/// with a way back. What the phone could not read or record is said with Try again (rule 5). Not
+/// here yet: History and Me (C6); Emergency Unlock over an unread standing's shields (with C4).
 struct HomeView: View {
     let phone: Phone
 

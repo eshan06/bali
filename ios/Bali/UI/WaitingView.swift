@@ -39,7 +39,9 @@ struct WaitingView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if let words = phone.sync?.meWords { Retry(words: words, phone: phone) }
+                    if let words = phone.sync?.refusedTapWords ?? phone.sync?.meWords {
+                        Retry(words: words, phone: phone)
+                    }
                     Button("Back to home") { phone.open(.home) }
                         .buttonStyle(SecondaryButtonStyle())
                 }

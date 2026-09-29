@@ -181,7 +181,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's round 1)"
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes)"
     )
     func keepsOpened() async throws {
         var before = SyncState()
@@ -192,9 +192,17 @@ struct ScreenTests {
         after.me = try BaliJSON.makeDecoder().decode(
             MeResponse.self, from: Data(Answer.me(nil, classes: [Answer.inClass("c")]).utf8))
         #expect(after.keepsOpened(from: before))
-        after.me = try BaliJSON.makeDecoder().decode(
+        // No classes while waiting — an armed tap needs no enrollment — is still Waiting's: the
+        // Home and Join opened over it stay (santa's round 2). Only out is Join the router's own.
+        let none = try BaliJSON.makeDecoder().decode(
             MeResponse.self, from: Data(Answer.me(nil).utf8))
-        #expect(after.hasClasses == false && !after.keepsOpened(from: before))
+        after.me = none
+        #expect(after.hasClasses == false && after.keepsOpened(from: before))
+        var out = SyncState()
+        (out.standing, out.me) = (.out, none)
+        var outBefore = out
+        outBefore.me = nil
+        #expect(!out.keepsOpened(from: outBefore) && outBefore.keepsOpened(from: outBefore))
         after.me = nil
         after.standing = .out
         #expect(!after.keepsOpened(from: before) && !before.keepsOpened(from: nil))
@@ -246,20 +254,20 @@ struct ScreenTests {
         #expect(state.queued.first?.stuck == true && state.pendingTap == nil)
         #expect(
             state.refusedTapWords
-                == "Bali doesn't know that block yet, so the tap hasn't counted. Ask your teacher to set it up."
+                == "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
         )
         let conflict = try record(outbox, .tap(tagId: "tag"))
         try await send(outbox, conflict, 409, Answer.refused("event_id_conflict"))
         state.queued = try outbox.records()
         #expect(
             state.refusedTapWords
-                == "Bali couldn't record the tap. Tap in again, or ask your teacher.")
+                == "Bali couldn't record a tap. Tap in again, or ask your teacher.")
         let (unsettled, _) = try makeOutbox()
         let lost = try record(unsettled, .tap(tagId: "tag"))
         for _ in 1...8 { try await send(unsettled, lost, 503) }
         state.queued = try unsettled.records()
         #expect(state.queued.first?.stuck == true)
-        #expect(state.refusedTapWords == "Bali couldn't record the tap yet. It keeps trying.")
+        #expect(state.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.")
         let (other, _) = try makeOutbox()
         let unlock = try record(other, .unlock(session: "s", reason: nil))
         try await send(other, unlock, 400, Answer.refused("invalid_request"))
