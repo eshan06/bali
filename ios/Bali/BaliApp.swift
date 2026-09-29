@@ -73,6 +73,12 @@ final class Phone {
     private(set) var askFailed: ScreenTimeAskError?
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
+    /// The screens the student opened over the router's, in order (C3): Home, from Waiting's Back
+    /// to home; Join, from Home's Join a class. Back closes the last; `synced`, as the state says.
+    private(set) var opened: [Screen] = []
+    /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
+    private(set) var scanning = false
+    private(set) var tapFailed: String?
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -94,6 +100,7 @@ final class Phone {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
+            opened = fixture.opened
         }
     #endif
 
@@ -103,8 +110,42 @@ final class Phone {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
             everApproved: everApproved, sync: sync, hasClasses: hasClasses, lastSessionOver: nil,
-            now: Date())
+            opened: opened, now: Date())
     }
+
+    /// Opens `screen` over what shows.
+    func open(_ screen: Screen) { opened.append(screen) }
+
+    /// Back from the screen opened last. A Join closed starts over, unless a try is under way.
+    func back() {
+        guard let closed = opened.popLast() else { return }
+        if closed == .join, !joining.busy { joining = Joining() }
+    }
+
+    /// The engine's state as it comes: the screens opened over another end as `keepsOpened` says,
+    /// a Join among them starting over unless it still shows, the router's own now (santa, 2).
+    func synced(_ state: SyncState) {
+        let keeps = state.keepsOpened(from: sync)
+        sync = state
+        guard !keeps, !opened.isEmpty else { return }
+        let hadJoin = opened.contains(.join)
+        opened = []
+        if hadJoin, screen != .join, !joining.busy { joining = Joining() }
+    }
+
+    /// Home's Tap in (B6's scan, `SyncEngine.tapIn`): a Bali block's code is the tap — recorded,
+    /// shielded at once and sent — and anything else is said under the button (rule 5), nothing
+    /// recorded. A phone whose engine has not started says so.
+    func tapIn() async {
+        guard !scanning else { return }
+        guard let engine else { return tapFailed = Joining.notStarted }
+        (tapFailed, scanning) = (nil, true)
+        defer { scanning = false }
+        tapFailed = await engine.tapIn(await BlockReader().read())
+    }
+
+    /// The student's Try again (rule 5): everything queued goes now, and the truth is read again.
+    func retry() async { await engine?.retryNow() }
 
     /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the engine: what it opens, or
     /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes.
@@ -130,9 +171,14 @@ final class Phone {
         let request = EnrollmentJoinRequest(
             joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
         (joining.failure, joining.busy) = (nil, true)
-        let answer = await engine.join(request)
+        joined(await engine.join(request))
+    }
+
+    /// A join's answer: in, a Join opened over Home closes, back to what it was opened over; else
+    /// why not, said on it.
+    func joined(_ answer: APIResponse<EnrollmentJoinResponse>) {
         joining.busy = false
-        _ = joining.joined(answer)
+        if joining.joined(answer), opened.last == .join { opened.removeLast() }
     }
 
     func sawIntro() {
@@ -194,7 +240,7 @@ final class Phone {
         onPhase = ({ await engine.setForeground($0) }, { await enforcer.check() })
         Task { await engine.run() }
         Task { await enforcer.run() }
-        Task { for await state in await engine.updates() { self.sync = state } }
+        Task { for await state in await engine.updates() { self.synced(state) } }
         Task {
             for await protection in await enforcer.updates() {
                 self.protection = protection

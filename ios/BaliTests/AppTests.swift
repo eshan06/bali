@@ -87,6 +87,99 @@ struct AppTests {
         await refused.lookUp()
         #expect(refused.joining.failure == Joining.notStarted && refused.joining.preview == nil)
         #expect(Phone(fixture: try #require(PreviewFixtures.all["home"])).hasClasses == true)
+        let fromHome = Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"]))
+        #expect(fromHome.opened == [.join])
+    }
+
+    @Test(
+        "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it, and Join over that Home in turn, Back returning to each (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
+    )
+    func opened() async throws {
+        let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        home.open(.join)
+        home.joining.type("KWX")
+        #expect(home.screen == .join)
+        home.back()
+        #expect(home.screen == .home && home.joining.code.isEmpty)
+        let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
+        let state = try #require(waiting.sync)
+        waiting.open(.home)
+        waiting.synced(state)
+        #expect(waiting.screen == .home)
+        waiting.open(.join)
+        #expect(waiting.screen == .join)
+        waiting.back()
+        #expect(waiting.screen == .home)
+        waiting.back()
+        #expect(waiting.screen == .waiting)
+        waiting.open(.home)
+        waiting.open(.join)
+        waiting.joining.type("KWX")
+        var out = state
+        out.standing = .out
+        waiting.synced(out)
+        waiting.synced(state)
+        #expect(waiting.opened.isEmpty && waiting.screen == .waiting)
+        #expect(waiting.joining.code.isEmpty)
+        // No classes: waiting, Home and Join over it stay — an armed tap needs no enrollment;
+        // out, Join is the router's own, keeping what was typed there (santa's round 2).
+        let none = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(#"{"user":{"id":"u","role":"student","displayName":null},"classes":[],"session":null}"#.utf8))
+        var armed = state
+        armed.me = none
+        waiting.open(.home)
+        waiting.open(.join)
+        waiting.synced(armed)
+        #expect(waiting.opened == [.home, .join] && waiting.screen == .join)
+        let reading = Phone(fixture: try #require(PreviewFixtures.all["homeLoading"]))
+        reading.open(.join)
+        reading.joining.type("KWX")
+        var noClasses = try #require(reading.sync)
+        noClasses.me = none
+        reading.synced(noClasses)
+        #expect(reading.opened.isEmpty && reading.screen == .join && reading.joining.code == "KWX")
+        await home.tapIn()
+        #expect(home.tapFailed == Joining.notStarted && !home.scanning)
+    }
+
+    @Test(
+        "A join's answer (santa's round 1): refused, a Join opened over Home stays, its words said; in, it closes, back to that Home — the class the engine's then"
+    )
+    func joined() async throws {
+        /// `POST /v1/enrollments`, as the API answers it: `status`, `body`.
+        func answer(_ status: Int, _ body: String) async -> APIResponse<EnrollmentJoinResponse> {
+            struct Answering: HTTPTransport {
+                let status: Int
+                let body: String
+                func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                    guard let url = request.url,
+                        let response = HTTPURLResponse(
+                            url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+                    else { throw URLError(.badURL) }
+                    return (Data(body.utf8), response)
+                }
+            }
+            struct Signed: TokenProvider {
+                func accessToken() async -> String? { "token" }
+            }
+            let client = APIClient(
+                baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
+                transport: Answering(status: status, body: body))
+            let now = Date()
+            return await client.join(
+                EnrollmentJoinRequest(
+                    joinCode: "KWX49Q", eventId: EventID.mint(at: now), deviceTime: now))
+        }
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"]))
+        #expect(phone.screen == .join)
+        let none = #"{"error":{"code":"not_found","reason":"class_not_found","message":"none"}}"#
+        phone.joined(await answer(404, none))
+        #expect(phone.screen == .join && phone.opened == [.join])
+        #expect(phone.joining.failure == Joining.words(.status(404), .classNotFound))
+        let joined = #"{"outcome":"joined","enrollmentId":"e","class":{"id":"c","name":"Class c"}}"#
+        phone.joined(await answer(200, joined))
+        #expect(phone.screen == .home && phone.opened.isEmpty && phone.joining == Joining())
     }
 
     @Test(

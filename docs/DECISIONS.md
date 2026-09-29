@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C3b: Home and Waiting drawn (D1's artboards), Join opened from Home with a
+  way back, and Home's Tap in.** **Home** (`HomeView`): the mark and name, "Hi, <name>" (`GET
+  /v1/me`'s display name; "Hi there" with none); D1's hero card, whose **Tap in** is B6's scan
+  (`Phone.tapIn`) — a block's code recorded as the tap, whose shields then send the router to
+  focus, and anything else said under the button (`BlockRead.words`: not a Bali block, an iPhone
+  that cannot read one, a scan that did not finish; `BlockRead.notKept`, a tap the phone could not
+  save; nothing for a scan the student closed); the classes, each with its teacher (C2a — a teacher
+  with no name gets no line); and **Join a class**. What the phone could not read is said with
+  **Try again** (`Retry`: `Phone.retry`, the engine's `retryNow`, everything queued sent now and
+  the truth read again): its classes, until a read answers them (`SyncState.meWords`, the Join
+  screen's words; "Reading your classes…" before any answer), and where the phone stood, when
+  unread. Not drawn here: D1's tab bar, whose History and Me are C6's; and Emergency Unlock over
+  the last run's shields where the phone stood unread (B6b's case, which the router sends to
+  Home) — it comes with C4's control, the one the focus screen holds; the live app has none
+  either way until then. **Waiting** (`WaitingView`): the ring with its dot, "Ready — waiting for
+  your teacher", D1's "Keep Bali open so it can start right away." — decision 6's ruling made
+  plain — a read with no answer said with Try again, and **Back to home**. An armed tap's
+  answer names no teacher, so the body says "your teacher's block" where D1 named Ms. Rivera.
+  **A screen opened over another** (`Phone.opened`, `Screen.choose`'s new input): Join over Home
+  (Home's Join a class; Join's code page draws Back when Home opened it — #106's rider) and Home
+  over Waiting (Back to home). The router shows one only while it would show the screen it was
+  opened over — never over the shields, a session's screens, session over, Screen Time, the
+  sign-in, nor the Home the last run's shields keep over an unread standing — and it ends once
+  where the phone stands changes, or a tap is made or answered (`SyncState.keepsOpened`), so a new
+  arming is Waiting's again; a tap's retry closes nothing. Alternatives: a sheet over Home (no
+  Linux test, and no fixture could show it); a flag per screen as the router's inputs (one input
+  says the same). **Built to the design framework (#109):** `docs/DESIGN.md` first, then
+  `design-taste-frontend`'s product-safe parts. The design read: Home and Waiting as D1 drew them,
+  for a student before the bell, calm and airy, light. Every state is drawn — loading ("Reading
+  your classes…"), empty ("No classes yet.", Join a class beneath), error (said, with Try again);
+  contrast and one intent per action checked; and the copy audit rewrote three of this step's own
+  lines in a student's words ("where this phone stands", "NFC", "keep the tap"). D1's layout is
+  unchanged: restyling an approved screen is a planned step, never a skill's side effect.
+  **Santa's round 1** (two blockers, fixed test first): the opened screens are a stack
+  (`Phone.opened`, `Screen.choose`'s `opened: [Screen]`), each shown only over the one under it —
+  a Home opened over Waiting now opens Join in turn, where the one slot put Join over Waiting, which
+  the router refused, and the student fell back to Waiting (Back pops one; a Join closed, by Back
+  or by the state, starts over unless a try is under way); and a tap the server refused is said on
+  Home (`SyncState.refusedTapWords`, with Try again): kept and retried until one is recorded, its
+  shields off meanwhile (ARCHITECTURE, tap step 10: "kept, retried and shown"), where Home said
+  nothing — the latest such tap, keyed on its last answer, so a block no teacher registered says
+  to ask the teacher to set it up. Riders: the opened screens end once the phone knows it has no
+  classes too (Join is the router's own then, with no Back to draw); Join a class is not offered
+  while where the phone stands is unread (the router keeps Home there, B6b); Tap in's glue is the
+  engine's (`SyncEngine.tapIn`), tested on Linux; and a join's answer closing a Join opened over
+  Home is `Phone.joined`, tested in the app. **Tap in in Debug builds only, until C4:** with Home's
+  Tap in, a Release build could shield a phone whose focus screen is still a placeholder, with no
+  Emergency Unlock anywhere but the Debug readout — so a Release build shows no Tap in until C4
+  draws the focus screen's Emergency Unlock, which lifts it (ARCHITECTURE: Emergency Unlock,
+  always allowed); no Release build exists before Phase 5, and the device checks run Debug.
+  **Santa's round 2** (one blocker, fixed test first): round 1's no-classes end of the opened
+  screens held while the phone was waiting too, where the router shows Waiting whatever the
+  classes — and an armed tap needs no enrollment, while the Start converts only enrolled
+  students', so the armed student with no class, who needs Join most, lost Home and Join at every
+  30 s read. It ends them only out, where Join is the router's own; and a Join still showing then
+  keeps what was typed (`Phone.synced` asks the router). Riders: a refused tap is said on Waiting
+  too, and its words say "a tap" — a stuck tap is kept until one is recorded, so they stay true
+  after a later tap lands.
+
 - **2026-09-29** — **A15: the sweep every minute, run by the API itself; Railway's cron is its
   backup (hosting decision 3 amended, on the owner's go-ahead).** **The evidence** (the owner's
   device check, 2026-09-27, on Railway dev): the dev teacher's `watch` saw "the session is over"

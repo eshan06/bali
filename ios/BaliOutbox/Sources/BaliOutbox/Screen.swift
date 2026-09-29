@@ -19,11 +19,14 @@ public enum Screen: Sendable, Hashable {
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
     /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `lastSessionOver`, a
-    /// session the phone was in that ended, until the student dismisses it (C5).
+    /// session the phone was in that ended, until the student dismisses it (C5); `opened`, the
+    /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
+    /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
+    /// the one under it shows, never over anything else.
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, lastSessionOver: SessionView?,
-        now: Date
+        opened: [Screen], now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
@@ -38,6 +41,21 @@ public enum Screen: Sendable, Hashable {
         if !introSeen { return .intro }
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }
+        var shown = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
+        for screen in opened {
+            switch (shown, screen) {
+            case (.home, .join), (.waiting, .home): shown = screen
+            default: return shown
+            }
+        }
+        return shown
+    }
+
+    /// The screen of where the phone stands, signed in and its permission checked.
+    private static func settled(
+        _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ hasClasses: Bool?,
+        _ lastSessionOver: SessionView?, _ now: Date
+    ) -> Screen {
         switch sync.standing {
         // Not read from the phone yet: home says so, and Emergency Unlock works there (B6b).
         case .unread: return .home
@@ -67,6 +85,54 @@ public enum Screen: Sendable, Hashable {
             }
         }
     }
+}
+
+extension SyncState {
+    /// Whether the screens the student opened over another (C3) stay open once the engine's state
+    /// is this, after `before`: not once the standing changes, nor once a tap is made or answered
+    /// (a new arming is Waiting's again), nor, out, once the phone knows it has no classes (Join is
+    /// the router's own then). Waiting's whatever the classes: arming needs no enrollment.
+    public func keepsOpened(from before: SyncState?) -> Bool {
+        standing == before?.standing && pendingTap?.eventId == before?.pendingTap?.eventId
+            && !(standing == .out && hasClasses == false)
+    }
+
+    /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried
+    /// until recorded, ARCHITECTURE tap step 10) or the retry bound left unsettled: keyed on its
+    /// last answer; nil while none is stuck.
+    public var refusedTapWords: String? {
+        let refused = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
+        guard let refused else { return nil }
+        switch refused.lastStatus {
+        case 404?:
+            return
+                "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
+        case let status? where (400..<500).contains(status):
+            return "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        default: return "Bali couldn't record a tap yet. It keeps trying."
+        }
+    }
+
+    /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in
+    /// the Join screen's words; nil while none failed.
+    public var meWords: String? { meFailed.map { Joining.words($0, nil) } }
+}
+
+extension BlockRead {
+    /// What Home says under Tap in when a scan recorded no tap (rule 5): nil for a block's code —
+    /// the tap — and for a scan the student closed, which changed nothing.
+    public var words: String? {
+        switch self {
+        case .block, .cancelled: nil
+        case .notBali: "That isn't a Bali block. Hold your phone to your teacher's block."
+        case .unsupported:
+            "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher."
+        case .failed: "The scan didn't finish. Try again."
+        }
+    }
+
+    /// What Home says when a block was read but the phone could not keep its tap (rule 5).
+    public static let notKept = "Your phone couldn't save the tap. Try again."
 }
 
 extension SignInError {

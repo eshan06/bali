@@ -9,8 +9,8 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
-        /// any session and in two classes, no ask for the permission failed and nothing typed to
-        /// join, unless said otherwise.
+        /// any session and in two classes, no ask for the permission failed, nothing typed to join
+        /// and no screen opened over another, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -19,6 +19,7 @@
             var sync: SyncState? = standing(.out)
             var askFailed: ScreenTimeAskError?
             var joining = Joining()
+            var opened: [Screen] = []
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -38,8 +39,13 @@
             "joinError": State(
                 sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound))),
+            "joinFromHome": State(joining: joining(), opened: [.join]),
             "home": State(),
+            "homeLoading": State(sync: standing(.out, me: nil)),
+            "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),
+            "homeUnread": State(sync: standing(.unread)),
             "waiting": State(sync: standing(.waiting)),
+            "waitingError": State(sync: standing(.waiting, failed: .networkError)),
             "focus": State(sync: standing(.inSession(period3, .focused))),
             "unlocked": State(sync: standing(.inSession(period3, .unlocked))),
             "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
@@ -93,10 +99,13 @@
         }
 
         /// The engine's truth, standing `standing`, the server reached a moment ago, `GET /v1/me`
-        /// answering `me`.
-        private static func standing(_ standing: Standing, me: MeResponse? = ana()) -> SyncState {
+        /// answering `me` — its last read `failed`, and the link down, when said.
+        private static func standing(
+            _ standing: Standing, me: MeResponse? = ana(), failed: SendResult? = nil
+        ) -> SyncState {
             var state = SyncState()
             (state.standing, state.link, state.heardAt, state.me) = (standing, .reached, Date(), me)
+            if let failed { (state.meFailed, state.link) = (failed, .unreachable) }
             return state
         }
 

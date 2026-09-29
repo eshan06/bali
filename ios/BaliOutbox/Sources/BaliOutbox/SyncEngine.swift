@@ -326,6 +326,17 @@ public actor SyncEngine {
         return try record(.tap(tagId: code))
     }
 
+    /// Home's Tap in (C3b): the scan `read`, as `tap` records it, and what Home says when it
+    /// recorded no tap (rule 5) — the scan's words, or that it could not be saved; nil once it did.
+    public func tapIn(_ read: BlockRead) -> String? {
+        do {
+            try tap(read)
+            return read.words
+        } catch {
+            return BlockRead.notKept
+        }
+    }
+
     /// The student's Emergency Unlock, recorded where `SyncState.emergencyUnlock` files it; nil
     /// when nothing the phone knows holds its shields.
     @discardableResult
@@ -341,9 +352,9 @@ public actor SyncEngine {
     }
 
     /// Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), its
-    /// token renewed once on a 401. Once in, the class is in `me` at once — so the router moves
-    /// on — and the truth is read again for the rest, its teacher's name; a read sent before the
-    /// join never takes the class away (C3).
+    /// token renewed once on a 401. Once in, the class is in `me` at once where a read has answered
+    /// — so the router moves on — else the read it asks for brings it, as it brings its teacher's
+    /// name; a read sent before the join never takes the class away (C3; #110's review).
     public func join(_ request: EnrollmentJoinRequest) async
         -> APIResponse<EnrollmentJoinResponse>
     {

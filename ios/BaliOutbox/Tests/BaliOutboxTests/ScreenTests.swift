@@ -12,7 +12,8 @@ private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
     everApproved: Bool = false, standing: Standing? = .out, queued: [OutboxRecord] = [],
-    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, now: Date = t0
+    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, opened: [Screen] = [],
+    now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -30,7 +31,7 @@ private func screen(
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
         everApproved: everApproved, sync: sync, hasClasses: hasClasses,
-        lastSessionOver: lastSessionOver, now: now)
+        lastSessionOver: lastSessionOver, opened: opened, now: now)
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -155,6 +156,126 @@ struct ScreenTests {
     }
 
     @Test(
+        "The screens the student opened over another (C3), in order: Join over Home — wherever Home is chosen, past the bell too — and Home over Waiting, then Join over that Home (santa's round 1: Join fell back to Waiting there); each only over the one under it, so never over anything else: the shields, a session's own screens, session over, Screen Time, the sign-in, the intro, nor the home the last run's shields keep over a standing not read (B6b)"
+    )
+    func opened() {
+        #expect(screen(hasClasses: true, opened: [.join]) == .join)
+        #expect(screen(opened: [.join]) == .join)
+        let rung = Standing.inSession(session(), .focused)
+        #expect(screen(standing: rung, opened: [.join], now: at(3000)) == .join)
+        #expect(screen(standing: .waiting, opened: [.home]) == .home)
+        #expect(screen(standing: .waiting, opened: [.home, .join]) == .join)
+        #expect(screen(standing: .waiting, opened: [.join]) == .waiting)
+        #expect(screen(standing: .waiting, opened: [.join, .home]) == .waiting)
+        #expect(screen(opened: [.join, .join]) == .join)
+        #expect(screen(hasClasses: false, opened: [.home]) == .join)
+        #expect(screen(hasClasses: true, opened: [.focus]) == .home)
+        #expect(screen(standing: .inSession(session(), .focused), opened: [.join]) == .focus)
+        #expect(screen(standing: .inSession(session(), .unlocked), opened: [.join]) == .unlocked)
+        #expect(screen(lastSessionOver: session(), opened: [.join]) == .sessionOver)
+        #expect(screen(permission: .denied, standing: .waiting, opened: [.home]) == .screenTime)
+        #expect(screen(signedIn: false, opened: [.join]) == .signIn)
+        #expect(screen(introSeen: false, opened: [.join]) == .intro)
+        #expect(
+            screen(signedIn: false, shielded: true, standing: .unread, opened: [.join]) == .home)
+    }
+
+    @Test(
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes)"
+    )
+    func keepsOpened() async throws {
+        var before = SyncState()
+        before.standing = .waiting
+        var after = before
+        (after.link, after.meFailed, after.heardAt) = (.unreachable, .networkError, t0)
+        #expect(after.keepsOpened(from: before))
+        after.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self, from: Data(Answer.me(nil, classes: [Answer.inClass("c")]).utf8))
+        #expect(after.keepsOpened(from: before))
+        // No classes while waiting — an armed tap needs no enrollment — is still Waiting's: the
+        // Home and Join opened over it stay (santa's round 2). Only out is Join the router's own.
+        let none = try BaliJSON.makeDecoder().decode(
+            MeResponse.self, from: Data(Answer.me(nil).utf8))
+        after.me = none
+        #expect(after.hasClasses == false && after.keepsOpened(from: before))
+        var out = SyncState()
+        (out.standing, out.me) = (.out, none)
+        var outBefore = out
+        outBefore.me = nil
+        #expect(!out.keepsOpened(from: outBefore) && outBefore.keepsOpened(from: outBefore))
+        after.me = nil
+        after.standing = .out
+        #expect(!after.keepsOpened(from: before) && !before.keepsOpened(from: nil))
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        var tapped = before
+        tapped.queued = try outbox.records()
+        #expect(!tapped.keepsOpened(from: before) && !before.keepsOpened(from: tapped))
+        try await send(outbox, tap, 503)
+        var retried = tapped
+        retried.queued = try outbox.records()
+        #expect(retried.queued.first?.attempts == 1 && retried.keepsOpened(from: tapped))
+    }
+
+    @Test(
+        "What Home says of a scan that recorded no tap (C3), each with the way on — not a Bali block, a phone that cannot read one, a scan that did not finish, a tap the phone could not save — and nothing for a block's code, the tap, nor for a scan the student closed; what Home and Waiting say while `GET /v1/me` gives no answer, in the Join screen's words"
+    )
+    func homeWords() {
+        #expect(BlockRead.block("T7XK2M9QPF").words == nil && BlockRead.cancelled.words == nil)
+        #expect(
+            BlockRead.notBali.words
+                == "That isn't a Bali block. Hold your phone to your teacher's block.")
+        #expect(
+            BlockRead.unsupported.words
+                == "This iPhone can't read Bali blocks, so it can't tap in. Ask your teacher.")
+        #expect(
+            BlockRead.failed("A scan is under way.").words == "The scan didn't finish. Try again.")
+        #expect(BlockRead.notKept == "Your phone couldn't save the tap. Try again.")
+        var state = SyncState()
+        #expect(state.meWords == nil)
+        state.meFailed = .networkError
+        #expect(state.meWords == "Can't reach the server. Check your connection and try again.")
+        state.meFailed = .status(503)
+        #expect(state.meWords == "Something went wrong at Bali. Try again in a moment.")
+    }
+
+    @Test(
+        "A tap the server refused is said on Home (rule 5; santa's round 1) — kept and retried until one is recorded, its shields off meanwhile: an unknown block with who can set it up, any other refusal with the way on, one left unsettled by the retry bound as still tried; the latest such tap, and nothing while none is stuck, nor for another kind of record"
+    )
+    func refusedTap() async throws {
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        var state = SyncState()
+        state.queued = try outbox.records()
+        #expect(state.refusedTapWords == nil)
+        let unknown = #"{"error":{"code":"not_found","message":"unknown block"}}"#
+        try await send(outbox, tap, 404, unknown)
+        state.queued = try outbox.records()
+        #expect(state.queued.first?.stuck == true && state.pendingTap == nil)
+        #expect(
+            state.refusedTapWords
+                == "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
+        )
+        let conflict = try record(outbox, .tap(tagId: "tag"))
+        try await send(outbox, conflict, 409, Answer.refused("event_id_conflict"))
+        state.queued = try outbox.records()
+        #expect(
+            state.refusedTapWords
+                == "Bali couldn't record a tap. Tap in again, or ask your teacher.")
+        let (unsettled, _) = try makeOutbox()
+        let lost = try record(unsettled, .tap(tagId: "tag"))
+        for _ in 1...8 { try await send(unsettled, lost, 503) }
+        state.queued = try unsettled.records()
+        #expect(state.queued.first?.stuck == true)
+        #expect(state.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.")
+        let (other, _) = try makeOutbox()
+        let unlock = try record(other, .unlock(session: "s", reason: nil))
+        try await send(other, unlock, 400, Answer.refused("invalid_request"))
+        state.queued = try other.records()
+        #expect(state.queued.first?.stuck == true && state.refusedTapWords == nil)
+    }
+
+    @Test(
         "A tap not yet answered holds the shields on, so focus, whatever the phone stood in — to its cap; not once the student unlocked after it (decision 11), nor once it is refused"
     )
     func pendingTap() async throws {
@@ -258,5 +379,26 @@ struct ScreenTests {
         let toSettings =
             "Bali couldn't ask iOS for Screen Time. Turn it on in Settings, or ask your teacher."
         #expect(failed.words(.denied) == toSettings)
+    }
+}
+
+@Suite("Home's Tap in (C3b)", .timeLimit(.minutes(3)))
+struct TapInTests {
+    @Test(
+        "Home's Tap in through the engine (santa's round 1: untested glue): a block's code is the tap — recorded and sent, nothing said; anything else records nothing and is said, a scan the student closed saying nothing; a tap the phone could not save is said"
+    )
+    func tapIn() async throws {
+        let rig = try Rig()
+        #expect(await rig.engine.tapIn(.notBali) == BlockRead.notBali.words)
+        #expect(await rig.engine.tapIn(.unsupported) == BlockRead.unsupported.words)
+        #expect(await rig.engine.tapIn(.cancelled) == nil)
+        #expect(await rig.engine.state.queued.isEmpty)
+        #expect(await rig.engine.tapIn(.block("T7XK2M9QPF")) == nil)
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await rig.until { $0.standing == .waiting && $0.queued.isEmpty }
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE outbox RENAME TO gone") }
+        #expect(await rig.engine.tapIn(.block("T7XK2M9QPF")) == BlockRead.notKept)
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
+        await rig.stop()
     }
 }

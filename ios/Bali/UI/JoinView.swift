@@ -3,10 +3,11 @@ import BaliOutbox
 import SwiftUI
 
 /// Join (C2b; D1's JoinCode and ConsentPreview artboards), where the router sends a phone that
-/// knows it has no classes: the student types their class's code, sees what it opens before
-/// anything is joined — the class, its teacher, and what that teacher sees, the intro's own list —
-/// and joins it. A look or a join that did not finish is said under its button, which is the way
-/// on (rule 5). The rules are `Joining`'s (BaliOutbox), the calls `Phone`'s.
+/// knows it has no classes — and which Home's Join a class opens (C3): the student types their
+/// class's code, sees what it opens before anything is joined — the class, its teacher, and what
+/// that teacher sees, the intro's own list — and joins it. A look or a join that did not finish is
+/// said under its button, which is the way on (rule 5). The rules are `Joining`'s (BaliOutbox),
+/// the calls `Phone`'s.
 struct JoinView: View {
     let phone: Phone
     /// The field's text, kept as a code is written (`Joining.type`) at every keystroke.
@@ -27,8 +28,10 @@ struct JoinView: View {
         }
     }
 
-    /// The code (D1's JoinCode). No way back at the router's root: there is nowhere to go back to.
+    /// The code (D1's JoinCode): back to Home when Home opened it (C3) — at the router's root, a
+    /// phone in no class, there is nowhere to go back to.
     @ViewBuilder private var entry: some View {
+        if phone.opened.last == .join { back { phone.back() } }
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -78,12 +81,7 @@ struct JoinView: View {
     /// their account has no name (A6). Once the join is sent there is no going back — it is made.
     @ViewBuilder private func previewing(_ preview: JoinCodePreviewResponse) -> some View {
         let teacher = preview.teacher.displayName ?? "your teacher"
-        Button { phone.joining.back() } label: {
-            Image(systemName: "arrow.left").font(.system(size: 20, weight: .semibold))
-                .frame(width: 44, height: 44)
-        }
-        .foregroundStyle(Theme.text).padding(.leading, -10).accessibilityLabel("Back")
-        .disabled(busy)
+        back { phone.joining.back() }
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -119,6 +117,16 @@ struct JoinView: View {
             Text(failure).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 12)
         }
+    }
+
+    /// D1's back arrow: `action`, once nothing is under way.
+    private func back(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "arrow.left").font(.system(size: 20, weight: .semibold))
+                .frame(width: 44, height: 44)
+        }
+        .foregroundStyle(Theme.text).padding(.leading, -10).accessibilityLabel("Back")
+        .disabled(busy)
     }
 
     /// `call` — one at a time, `Phone`'s to see to, the screen busy meanwhile.
@@ -179,5 +187,8 @@ struct ConsentCard: View {
     }
     #Preview("Join — no such class") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["joinError"]!))
+    }
+    #Preview("Join — from Home") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["joinFromHome"]!))
     }
 #endif
