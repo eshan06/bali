@@ -117,7 +117,7 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
 
-Bali's own shield, "Focused with Bali until 9:42", is round 3's (B5c), below.
+Bali's own shield, "Focused with Bali", is round 3's (B5c, B5c-2), below.
 
 ### Round 2 (B5b): the bell with the app closed
 
@@ -183,24 +183,23 @@ window, the backup wakes the monitor too — after the bell's wake, it finds not
 ### Round 3 (B5c): Bali's own shield
 
 After rounds 1 and 2, on the same build and phone, `npm run dev:teacher -- watch` running. The shield
-extension draws Bali's shield each time iOS asks for one, from where the phone stands in the outbox
-file: D1's colours, the ring mark and the words are Bali's; the font, sizes and layout are iOS's. The
-bell is written as the phone writes a time — `9:42 AM`, or `09:42` with 24-Hour Time on.
+extension draws Bali's shield each time iOS asks for one, with the same words whatever the phone
+stands in: it reads nothing — iOS's sandbox refuses a shield extension the outbox file (B5c-2) — and
+never shows a time; Bali does. D1's colours, the ring mark and the words are Bali's; the font, sizes
+and layout are iOS's.
 
-1. **Tapped in: the bell.** `npm run dev:teacher -- start 20`, **Tap** with `DEVICE-CHECK-1`, then
-   open any blocked app: Bali's shield, light even with the phone in dark mode, never iOS's own — the
-   ring mark (a green arc open at the upper left, on a pale green track), the title
-   `Focused with Bali until` and the bell, and under it "This app is paused for class. Calls,
-   FaceTime, Messages and Emergency SOS always work. If you need out, Emergency Unlock is always in
-   the Bali app." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
-   once a check-in has moved `due until`, a blocked app says the new bell. If it still says the old
-   one, iOS keeps a shield's words until the shields change — note it: that is a follow-up.
+1. **Tapped in: Bali's shield.** `npm run dev:teacher -- start 20`, **Tap** with `DEVICE-CHECK-1`,
+   then open any blocked app: Bali's shield, light even with the phone in dark mode, never iOS's own —
+   the ring mark (a green arc open at the upper left, on a pale green track), the title
+   `Focused with Bali` with no time, and under it "This app is paused for class. Calls, FaceTime,
+   Messages and Emergency SOS always work. Open Bali to see when class ends — Emergency Unlock is
+   always there." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
+   a blocked app says the same — the new bell is Bali's to show.
 2. **After Emergency Unlock: no shield.** **Emergency Unlock**: every app opens, with no shield at
    all, Bali's or iOS's.
-3. **A tap not yet answered: no time.** Turn on Airplane Mode and **Tap**: shielded at once, and a
-   blocked app says `Focused with Bali — waiting for your class`, with no time — the phone has not
-   heard the bell. Airplane Mode off: once `watch` shows focused, a blocked app says
-   `Focused with Bali until` and the bell again (if it still waits, the same note as step 1).
+3. **A tap not yet answered: the same words.** Turn on Airplane Mode and **Tap**: shielded at once,
+   and a blocked app says `Focused with Bali` and the same line, with no time. Airplane Mode off: once
+   `watch` shows focused, the same words.
 
 ### Round 4 (B6): the block, read over NFC
 
