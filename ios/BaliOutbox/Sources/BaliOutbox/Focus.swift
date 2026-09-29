@@ -25,6 +25,10 @@ public struct FocusWords: Sendable, Hashable {
     /// iOS refused the wake at the end — this run's window, or the monitor's next with the app
     /// closed (B5b, B5b-2) — so with Bali closed the shields may outlast it; nil when neither.
     public let unscheduled: String?
+    /// Why the shields came back after an Emergency Unlock the server recorded late, in this
+    /// session (C5a): a return to focus the phone's order cannot place went ahead of it — or, sent
+    /// with no order, its clock was behind (A10, A12); nil when none did.
+    public let superseded: String?
     /// Under Emergency Unlock.
     public let caption: String
 
@@ -45,12 +49,16 @@ public struct FocusWords: Sendable, Hashable {
         let ends = held ?? session?.endsAt ?? now
         let (at, capped) = (ends.formatted(time), ends != session?.endsAt)
         if let session {
-            let named = sync.me?.classes.first { $0.id == session.classId }
-            let bell = "ends \(session.endsAt.formatted(time))"
-            title = named?.name ?? "In focus"
-            subtitle = named?.teacher?.displayName.map { "with \($0) · \(bell)" } ?? bell
+            let heading = sync.heading(session, time)
+            (title, subtitle) = (heading.title ?? "In focus", heading.subtitle)
         } else {
             (title, subtitle) = ("You're in", "Your class shows here once Bali hears back.")
+        }
+        superseded = sync.superseded.flatMap { late in
+            guard late.session == session?.id else { return nil }
+            return late.ordered
+                ? "Bali recorded your unlock, but Bali on another phone, or from before a reinstall, put you back in focus after it. Hold to unlock again if you need to."
+                : "Bali recorded your unlock, but this phone's clock was behind, so it counted as before you went back to focus. Turn on Set Automatically in Settings → General → Date & Time, then hold to unlock again."
         }
         claim =
             protection?.shielded == true
@@ -94,20 +102,33 @@ public struct FocusWords: Sendable, Hashable {
 
 }
 
+extension SyncState {
+    /// A session's class, where `GET /v1/me` names it, and under it its teacher and bell (C4, C5a).
+    func heading(_ session: SessionView, _ time: Date.FormatStyle) -> (
+        title: String?, subtitle: String
+    ) {
+        let named = me?.classes.first { $0.id == session.classId }
+        let bell = "ends \(session.endsAt.formatted(time))"
+        return (named?.name, named?.teacher?.displayName.map { "with \($0) · \(bell)" } ?? bell)
+    }
+}
+
 /// Why an Emergency Unlock did not go through: the phone's engine has not started (a frozen
-/// fixture's), or the outbox refused to keep it.
+/// fixture's), the outbox refused to keep it, or nothing the phone knows held the shields by the
+/// end of the press — its tap answered meanwhile, say (#116's review).
 public enum UnlockFailure: Sendable, Hashable {
-    case notStarted, notSaved
+    case notStarted, notSaved, nothing
 
     /// In words (rule 5): the outbox refused the write, so nothing changed — the apps "still
     /// paused" only where the check verified them so (`paused`: rule 3) — or the phone has not
-    /// started; holding again is the way on.
+    /// started; holding again is the way on. Nothing held: nothing to unlock, nothing recorded.
     public func words(paused: Bool) -> String {
         switch self {
         case .notStarted: Joining.notStarted
         case .notSaved where paused:
             "Bali couldn't save your unlock, so your apps are still paused. Hold to try again."
         case .notSaved: "Bali couldn't save your unlock. Hold to try again."
+        case .nothing: "Nothing is paused now, so there was nothing to unlock."
         }
     }
 }

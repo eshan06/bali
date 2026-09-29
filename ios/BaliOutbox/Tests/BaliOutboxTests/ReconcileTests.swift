@@ -86,8 +86,8 @@ struct AnswerTests {
     }
 
     @Test(
-        "An unlock recorded with a note names no live session — none, or one over — so the truth is read again",
-        arguments: [Answer.unlockNoted, Answer.unlockAfterEnd()])
+        "An unlock recorded with a note names no live session — none, one over, or none left late once the student has left it (A11) — so the truth is read again",
+        arguments: [Answer.unlockNoted, Answer.unlockAfterEnd(), Answer.supersededGone])
     func unlockNoted(answer: String) async throws {
         let rig = try Rig()
         try await rig.tapIn()
@@ -346,7 +346,7 @@ struct StaleReadTests {
         rig.clock.advance(by: 2 * Outbox.backoffCap)
         try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
         let state = await rig.until { $0.queued.isEmpty }
-        #expect(state.standing == .inSession(session(), .focused))
+        #expect(state.standing == .inSession(session(), .focused) && state.superseded == nil)
         #expect(try !rig.outbox.holdsUnlock(session: "s"))
         await rig.stop()
     }
@@ -362,6 +362,7 @@ struct StaleReadTests {
         try await rig.server.next(unlockRoute).reply(200, Answer.unlockSuperseded())
         let state = await rig.until { $0.queued.isEmpty }
         #expect(state.standing == .inSession(session(), .focused))
+        #expect(state.superseded == Superseded(session: "s", ordered: true))
         await rig.stop()
     }
 

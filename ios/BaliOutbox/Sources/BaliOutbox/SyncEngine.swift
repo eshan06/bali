@@ -124,6 +124,13 @@ public struct SyncState: Sendable, Hashable {
     /// The last state change the server refused, dropped and never sent again: shown (rule 5)
     /// until the phone's next change.
     public var refused: Refusal?
+    /// The student's unlock the server recorded late — a return to focus went ahead of it (A10,
+    /// A12) — which put the shields back with no return of this phone's since: said on Focus
+    /// (C5a) until the phone's next change.
+    public var superseded: Superseded?
+    /// The session protection off was last reported in, since the phone's last tap
+    /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
+    public var reportedOff: String?
     /// How long a tap not yet answered is shielded for: decision 7's `tapCap`, or the shorter one a
     /// Debug build sets for B5b's device check (`SyncEngine.setTapCap`).
     public var cap = SyncState.tapCap
@@ -178,6 +185,15 @@ public struct Refusal: Sendable, Hashable {
     public let message: String?
 }
 
+/// A late unlock's session, and whether it went with the phone's order (A12): with one, the return
+/// that went ahead is one the order cannot place — another install's, or one sent with none;
+/// without, the phone's clock was behind (A10).
+public struct Superseded: Sendable, Hashable {
+    public let session: String
+    public let ordered: Bool
+    public init(session: String, ordered: Bool) { (self.session, self.ordered) = (session, ordered) }
+}
+
 /// The sync engine (ARCHITECTURE, "iOS app structure", decision 4): the one owner of the phone's
 /// server communication. It drains the outbox through the app's one `APIClient`, checks in every
 /// 30 seconds while the app is in the foreground, and applies the server's answers — the
@@ -186,6 +202,11 @@ public struct Refusal: Sendable, Hashable {
 public actor SyncEngine {
     /// The every-30-seconds "still here" (data model, decision 7).
     public static let checkInInterval: TimeInterval = 30
+    /// How long an Emergency Unlock's send waits for the reason the Unlocked screen asks (C5a; A1:
+    /// a reason is kept once recorded): the unlock itself never waits — the shields are off and
+    /// the record queued at once — and any change of the phone's, or the app going behind, sends it
+    /// sooner. The teacher sees it at most this late, online.
+    public static let reasonHold: TimeInterval = 15
 
     /// The app's one client, and its one URLSession: the screens' own calls go through it too.
     public nonisolated let client: APIClient
@@ -226,6 +247,8 @@ public actor SyncEngine {
     /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
     private var reauth: Task<Bool, Never>?
     private var running = false
+    /// The record on its way to the server: a reason given now would not go with it.
+    private var sending: String?
     private enum Loop { case drain, read }
     private var waiters: [Loop: (pause: Int, wake: CheckedContinuation<Void, Never>)] = [:]
     private var rung: Set<Loop> = []
@@ -248,6 +271,7 @@ public actor SyncEngine {
         let queued = try? outbox.records()
         state.queued = queued ?? []
         if queued == nil { state.link = .storageFailed }
+        state.reportedOff = try? outbox.reportedOff()
         do {
             state.standing = try outbox.standing()
             // An unlock not filed yet acts on it, and the first change files it (`keepStanding`) —
@@ -289,9 +313,10 @@ public actor SyncEngine {
     /// Queues what the phone just did — acted on at once — and sends it; nil when there is nothing
     /// to send (protection off already reported). Throws when it could not be written: the caller
     /// shows it (rule 5). The student acting again ends a refusal's showing. An Emergency Unlock
-    /// goes through `emergencyUnlock`, which files it where decision 11 says.
+    /// goes through `emergencyUnlock`, which files it where decision 11 says; `hold` delays the send
+    /// of one waiting for its reason (C5a). Acting again ends a late unlock's showing too.
     @discardableResult
-    public func record(_ change: Change) throws -> OutboxRecord? {
+    public func record(_ change: Change, holding hold: TimeInterval = 0) throws -> OutboxRecord? {
         // Standing focused there, the phone's row is focused again — a re-tap older than its last
         // report can put it back (A13) — so protection off found now is reported again.
         if case .protectionOff(let session) = change, state.standing.isFocused(in: session) {
@@ -301,18 +326,20 @@ public actor SyncEngine {
         // relaunch would stand where the phone stood before — shielded over an Emergency Unlock.
         let standing = state.standing.acting(change)
         let keeping = standing == .unread ? nil : standing
-        guard let record = try outbox.record(change, now: clock.now(), standing: keeping) else {
-            return nil
-        }
+        guard
+            let record = try outbox.record(
+                change, now: clock.now(), standing: keeping, holding: hold)
+        else { return nil }
         if let keeping { kept = keeping }
         changes += 1
         // A read that fails keeps the last list — with this record, which the file holds now: the
         // phone acts on what it just did (an unlock's shields off, a tap's on) whatever the read.
         let queued = stored(outbox.records) ?? state.queued + [record]
+        let reportedOff = stored(outbox.reportedOff) ?? state.reportedOff
         update {
             $0.standing = standing
-            $0.queued = queued
-            $0.refused = nil
+            ($0.queued, $0.reportedOff) = (queued, reportedOff)
+            ($0.refused, $0.superseded) = (nil, nil)
         }
         ring(.drain)
         return record
@@ -343,6 +370,40 @@ public actor SyncEngine {
     public func emergencyUnlock(reason: UnlockReason? = nil) throws -> OutboxRecord? {
         guard let unlock = state.emergencyUnlock(reason: reason) else { return nil }
         return try record(unlock)
+    }
+
+    /// Emergency Unlock as the screens press it (C4): its send held `reasonHold` where the Unlocked
+    /// screen then asks why — in a session (C5a) — or why it did not go through (rule 5): nothing
+    /// the phone knows holds the shields any more (#116's review), or the outbox refused it.
+    public func pressUnlock() -> UnlockFailure? {
+        guard let unlock = state.emergencyUnlock(reason: nil) else { return .nothing }
+        let hold = state.standing.sessionId == nil ? 0 : Self.reasonHold
+        do { try record(unlock, holding: hold) } catch { return .notSaved }
+        return nil
+    }
+
+    /// The student's reason for their latest Emergency Unlock (C5a; A1), sent with it at once while
+    /// it has never been sent — or what the Unlocked screen says (rule 5): too late, or not saved.
+    public func explain(_ reason: UnlockReason) -> String? {
+        do {
+            let kept = try outbox.explain(reason, now: clock.now(), sending: sending)
+            guard kept else { return UnlockedWords.late }
+        } catch {
+            return "Bali couldn't save your reason. Try again."
+        }
+        refreshQueue()
+        ring(.drain)
+        return nil
+    }
+
+    /// Back to focus (C5a): the refocus of the session the phone stands unlocked in — none where it
+    /// stands in none, and another screen shows — or what the Unlocked screen says (rule 5).
+    public func backToFocus() -> String? {
+        guard case .inSession(let session, .unlocked?) = state.standing else { return nil }
+        do { try record(.refocus(session: session.id)) } catch {
+            return "Bali couldn't take you back to focus. Try again."
+        }
+        return nil
     }
 
     /// What a join code opens (`GET /v1/join-codes/{code}`): the Join screen's own call (C2b), its
@@ -388,11 +449,15 @@ public actor SyncEngine {
     public func setTapCap(_ cap: TimeInterval?) { state.cap = cap ?? SyncState.tapCap }
 
     /// The app entered the foreground, or left it. The check-in runs only in the foreground — iOS
-    /// won't run a timer forever behind it — and coming back reads the truth at once.
+    /// won't run a timer forever behind it — and coming back reads the truth at once. Going behind,
+    /// no reason is coming: an unlock held for one goes now, before iOS suspends the app (C5a).
     public func setForeground(_ foreground: Bool) {
         self.foreground = foreground
-        guard foreground else { return }
-        reread()
+        if foreground {
+            reread()
+        } else {
+            _ = stored { try outbox.release(now: clock.now()) }
+        }
         ring(.drain)
     }
 
@@ -426,7 +491,10 @@ public actor SyncEngine {
                 switch try outbox.nextDue(now: clock.now()) {
                 case .send(let record):
                     // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
-                    guard let sent = await record.send(through: client) else { break }
+                    sending = record.eventId
+                    let sent = await record.send(through: client)
+                    sending = nil
+                    guard let sent else { break }
                     // No token: nothing went, so nothing is settled — the record waits on sign-in
                     // (a ring), or a minute. Never a sign-out, never a dropped record.
                     guard sent.noAnswer != .noToken else {
@@ -478,6 +546,15 @@ public actor SyncEngine {
             let after = record.change.isReturn ? (record.order?.seq ?? 0) : 0
             if participation == .focused, keepsUnlocked(session.id, after: after) {
                 participation = .unlocked
+            }
+            // A late unlock putting the shields back with no return of the phone's own since —
+            // focused there already, or a tap or refocus made after it — is said why (C5a).
+            let seq = record.order?.seq ?? 0
+            if sent.superseded, participation == .focused, applies,
+                !next.standing.isFocused(in: session.id),
+                !queued.contains(where: { $0.change.isReturn && ($0.order?.seq ?? 0) > seq })
+            {
+                next.superseded = Superseded(session: session.id, ordered: record.order != nil)
             }
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:

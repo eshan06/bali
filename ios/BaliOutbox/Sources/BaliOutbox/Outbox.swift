@@ -398,17 +398,19 @@ public struct Outbox: Sendable {
     /// other. A tap or an unlock supersedes every queued refocus (deleted, never sent: it could
     /// only make the truth older). Protection off is reported once per revocation — nil when
     /// already reported in this session — and again after a tap, which returns the row to
-    /// focused, or `protectionRestored`.
+    /// focused, or `protectionRestored`. An unlock waiting for its reason is due `hold` later
+    /// (C5a), and whatever the phone does next sends one at once: the student has moved on.
     @discardableResult
-    public func record(_ change: Change, now: Date, standing: Standing? = nil) throws
-        -> OutboxRecord?
-    {
+    public func record(
+        _ change: Change, now: Date, standing: Standing? = nil, holding hold: TimeInterval = 0
+    ) throws -> OutboxRecord? {
         try pool.write { db in
             if case .protectionOff(let session) = change,
                 try Self.state(db, Self.reportedKey) == session
             {
                 return nil
             }
+            try Self.release(db, now: now)
             // Kept as `file` keeps it, before what this does: an unlock not filed yet — a filing
             // that failed, say — goes where the phone stood, or under the last tap before this.
             if let standing { try Self.file(db, standing) }
@@ -458,10 +460,45 @@ public struct Outbox: Sendable {
                     """,
                 arguments: [
                     eventId, row.kind, row.tagId, row.session, tap, row.reason?.rawValue, follows,
-                    now, now,
+                    now, now + hold,
                 ])
             return try Self.fetch(db, eventId)
         }
+    }
+
+    /// Sends now an unlock held for its reason — never sent, due after it was made (C5a) — as the
+    /// app goes behind, where it may be suspended before the hold ends.
+    public func release(now: Date) throws { try pool.write { try Self.release($0, now: now) } }
+
+    static func release(_ db: Database, now: Date) throws {
+        try db.execute(
+            sql: """
+                UPDATE outbox SET nextAttemptAt = ? WHERE kind = 'unlock' AND attempts = 0
+                  AND nextAttemptAt > MAX(recordedAt, ?)
+                """, arguments: [now, now])
+    }
+
+    /// The student's reason for their latest Emergency Unlock (C5a; A1), kept in its record while
+    /// it has never been sent — `sending`, the record on its way, has — which then goes at once:
+    /// false when it was too late.
+    public func explain(_ reason: UnlockReason, now: Date, sending: String?) throws -> Bool {
+        try pool.write { db in
+            try !String.fetchAll(
+                db,
+                sql: """
+                    UPDATE outbox SET reason = ?, nextAttemptAt = ? WHERE kind = 'unlock'
+                      AND attempts = 0 AND eventId IS NOT ?
+                      AND eventId = (SELECT value FROM outboxState WHERE key = ?)
+                    RETURNING eventId
+                    """, arguments: [reason.rawValue, now, sending, Self.lastUnlockKey]
+            ).isEmpty
+        }
+    }
+
+    /// The session protection off was last reported in, since the phone's last tap: a refocus out
+    /// of it is refused and a re-tap returns (A2), so the Unlocked screen offers that there (C5a).
+    public func reportedOff() throws -> String? {
+        try pool.read { try Self.state($0, Self.reportedKey) }
     }
 
     /// A later revocation is a new one, reported again: the Screen Time permission is back, or the

@@ -5,21 +5,21 @@ import Testing
 @testable import BaliOutbox
 
 /// A US phone in New York writes a time so — `t0` is 10:13:20 AM there.
-private let newYork = Date.FormatStyle(
+let newYork = Date.FormatStyle(
     date: .omitted, time: .shortened, locale: Locale(identifier: "en_US"),
     timeZone: TimeZone(identifier: "America/New_York")!)
 
 /// `text` with plain spaces: ICU writes a narrow no-break one before "AM".
-private func plain(_ text: String?) -> String? {
+func plain(_ text: String?) -> String? {
     text?.replacing("\u{202F}", with: " ").replacing("\u{A0}", with: " ")
 }
 
 /// A session whose bell is at 10:42 AM in New York.
-private let bell1042 = session(endsAt: 1720)
+let bell1042 = session(endsAt: 1720)
 
 /// The engine standing `standing` with `queued`, its link `link`, and `GET /v1/me` naming class
 /// "c" Period 3, with `teacher` — "null" for a teacher with no name — or, `me` false, not read.
-private func synced(
+func synced(
     _ standing: Standing, queued: [OutboxRecord] = [], link: Link? = .reached,
     teacher: String = #""Ms. Rivera""#, me: Bool = true
 ) throws -> SyncState {
@@ -154,7 +154,7 @@ struct FocusTests {
     }
 
     @Test(
-        "An Emergency Unlock the outbox could not keep is said, holding again the way on — its apps 'still paused' only where the check verified the shields on, never over Screen Time off or nothing checked yet (rule 3; santa's review); a phone not started says so"
+        "An Emergency Unlock the outbox could not keep is said, holding again the way on — its apps 'still paused' only where the check verified the shields on, never over Screen Time off or nothing checked yet (rule 3; santa's review); a phone not started says so, and a press that found nothing to unlock (#116's review)"
     )
     func unlockFailed() throws {
         let focused = try synced(.inSession(bell1042, .focused))
@@ -171,6 +171,7 @@ struct FocusTests {
                 "\(String(describing: protection))")
         }
         #expect(said(.notStarted) == Joining.notStarted)
+        #expect(said(.nothing) == "Nothing is paused now, so there was nothing to unlock.")
     }
 
     @Test(
