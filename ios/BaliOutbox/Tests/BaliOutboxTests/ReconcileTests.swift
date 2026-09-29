@@ -481,7 +481,7 @@ struct ClassesTests {
     }
 
     @Test(
-        "Waiting for the Start (open decision 6's adopted default): in the foreground the phone reads the truth at each wake, every 30 s, and the Start found puts it in the session, shielded; behind the app it reads nothing"
+        "Waiting for the Start (decision 6, the owner's ruling): in the foreground the phone reads the truth at each wake, every 30 s, and the Start found puts it in the session, shielded; behind the app it reads nothing"
     )
     func waitingReads() async throws {
         let rig = try Rig()

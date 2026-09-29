@@ -27,7 +27,7 @@ public enum Standing: Sendable, Hashable {
     case out
     /// Armed, waiting for the teacher's Start (decision 5): nothing to shield yet. No read shows an
     /// armed tap, so one naming no session leaves the phone waiting; in the foreground it reads the
-    /// truth every 30 s for the Start (open decision 6's adopted default, C3a).
+    /// truth every 30 s for the Start (decision 6, the owner's ruling, 2026-09-29; C3a).
     case waiting
     /// In `session`: shielded only while `focused` (nil is a state this build does not know), and
     /// only until its `endsAt`, which the phone's own clock keeps (data model, decision 6).
@@ -503,9 +503,9 @@ public actor SyncEngine {
             // left open there, a grant taken back is found at a wake, not at the app's next return
             // to the front — and reported nowhere, which the check's own rules see to.
             if foreground { await check?() }
-            // Open decision 6's adopted default (C3a; docs/DECISIONS.md, 2026-09-29): waiting for
-            // the teacher's Start, the phone reads the truth at each wake in the foreground — the
-            // check-in's cadence — since no answer of its own brings the Start, and no feed does.
+            // Decision 6, the owner's ruling (2026-09-29; C3a): waiting for the teacher's Start,
+            // the phone reads the truth at each wake in the foreground — the check-in's cadence —
+            // since no answer of its own brings the Start, and no feed does.
             if foreground, state.standing == .waiting { rereading = true }
             if let sent = stored(stamp) {
                 if rereading {

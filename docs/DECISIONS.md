@@ -8,9 +8,8 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-09-29** — **C3a: the classes from `GET /v1/me` in the engine, open decision 6's default
-  — the conductor's recommendation, adopted unless the owner overrules — and #106's review WARNs.**
-  **The classes**
+- **2026-09-29** — **C3a: the classes from `GET /v1/me` in the engine, open decision 6 — the
+  owner's ruling — and #106's review WARNs.** **The classes**
   (`SyncState.me`, `hasClasses`): the engine keeps `GET /v1/me`'s last answer — read as before, at
   every return to the foreground (the launch's among them) and whenever an answer names no live
   session — so the router's `hasClasses` is fed at last (C1a's hand-off): nil until a read answers,
@@ -26,9 +25,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   seam #106's review found missing (`hasClasses` after a join, untested): `JoinEngineTests`.
   Alternative: `Phone` keeping "true once a join says so" beside the engine's read — one fact in
   two places, where a read sent before the join and answered after it would show Join again for a
-  round trip. **Open decision 6, how a waiting phone learns of the Start — the conductor's
-  recommended default, explained to the owner on 2026-09-29 (load and trade-off), adopted unless
-  the owner overrules:** while the phone stands waiting — a tap answered armed (decision 5) — the
+  round trip. **Open decision 6, how a waiting phone learns of the Start — the owner's ruling
+  (2026-09-29), on the conductor's recommendation, the load and the trade-off explained: "go ahead
+  with it":** while the phone stands waiting — a tap answered armed (decision 5) — the
   engine reads the truth (`GET /v1/me`) at each wake in the foreground, every 30 s, the check-in's
   cadence, and never behind the app; the Start converts the armed tap into a participation, the
   read names its session, and the phone shields. No push: push notifications are a later upgrade
