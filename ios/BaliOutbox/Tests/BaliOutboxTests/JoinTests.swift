@@ -283,6 +283,9 @@ struct JoinEngineTests {
         try await rig.server.next(joinRoute).reply(404, Answer.refused("class_not_found"))
         #expect(await answer.error?.error.reason == .classNotFound)
         #expect(await rig.engine.state.hasClasses == false)
+        // A read asked for would have gone by the loop's next wake, and kept it from sleeping on.
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([at(60)])
         #expect(await rig.server.waiting.isEmpty)
         await rig.stop()
     }

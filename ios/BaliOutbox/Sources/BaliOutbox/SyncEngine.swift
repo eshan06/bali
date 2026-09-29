@@ -471,13 +471,15 @@ public actor SyncEngine {
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:
             switch next.standing {
-            // Arming ends nothing: a session the phone is in stays (decision 4) — and one it may
-            // be in, where it stood unread, is asked of the server, the arming carried meanwhile.
-            case .inSession: break
+            // Arming ends nothing: a session the phone is in stays (decision 4) while it runs by
+            // the phone's own clock (data model, decision 6) — past its bell the phone is in none,
+            // and waits as from out: the sweep that ends it on the server may run late (C3a). One
+            // it may be in, where it stood unread, is asked of the server, the arming carried.
+            case .inSession(let session, _) where session.endsAt > clock.now(): break
             case .unread:
                 if applies { armed = true }
                 reread()
-            case .out, .waiting: if applies { next.standing = .waiting }
+            case .inSession, .out, .waiting: if applies { next.standing = .waiting }
             }
         case .tap(.reread)?, .tap(.retryAndSurface)?, .stateChange(.reread)?: reread()
         case .stateChange(.drop)?:

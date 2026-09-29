@@ -404,9 +404,10 @@ final class Phone {
                 .joined(separator: " · ")
         }
 
+        /// A class joined through the engine, as the Join screen joins one: in `me` at once.
         private func join() async -> String {
             let now = Date()
-            let joined = await engine.client.join(
+            let joined = await engine.join(
                 EnrollmentJoinRequest(joinCode: code, eventId: EventID.mint(at: now), deviceTime: now))
             return joined.answer.map { "joined \($0.class.name)" }
                 ?? "not joined: \(joined.result) \(joined.error?.error.message ?? "")"

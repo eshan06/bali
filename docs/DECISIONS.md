@@ -41,9 +41,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Start:** waiting, a read naming a session whose end has passed by the phone's own clock (data
   model, decision 6) leaves the phone waiting — the sweep that ends it on the server can run late
   (dev's did, 2026-09-27), and that session, an earlier class's, would end the wait with no class
-  to be in, so the phone would never learn of the Start it waits for. Accepted: a phone whose armed
-  tap was converted into a session that then ended while it could not reach the server keeps
-  waiting until its next tap — a stale screen, where the other way a phone misses a Start. **#106's
+  to be in, so the phone would never learn of the Start it waits for. And the other way round
+  (santa's round 1): a tap answered armed while the phone stands in a session its own clock has
+  ended — the server armed it, the sweep not yet run — waits as from out, where it left the phone in
+  that session, reading nothing, until the sweep's `gone` sent it out and the armed tap was
+  forgotten; arming still ends no session running by the phone's clock (decision 4). Accepted: a
+  phone whose armed tap was converted into a session that then ended while it could not reach the
+  server keeps waiting until its next tap — a stale screen, where the other way a phone misses a
+  Start. **#106's
   review WARNs:** the code stays as sent while its look-up is under way (`Joining.busy`: `type` and
   `back` change nothing meanwhile, and the field is disabled, its keyboard back once the answer is
   in), so no answer is dropped for an edit with nothing said; and a look-up or a join on a phone
