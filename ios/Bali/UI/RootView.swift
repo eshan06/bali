@@ -12,7 +12,9 @@ struct RootView: View {
     #endif
 
     var body: some View {
-        screen
+        // At the bell nothing Unlocked (or Protection off) watches changes, as Focus's shields do:
+        // the router chooses again then (C1a's hand-off).
+        TimelineView(.explicit(phone.bell.map { [$0] } ?? [])) { _ in screen }
             .preferredColorScheme(.light)
             #if DEBUG
                 .overlay(alignment: .topTrailing) {
@@ -38,7 +40,7 @@ struct RootView: View {
         case .home: HomeView(phone: phone)
         case .waiting: WaitingView(phone: phone)
         case .focus: FocusView(phone: phone)
-        case .unlocked: StepPlaceholder("Unlocked — C5")
+        case .unlocked: UnlockedView(phone: phone)
         case .protectionOff: StepPlaceholder("Protection off — C5")
         case .sessionOver: StepPlaceholder("Session over — C5")
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }

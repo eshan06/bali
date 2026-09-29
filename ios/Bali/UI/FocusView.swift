@@ -74,9 +74,14 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// Offline, D1's card; a wake iOS refused; then Emergency Unlock and its line.
+    /// Why an unlock gave way (C5a); offline, D1's card; a wake iOS refused; then Emergency Unlock
+    /// and its line.
     private func lower(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
+            if let late = focus.superseded {
+                Card { Text(late).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading) }
+                    .multilineTextAlignment(.leading)
+            }
             if let offline = focus.offline {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {
