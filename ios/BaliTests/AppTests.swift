@@ -91,7 +91,9 @@ struct AppTests {
         #expect(fromHome.opened == [.join])
         // Focus (C4): a frozen phone's Emergency Unlock says it has not started, never nothing;
         // the held tap's fixtures hold one, and the one over no shields claims none.
-        #expect(await Phone(fixture: try #require(PreviewFixtures.all["focus"])).emergencyUnlock() == Joining.notStarted)
+        #expect(
+            await Phone(fixture: try #require(PreviewFixtures.all["focus"])).emergencyUnlock()
+                == .notStarted)
         for (name, title, claim) in [
             ("focus", "Period 3 — Algebra II", FocusWords.Claim.paused),
             ("focusTapHeld", "You're in", .paused), ("focusNoShields", "You're in", .screenTimeOff),

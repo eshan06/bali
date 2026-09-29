@@ -90,6 +90,8 @@ struct FocusTests {
             #expect(words.countdown == digits && words.final == final, "\(now)")
             #expect(words.title == "Period 3 — Algebra II", "\(now)")
         }
+        #expect(focus(state, at: at(1720 - 112)).secondsLeft == 112)
+        #expect(focus(state, at: at(1720 - 0.3)).secondsLeft == 1)
         #expect(focus(state, at: at(1720)).fraction == 0)
         let long = try synced(.inSession(session(endsAt: 3905), .focused))
         #expect(focus(long).countdown == "1:05:05" && focus(long).fraction == 1)
@@ -134,7 +136,7 @@ struct FocusTests {
     }
 
     @Test(
-        "It claims what the check verified, never the standing: the shields on is paused; the permission taken back — a tap held, focused still until the report lands — is Screen Time off and the way back, never 'paused'; nothing checked yet, or not determined for a moment, claims nothing"
+        "It claims what the check verified, never the standing: the shields on is paused; the permission taken back — a tap held, focused still until the report lands — is Screen Time off and the way back, never 'paused'; nothing checked yet, or not determined for a moment, claims nothing but that the check runs"
     )
     func claim() throws {
         let focused = try synced(.inSession(bell1042, .focused))
@@ -147,8 +149,25 @@ struct FocusTests {
         #expect(focus(try synced(.out, queued: try heldTap()), checked(shielded: false, off: true)).claim == .screenTimeOff)
         for unverified in [nil, Protection(), checked(shielded: false)] {
             let words = focus(focused, unverified)
-            #expect(words.claim == .unverified && words.claimWords == nil)
+            #expect(words.claim == .unverified && words.claimWords == "Checking Screen Time…")
         }
+    }
+
+    @Test(
+        "An Emergency Unlock the outbox could not keep is said, holding again the way on — its apps 'still paused' only where the check verified the shields on, never over Screen Time off or nothing checked yet (rule 3; santa's review); a phone not started says so"
+    )
+    func unlockFailed() throws {
+        let focused = try synced(.inSession(bell1042, .focused))
+        #expect(
+            focus(focused).words(.notSaved)
+                == "Bali couldn't save your unlock, so your apps are still paused. Hold to try again.")
+        for protection in [checked(shielded: false, off: true), nil, checked(shielded: false)] {
+            #expect(
+                focus(focused, protection).words(.notSaved)
+                    == "Bali couldn't save your unlock. Hold to try again.",
+                "\(String(describing: protection))")
+        }
+        #expect(focus(focused).words(.notStarted) == Joining.notStarted)
     }
 
     @Test(

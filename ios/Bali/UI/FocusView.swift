@@ -9,7 +9,7 @@ import UIKit
 struct FocusView: View {
     let phone: Phone
     /// Why the last Emergency Unlock did not go through (rule 5): holding again is the way on.
-    @State private var failed: String?
+    @State private var failed: UnlockFailure?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -20,20 +20,20 @@ struct FocusView: View {
     }
 
     /// D1's three groups — the class; the state, the ring and the claim; and Emergency Unlock —
-    /// each at its own height: only the spacers give, since a group offered less than its own
-    /// height, the ring's fixed, would cut its lines instead.
+    /// at least D1's 24 pt apart, each at its own height: only the spacers give, since a group
+    /// offered less than its own height, the ring's fixed, would cut its lines instead.
     private func page(_ focus: FocusWords) -> some View {
         ScreenScaffold {
             PageScroll {
-                VStack(spacing: 24) {
+                VStack(spacing: 0) {
                     VStack(spacing: 2) {
                         Text(focus.title).textStyle(.h3)
                         Text(focus.subtitle).textStyle(.caption).foregroundStyle(Theme.textTertiary)
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 24)
                     middle(focus).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 24)
                     lower(focus).fixedSize(horizontal: false, vertical: true)
                 }
                 .multilineTextAlignment(.center)
@@ -54,16 +54,15 @@ struct FocusView: View {
                 if focus.final, focus.claim == .paused {
                     Text("Almost done").textStyle(.h3).foregroundStyle(Theme.brand)
                 }
-                if let claim = focus.claimWords {
-                    Text(claim).textStyle(.body).foregroundStyle(Theme.textSecondary)
-                        .padding(.horizontal, 12)
-                }
+                Text(focus.claimWords).textStyle(.body).foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 12)
             }
+            // D1's ProtectionOff draws the way back as the primary action.
             if focus.claim == .screenTimeOff {
                 Button("Turn on Screen Time") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
-                .buttonStyle(SecondaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle())
             }
         }
     }
@@ -78,7 +77,7 @@ struct FocusView: View {
     }
 
     /// Offline, D1's card; a wake iOS refused; then Emergency Unlock and its line — or why the
-    /// last press did not go through.
+    /// last press did not go through, which VoiceOver, left on the control, is told as well.
     private func lower(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
             if let offline = focus.offline {
@@ -96,8 +95,16 @@ struct FocusView: View {
                 Text(note).textStyle(.caption).foregroundStyle(Theme.textSecondary)
             }
             VStack(spacing: 12) {
-                UnlockControl { Task { failed = await phone.emergencyUnlock() } }
-                Text(failed ?? focus.caption).textStyle(.caption)
+                UnlockControl {
+                    Task {
+                        let failure = await phone.emergencyUnlock()
+                        failed = failure
+                        if let failure {
+                            AccessibilityNotification.Announcement(focus.words(failure)).post()
+                        }
+                    }
+                }
+                Text(failed.map(focus.words) ?? focus.caption).textStyle(.caption)
                     .foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
             }
         }
@@ -132,7 +139,11 @@ private struct Ring: View {
         }
         .padding(12).frame(width: 240, height: 240)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(focus.countdown) left, \(focus.until)")
+        // Spoken as a length of time — "1 minute, 52 seconds" — never as a clock's "one fifty-two".
+        .accessibilityLabel(
+            Duration.seconds(focus.secondsLeft)
+                .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))
+                + " left, \(focus.until)")
         .accessibilityAddTraits(.updatesFrequently)
         .onAppear {
             withAnimation(reduceMotion ? nil : .timingCurve(0.2, 0, 0, 1, duration: 0.6)) {
@@ -143,8 +154,10 @@ private struct Ring: View {
 }
 
 /// D1's Emergency Unlock: warm orange and round — never red — always there while the shields are.
-/// Held for a second it unlocks; let go early, nothing happens and it springs back (the design
-/// system's spring). VoiceOver's own action unlocks in one step.
+/// Held for a second it unlocks, a finger drifting up to a touch target's width; let go early,
+/// nothing happens and its progress springs back (the design system's spring) — under Reduce
+/// Motion none is drawn, never a ring that looks done a second early. VoiceOver's own action
+/// unlocks in one step, and Voice Control knows it by the words on it too.
 struct UnlockControl: View {
     let unlock: () -> Void
     @State private var holding = false
@@ -167,13 +180,15 @@ struct UnlockControl: View {
         .multilineTextAlignment(.center).foregroundStyle(look.ink)
         .padding(10).frame(minHeight: 64)
         .background(look.fill, in: .capsule)
-        .onLongPressGesture(minimumDuration: 1, perform: unlock) { pressing in
-            let motion: Animation? =
+        .onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock) { pressing in
+            guard !reduceMotion else { return }
+            let motion: Animation =
                 pressing ? .linear(duration: 1) : .timingCurve(0.34, 1.3, 0.64, 1, duration: 0.3)
-            withAnimation(reduceMotion ? nil : motion) { holding = pressing }
+            withAnimation(motion) { holding = pressing }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Emergency Unlock. Your teacher will see it.")
+        .accessibilityInputLabels(["Hold to unlock", "Emergency Unlock"])
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { unlock() }
     }

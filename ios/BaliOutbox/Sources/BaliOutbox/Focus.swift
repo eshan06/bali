@@ -15,9 +15,11 @@ public struct FocusWords: Sendable, Hashable {
     public let title: String, subtitle: String
     public let claim: Claim
     /// The time left until the shields come off by the phone's own clock (`shieldedUntil`) — the
-    /// bell, or a tap's cap, which is only the latest they can — as the digits say it, how full
-    /// the ring is, until when, and whether these are the last two minutes (D1's FocusFinal).
-    public let countdown: String, fraction: Double, until: String, final: Bool
+    /// bell, or a tap's cap, which is only the latest they can — in whole seconds, rounded up, and
+    /// as the digits say it; how full the ring is, until when, and whether these are the last two
+    /// minutes (D1's FocusFinal).
+    public let secondsLeft: Int, countdown: String
+    public let fraction: Double, until: String, final: Bool
     /// No answer from the server (D1's FocusOffline): what its card says; nil online.
     public let offline: String?
     /// iOS refused the wake at the end — this run's window, or the monitor's next with the app
@@ -56,6 +58,7 @@ public struct FocusWords: Sendable, Hashable {
         let left = max(0, ends.timeIntervalSince(now))
         let seconds = Int(left.rounded(.up))
         let (hours, minutes) = (seconds / 3600, seconds / 60 % 60)
+        secondsLeft = seconds
         countdown =
             hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds % 60)
@@ -79,18 +82,29 @@ public struct FocusWords: Sendable, Hashable {
             : "Works without Wi-Fi. Letting go early does nothing."
     }
 
-    /// What the claim says under the ring, and nothing while nothing is verified.
-    public var claimWords: String? {
+    /// What the claim says under the ring — while nothing is verified, only that the check runs.
+    public var claimWords: String {
         switch claim {
         case .paused: "Every app is paused. Calls, FaceTime, Messages and Emergency SOS always work."
         case .screenTimeOff:
             "Screen Time is off for Bali, so no app is paused. Turn it back on in Settings → Screen Time → Apps with Screen Time Access."
-        case .unverified: nil
+        case .unverified: "Checking Screen Time…"
         }
     }
 
-    /// What the screen says when Emergency Unlock could not be kept (rule 5): the outbox refused
-    /// the write, so nothing changed — holding again is the way on.
-    public static let unlockNotSaved =
-        "Bali couldn't save your unlock, so your apps are still paused. Hold to try again."
+    /// Why an Emergency Unlock did not go through (rule 5), in words: the outbox refused the write,
+    /// so nothing changed — its apps "still paused" only where the check verified them so (rule 3)
+    /// — or the phone has not started; holding again is the way on.
+    public func words(_ failure: UnlockFailure) -> String {
+        switch failure {
+        case .notStarted: Joining.notStarted
+        case .notSaved where claim == .paused:
+            "Bali couldn't save your unlock, so your apps are still paused. Hold to try again."
+        case .notSaved: "Bali couldn't save your unlock. Hold to try again."
+        }
+    }
 }
+
+/// Why an Emergency Unlock did not go through: the phone's engine has not started (a frozen
+/// fixture's), or the outbox refused to keep it.
+public enum UnlockFailure: Sendable, Hashable { case notStarted, notSaved }

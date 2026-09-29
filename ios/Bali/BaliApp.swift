@@ -207,15 +207,15 @@ final class Phone {
     }
 
     /// Emergency Unlock (C4), always allowed: recorded where decision 11 files it — the shields off
-    /// at once, the record queued, never waiting on the network — or why not, in words (rule 5).
-    /// A phone whose engine has not started — a frozen one too — says so.
-    func emergencyUnlock() async -> String? {
-        guard let engine else { return Joining.notStarted }
+    /// at once, the record queued, never waiting on the network — or why not (rule 5), which the
+    /// screen says: a phone whose engine has not started, a frozen one too, or an outbox refusing.
+    func emergencyUnlock() async -> UnlockFailure? {
+        guard let engine else { return .notStarted }
         do {
             try await engine.emergencyUnlock()
             return nil
         } catch {
-            return FocusWords.unlockNotSaved
+            return .notSaved
         }
     }
 
