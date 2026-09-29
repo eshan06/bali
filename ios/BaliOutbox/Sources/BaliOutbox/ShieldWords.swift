@@ -16,7 +16,7 @@ public struct ShieldWords: Sendable, Hashable {
         title = "Focused with Bali"
         subtitle =
             "This \(over == .app ? "app" : "website") is paused for class. Calls, FaceTime, "
-            + "Messages and Emergency SOS always work. Open Bali to see when class ends — "
+            + "Messages and Emergency SOS always work. Open Bali to see when class ends. "
             + "Emergency Unlock is always there."
     }
 }

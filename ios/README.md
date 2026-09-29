@@ -192,7 +192,7 @@ and layout are iOS's.
    then open any blocked app: Bali's shield, light even with the phone in dark mode, never iOS's own —
    the ring mark (a green arc open at the upper left, on a pale green track), the title
    `Focused with Bali` with no time, and under it "This app is paused for class. Calls, FaceTime,
-   Messages and Emergency SOS always work. Open Bali to see when class ends — Emergency Unlock is
+   Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency Unlock is
    always there." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
    a blocked app says the same — the new bell is Bali's to show.
 2. **After Emergency Unlock: no shield.** **Emergency Unlock**: every app opens, with no shield at

@@ -13,7 +13,7 @@ struct ShieldWordsTests {
         #expect(app.title == "Focused with Bali")
         #expect(
             app.subtitle
-                == "This app is paused for class. Calls, FaceTime, Messages and Emergency SOS always work. Open Bali to see when class ends — Emergency Unlock is always there."
+                == "This app is paused for class. Calls, FaceTime, Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency Unlock is always there."
         )
         let website = ShieldWords(over: .website)
         #expect(website.title == "Focused with Bali")
