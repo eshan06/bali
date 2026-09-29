@@ -156,8 +156,8 @@ private struct Ring: View {
 /// D1's Emergency Unlock: warm orange and round — never red — always there while the shields are.
 /// Held for a second it unlocks, a finger drifting up to a touch target's width; let go early,
 /// nothing happens and its progress springs back (the design system's spring) — under Reduce
-/// Motion none is drawn, never a ring that looks done a second early. VoiceOver's own action
-/// unlocks in one step, and Voice Control knows it by the words on it too.
+/// Motion a still pressed look instead, never a ring that looks done a second early. VoiceOver's
+/// own action unlocks in one step, and Voice Control knows it by the words on it too.
 struct UnlockControl: View {
     let unlock: () -> Void
     @State private var holding = false
@@ -169,7 +169,7 @@ struct UnlockControl: View {
             Image(systemName: "lock.open").font(.system(size: 20, weight: .semibold))
                 .frame(width: 44, height: 44).background(Theme.card, in: .circle)
                 .overlay {
-                    Circle().trim(from: 0, to: holding ? 1 : 0)
+                    Circle().trim(from: 0, to: holding && !reduceMotion ? 1 : 0)
                         .stroke(look.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
@@ -180,11 +180,11 @@ struct UnlockControl: View {
         .multilineTextAlignment(.center).foregroundStyle(look.ink)
         .padding(10).frame(minHeight: 64)
         .background(look.fill, in: .capsule)
+        .opacity(holding && reduceMotion ? 0.7 : 1)
         .onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock) { pressing in
-            guard !reduceMotion else { return }
             let motion: Animation =
                 pressing ? .linear(duration: 1) : .timingCurve(0.34, 1.3, 0.64, 1, duration: 0.3)
-            withAnimation(motion) { holding = pressing }
+            withAnimation(reduceMotion ? nil : motion) { holding = pressing }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Emergency Unlock. Your teacher will see it.")
