@@ -7,9 +7,14 @@ collects), plus Bali's design tooling at the end.
 
 **Scope: user-facing UI only.** That means the portal's pages and components
 (`apps/web/src/app`, `apps/web/src/components`), the student app's screens
-(`ios/Bali/UI`), the shield (`ios/BaliShield`), a future demo site, and the
-words any of them show. It never covers the API, `packages/`, `apps/web/src/lib`
-or the iOS engine and outbox.
+(`ios/Bali/UI`), the shield (`ios/BaliShield`), a future demo site, and
+**user-facing strings wherever they live**. Several live outside those
+folders: `ios/BaliOutbox/Sources/BaliOutbox/` (`ShieldWords.swift`, and the
+`words` in `Screen.swift` and `Join.swift`, sign-in's included), and
+`apps/web/src/lib/errors.ts` and `grid-state.ts` (the grid's notes). Their
+voice follows this file; their logic does not. It never covers the API,
+`packages/`, or `apps/web/src/lib` and the iOS engine and outbox beyond those
+strings.
 
 **Sources, and who wins.** The source of truth is the
 [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
@@ -22,8 +27,14 @@ side effect of a PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`). The portal does not yet: it is Tailwind v4 with
-its defaults and a system font. Bringing the tokens into the portal is a later
-planned step.
+its defaults (slate neutrals, a system font, no icon set) and follows the
+phone's or computer's dark mode (`color-scheme: light dark`, `dark:` classes).
+Bringing the tokens into the portal is a later planned step. **Until then,
+portal work keeps its current Tailwind styling** (dark variants included) and
+follows the rules here that need no tokens: what each colour means, a state
+never shown by colour alone (colour + label today; icons come with the icon
+set), the motion budget, the voice and sentence case. It adds no token layer,
+font or icon set on the way.
 
 ## 1. Visual theme and atmosphere
 
@@ -43,9 +54,10 @@ honesty without harshness.
   shadow blacks. Never blue-grey, never pure black, never acid green.
 
 Density: the teacher's live grid is dense (many students at a glance); the
-student app is airy and simple. Theme: **light**. D1 was approved light-only,
-and the app renders light in every appearance. The tokens carry designed dark
-values, unused until a plan step adopts them.
+student app is airy and simple. Theme: **light** for the app and the shield:
+D1 was approved light-only, and the app renders light in every appearance. The
+portal follows the device's dark mode today (above). The tokens carry designed
+dark values, unused until a plan step adopts them.
 
 ## 2. Colour palette and roles
 
@@ -70,29 +82,42 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 | Countdown arc | `arc-fill` / `arc-track` / `arc-final2` | green-600 / stone-200 / green-400 |
 | Focus ring | `focus-ring-color` | green-600 `#2C6F51` |
 
-**The seven states** are the heart of the product: every surface shows a
-student with the same chip, always colour + icon + label, never colour alone.
+**The states** are the heart of the product: every surface shows a student's
+state with a chip, always colour + icon + label, never colour alone. The design
+system names seven states in its own (v2) ids; Bali's code has its own. Build
+from the code's states, never the design system's ids: `@bali/shared`'s
+`PARTICIPATION_STATES` and `DisplayState` (ARCHITECTURE rule 2), and the
+portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 
-| State | Label | Tokens | Icon (lucide / SF Symbol) |
-| --- | --- | --- | --- |
-| not_joined | "Not in" | `state-notjoined-*` | circle / circle |
-| focused | "Focused" | `state-focused-*` | circle-check / checkmark.circle.fill |
-| pass | "Pass" | `state-pass-*` | ticket / ticket |
-| emergency_unlocked | "Unlocked" | `state-emergency-*` | lock-open / lock.open |
-| revoked | "Permission off" | `state-revoked-*` | shield-off / shield.slash |
-| no_device | "No device" | `state-nodevice-fg`, dashed `border-default`, no fill | smartphone / iphone.slash |
-| ended | "Ended" | `state-ended-*` | flag / flag |
+| Bali state (code) | Design-system state | Tokens | Icon (lucide / SF Symbol) | Words today |
+| --- | --- | --- | --- | --- |
+| `focused` | focused | `state-focused-*` | circle-check / checkmark.circle.fill | "Focused" |
+| `unlocked` | emergency_unlocked | `state-emergency-*` | lock-open / lock.open | "Unlocked" |
+| `protection_off` | revoked | `state-revoked-*` | shield-off / shield.slash | grid "Protection off"; app "Screen Time off" |
+| `ended` | ended | `state-ended-*` | flag / flag | grid "Left" |
+| `silent` (derived, never stored) | none: the design system has staleness as a badge only | none yet | none yet | grid "Silent" |
+| grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
+| grid `left_unprotected`, `left_protection_off` | none | red today (see the colour rules) | none yet | "Left · unlocked", "Left · protection off" |
+| grid `unknown` | none | none yet | none yet | "Unknown · refresh" |
+| none in v3 | pass (passes became an unlock's reason at launch) | `state-pass-*`, unused | ticket / ticket | none |
+| none in v3 | no_device | `state-nodevice-*`, unused | smartphone / iphone.slash | none |
 
 The words for a state are decided per surface, and several are owner rulings
-(`docs/PLAN.md`, `docs/DECISIONS.md`): the portal's grid says "Protection off",
-the student app says "Screen Time off". Staleness ("last seen 4m ago") is a
-badge on any state, never a state of its own, and never a reason to keep
-showing green.
+(`docs/PLAN.md`, `docs/DECISIONS.md`): the grid's "Protection off" is the app's
+"Screen Time off" (the owner's 2026-09-27 ruling replaced D1's "Permission
+off"). `silent` is a real display state, derived from the last check-in and
+never stored (data-model decision 7), so it is never green; staleness short of
+silence ("last seen 4m ago") is a badge on any state. The rows marked "none
+yet" get their look in the design step (D2, `docs/PLAN.md`).
 
 **Colour rules (law):**
 
 - **Red is reserved** for exactly two things: the revoked (protection off)
-  state and destructive actions. Nowhere else, ever.
+  state and destructive actions. **One shipped exception is open:** the grid's
+  "Left · unlocked" and "Left · protection off" chips are red on purpose
+  (`apps/web/src/components/live-grid.tsx`, ISSUES #2: a phone left unshielded
+  and off the roster must not read as the quiet "Left"). The owner settles it
+  in D2; don't recolour them before then.
 - **Emergency is warm orange**, never red: the unlock is allowed, and the
   colour must say so.
 - **Blue belongs to passes** and nothing else.
@@ -132,13 +157,17 @@ showing green.
   `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
 - **Destructive button:** `action-destructive-*`, only for removing a student
   or deleting a class.
-- **Emergency Unlock control:** warm orange, `radius-full`, a hold-to-release
-  spring-back (the `spring` easing). Always reachable when the shields are on.
-- **Card:** `surface-card`, `radius-lg`, `shadow-1`, 20 pt padding on iOS
-  (D1). Use a card only when elevation means hierarchy; otherwise group with
-  spacing or a hairline.
+- **Emergency Unlock control:** one tap, always (ARCHITECTURE: the one-tap
+  sanctioned exit); never a hold, a confirmation or a delay in front of it.
+  Warm orange, `radius-full`; the `spring` easing is only its press feedback,
+  springing back on release. Always reachable when the shields are on.
+- **Card:** `surface-card`, `shadow-1`; `radius-md` and `space-4` padding per
+  the tokens (the web), and D1's `radius-lg` with 20 pt padding on iOS. Use a
+  card only when elevation means hierarchy; otherwise group with spacing or a
+  hairline.
 - **State chip:** the state's fill and ink, its icon, the `label` style in
-  uppercase, 6 × 12 padding, `radius-md`.
+  uppercase, `radius-md`; padding `space-2` × `space-3` per the tokens (the
+  web), and D1's 6 × 12 pt on iOS.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
   focus shows the focus ring.
 - **The mark:** the session arc as emblem: a green-200 track ring and a
@@ -230,8 +259,9 @@ design if it has one. Then:
 - **Use tokens, never raw values.** A value the tokens lack is a question for
   the owner, not an invention.
 - **Look before shipping** (web): run the portal (`npm run dev -w @bali/web`),
-  take a Playwright screenshot of the changed page, and check it against this
-  file.
+  screenshot the changed page with the `playwright` CLI (installed in cloud
+  sessions; elsewhere `npx playwright`), and check it against this file.
+  Never add Playwright to a `package.json` for this.
 - **Run the checks** listed under Design tooling before `/santa-loop`.
 
 Example prompts that fit this system:

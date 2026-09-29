@@ -96,12 +96,13 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,
   `apps/web/src/components`), `ios/Bali/UI`, the shield (`ios/BaliShield`), a
-  demo site, and the words they show. Read `docs/DESIGN.md` first, then design
-  and build with the `design-taste-frontend` skill; `/santa-loop` runs
-  `web-design-guidelines` on the portal's UI (WARNs only). The design skills
-  never apply to the API, `packages/`, `apps/web/src/lib` or the iOS engine.
-  Restyling an approved screen is a planned design step with the owner's
-  sign-off, never a side effect of a skill's advice.
+  demo site, and user-facing strings wherever they live (DESIGN.md lists
+  where). Read `docs/DESIGN.md` first, then design and build with the
+  `design-taste-frontend` skill; `/santa-loop` runs `web-design-guidelines` on
+  the portal's UI (WARNs only). The design skills never apply to the API,
+  `packages/`, or `apps/web/src/lib` and the iOS engine beyond their
+  user-facing strings. Restyling an approved screen is a planned design step
+  with the owner's sign-off, never a side effect of a skill's advice.
 - **Found a critical or recurring issue?** First make it impossible to hit
   again: a regression test, a CI check, or a rule in this file — in that
   order. Only a trap that fits none of those (environment quirks, process

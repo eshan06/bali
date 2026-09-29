@@ -5,7 +5,7 @@ description: 'Bali style option, for comparison on a design canvas only; user-fa
 
 > **Bali, read this first.** Copied from Leonxlnx/taste-skill@ce26fc25c0e5e8cab638f883de62d9a86ee5e45b, `skills/minimalist-skill/SKILL.md` (MIT, `LICENSE` beside this file). Only this block and the `description` line differ from upstream.
 >
-> - **Scope: user-facing UI only: the portal's pages and components (`apps/web/src/app`, `apps/web/src/components`), the student app's screens (`ios/Bali/UI`), the shield (`ios/BaliShield`) and a future demo site. Never the API, `packages/`, `apps/web/src/lib` or the iOS engine and outbox.**
+> - **Scope: user-facing UI only: the portal's pages and components (`apps/web/src/app`, `apps/web/src/components`), the student app's screens (`ios/Bali/UI`), the shield (`ios/BaliShield`), a future demo site, and user-facing strings wherever they live (`docs/DESIGN.md` lists where). Never the API, `packages/`, or `apps/web/src/lib` and the iOS engine and outbox beyond those strings.**
 > - **`docs/DESIGN.md` wins.** Bali's tokens, type, motion budget, state colours and voice hold wherever this skill says otherwise; changing DESIGN.md is the owner's call, made on a design canvas.
 > - **Never restyle an approved screen on this skill's say-so.** A redesign is a planned design step with the owner's sign-off (`docs/PLAN.md`).
 > - **CLAUDE.md still rules:** no new dependency (animation library, font, icon set, component kit) without a plan step that names it; every error path says something honest with a way to retry; tests and every CI gate as always.
