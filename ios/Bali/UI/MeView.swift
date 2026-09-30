@@ -230,7 +230,7 @@ struct LeaveQuestion: View {
             Text(held).textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.bottom, 12)
-        } else if leaving.asking?.id == row.id {
+        } else if leaving.asks(row) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(Leaving.question(row))
                     .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))

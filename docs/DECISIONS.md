@@ -16,9 +16,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the student's own leave stays calm, in the secondary button, not the destructive red DESIGN.md
   keeps for removing a student and deleting a class. Said to VoiceOver as it appears. **Its
   rules** (`Leaving`, on Linux): one leave at a time; one event id while it is the same
-  enrollment's, so a try after no answer is its replay (rule 4); an answer to a leave the
-  question did not send, dropped; a class named with no enrollment id (an older API's) shows no
-  Leave. **Through the engine** (`SyncEngine.leave`): the class gone from `me` at once, and the
+  enrollment's, so a try after no answer is its replay (rule 4); the question shown under the
+  enrollment it was asked about, so a class joined again since shows none (santa's round 1); an
+  answer to a leave the question did not send, dropped; a class named with no enrollment id (an
+  older API's) shows no Leave. **Through the engine** (`SyncEngine.leave`): the class gone from `me` at once, and the
   truth read again after any answer, the `meChanges` guard keeping an older read from bringing
   it back. **In session:** held, dimmed with the reason, while the phone stands in that class's
   lesson by its own clock (`Leaving.held`). The phone knows only its own lesson — `/v1/me` names

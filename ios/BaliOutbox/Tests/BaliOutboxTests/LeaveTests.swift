@@ -37,7 +37,7 @@ private func row(_ id: String, _ name: String, enrolled: Bool = true) throws -> 
 private let (unreachable, generic, lost) = (
     "Can't reach the server. Check your connection and try again.",
     "Something went wrong at Bali. Try again in a moment.",
-    "Bali couldn't find you in this class. Your classes are being read again."
+    "Bali couldn't find you in this class. It's checking your classes again."
 )
 
 @Suite("Leaving a class (C6c)")
@@ -81,6 +81,21 @@ struct LeaveTests {
         leaving.ask(p3)
         leaving.cancel()
         #expect(leaving.asking == p5 && leaving.busy)
+    }
+
+    @Test(
+        "The question shows under the enrollment it was asked about (santa's round 1): the same class joined again since is another enrollment, which shows none — its Leave class would send the old one's leave, answered as already out — and a class with no enrollment id never shows it"
+    )
+    func asks() throws {
+        var leaving = Leaving()
+        let p3 = try row("3", "Period 3")
+        leaving.ask(p3)
+        #expect(leaving.asks(p3))
+        let rejoined = try BaliJSON.makeDecoder().decode(
+            MeClass.self, from: Data(#"{"id":"3","name":"Period 3","enrollmentId":"e9"}"#.utf8))
+        let (unenrolled, p5) = (try row("3", "Period 3", enrolled: false), try row("5", "Period 5"))
+        #expect(!leaving.asks(rejoined) && !leaving.asks(unenrolled))
+        #expect(!leaving.asks(p5) && !Leaving().asks(p3))
     }
 
     @Test(

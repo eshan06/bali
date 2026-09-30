@@ -153,6 +153,13 @@ public struct Leaving: Sendable, Hashable {
         (asking, failure) = (row, nil)
     }
 
+    /// Whether the question shows under `row`: asked about its enrollment. A class joined again
+    /// since is another enrollment, which shows none (santa's round 1): Leave class would send the
+    /// old one's leave, answered as already out.
+    public func asks(_ row: MeClass) -> Bool {
+        asking?.enrollmentId != nil && asking?.enrollmentId == row.enrollmentId
+    }
+
     /// Cancel: no question — once a leave under way has its answer.
     public mutating func cancel() {
         guard !busy else { return }
@@ -218,7 +225,7 @@ public struct Leaving: Sendable, Hashable {
         switch reason {
         case .classInSession?: inSession(row)
         case .enrollmentNotFound?, .enrollmentNotYours?, .unknownUser?:
-            "Bali couldn't find you in this class. Your classes are being read again."
+            "Bali couldn't find you in this class. It's checking your classes again."
         default: Joining.words(result, nil)
         }
     }
