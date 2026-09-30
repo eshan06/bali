@@ -183,6 +183,10 @@ public struct Refusal: Sendable, Hashable {
     public let status: Int?
     public let reason: ApiErrorReason?
     public let message: String?
+
+    public init(change: Change, status: Int?, reason: ApiErrorReason?, message: String?) {
+        (self.change, self.status, self.reason, self.message) = (change, status, reason, message)
+    }
 }
 
 /// A late unlock's session, and whether it went with the phone's order (A12): with one, the return

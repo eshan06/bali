@@ -113,21 +113,13 @@ struct UnlockedView: View {
     /// What did not go through, told to VoiceOver too: its focus stays on the button (rule 5).
     private func announce(_ words: String) { AccessibilityNotification.Announcement(words).post() }
 
-    /// Back to focus — or, where protection off was reported here, the block's scan — and D1's line.
+    /// Back to focus — or, where protection off was reported here or Back to focus was refused, the
+    /// block's scan — and D1's line.
     private func back(_ words: UnlockedWords) -> some View {
         VStack(spacing: 12) {
             if let retap = words.retap {
                 Text(retap).textStyle(.body)
-                Button {
-                    Task {
-                        await phone.tapIn()
-                        if let failed = phone.tapFailed { announce(failed) }
-                    }
-                } label: {
-                    Label(phone.scanning ? "Scanning…" : "Tap in", systemImage: "wave.3.right")
-                }
-                .buttonStyle(PrimaryButtonStyle()).disabled(phone.scanning)
-                if let tapFailed = phone.tapFailed { Text(tapFailed).textStyle(.body) }
+                TapIn(phone: phone)
             } else {
                 Button("Back to focus") {
                     Task {
@@ -145,6 +137,27 @@ struct UnlockedView: View {
             .textStyle(.caption).foregroundStyle(Theme.textTertiary).padding(.horizontal, 8)
             .multilineTextAlignment(.leading)
         }
+    }
+}
+
+/// Tap in, the block's scan (`Phone.tapIn`), where a re-tap is the way back to focus (C5a, C5b) —
+/// and why the last scan recorded no tap, told to VoiceOver too (rule 5).
+struct TapIn: View {
+    let phone: Phone
+
+    var body: some View {
+        Button {
+            Task {
+                await phone.tapIn()
+                if let failed = phone.tapFailed {
+                    AccessibilityNotification.Announcement(failed).post()
+                }
+            }
+        } label: {
+            Label(phone.scanning ? "Scanning…" : "Tap in", systemImage: "wave.3.right")
+        }
+        .buttonStyle(PrimaryButtonStyle()).disabled(phone.scanning)
+        if let failed = phone.tapFailed { Text(failed).textStyle(.body) }
     }
 }
 

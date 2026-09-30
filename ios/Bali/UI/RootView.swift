@@ -1,5 +1,6 @@
 import BaliOutbox
 import SwiftUI
+import UIKit
 
 /// The student app's one root: the screen `Screen.choose` picks from what the phone knows
 /// (`Phone.screen`), light in every appearance — D1 is light. A screen a later step draws shows a
@@ -11,8 +12,9 @@ struct RootView: View {
         @State private var readout = false
     #endif
 
-    /// The last bell rung: at a bell nothing Unlocked (or Protection off) watches changes, as
-    /// Focus's shields do, so the router is asked again then (C1a's hand-off).
+    /// The last bell rung: at a bell nothing Unlocked or Protection off watches changes, as
+    /// Focus's shields do, so the router is asked again then (C1a's hand-off) — by the phone's
+    /// clock, as the router reads it, set forward past the bell too (C5b).
     @State private var rung: Date?
 
     var body: some View {
@@ -21,10 +23,7 @@ struct RootView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { if phone.tabbed { TabBar(phone: phone) } }
             .task(id: phone.bell) {
                 guard let bell = phone.bell else { return }
-                // By the phone's clock, as the router reads it: set back meanwhile, it sleeps on.
-                while bell.timeIntervalSinceNow > 0, !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(bell.timeIntervalSinceNow))
-                }
+                await Screen.bell(bell, change: UIApplication.significantTimeChangeNotification)
                 if !Task.isCancelled { rung = bell }
             }
             .preferredColorScheme(.light)
@@ -53,8 +52,8 @@ struct RootView: View {
         case .waiting: WaitingView(phone: phone)
         case .focus: FocusView(phone: phone)
         case .unlocked: UnlockedView(phone: phone)
-        case .protectionOff: StepPlaceholder("Protection off — C5")
-        case .sessionOver: StepPlaceholder("Session over — C5")
+        case .protectionOff: ProtectionOffView(phone: phone)
+        case .sessionOver: SessionOverView(phone: phone)
         case .history: HistoryView(phone: phone)
         // A placeholder, as every screen not drawn yet, so the tab bar is D1's whole one and C6b
         // changes this line alone.

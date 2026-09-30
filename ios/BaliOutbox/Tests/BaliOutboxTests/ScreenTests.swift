@@ -7,18 +7,20 @@ import Testing
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
 /// and checked (never read approved before, `everApproved`), the engine standing `standing` with
 /// `queued`, and Home's tab chosen, unless said otherwise — nil for a sign-in, an enforcer or an
-/// engine that has not spoken.
+/// engine that has not spoken. The permission is judged off as the enforcer judges it: denied at
+/// once, not determined only where `permissionOff` says it has lasted past B5a-2's grace.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
-    permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
-    everApproved: Bool = false, standing: Standing? = .out, queued: [OutboxRecord] = [],
-    hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, opened: [Screen] = [],
-    tab: Screen = .home, now: Date = t0
+    permission: Permission? = .approved, permissionOff: Bool? = nil, checked: Bool = true,
+    shielded: Bool = false, everApproved: Bool = false, standing: Standing? = .out,
+    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, sessionOverClosed: String? = nil,
+    opened: [Screen] = [], tab: Screen = .home, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
         protection = Protection()
         protection?.permission = permission
+        protection?.permissionOff = permissionOff ?? (permission == .denied)
         protection?.checked = checked
         protection?.shielded = shielded
     }
@@ -31,7 +33,7 @@ private func screen(
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
         everApproved: everApproved, sync: sync, hasClasses: hasClasses,
-        lastSessionOver: lastSessionOver, opened: opened, tab: tab, now: now)
+        sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: now)
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -94,14 +96,15 @@ struct ScreenTests {
     }
 
     @Test(
-        "In a running session: unlocked and protection off have their screens, whatever the permission reads — taken back mid-session, the check reports protection off, whose screen says how back; a state this build does not know is home — never focus, never unlocked"
+        "In a running session: unlocked and protection off have their screens — never Screen Time's, however the permission reads: taken back mid-session (denied is judged off at once), protection off's, whose screen says how back; a state this build does not know is home — never focus, never unlocked"
     )
     func inSession() {
         #expect(screen(standing: .inSession(session(), .focused)) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked)) == .unlocked)
         #expect(screen(standing: .inSession(session(), .protectionOff)) == .protectionOff)
         #expect(screen(standing: .inSession(session(), nil)) == .home)
-        #expect(screen(permission: .denied, standing: .inSession(session(), .unlocked)) == .unlocked)
+        #expect(
+            screen(permission: .denied, standing: .inSession(session(), .unlocked)) == .protectionOff)
         #expect(
             screen(permission: .denied, standing: .inSession(session(), .protectionOff))
                 == .protectionOff)
@@ -109,24 +112,62 @@ struct ScreenTests {
     }
 
     @Test(
-        "The bell rung by the phone's own clock (decision 6), no read yet: the shields are off, so home — never focus, unlocked or protection off over them — and Screen Time when the permission is not approved; a second before it, the session's screen"
+        "In a running session, the permission judged off — denied, or not determined past B5a-2's grace — is Protection off, whose screen says how back (Settings, then a re-tap), whatever the standing says before the check's report lands: unlocked, or a state this build does not know (C5b). Focus still wins where the enforcer keeps the shields — Emergency Unlock is there — and so does Home over the last run's; a read not determined within the grace changes nothing; the grant screen only outside a session"
+    )
+    func permissionOffInSession() throws {
+        let states: [ParticipationState?] = [.unlocked, .protectionOff, nil]
+        for state in states {
+            let standing = Standing.inSession(session(), state)
+            for permission in [Permission.denied, .notDetermined] {
+                #expect(
+                    screen(permission: permission, permissionOff: true, standing: standing)
+                        == .protectionOff, "\(permission) \(String(describing: state))")
+            }
+        }
+        let unlocked = Standing.inSession(session(), .unlocked)
+        #expect(screen(permission: .notDetermined, standing: unlocked) == .unlocked)
+        let unknown = Standing.inSession(session(), nil)
+        #expect(screen(permission: .notDetermined, everApproved: true, standing: unknown) == .home)
+        let focused = Standing.inSession(session(), .focused)
+        #expect(screen(permission: .denied, standing: focused) == .focus)
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .tap(tagId: "tag"))
+        #expect(
+            screen(
+                permission: .denied, standing: .inSession(session(), .protectionOff),
+                queued: try outbox.records()) == .focus)
+        #expect(screen(permission: .denied, shielded: true, standing: .unread) == .home)
+        for standing in [Standing.out, .waiting, .inSession(session(), .protectionOff)] {
+            #expect(
+                screen(permission: .denied, standing: standing, now: at(3000)) == .screenTime,
+                "\(standing)")
+        }
+    }
+
+    @Test(
+        "The bell rung by the phone's own clock (decision 6), no read yet: session over (C5b) — never focus, unlocked or protection off over shields that are off, whatever the classes — until the student closes it: home, the next session's own again; Screen Time first when the permission is not approved; a second before it, the session's screen"
     )
     func bellRung() {
         for state in [ParticipationState.focused, .unlocked, .protectionOff] {
             let standing = Standing.inSession(session(), state)
-            #expect(screen(standing: standing, now: at(3000)) == .home, "\(state)")
-            #expect(screen(standing: standing, now: at(9000)) == .home, "\(state)")
+            #expect(screen(standing: standing, now: at(3000)) == .sessionOver, "\(state)")
+            #expect(screen(standing: standing, now: at(9000)) == .sessionOver, "\(state)")
+            #expect(
+                screen(standing: standing, sessionOverClosed: "s", now: at(3000)) == .home,
+                "\(state)")
             #expect(
                 screen(permission: .denied, standing: standing, now: at(3000)) == .screenTime,
                 "\(state)")
         }
+        let next = Standing.inSession(session("t"), .unlocked)
+        #expect(screen(standing: next, sessionOverClosed: "s", now: at(3000)) == .sessionOver)
         #expect(screen(standing: .inSession(session(), .focused), now: at(2999)) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked), now: at(2999)) == .unlocked)
         #expect(
             screen(standing: .inSession(session(), .protectionOff), now: at(2999)) == .protectionOff)
         #expect(
             screen(standing: .inSession(session(), .focused), hasClasses: false, now: at(3000))
-                == .home)
+                == .sessionOver)
     }
 
     @Test(
@@ -143,26 +184,25 @@ struct ScreenTests {
     }
 
     @Test(
-        "Out of any session: home — join once the phone knows it has no classes, and session over while one just ended, whatever its classes; only out"
+        "Out of any session: home — join once the phone knows it has no classes; never session over, whose screen leaves by itself once a read says where the phone stands (C5b)"
     )
     func out() {
         #expect(screen() == .home)
         #expect(screen(hasClasses: true) == .home)
         #expect(screen(hasClasses: false) == .join)
-        #expect(screen(lastSessionOver: session()) == .sessionOver)
-        #expect(screen(hasClasses: false, lastSessionOver: session()) == .sessionOver)
-        #expect(screen(standing: .waiting, lastSessionOver: session()) == .waiting)
+        #expect(screen(sessionOverClosed: "s") == .home)
         #expect(screen(standing: .unread, hasClasses: false) == .home)
     }
 
     @Test(
-        "The screens the student opened over another (C3), in order: Join over Home — wherever Home is chosen, past the bell too — and Home over Waiting, then Join over that Home (santa's round 1: Join fell back to Waiting there); each only over the one under it, so never over anything else: the shields, a session's own screens, session over, Screen Time, the sign-in, the intro, nor the home the last run's shields keep over a standing not read (B6b)"
+        "The screens the student opened over another (C3), in order: Join over Home — wherever Home is chosen, past the bell too once session over is closed — and Home over Waiting, then Join over that Home (santa's round 1: Join fell back to Waiting there); each only over the one under it, so never over anything else: the shields, a session's own screens, session over, Screen Time, the sign-in, the intro, nor the home the last run's shields keep over a standing not read (B6b)"
     )
     func opened() {
         #expect(screen(hasClasses: true, opened: [.join]) == .join)
         #expect(screen(opened: [.join]) == .join)
         let rung = Standing.inSession(session(), .focused)
-        #expect(screen(standing: rung, opened: [.join], now: at(3000)) == .join)
+        #expect(screen(standing: rung, sessionOverClosed: "s", opened: [.join], now: at(3000)) == .join)
+        #expect(screen(standing: rung, opened: [.join], now: at(3000)) == .sessionOver)
         #expect(screen(standing: .waiting, opened: [.home]) == .home)
         #expect(screen(standing: .waiting, opened: [.home, .join]) == .join)
         #expect(screen(standing: .waiting, opened: [.join]) == .waiting)
@@ -172,7 +212,6 @@ struct ScreenTests {
         #expect(screen(hasClasses: true, opened: [.focus]) == .home)
         #expect(screen(standing: .inSession(session(), .focused), opened: [.join]) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked), opened: [.join]) == .unlocked)
-        #expect(screen(lastSessionOver: session(), opened: [.join]) == .sessionOver)
         #expect(screen(permission: .denied, standing: .waiting, opened: [.home]) == .screenTime)
         #expect(screen(signedIn: false, opened: [.join]) == .signIn)
         #expect(screen(introSeen: false, opened: [.join]) == .intro)
@@ -181,7 +220,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "D1's tab bar (C6a): History or Me in place of the router's own Home — out, not read, past the bell, a state not known — and Home's tab is Home; nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it, Join (its own, or opened over Home), session over, Screen Time, the sign-in, the intro, starting, nor the home the last run's shields keep over a standing not read (B6b)"
+        "D1's tab bar (C6a): History or Me in place of the router's own Home — out, not read, past the bell once session over is closed (C5b), a state not known — and Home's tab is Home; nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it, Join (its own, or opened over Home), session over, Screen Time, the sign-in, the intro, starting, nor the home the last run's shields keep over a standing not read (B6b)"
     )
     func tabs() {
         for tab in [Screen.history, .me] {
@@ -189,7 +228,8 @@ struct ScreenTests {
             #expect(screen(hasClasses: true, tab: tab) == tab)
             #expect(screen(standing: .unread, tab: tab) == tab)
             let rung = Standing.inSession(session(), .focused)
-            #expect(screen(standing: rung, tab: tab, now: at(3000)) == tab)
+            #expect(screen(standing: rung, sessionOverClosed: "s", tab: tab, now: at(3000)) == tab)
+            #expect(screen(standing: rung, tab: tab, now: at(3000)) == .sessionOver)
             #expect(screen(standing: .inSession(session(), nil), tab: tab) == tab)
             #expect(screen(standing: .inSession(session(), .focused), tab: tab) == .focus)
             #expect(screen(standing: .inSession(session(), .unlocked), tab: tab) == .unlocked)
@@ -199,7 +239,6 @@ struct ScreenTests {
             #expect(screen(standing: .waiting, opened: [.home], tab: tab) == .home)
             #expect(screen(opened: [.join], tab: tab) == .join)
             #expect(screen(hasClasses: false, tab: tab) == .join)
-            #expect(screen(lastSessionOver: session(), tab: tab) == .sessionOver)
             #expect(screen(permission: .denied, tab: tab) == .screenTime)
             #expect(screen(signedIn: false, tab: tab) == .signIn)
             #expect(screen(introSeen: false, tab: tab) == .intro)
@@ -386,7 +425,7 @@ struct ScreenTests {
         #expect(
             screen(
                 permission: .notDetermined, everApproved: true,
-                standing: .inSession(session(), .focused), now: at(3000)) == .home)
+                standing: .inSession(session(), .focused), now: at(3000)) == .sessionOver)
         #expect(screen(permission: .denied, everApproved: true) == .screenTime)
         #expect(screen(permission: .notDetermined, everApproved: false) == .screenTime)
         #expect(screen(permission: .notDetermined, checked: false, everApproved: true) == .starting)
@@ -471,5 +510,48 @@ struct TapInTests {
         #expect(await rig.engine.tapIn(.block("T7XK2M9QPF")) == BlockRead.notKept)
         try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
         await rig.stop()
+    }
+}
+
+/// The phone's clock as the bell's wait reads it: a test clock's time, each read counted. The wait
+/// reads it first once its observer is registered (`Screen.bell`), then at each look.
+private final class Reads: @unchecked Sendable {
+    let clock = TestClock()
+    private let lock = NSLock()
+    private var count = 0
+
+    func now() -> Date {
+        lock.withLock { count += 1 }
+        return clock.now()
+    }
+
+    var reads: Int { lock.withLock { count } }
+}
+
+@Suite("The bell, where the router chooses again (C5a, C5b)", .timeLimit(.minutes(3)))
+struct BellRedrawTests {
+    @Test(
+        "Slept towards by the phone's own clock, and looked at again whenever iOS says the time was set: a clock set forward past the bell ends the wait at once — a sleep counts only the time that passes, and waited out the time left (C5a's review) — while a change short of it does not; the bell reached by sleeping ends it, and so does a cancel"
+    )
+    func timeSet() async throws {
+        let (center, change, reads) = (NotificationCenter(), Notification.Name("time set"), Reads())
+        await Screen.bell(Date() + 0.05, change: change, center: center)
+        let cancelled = Task { await Screen.bell(Date() + 3600, change: change, center: center) }
+        cancelled.cancel()
+        await cancelled.value
+        let bell = at(3600)
+        // A child task, so the suite's time limit cancels a wait that never ends: the test fails.
+        async let rung: Date = {
+            await Screen.bell(bell, change: change, center: center) { reads.now() }
+            return reads.clock.now()
+        }()
+        // Read once, its observer is registered: a change posted now is seen, and looked at — a
+        // second read — short of the bell, which ends nothing (santa's review: no timing).
+        try await eventually { reads.reads >= 1 }
+        center.post(name: change, object: nil)
+        try await eventually { reads.reads >= 2 }
+        reads.clock.turn(by: 3600)
+        center.post(name: change, object: nil)
+        #expect(await rung >= bell)
     }
 }

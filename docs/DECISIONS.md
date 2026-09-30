@@ -8,6 +8,45 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C5b: the Protection off and Session over screens, and the router around
+  them.** **The permission gate:** the brief's red case — a permission not approved routing to the
+  grant screen ahead of a running session's standing — was already closed on `main`: C1a's santa
+  round put a session's unlocked and protection off ahead of the permission (its entry, below).
+  What was left: the permission judged off (`Protection.permissionOff`: denied, or not determined
+  past B5a-2's grace) over a standing not yet protection off — unlocked, or a state this build
+  does not know — which showed Unlocked or Home until the check's report landed, and for good where
+  the report could not be queued. **Decided:** Protection off there, red first
+  (`ScreenTests.permissionOffInSession`). Focus stays first where the enforcer keeps the shields
+  (its screen already says Screen Time is off, C4, until the report lands), and so does Home over
+  the last run's shields (B6b). Not Unlocked: its Back to focus is a dead end with the permission
+  off — the refocus returns to no shield, and once the report lands it is refused (A2).
+  **Session over:** from the bell by the phone's own clock, while no read has said where the phone
+  stands, until the student closes it (Done) — the brief's "leaves by itself once read or
+  dismissed". A read saying out is Home, never Session over: out, the phone cannot tell a class that
+  ended from a removal or a switch, where "Class is over" would be false. So C1a's never-fed
+  `lastSessionOver` input is replaced by `sessionOverClosed`, the session whose Session over the
+  student closed; the grant screen still comes first past the bell, which is outside a session.
+  Cost, disclosed: in the foreground Session over lasts until a check-in finds the session gone
+  (the sweep runs every minute, A15), about one to two minutes, then Home by itself; at a launch
+  past the bell, until the first read. **Protection off's way on follows what rule 3's check
+  verified** (santa's round 1): D1 draws the permission off — Settings where it is denied, and
+  iOS's own prompt where it reads not determined past the grace (never given on this phone, or lost
+  with a restored backup, where Settings lists no Bali); once it reads approved again "Screen Time
+  is off" would be false, so the screen says "Screen Time is back on", ticks the first step and
+  makes the re-tap (Tap in) its primary action — not offered while the permission is off, where a
+  tap would put the phone back in focus over no shield and report protection off again; and a read
+  not determined within the grace — a relaunch's moment — claims nothing: "Checking Screen Time…",
+  no way offered yet, as C4's Focus does. "Sees" or "will see" follows C5a's rule for the unlock:
+  the report on the phone, or not made yet, is "will see"; one the check found and could not save
+  (`Protection.unreported`) says so and that Bali keeps trying, since nothing yet makes "will see"
+  true. **A refused Back to focus** (`409 protection_off`, or any refusal the outbox drops) is said
+  where the student lands — Protection off, Unlocked (the re-tap in place of Back to focus, which
+  would only be refused again), the class's Home — until the phone's next change, and only while
+  the phone stands in that class before its bell: after it, "tap your teacher's block" would only
+  arm for the next class (santa's round 1), and the truth read is the answer. Not on Focus, the
+  moment between the refocus acted on and its refusal read back. **The bell wait** wakes at a
+  significant time change too (C5a's review WARN): `Screen.bell`, one helper in BaliOutbox, tested
+  on Linux with its own notification centre, red on the sleep alone.
 - **2026-09-29** — **C6a-2: the History screen as D1 draws it, over C6a-1's rules.** **Read** anew
   from the top each time the student comes to the History tab — `Phone.select` forgets the history
   read at any change of tab, `synced`'s reset to Home included, and the screen reads whenever it

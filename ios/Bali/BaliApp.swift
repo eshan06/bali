@@ -87,6 +87,8 @@ final class Phone {
     /// them, and the history forgotten, so an answer to a read the student has left is dropped.
     private(set) var history = History()
     private(set) var reads = 0
+    /// The session whose Session over the student closed (C5b): Home past its bell.
+    private(set) var sessionOverClosed: String?
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -113,7 +115,7 @@ final class Phone {
     #endif
 
     /// The screen to show now: `Screen.choose`, the one place that decides, over what the phone
-    /// knows. A session just over is a later step's (C5): nil until then.
+    /// knows.
     var screen: Screen { chosen(tab: tab) }
 
     /// Whether D1's tab bar shows (C6a): wherever the router honours a tab — so the one place that
@@ -123,8 +125,8 @@ final class Phone {
     private func chosen(tab: Screen) -> Screen {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-            everApproved: everApproved, sync: sync, hasClasses: hasClasses, lastSessionOver: nil,
-            opened: opened, tab: tab, now: Date())
+            everApproved: everApproved, sync: sync, hasClasses: hasClasses,
+            sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: Date())
     }
 
     /// A tab chosen (C6a) — or `synced`'s Home. A change of tab forgets the history read, and any
@@ -172,6 +174,11 @@ final class Phone {
     /// The bell of the session the phone stands in, where the router chooses again (C5a).
     var bell: Date? {
         if case .inSession(let session, _)? = sync?.standing { session.endsAt } else { nil }
+    }
+
+    /// Session over's Done (C5b): Home, until a read says where the phone stands.
+    func closeSessionOver() {
+        if case .inSession(let session, _)? = sync?.standing { sessionOverClosed = session.id }
     }
 
     /// Opens `screen` over what shows.

@@ -20,8 +20,8 @@ public enum Screen: Sendable, Hashable {
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
-    /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `lastSessionOver`, a
-    /// session the phone was in that ended, until the student dismisses it (C5); `opened`, the
+    /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `sessionOverClosed`,
+    /// the session whose Session over the student closed (C5b); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
     /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
     /// the one under it shows, never over anything else; `tab`, the one chosen in D1's tab bar
@@ -30,7 +30,7 @@ public enum Screen: Sendable, Hashable {
     /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
-        everApproved: Bool, sync: SyncState?, hasClasses: Bool?, lastSessionOver: SessionView?,
+        everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: String?,
         opened: [Screen], tab: Screen, now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
@@ -46,7 +46,7 @@ public enum Screen: Sendable, Hashable {
         if !introSeen { return .intro }
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }
-        var shown = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
+        var shown = settled(sync, protection, everApproved, hasClasses, sessionOverClosed, now)
         if shown == .home, opened.isEmpty, tab == .history || tab == .me { return tab }
         for screen in opened {
             switch (shown, screen) {
@@ -60,24 +60,23 @@ public enum Screen: Sendable, Hashable {
     /// The screen of where the phone stands, signed in and its permission checked.
     private static func settled(
         _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ hasClasses: Bool?,
-        _ lastSessionOver: SessionView?, _ now: Date
+        _ sessionOverClosed: String?, _ now: Date
     ) -> Screen {
         switch sync.standing {
         // Not read from the phone yet: home says so, and Emergency Unlock works there (B6b).
         case .unread: return .home
-        // In a session still running: its state's screen, whatever the permission reads — taken
-        // back mid-session, the check reports protection off, whose screen says how back. Focused
-        // is the rule above; a state this build does not know is home — never focus, which the
-        // enforcer does not shield for, and never an unlock the student did not make.
+        // In a session still running: its state's screen — and protection off, whatever the state,
+        // once the check judges the permission off (denied, or not determined past B5a-2's
+        // grace): the check reports it within a moment, and that screen says how back (Settings,
+        // then a re-tap), where Screen Time's would not (C5b). Focused is the rule above; a state
+        // this build does not know is home — never focus, which the enforcer does not shield for,
+        // and never an unlock the student did not make.
         case .inSession(let session, let state) where session.endsAt > now:
-            switch state {
-            case .unlocked?: return .unlocked
-            case .protectionOff?: return .protectionOff
-            default: return .home
-            }
+            if state == .protectionOff || protection.permissionOff { return .protectionOff }
+            return state == .unlocked ? .unlocked : .home
         // No session runs by the phone's clock — the bell rung, no read yet; waiting; out — so the
-        // permission not approved is Screen Time; past the bell, home until a read says where the
-        // phone stands (C5 may say session over).
+        // permission not approved is Screen Time; past the bell, session over until a read says
+        // where the phone stands or the student closes it (C5b).
         case .inSession, .waiting, .out:
             let approved =
                 protection.permission == .approved
@@ -85,11 +84,40 @@ public enum Screen: Sendable, Hashable {
             if !approved { return .screenTime }
             switch sync.standing {
             case .waiting: return .waiting
-            case .out where lastSessionOver != nil: return .sessionOver
+            case .inSession(let session, _) where session.id != sessionOverClosed:
+                return .sessionOver
             case .out where hasClasses == false: return .join
             default: return .home
             }
         }
+    }
+}
+
+extension Screen {
+    /// Returns at `bell` by the phone's own clock, `now` — where the router chooses again (C5a) —
+    /// or once cancelled: slept towards, and looked at again at each `change` posted to `center`,
+    /// iOS saying the time was set. A sleep counts only the time that passes: with the clock set
+    /// forward past the bell, it would wait out the time left (C5a's review).
+    public static func bell(
+        _ bell: Date, change: Notification.Name, center: NotificationCenter = .default,
+        now: @escaping @Sendable () -> Date = Date.init
+    ) async {
+        let (looks, look) = AsyncStream.makeStream(
+            of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        let observer = center.addObserver(forName: change, object: nil, queue: nil) { _ in
+            look.yield()
+        }
+        let sleeper = Task {
+            repeat {
+                try? await Task.sleep(for: .seconds(max(0, bell.timeIntervalSince(now()))))
+                look.yield()
+            } while now() < bell && !Task.isCancelled
+        }
+        defer {
+            sleeper.cancel()
+            center.removeObserver(observer)
+        }
+        for await _ in looks where now() >= bell { return }
     }
 }
 
@@ -128,6 +156,36 @@ extension SyncState {
     /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in
     /// the Join screen's words; nil while none failed.
     public var meWords: String? { meFailed.map { Joining.words($0, nil) } }
+
+    /// What the screen the student lands on says of a Back to focus the server refused — dropped,
+    /// never sent again — with the way back, a re-tap (C5b; rule 5): while the phone stands in that
+    /// class and its bell has not rung by the phone's clock (`now`). Once the class is over for the
+    /// phone the words would be stale (santa's review): nil then, and while none was refused since
+    /// the phone's last change.
+    public func refusedRefocusWords(at now: Date) -> String? {
+        guard case .inSession(let session, _) = standing, session.endsAt > now else { return nil }
+        return refusedRefocus(in: session.id)
+    }
+
+    /// The words for a Back to focus the server refused in `session`, the class the phone stands in.
+    func refusedRefocus(in session: String) -> String? {
+        guard let refused, refused.change == .refocus(session: session) else { return nil }
+        return refused.reason == .protectionOff
+            ? "Bali couldn't take you back to focus, because Screen Time was off during this class. Tap your teacher's block to go back to focus."
+            : "Bali couldn't take you back to focus. Tap your teacher's block to go back, or ask your teacher."
+    }
+
+    /// What Session over says (C5b; D1's SessionOver) of the session the phone stands in, its bell
+    /// rung: the class and when — and that every app is back only once rule 3's check found no
+    /// shield on; nil standing in none.
+    public func sessionOverWords(
+        _ protection: Protection?, time: Date.FormatStyle = .init(date: .omitted, time: .shortened)
+    ) -> String? {
+        guard case .inSession(let session, _) = standing else { return nil }
+        let name = me?.classes.first { $0.id == session.classId }?.name ?? "Your class"
+        let ended = "\(name) ended at \(session.endsAt.formatted(time))."
+        return protection?.shielded == false ? ended + " All your apps are back." : ended
+    }
 }
 
 extension BlockRead {
