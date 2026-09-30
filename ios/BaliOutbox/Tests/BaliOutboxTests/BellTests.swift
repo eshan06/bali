@@ -1042,6 +1042,21 @@ struct RegisterTests {
         #expect(said == "cleared" && cleared && center.calls.isEmpty)
     }
 
+    #if os(iOS)
+        @Test(
+            "The ends the monitor asked for, kept in the app group's defaults, read back as written — each of its names to its end — and none as none: without them no echo is known, and its wakes set each other off as on `main` (santa's review, B5b-5; the simulator only)"
+        )
+        func monitorAskedKept() {
+            let kept = Bell.monitorAsked
+            defer { Bell.monitorAsked = kept }
+            let ends: [Bell.Name: Date] = [.tick: at(1240), .tock: at(1300)]
+            Bell.monitorAsked = ends
+            #expect(Bell.monitorAsked == ends)
+            Bell.monitorAsked = [:]
+            #expect(Bell.monitorAsked.isEmpty)
+        }
+    #endif
+
     @Test(
         "No wake of the monitor's asks iOS anything of the window that woke it — on iOS 18, `startMonitoring` for it inside its own `intervalDidEnd` deadlocks (FB14664238) — nor of the app's, nor stops any, nor reads any back: its next wake asked for under one of its own, in turn, and nothing else; a clear asks nothing at all (B5b-3)"
     )

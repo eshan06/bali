@@ -44,11 +44,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   their ends. **#113's consequence (2):** a stopped `tick` or `tock` now wakes the monitor to ask
   nothing, but the bell's and backup's replacements still wake it to ask for a `tick` at the new
   bell: the bell still costs one wake for nothing, as round 2's step 5 saw; `register` points here
-  now (#113's rider). **Not covered, disclosed:** the record's storage (`PhoneBell`) is iOS's,
-  pinned only by the source test that the monitor passes it; a wake iOS makes more than a minute
-  before a window's end, never seen, would read as a stop's and ask nothing — the bell's window or
-  its backup then wakes the monitor; the monitor's callbacks are taken to run one at a time, as its
-  log already takes them — the record is written back as a wake returns. **Tests** (Linux and the
+  now (#113's rider). **Not covered, disclosed:** the record's storage (`PhoneBell`) is pinned on
+  the iOS Simulator only (`monitorAskedKept`), and the monitor passing it by a source test; a wake
+  iOS makes more than a minute before the end of a window of the monitor's own, never seen, would
+  read as a stop's and ask nothing — a time zone moved east while one is pending would do it, iOS
+  reading its wall-clock end anew while the record keeps the old instant. The bell's window or its
+  backup then wakes the monitor; but past the backup's end, the fail-safe's file still unread,
+  nothing would, and the shields would stay until the app is opened, where `main` asked again
+  (santa's review). The monitor's callbacks are taken to run one at a time, as its log already
+  takes them — the record is written back as a wake returns. **Tests** (Linux and the
   iOS Simulator): `RegisterTests.twoExtensions`, `failSafe` and `noLoop` — every three of six
   moves (an extension, a relaunch's pass, an Emergency Unlock, a refocus, a minute on, past the
   bell), the file read or not at each, ended windows waking the monitor or not: no burst, and a
