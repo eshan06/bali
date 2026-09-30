@@ -195,6 +195,9 @@ struct AppTests {
         #expect(me.sync.flatMap(SignOutWords.held) == nil)
         let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
         #expect(notOut.signOutFailed == SignOutWords.failed)
+        // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
+        let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
+        #expect(off.screen == .me && off.tabbed && off.protection?.permissionOff == true)
     }
 
     @Test(
@@ -359,6 +362,9 @@ struct AppTests {
         try await engine.record(.unlock(session: "s", reason: nil))
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
+        // Once no unlock waits, saying one does is stale: gone (santa's round 1).
+        held.synced(SyncState())
+        #expect(held.signOutFailed == nil)
         let keychain = Keychain(account: "ana")
         let (phone, _) = try standIn(StandIn(), keychain: keychain)
         keychain.locked = true

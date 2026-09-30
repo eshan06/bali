@@ -65,11 +65,13 @@ struct MeTests {
         let shared = Contract.repoRoot.appending(path: "packages/shared/src/index.ts")
         let rules = try String(contentsOf: api, encoding: .utf8)
         let tidy = try String(contentsOf: shared, encoding: .utf8)
-        // Each pinned by its parts but the joiners' and the braille cell's own escapes.
+        // Each by its parts, the joiners it keeps and the braille cell among them: `\u{5C}` is the
+        // backslash of a JavaScript escape.
         let pins = [
             #"UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?!["#, #"])\p{Cf}/gu;"#,
+            "(?![\u{5C}u200c\u{5C}u200d])",
             #"INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}"#,
-            #"\u{1D159}]*$/u;"#,
+            "_Code_Point}\u{5C}u2800\u{5C}u{1D159}]*$/u;",
         ]
         for pin in pins { #expect(rules.contains(pin), "\(pin)") }
         #expect(tidy.contains(#"return name.replace(/[\s⠀\u{1D159}]+/gu, ' ').trim();"#))

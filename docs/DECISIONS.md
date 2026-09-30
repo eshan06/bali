@@ -43,19 +43,31 @@ a real decision? Add a dated entry at the top: what was decided and why.
   nothing unseen is sent and refused as "Bali can't use that name"; blank space is tidied as sent
   (runs one space, none at either end); a name of nothing a reader would see — blank space and
   characters that draw nothing — is nothing to save ("Type a name to save it."). A failed Sign
-  out's words never stand beside the unsent unlock's hold, and go at each try; the keyboard comes
-  back after a failed save; the Screen Time row reads "On" alone, the router never showing Me
-  without the permission (its "Off" could not show). **The last student's `me`, keyed on the
-  account:** `SignIn.account()` — the access token's `sub`, read unverified, only to tell one
-  student from another (tokens it cannot read so: their refresh token) — and `Phone.signed(in:as:)`
-  starts the tabs over and forgets `me` when the account differs from the last one known; the
-  stream keeps its newest value only, so a sign-out between two students could go unseen and,
-  keyed on the seen edge, forget nothing. The same student again forgets nothing; with no account
-  to tell by, a sign-in after a seen sign-out still does. **Tests at the app's level**, which a
-  frozen phone could not reach: `Phone(signIn:engine:)` (Debug) over stand-ins for the server and
-  the Keychain — Sign out held by the outbox file, failed by the Keychain, made; the forget on
-  another account; History's pages, Show earlier's cursor on the wire. The held-tap fixture's
-  outbox failing stops with why, where it held nothing quietly.
+  out's words never stand beside the unsent unlock's hold, and go at each try — and "hasn't
+  reached your teacher yet" goes once no unlock waits; the keyboard comes back after a failed
+  save. **Kept, not removed: the Screen Time row's "Off".** C6b-2's review had it unreachable,
+  the router never showing Me without the permission; santa's round 1 here found the path it
+  missed — where the phone stood unread, Home (and so Me) shows whatever the permission reads —
+  so the row stays and gains its fixture, `meScreenTimeOff`, and a router test. **The last
+  student's `me`, keyed on the account:** `SignIn.account()` — the access token's `sub`, read
+  unverified, only to tell one student from another; nil for tokens that name none, never a
+  stand-in a renewal could change (a rotated refresh token would read as another student at each
+  renewal; santa's round 1) — and `Phone.signed(in:as:)` starts the tabs over and forgets `me`
+  when the account differs from the last one known; the stream keeps its newest value only, so a
+  sign-out between two students could go unseen and, keyed on the seen edge, forget nothing. The
+  same student again forgets nothing; with no account to tell by, a sign-in after a seen sign-out
+  still does. **Tests at the app's level**, which a frozen phone could not reach:
+  `Phone(signIn:engine:)` (Debug) over stand-ins for the server and the Keychain — Sign out held
+  by the outbox file, failed by the Keychain, made; the forget on another account; History's
+  pages, Show earlier's cursor on the wire. The views' own wiring (History's forget as it goes,
+  one reason at a time, the keyboard back) is pinned by reading their source, as Focus's hold is:
+  no SwiftUI view can be driven from a test. The held-tap fixture's outbox failing stops with
+  why, where it held nothing quietly. **Santa** (two Claude reviewers, so they share a model
+  family — Codex refuses every model on this Mac — and the design check): round 1, one blocker —
+  the Screen Time row above, fixed test first — and, from its WARNs, the kept reason only where no
+  other unlock is queued (an older unlock's answer landing after a newer press no longer speaks
+  over the newer card), the account's stand-in dropped, the stale "hasn't reached" cleared, and
+  the API's joiner and braille escapes pinned too.
 
 - **2026-09-30** — **A16: an extend racing the sweep — the expiry judged again under the
   session's lock** (#111's santa review; pre-existing). **The interleaving:** `expireDueSessions`

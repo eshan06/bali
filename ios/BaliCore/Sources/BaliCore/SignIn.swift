@@ -262,10 +262,11 @@ public actor SignIn: TokenProvider {
     private func unwatch(_ id: UUID) { watchers[id] = nil }
 
     /// Who is signed in: the account the tokens are for — their `sub`, read unverified, only ever
-    /// to tell one student from another (C6b's review) — or, tokens it cannot read so, their
-    /// refresh token's own; nil when nobody is, or the Keychain cannot be read yet.
+    /// to tell one student from another (C6b's review); nil when nobody is, the Keychain cannot be
+    /// read yet, or the tokens name none — never a stand-in a renewal could change (santa's round
+    /// 1: a rotated refresh token would read as another student at each renewal).
     public func account() -> String? {
-        current().map { Tokens.subject(of: $0.access) ?? $0.refresh }
+        current().flatMap { Tokens.subject(of: $0.access) }
     }
 
     /// The tokens, read from the store the first time it can be read. Only a store with nothing in

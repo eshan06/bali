@@ -602,9 +602,11 @@ public actor SyncEngine {
         // kept and shown, and still stands on the phone (`holdsUnlock`).
         case nil, .unlock(.retryAndSurface)?: break
         case .tap(.applySession)?, .unlock(.recorded)?, .stateChange(.applySession)?:
-            // A reason the server did not keep, the one it recorded first standing (A1): said.
+            // A reason the server did not keep, the one it recorded first standing (A1): said —
+            // unless another unlock is queued, a newer one the card is about (Riders-2's santa).
             if disposition == .unlock(.recorded), let given = record.change.reason,
-                sent.reason != given, let session = sent.session
+                sent.reason != given, let session = sent.session,
+                !queued.contains(where: \.change.isUnlock)
             {
                 next.reasonKept = ReasonKept(session: session.id, reason: sent.reason)
             }

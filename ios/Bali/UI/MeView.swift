@@ -120,11 +120,12 @@ struct MeView: View {
 
     private func save() { Task { await phone.saveName() } }
 
-    /// D1's card of Bali in class: what pauses and what never does, Screen Time on — Settings, where
-    /// it changes: the router never shows Me without it (Screen Time's own screen, or Protection
-    /// off, instead; C6b-2's review) — and what a teacher sees.
+    /// D1's card of Bali in class: what pauses and what never does, Screen Time's state — Settings,
+    /// where it changes; Off where the router shows Me over a standing not read (`meScreenTimeOff`;
+    /// Riders-2's santa) — and what a teacher sees.
     private var about: some View {
-        Card(padding: 0) {
+        let off = phone.protection?.permissionOff == true
+        return Card(padding: 0) {
             VStack(spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "shield").font(.system(size: 20)).foregroundStyle(Theme.brand)
@@ -143,7 +144,7 @@ struct MeView: View {
                 .padding(.vertical, 14).padding(.horizontal, 16)
                 .accessibilityElement(children: .combine)
                 Rectangle().fill(Theme.border).frame(height: 1)
-                row("Screen Time", value: ("On", Theme.brand)) {
+                row("Screen Time", value: off ? ("Off", Theme.textSecondary) : ("On", Theme.brand)) {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 Rectangle().fill(Theme.border).frame(height: 1)

@@ -170,6 +170,17 @@ struct ReasonTests {
             #expect(await rig.engine.state.reasonKept == nil, "\(answer)")
             await rig.stop()
         }
+        // An older unlock's answer landing after a newer unlock was pressed, still queued: the
+        // card is about the newer one, whose reason can still go — nothing said (santa's round 1).
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: .nurse))
+        let older = try await rig.server.next(unlockRoute)
+        #expect(await rig.engine.pressUnlock() == nil)
+        older.reply(200, replay("null"))
+        await rig.until { $0.queued.count == 1 }
+        #expect(await rig.engine.state.reasonKept == nil)
+        await rig.stop()
     }
 
     @Test(

@@ -268,6 +268,9 @@ struct ScreenTests {
         #expect(screen(tab: .home) == .home)
         // Only Home's neighbours are tabs: anything else chosen changes nothing.
         #expect(screen(tab: .focus) == .home && screen(tab: .join) == .home)
+        // Where the phone stood unread, Home — and so Me — whatever the permission reads: Me's
+        // Screen Time row can read Off (santa's round 1, Riders-2).
+        #expect(screen(permission: .denied, standing: .unread, tab: .me) == .me)
         // The bar in the same answer as the screen, at the same moment (C6a's review): a class's
         // screen has none, the router's own Home has one; Waiting, and anything opened, none.
         #expect(!tabbed(standing: .inSession(session(), .unlocked), now: at(2999)))
@@ -365,6 +368,19 @@ struct ScreenTests {
                 #""You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again.""#
             ))
         #expect(!waiting.contains("the moment class starts"))
+    }
+
+    @Test(
+        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked takes one reason at a time; Me gives the keyboard back once a save is over"
+    )
+    func ridersWiring() throws {
+        let history = try sourceCode("Bali/UI/HistoryView.swift")
+        #expect(history.contains(".onDisappear { phone.forgetHistory() }"))
+        let unlocked = try sourceCode("Bali/UI/UnlockedView.swift")
+        #expect(unlocked.contains("guard !explaining, given == nil else { return }"))
+        #expect(unlocked.contains("explaining = true") && unlocked.contains("explaining = false"))
+        let me = try sourceCode("Bali/UI/MeView.swift")
+        #expect(me.contains(".onChange(of: naming.busy) { _, busy in"))
     }
 
     @Test(

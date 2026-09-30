@@ -289,6 +289,11 @@ final class Phone {
     func synced(_ state: SyncState) {
         let keeps = state.keepsOpened(from: sync, at: Date())
         sync = state
+        // An unlock that held Sign out has gone: saying it has not would be stale (Riders-2's
+        // santa).
+        if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil {
+            signOutFailed = nil
+        }
         guard !keeps else { return }
         select(.home)
         guard !opened.isEmpty else { return }

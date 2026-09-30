@@ -103,6 +103,9 @@
             "meSignOutFailed": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me,
                 signOutFailed: SignOutWords.failed),
+            // Where the phone stood not read, Screen Time taken back: Me, its row Off.
+            "meScreenTimeOff": State(
+                protection: screenTimeOff(), sync: standing(.unread, me: anaRodriguez), tab: .me),
             "unlockedRefused": State(
                 sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
             "protectionOff": State(
