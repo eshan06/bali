@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A18: a Start past the bell closes the class itself** (the owner's ruling,
+  2026-09-30). **Why:** back-to-back classes. Past its bell by the server's clock a class is over,
+  swept or not (decision 12), and an extend is already refused there; yet a Start handed the old
+  session back until the sweep marked it over, so the next class waited up to the sweep's minute
+  (A15). A16 left this for the owner; the ruling is that Start ends it. **Decided:**
+  `startSession` takes the class's session not yet marked over FOR UPDATE — the row taken first,
+  as the sweep takes it — and judges it by A17's rule, `sessionRunning(session, startedAt)`, not a
+  copy of it. Running, it is answered again (`existing`), as before. Past its bell, the Start ends
+  it by the sweep's own end transition, `endHeldSession`, which `endSession` now runs on its locked
+  row too: `'expired'` at the Start's moment, so at its bell, its live participations closed
+  `session_expired`, one `session_expired` event — then starts the new session in the same
+  transaction and converts the waiting taps, so a tap armed in the gap (A17) joins it. A sweep that
+  ends the session first is waited out on the row, and the Start, reading it again under the lock
+  (Postgres re-checks `ended_at is null`), finds it over and simply starts the next; one that
+  comes second finds it ended. Exactly one end either way, and one new session. **The class
+  lock:** Start took the class row FOR UPDATE to serialise two Starts. Waiting now on the old
+  session's row while holding it, the Start deadlocked with the sweep: the sweep holds that row
+  and its `session_expired` insert needs the class row's key-share for its foreign key, which FOR
+  UPDATE refuses — measured, 4 runs in 6 of the race below, each a second lost to Postgres's
+  deadlock timeout before a retry converged. A tap, unlock or End holding the row meets the same.
+  So the class row is taken FOR NO KEY UPDATE: two Starts still serialise on it, and other writers'
+  foreign-key checks pass. **Kept:** a Start before the bell still answers with the class running,
+  and double presses still get one session. The route starts at the app's clock (`AppDeps.clock`,
+  A17's). The portal's recovery read (`findLiveSessionForClass`) still counts a session past its
+  bell until the sweep — its comment no longer claims Start's definition. **Tests,** red first:
+  PGlite — a Start in the gap ends the old session at its bell (its row `session_expired`, one
+  event), starts the next and joins a tap armed in the gap; a second before the bell it answers
+  the running one; and the sweep's own step then finds nothing to end. The wire — the same at `POST
+  /v1/classes/{id}/sessions`. Real Postgres — a Start racing the sweep over a session past its
+  bell, staged both ways round with a holder on the row: one `session_expired`, one new session,
+  the sweep ending it when first and finding nothing when second (8 of 8 with NO KEY UPDATE). Also
+  here, from A17's last review: A17's entry said an unlock under a tap racing its arm is "never"
+  `unknown_tap`; true only when the arm takes the tap's lock first, and now worded so.
+
 - **2026-09-30** — **C6c: D1's Leave on Me.** **Built as D1 draws it:** a quiet text Leave on
   each class (15 semibold, the secondary ink, 44 pt), and D1's line under the classes. **The
   question, which D1 does not draw:** asked in place under the class, as Me's name is edited in
@@ -60,6 +94,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   that staged "left mid-session" stage a removal (the replay rules read an ended participation,
   whatever ended it), and the fixtures' mid-lesson leave is now the refusal, and a leave with
   no lesson running.
+
 - **2026-09-30** — **A17: a tap after the bell never joins the session that just ended — one
   rule for "running", by the server's clock, judged under the lock** (#127's Claude Review; the
   owner's ask). **The gap:** A16 refused an extend at or past the bell before the sweep marks the
@@ -88,8 +123,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the lock left a tap armed while its class ran to the new bell. Both closed: the past-bell
   candidate is tried under its lock, and `armTap` takes the tap's own lock (`lockTap`) first, as
   the landing and an unlock sent under the tap do — so an arm waits out its own tap still landing
-  and answers as its replay, and an unlock under a tap racing its arm is kept `tap_armed`, never
-  `unknown_tap`. **Left, disclosed:** an extend pressed before the bell whose transaction reaches
+  and answers as its replay, and an unlock under a tap reaching the tap's lock after its arm is
+  kept `tap_armed`, not `unknown_tap` (one reaching it first is `unknown_tap`, by arrival order,
+  and is not filed once the tap arms — worded as "never" at first; corrected in A18). **Left, disclosed:** an extend pressed before the bell whose transaction reaches
   the session's lock only after a tap heard past the bell was refused there — the tap arms, the
   extend lands (it is judged by its press, decision 12), and the class runs on without that
   student until they tap again: whichever takes the session first wins, as A16's extend and sweep

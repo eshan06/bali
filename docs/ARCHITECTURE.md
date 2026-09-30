@@ -161,8 +161,9 @@ scheduled program marks the session and its participations as ended and adds a
 `session_extended` event, so reports show exactly what happened. Time is added only before
 the bell by the server's clock: past it, the phones have let go, so the session is over even
 before the sweep marks it, and an extend is refused as one for a session already ended (ruled
-2026-09-30). The teacher starts a new one instead, once the sweep has marked the old one over
-(within the minute); until then a Start answers with the old one. Nor does anyone join a
+2026-09-30). The teacher starts a new one instead: a Start past the old one's bell ends it as
+the sweep would and starts the new one in the same request (A18, ruled 2026-09-30), so
+back-to-back classes never wait for the sweep. Nor does anyone join a
 session past its bell, or return to focus in it (A17 — one rule for all three): a tap then arms
 for the teacher's next Start, as when nothing runs, and a refocus is refused as after the sweep.
 What a phone reports there — an unlock, protection off — is recorded by its own rules.
@@ -395,7 +396,8 @@ Teacher app and web portal:
 - `GET /v1/classes/{id}/roster` — the roster; `DELETE /v1/enrollments/{id}` — remove a
   student (the one-transaction removal).
 - `POST /v1/classes/{id}/sessions` — start a session; if one is already open for this
-  class, the response returns that session instead of creating a duplicate.
+  class, the response returns that session instead of creating a duplicate; one
+  past its bell, not yet swept, is ended as the sweep would end it and the new one starts (A18).
 - `POST /v1/sessions/{id}/end` and `POST /v1/sessions/{id}/extend`.
 - `GET /v1/sessions/{id}/events?after={number}` — catch-up reads of the event log.
   (The live stream endpoint is decided in the live-updates section.)
