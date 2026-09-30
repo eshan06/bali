@@ -1238,7 +1238,12 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       }
     }
 
-    if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+    // Past its bell by the server's clock, the class is over whether or not
+    // the sweep has marked it yet: every phone let go at the bell by its own
+    // clock (decision 6). The owner's ruling, 2026-09-30 (decision 12).
+    if (session.endedAt || session.endsAt <= input.at) {
+      throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+    }
 
     // Ordering, deliberate and worth saying: replay, then state, then input.
     // An ended session plus a bad duration answers SESSION_NOT_RUNNING rather
@@ -1264,16 +1269,14 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       );
     }
 
-    // Add to whichever is later: the current end (extend the remaining time)
-    // or now (a session already past its end but not yet swept gets a fresh
-    // window rather than a new end still in the past). Computed HERE, under
-    // the same FOR UPDATE that loaded the session, so a concurrent extend has
-    // either already committed and is included, or is waiting behind this one.
-    // Never earlier than the end it had: `returnedSince` relies on it.
-    const base = Math.max(input.at.getTime(), session.endsAt.getTime());
-    const newEndsAt = new Date(base + input.durationMinutes * 60_000);
+    // Added to the current end, which is still ahead (above). Computed HERE,
+    // under the same FOR UPDATE that loaded the session, so a concurrent
+    // extend has either already committed and is included, or is waiting
+    // behind this one. Never earlier than the end it had: `returnedSince`
+    // relies on it.
+    const newEndsAt = new Date(session.endsAt.getTime() + input.durationMinutes * 60_000);
     // Kept even though MAX_SESSION_MINUTES now forecloses the way this used to
-    // be reached (1e15 minutes): `base` comes from the stored session, so a row
+    // be reached (1e15 minutes): the end comes from the stored session, so a row
     // whose end is already near the Date boundary still overflows on a
     // perfectly ordinary ten-minute press. An Invalid Date turns the
     // toISOString() below into a bare RangeError — an unmapped 500, where the
@@ -1317,7 +1320,10 @@ export interface EndSessionInput {
   reason: 'ended' | 'expired';
 }
 export interface EndSessionResult {
-  /** false when the session was already ended (idempotent no-op). */
+  /**
+   * false when the session was already ended (idempotent no-op), or, for an
+   * expiry, when it is not due at `at` — an extend moved its bell on.
+   */
   ended: boolean;
   endedParticipations: number;
 }
@@ -1338,6 +1344,13 @@ export async function endSession(db: Database, input: EndSessionInput): Promise<
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
       if (session.endedAt) return { ended: false, endedParticipations: 0 };
+      // An expiry is the bell's, so it is judged here, under the lock: the
+      // sweep picks sessions with an unlocked scan, and an extend committed
+      // since has moved the bell on. Ending it anyway told the teacher
+      // "extended" for a class that then ended (A16).
+      if (input.reason === 'expired' && session.endsAt > input.at) {
+        return { ended: false, endedParticipations: 0 };
+      }
 
       const endedAt = clampToWindow(input.at, session.startedAt, session.endsAt);
       await tx.update(sessions).set({ endedAt }).where(eq(sessions.id, session.id));
@@ -1365,7 +1378,9 @@ export async function endSession(db: Database, input: EndSessionInput): Promise<
 /**
  * The expiry sweep (decision 6): end every session past its end time that
  * hasn't been ended yet. Idempotent — safe to run on a schedule and safe to
- * double-run. Returns the ids it ended.
+ * double-run. Returns the ids it ended. The scan takes no lock: each expiry
+ * is judged again under the session's (`endSession`), so a session an extend
+ * moved on since is left running.
  */
 export async function expireDueSessions(db: Database, now: Date): Promise<string[]> {
   const due = await db

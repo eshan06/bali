@@ -1011,11 +1011,11 @@ describe('state changes', () => {
     });
 
     describe('a report that first reaches the server after the session ended (owner decision 10)', () => {
-      /** The bell is the sweep's own call (expireDueSessions -> endSession 'expired'). */
-      function end(session: { id: string }, how: 'bell' | 'early') {
+      /** The bell is the sweep's own call (expireDueSessions -> endSession 'expired'), at it. */
+      function end(session: { id: string; endsAt: Date }, how: 'bell' | 'early') {
         return endSession(db, {
           sessionId: session.id,
-          at: at(10),
+          at: how === 'bell' ? session.endsAt : at(10),
           reason: how === 'bell' ? 'expired' : 'ended',
         });
       }
@@ -3026,22 +3026,35 @@ describe('extendSession', () => {
     expect((await eventsFor(session.id)).some((e) => e.type === 'session_extended')).toBe(true);
   });
 
-  it('gives a session past its end but not yet swept a window starting from now', async () => {
-    // The other half of `base = max(at, endsAt)`, which moved from the route
-    // into the locked read with this change. The expiry sweep runs once a
-    // minute, so a teacher can press "add time" on a session whose end has
-    // just passed. Adding to the stale end would hand back a new end that is
-    // STILL in the past — the shield never comes back and the press looks
-    // like it did nothing.
+  it('refuses a session past its bell that the sweep has not ended yet (decision 12)', async () => {
+    // The owner's ruling (2026-09-30): past its bell by the server's clock
+    // the class is over, swept or not. Every phone let go at the bell by its
+    // own clock (decision 6), so a late extend would show them green while
+    // unlocked, and whether it took would turn on when the sweep ran. It gets
+    // a swept session's answer, and the teacher starts a new session. Phase 2
+    // gave it a fresh window from the press instead.
     const { klass } = await seedClass('extend-late');
     const w = window('2026-01-01T09:00:00Z');
     const { session } = await startSession(db, { classId: klass.id, ...w });
 
-    const at = new Date('2026-01-01T09:25:30Z'); // 30s past the 09:25 end
-    const updated = await extendSession(db, { sessionId: session.id, durationMinutes: 10, at });
+    // At the bell, and 30 s past it.
+    for (const at of [w.endsAt, new Date('2026-01-01T09:25:30Z')]) {
+      await expect(
+        extendSession(db, { sessionId: session.id, durationMinutes: 10, at, eventId: newUuidV7() }),
+      ).rejects.toMatchObject({ code: 'SESSION_NOT_RUNNING' });
+    }
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt).toEqual(w.endsAt);
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual(['session_started']);
 
-    expect(updated.endsAt.toISOString()).toBe(new Date(at.getTime() + 10 * 60_000).toISOString());
-    expect(updated.endsAt.getTime()).toBeGreaterThan(at.getTime());
+    // A second before the bell, it still extends.
+    const early = new Date(w.endsAt.getTime() - 1_000);
+    const updated = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 10,
+      at: early,
+    });
+    expect(updated.endsAt).toEqual(new Date(w.endsAt.getTime() + 10 * 60_000));
   });
 
   it('refuses an extension that would not move the end forward', async () => {
@@ -3088,8 +3101,8 @@ describe('extendSession', () => {
      * The guard that MAX_SESSION_MINUTES made unreachable from the direction
      * its old test came at it: `1e15` minutes used to land here, and now the
      * duration check two lines above rejects it first. What still reaches it
-     * is the case the guard was really for — `base` is `max(at, endsAt)` and
-     * `endsAt` comes from the STORED session, so a row already near the JS
+     * is the case the guard was really for — the new end is added to
+     * `endsAt` from the STORED session, so a row already near the JS
      * `Date` boundary overflows on a perfectly legal ten-minute press.
      * Unguarded, `newEndsAt` is an Invalid Date and `toISOString()` throws a
      * bare `RangeError`: an unmapped 500, where the point of these checks is
@@ -3286,6 +3299,54 @@ describe('endSession & expiry', () => {
       await db.select().from(participations).where(eq(participations.sessionId, sessionDue.id)),
     );
     expect(part.endedReason).toBe('session_expired');
+  });
+
+  it('an expiry the sweep chose before an extend landed leaves the session running (A16)', async () => {
+    // The sweep picks due sessions with an unlocked scan, then expires each
+    // under its lock. An extend committing in between moved the bell on, and
+    // the expiry ended the session anyway: the teacher was told "extended"
+    // for a class that ended. PGlite cannot interleave the two, so the order
+    // is pinned by hand — the scan's pick at the bell, the extend pressed a
+    // second before it, then the sweep's own per-session step. The
+    // real-Postgres lane stages it through the sweep.
+    const { klass, student } = await seedClass('expire-after-extend');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const now = session.endsAt; // the sweep's, at the bell: the session is due
+
+    const extended = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 10,
+      at: new Date(now.getTime() - 1_000),
+    });
+    const expiry = await endSession(db, { sessionId: session.id, at: now, reason: 'expired' });
+
+    expect(expiry).toEqual({ ended: false, endedParticipations: 0 });
+    const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(row.endedAt).toBeNull();
+    expect(row.endsAt).toEqual(extended.endsAt);
+    expect((await eventsFor(session.id)).map((e) => e.type)).not.toContain('session_expired');
+    const part = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(part.endedAt).toBeNull();
+
+    // At the new bell it expires as usual, recorded at the bell.
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:40:00Z'),
+      reason: 'expired',
+    });
+    const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(over.endedAt).toEqual(extended.endsAt);
   });
 });
 
@@ -4736,7 +4797,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     });
     await endSession(db, {
       sessionId: resolved.session.id,
-      at: new Date('2026-01-01T09:11:00Z'),
+      at: resolved.session.endsAt,
       reason: 'expired',
     });
 
@@ -4914,7 +4975,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     });
     await endSession(db, {
       sessionId: recorded.session.id,
-      at: new Date('2026-01-01T09:20:00Z'),
+      at: recorded.session.endsAt,
       reason: 'expired',
     });
     const resolved = await startSession(db, {

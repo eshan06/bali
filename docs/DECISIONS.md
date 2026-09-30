@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A16: an extend racing the sweep — the expiry judged again under the
+  session's lock** (#111's santa review; pre-existing). **The interleaving:** `expireDueSessions`
+  picks due sessions with an unlocked scan (`ended_at is null and ends_at <= now`), then expires
+  each in a transaction of its own (`endSession`), which locked the row but checked only
+  `ended_at`. A teacher's extend committing between the two — pressed a moment before the bell,
+  or past it on a session not yet swept, which `extendSession` then gave a fresh window from the
+  press — was answered "extended", and the expiry then ended the session anyway, stamped at the
+  sweep's time inside the new window. A15 made the pairing routine: a sweep every minute in each process,
+  and the cron. **Decided:**
+  an expiry is the bell's, so `endSession` judges it under the lock — `'expired'` with `ends_at`
+  after `at` ends nothing (`ended: false`, the answer of an expiry already done). Both sides take
+  the session's row first, in one transaction, so exactly one wins: the extend, and the session
+  runs on, its answer true; the sweep, and the extend finds the session ended and is refused
+  `409 session_not_running` ("session has ended"), never "extended". And every expiry now ends at
+  its bell, never before it. **Weighed:** locking the scan (`for update skip locked`) holds every
+  due row for the whole pass and leaves a skipped one for the next minute; re-checking in
+  `expireDueSessions` before the call is unlocked too, so it only narrows the window. **Tests:**
+  real Postgres, staged both ways round — a holder on the session's row (`holdSession`), the
+  first caller parked on it and the second behind, the sweep's scan run before either lands, the
+  press stamped a second before the bell: without the guard the extend-first order ended the
+  session under an "extended", red 3 of 3; PGlite pins that order by hand (the scan's pick, the
+  extend, then the sweep's per-session step); and the wire test of an extend after the end covers
+  the sweep's end and asserts the reason. A press before the bell races the sweep however the
+  question below was ruled, so those tests stand as they are. Three PGlite tests that expired a
+  session before its bell — which no sweep does — expire it at the bell. **Open decision 12, the
+  owner's ruling (2026-09-30, in chat): an extend past the bell is refused.** The question
+  ARCHITECTURE and this log did not answer: may a session past its bell by the server's clock,
+  not yet swept, be extended at all? Phase 2 said yes — a fresh window from the press (`base =
+  max(at, endsAt)`, pinned by "gives a session past its end but not yet swept a window starting
+  from now", lest the new end still be past), which #28 kept. **Refused**, for the owner's
+  reasons: every phone clears its shields at the bell by its own clock (decision 6); a late
+  extend would show those phones green on the grid while they are unlocked; and whether it took
+  would depend on whether the sweep had run yet. So `extendSession` refuses a session whose end
+  is at or before `at`, by the server's clock, with a swept session's answer, `409
+  session_not_running` ("session has ended"); `base` is the stored end again. The teacher
+  starts a new session, which a Start opens once the sweep has marked the old one (within the
+  minute). Until then a Start answers with the old one, which predates this (A15's entry).
+  Both santa round-2 reviewers raised it as a WARN. It is left for the owner: a Start that ends
+  a due session itself would be a design change of its own. A `/v1` correction in place, `200` to `409` (API decision 2): no shipped
+  client calls extend yet (the portal has no control; `npm run dev:teacher -- extend` stops on
+  the `409`, its body printed). ARCHITECTURE's decision 6 says so now. Red first: Phase 2's test, flipped to the
+  refusal (at the bell and 30 s past it, with a second before it still extending), and a wire
+  test of a session past its bell that the sweep has not reached.
+
 - **2026-09-30** — **The C riders, Riders-1: honesty and safety — the review WARNs C4–C6b left
   open.** Seven, each where the phone said less than the truth or trapped a student. **Sign out on
   Join:** a student in no class sees only the router's own Join — no tab bar, so not Me — and

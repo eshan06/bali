@@ -158,7 +158,11 @@ only knowable once a session starts. It expires at the end of the school day.
 shields at that moment using its own clock, even with no internet. On the server, a small
 scheduled program marks the session and its participations as ended and adds a
 `session_expired` event. If the teacher adds time, that is recorded as its own
-`session_extended` event, so reports show exactly what happened.
+`session_extended` event, so reports show exactly what happened. Time is added only before
+the bell by the server's clock: past it, the phones have let go, so the session is over even
+before the sweep marks it, and an extend is refused as one for a session already ended (ruled
+2026-09-30). The teacher starts a new one instead, once the sweep has marked the old one over
+(within the minute); until then a Start answers with the old one.
 
 **7. The every-30-seconds "still here" message only updates one column — it never adds
 history rows.** During a session, each app tells the server every ~30 seconds: "still
