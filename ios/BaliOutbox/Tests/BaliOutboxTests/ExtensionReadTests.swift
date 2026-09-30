@@ -109,14 +109,14 @@ struct ExtensionReadTests {
     }
 
     @Test(
-        "A file this build has yet to migrate — the app not opened since an update, B6a's v3 and B6b's v4 — is migrated where the monitor reads it, once, as the app's open would: the bell clears the shields, and every read after is read only"
+        "A file this build has yet to migrate — the app not opened since an update, B6a's v3, B6b's v4 and the riders' v5 — is migrated where the monitor reads it, once, as the app's open would: the bell clears the shields, and every read after is read only"
     )
     func older() throws {
         let bound = TimeInterval(patience.components.seconds)
-        for version in ["v2", "v3"] {
+        for version in ["v2", "v3", "v4"] {
             let url = try madeBy(version)
             #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear, "\(version)")
-            #expect(try applied(url) == ["v1", "v2", "v3", "v4"], "\(version)")
+            #expect(try applied(url) == migrations, "\(version)")
             let (file, wal) = (bytes(url), bytes(url, "-wal"))
             let state = try read(url)
             #expect(state.standing == .inSession(class1042, .focused), "\(version)")
@@ -160,7 +160,7 @@ struct ExtensionReadTests {
         #expect(try halfway.get() == ["v1", "v2", "v3"])
         let bound = TimeInterval(patience.components.seconds)
         #expect(Bell.wake(outboxAt: url, now: at(1720), within: bound) == .clear)
-        #expect(try applied(url) == ["v1", "v2", "v3", "v4"])
+        #expect(try applied(url) == migrations)
     }
 
     @Test(

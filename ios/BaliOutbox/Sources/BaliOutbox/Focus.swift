@@ -14,6 +14,9 @@ public struct FocusWords: Sendable, Hashable {
     /// The class, and under it its teacher and bell; a tap not answered yet knows neither.
     public let title: String, subtitle: String
     public let claim: Claim
+    /// What the claim says under the ring — while nothing is verified, only that the check runs —
+    /// and, Screen Time off, a report of it the check could not save (C4's review; rule 5).
+    public let claimWords: String
     /// The time left until the shields come off by the phone's own clock (`shieldedUntil`) — the
     /// bell, or a tap's cap, which is only the latest they can — in whole seconds, rounded up, and
     /// as the digits say it; how full the ring is, until when, and whether these are the last two
@@ -22,6 +25,10 @@ public struct FocusWords: Sendable, Hashable {
     public let fraction: Double, until: String, final: Bool
     /// No answer from the server (D1's FocusOffline): what its card says; nil online.
     public let offline: String?
+    /// Why nothing reaches the teacher, the server there or not — signed out, the sign-in not
+    /// renewed, or the phone's storage refusing — said beside the countdown, which still holds
+    /// (C4's review; rule 5); nil otherwise.
+    public let stalled: String?
     /// iOS refused the wake at the end — this run's window, or the monitor's next with the app
     /// closed (B5b, B5b-2) — so with Bali closed the shields may outlast it; nil when neither.
     public let unscheduled: String?
@@ -35,8 +42,9 @@ public struct FocusWords: Sendable, Hashable {
     /// The ring is full with this long left or more: the phone knows the bell, not the start.
     public static let ringSpan: TimeInterval = 50 * 60
 
+    /// `signedIn`: whether someone is, as the Keychain says; nil, not known yet.
     public init(
-        _ sync: SyncState, _ protection: Protection?, now: Date,
+        _ sync: SyncState, _ protection: Protection?, now: Date, signedIn: Bool? = nil,
         time: Date.FormatStyle = .init(date: .omitted, time: .shortened)
     ) {
         // The session named is the one whose bell ends the shields — not one a re-tap's cap
@@ -63,6 +71,28 @@ public struct FocusWords: Sendable, Hashable {
         claim =
             protection?.shielded == true
             ? .paused : protection?.permissionOff == true ? .screenTimeOff : .unverified
+        let claimed =
+            switch claim {
+            case .paused:
+                "Every app is paused. Calls, FaceTime, Messages and Emergency SOS always work."
+            case .screenTimeOff:
+                "Screen Time is off for Bali, so no app is paused. Turn it back on in Settings → Screen Time → Apps with Screen Time Access."
+            case .unverified: "Checking Screen Time…"
+            }
+        // Found and not saved: the check tries again while it is off (rule 5).
+        claimWords =
+            claim == .screenTimeOff && protection?.unreported == true
+            ? claimed + " Bali couldn't tell your teacher yet, and keeps trying." : claimed
+        stalled =
+            switch (signedIn, sync.link) {
+            case (false?, _):
+                "You're signed out, so Bali can't reach your teacher. Sign in again once class is over."
+            case (_, .signIn?):
+                "Bali can't check your sign-in right now, so it can't reach your teacher. It keeps trying."
+            case (_, .storageFailed?):
+                "Bali can't use this phone's storage right now, so it can't reach your teacher. It tries again within a minute."
+            default: nil
+            }
         let left = max(0, ends.timeIntervalSince(now))
         let seconds = Int(left.rounded(.up))
         let (hours, minutes) = (seconds / 3600, seconds / 60 % 60)
@@ -88,16 +118,6 @@ public struct FocusWords: Sendable, Hashable {
             unreachable
             ? "Works without Wi-Fi — an unlock is saved on this phone first. Letting go early does nothing."
             : "Works without Wi-Fi. Letting go early does nothing."
-    }
-
-    /// What the claim says under the ring — while nothing is verified, only that the check runs.
-    public var claimWords: String {
-        switch claim {
-        case .paused: "Every app is paused. Calls, FaceTime, Messages and Emergency SOS always work."
-        case .screenTimeOff:
-            "Screen Time is off for Bali, so no app is paused. Turn it back on in Settings → Screen Time → Apps with Screen Time Access."
-        case .unverified: "Checking Screen Time…"
-        }
     }
 
 }

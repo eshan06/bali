@@ -38,6 +38,11 @@ struct ProtectionOffView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 24)
                     VStack(spacing: 24) {
+                        // What Unlocked or Home would have said, kept here (C5b's review).
+                        if !words.problems.isEmpty {
+                            Retry(words: words.problems.joined(separator: "\n"), phone: phone)
+                                .multilineTextAlignment(.leading)
+                        }
                         steps(backOn: words.way == .retap)
                         action(words.way)
                     }

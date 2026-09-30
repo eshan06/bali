@@ -45,6 +45,11 @@
                 sync: standing(.out, me: ana(newcomer: true)),
                 joining: joining(failure: Joining.words(.status(404), .classNotFound))),
             "joinFromHome": State(joining: joining(), opened: [.join]),
+            // In no class, an unlock the bell rang on before it was sent: Sign out waits for it.
+            "joinSignOutHeld": State(
+                sync: queued(
+                    standing(.out, me: ana(newcomer: true)),
+                    .unlock(session: "session", reason: nil))),
             "home": State(),
             "homeLoading": State(sync: standing(.out, me: nil)),
             "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),
@@ -64,6 +69,10 @@
                 protection: shielded(unscheduled: true),
                 sync: standing(.inSession(period3, .focused))),
             "focusSuperseded": State(protection: shielded(), sync: superseded()),
+            // Signed out mid-class (Cognito refused the sign-in): nothing reaches the teacher.
+            "focusSignedOut": State(
+                signedIn: false, protection: shielded(),
+                sync: waitingOnSignIn(standing(.inSession(period3, .focused)))),
             "unlocked": State(
                 sync: queued(
                     standing(.inSession(period3, .unlocked)), .unlock(session: "session", reason: nil),
@@ -111,6 +120,10 @@
             "protectionOffRefused": State(
                 protection: screenTimeOff(),
                 sync: refused(standing(.inSession(period3, .protectionOff)), .protectionOff)),
+            // What Home would say of the classes not read, said here (C5b's review).
+            "protectionOffError": State(
+                protection: screenTimeOff(),
+                sync: standing(.inSession(period3, .protectionOff), me: nil, failed: .networkError)),
             "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
             "sessionOver": State(sync: standing(.inSession(periodOver, .focused))),
             "storage": State(
@@ -242,6 +255,13 @@
         private static func offline(_ state: SyncState) -> SyncState {
             var state = state
             state.link = .unreachable
+            return state
+        }
+
+        /// `state` with no token to send: the engine waits on the sign-in.
+        private static func waitingOnSignIn(_ state: SyncState) -> SyncState {
+            var state = state
+            state.link = .signIn
             return state
         }
 

@@ -229,6 +229,41 @@ struct FocusTests {
     }
 
     @Test(
+        "Nothing reaching the teacher though the server may be there is said beside the countdown, which still holds, never over it (C4's review; rule 5): signed out, sign in again once class is over; waiting on the sign-in, Bali keeps trying; the phone's storage refusing, it tries again within a minute. Protection off the check could not save is said with the claim of Screen Time off. Otherwise nothing"
+    )
+    func stalled() throws {
+        let focused = try synced(.inSession(bell1042, .focused), link: .signIn)
+        let signedOut =
+            "You're signed out, so Bali can't reach your teacher. Sign in again once class is over."
+        let out = FocusWords(focused, checked(), now: t0, signedIn: false, time: newYork)
+        #expect(out.stalled == signedOut)
+        #expect(out.countdown == "28:40" && out.claim == .paused && out.offline == nil)
+        // Signed out offline too: the card says why nothing goes, beside offline's.
+        let away = try synced(.inSession(bell1042, .focused), link: .unreachable)
+        #expect(FocusWords(away, checked(), now: t0, signedIn: false).stalled == signedOut)
+        for signedIn in [true, nil] {
+            #expect(
+                FocusWords(focused, checked(), now: t0, signedIn: signedIn).stalled
+                    == "Bali can't check your sign-in right now, so it can't reach your teacher. It keeps trying.",
+                "\(String(describing: signedIn))")
+        }
+        let storage = focus(try synced(.inSession(bell1042, .focused), link: .storageFailed))
+        #expect(
+            storage.stalled
+                == "Bali can't use this phone's storage right now, so it can't reach your teacher. It tries again within a minute."
+        )
+        #expect(storage.countdown == "28:40" && storage.claim == .paused)
+        for link in [Link.reached, .unreachable, nil] {
+            #expect(focus(try synced(.inSession(bell1042, .focused), link: link)).stalled == nil)
+        }
+        var unsaved = checked(shielded: false, off: true)
+        unsaved.unreported = true
+        let said = focus(try synced(.inSession(bell1042, .focused)), unsaved)
+        #expect(said.claimWords.hasSuffix(" Bali couldn't tell your teacher yet, and keeps trying."))
+        #expect(!focus(try synced(.inSession(bell1042, .focused))).claimWords.contains("teacher"))
+    }
+
+    @Test(
         "A wake iOS refused at the end — this run's window, or the monitor's next with the app closed (B5b-2) — is said, with the way on: Bali opened after class; neither, nothing"
     )
     func unscheduled() throws {

@@ -21,12 +21,12 @@ struct SchemaTests {
                 try db.columns(in: "outboxState").map(\.name)
             )
         }
-        #expect(applied == ["v1", "v2", "v3", "v4"])
+        #expect(applied == migrations)
         #expect(
             columns == [
                 "seq", "eventId", "kind", "tagId", "sessionId", "tapId", "reason", "follows",
                 "recordedAt", "attempts", "answers", "nextAttemptAt", "stuck", "lastStatus",
-                "lastReason", "lastMessage", "orderSeq",
+                "lastReason", "lastMessage", "orderSeq", "refusedStatus",
             ])
         #expect(state == ["key", "value"])
         #expect(try outbox.records().isEmpty)
@@ -50,7 +50,7 @@ struct SchemaTests {
         // Protection off was reported for this session: reopening does not report it again.
         #expect(try reopened.record(.protectionOff(session: "s"), now: t0) == nil)
         let applied = try await reopened.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2", "v3", "v4"])
+        #expect(applied == migrations)
     }
 
     @Test("The schema refuses a row its kind could not send")
@@ -117,7 +117,7 @@ struct SchemaTests {
 
             let outbox = try open(url)
             let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-            #expect(applied == ["v1", "v2", "v3", "v4"])
+            #expect(applied == migrations)
             let kept = try outbox.records()
             let install = try #require(try installOf(outbox))
             let queued: [Change] = [.unlock(session: "s", reason: .nurse)]
@@ -162,7 +162,7 @@ struct SchemaTests {
 
             let outbox = try open(url)
             let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-            #expect(applied == ["v1", "v2", "v3", "v4"])
+            #expect(applied == migrations)
             let kept = try outbox.records()
             let install = try #require(try installOf(outbox))
             let queued: [Change] = [.unlockUnderTap(tap: "e0", reason: .nurse)]
@@ -174,6 +174,43 @@ struct SchemaTests {
             #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 4)
             #expect(try record(outbox, .unlockUnfiled(reason: nil)).order?.seq == 5)
         }
+    }
+
+    @Test(
+        "A file B6b's build made keeps what it queued, and its counter — and each record a refusal stuck, as its last answer says, keeps the refusal (the riders): a tap refused, and an unlock; one the bound stuck, or not stuck, none"
+    )
+    func fromV4() throws {
+        let url = temporaryFile()
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let old = try DatabasePool(path: url.path(percentEncoded: false))
+        try Outbox.migrator.migrate(old, upTo: "v4")
+        try old.write { db in
+            for (id, kind, stuck, status) in [
+                ("refused", "tap", true, 404), ("unlock", "unlock", true, 409),
+                ("bound", "tap", true, 503), ("retried", "tap", false, 429),
+                ("renewing", "tap", true, 401),
+            ] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO outbox (eventId, kind, tagId, sessionId, recordedAt,
+                          nextAttemptAt, attempts, answers, stuck, lastStatus)
+                        VALUES (?, ?, ?, ?, ?, ?, 8, 8, ?, ?)
+                        """,
+                    arguments: [
+                        id, kind, kind == "tap" ? "tag" : nil, kind == "tap" ? nil : "s", t0, t0,
+                        stuck, status,
+                    ])
+            }
+        }
+        try old.close()
+
+        let outbox = try open(url)
+        #expect(try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) } == migrations)
+        let kept = try outbox.records()
+        #expect(kept.map(\.eventId) == ["refused", "unlock", "bound", "retried", "renewing"])
+        #expect(kept.map(\.refusedStatus) == [404, 409, nil, nil, nil])
+        #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 6)
     }
 }
 
@@ -365,7 +402,7 @@ struct ActionOrderTests {
         let install = try #require(try installOf(outbox))
         #expect(try outbox.records().map(\.order) == [ActionOrder(install: install, seq: 1)])
         let applied = try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) }
-        #expect(applied == ["v1", "v2", "v3", "v4"])
+        #expect(applied == migrations)
     }
 
     static var uuid: Regex<Substring> {

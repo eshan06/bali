@@ -46,11 +46,26 @@ public struct UnlockedWords: Sendable, Hashable {
             sync.reportedOff == session.id
             ? "Screen Time was off during this class, so tap your teacher's block to go back to focus."
             : sync.refusedRefocus(in: session.id)
-        stuck =
-            unlock?.stuck == true
-            ? "Bali couldn't send your unlock to your teacher yet. It keeps trying." : nil
+        stuck = unlock?.stuck == true ? Self.unsent : nil
     }
 
     /// What the reason card says once it is too late for one.
     public static let late = "Your unlock goes to your teacher without a reason."
+
+    /// What a screen says of an Emergency Unlock stuck on the phone, kept and retried (rule 5).
+    public static let unsent = "Bali couldn't send your unlock to your teacher yet. It keeps trying."
+}
+
+extension SyncState {
+    /// The latest Emergency Unlock queued for `session`: that session's own, or one filed under a
+    /// tap or not filed yet, which may be any session's (C5b's review).
+    func unlock(in session: String) -> OutboxRecord? {
+        queued.last {
+            switch $0.change {
+            case .unlock(let id, _): id == session
+            case .unlockUnderTap, .unlockUnfiled: true
+            case .tap, .refocus, .protectionOff: false
+            }
+        }
+    }
 }

@@ -373,6 +373,17 @@ public struct Outbox: Sendable {
                     DROP TABLE outboxV3;
                     """)
         }
+        // The status a refusal answered with, kept on its record (the riders; C4's review): every
+        // later answer overwrites `lastStatus`, so a refused tap read back as one the bound stuck,
+        // "keeps trying". A record whose last answer refused it keeps that refusal as it migrates.
+        migrator.registerMigration("v5") { db in
+            try db.execute(
+                sql: """
+                    ALTER TABLE outbox ADD COLUMN refusedStatus INTEGER;
+                    UPDATE outbox SET refusedStatus = lastStatus WHERE stuck
+                      AND lastStatus BETWEEN 400 AND 499 AND lastStatus NOT IN (401, 408, 429);
+                    """)
+        }
         return migrator
     }
 
@@ -621,12 +632,14 @@ public struct Outbox: Sendable {
             try db.execute(
                 sql: """
                     UPDATE outbox SET attempts = ?, answers = ?, stuck = ?, nextAttemptAt = ?,
-                      lastStatus = ?, lastReason = ?, lastMessage = ? WHERE eventId = ?
+                      lastStatus = ?, lastReason = ?, lastMessage = ?,
+                      refusedStatus = COALESCE(?, refusedStatus) WHERE eventId = ?
                     """,
                 arguments: [
                     attempts, answers, record.stuck || disposition.refused || answers >= Self.bound,
                     now + backoff(attempts), sent.status, sent.error?.error.reason?.rawValue,
-                    sent.error?.error.message, sent.eventId,
+                    sent.error?.error.message, disposition.refused ? sent.status : nil,
+                    sent.eventId,
                 ])
             return disposition
         }

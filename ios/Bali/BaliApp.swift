@@ -87,8 +87,9 @@ final class Phone {
     /// them, and the history forgotten, so an answer to a read the student has left is dropped.
     private(set) var history = History()
     private(set) var reads = 0
-    /// The session whose Session over the student closed (C5b): Home past its bell.
-    private(set) var sessionOverClosed: String?
+    /// The session whose Session over the student closed, as it was then (C5b): Home past its bell,
+    /// until the bell moves — an extension rings one of its own (C5b's review).
+    private(set) var sessionOverClosed: SessionView?
     /// The Me screen's (C6b): the name as the student edits it, and why the last Sign out did not
     /// finish (rule 5).
     var naming = Naming()
@@ -171,13 +172,15 @@ final class Phone {
     private func forgetHistory() { (history, reads) = (History(), reads + 1) }
 
     /// Who is signed in, as the Keychain says: a change starts the tabs over at Home, and the
-    /// history read and a name being edited go with it — another student's is never shown (C6a,
-    /// C6b); so, where someone signs in after a sign-out, does the engine's `me`.
+    /// history read, a name being edited and a class code typed go with it — another student's is
+    /// never shown (C6a, C6b; Join's Sign out, the riders); so, where someone signs in after a
+    /// sign-out, does the engine's `me`.
     func signed(in signedIn: Bool?) {
         if signedIn != self.signedIn {
             tab = .home
             forgetHistory()
             (naming, signOutFailed) = (Naming(), nil)
+            if !joining.busy { joining = Joining() }
             if signedIn == true, self.signedIn == false { Task { await engine?.forgetMe() } }
         }
         self.signedIn = signedIn
@@ -222,9 +225,20 @@ final class Phone {
         if case .inSession(let session, _)? = sync?.standing { session.endsAt } else { nil }
     }
 
-    /// Session over's Done (C5b): Home, until a read says where the phone stands.
+    /// Session over's Done (C5b): Home, until a read says where the phone stands. Only a session
+    /// whose bell has rung by the phone's clock is closed: one a read put the phone in as Done was
+    /// pressed is not the one that ended (C5b's review).
     func closeSessionOver() {
-        if case .inSession(let session, _)? = sync?.standing { sessionOverClosed = session.id }
+        if case .inSession(let session, _)? = sync?.standing, session.endsAt <= Date() {
+            sessionOverClosed = session
+        }
+    }
+
+    /// Session over's See history (D1): closed, and History chosen — which the read after the bell
+    /// keeps (`keepsOpened`; C5b's hand-off).
+    func seeHistory() {
+        closeSessionOver()
+        select(.history)
     }
 
     /// Opens `screen` over what shows.
@@ -232,6 +246,11 @@ final class Phone {
 
     /// Whether the screen shown was opened over another, so it draws a way back to it (C3).
     var canGoBack: Bool { opened.last == screen }
+
+    /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
+    /// a student in no class reaches no tab bar, so not Me: signed in with the wrong account, it is
+    /// their way out (the riders).
+    var offersSignOut: Bool { screen == .me || screen == .join && !canGoBack }
 
     /// Back from the screen opened last. A Join closed starts over, unless a try is under way.
     func back() {
@@ -243,7 +262,7 @@ final class Phone {
     /// a Join among them starting over unless it still shows, the router's own now (santa, 2) —
     /// and the tab chosen with them, Home again (C6a).
     func synced(_ state: SyncState) {
-        let keeps = state.keepsOpened(from: sync)
+        let keeps = state.keepsOpened(from: sync, at: Date())
         sync = state
         guard !keeps else { return }
         select(.home)

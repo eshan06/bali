@@ -11,6 +11,9 @@ import Testing
 /// A fixed instant on a whole second: the database keeps times to the millisecond.
 let t0 = Date(timeIntervalSince1970: 1_790_000_000)
 
+/// Every migration of the outbox's file, in order, as the tests pin them: a new one joins here.
+let migrations = ["v1", "v2", "v3", "v4", "v5"]
+
 /// A fresh outbox in a file of its own, its jitter fixed at `random`.
 func makeOutbox(random: Double = 0) throws -> (outbox: Outbox, url: URL) {
     let url = temporaryFile()
