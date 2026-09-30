@@ -1,4 +1,11 @@
-import { armTap, type Database, findOrCreateStudent, resolveTapTarget, tapIn } from '@bali/db';
+import {
+  armTap,
+  type Database,
+  findOrCreateStudent,
+  resolveTapTarget,
+  sessionRunning,
+  tapIn,
+} from '@bali/db';
 import type { TapResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -34,7 +41,7 @@ function endOfDay(now: Date): Date {
  * response is the phone's reconciliation channel: a retry names its session
  * only while it is live there, and names none once it is not (A4).
  */
-export function registerTapsRoute(app: FastifyInstance, db: Database): void {
+export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
   app.post('/v1/taps', { preHandler: app.authenticate }, async (request): Promise<TapResponse> => {
     const identity = requireAuth(request);
     const body = parse(TapBody, request.body);
@@ -44,14 +51,20 @@ export function registerTapsRoute(app: FastifyInstance, db: Database): void {
     const target = await resolveTapTarget(db, body.tagId, student.id);
     if (!target) throw ApiError.notFound('unknown block');
 
-    if (target.session) {
+    // The newest session still running by the server's clock: one past its
+    // bell is over, swept or not, so a tap then arms as when nothing runs
+    // (A17). The engine judges it again under the lock, at the same moment.
+    const now = clock();
+    const session = target.sessions.find((s) => sessionRunning(s, now));
+    if (session) {
       const result = await mapTransitionError(() =>
         tapIn(db, {
-          sessionId: target.session!.id,
+          sessionId: session.id,
           studentId: student.id,
           eventId: body.eventId,
           deviceTime,
           order: body.order ?? null,
+          now,
         }),
       );
       return {

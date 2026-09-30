@@ -79,7 +79,7 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
  * shape the response.
  */
-export function registerSessionsRoute(app: FastifyInstance, db: Database): void {
+export function registerSessionsRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
   // POST /v1/classes/:id/sessions — start (or return the already-running) session.
   app.post(
     '/v1/classes/:id/sessions',
@@ -139,7 +139,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
       // arithmetic belongs inside its locked read, or two simultaneous
       // presses compute the same target and the second is refused.
       const updated = await mapTransitionError(() =>
-        extendSession(db, { sessionId: session.id, durationMinutes, at: new Date(), eventId }),
+        extendSession(db, { sessionId: session.id, durationMinutes, at: clock(), eventId }),
       );
       return { outcome: 'extended', session: toSessionView(updated) };
     },
@@ -274,6 +274,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database): void 
           eventId: body.eventId,
           deviceTime: new Date(body.deviceTime),
           order: body.order ?? null,
+          now: clock(),
         }),
       );
       return {
