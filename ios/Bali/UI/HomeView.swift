@@ -125,16 +125,17 @@ struct HomeView: View {
 }
 
 /// What the phone could not read, said (rule 5), and **Try again**: everything queued sent now,
-/// and the truth read again (`Phone.retry`).
+/// and the truth read again (`Phone.retry`) — or, for a screen's own read, `again`.
 struct Retry: View {
     let words: String
     let phone: Phone
+    var again: (@MainActor () async -> Void)?
 
     var body: some View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(words).textStyle(.body)
-                Button("Try again") { Task { await phone.retry() } }
+                Button("Try again") { Task { await (again ?? phone.retry)() } }
                     .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                     .foregroundStyle(Theme.brand).frame(minHeight: 44)
             }

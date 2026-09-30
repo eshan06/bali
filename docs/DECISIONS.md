@@ -8,6 +8,33 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C6a-2: the History screen as D1 draws it, over C6a-1's rules.** **Read** from
+  the top each time the History tab is chosen — `Phone.select` forgets the last read, and the
+  screen's first appearance reads (a fixture's, read or not, stays as made) — through the engine
+  (`SyncEngine.history`, a 401 renewed once). No pull to refresh: choosing the tab again reads
+  anew. An answer to a read the student has left since — another tab chosen, a sign-out — is
+  dropped (`Phone.reads`), and a sign-out forgets the history read, so no student is shown
+  another's. **Paging:** A7's pages of 50; older ones on **Show earlier**, a secondary button under
+  the last day (D1 draws a history short enough to need none), a failed one said there with Try
+  again, and a cursor the history does not hold read again from the top. Alternatives: loading the
+  next page as the list's end appears (a failure still needs a place and a Try again, and a scroll
+  can fire it again); the first page alone (a week of classes would cut the rest off, unsaid).
+  **States:** reading ("Reading your history…", as Home says "Reading your classes…"), nothing yet (a
+  card: "No moments yet", "When you tap in to a class, it shows here."), a read that failed (its
+  words with Try again: `Retry` gains a screen's own read in place of `Phone.retry`). **Look:** D1's
+  History — the title and its line, the day labels, the class cards (radius 20, padded 12 · 16 · 4),
+  rows at least 44 pt tall: the time in `TextStyle.data`, the icon, the words. SF Symbols for D1's
+  lucide icons, each in its state's ink as DESIGN.md's states give it: in focus (`checkmark.circle`,
+  the brand's: tapped in, back to focus), unlocked (`lock.open`, the emergency ink), Screen Time off
+  (`shield.slash`, the revoked ink: red is protection off's), not in (`circle`: a declined tap), and
+  ended (`flag`, the tertiary: the class ending, a switch, leaving, being removed); a note under the
+  words in the caption style. At the accessibility text sizes the teacher sits under the class and
+  the time above the words, so none is squeezed. **Tests:** `AppTests.fixtures` (D1's days and
+  cards in `history`, each state's fixture, a frozen phone's read saying it has not started),
+  `AppTests.tabs` (History read again at each choice, a sign-out forgetting it); the four fixtures,
+  `home` and `me` checked on the iPhone Air simulator at the default text size and the largest
+  accessibility one.
+
 - **2026-09-29** — **C6a-1: D1's tab bar as the router's input, and History's rules.** C6a in two
   PRs for size (santa's step 0 found it near 500 lines), as C5a was: this one the tab bar, History's
   rules and the engine's call; C6a-2, stacked on it, the screen. **The tab bar:** D1 draws it on
