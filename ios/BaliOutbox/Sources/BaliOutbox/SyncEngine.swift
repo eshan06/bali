@@ -448,19 +448,27 @@ public actor SyncEngine {
 
     /// Sets the student's own name (`PATCH /v1/me`, A8): the Me screen's own call (C6b), its token
     /// renewed once on a 401. Once set — applied, or a replay's name now — it is `me`'s at once, for
-    /// Home's greeting and Me's card, and a read sent before it never takes it back; where `me`
-    /// changed meanwhile — another join, a sign-in forgetting it — the truth is read again instead.
+    /// Home's greeting and Me's card, unless `me` changed meanwhile (another join, a sign-in
+    /// forgetting it); and, as after a join, the truth is read again: a read sent before it, which
+    /// never applies its `me`, would otherwise leave the classes as old as the last one (santa's
+    /// round 1).
     public func rename(_ request: UpdateMeRequest) async -> APIResponse<UpdateMeResponse> {
         let changesThen = meChanges
         let answer = await Joining.send(renewing: refresh) { await client.updateMe(request) }
         guard let user = answer.answer?.user else { return answer }
         if meChanges == changesThen, let me = state.me {
             state.me = MeResponse(user: user, classes: me.classes, session: me.session)
-        } else {
-            reread()
         }
         meChanges += 1
+        reread()
         return answer
+    }
+
+    /// Whether an Emergency Unlock waits unsent in the outbox file — Sign out's rule (C6b) — read
+    /// from the file itself, so one a failed read left out of `state.queued` counts too (santa's
+    /// round 1); nil when the file cannot be read now.
+    public func unlockUnsent() -> Bool? {
+        (try? outbox.records()).map { $0.contains { $0.change.isUnlock } }
     }
 
     /// Someone signs in where someone signed out (C6b): the last student's `me` — their name and

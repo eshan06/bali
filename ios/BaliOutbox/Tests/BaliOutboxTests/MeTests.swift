@@ -152,7 +152,7 @@ struct MeEngineTests {
     private let request = UpdateMeRequest(displayName: "Eve Park", eventId: EventID.mint(at: t0))
 
     @Test(
-        "A name set is the engine's at once — `me`'s user, its classes kept — so Home and Me show it; one refused changes nothing and reads nothing; a 401 renews the token once"
+        "A name set is the engine's at once — `me`'s user, its classes kept — so Home and Me show it, and the truth is read again, as after a join (santa's round 1); one refused changes nothing and reads nothing; a 401 renews the token once"
     )
     func renamed() async throws {
         let rig = try Rig()
@@ -161,6 +161,11 @@ struct MeEngineTests {
         try await rig.server.next(renameRoute).reply(409, Answer.refused("display_name_taken"))
         #expect(await refused.error?.error.reason == .displayNameTaken)
         #expect(await rig.engine.state.me?.user.displayName == nil)
+        // No read asked for: one would have gone by the loop's next wake and kept it from
+        // sleeping on.
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([at(60)])
+        #expect(await rig.server.waiting.isEmpty)
         async let answer = rig.engine.rename(request)
         try await rig.server.next(renameRoute).reply(401)
         let again = try await rig.server.next(renameRoute)
@@ -169,11 +174,29 @@ struct MeEngineTests {
         #expect(await answer.answer?.user.displayName == "Eve Park")
         let me = await rig.engine.state.me
         #expect(me?.user.displayName == "Eve Park" && me?.classes.map(\.id) == ["c"])
-        // Neither asked for a read, which would have gone by the loop's next wake and kept it from
-        // sleeping on.
-        rig.clock.advance(by: 30)
-        try await rig.sleeping([at(60)])
-        #expect(await rig.server.waiting.isEmpty)
+        let classes = [Answer.inClass("c"), Answer.inClass("d")].joined(separator: ",")
+        try await rig.server.next(meRoute).reply(
+            200,
+            #"{"user":{"id":"u","role":"student","displayName":"Eve Park"},"classes":[\#(classes)],"session":null}"#
+        )
+        let read = await rig.until { $0.me?.classes.count == 2 }
+        #expect(read.me?.user.displayName == "Eve Park")
+        await rig.stop()
+    }
+
+    @Test(
+        "Sign out's rule asks the outbox file itself whether an Emergency Unlock waits unsent (santa's round 1): none, then one pressed and queued, then none once the server has recorded it"
+    )
+    func unlockUnsent() async throws {
+        let rig = try Rig()
+        #expect(await rig.engine.unlockUnsent() == false)
+        try await rig.tapIn()
+        #expect(await rig.engine.unlockUnsent() == false)
+        try await rig.engine.emergencyUnlock()
+        #expect(await rig.engine.unlockUnsent() == true)
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        await rig.until { $0.queued.isEmpty }
+        #expect(await rig.engine.unlockUnsent() == false)
         await rig.stop()
     }
 

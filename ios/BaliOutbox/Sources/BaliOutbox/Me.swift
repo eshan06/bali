@@ -43,6 +43,9 @@ public struct Naming: Sendable, Hashable {
     /// Something to save: a name that is not blank.
     public var complete: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    /// What the card says when a blank name is saved — the keyboard's Done — rather than nothing.
+    public static let blank = "Type a name to save it."
+
     /// A save begins: the name as typed, under its last try's event id while the name is the same,
     /// busy until the answer comes, the last try's words gone.
     public mutating func save(at now: Date) -> UpdateMeRequest {
@@ -89,10 +92,15 @@ public enum SignOutWords {
     /// out, it would wait for the next sign-in and go under whoever makes it (B4's rule) — on a
     /// shared phone, another student. Nil: nothing holds it.
     public static func held(_ sync: SyncState) -> String? {
-        sync.queued.contains { $0.change.isUnlock }
-            ? "Your Emergency Unlock hasn't reached your teacher yet. You can sign out once it has."
-            : nil
+        sync.queued.contains { $0.change.isUnlock } ? unsent : nil
     }
+
+    public static let unsent =
+        "Your Emergency Unlock hasn't reached your teacher yet. You can sign out once it has."
+
+    /// The outbox file could not be read to say whether an unlock waits: nothing changed.
+    public static let unread =
+        "Bali can't read what your phone saved right now, so it can't sign you out yet. Try again in a moment."
 
     /// The Keychain could not forget the sign-in right now: nothing changed.
     public static let failed = "Bali couldn't sign you out. Try again."

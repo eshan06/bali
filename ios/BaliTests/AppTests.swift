@@ -215,10 +215,13 @@ struct AppTests {
     }
 
     @Test(
-        "Me's name and Sign out as the phone keeps them (C6b): a frozen phone's save and Sign out say it has not started, never nothing, the name kept to try again; Sign out tries nothing while an Emergency Unlock is unsent; and a change of who is signed in takes a name being edited, and a failed Sign out, with it"
+        "Me's name and Sign out as the phone keeps them (C6b): a blank name's save says how on (santa's round 1); a frozen phone's save and Sign out say it has not started, never nothing, the name kept to try again; Sign out tries nothing while an Emergency Unlock is unsent; and a change of who is signed in takes a name being edited, and a failed Sign out, with it"
     )
     func nameAndSignOut() async throws {
         let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        phone.naming.edit(" ")
+        await phone.saveName()
+        #expect(phone.naming.failure == Naming.blank && phone.naming.editing)
         phone.naming.edit("Ana")
         phone.naming.type("Ana R.")
         await phone.saveName()

@@ -182,7 +182,8 @@ final class Phone {
     /// is `me`'s; else why not, said under the field. A phone whose engine has not started — a
     /// frozen one too — says so (rule 5).
     func saveName() async {
-        guard !naming.busy, naming.complete else { return }
+        guard !naming.busy else { return }
+        guard naming.complete else { return naming.failure = Naming.blank }
         guard let engine else { return naming.failure = Joining.notStarted }
         let request = naming.save(at: Date())
         let answer = await engine.rename(request)
@@ -191,11 +192,18 @@ final class Phone {
 
     /// Me's Sign out (C6b): the sign-in's tokens forgotten — never where the phone stands, its
     /// shields or a queued record (B4) — so Sign in shows, or Focus while the shields are on. Never
-    /// while an Emergency Unlock is unsent (`SignOutWords.held`); a Keychain that cannot forget
-    /// them now, or a phone not started, is said (rule 5).
+    /// while an Emergency Unlock is unsent (`SignOutWords.held`, which the screen says), nor while
+    /// the outbox file, asked itself, holds one or cannot say (santa's round 1: a failed read of
+    /// the queue shows none); that, a Keychain that cannot forget the tokens now, or a phone not
+    /// started, is said (rule 5).
     func signOut() async {
         guard sync.flatMap(SignOutWords.held) == nil else { return }
-        guard let signIn else { return signOutFailed = Joining.notStarted }
+        guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
+        switch await engine.unlockUnsent() {
+        case false?: break
+        case true?: return signOutFailed = SignOutWords.unsent
+        case nil: return signOutFailed = SignOutWords.unread
+        }
         do {
             try await signIn.signOut()
             signOutFailed = nil

@@ -13,7 +13,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   were): this one the rules and the engine, C6b-2, stacked on it, the screen. **The name** (A8's
   `PATCH /v1/me`): `Naming` keeps it as typed, to the whole characters within
   `DISPLAY_NAME_MAX_LENGTH` code points — a field cut at a code point could leave half an emoji, a
-  format character the server refuses — and a blank one is nothing to save. **One event id per
+  format character the server refuses — and a blank one is nothing to save, said so. **One event id per
   name tried** (rule 4): kept while the name is the one it sent, so a retry after an answer that
   never came is answered as its replay, not a second rename; a name typed since is a new save. A
   join mints one per press because the server knows its retry by the enrollment; a rename has only
@@ -21,10 +21,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Each refusal is said: a name a classmate uses ("Try another, like adding your last initial":
   the way on, where a name like theirs is the likely clash), one Bali can't use, a teacher's
   account, else the Join screen's words. `SyncEngine.rename` makes the name `me`'s at once, for
-  Home's greeting and Me; the engine's `joins` counter becomes `meChanges` — a join, a rename, a
-  forgetting — so a read of `GET /v1/me` sent before one never applies its `me`, and a rename
-  answered after `me` changed some other way reads the truth again rather than set a name on
-  another `me`. **Sign out, decided** (the owner's open note, B4's rule: a queued record waits for
+  Home's greeting and Me, unless `me` changed some other way meanwhile, and reads the truth again
+  as a join does; the engine's `joins` counter becomes `meChanges` — a join, a rename, a
+  forgetting — so a read of `GET /v1/me` sent before one never applies its `me`. **Sign out, decided** (the owner's open note, B4's rule: a queued record waits for
   the next sign-in and goes under whoever makes it): `Phone.signOut` forgets the sign-in's tokens
   and nothing else — never the standing, its shields or a queued record — so the router shows Sign
   in, or Focus while the shields are on, whose Emergency Unlock needs no token. Me, where Sign out
@@ -34,8 +33,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`SignOutWords.held`: a session's, one under a tap, one not filed yet): signed out, that unlock
   would wait for the next sign-in and, on a shared phone, be filed under another student. Only an
   unlock holds it: the server records every unlock one reaches, so the hold ends once the phone is
-  online, while a refused tap stays queued for good (B3a) and would hold Sign out for ever. A
-  Keychain that cannot forget the tokens is said, nothing changed. **Not covered, disclosed:** a
+  online, while a refused tap stays queued for good (B3a) and would hold Sign out for ever. The
+  outbox file is asked too, at the press (`SyncEngine.unlockUnsent`): a queue the engine could
+  not read shows none, so an unlock it missed still holds Sign out, and a file that cannot say
+  holds it, said. A Keychain that cannot forget the tokens is said, nothing changed. **Not covered, disclosed:** a
   sign-out the student did not make — Cognito refusing the refresh token — and an unlock made after
   it, on Focus, still go under the next sign-in, as does any other record still queued at a
   sign-out (a tap the server refused or left unsettled, say); the owner's note stays open for them.
@@ -50,6 +51,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   nothing, a 401 renewed once; a stale read never taking the name back; `forgetMe` dropping a read
   and a rename on their way), `AppTests.nameAndSignOut` (a frozen phone's save and Sign out said,
   Sign out trying nothing over an unsent unlock, a sign-in change forgetting the name edited).
+  **Santa** (two Claude reviewers, so they share a model family — Codex refuses every model on
+  this Mac — and the design check on the words): round 1, no blockers. Its WARNs, fixed: a
+  rename answered while a read was on its way dropped that read's classes and asked for none
+  (both reviewers) — it now reads again, as a join does; the rule read only the engine's last
+  read of the queue, which one that failed leaves empty — the file is asked itself; a blank
+  name saved with the keyboard's Done said nothing — `Naming.blank`. Listed, not fixed: the app's
+  wiring of `forgetMe` at a sign-in, and Sign out's success and Keychain failure, have no test
+  of their own — a frozen phone has no engine or sign-in; the engine's halves are tested.
 
 - **2026-09-29** — **C5b: the Protection off and Session over screens, and the router around
   them.** **The permission gate:** the brief's red case — a permission not approved routing to the
