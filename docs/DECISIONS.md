@@ -8,6 +8,55 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **The C riders, Riders-2: polish — History, Unlocked and Me's review WARNs.**
+  **History:** `History.answered` reloads from the top on `unknown_cursor` only where a cursor was
+  sent — the page after `nextBefore` — since a read from the top answered so would be read again
+  forever (the view reads whenever the history is fresh); it is said as any failure is. The
+  screen gone by any way — a tab, or the router taking it away, Screen Time turned off and on
+  again — forgets the history (`onDisappear`), so it is read anew when it shows again, as C6a
+  meant ("read anew each time the student comes to it"). The router answers the screen and whether
+  the tab bar shows in one call (`Screen.choose` returns both), and `RootView` asks it once per
+  draw: two asks at two moments could draw the bar over a class's screen for a frame at a bell.
+  D1's "Tap not used — it already counted in <class>" is "Tap not used. It already counted in
+  <class>." (the owner's ruling, 2026-09-30): with a class named with a dash of its own, the one
+  line read with two. **Unlocked:** reason taps go one at a time (a second while the first is on
+  its way does nothing), so the card never shows one reason while the record carries another; the
+  card reads this class's unlock (`SyncState.unlock(in:)`, Riders-1's), never another class's
+  stuck one, its reason or its "will see"; the screen draws Home where its words cannot be built
+  (unreachable: never a blank); and **a reason the server did not keep** — it keeps the one
+  recorded first (A1), so an unlock sent, its settle refused as the app was suspended, then given a
+  reason after a relaunch, is answered with the reason on record — is said in the reason's place:
+  `Sent.reason` carries the answer's, and `SyncState.reasonKept` names the session and the reason
+  kept (none: "without a reason") until the phone's next change. **#119's fixture WARN:** the
+  engine tests' hand-written answer for a late unlock of a student gone from the session now has a
+  fixture, `unlock/recorded-superseded-gone`, and a test pins the hand-written one to it — and it
+  was not the API's: the API names the session there, `state` alone null. The engine read both
+  alike (no state: read the truth again), so nothing else changes. **Dismissed, #119's
+  `.inactive` WARN:** the held unlock is released as the app goes behind at `.inactive`, which a
+  pulled-down Notification Center also is. Kept: at `.background` the app suspends the outbox file
+  at once (0xdead10cc), so a release there is refused and nothing sends until the app returns; at
+  `.inactive` the unlock goes while the app can still send it, and the teacher's live grid
+  outranks the optional reason, whose card then says, honestly, that it went without one. **Me:**
+  a name goes as the API stores it (`display-name.ts`, whose three rules a test now pins): as
+  typed, a pasted tab, line break or line separator is the space it looks like, and what a name
+  never carries — control and format characters but the joiners names need — is left out, so
+  nothing unseen is sent and refused as "Bali can't use that name"; blank space is tidied as sent
+  (runs one space, none at either end); a name of nothing a reader would see — blank space and
+  characters that draw nothing — is nothing to save ("Type a name to save it."). A failed Sign
+  out's words never stand beside the unsent unlock's hold, and go at each try; the keyboard comes
+  back after a failed save; the Screen Time row reads "On" alone, the router never showing Me
+  without the permission (its "Off" could not show). **The last student's `me`, keyed on the
+  account:** `SignIn.account()` — the access token's `sub`, read unverified, only to tell one
+  student from another (tokens it cannot read so: their refresh token) — and `Phone.signed(in:as:)`
+  starts the tabs over and forgets `me` when the account differs from the last one known; the
+  stream keeps its newest value only, so a sign-out between two students could go unseen and,
+  keyed on the seen edge, forget nothing. The same student again forgets nothing; with no account
+  to tell by, a sign-in after a seen sign-out still does. **Tests at the app's level**, which a
+  frozen phone could not reach: `Phone(signIn:engine:)` (Debug) over stand-ins for the server and
+  the Keychain — Sign out held by the outbox file, failed by the Keychain, made; the forget on
+  another account; History's pages, Show earlier's cursor on the wire. The held-tap fixture's
+  outbox failing stops with why, where it held nothing quietly.
+
 - **2026-09-30** — **A16: an extend racing the sweep — the expiry judged again under the
   session's lock** (#111's santa review; pre-existing). **The interleaving:** `expireDueSessions`
   picks due sessions with an unlocked scan (`ended_at is null and ends_at <= now`), then expires
