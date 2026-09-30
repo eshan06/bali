@@ -10,8 +10,8 @@
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
-        /// no screen opened over another, Home's tab chosen and no history read, unless said
-        /// otherwise.
+        /// no screen opened over another, Home's tab chosen and no history read, no name being
+        /// edited and no sign-out failed, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -23,6 +23,8 @@
             var opened: [Screen] = []
             var tab = Screen.home
             var history = History()
+            var naming = Naming()
+            var signOutFailed: String?
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -77,7 +79,21 @@
             "historyError": State(
                 tab: .history, history: history(failure: History.words(.networkError))),
             "historyLoading": State(tab: .history, history: history(busy: true)),
-            "me": State(tab: .me),
+            "me": State(sync: standing(.out, me: anaRodriguez), tab: .me),
+            "meEditing": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me, naming: naming("Ana R.")),
+            "meNameError": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me,
+                naming: naming(
+                    "Bea Ortiz", failure: Naming.words(.status(409), .displayNameTaken))),
+            // An unlock the bell rang on before it was sent: Sign out waits for it.
+            "meSignOutHeld": State(
+                sync: queued(
+                    standing(.out, me: anaRodriguez), .unlock(session: "session", reason: nil)),
+                tab: .me),
+            "meSignOutFailed": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me,
+                signOutFailed: SignOutWords.failed),
             "unlockedRefused": State(
                 sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
             "protectionOff": State(
@@ -141,6 +157,14 @@
             var joining = Joining()
             (joining.code, joining.preview, joining.failure) = ("KWX49Q", opens, failure)
             return joining
+        }
+
+        /// Me's name card editing, `name` typed — and why its save failed: `failure`.
+        private static func naming(_ name: String, failure: String? = nil) -> Naming {
+            var naming = Naming()
+            naming.edit(name)
+            naming.failure = failure
+            return naming
         }
 
         /// The History screen, `read` or `busy` reading, or its read failed: `failure`.
@@ -272,9 +296,12 @@
             return state
         }
 
+        /// Ana as D1's Me names her.
+        private static let anaRodriguez = ana(name: "Ana Rodríguez")
+
         /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
-        /// Okafor — or, a `newcomer`, in no class yet.
-        private static func ana(newcomer: Bool = false) -> MeResponse? {
+        /// Okafor — or, a `newcomer`, in no class yet — named `name`.
+        private static func ana(newcomer: Bool = false, name: String = "Ana") -> MeResponse? {
             let classes =
                 newcomer
                 ? ""
@@ -282,7 +309,7 @@
             return try? BaliJSON.makeDecoder().decode(
                 MeResponse.self,
                 from: Data(
-                    #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[\#(classes)],"session":null}"#
+                    #"{"user":{"id":"ana","role":"student","displayName":"\#(name)"},"classes":[\#(classes)],"session":null}"#
                         .utf8))
         }
     }

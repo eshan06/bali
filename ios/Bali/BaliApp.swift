@@ -115,6 +115,7 @@ final class Phone {
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
+            (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
         }
     #endif
 
@@ -123,8 +124,12 @@ final class Phone {
     var screen: Screen { chosen(tab: tab) }
 
     /// Whether D1's tab bar shows (C6a): wherever the router honours a tab — so the one place that
-    /// decides the screen decides this too.
-    var tabbed: Bool { chosen(tab: .history) == .history }
+    /// decides the screen decides this too — but while Me shows its name being edited, whose ways
+    /// on are Save and Cancel, and whose keyboard it would otherwise ride above (C6b). Anywhere
+    /// else — Home, where a change of standing sends the tab mid-edit — it shows.
+    var tabbed: Bool {
+        chosen(tab: .history) == .history && !(naming.editing && screen == .me)
+    }
 
     private func chosen(tab: Screen) -> Screen {
         Screen.choose(
