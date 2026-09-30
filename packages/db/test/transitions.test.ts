@@ -1011,11 +1011,11 @@ describe('state changes', () => {
     });
 
     describe('a report that first reaches the server after the session ended (owner decision 10)', () => {
-      /** The bell is the sweep's own call (expireDueSessions -> endSession 'expired'). */
-      function end(session: { id: string }, how: 'bell' | 'early') {
+      /** The bell is the sweep's own call (expireDueSessions -> endSession 'expired'), at it. */
+      function end(session: { id: string; endsAt: Date }, how: 'bell' | 'early') {
         return endSession(db, {
           sessionId: session.id,
-          at: at(10),
+          at: how === 'bell' ? session.endsAt : at(10),
           reason: how === 'bell' ? 'expired' : 'ended',
         });
       }
@@ -3287,6 +3287,53 @@ describe('endSession & expiry', () => {
     );
     expect(part.endedReason).toBe('session_expired');
   });
+
+  it('an expiry the sweep chose before an extend landed leaves the session running (A16)', async () => {
+    // The sweep picks due sessions with an unlocked scan, then expires each
+    // under its lock. An extend committing in between moved the bell on, and
+    // the expiry ended the session anyway: the teacher was told "extended"
+    // for a class that ended. PGlite cannot interleave the two, so the order
+    // is pinned by hand — the scan's pick, the extend, then the sweep's own
+    // per-session step. The real-Postgres lane stages it through the sweep.
+    const { klass, student } = await seedClass('expire-after-extend');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+    const now = new Date('2026-01-01T09:25:30Z'); // 30 s past the bell, not yet swept
+
+    const extended = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 10,
+      at: now,
+    });
+    const expiry = await endSession(db, { sessionId: session.id, at: now, reason: 'expired' });
+
+    expect(expiry).toEqual({ ended: false, endedParticipations: 0 });
+    const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(row.endedAt).toBeNull();
+    expect(row.endsAt).toEqual(extended.endsAt);
+    expect((await eventsFor(session.id)).map((e) => e.type)).not.toContain('session_expired');
+    const part = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(part.endedAt).toBeNull();
+
+    // At the new bell it expires as usual, recorded at the bell.
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:40:00Z'),
+      reason: 'expired',
+    });
+    const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(over.endedAt).toEqual(extended.endsAt);
+  });
 });
 
 describe('armed taps', () => {
@@ -4736,7 +4783,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     });
     await endSession(db, {
       sessionId: resolved.session.id,
-      at: new Date('2026-01-01T09:11:00Z'),
+      at: resolved.session.endsAt,
       reason: 'expired',
     });
 
@@ -4914,7 +4961,7 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     });
     await endSession(db, {
       sessionId: recorded.session.id,
-      at: new Date('2026-01-01T09:20:00Z'),
+      at: recorded.session.endsAt,
       reason: 'expired',
     });
     const resolved = await startSession(db, {

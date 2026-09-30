@@ -3,6 +3,7 @@ import {
   endEnrollment,
   enrollments,
   events,
+  expireDueSessions,
   participations,
   startSession,
   tapIn,
@@ -223,15 +224,23 @@ describe('POST /v1/sessions/:id/extend', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('cannot extend an ended session (409)', async () => {
-    const { teacher, session } = await seedRunning('extend-ended');
-    const token = await ctx.tokenFor(teacher.cognitoId);
-    await post(token, `/v1/sessions/${session.id}/end`);
-    const res = await post(token, `/v1/sessions/${session.id}/extend`, {
-      durationMinutes: 10,
-      eventId: randomUUID(),
-    });
-    expect(res.statusCode).toBe(409);
+  it('cannot extend a session its teacher or the sweep ended (409 session_not_running)', async () => {
+    // The sweep taking the session before an extend does (A16) ends in this
+    // answer, never "extended": refused, with the reason a client keys on (A5).
+    for (const how of ['end', 'sweep'] as const) {
+      const { teacher, session } = await seedRunning(`extend-ended-${how}`);
+      const token = await ctx.tokenFor(teacher.cognitoId);
+      if (how === 'end') await post(token, `/v1/sessions/${session.id}/end`);
+      else expect(await expireDueSessions(db, session.endsAt)).toEqual([session.id]);
+      const res = await post(token, `/v1/sessions/${session.id}/extend`, {
+        durationMinutes: 10,
+        eventId: randomUUID(),
+      });
+      expect(res.statusCode, how).toBe(409);
+      expect(res.json(), how).toEqual({
+        error: { code: 'conflict', reason: 'session_not_running', message: 'session has ended' },
+      });
+    }
   });
 
   it('rejects a bad duration (400)', async () => {

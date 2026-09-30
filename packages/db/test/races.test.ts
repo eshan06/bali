@@ -1792,7 +1792,102 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
       expect(await eventsOfType(session.id, 'session_extended')).toHaveLength(2);
     }
   });
+
+  it('an extend racing the sweep: the first to take the session wins, and the extend says so truly (A16)', async () => {
+    /*
+     * The sweep picks due sessions with an unlocked scan, then expires each
+     * under its lock. Staged both ways round: a holder takes the session's
+     * row, the first caller parks on it and the second behind it, the sweep's
+     * scan having run before either lands — so it always finds the session
+     * due. Extend first: it lands, and the sweep, judging the expiry again
+     * under the lock, leaves the session running; without that it ended the
+     * class the teacher had just been told was extended. Sweep first: the
+     * session ends, and the extend is refused SESSION_NOT_RUNNING.
+     */
+    for (const first of ['extend', 'sweep'] as const) {
+      const { classId, studentId } = await seed(`race-extend-sweep-${first}`);
+      const session = await openSession(classId, { due: true });
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+
+      const release = await holdSession(session.id);
+      const now = new Date();
+      const press = { sessionId: session.id, durationMinutes: 10, at: now, eventId: newUuidV7() };
+      let extending: ReturnType<typeof extendSession> | undefined;
+      let sweeping: ReturnType<typeof expireDueSessions> | undefined;
+      let unstaged: Error | null = null;
+      try {
+        if (first === 'extend') extending = extendSession(db, press);
+        else sweeping = expireDueSessions(db, now);
+        await waitForBlockedBackend();
+        if (first === 'extend') sweeping = expireDueSessions(db, now);
+        else extending = extendSession(db, press);
+        await waitForBlockedBackend(5_000, 2);
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        await release();
+      }
+      const [extended, swept] = await Promise.allSettled([extending, sweeping]);
+      if (unstaged !== null) throw unstaged;
+      if (swept.status === 'rejected') throw swept.reason;
+
+      const row = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+      if (first === 'extend') {
+        if (extended.status === 'rejected') throw extended.reason;
+        expect(swept.value, first).not.toContain(session.id);
+        expect(row.endedAt, first).toBeNull();
+        expect(row.endsAt, first).toEqual(extended.value?.endsAt);
+        expect(await eventsOfType(session.id, 'session_expired'), first).toHaveLength(0);
+        expect(await liveParticipations(session.id), first).toHaveLength(1);
+      } else {
+        expect(extended, first).toMatchObject({
+          status: 'rejected',
+          reason: { code: 'SESSION_NOT_RUNNING' },
+        });
+        expect(swept.value, first).toContain(session.id);
+        expect(row.endedAt, first).not.toBeNull();
+        expect(row.endsAt, first).toEqual(session.endsAt);
+        expect(await eventsOfType(session.id, 'session_expired'), first).toHaveLength(1);
+        expect(await eventsOfType(session.id, 'session_extended'), first).toHaveLength(0);
+        expect(await liveParticipations(session.id), first).toHaveLength(0);
+      }
+    }
+  }, 30_000);
 });
+
+/**
+ * Take `sessionId`'s row lock and hold it. Whatever locks the row meanwhile
+ * parks, and goes through in the order it parked once the returned release
+ * rolls the holder back.
+ */
+async function holdSession(sessionId: string): Promise<() => Promise<void>> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const hasLock = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db
+    .transaction(async (tx) => {
+      await tx.select().from(sessions).where(eq(sessions.id, sessionId)).for('update');
+      locked();
+      await held;
+      throw new Error('rolled back on purpose');
+    })
+    .catch(() => undefined);
+  await hasLock;
+  return async () => {
+    release();
+    await holder;
+  };
+}
 
 /**
  * Deadlocks Postgres has broken in the database `on` is connected to.
@@ -1931,7 +2026,8 @@ async function behindHolder<P, R>(
 }
 
 /**
- * Fail rather than proceed if nothing ever blocks — the staging must be real.
+ * Fail rather than proceed if fewer than `waiters` backends ever block at
+ * once — the staging must be real.
  *
  * Held-transaction tests that gate on the 5 s default carry an explicit 20 s
  * budget, and must: this package has no vitest config, so the test budget is
@@ -1939,13 +2035,15 @@ async function behindHolder<P, R>(
  * naming nothing — before the gate could throw the error that says what went
  * wrong. Measured, with the gate forced to miss.
  */
-async function waitForBlockedBackend(timeoutMs = 5_000): Promise<void> {
+async function waitForBlockedBackend(timeoutMs = 5_000, waiters = 1): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if ((await lockWaiters()) > 0) return;
+    if ((await lockWaiters()) >= waiters) return;
     await new Promise((r) => setTimeout(r, 10));
   }
-  throw new Error('no backend ever blocked on the row lock — the interleaving was not staged');
+  throw new Error(
+    `fewer than ${waiters} backend(s) ever blocked on the row lock — the interleaving was not staged`,
+  );
 }
 
 /**
