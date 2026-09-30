@@ -24,11 +24,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   again; the stuck unlock is this class's (or one under a tap or not filed yet, which may be any),
   never another class's — `SyncState.unlock(in:)`, which Riders-2 gives Unlocked too. **"Will see"
   only over a report:** protection off the check found and could not save was said only where the
-  way is Settings or iOS's prompt; the re-tap's and the check's screens still said the teacher
-  would see it. Now one rule for every way (`untold`: unreported, and no report sent or queued)
-  — the re-tap's says Bali couldn't tell the teacher, without "keeps trying" (on again, the check
-  reports nothing more). **Session over's Done keeps the bell it closed:** `sessionOverClosed` was
-  a session id, so an extension after Done hid the real bell's Session over (the one screen that
+  way is Settings or iOS's prompt; the re-tap's and the check's words still said the teacher would
+  see it. Now one rule for every way (`untold`: unreported, and no report sent or queued) — the
+  re-tap's says Bali couldn't tell the teacher, without "keeps trying" (on again, the check reports
+  nothing more). To know (santa's round 1): as the router shows those two screens today — only
+  over a standing of protection off, whose report is sent or queued — no student saw the old
+  words; the rule makes the words hold whatever the standing, rather than resting on the router.
+  **Session over's Done keeps the bell it closed:** `sessionOverClosed` was a session id, so an
+  extension after Done hid the real bell's Session over (the one screen that
   says the apps are back), and Done pressed as a read put the phone in a new class closed that one.
   It is the session as it was (its end with it), and Done closes only a session whose bell has
   rung by the phone's clock. **A refusal stays a refusal:** every answer overwrites a record's
@@ -47,7 +50,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   resets to Home at any change: History opened from Session over closed itself. `keepsOpened` now
   counts a read saying out, once the bell has rung by the phone's clock, as no change — the class
   was over for the phone already — so History, or Join opened over the Home that Done shows,
-  stays; a class ending before its bell is still a change. **Words, new (DESIGN.md's voice, no
+  stays; a class ending before its bell is still a change. See history chooses History only where
+  it closed Session over, so a read racing the press chooses nothing. **Words, new (DESIGN.md's voice, no
   em-dash):** Focus's three stalled lines and the unsaved report's sentence; Protection off's two
   unsaved lines; "See history" is D1's. **Fixtures:** `joinSignOutHeld`, `focusSignedOut`,
   `protectionOffError`; `join` and `sessionOver` gain Sign out and See history. **Tests, red first
@@ -55,7 +59,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `ProtectionOffScreenTests.unreported` and `.carried`, `FocusTests.stalled`,
   `SchemaTests.fromV4` (and v5 pinned wherever v4 was), `ExtensionReadTests.older` (a v4 file
   migrated where the monitor reads it); `AppTests` for Sign out's reach, See history held after
-  the read, and Done racing a read.
+  the read, and Done racing a read. **Santa** (two Claude reviewers, so they share a model family
+  — Codex refuses every model on this Mac — and the design check): round 1, no blockers. Fixed
+  from its WARNs, tests first: Done and the read after the bell compare a class's bell to the
+  second (`SessionView.rings(as:)`) — the copy the file keeps is written to the millisecond,
+  rounded down, so after a relaunch the same bell read as moved: Session over again after Done,
+  History closed by the read; and See history leaves behind a Join opened before the bell, which
+  the router would have shown in History's place. Kept: the unreported words on the re-tap's and
+  the check's screens, unreachable as the router shows them today (both reviewers) — they stay,
+  so the words are honest whatever the standing.
 
 - **2026-09-30** — **The shields with the app force-quit: decided (a) (the owner's ruling).**
   ARCHITECTURE parked it with a lean to (a) — the shields stay until the session ends, the monitor

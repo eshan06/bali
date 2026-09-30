@@ -85,11 +85,21 @@ public enum Screen: Sendable, Hashable {
             if !approved { return .screenTime }
             switch sync.standing {
             case .waiting: return .waiting
-            case .inSession(let session, _) where session != sessionOverClosed: return .sessionOver
+            case .inSession(let session, _) where !session.rings(as: sessionOverClosed):
+                return .sessionOver
             case .out where hasClasses == false: return .join
             default: return .home
             }
         }
+    }
+}
+
+extension SessionView {
+    /// Whether `other` is this session with the same bell: to the second — an extension moves it
+    /// by minutes, while the copy the file keeps is written to the millisecond, rounded down, so
+    /// it can read a millisecond off the server's (santa's round 1).
+    func rings(as other: SessionView?) -> Bool {
+        other.map { $0.id == id && abs($0.endsAt.timeIntervalSince(endsAt)) < 1 } ?? false
     }
 }
 
@@ -126,13 +136,20 @@ extension SyncState {
     /// stay once the engine's state is this, after `before`, at `now`: not once the standing
     /// changes, nor once a tap is made or answered (a new arming is Waiting's again), nor, out,
     /// once the phone knows it has no classes (Join is the router's own then). Waiting's whatever
-    /// the classes: arming needs no enrollment. A read saying out past the bell by the phone's
-    /// clock changes nothing the student sees — the class was over for the phone already — so
-    /// History chosen from Session over holds (C5b's hand-off).
+    /// the classes: arming needs no enrollment. A read saying out, or the same class still past
+    /// its bell (santa's round 1), once the bell has rung by the phone's clock changes nothing the
+    /// student sees — the class was over for the phone already — so History chosen from Session
+    /// over holds (C5b's hand-off).
     public func keepsOpened(from before: SyncState?, at now: Date) -> Bool {
-        var rung = false
-        if case .inSession(let session, _)? = before?.standing { rung = session.endsAt <= now }
-        return (standing == before?.standing || standing == .out && rung)
+        var over = false
+        if case .inSession(let ended, _)? = before?.standing, ended.endsAt <= now {
+            switch standing {
+            case .out: over = true
+            case .inSession(let session, _): over = session.rings(as: ended)
+            case .waiting, .unread: over = false
+            }
+        }
+        return (standing == before?.standing || over)
             && pendingTap?.eventId == before?.pendingTap?.eventId
             && !(standing == .out && hasClasses == false)
     }

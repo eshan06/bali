@@ -163,7 +163,8 @@ struct AppTests {
         next.standing = .inSession(running, .focused)
         racing.synced(next)
         racing.closeSessionOver()
-        #expect(racing.sessionOverClosed == nil)
+        racing.seeHistory()
+        #expect(racing.sessionOverClosed == nil && racing.tab == .home)
         // See history (D1's, C5b's hand-off): History shown, and kept once the read after the bell
         // says where the phone stands.
         let seen = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
@@ -173,6 +174,13 @@ struct AppTests {
         read.standing = .out
         seen.synced(read)
         #expect(seen.screen == .history && seen.tabbed)
+        // Join opened before the bell (over a class's Home this build knows no state of) is left
+        // behind: History, never the Join the router would show in its place (santa's round 1).
+        let opened = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
+        opened.open(.join)
+        opened.joining.type("KWX")
+        opened.seeHistory()
+        #expect(opened.screen == .history && opened.opened.isEmpty && opened.joining == Joining())
         // Me (C6b): D1's name card, editing it and a refused save; Sign out held over an unsent
         // unlock — pressed, nothing tried — and one that failed.
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))

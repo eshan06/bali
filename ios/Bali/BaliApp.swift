@@ -227,17 +227,24 @@ final class Phone {
 
     /// Session over's Done (C5b): Home, until a read says where the phone stands. Only a session
     /// whose bell has rung by the phone's clock is closed: one a read put the phone in as Done was
-    /// pressed is not the one that ended (C5b's review).
-    func closeSessionOver() {
-        if case .inSession(let session, _)? = sync?.standing, session.endsAt <= Date() {
-            sessionOverClosed = session
+    /// pressed is not the one that ended (C5b's review). Whether it closed one.
+    @discardableResult
+    func closeSessionOver() -> Bool {
+        guard case .inSession(let session, _)? = sync?.standing, session.endsAt <= Date() else {
+            return false
         }
+        sessionOverClosed = session
+        return true
     }
 
     /// Session over's See history (D1): closed, and History chosen — which the read after the bell
-    /// keeps (`keepsOpened`; C5b's hand-off).
+    /// keeps (`keepsOpened`; C5b's hand-off) — over anything opened before the bell, which the
+    /// router would show in its place (santa's round 1). Nothing chosen where nothing closed: a
+    /// read put the phone in a new class meanwhile.
     func seeHistory() {
-        closeSessionOver()
+        guard closeSessionOver() else { return }
+        if opened.contains(.join), !joining.busy { joining = Joining() }
+        opened = []
         select(.history)
     }
 

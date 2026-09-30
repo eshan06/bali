@@ -164,6 +164,10 @@ struct ScreenTests {
         let extended = Standing.inSession(session(endsAt: 3600), .focused)
         #expect(
             screen(standing: extended, sessionOverClosed: session(), now: at(3600)) == .sessionOver)
+        // The bell as the file kept it, a millisecond off the server's (its dates are written to
+        // the millisecond, rounded down): the same bell, still closed (santa's round 1).
+        let read = Standing.inSession(session(endsAt: 3000.001), .focused)
+        #expect(screen(standing: read, sessionOverClosed: session(), now: at(3001)) == .home)
         #expect(screen(standing: .inSession(session(), .focused), now: at(2999)) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked), now: at(2999)) == .unlocked)
         #expect(
@@ -268,6 +272,13 @@ struct ScreenTests {
         #expect(!read.keepsOpened(from: rung, at: at(3000)))
         read.standing = .waiting
         #expect(!read.keepsOpened(from: rung, at: at(3000)))
+        // The same class, still past its bell — the sweep not run yet, a state changed, or its
+        // bell a millisecond off the copy the file kept (santa's round 1): no change either; its
+        // bell moved on, an extension, is one.
+        read.standing = .inSession(session(endsAt: 3000.001), .unlocked)
+        #expect(read.keepsOpened(from: rung, at: at(3001)))
+        read.standing = .inSession(session(endsAt: 3600), .focused)
+        #expect(!read.keepsOpened(from: rung, at: at(3001)))
         var before = SyncState()
         before.standing = .waiting
         var after = before
