@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a) — which say the phone has not started, never nothing (#106's review). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -131,13 +131,31 @@ struct AppTests {
         let error = Phone(fixture: try #require(PreviewFixtures.all["historyError"]))
         await error.readHistory()
         #expect(error.history.failure == Joining.notStarted && !error.history.read)
+        // Protection off and Session over (C5b): each look's step and words, a refused Back to
+        // focus said where the student lands, and Done closing Session over — Home past the bell.
+        let looks: [(String, ProtectionOffWords.Way, Bool)] = [
+            ("protectionOff", .settings, false), ("protectionOffBackOn", .retap, false),
+            ("protectionOffChecking", .checking, false), ("protectionOffAsk", .ask, false),
+            ("protectionOffUnreported", .settings, false), ("protectionOffRefused", .settings, true),
+        ]
+        for (name, way, refused) in looks {
+            let fixture = try #require(PreviewFixtures.all[name])
+            let words = ProtectionOffWords(try #require(fixture.sync), fixture.protection)
+            #expect(words?.way == way && (words?.refused != nil) == refused, "\(name)")
+        }
+        #expect(UnlockedWords(try #require(PreviewFixtures.all["unlockedRefused"]?.sync))?.retap != nil)
+        #expect(PreviewFixtures.all["homeRefused"]?.sync?.refusedRefocusWords(at: Date()) != nil)
+        let over = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
+        #expect(over.sync?.sessionOverWords(over.protection)?.hasSuffix("All your apps are back.") == true)
+        over.closeSessionOver()
+        #expect(over.screen == .home)
     }
 
     @Test(
         "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab"
     )
     func tabs() async throws {
-        let homes = ["home", "homeLoading", "homeError", "homeUnread", "me"]
+        let homes = ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "me"]
         for (name, state) in PreviewFixtures.all {
             let tabbed = homes.contains(name) || name.hasPrefix("history")
             #expect(Phone(fixture: state).tabbed == tabbed, "\(name)")

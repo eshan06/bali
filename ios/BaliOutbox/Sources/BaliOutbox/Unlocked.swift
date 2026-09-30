@@ -13,7 +13,8 @@ public struct UnlockedWords: Sendable, Hashable {
     /// Nil: no unlock of this phone's to give a reason for — one before a relaunch, say.
     public let picker: Picker?
     /// Why the way back is a re-tap, not Back to focus: protection off was reported in this session
-    /// since the phone's last tap, and a refocus out of it is refused (A2; #96's review).
+    /// since the phone's last tap, and a refocus out of it is refused (A2; #96's review) — or the
+    /// server refused this session's Back to focus (C5b).
     public let retap: String?
     /// The unlock stuck — refused, or unsettled to the bound — still kept and retried (rule 5).
     public let stuck: String?
@@ -44,7 +45,7 @@ public struct UnlockedWords: Sendable, Hashable {
         retap =
             sync.reportedOff == session.id
             ? "Screen Time was off during this class, so tap your teacher's block to go back to focus."
-            : nil
+            : sync.refusedRefocus(in: session.id)
         stuck =
             unlock?.stuck == true
             ? "Bali couldn't send your unlock to your teacher yet. It keeps trying." : nil

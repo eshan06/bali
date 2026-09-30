@@ -72,13 +72,31 @@
                     .unlock(session: "session", reason: .bathroom))),
             "unlockedRecorded": State(sync: standing(.inSession(period3, .unlocked))),
             "unlockedRetap": State(sync: reported(standing(.inSession(period3, .unlocked)))),
-            "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
             "history": State(tab: .history, history: anaHistory()),
             "historyEmpty": State(tab: .history, history: history(read: true)),
             "historyError": State(
                 tab: .history, history: history(failure: History.words(.networkError))),
             "historyLoading": State(tab: .history, history: history(busy: true)),
             "me": State(tab: .me),
+            "unlockedRefused": State(
+                sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
+            "protectionOff": State(
+                protection: screenTimeOff(), sync: standing(.inSession(period3, .protectionOff))),
+            "protectionOffBackOn": State(sync: standing(.inSession(period3, .protectionOff))),
+            "protectionOffChecking": State(
+                protection: permission(.notDetermined),
+                sync: standing(.inSession(period3, .protectionOff))),
+            "protectionOffAsk": State(
+                protection: screenTimeOff(.notDetermined),
+                sync: standing(.inSession(period3, .protectionOff))),
+            "protectionOffUnreported": State(
+                protection: screenTimeOff(unreported: true),
+                sync: standing(.inSession(period3, .unlocked))),
+            "protectionOffRefused": State(
+                protection: screenTimeOff(),
+                sync: refused(standing(.inSession(period3, .protectionOff)), .protectionOff)),
+            "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
+            "sessionOver": State(sync: standing(.inSession(periodOver, .focused))),
             "storage": State(
                 problem: "The outbox could not be opened: SQLite error 14: unable to open database",
                 signedIn: nil, protection: nil, sync: nil),
@@ -101,11 +119,13 @@
             return arguments[at + 1]
         }
 
-        /// A class whose bell is 27 minutes away — Period 3's, with Ms. Rivera — and one whose bell
-        /// is 1:52 away (D1's FocusFinal).
+        /// A class whose bell is 27 minutes away — Period 3's, with Ms. Rivera — one whose bell
+        /// is 1:52 away (D1's FocusFinal), and one whose bell rang a minute ago.
         private static let period3 = SessionView(id: "session", classId: "p3", endsAt: Date() + 27 * 60)
         private static let lastMinutes = SessionView(
             id: "session", classId: "p3", endsAt: Date() + 112)
+        private static let periodOver = SessionView(
+            id: "session", classId: "p3", endsAt: Date() - 60)
 
         /// What `KWX49Q` opens, as `GET /v1/join-codes/{code}` answers: Period 3, with Ms. Rivera.
         private static let period3Preview = try? BaliJSON.makeDecoder().decode(
@@ -184,10 +204,13 @@
             return protection
         }
 
-        /// The check judged the permission taken back: iOS dropped every shield.
-        private static func screenTimeOff() -> Protection {
-            var protection = permission(.denied)
-            protection.permissionOff = true
+        /// The check judged the permission off, read `read` — taken back, or never given here — so
+        /// iOS holds no shield; `unreported`, the protection off it found could not be saved.
+        private static func screenTimeOff(_ read: Permission = .denied, unreported: Bool = false)
+            -> Protection
+        {
+            var protection = permission(read)
+            (protection.permissionOff, protection.unreported) = (true, unreported)
             return protection
         }
 
@@ -212,6 +235,14 @@
             let outbox = try? Outbox(at: url)
             _ = try? outbox?.record(change, now: Date(), holding: hold)
             state.queued = (try? outbox?.records()) ?? []
+            return state
+        }
+
+        /// Back to focus in Period 3, which the server refused for `reason` (C5b).
+        private static func refused(_ state: SyncState, _ reason: ApiErrorReason) -> SyncState {
+            var state = state
+            state.refused = Refusal(
+                change: .refocus(session: period3.id), status: 409, reason: reason, message: nil)
             return state
         }
 

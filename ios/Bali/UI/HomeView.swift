@@ -44,6 +44,13 @@ struct HomeView: View {
                     // In every build, as Emergency Unlock is wherever the shields can be on:
                     // nothing may shield a phone with no way out (ARCHITECTURE; FocusTests).
                     tapIn
+                    // A Back to focus refused, in a class this build knows no state of (C5b).
+                    if let refused = phone.sync?.refusedRefocusWords(at: Date()) {
+                        Card(padding: 16) {
+                            Text(refused).textStyle(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }

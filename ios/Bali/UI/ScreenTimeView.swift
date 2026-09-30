@@ -11,7 +11,6 @@ import UIKit
 struct ScreenTimeView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
-    @State private var busy = false
 
     private var permission: Permission { phone.protection?.permission ?? .notDetermined }
 
@@ -41,9 +40,11 @@ struct ScreenTimeView: View {
                                 }
                             }
                             .buttonStyle(PrimaryButtonStyle())
-                            askButton(words.ask).buttonStyle(SecondaryButtonStyle())
+                            AskScreenTime(phone: phone, label: words.ask)
+                                .buttonStyle(SecondaryButtonStyle())
                         } else {
-                            askButton(words.ask).buttonStyle(PrimaryButtonStyle())
+                            AskScreenTime(phone: phone, label: words.ask)
+                                .buttonStyle(PrimaryButtonStyle())
                         }
                         if let failure = phone.askFailed?.words(permission) {
                             Text(failure).textStyle(.body)
@@ -57,18 +58,26 @@ struct ScreenTimeView: View {
             }
         }
     }
+}
 
-    /// The ask's button, labelled `label` — busy while iOS's prompt is up.
-    private func askButton(_ label: String) -> some View {
-        Button(busy ? "Asking…" : label) { Task { await ask() } }.disabled(busy)
-    }
+/// The ask for the Screen Time permission, labelled `label`: iOS's own prompt, through the enforcer
+/// (`Phone.askScreenTime()`), one at a time, busy while it is up — the grant screen's (C1b), and
+/// Protection off's where the permission was never given on this phone (C5b).
+struct AskScreenTime: View {
+    let phone: Phone
+    let label: String
+    @State private var busy = false
 
-    /// One ask: iOS's prompt, the button busy meanwhile.
-    private func ask() async {
-        guard !busy else { return }
-        busy = true
-        defer { busy = false }
-        await phone.askScreenTime()
+    var body: some View {
+        Button(busy ? "Asking…" : label) {
+            Task {
+                guard !busy else { return }
+                busy = true
+                await phone.askScreenTime()
+                busy = false
+            }
+        }
+        .disabled(busy)
     }
 }
 

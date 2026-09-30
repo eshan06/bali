@@ -217,6 +217,35 @@ struct ReasonTests {
     }
 
     @Test(
+        "Back to focus refused by the server (C5b; rule 5): protection off there, dropped and the truth read again, lands on Protection off, saying why and the re-tap; another refusal, the unlock still standing, lands on Unlocked with the re-tap in its place — and the phone's next change ends the words"
+    )
+    func refusedBack() async throws {
+        for (reason, read, landed, said) in [
+            ("protection_off", "protection_off", ParticipationState.protectionOff, offWords),
+            ("event_id_conflict", "unlocked", .unlocked, refusedWords),
+        ] {
+            let rig = try Rig()
+            try await rig.tapIn()
+            #expect(await rig.engine.pressUnlock() == nil)
+            #expect(await rig.engine.backToFocus() == nil)
+            try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+            try await rig.server.next(refocusRoute).reply(409, Answer.refused(reason))
+            try await rig.server.next(meRoute).reply(200, Answer.me(state: read))
+            let state = await rig.until {
+                $0.standing == .inSession(session(), landed) && $0.refused != nil
+            }
+            #expect(state.refusedRefocusWords(at: t0) == said, "\(reason)")
+            let where_ =
+                landed == .protectionOff
+                ? ProtectionOffWords(state, nil)?.refused : UnlockedWords(state)?.retap
+            #expect(where_ == said, "\(reason)")
+            try await rig.engine.record(.tap(tagId: "tag"))
+            #expect(await rig.engine.state.refusedRefocusWords(at: t0) == nil, "\(reason)")
+            await rig.stop()
+        }
+    }
+
+    @Test(
         "A press that finds nothing to unlock by its end — out, its tap answered meanwhile — is said, never silence, and records nothing (#116's review); pressed where no Unlocked screen asks why — under a tap made out of any session — it goes at once"
     )
     func nothing() async throws {
