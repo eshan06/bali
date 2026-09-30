@@ -8,6 +8,52 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C5a: the Unlocked screen — the reason held for, never the unlock; Back to
+  focus or a re-tap; a late unlock said; the screen chosen again at the bell.** **The reason:** D1
+  asks why after the unlock, and a reason is kept once recorded (A1), so the send waits for it —
+  A1's "holds the send until the picker is answered or skipped" — and the unlock never does: the
+  shields come off and the record is queued at the press, as before. The hold is bounded, 15 s
+  (`SyncEngine.reasonHold`, the record's first `nextAttemptAt`), and ends early: a reason given
+  (`Outbox.explain` sets it and makes the record due), any change of the phone's (`Outbox.record`
+  sends a held unlock first — the student has moved on, and a held record holds the queue), Bali
+  going behind (`setForeground(false)`: iOS may suspend it before the hold ends), a Try again. A
+  reason is written only into an unlock never sent — not the one on its way (`sending`) — so the
+  card never claims one the server did not get: too late is said (rule 5). Held only where the
+  Unlocked screen then asks: in a session; Home's unlock over an unread standing, and one under a
+  tap made out of any session, go at once, and the Readout's (`emergencyUnlock`) is unchanged.
+  Alternatives: no hold (online, the reason could never go with the unlock), a hold until answered
+  (the grid green over an unshielded phone for as long as the student looks away), a second unlock
+  carrying the reason (two unlocks in the reports for one press), an endpoint adding a reason later
+  (an API change for a picker). Cost, disclosed: online, a student who stays in Bali without
+  answering reaches the teacher's grid up to 15 s late — a knob, `reasonHold`. **The card:** the
+  three while the reason can still go; the one given (the brand's fill — D1 draws none given; for
+  the owner's canvas); once gone without one, "Your unlock goes to your teacher without a reason";
+  none for an unlock the phone did not make this run. The body says "Your teacher will see you
+  unlocked" while the unlock is on the phone and D1's "can see" once it has gone (honesty over the
+  artboard's one state). **The way back:** Back to focus is the refocus (`SyncEngine.backToFocus`);
+  where protection off was reported in the session since the phone's last tap
+  (`Outbox.reportedOff`, read into `SyncState.reportedOff`), Tap in — the block's scan — instead: a
+  refocus out of protection off is refused `409 protection_off`, and B6b-2's guard can show
+  unlocked over it (#96's review). **A late unlock** (`superseded`, A10/A12) whose answer puts the
+  shields back, with no return of this phone's since — focused there already, or a tap or refocus
+  made after it by the order — is said on Focus until the phone's next change: sent with the order,
+  a return the order cannot place went ahead (Bali on another phone, or before a reinstall); sent
+  with none, the phone's clock was behind, and how to set it. With a return of its own since it is
+  no surprise, and nothing is said. One answered with no state re-reads the truth (A11), pinned.
+  **At the bell** `RootView` asks the router again — a task that sleeps until `Phone.bell` and
+  then redraws it — since the router's bell rule reaches Unlocked only when something it watches
+  changes (C1a's hand-off). Found on the simulator: `TimelineView(.explicit([bell]))`, the
+  hand-off's suggestion, renders its first entry at once, the bell's own date, and never again —
+  the screen stayed Unlocked past the bell; `[.now, bell]` did no better. **Rider
+  (#116's review):** a press that finds nothing to unlock by its end — its tap answered meanwhile —
+  says so (`UnlockFailure.nothing`), never nothing. **Not covered, disclosed:** a swipe out of Bali
+  that suspends it before `Outbox.release` is written leaves the unlock to its next foreground, as
+  offline; a B6d follow-up (a scan that joins no class) carries the reason given before its refiling,
+  not after; a Back to focus the server refuses lands where the truth read again says, and no screen
+  says the refusal yet (`SyncState.refused`: C5b's); an unlock under a tap made out of any session
+  shows Home, not Unlocked (no class to name);
+  D1's "Saved on your phone first — it reaches…" keeps its em-dash (D1's own words).
+
 - **2026-09-29** — **The owner's two rulings: Emergency Unlock is a one-second hold, and Waiting
   promises the lock only while Bali is open.** **The hold:** D1's approved Focus draws "Hold to
   unlock" and C4 built it — held one second, VoiceOver unlocking in one step — while DESIGN.md §4
