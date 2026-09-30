@@ -51,8 +51,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   offline; a B6d follow-up (a scan that joins no class) carries the reason given before its refiling,
   not after; a Back to focus the server refuses lands where the truth read again says, and no screen
   says the refusal yet (`SyncState.refused`: C5b's); an unlock under a tap made out of any session
-  shows Home, not Unlocked (no class to name);
-  D1's "Saved on your phone first — it reaches…" keeps its em-dash (D1's own words).
+  shows Home, not Unlocked (no class to name); D1's "Saved on your phone first — it reaches…" keeps
+  its em-dash (D1's own words). **Tests** (Linux and the iOS simulator): `UnlockedTests` (the words,
+  the card's states, the re-tap, a stuck unlock), `ReasonTests` (the hold and each way it ends, too
+  late — on its way included — a reason or Back to focus the file refuses, nothing to unlock, the
+  report kept across a relaunch, the late unlock's words both ways and a tap of its own since),
+  `ReconcileTests` (the note, or none after the student's own re-tap; the no-state answer),
+  `FocusTests.unlockFailed`, `AppTests.fixtures`; 14 mutations of the rules each turn a test red.
 
 - **2026-09-29** — **The owner's two rulings: Emergency Unlock is a one-second hold, and Waiting
   promises the lock only while Bali is open.** **The hold:** D1's approved Focus draws "Hold to
