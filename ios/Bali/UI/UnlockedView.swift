@@ -71,12 +71,14 @@ struct UnlockedView: View {
                     HStack(spacing: 8) { choices(picker) }
                     VStack(spacing: 8) { choices(picker) }
                 }
+                // Too late, a failed try's words give way: there is nothing left to try.
                 Text(
-                    failed
-                        ?? (picker == .late
-                            ? UnlockedWords.late : "Your teacher sees the reason with your unlock.")
+                    picker == .late
+                        ? UnlockedWords.late
+                        : failed ?? "Your teacher sees the reason with your unlock."
                 )
-                .textStyle(.caption).foregroundStyle(failed == nil ? Theme.textTertiary : Theme.text)
+                .textStyle(.caption)
+                .foregroundStyle(failed == nil || picker == .late ? Theme.textTertiary : Theme.text)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

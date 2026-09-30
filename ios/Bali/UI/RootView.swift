@@ -11,10 +11,18 @@ struct RootView: View {
         @State private var readout = false
     #endif
 
+    /// The last bell rung: at a bell nothing Unlocked (or Protection off) watches changes, as
+    /// Focus's shields do, so the router is asked again then (C1a's hand-off).
+    @State private var rung: Date?
+
     var body: some View {
-        // At the bell nothing Unlocked (or Protection off) watches changes, as Focus's shields do:
-        // the router chooses again then (C1a's hand-off).
-        TimelineView(.explicit(phone.bell.map { [$0] } ?? [])) { _ in screen }
+        let _ = rung
+        screen
+            .task(id: phone.bell) {
+                guard let bell = phone.bell else { return }
+                try? await Task.sleep(for: .seconds(bell.timeIntervalSinceNow))
+                if !Task.isCancelled { rung = bell }
+            }
             .preferredColorScheme(.light)
             #if DEBUG
                 .overlay(alignment: .topTrailing) {
