@@ -597,6 +597,15 @@ struct RegisterTests {
         /// The names whose window iOS has ended — the monitor woken under it — and holds still,
         /// spent, until it is stopped or replaced.
         var spent: Set<Bell.Name> = []
+        /// The wakes iOS owes the monitor, oldest first: stopping or replacing a window it holds
+        /// wakes the monitor under that name at once (round 2, `docs/DECISIONS.md`, 2026-09-29) —
+        /// a window still to end by `clock`, as seen, and one that has ended too when `spentWakes`
+        /// is set (not seen either way). Delivered by `deliver`, as the monitor's callbacks run:
+        /// one at a time.
+        var owed: [Bell.Name] = []
+        var spentWakes = false
+        /// The phone's clock, as `deliver` and `run` move it.
+        var clock = Date.distantPast
 
         func heldEnd(_ name: Bell.Name) -> DateComponents? {
             calls.append(.held(name))
@@ -605,15 +614,22 @@ struct RegisterTests {
         func start(_ name: Bell.Name, _ start: DateComponents, _ end: DateComponents) throws {
             calls.append(.start(name))
             if refusing.contains(name) { throw Refused() }
+            owe(name)
             held[name] = (start, end)
             spent.remove(name)
         }
         func stop(_ names: [Bell.Name]) {
             calls.append(.stop(names))
             for name in names {
+                owe(name)
                 held[name] = nil
                 spent.remove(name)
             }
+        }
+
+        private func owe(_ name: Bell.Name) {
+            guard let end = window(name)?.end else { return }
+            if spentWakes || (end > clock && !spent.contains(name)) { owed.append(name) }
         }
 
         var starts: Int { calls.count { if case .start = $0 { true } else { false } } }
@@ -637,7 +653,54 @@ struct RegisterTests {
             return Bell.carryOut(
                 wake, woken: name, at: now, in: self, clearing: { true }, refused: &refused)
         }
+
+        /// The first delivery past `deliver`'s bound — the monitor's wakes setting each other off,
+        /// back to back; nil: none.
+        var burst: [String]?
+
+        /// iOS delivering the wakes it owes, one at a time, each a tenth of a second after the
+        /// last from `now`, over `truth` — nil: the file not read — each wake's own calls owing
+        /// more. More than `bound` at once is a `burst`: kept, and the rest dropped. What each did,
+        /// in order.
+        func deliver(
+            reading truth: SyncState?, from now: Date, refused: inout Date?, bound: Int = 12
+        ) -> [String] {
+            var (said, now) = ([String](), now)
+            while !owed.isEmpty {
+                guard said.count < bound else {
+                    burst = burst ?? said
+                    owed = []
+                    break
+                }
+                let name = owed.removeFirst()
+                now += 0.1
+                clock = now
+                let wake = Bell.wake(now: now) {
+                    guard let truth else { throw Outbox.Busy() }
+                    return truth
+                }
+                let did = Bell.carryOut(
+                    wake, woken: name, at: now, in: self, clearing: { true }, refused: &refused)
+                said.append("\(name) · \(did)")
+            }
+            return said
+        }
+
+        /// iOS until `end`, the app closed: the windows it holds ended in turn, those ending
+        /// together at once — the monitor woken under each a second after, as round 2 saw, reading
+        /// `truth` — and what that owes, delivered after them (`deliver`).
+        func run(to end: Date, reading truth: SyncState?, refused: inout Date?) -> [String] {
+            var said: [String] = []
+            while let due = Bell.Name.allCases.compactMap({ live($0)?.end }).min(), due < end {
+                let ending = Bell.Name.allCases.filter { live($0)?.end == due }
+                spent.formUnion(ending)
+                owed.insert(contentsOf: ending, at: 0)
+                said += deliver(reading: truth, from: due + 0.9, refused: &refused)
+            }
+            return said
+        }
     }
+
 
     /// A phone's calendar, away from UTC.
     static let calendar = {
@@ -835,6 +898,97 @@ struct RegisterTests {
         // The bell's window taken a pass before: the monitor's own stays, and its wake reads the
         // truth as any does.
         #expect(center.held[.tick] != nil)
+    }
+
+    @Test(
+        "Two extensions in one class, each found at a check-in — the file read, or not: the wakes the app's moves owe run out, the monitor's own asks' included — `tick` and `tock` never waking each other back to back — and the bell's window still wakes it at the last bell (#113's review, B5b-5)"
+    )
+    func twoExtensions() throws {
+        for unread in [false, true] {
+            let center = Center()
+            var (state, refused, bell) = (SyncState(), Date?.none, 1200.0)
+            state.standing = .inSession(session(endsAt: bell), .focused)
+            try Bell.register(Bell.window(until: at(bell)), in: center)
+            for moment in [at(600), at(700)] {
+                bell += 600
+                state.standing = .inSession(session(endsAt: bell), .focused)
+                try Bell.register(Bell.window(until: at(bell)), in: center)
+                let said = center.deliver(
+                    reading: unread ? nil : state, from: moment, refused: &refused)
+                #expect(!said.isEmpty && center.burst == nil, "unread \(unread): \(said)")
+            }
+            #expect(center.live(.bell) == Bell.window(until: at(bell)), "unread \(unread)")
+        }
+    }
+
+    @Test(
+        "The fail-safe, the file unread from the bell on, the app closed — if replacing a window that has ended wakes the monitor too: woken about once a minute, never back to back, its next wake always still to come; the file read again, cleared (#113's review, B5b-5)"
+    )
+    func failSafe() throws {
+        let center = Center()
+        center.spentWakes = true
+        let bell = Bell.window(until: at(1200))
+        try Bell.register(bell, in: center)
+        var (state, refused) = (SyncState(), Date?.none)
+        state.standing = .inSession(session(endsAt: 1200), .focused)
+        // Ten minutes unread: at most two wakes a minute — the backup's joins the monitor's own.
+        let unread = center.run(to: bell.end + 600, reading: nil, refused: &refused)
+        #expect(center.burst == nil && unread.count <= 20, "\(unread)")
+        #expect(center.live(.tick) != nil || center.live(.tock) != nil, "\(unread)")
+        let read = center.run(to: bell.end + 900, reading: state, refused: &refused)
+        #expect(read.first?.hasSuffix("cleared") == true, "\(read)")
+        #expect(Bell.Name.allCases.allSatisfy { center.live($0) == nil }, "\(read)")
+    }
+
+    @Test(
+        "No three of the app's moves and iOS's ends — an extension, a relaunch's pass, an Emergency Unlock, a refocus, a minute on, past the bell — the file read or not at each, replacing a window that has ended waking the monitor or not, set its wakes off back to back; and a wake that keeps the shields, while the app keeps them on, always leaves one to come (B5b-5)"
+    )
+    func noLoop() throws {
+        enum Move: CaseIterable { case extend, relaunch, unlock, refocus, minute, bell }
+        let steps = Move.allCases.flatMap { move in [false, true].map { (move, unread: $0) } }
+        var runs: [[(Move, unread: Bool)]] = [[]]
+        for _ in 1...3 { runs = runs.flatMap { run in steps.map { run + [$0] } } }
+        for spentWakes in [false, true] {
+            for run in runs {
+                let center = Center()
+                center.spentWakes = spentWakes
+                var (state, refused, bell, now, on) = (SyncState(), Date?.none, 900.0, t0, true)
+                state.standing = .inSession(session(endsAt: bell), .focused)
+                try Bell.register(Bell.window(until: at(bell)), in: center)
+                for (move, unread) in run {
+                    center.clock = now
+                    switch move {
+                    case .extend, .refocus:
+                        if move == .extend { bell += 300 }
+                        state.standing = .inSession(session(endsAt: bell), .focused)
+                    case .unlock: state.standing = .inSession(session(endsAt: bell), .unlocked)
+                    case .relaunch, .minute, .bell: break
+                    }
+                    let truth = unread ? nil : state
+                    let said: [String]
+                    switch move {
+                    case .extend, .refocus, .unlock, .relaunch:
+                        // The app's pass: the windows for the shields the truth keeps on, or none.
+                        let window = state.shieldedUntil(now).map(Bell.window)
+                        try Bell.register(window, in: center)
+                        on = window != nil
+                        said = center.deliver(reading: truth, from: now, refused: &refused)
+                    case .minute, .bell:
+                        let end = Bell.window(until: at(bell)).end + Bell.backupAfter + 60
+                        now = move == .minute ? now + 60 : max(now, end)
+                        said = center.run(to: now, reading: truth, refused: &refused)
+                    }
+                    let moves = run.map { "\($0.0)\($0.unread ? " (unread)" : "")" }
+                    let label = "\(spentWakes ? "ended windows wake: " : "")\(moves), at \(move)"
+                    #expect(center.burst == nil, "\(label): \(center.burst ?? [])")
+                    if on, said.last?.contains("kept") == true {
+                        #expect(
+                            Bell.Name.allCases.contains { center.live($0) != nil }, "\(label): \(said)")
+                    }
+                    now += 5
+                }
+            }
+        }
     }
 
     @Test(
