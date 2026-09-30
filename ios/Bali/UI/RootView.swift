@@ -20,7 +20,10 @@ struct RootView: View {
         screen
             .task(id: phone.bell) {
                 guard let bell = phone.bell else { return }
-                try? await Task.sleep(for: .seconds(bell.timeIntervalSinceNow))
+                // By the phone's clock, as the router reads it: set back meanwhile, it sleeps on.
+                while bell.timeIntervalSinceNow > 0, !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(bell.timeIntervalSinceNow))
+                }
                 if !Task.isCancelled { rung = bell }
             }
             .preferredColorScheme(.light)

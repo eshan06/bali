@@ -31,7 +31,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   name); D1's "Saved on your phone first — it reaches…" keeps its em-dash (D1's own words). **Tests:**
   `AppTests.fixtures` (the five fixtures' screens and cards, a frozen phone's reason and Back to
   focus); the screens checked on the iPhone Air simulator, at the default and an accessibility text
-  size.
+  size. **Santa** (two Claude reviewers, both the fallback — Codex refuses every model on this Mac,
+  so they share a model family — and the design check): round 1, no blockers; six WARNs, the easy
+  ones fixed — the bell's task sleeps on while the phone's clock, set back, has not reached the bell;
+  a second tap just after a reason went changes nothing it says; a failed Back to focus or Tap in is
+  told to VoiceOver too. Left: the card's reason from an older unlock still stuck in the queue
+  (C5a-1's words; rare, and it clears itself), and D1's em-dash (the owner's cleanup).
 
 - **2026-09-29** — **C5a-1: the Unlocked screen's engine side — the reason held for, never the
   unlock; Back to focus or a re-tap; a late unlock kept for Focus to say; and two riders.** C5a in

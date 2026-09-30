@@ -90,12 +90,11 @@ struct UnlockedView: View {
             let chosen = picker == .given(reason)
             Button {
                 Task {
-                    failed = await phone.explain(reason)
-                    if let failed {
-                        AccessibilityNotification.Announcement(failed).post()
-                    } else {
-                        given = reason
-                    }
+                    let words = await phone.explain(reason)
+                    // A second tap a moment after a reason went: that one stands.
+                    guard given == nil else { return }
+                    failed = words
+                    if let words { announce(words) } else { given = reason }
                 }
             } label: {
                 // As wide as the widest: side by side only while all three fit whole (D1's thirds).
@@ -111,21 +110,32 @@ struct UnlockedView: View {
         }
     }
 
+    /// What did not go through, told to VoiceOver too: its focus stays on the button (rule 5).
+    private func announce(_ words: String) { AccessibilityNotification.Announcement(words).post() }
+
     /// Back to focus — or, where protection off was reported here, the block's scan — and D1's line.
     private func back(_ words: UnlockedWords) -> some View {
         VStack(spacing: 12) {
             if let retap = words.retap {
                 Text(retap).textStyle(.body)
                 Button {
-                    Task { await phone.tapIn() }
+                    Task {
+                        await phone.tapIn()
+                        if let failed = phone.tapFailed { announce(failed) }
+                    }
                 } label: {
                     Label(phone.scanning ? "Scanning…" : "Tap in", systemImage: "wave.3.right")
                 }
                 .buttonStyle(PrimaryButtonStyle()).disabled(phone.scanning)
                 if let tapFailed = phone.tapFailed { Text(tapFailed).textStyle(.body) }
             } else {
-                Button("Back to focus") { Task { notBack = await phone.backToFocus() } }
-                    .buttonStyle(PrimaryButtonStyle())
+                Button("Back to focus") {
+                    Task {
+                        notBack = await phone.backToFocus()
+                        if let notBack { announce(notBack) }
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
                 if let notBack { Text(notBack).textStyle(.body) }
             }
             HStack(alignment: .top, spacing: 8) {
