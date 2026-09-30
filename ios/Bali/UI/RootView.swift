@@ -11,8 +11,21 @@ struct RootView: View {
         @State private var readout = false
     #endif
 
+    /// The last bell rung: at a bell nothing Unlocked (or Protection off) watches changes, as
+    /// Focus's shields do, so the router is asked again then (C1a's hand-off).
+    @State private var rung: Date?
+
     var body: some View {
+        let _ = rung
         screen
+            .task(id: phone.bell) {
+                guard let bell = phone.bell else { return }
+                // By the phone's clock, as the router reads it: set back meanwhile, it sleeps on.
+                while bell.timeIntervalSinceNow > 0, !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(bell.timeIntervalSinceNow))
+                }
+                if !Task.isCancelled { rung = bell }
+            }
             .preferredColorScheme(.light)
             #if DEBUG
                 .overlay(alignment: .topTrailing) {
@@ -38,7 +51,7 @@ struct RootView: View {
         case .home: HomeView(phone: phone)
         case .waiting: WaitingView(phone: phone)
         case .focus: FocusView(phone: phone)
-        case .unlocked: StepPlaceholder("Unlocked — C5")
+        case .unlocked: UnlockedView(phone: phone)
         case .protectionOff: StepPlaceholder("Protection off — C5")
         case .sessionOver: StepPlaceholder("Session over — C5")
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }

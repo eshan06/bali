@@ -58,7 +58,17 @@
             "focusUnscheduled": State(
                 protection: shielded(unscheduled: true),
                 sync: standing(.inSession(period3, .focused))),
-            "unlocked": State(sync: standing(.inSession(period3, .unlocked))),
+            "focusSuperseded": State(protection: shielded(), sync: superseded()),
+            "unlocked": State(
+                sync: queued(
+                    standing(.inSession(period3, .unlocked)), .unlock(session: "session", reason: nil),
+                    holding: SyncEngine.reasonHold)),
+            "unlockedReason": State(
+                sync: queued(
+                    standing(.inSession(period3, .unlocked)),
+                    .unlock(session: "session", reason: .bathroom))),
+            "unlockedRecorded": State(sync: standing(.inSession(period3, .unlocked))),
+            "unlockedRetap": State(sync: reported(standing(.inSession(period3, .unlocked)))),
             "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
             "storage": State(
                 problem: "The outbox could not be opened: SQLite error 14: unable to open database",
@@ -132,15 +142,35 @@
             return state
         }
 
-        /// Out of any session, a tap made as the fixture was, not answered yet (decision 7's cap) —
-        /// kept in an outbox of the fixture's own, since only an outbox makes one.
-        private static func heldTap() -> SyncState {
-            var state = standing(.out)
+        /// Out of any session, a tap made as the fixture was, not answered yet (decision 7's cap).
+        private static func heldTap() -> SyncState { queued(standing(.out), .tap(tagId: "fixture")) }
+
+        /// `state` with `change` made as the fixture was, not sent yet — for `hold`, an unlock
+        /// waiting for its reason — kept in an outbox of the fixture's own: only an outbox makes one.
+        private static func queued(_ state: SyncState, _ change: Change, holding hold: TimeInterval = 0)
+            -> SyncState
+        {
+            var state = state
             let url = FileManager.default.temporaryDirectory.appending(
                 path: "fixture-\(UUID().uuidString).sqlite")
             let outbox = try? Outbox(at: url)
-            _ = try? outbox?.record(.tap(tagId: "fixture"), now: Date())
+            _ = try? outbox?.record(change, now: Date(), holding: hold)
             state.queued = (try? outbox?.records()) ?? []
+            return state
+        }
+
+        /// Protection off reported in Period 3 since the phone's last tap: only a re-tap leaves it.
+        private static func reported(_ state: SyncState) -> SyncState {
+            var state = state
+            state.reportedOff = period3.id
+            return state
+        }
+
+        /// Focused in Period 3 again: the student's unlock recorded late, a return this phone's
+        /// order cannot place gone ahead of it (A12).
+        private static func superseded() -> SyncState {
+            var state = standing(.inSession(period3, .focused))
+            state.superseded = Superseded(session: period3.id, ordered: true)
             return state
         }
 

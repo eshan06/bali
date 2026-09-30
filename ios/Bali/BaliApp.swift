@@ -113,6 +113,11 @@ final class Phone {
             opened: opened, now: Date())
     }
 
+    /// The bell of the session the phone stands in, where the router chooses again (C5a).
+    var bell: Date? {
+        if case .inSession(let session, _)? = sync?.standing { session.endsAt } else { nil }
+    }
+
     /// Opens `screen` over what shows.
     func open(_ screen: Screen) { opened.append(screen) }
 
@@ -211,15 +216,24 @@ final class Phone {
 
     /// Emergency Unlock (C4), always allowed: recorded where decision 11 files it — the shields off
     /// at once, the record queued, never waiting on the network — or why not (rule 5), which the
-    /// screen says: a phone whose engine has not started, a frozen one too, or an outbox refusing.
+    /// screen says: a phone whose engine has not started, a frozen one too, an outbox refusing, or
+    /// nothing left to unlock (`SyncEngine.pressUnlock`).
     func emergencyUnlock() async -> UnlockFailure? {
         guard let engine else { return .notStarted }
-        do {
-            try await engine.emergencyUnlock()
-            return nil
-        } catch {
-            return .notSaved
-        }
+        return await engine.pressUnlock()
+    }
+
+    /// The reason for the latest Emergency Unlock (C5a), sent with it while it has never been
+    /// sent — or what the Unlocked screen says (rule 5); a phone not started says so.
+    func explain(_ reason: UnlockReason) async -> String? {
+        guard let engine else { return Joining.notStarted }
+        return await engine.explain(reason)
+    }
+
+    /// Back to focus from an Emergency Unlock (C5a) — or what the Unlocked screen says (rule 5).
+    func backToFocus() async -> String? {
+        guard let engine else { return Joining.notStarted }
+        return await engine.backToFocus()
     }
 
     /// Starts the sign-in, the engine and the enforcer, unless they run already: a start that
