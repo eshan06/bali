@@ -900,6 +900,8 @@ async function takeOverStaleRow(
  * and re-reads the truth. Its `event_id` index is the arbiter: a rival delivery
  * of the same tap, uncommitted when `exact` looked, is answered as this one's
  * retry. Nothing deletes an `armed_taps` row, so the rival is always found.
+ * (Since A17 `armTap` holds the tap's own lock, so such a rival can only be a
+ * writer outside it; the arbiter stays as the defence.)
  */
 async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promise<ArmTapResult> {
   const recorded = firstOrUndefined(
@@ -1116,7 +1118,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // event_id index is answered as a replay, not a 500" stages the
       // interleaving with a held transaction, on the real-Postgres lane CI
       // runs; rethrowing instead of recovering, or dropping the savepoint,
-      // each turns it red.
+      // each turns it red. Since A17 this function holds the tap's own lock,
+      // so the concurrent delivery can only be a writer outside it (that
+      // test's is a raw insert); the recovery stays as the defence.
       let row: typeof armedTaps.$inferSelect | undefined;
       let idAlreadyTaken = false;
       try {

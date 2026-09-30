@@ -1920,7 +1920,7 @@ describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
     expect((await landing).outcome).toBe('joined');
     expect(await arming).toEqual({ outcome: 'replay' });
     expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
-  });
+  }, 20_000);
 });
 
 /**

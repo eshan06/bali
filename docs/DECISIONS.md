@@ -41,7 +41,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the session's lock only after a tap heard past the bell was refused there — the tap arms, the
   extend lands (it is judged by its press, decision 12), and the class runs on without that
   student until they tap again: whichever takes the session first wins, as A16's extend and sweep
-  do; closing it would judge the extend at its commit, a change to decision 12's rule. **Kept:**
+  do; closing it would judge the extend at its commit, a change to decision 12's rule. The same
+  outcome, contrived: a student in two of a teacher's classes whose sessions are both past their
+  bells by the read — only the newest is tried under its lock, so an extend landing on the older
+  one first leaves the tap armed too. And one practically unreachable (santa's round 2): a delivery heard before the bell that loses a deadlock
+  lets go of the tap's lock for `withDeadlockRetry`'s 10–20 ms backoff, and a retry of it heard
+  past the bell in that moment arms before the re-run joins, at its own moment — told `armed`,
+  joined, and the Start skips the spent row. It needs the phone's retry, sent only once its
+  request times out, to land inside that backoff at the bell. **Kept:**
   late records — an unlock or protection off in the gap is recorded as before the sweep, and after
   it keeps its note (A2c, A10, A11); only joining or returning to focus in an over session is
   refused. Start is untouched here. One knock-on, as after the sweep today: an unlock sent under a

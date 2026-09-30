@@ -433,6 +433,8 @@ describe('POST /v1/taps', () => {
 });
 
 // Only a real Postgres contends, so these run where TEST_DATABASE_URL is set.
+// Each gates its staging on 5 s, so each carries a 20 s budget: a staging that
+// never happened says so, rather than dying as vitest's own 5 s time-out.
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
 
 describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => {
@@ -526,7 +528,7 @@ describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => 
     expect(res?.statusCode).toBe(200);
     expect(res?.json()).toEqual({ outcome: 'replay', session: null, state: null });
     expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
-  });
+  }, 20_000);
 
   it('a tap past the bell by the read joins when an extend moved the bell before its lock', async () => {
     // An extend pressed before the bell commits between the route's read of
@@ -557,5 +559,5 @@ describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => 
       session: { id: session.id, classId: session.classId, endsAt: extended.endsAt.toISOString() },
       state: 'focused',
     });
-  });
+  }, 20_000);
 });
