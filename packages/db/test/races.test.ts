@@ -1799,10 +1799,12 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
      * under its lock. Staged both ways round: a holder takes the session's
      * row, the first caller parks on it and the second behind it, the sweep's
      * scan having run before either lands — so it always finds the session
-     * due. Extend first: it lands, and the sweep, judging the expiry again
-     * under the lock, leaves the session running; without that it ended the
-     * class the teacher had just been told was extended. Sweep first: the
-     * session ends, and the extend is refused SESSION_NOT_RUNNING.
+     * due. The press is stamped a second before the bell, as a teacher's last
+     * moment "add time" is. Extend first: it lands, and the sweep, judging
+     * the expiry again under the lock, leaves the session running; without
+     * that it ended the class the teacher had just been told was extended.
+     * Sweep first: the session ends, and the extend is refused
+     * SESSION_NOT_RUNNING.
      */
     for (const first of ['extend', 'sweep'] as const) {
       const { classId, studentId } = await seed(`race-extend-sweep-${first}`);
@@ -1816,7 +1818,12 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
 
       const release = await holdSession(session.id);
       const now = new Date();
-      const press = { sessionId: session.id, durationMinutes: 10, at: now, eventId: newUuidV7() };
+      const press = {
+        sessionId: session.id,
+        durationMinutes: 10,
+        at: new Date(session.endsAt.getTime() - 1_000),
+        eventId: newUuidV7(),
+      };
       let extending: ReturnType<typeof extendSession> | undefined;
       let sweeping: ReturnType<typeof expireDueSessions> | undefined;
       let unstaged: Error | null = null;

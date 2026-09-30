@@ -3293,8 +3293,9 @@ describe('endSession & expiry', () => {
     // under its lock. An extend committing in between moved the bell on, and
     // the expiry ended the session anyway: the teacher was told "extended"
     // for a class that ended. PGlite cannot interleave the two, so the order
-    // is pinned by hand — the scan's pick, the extend, then the sweep's own
-    // per-session step. The real-Postgres lane stages it through the sweep.
+    // is pinned by hand — the scan's pick at the bell, the extend pressed a
+    // second before it, then the sweep's own per-session step. The
+    // real-Postgres lane stages it through the sweep.
     const { klass, student } = await seedClass('expire-after-extend');
     const { session } = await startSession(db, {
       classId: klass.id,
@@ -3306,12 +3307,12 @@ describe('endSession & expiry', () => {
       eventId: newUuidV7(),
       deviceTime: new Date('2026-01-01T09:01:00Z'),
     });
-    const now = new Date('2026-01-01T09:25:30Z'); // 30 s past the bell, not yet swept
+    const now = session.endsAt; // the sweep's, at the bell: the session is due
 
     const extended = await extendSession(db, {
       sessionId: session.id,
       durationMinutes: 10,
-      at: now,
+      at: new Date(now.getTime() - 1_000),
     });
     const expiry = await endSession(db, { sessionId: session.id, at: now, reason: 'expired' });
 
