@@ -16,9 +16,11 @@ public struct History: Sendable, Hashable {
 
     public init() {}
 
-    /// A page came back — the first, or the one after `nextBefore` — its moments after those read,
-    /// or why not. True when the history must be read again from the top: a cursor it does not
-    /// hold (`unknown_cursor`), whose Try again would only be refused again.
+    /// A page came back — the first, into a new `History` (a read from the top starts from one: a
+    /// newer moment added after older ones would be drawn out of order), or the one after
+    /// `nextBefore` — its moments after those read, each once, or why not.
+    /// True when the history must be read again from the top: a cursor it does not hold
+    /// (`unknown_cursor`), whose Try again would only be refused again.
     public mutating func answered(_ response: APIResponse<HistoryPage>) -> Bool {
         busy = false
         guard let page = response.answer else {

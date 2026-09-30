@@ -42,7 +42,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ("Period 5 — Chemistry"): for the owner too. **Tests:** `HistoryTests` (the grouping across days,
   years and time zones; every kind in `history/every-kind`; what this build does not know; the pages;
   each failure), `HistoryEngineTests` (the 401 renewal and the cursor), `ScreenTests.tabs`,
-  `AppTests.tabs`.
+  `AppTests.tabs`. **Santa** (two Claude reviewers — Codex refuses every model on this Mac, so they
+  share a model family — and the design check): round 1, no blockers; the WARNs fixed — a first
+  page is answered into a new `History`, said (one added after older moments would be drawn out
+  of order), and VoiceOver reads the bar as tabs, its icons hidden from it. Left: D1's em-dash,
+  the owner's.
 
 - **2026-09-29** — **B5b-5: the monitor's own wakes never wake each other — a wake of `tick` or
   `tock` more than a minute before the end the monitor asked for there asks nothing (#113's open

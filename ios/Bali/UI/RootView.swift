@@ -82,8 +82,9 @@ struct StepPlaceholder: View {
 }
 
 /// D1's tab bar, where the router honours a tab (C6a; `Phone.tabbed`): the one shown in the
-/// brand's ink, the others in the tertiary, on white under a hairline. Its text grows no larger
-/// than the largest standard size, and shows large on a long press, as iOS's own tab bar does.
+/// brand's ink, the others in the tertiary, on white under a hairline. As iOS's own tab bar does,
+/// its text grows no larger than the largest standard size and shows large on a long press, and
+/// VoiceOver reads it as tabs.
 struct TabBar: View {
     let phone: Phone
 
@@ -101,6 +102,7 @@ struct TabBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: icon).font(.system(size: 22)).frame(height: 24)
+                            .accessibilityHidden(true)
                         Text(title).textStyle(
                             TextStyle(size: 12, line: 16, weight: shown == tab ? .semibold : .medium))
                     }
@@ -111,6 +113,7 @@ struct TabBar: View {
                 .accessibilityShowsLargeContentViewer()
             }
         }
+        .accessibilityElement(children: .contain).accessibilityAddTraits(.isTabBar)
         .padding(.top, 8).background(Theme.card.ignoresSafeArea(edges: .bottom))
         .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)

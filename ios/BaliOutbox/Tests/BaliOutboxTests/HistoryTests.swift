@@ -164,7 +164,7 @@ struct HistoryTests {
     }
 
     @Test(
-        "Pages: the first read in, the next after it, each moment once however often a page is read; the cursor the last page named, none at the end; a page that fails keeps what was read and says why, and the next answer clears it"
+        "Pages: the first read into a new History, the next after it, each moment once should an answer come twice; the cursor the last page named, none at the end; a page that fails keeps what was read and says why, and the next answer clears it"
     )
     func pages() async throws {
         var history = History()
