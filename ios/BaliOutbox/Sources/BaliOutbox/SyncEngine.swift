@@ -478,6 +478,27 @@ public actor SyncEngine {
         return answer
     }
 
+    /// Leaves a class (`DELETE /v1/enrollments/{id}`, A19): the Me screen's own call (C6c), its
+    /// token renewed once on a 401. Out — it ended, or they were out already — the class leaves
+    /// `me` at once; and with any answer the truth is read again, which a read sent before it
+    /// never overrides — a refusal says why, and a class the server does not know is read away.
+    public func leave(enrollment id: String, _ request: EndEnrollmentRequest) async
+        -> APIResponse<EndEnrollmentResponse>
+    {
+        let answer = await Joining.send(renewing: refresh) {
+            await client.leave(enrollment: id, request)
+        }
+        guard case .status = answer.result else { return answer }
+        if answer.answer != nil, let me = state.me {
+            state.me = MeResponse(
+                user: me.user, classes: me.classes.filter { $0.enrollmentId != id },
+                session: me.session)
+        }
+        meChanges += 1
+        reread()
+        return answer
+    }
+
     /// Whether an Emergency Unlock waits unsent in the outbox file — Sign out's rule (C6b) — read
     /// from the file itself, so one a failed read left out of `state.queued` counts too (santa's
     /// round 1); nil when the file cannot be read now.

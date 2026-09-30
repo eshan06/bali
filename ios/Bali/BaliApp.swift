@@ -94,6 +94,9 @@ final class Phone {
     /// finish (rule 5).
     var naming = Naming()
     private(set) var signOutFailed: String?
+    /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
+    /// did not finish.
+    var leaving = Leaving()
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -117,6 +120,7 @@ final class Phone {
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
+            leaving = fixture.leaving
         }
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
@@ -193,7 +197,7 @@ final class Phone {
         if signedIn != self.signedIn || another {
             tab = .home
             forgetHistory()
-            (naming, signOutFailed) = (Naming(), nil)
+            (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             if !joining.busy { joining = Joining() }
         }
         if another { Task { await engine?.forgetMe() } }
@@ -211,6 +215,18 @@ final class Phone {
         let request = naming.save(at: Date())
         let answer = await engine.rename(request)
         naming.saved(answer, for: request)
+    }
+
+    /// Leave class (C6c): the class asked about is left (`DELETE /v1/enrollments/{id}`, A19) through
+    /// the engine — under its last try's event id while it is the same class's, so a try after no
+    /// answer is its replay. Out, the class is gone from `me` at once; else why not, said under the
+    /// question (rule 5). A phone whose engine has not started — a frozen one too — says so.
+    func leave() async {
+        guard leaving.asking != nil, !leaving.busy else { return }
+        guard let engine else { return leaving.failure = Joining.notStarted }
+        guard let sent = leaving.send(at: Date()) else { return }
+        leaving.left(
+            await engine.leave(enrollment: sent.enrollmentId, sent.request), for: sent.enrollmentId)
     }
 
     /// Me's Sign out (C6b): the sign-in's tokens forgotten — never where the phone stands, its

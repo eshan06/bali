@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a), nor a leave (C6c) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -198,6 +198,26 @@ struct AppTests {
         // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
         let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
         #expect(off.screen == .me && off.tabbed && off.protection?.permissionOff == true)
+        // Leave (C6c): Period 3's question; the leave under way; the server's no said under it;
+        // and Leave held while the phone stands in Period 3's lesson, never out of it. A frozen
+        // phone's leave says it has not started, the question kept to try again; a change of who
+        // is signed in takes it away.
+        let asked = Phone(fixture: try #require(PreviewFixtures.all["meLeaveAsk"]))
+        let period3 = try #require(asked.sync?.me?.classes.first)
+        #expect(asked.leaving.asking == period3 && period3.enrollmentId == "e3")
+        #expect(!asked.leaving.busy && asked.screen == .me && asked.tabbed)
+        await asked.leave()
+        #expect(asked.leaving.failure == Joining.notStarted && asked.leaving.asking == period3)
+        asked.signed(in: false)
+        #expect(asked.leaving == Leaving())
+        #expect(try #require(PreviewFixtures.all["meLeaving"]).leaving.busy)
+        let refusedLeave = try #require(PreviewFixtures.all["meLeaveError"]).leaving
+        #expect(refusedLeave.failure == Leaving.inSession(period3) && !refusedLeave.busy)
+        let inLesson = Phone(fixture: try #require(PreviewFixtures.all["meLeaveInSession"]))
+        #expect(inLesson.screen == .me && inLesson.tabbed)
+        let lesson = try #require(inLesson.sync)
+        #expect(Leaving.held(period3, lesson, now: Date()) == Leaving.inSession(period3))
+        #expect(Leaving.held(period3, try #require(me.sync), now: Date()) == nil)
     }
 
     @Test(

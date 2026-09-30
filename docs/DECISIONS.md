@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **C6c: D1's Leave on Me.** **Built as D1 draws it:** a quiet text Leave on
+  each class (15 semibold, the secondary ink, 44 pt), and D1's line under the classes. **The
+  question, which D1 does not draw:** asked in place under the class, as Me's name is edited in
+  place (C6b) — "Leave <class>?", what it costs ("You'll need the class code to join it
+  again."), **Leave class** and **Cancel** — never a system dialog: DESIGN.md's tokens hold, and
+  the student's own leave stays calm, in the secondary button, not the destructive red DESIGN.md
+  keeps for removing a student and deleting a class. Said to VoiceOver as it appears. **Its
+  rules** (`Leaving`, on Linux): one leave at a time; one event id while it is the same
+  enrollment's, so a try after no answer is its replay (rule 4); an answer to a leave the
+  question did not send, dropped; a class named with no enrollment id (an older API's) shows no
+  Leave. **Through the engine** (`SyncEngine.leave`): the class gone from `me` at once, and the
+  truth read again after any answer, the `meChanges` guard keeping an older read from bringing
+  it back. **In session:** held, dimmed with the reason, while the phone stands in that class's
+  lesson by its own clock (`Leaving.held`). The phone knows only its own lesson — `/v1/me` names
+  no other class's — so Leave in a class whose lesson runs without the student is refused by the
+  server, and `class_in_session` is said under the question in the same words. No new em-dash in
+  Bali's own words; a class's name keeps its own.
 - **2026-09-30** — **A19: a student leaves a class, never while it is in session (the
   owner's approval, 2026-09-30).** **The rule:** `DELETE /v1/enrollments/{id}` on the
   student's own enrollment is refused `409 class_in_session` (`API_ERROR_REASONS`, additive;
