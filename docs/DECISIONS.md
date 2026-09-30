@@ -13,9 +13,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   picks due sessions with an unlocked scan (`ended_at is null and ends_at <= now`), then expires
   each in a transaction of its own (`endSession`), which locked the row but checked only
   `ended_at`. A teacher's extend committing between the two — pressed a moment before the bell,
-  or past it on a session not yet swept, which `extendSession` gives a fresh window from the press
-  — was answered "extended", and the expiry then ended the session anyway, stamped at the sweep's
-  time inside the new window. A15 made the pairing routine: a sweep every minute in each process,
+  or past it on a session not yet swept, which `extendSession` then gave a fresh window from the
+  press — was answered "extended", and the expiry then ended the session anyway, stamped at the
+  sweep's time inside the new window. A15 made the pairing routine: a sweep every minute in each process,
   and the cron. **Decided:**
   an expiry is the bell's, so `endSession` judges it under the lock — `'expired'` with `ends_at`
   after `at` ends nothing (`ended: false`, the answer of an expiry already done). Both sides take
@@ -30,15 +30,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   press stamped a second before the bell: without the guard the extend-first order ended the
   session under an "extended", red 3 of 3; PGlite pins that order by hand (the scan's pick, the
   extend, then the sweep's per-session step); and the wire test of an extend after the end covers
-  the sweep's end and asserts the reason. A press before the bell races the sweep whatever the
-  question below decides, so the tests stand either way. Three PGlite tests that expired a
-  session before its bell — which no sweep does — expire it at the bell. **Open, the owner's
-  (PLAN.md open decision 12):** whether a session past its bell by the server's clock, not yet
-  swept, may be extended at all. ARCHITECTURE and this log do not say: Phase 2 chose yes (`base =
+  the sweep's end and asserts the reason. A press before the bell races the sweep however the
+  question below was ruled, so those tests stand as they are. Three PGlite tests that expired a
+  session before its bell — which no sweep does — expire it at the bell. **Open decision 12, the
+  owner's ruling (2026-09-30, in chat): an extend past the bell is refused.** The question
+  ARCHITECTURE and this log did not answer: may a session past its bell by the server's clock,
+  not yet swept, be extended at all? Phase 2 said yes — a fresh window from the press (`base =
   max(at, endsAt)`, pinned by "gives a session past its end but not yet swept a window starting
-  from now" — else the new end is still past and "the shield never comes back"), #28 kept it, and
-  decision 6 has every phone let go at the bell by its own clock. Left as it is here; refusing
-  it, prototyped, turns only that Phase 2 test red.
+  from now", lest the new end still be past), which #28 kept. **Refused**, for the owner's
+  reasons: every phone clears its shields at the bell by its own clock (decision 6); a late
+  extend would show those phones green on the grid while they are unlocked; and whether it took
+  would depend on whether the sweep had run yet. So `extendSession` refuses a session whose end
+  is at or before `at`, by the server's clock, with a swept session's answer, `409
+  session_not_running` ("session has ended"), and the teacher starts a new session; `base` is
+  the stored end again. A `/v1` correction in place, `200` to `409` (API decision 2): no shipped
+  client calls extend yet (the portal has no control; `npm run dev:teacher -- extend` stops on
+  the `409`, its body printed). ARCHITECTURE's decision 6 says so now. Red first: Phase 2's test, flipped to the
+  refusal (at the bell and 30 s past it, with a second before it still extending), and a wire
+  test of a session past its bell that the sweep has not reached.
 
 - **2026-09-30** — **The C riders, Riders-1: honesty and safety — the review WARNs C4–C6b left
   open.** Seven, each where the phone said less than the truth or trapped a student. **Sign out on
