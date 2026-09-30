@@ -31,15 +31,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   weekday and date, its year once not this one — each oldest first, the page reversed and never
   re-sorted (A7: a switch's two moments share an instant), in cards of one class's moments in a
   row; the day and the time in the phone's locale and time zone. A kind this build does not know is
-  left out, as A7 asks. **Words D1 does not draw** — for the owner, and unchanged until their word:
-  "Screen Time off" (protection off, the app's name for it since 2026-09-27), "Switched to another
-  class", "Left the class", "Removed from the class", "Tap not used — it already counted in another
-  class" (a declined tap whose class is not named), the notes "Arrived after class ended",
-  "Arrived late, so it changed nothing", "Arrived after you left this class" and "Screen Time was
-  off, so it changed nothing", and "This is a teacher's account, and History is only for students."
-  D1's own words keep their em-dashes ("The same moments your teachers see — nothing more.", "Tap
-  not used — it already counted in …"), which reads twice where the class's name has one of its own
-  ("Period 5 — Chemistry"): for the owner too. **Tests:** `HistoryTests` (the grouping across days,
+  left out, as A7 asks. **Words D1 does not draw**, kept as written on the conductor's word
+  (2026-09-29) but for the one new em-dash, which DESIGN.md bans: "Screen Time off" (protection off,
+  the app's name for it since 2026-09-27), "Switched to another class", "Left the class", "Removed
+  from the class", "Tap not used. It already counted in another class." (a declined tap whose
+  class is not named), the notes "Arrived after class ended", "Arrived late, so it changed
+  nothing", "Arrived after you left this class" and "Screen Time was off, so it changed nothing",
+  and "This is a teacher's account, and History is only for students." D1's own words keep their
+  em-dashes ("The same moments your teachers see — nothing more.", "Tap not used — it already
+  counted in <class>") until the owner rules — the second reads twice where the class's name has
+  one of its own ("Period 5 — Chemistry"). **Tests:** `HistoryTests` (the grouping across days,
   years and time zones; every kind in `history/every-kind`; what this build does not know; the pages;
   each failure), `HistoryEngineTests` (the 401 renewal and the cursor), `ScreenTests.tabs`,
   `AppTests.tabs`. **Santa** (two Claude reviewers — Codex refuses every model on this Mac, so they

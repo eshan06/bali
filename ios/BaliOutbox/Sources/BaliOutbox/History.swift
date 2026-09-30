@@ -124,8 +124,11 @@ extension History.Moment {
             case .leftForOtherSession: "Switched to another class"
             case .enrollmentLeft: "Left the class"
             case .enrollmentRemoved: "Removed from the class"
+            // D1's words where they name the class, its em-dash kept until the owner's cleanup;
+            // with none named, no new em-dash (DESIGN.md).
             case .armedTapSkipped:
-                "Tap not used — it already counted in \(event.countedIn?.name ?? "another class")"
+                event.countedIn.map { "Tap not used — it already counted in \($0.name)" }
+                    ?? "Tap not used. It already counted in another class."
             case .sessionEnded, .sessionExpired: "Class ended"
             }
         note =

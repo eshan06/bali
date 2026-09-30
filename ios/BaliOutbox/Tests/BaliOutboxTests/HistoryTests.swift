@@ -157,7 +157,7 @@ struct HistoryTests {
         #expect(
             drawn(history.days(now: t0, time: us())) == [
                 "Today", "[Period 3 — Algebra II · Ms. Rivera]",
-                "9:12 AM Tap not used — it already counted in another class",
+                "9:12 AM Tap not used. It already counted in another class.",
                 "9:14 AM Unlocked · Nurse (Screen Time was off, so it changed nothing)",
                 "9:16 AM Unlocked (Arrived after you left this class)", "9:20 AM Unlocked",
             ])
