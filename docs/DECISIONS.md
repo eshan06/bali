@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C5a-1: the Unlocked screen's engine side — the reason held for, never the
+  unlock; Back to focus or a re-tap; a late unlock kept for Focus to say; and two riders.** C5a in
+  two PRs for size (santa's step 0): this one, BaliOutbox; C5a-2 the screen. **The reason:** D1
+  asks why after the unlock, and a reason is kept once recorded (A1), so the send waits for it —
+  A1's "holds the send until the picker is answered or skipped" — and the unlock never does: the
+  shields come off and the record is queued at the press, as before. The hold is bounded, 15 s
+  (`SyncEngine.reasonHold`, the record's first `nextAttemptAt`; the owner told, and kept as built),
+  and ends early: a reason given (`Outbox.explain` sets it and makes the record due), any change of
+  the phone's (`Outbox.record` sends a held unlock first — the student has moved on, and a held
+  record holds the queue), Bali going behind (`setForeground(false)`: iOS may suspend it before the
+  hold ends), a Try again. A reason is written only into an unlock never sent — not the one on its
+  way (`sending`) — so no screen can claim one the server did not get: too late is said (rule 5).
+  Held only where the Unlocked screen then asks — in a session (`pressUnlock`); over an unread
+  standing, or under a tap made out of any session, it goes at once, and the Readout's
+  (`emergencyUnlock`) is unchanged. Alternatives: no hold (online, the reason could never go with
+  the unlock), a hold until answered (the grid green over an unshielded phone for as long as the
+  student looks away), a second unlock carrying the reason (two unlocks in the reports for one
+  press), an endpoint adding a reason later (an API change for a picker). Cost, disclosed: online, a
+  student who stays in Bali without answering reaches the teacher's grid up to 15 s late — one
+  constant. **The way back:** Back to focus is the refocus (`SyncEngine.backToFocus`); where
+  protection off was reported in the session since the phone's last tap (`Outbox.reportedOff`, read
+  into `SyncState.reportedOff` at launch and at each change), a re-tap instead: a refocus out of
+  protection off is refused `409 protection_off`, and B6b-2's guard can show unlocked over it (#96's
+  review). **A late unlock** (`superseded`, A10/A12) whose answer puts the shields back, with no
+  return of this phone's since — focused there already, or a tap or refocus made after it by the
+  order — is kept for Focus until the phone's next change (`Sent.superseded`,
+  `SyncState.superseded`): sent with the order, a return the order cannot place went ahead (Bali on
+  another phone, or before a reinstall); sent with none, the phone's clock was behind, and how to
+  set it. With a return of its own since it is no surprise, and nothing is said. One answered with
+  no state re-reads the truth (A11), pinned. **Riders:** a press that finds nothing to unlock by
+  its end — its tap answered meanwhile — says so (`UnlockFailure.nothing`, #116's review), through
+  `pressUnlock`, which C5a-2's `Phone` calls; Emergency Unlock's one-second hold pinned
+  (`FocusTests.unlockHold`, #118's review) by reading the control's own source, as `waitingWords`
+  reads Waiting's (no SwiftUI press can be made from a test): the long press's own action at one
+  second, its ring filling in that second, VoiceOver's action in one step, and no other way in — red
+  on a half-second hold, and on a tap in VoiceOver's place. **Not covered, disclosed:** a swipe out
+  of Bali that suspends it before `Outbox.release` is written leaves the unlock to its next
+  foreground, as offline; a B6d follow-up (a scan that joins no class) carries the reason given
+  before its refiling, not after; a Back to focus the server refuses lands where the truth read
+  again says, and no screen says the refusal yet (`SyncState.refused`: C5b's). **Tests** (Linux and
+  the iOS simulator): `UnlockedTests` (the words, the card's states, the re-tap, a stuck unlock),
+  `ReasonTests` (the hold and each way it ends, too late — on its way included — a reason or Back
+  to focus the file refuses, nothing to unlock, the report kept across a relaunch, the late unlock's
+  words both ways and a tap of its own since), `ReconcileTests` (the note, or none after the
+  student's own re-tap; the no-state answer), `FocusTests.unlockFailed` and `unlockHold`; 13
+  mutations of the rules each turn a test red.
+
 - **2026-09-29** — **The owner's two rulings: Emergency Unlock is a one-second hold, and Waiting
   promises the lock only while Bali is open.** **The hold:** D1's approved Focus draws "Hold to
   unlock" and C4 built it — held one second, VoiceOver unlocking in one step — while DESIGN.md §4
