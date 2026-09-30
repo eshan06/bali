@@ -57,7 +57,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   late — on its way included — a reason or Back to focus the file refuses, nothing to unlock, the
   report kept across a relaunch, the late unlock's words both ways and a tap of its own since),
   `ReconcileTests` (the note, or none after the student's own re-tap; the no-state answer),
-  `FocusTests.unlockFailed`, `AppTests.fixtures`; 14 mutations of the rules each turn a test red.
+  `FocusTests.unlockFailed`, `AppTests.fixtures`; 13 mutations of the rules each turn a test red.
+  **Rider (#118's review): the one-second hold pinned** — `FocusTests.unlockHold` reads the
+  control's own source, as `waitingWords` reads Waiting's (no SwiftUI press can be made from a
+  test): the long press's own action at one second, its ring filling in that second, VoiceOver's
+  action in one step, and no other way in — no tap, no button. Red on a half-second hold, and on
+  a tap in place of VoiceOver's action.
 
 - **2026-09-29** — **The owner's two rulings: Emergency Unlock is a one-second hold, and Waiting
   promises the lock only while Bali is open.** **The hold:** D1's approved Focus draws "Hold to

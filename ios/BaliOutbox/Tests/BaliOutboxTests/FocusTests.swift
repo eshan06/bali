@@ -192,6 +192,25 @@ struct FocusTests {
     }
 
     @Test(
+        "Emergency Unlock is a one-second hold (the owner's ruling, 2026-09-29; DESIGN.md §4): the control unlocks only through its long press's own action, once held a second — its ring filling in that second — so letting go early, or a tap, does nothing; and VoiceOver's action unlocks in one step (#118's review). The control's own source is read: no SwiftUI press can be made from a test"
+    )
+    func unlockHold() throws {
+        let source = try sourceCode("Bali/UI/FocusView.swift")
+        let control = String(source[try #require(source.range(of: "struct UnlockControl")).lowerBound...])
+        #expect(
+            control.contains(
+                ".onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock)"))
+        #expect(control.contains("pressing ? .linear(duration: 1)"))
+        #expect(control.contains(".accessibilityAction { unlock() }"))
+        // Those two are its only ways in: no tap, no button, no other call.
+        #expect(control.components(separatedBy: "perform: unlock").count == 2)
+        #expect(control.components(separatedBy: "unlock()").count == 2)
+        for other in ["TapGesture", "onTapGesture", "Button("] {
+            #expect(!control.contains(other), "\(other)")
+        }
+    }
+
+    @Test(
         "No answer from the server (D1's FocusOffline): the bell still kept by the phone, and an unlock saved on it first; waiting on sign-in, storage refused or no exchange yet is no 'no connection'"
     )
     func offline() throws {
