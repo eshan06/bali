@@ -56,9 +56,7 @@ struct RootView: View {
         case .protectionOff: StepPlaceholder("Protection off — C5")
         case .sessionOver: StepPlaceholder("Session over — C5")
         case .history: HistoryView(phone: phone)
-        // A placeholder, as every screen not drawn yet, so the tab bar is D1's whole one and C6b
-        // changes this line alone.
-        case .me: StepPlaceholder("Me — C6b")
+        case .me: MeView(phone: phone)
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }
         }
     }

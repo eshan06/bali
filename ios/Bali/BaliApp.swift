@@ -87,6 +87,10 @@ final class Phone {
     /// them, and the history forgotten, so an answer to a read the student has left is dropped.
     private(set) var history = History()
     private(set) var reads = 0
+    /// The Me screen's (C6b): the name as the student edits it, and why the last Sign out did not
+    /// finish (rule 5).
+    var naming = Naming()
+    private(set) var signOutFailed: String?
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -109,6 +113,7 @@ final class Phone {
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
+            (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
         }
     #endif
 
@@ -117,8 +122,9 @@ final class Phone {
     var screen: Screen { chosen(tab: tab) }
 
     /// Whether D1's tab bar shows (C6a): wherever the router honours a tab — so the one place that
-    /// decides the screen decides this too.
-    var tabbed: Bool { chosen(tab: .history) == .history }
+    /// decides the screen decides this too — but while Me's name is edited, whose ways on are Save
+    /// and Cancel, and whose keyboard it would otherwise ride above (C6b).
+    var tabbed: Bool { chosen(tab: .history) == .history && !naming.editing }
 
     private func chosen(tab: Screen) -> Screen {
         Screen.choose(
@@ -160,13 +166,42 @@ final class Phone {
     private func forgetHistory() { (history, reads) = (History(), reads + 1) }
 
     /// Who is signed in, as the Keychain says: a change starts the tabs over at Home, and the
-    /// history read goes with it — another student's is never shown (C6a).
+    /// history read and a name being edited go with it — another student's is never shown (C6a,
+    /// C6b); so, where someone signs in after a sign-out, does the engine's `me`.
     func signed(in signedIn: Bool?) {
         if signedIn != self.signedIn {
             tab = .home
             forgetHistory()
+            (naming, signOutFailed) = (Naming(), nil)
+            if signedIn == true, self.signedIn == false { Task { await engine?.forgetMe() } }
         }
         self.signedIn = signedIn
+    }
+
+    /// Saves the name as typed (`PATCH /v1/me`), through the engine: set, editing ends and the name
+    /// is `me`'s; else why not, said under the field. A phone whose engine has not started — a
+    /// frozen one too — says so (rule 5).
+    func saveName() async {
+        guard !naming.busy, naming.complete else { return }
+        guard let engine else { return naming.failure = Joining.notStarted }
+        let request = naming.save(at: Date())
+        let answer = await engine.rename(request)
+        naming.saved(answer, for: request)
+    }
+
+    /// Me's Sign out (C6b): the sign-in's tokens forgotten — never where the phone stands, its
+    /// shields or a queued record (B4) — so Sign in shows, or Focus while the shields are on. Never
+    /// while an Emergency Unlock is unsent (`SignOutWords.held`); a Keychain that cannot forget
+    /// them now, or a phone not started, is said (rule 5).
+    func signOut() async {
+        guard sync.flatMap(SignOutWords.held) == nil else { return }
+        guard let signIn else { return signOutFailed = Joining.notStarted }
+        do {
+            try await signIn.signOut()
+            signOutFailed = nil
+        } catch {
+            signOutFailed = SignOutWords.failed
+        }
     }
 
     /// The bell of the session the phone stands in, where the router chooses again (C5a).

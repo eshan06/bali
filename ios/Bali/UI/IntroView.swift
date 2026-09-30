@@ -28,7 +28,7 @@ struct IntroView: View {
         ScreenScaffold {
             TabView(selection: $page) {
                 PageScroll { first }.tag(0)
-                PageScroll { second }.tag(1)
+                PageScroll { Self.consent }.tag(1)
                 PageScroll { third }.tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -57,7 +57,9 @@ struct IntroView: View {
         }
     }
 
-    private var second: some View {
+    /// What a teacher sees: the second page, and Me's What your teacher sees (C6b) — one page, so
+    /// the two never say different things.
+    static var consent: some View {
         VStack(spacing: 24) {
             Text("What your teacher sees").textStyle(.h1).multilineTextAlignment(.center)
             ConsentCard(title: "Sees")

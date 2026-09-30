@@ -47,7 +47,7 @@ struct HomeView: View {
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }
-                    classes
+                    ClassesSection(phone: phone, title: "Your classes")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -77,12 +77,20 @@ struct HomeView: View {
             .multilineTextAlignment(.center)
         }
     }
+}
 
-    /// The student's classes as `GET /v1/me` names them — or, until a read answers, why not — and
-    /// Join a class.
-    private var classes: some View {
+/// The student's classes as `GET /v1/me` names them, each with its teacher — or, until a read
+/// answers, why not — and Join a class, opened over the screen with a way back: Home's (C3) and
+/// Me's (C6b), under `title`.
+struct ClassesSection: View {
+    let phone: Phone
+    let title: String
+
+    private var me: MeResponse? { phone.sync?.me }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Your classes").textStyle(.label).textCase(.uppercase)
+            Text(title).textStyle(.label).textCase(.uppercase)
                 .foregroundStyle(Theme.textTertiary)
             if let me, me.classes.isEmpty {
                 Text("No classes yet.").textStyle(.body).foregroundStyle(Theme.textSecondary)
@@ -99,6 +107,8 @@ struct HomeView: View {
                                         .foregroundStyle(Theme.textTertiary)
                                 }
                             }
+                            // Clear of the hairlines once the text size outgrows D1's 60.
+                            .padding(.vertical, 8)
                             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
                             .padding(.horizontal, 16).accessibilityElement(children: .combine)
                         }
