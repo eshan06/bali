@@ -127,10 +127,10 @@ final class Phone {
             opened: opened, tab: tab, now: Date())
     }
 
-    /// A tab chosen (C6a). A change of tab forgets the history read, and any answer on its way, so
-    /// History is read anew each time the student comes to it — its screen's first appearance
-    /// reads it (`readHistory`). The tab shown, chosen again, changes nothing: its screen does not
-    /// appear anew, so nothing would read a history forgotten then (santa's round 1).
+    /// A tab chosen (C6a) — or `synced`'s Home. A change of tab forgets the history read, and any
+    /// answer on its way, so History is read anew each time the student comes to it: its screen
+    /// reads whenever it shows none (`readHistory`). The tab shown, chosen again, changes nothing
+    /// (santa's round 1: nothing read a history forgotten so).
     func select(_ tab: Screen) {
         if tab != self.tab { forgetHistory() }
         self.tab = tab
@@ -193,7 +193,7 @@ final class Phone {
         let keeps = state.keepsOpened(from: sync)
         sync = state
         guard !keeps else { return }
-        tab = .home
+        select(.home)
         guard !opened.isEmpty else { return }
         let hadJoin = opened.contains(.join)
         opened = []

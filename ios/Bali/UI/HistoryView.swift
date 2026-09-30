@@ -5,8 +5,8 @@ import SwiftUI
 /// History (C6a; D1's History), where the router sends the History tab: the student's own moments
 /// as `GET /v1/me/history` gives them — what their teachers see, nothing more — in D1's days and
 /// class cards, times in the phone's locale and time zone (`History.days`, tested on Linux). Read
-/// from the top each time the tab is chosen; reading, nothing yet and a read that failed are each
-/// said, a failure with Try again (rule 5); an older page on Show earlier.
+/// from the top each time the student comes to the tab; reading, nothing yet and a read that failed
+/// are each said, a failure with Try again (rule 5); an older page on Show earlier.
 struct HistoryView: View {
     let phone: Phone
 
@@ -36,8 +36,12 @@ struct HistoryView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
-        // First shown since the tab was chosen: read it. A fixture's, read or not, stays as made.
-        .task { if phone.history == History() { await phone.readHistory() } }
+        // Shown with nothing read or reading — first shown since the tab was chosen, or forgotten
+        // while it shows (santa's round 2) — it is read; a fixture's, read or not, stays as made.
+        // Its own task, which leaving the screen does not cancel: an answer it outlives is dropped.
+        .onChange(of: phone.history == History(), initial: true) { _, fresh in
+            if fresh { Task { await phone.readHistory() } }
+        }
     }
 
     /// The days read — or, with none and nothing older, that there is nothing yet — and Show
