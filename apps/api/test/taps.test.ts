@@ -1,17 +1,21 @@
 import {
+  armedTaps,
   classes,
   type Database,
   endSession,
   enrollments,
   expireDueSessions,
+  extendSession,
   participations,
+  sessions,
   startSession,
+  tapIn,
   users,
 } from '@bali/db';
 import type { TapResponse } from '@bali/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
@@ -425,5 +429,133 @@ describe('POST /v1/taps', () => {
   it('requires authentication', async () => {
     const res = await ctx.app.inject({ method: 'POST', url: '/v1/taps', payload: {} });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+// Only a real Postgres contends, so these run where TEST_DATABASE_URL is set.
+const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
+
+describe.runIf(REAL_PG)('POST /v1/taps at the bell (real Postgres, A17)', () => {
+  /** Take `sessionId`'s row and hold it: whatever locks it parks, in order, until the release. */
+  async function hold(sessionId: string): Promise<() => Promise<void>> {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const hasLock = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const holder = db
+      .transaction(async (tx) => {
+        await tx.select().from(sessions).where(eq(sessions.id, sessionId)).for('update');
+        locked();
+        await held;
+        throw new Error('rolled back on purpose');
+      })
+      .catch(() => undefined);
+    await hasLock;
+    return async () => {
+      release();
+      await holder;
+    };
+  }
+
+  /** Until `n` backends wait on a lock — or `call` has answered without waiting. */
+  async function parked(n: number, call: Promise<unknown>): Promise<void> {
+    let answered = false;
+    const done = () => {
+      answered = true;
+    };
+    void call.then(done, done);
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const rows = (await db.execute(
+        sql`select count(*)::int as n from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock'`,
+      )) as { n: number }[];
+      if (answered || (rows[0]?.n ?? 0) >= n) return;
+      if (Date.now() > deadline) throw new Error(`fewer than ${n} backend(s) ever parked`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  /** A running lesson, and an app whose clock reads a second past its bell. */
+  async function lesson(tag: string) {
+    const room = await seedClassroom(db, tag);
+    const { session } = await startSession(db, {
+      classId: room.klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 60_000),
+    });
+    const late = await makeAuthedApp(db, () => new Date(session.endsAt.getTime() + 1_000));
+    onTestFinished(() => late.close());
+    const tapAt = async (eventId: string) =>
+      authedInject(late.app, await late.tokenFor(room.student.cognitoId), {
+        method: 'POST',
+        url: '/v1/taps',
+        payload: { tagId: room.block.tagId, eventId, deviceTime: new Date().toISOString() },
+      });
+    return { ...room, session, tapAt };
+  }
+
+  it('the retry of a tap still landing, heard past the bell, answers as its replay — never armed', async () => {
+    // The tap lands before the bell and parks on the session's row, holding
+    // the tap's lock; its retry is heard past the bell. Armed on the read
+    // alone, its id would be spent by the landing a moment later, the next
+    // Start would skip the row, and a phone told "armed" would wait for nothing.
+    const { student, session, tapAt } = await lesson('tap-bell-landing');
+    const eventId = randomUUID();
+    const release = await hold(session.id);
+    const landing = tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId,
+      deviceTime: new Date(),
+    });
+    let retry: ReturnType<typeof tapAt> | undefined;
+    try {
+      await parked(1, landing);
+      retry = tapAt(eventId);
+      await parked(2, retry);
+    } finally {
+      await release();
+    }
+    expect((await landing).outcome).toBe('joined');
+    const res = await retry;
+    expect(res?.statusCode).toBe(200);
+    expect(res?.json()).toEqual({ outcome: 'replay', session: null, state: null });
+    expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
+  });
+
+  it('a tap past the bell by the read joins when an extend moved the bell before its lock', async () => {
+    // An extend pressed before the bell commits between the route's read of
+    // the session and the tap's lock: over by that read, the session runs on
+    // under the lock, and the tap joins it. Armed on the read alone, the
+    // student would wait for a Start while their class ran on.
+    const { session, tapAt } = await lesson('tap-bell-extend');
+    const release = await hold(session.id);
+    const extending = extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 10,
+      at: new Date(session.endsAt.getTime() - 1_000),
+      eventId: randomUUID(),
+    });
+    let tapping: ReturnType<typeof tapAt> | undefined;
+    try {
+      await parked(1, extending);
+      tapping = tapAt(randomUUID());
+      await parked(2, tapping);
+    } finally {
+      await release();
+    }
+    const extended = await extending;
+    const res = await tapping;
+    expect(res?.statusCode).toBe(200);
+    expect(res?.json()).toEqual({
+      outcome: 'joined',
+      session: { id: session.id, classId: session.classId, endsAt: extended.endsAt.toISOString() },
+      state: 'focused',
+    });
   });
 });
