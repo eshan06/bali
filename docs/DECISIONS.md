@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A16: an extend racing the sweep — the expiry judged again under the
+  session's lock** (#111's santa review; pre-existing). **The interleaving:** `expireDueSessions`
+  picks due sessions with an unlocked scan (`ended_at is null and ends_at <= now`), then expires
+  each in a transaction of its own (`endSession`), which locked the row but checked only
+  `ended_at`. A teacher's extend committing between the two — pressed a moment before the bell,
+  or past it on a session not yet swept, which `extendSession` gives a fresh window from the press
+  — was answered "extended", and the expiry then ended the session anyway, stamped at the sweep's
+  time inside the new window. A15 made the pairing routine: a sweep every minute in each process,
+  and the cron. **Decided:**
+  an expiry is the bell's, so `endSession` judges it under the lock — `'expired'` with `ends_at`
+  after `at` ends nothing (`ended: false`, the answer of an expiry already done). Both sides take
+  the session's row first, in one transaction, so exactly one wins: the extend, and the session
+  runs on, its answer true; the sweep, and the extend finds the session ended and is refused
+  `409 session_not_running` ("session has ended"), never "extended". And every expiry now ends at
+  its bell, never before it. **Weighed:** locking the scan (`for update skip locked`) holds every
+  due row for the whole pass and leaves a skipped one for the next minute; re-checking in
+  `expireDueSessions` before the call is unlocked too, so it only narrows the window. **Tests:**
+  real Postgres, staged both ways round — a holder on the session's row (`holdSession`), the
+  first caller parked on it and the second behind, the sweep's scan run before either lands, the
+  press stamped a second before the bell: without the guard the extend-first order ended the
+  session under an "extended", red 3 of 3; PGlite pins that order by hand (the scan's pick, the
+  extend, then the sweep's per-session step); and the wire test of an extend after the end covers
+  the sweep's end and asserts the reason. A press before the bell races the sweep whatever the
+  question below decides, so the tests stand either way. Three PGlite tests that expired a
+  session before its bell — which no sweep does — expire it at the bell. **Open, the owner's
+  (PLAN.md open decision 12):** whether a session past its bell by the server's clock, not yet
+  swept, may be extended at all. ARCHITECTURE and this log do not say: Phase 2 chose yes (`base =
+  max(at, endsAt)`, pinned by "gives a session past its end but not yet swept a window starting
+  from now" — else the new end is still past and "the shield never comes back"), #28 kept it, and
+  decision 6 has every phone let go at the bell by its own clock. Left as it is here; refusing
+  it, prototyped, turns only that Phase 2 test red.
+
 - **2026-09-30** — **The C riders, Riders-1: honesty and safety — the review WARNs C4–C6b left
   open.** Seven, each where the phone said less than the truth or trapped a student. **Sign out on
   Join:** a student in no class sees only the router's own Join — no tab bar, so not Me — and
