@@ -31,6 +31,15 @@ public enum Change: Sendable, Hashable {
 
     var isUnfiled: Bool { if case .unlockUnfiled = self { true } else { false } }
 
+    /// An unlock's reason, as the student gave it; nil for none, and for any other change.
+    var reason: UnlockReason? {
+        switch self {
+        case .unlock(_, let reason), .unlockUnderTap(_, let reason), .unlockUnfiled(let reason):
+            reason
+        case .tap, .refocus, .protectionOff: nil
+        }
+    }
+
     /// The student's own return to focus — a tap, or a refocus — whose answer an unlock made before
     /// it, by the phone's order, never holds back (A13).
     var isReturn: Bool {
@@ -184,6 +193,8 @@ public struct Sent: Sendable {
     /// A 2xx answer's session and state: the truth as of this change, to reconcile to.
     public let session: SessionView?
     public let state: ParticipationState?
+    /// An unlock recorded late: a return to focus went ahead of it (A10, A12).
+    public let superseded: Bool
 
     fileprivate init<Answer: ChangeAnswer>(
         _ eventId: String, _ response: APIResponse<Answer>, _ disposition: Disposition
@@ -192,6 +203,7 @@ public struct Sent: Sendable {
             (eventId, response.result, response.noAnswer, response.error)
         (self.disposition, session, state) =
             (disposition, response.answer?.session, response.answer?.state?.known)
+        superseded = response.answer?.superseded ?? false
     }
 
     var status: Int? { if case .status(let status) = result { status } else { nil } }
@@ -201,10 +213,17 @@ public struct Sent: Sendable {
 protocol ChangeAnswer: Decodable, Sendable {
     var session: SessionView? { get }
     var state: OrUnknown<ParticipationState>? { get }
+    var superseded: Bool { get }
+}
+
+extension ChangeAnswer {
+    var superseded: Bool { false }
 }
 
 extension TapResponse: ChangeAnswer {}
-extension UnlockResponse: ChangeAnswer {}
+extension UnlockResponse: ChangeAnswer {
+    var superseded: Bool { recordedAs?.known == .superseded }
+}
 extension RefocusResponse: ChangeAnswer {}
 extension ProtectionOffResponse: ChangeAnswer {}
 

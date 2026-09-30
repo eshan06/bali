@@ -5,21 +5,21 @@ import Testing
 @testable import BaliOutbox
 
 /// A US phone in New York writes a time so — `t0` is 10:13:20 AM there.
-private let newYork = Date.FormatStyle(
+let newYork = Date.FormatStyle(
     date: .omitted, time: .shortened, locale: Locale(identifier: "en_US"),
     timeZone: TimeZone(identifier: "America/New_York")!)
 
 /// `text` with plain spaces: ICU writes a narrow no-break one before "AM".
-private func plain(_ text: String?) -> String? {
+func plain(_ text: String?) -> String? {
     text?.replacing("\u{202F}", with: " ").replacing("\u{A0}", with: " ")
 }
 
 /// A session whose bell is at 10:42 AM in New York.
-private let bell1042 = session(endsAt: 1720)
+let bell1042 = session(endsAt: 1720)
 
 /// The engine standing `standing` with `queued`, its link `link`, and `GET /v1/me` naming class
 /// "c" Period 3, with `teacher` — "null" for a teacher with no name — or, `me` false, not read.
-private func synced(
+func synced(
     _ standing: Standing, queued: [OutboxRecord] = [], link: Link? = .reached,
     teacher: String = #""Ms. Rivera""#, me: Bool = true
 ) throws -> SyncState {
@@ -154,7 +154,7 @@ struct FocusTests {
     }
 
     @Test(
-        "An Emergency Unlock the outbox could not keep is said, holding again the way on — its apps 'still paused' only where the check verified the shields on, never over Screen Time off or nothing checked yet (rule 3; santa's review); a phone not started says so"
+        "An Emergency Unlock the outbox could not keep is said, holding again the way on — its apps 'still paused' only where the check verified the shields on, never over Screen Time off or nothing checked yet (rule 3; santa's review); a phone not started says so, and a press that found nothing to unlock (#116's review)"
     )
     func unlockFailed() throws {
         let focused = try synced(.inSession(bell1042, .focused))
@@ -171,6 +171,7 @@ struct FocusTests {
                 "\(String(describing: protection))")
         }
         #expect(said(.notStarted) == Joining.notStarted)
+        #expect(said(.nothing) == "There was nothing to unlock, so nothing was recorded.")
     }
 
     @Test(
@@ -188,6 +189,25 @@ struct FocusTests {
         #expect(tapIn, "Home's Tap in is not in a Release build")
         #expect(home.contains("EmergencyUnlock("), "Home over an unread standing has no unlock")
         #expect(try release("Bali/UI/FocusView.swift").contains("EmergencyUnlock("))
+    }
+
+    @Test(
+        "Emergency Unlock is a one-second hold (the owner's ruling, 2026-09-29; DESIGN.md §4): the control unlocks only through its long press's own action, once held a second — its ring filling in that second — so letting go early, or a tap, does nothing; and VoiceOver's action unlocks in one step (#118's review). The control's own source is read: no SwiftUI press can be made from a test"
+    )
+    func unlockHold() throws {
+        let source = try sourceCode("Bali/UI/FocusView.swift")
+        let control = String(source[try #require(source.range(of: "struct UnlockControl")).lowerBound...])
+        #expect(
+            control.contains(
+                ".onLongPressGesture(minimumDuration: 1, maximumDistance: 44, perform: unlock)"))
+        #expect(control.contains("pressing ? .linear(duration: 1)"))
+        #expect(control.contains(".accessibilityAction { unlock() }"))
+        // Those two are its only ways in: no tap, no button, no other call.
+        #expect(control.components(separatedBy: "perform: unlock").count == 2)
+        #expect(control.components(separatedBy: "unlock()").count == 2)
+        for other in ["TapGesture", "onTapGesture", "Button("] {
+            #expect(!control.contains(other), "\(other)")
+        }
     }
 
     @Test(
