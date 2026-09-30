@@ -79,6 +79,14 @@ final class Phone {
     /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
     private(set) var scanning = false
     private(set) var tapFailed: String?
+    /// The tab chosen in D1's tab bar (C6a): the router's input, as `opened` is — Home, History or
+    /// Me, honoured in place of its own Home only. Home again once `synced` closes what was opened,
+    /// or who is signed in changes.
+    private(set) var tab = Screen.home
+    /// The History screen's (C6a): the moments read, and why a read did not finish. `reads` counts
+    /// them, so an answer to one the student has left since is dropped.
+    private(set) var history = History()
+    private var reads = 0
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -100,17 +108,58 @@ final class Phone {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
-            opened = fixture.opened
+            (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
         }
     #endif
 
     /// The screen to show now: `Screen.choose`, the one place that decides, over what the phone
     /// knows. A session just over is a later step's (C5): nil until then.
-    var screen: Screen {
+    var screen: Screen { chosen(tab: tab) }
+
+    /// Whether D1's tab bar shows (C6a): wherever the router honours a tab — so the one place that
+    /// decides the screen decides this too.
+    var tabbed: Bool { chosen(tab: .history) == .history }
+
+    private func chosen(tab: Screen) -> Screen {
         Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
             everApproved: everApproved, sync: sync, hasClasses: hasClasses, lastSessionOver: nil,
-            opened: opened, now: Date())
+            opened: opened, tab: tab, now: Date())
+    }
+
+    /// A tab chosen (C6a): History is read again from the top — its screen's first appearance
+    /// reads it (`readHistory`).
+    func select(_ tab: Screen) {
+        if tab == .history { forgetHistory() }
+        self.tab = tab
+    }
+
+    /// Reads the student's history through the engine: from the top, or `more`, the page after
+    /// those read — a cursor the history does not hold, from the top again. A phone whose engine
+    /// has not started — a frozen one too — says so (rule 5).
+    func readHistory(more: Bool = false) async {
+        guard !history.busy, !more || history.nextBefore != nil else { return }
+        guard let engine else { return history.failure = Joining.notStarted }
+        let before = more ? history.nextBefore : nil
+        if !more { forgetHistory() }
+        (history.busy, history.failure, reads) = (true, nil, reads + 1)
+        let read = reads
+        let page = await engine.history(before: before)
+        guard read == reads else { return }
+        if history.answered(page) { await readHistory() }
+    }
+
+    /// No history read, and none under way that could still land.
+    private func forgetHistory() { (history, reads) = (History(), reads + 1) }
+
+    /// Who is signed in, as the Keychain says: a change starts the tabs over at Home, and the
+    /// history read goes with it — another student's is never shown (C6a).
+    func signed(in signedIn: Bool?) {
+        if signedIn != self.signedIn {
+            tab = .home
+            forgetHistory()
+        }
+        self.signedIn = signedIn
     }
 
     /// The bell of the session the phone stands in, where the router chooses again (C5a).
@@ -131,11 +180,14 @@ final class Phone {
     }
 
     /// The engine's state as it comes: the screens opened over another end as `keepsOpened` says,
-    /// a Join among them starting over unless it still shows, the router's own now (santa, 2).
+    /// a Join among them starting over unless it still shows, the router's own now (santa, 2) —
+    /// and the tab chosen with them, Home again (C6a).
     func synced(_ state: SyncState) {
         let keeps = state.keepsOpened(from: sync)
         sync = state
-        guard !keeps, !opened.isEmpty else { return }
+        guard !keeps else { return }
+        tab = .home
+        guard !opened.isEmpty else { return }
         let hadJoin = opened.contains(.join)
         opened = []
         if hadJoin, screen != .join, !joining.busy { joining = Joining() }
@@ -277,7 +329,7 @@ final class Phone {
                 self.remember(protection)
             }
         }
-        Task { for await signedIn in await signIn.signedIn() { self.signedIn = signedIn } }
+        Task { for await signedIn in await signIn.signedIn() { self.signed(in: signedIn) } }
         await engine.setForeground(foreground)
     }
 

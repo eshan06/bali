@@ -5,7 +5,8 @@ import SwiftUI
 /// Home (C3; D1's Home artboard): the student greeted by name, Tap in (B6's scan), their classes
 /// with each teacher (`GET /v1/me`), and Join a class, opened over Home with a way back. What the
 /// phone could not read or record is said with Try again (rule 5); where it stood unread with the
-/// last run's shields on, Emergency Unlock is here (B6b, C4). Not here yet: History and Me (C6).
+/// last run's shields on, Emergency Unlock is here (B6b, C4). D1's tab bar under it is the
+/// router's to show (C6a, `RootView`).
 struct HomeView: View {
     let phone: Phone
 
@@ -124,16 +125,17 @@ struct HomeView: View {
 }
 
 /// What the phone could not read, said (rule 5), and **Try again**: everything queued sent now,
-/// and the truth read again (`Phone.retry`).
+/// and the truth read again (`Phone.retry`) — or, for a screen's own read, `again`.
 struct Retry: View {
     let words: String
     let phone: Phone
+    var again: (@MainActor () async -> Void)?
 
     var body: some View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(words).textStyle(.body)
-                Button("Try again") { Task { await phone.retry() } }
+                Button("Try again") { Task { await (again ?? phone.retry)() } }
                     .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                     .foregroundStyle(Theme.brand).frame(minHeight: 44)
             }

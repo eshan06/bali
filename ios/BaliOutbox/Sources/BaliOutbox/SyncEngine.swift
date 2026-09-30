@@ -418,6 +418,12 @@ public actor SyncEngine {
         await Joining.send(renewing: refresh) { await client.previewJoinCode(code) }
     }
 
+    /// A page of the student's own history (`GET /v1/me/history`), older than `before` — nil, the
+    /// newest: the History screen's own call (C6a), its token renewed once on a 401.
+    public func history(before: String?) async -> APIResponse<HistoryPage> {
+        await Joining.send(renewing: refresh) { await client.history(before: before) }
+    }
+
     /// Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), its
     /// token renewed once on a 401. Once in, the class is in `me` at once where a read has answered
     /// — so the router moves on — else the read it asks for brings it, as it brings its teacher's

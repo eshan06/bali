@@ -5,15 +5,15 @@ import Testing
 @testable import BaliOutbox
 
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
-/// and checked (never read approved before, `everApproved`), and the engine standing `standing`
-/// with `queued`, unless said otherwise — nil for a sign-in, an enforcer or an engine that has not
-/// spoken.
+/// and checked (never read approved before, `everApproved`), the engine standing `standing` with
+/// `queued`, and Home's tab chosen, unless said otherwise — nil for a sign-in, an enforcer or an
+/// engine that has not spoken.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, checked: Bool = true, shielded: Bool = false,
     everApproved: Bool = false, standing: Standing? = .out, queued: [OutboxRecord] = [],
     hasClasses: Bool? = nil, lastSessionOver: SessionView? = nil, opened: [Screen] = [],
-    now: Date = t0
+    tab: Screen = .home, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -31,7 +31,7 @@ private func screen(
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
         everApproved: everApproved, sync: sync, hasClasses: hasClasses,
-        lastSessionOver: lastSessionOver, opened: opened, now: now)
+        lastSessionOver: lastSessionOver, opened: opened, tab: tab, now: now)
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -178,6 +178,38 @@ struct ScreenTests {
         #expect(screen(introSeen: false, opened: [.join]) == .intro)
         #expect(
             screen(signedIn: false, shielded: true, standing: .unread, opened: [.join]) == .home)
+    }
+
+    @Test(
+        "D1's tab bar (C6a): History or Me in place of the router's own Home — out, not read, past the bell, a state not known — and Home's tab is Home; nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it, Join (its own, or opened over Home), session over, Screen Time, the sign-in, the intro, starting, nor the home the last run's shields keep over a standing not read (B6b)"
+    )
+    func tabs() {
+        for tab in [Screen.history, .me] {
+            #expect(screen(tab: tab) == tab)
+            #expect(screen(hasClasses: true, tab: tab) == tab)
+            #expect(screen(standing: .unread, tab: tab) == tab)
+            let rung = Standing.inSession(session(), .focused)
+            #expect(screen(standing: rung, tab: tab, now: at(3000)) == tab)
+            #expect(screen(standing: .inSession(session(), nil), tab: tab) == tab)
+            #expect(screen(standing: .inSession(session(), .focused), tab: tab) == .focus)
+            #expect(screen(standing: .inSession(session(), .unlocked), tab: tab) == .unlocked)
+            let off = Standing.inSession(session(), .protectionOff)
+            #expect(screen(standing: off, tab: tab) == .protectionOff)
+            #expect(screen(standing: .waiting, tab: tab) == .waiting)
+            #expect(screen(standing: .waiting, opened: [.home], tab: tab) == .home)
+            #expect(screen(opened: [.join], tab: tab) == .join)
+            #expect(screen(hasClasses: false, tab: tab) == .join)
+            #expect(screen(lastSessionOver: session(), tab: tab) == .sessionOver)
+            #expect(screen(permission: .denied, tab: tab) == .screenTime)
+            #expect(screen(signedIn: false, tab: tab) == .signIn)
+            #expect(screen(introSeen: false, tab: tab) == .intro)
+            #expect(screen(signedIn: nil, tab: tab) == .starting)
+            #expect(screen(signedIn: false, shielded: true, standing: .unread, tab: tab) == .home)
+            #expect(screen(shielded: true, standing: .unread, tab: tab) == .home)
+        }
+        #expect(screen(tab: .home) == .home)
+        // Only Home's neighbours are tabs: anything else chosen changes nothing.
+        #expect(screen(tab: .focus) == .home && screen(tab: .join) == .home)
     }
 
     @Test(
