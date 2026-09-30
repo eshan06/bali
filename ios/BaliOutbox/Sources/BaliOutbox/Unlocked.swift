@@ -28,14 +28,19 @@ public struct UnlockedWords: Sendable, Hashable {
         guard case .inSession(let session, .unlocked?) = sync.standing else { return nil }
         let heading = sync.heading(session, time)
         (title, subtitle) = (heading.title ?? "Your class", heading.subtitle)
-        let (unlock, bell) = (sync.queued.last { $0.change.isUnlock }, session.endsAt.formatted(time))
+        // This class's: another class's unlock, stuck, is not the one the screen shows (#119's
+        // review) — one under a tap or not filed yet may be any's.
+        let (unlock, bell) = (sync.unlock(in: session.id), session.endsAt.formatted(time))
         body =
             "Everything's open until you go back to focus or the bell at \(bell). "
             + (unlock == nil
                 ? "Your teacher can see you unlocked." : "Your teacher will see you unlocked.")
-        // What this screen gave comes first: a record still queued may be an older unlock, stuck.
+        // The reason the server kept where it is not the phone's, first (#119's review); then what
+        // this screen gave: a record still queued may be an older unlock, stuck.
         picker =
-            if let given {
+            if let kept = sync.reasonKept, kept.session == session.id {
+                kept.reason.map(Picker.given) ?? .late
+            } else if let given {
                 .given(given)
             } else if let unlock {
                 unlock.change.reason.map(Picker.given) ?? (unlock.attempts == 0 ? .open : .late)

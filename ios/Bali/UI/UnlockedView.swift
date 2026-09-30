@@ -16,6 +16,9 @@ struct UnlockedView: View {
     /// Why the last reason, or Back to focus, did not go through (rule 5).
     @State private var failed: String?
     @State private var notBack: String?
+    /// A reason on its way to the engine: one at a time, so the card shows the one kept (#121's
+    /// review).
+    @State private var explaining = false
 
     var body: some View {
         if let sync = phone.sync, let words = UnlockedWords(sync, given: given, asked: asked) {
@@ -26,6 +29,10 @@ struct UnlockedView: View {
                 case nil: break
                 }
             }
+        } else {
+            // The router shows this only where the words can be built; never a blank all the same
+            // (#121's review).
+            HomeView(phone: phone)
         }
     }
 
@@ -89,10 +96,13 @@ struct UnlockedView: View {
         ForEach(UnlockReason.allCases, id: \.self) { reason in
             let chosen = picker == .given(reason)
             Button {
+                // A second tap while the first is on its way: the first stands, as the engine
+                // keeps it — never the card showing one reason and the record another.
+                guard !explaining, given == nil else { return }
+                explaining = true
                 Task {
                     let words = await phone.explain(reason)
-                    // A second tap a moment after a reason went: that one stands.
-                    guard given == nil else { return }
+                    explaining = false
                     failed = words
                     if let words { announce(words) } else { given = reason }
                 }

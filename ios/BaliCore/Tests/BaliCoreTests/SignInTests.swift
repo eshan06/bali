@@ -570,6 +570,25 @@ struct TokenTests {
         #expect(await first(watching) == false)
     }
 
+    @Test(
+        "who is signed in: the account the tokens are for, read from them unverified (C6b's review) — the same across a renewal, none once signed out, and none for tokens that name none, never a stand-in a renewal could change"
+    )
+    func account() async throws {
+        let endpoint = TransportDouble { _ in (200, Data(granted(jwt("a1"), refresh: "refresh-2").utf8)) }
+        let (store, now) = (try MemoryStore.holding(jwt("a1")), Now())
+        let phone = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await phone.account() == "a1")
+        now.set(4000)
+        #expect(await phone.accessToken() == jwt("a1") && store.tokens?.refresh == "refresh-2")
+        #expect(await phone.account() == "a1")
+        try await phone.signOut()
+        #expect(await phone.account() == nil)
+        let opaque = try MemoryStore.holding("not-a-jwt")
+        let unread = await signIn(opaque, TransportDouble(status: 500), told: Told())
+        #expect(await unread.accessToken() == "not-a-jwt")
+        #expect(await unread.account() == nil)
+    }
+
     @Test("a sign-out while a renewal runs is not undone by its answer")
     func signOutMidRenewal() async throws {
         let endpoint = HeldEndpoint()

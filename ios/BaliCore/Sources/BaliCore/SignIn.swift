@@ -130,15 +130,24 @@ struct Tokens: Codable, Sendable {
     /// only says when to stop sending it.
     static func lifetime(of token: String) -> TimeInterval? {
         struct Claims: Decodable { let iat, exp: TimeInterval }
+        return claims(Claims.self, of: token).map { $0.exp - $0.iat }
+    }
+
+    /// `sub` from the token's payload, unverified: only ever to tell one account from another.
+    static func subject(of token: String) -> String? {
+        struct Claims: Decodable { let sub: String }
+        return claims(Claims.self, of: token)?.sub
+    }
+
+    /// The token's payload read as `T`, unverified; nil when it cannot be.
+    private static func claims<T: Decodable>(_ type: T.Type, of token: String) -> T? {
         let parts = token.split(separator: ".", omittingEmptySubsequences: false)
         var payload = parts.count == 3 ? String(parts[1]) : ""
         payload = payload.replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
         payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
-        guard let json = Data(base64Encoded: payload),
-            let claims = try? JSONDecoder().decode(Claims.self, from: json)
-        else { return nil }
-        return claims.exp - claims.iat
+        guard let json = Data(base64Encoded: payload) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: json)
     }
 }
 
@@ -251,6 +260,14 @@ public actor SignIn: TokenProvider {
     }
 
     private func unwatch(_ id: UUID) { watchers[id] = nil }
+
+    /// Who is signed in: the account the tokens are for — their `sub`, read unverified, only ever
+    /// to tell one student from another (C6b's review); nil when nobody is, the Keychain cannot be
+    /// read yet, or the tokens name none — never a stand-in a renewal could change (santa's round
+    /// 1: a rotated refresh token would read as another student at each renewal).
+    public func account() -> String? {
+        current().flatMap { Tokens.subject(of: $0.access) }
+    }
 
     /// The tokens, read from the store the first time it can be read. Only a store with nothing in
     /// it is nobody signed in: one that cannot be read right now — the Keychain while the phone is

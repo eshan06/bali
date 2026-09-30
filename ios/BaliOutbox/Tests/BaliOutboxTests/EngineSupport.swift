@@ -362,9 +362,10 @@ enum Answer {
     static func unlockSuperseded(_ view: SessionView = session()) -> String {
         #"{"outcome":"recorded","recordedAs":"superseded","state":"focused","session":\#(json(view)),"reason":null}"#
     }
-    /// A late unlock of a student no longer in the session: recorded, with no state (A11).
+    /// A late unlock of a student no longer in the session: recorded, with no state (A11), its
+    /// session named — as the API answers it (`unlock/recorded-superseded-gone`; #119's review).
     static let supersededGone =
-        #"{"outcome":"recorded","recordedAs":"superseded","state":null,"session":null,"reason":null}"#
+        #"{"outcome":"recorded","recordedAs":"superseded","state":null,"session":\#(json(session())),"reason":null}"#
     static func refocused(_ view: SessionView = session()) -> String {
         #"{"outcome":"applied","state":"focused","session":\#(json(view))}"#
     }

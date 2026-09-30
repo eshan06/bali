@@ -97,7 +97,7 @@ struct HistoryTests {
                 "9:12 AM Unlocked · Bathroom", "9:16 AM Back to focus", "9:45 AM Class ended",
                 "Yesterday", "[Period 5 — Chemistry · Mr. Okafor]", "1:02 PM Tapped in",
                 "1:50 PM Class ended", "[Period 6 — Geometry · -]",
-                "2:48 PM Tap not used — it already counted in Period 5 — Chemistry",
+                "2:48 PM Tap not used. It already counted in Period 5 — Chemistry.",
                 "[Period 3 — Algebra II · Ms. Rivera]", "10:30 PM Left the class",
                 "Wednesday, September 16", "[Period 5 — Chemistry · Mr. Okafor]",
                 "11:00 AM Tapped in", "Monday, December 15, 2025",
@@ -135,7 +135,7 @@ struct HistoryTests {
                 "7:12 PM Switched to another class", "[Class fx-hist-p6 · -]", "7:12 PM Tapped in",
                 "7:09 PM Class ended", "[Class fx-hist-p3 · Ms. Rivera]", "7:08 PM Tapped in",
                 "[Class fx-hist-p6 · -]",
-                "7:07 PM Tap not used — it already counted in Class fx-hist-p3",
+                "7:07 PM Tap not used. It already counted in Class fx-hist-p3.",
                 "[Class fx-hist-p3 · Ms. Rivera]", "7:05 PM Left the class",
                 "[Class fx-hist-p5 · Mr. Okafor]", "7:04 PM Tapped in",
                 "7:02 PM Removed from the class", "[Class fx-hist-p6 · -]",
@@ -206,6 +206,12 @@ struct HistoryTests {
         history.busy = true
         #expect(history.answered(try await answer("400-bad-cursor.json")))
         #expect(history == History())
+        // A read from the top — no cursor sent — so answered is said, never read again: that
+        // would be refused again, forever (C6a-2's review).
+        history.busy = true
+        #expect(!history.answered(try await answer("400-bad-cursor.json")))
+        #expect(history.failure == "Something went wrong at Bali. Try again in a moment.")
+        #expect(!history.read && !history.busy)
     }
 }
 

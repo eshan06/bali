@@ -118,26 +118,29 @@ final class Phone {
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
         }
+
+        /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
+        /// `start` wires between them and the screens, tested over stand-ins for the Keychain and
+        /// the server (C6a-2's and C6b-1's reviews).
+        init(signIn: SignIn, engine: SyncEngine) { (self.signIn, self.engine) = (signIn, engine) }
     #endif
 
-    /// The screen to show now: `Screen.choose`, the one place that decides, over what the phone
-    /// knows.
-    var screen: Screen { chosen(tab: tab) }
-
-    /// Whether D1's tab bar shows (C6a): wherever the router honours a tab — so the one place that
-    /// decides the screen decides this too — but while Me shows its name being edited, whose ways
-    /// on are Save and Cancel, and whose keyboard it would otherwise ride above (C6b). Anywhere
-    /// else — Home, where a change of standing sends the tab mid-edit — it shows.
-    var tabbed: Bool {
-        chosen(tab: .history) == .history && !(naming.editing && screen == .me)
-    }
-
-    private func chosen(tab: Screen) -> Screen {
-        Screen.choose(
+    /// The screen to show now, and whether D1's tab bar shows under it (C6a): `Screen.choose`, the
+    /// one place that decides, over what the phone knows — asked once, so the two never disagree,
+    /// at a bell either (C6a's review). The bar shows wherever the router honours a tab, but while
+    /// Me shows its name being edited, whose ways on are Save and Cancel, and whose keyboard it
+    /// would otherwise ride above (C6b). Anywhere else — Home, where a change of standing sends the
+    /// tab mid-edit — it shows. A view drawing both reads this once.
+    var shown: (screen: Screen, tabbed: Bool) {
+        let shown = Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
             everApproved: everApproved, sync: sync, hasClasses: hasClasses,
             sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: Date())
+        return (shown.screen, shown.tabbed && !(naming.editing && shown.screen == .me))
     }
+
+    var screen: Screen { shown.screen }
+    var tabbed: Bool { shown.tabbed }
 
     /// A tab chosen (C6a) — or `synced`'s Home. A change of tab forgets the history read, and any
     /// answer on its way, so History is read anew each time the student comes to it: its screen
@@ -168,21 +171,33 @@ final class Phone {
         if history.answered(page) { await readHistory() }
     }
 
-    /// No history read, and none under way that could still land.
-    private func forgetHistory() { (history, reads) = (History(), reads + 1) }
+    /// No history read, and none under way that could still land: History's screen, gone from the
+    /// phone by any way — a tab, or the router taking it away (Screen Time off, say) — forgets it,
+    /// so it is read anew when it shows again (C6a-2's review).
+    func forgetHistory() { (history, reads) = (History(), reads + 1) }
 
-    /// Who is signed in, as the Keychain says: a change starts the tabs over at Home, and the
-    /// history read, a name being edited and a class code typed go with it — another student's is
-    /// never shown (C6a, C6b; Join's Sign out, the riders); so, where someone signs in after a
-    /// sign-out, does the engine's `me`.
-    func signed(in signedIn: Bool?) {
-        if signedIn != self.signedIn {
+    /// Whose tokens these are (`SignIn.account`), the last one known: another student's sign-in
+    /// is known by it, whether or not the sign-out between them was seen.
+    private var account: String?
+
+    /// Who is signed in, as the Keychain says — `account`, theirs, where the sign-in could say: a
+    /// change starts the tabs over at Home, and the history read, a name being edited, a failed
+    /// Sign out and a class code typed go with it; so, where another student signs in, does the
+    /// engine's `me` — keyed on the account (C6b-1's review): a sign-out the stream let go by
+    /// between two sign-ins is no matter. With no account to tell by, on a sign-in after a sign-out.
+    /// Another student's is never shown (C6a, C6b).
+    func signed(in signedIn: Bool?, as account: String? = nil) {
+        let another =
+            account.map { self.account != nil && $0 != self.account }
+            ?? (signedIn == true && self.signedIn == false)
+        if signedIn != self.signedIn || another {
             tab = .home
             forgetHistory()
             (naming, signOutFailed) = (Naming(), nil)
             if !joining.busy { joining = Joining() }
-            if signedIn == true, self.signedIn == false { Task { await engine?.forgetMe() } }
         }
+        if another { Task { await engine?.forgetMe() } }
+        if let account { self.account = account }
         self.signedIn = signedIn
     }
 
@@ -205,6 +220,9 @@ final class Phone {
     /// the queue shows none); that, a Keychain that cannot forget the tokens now, or a phone not
     /// started, is said (rule 5).
     func signOut() async {
+        // The last try's words go, whatever this one does: never two reasons at once (C6b-1's
+        // review).
+        signOutFailed = nil
         guard sync.flatMap(SignOutWords.held) == nil else { return }
         guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
         switch await engine.unlockUnsent() {
@@ -270,7 +288,14 @@ final class Phone {
     /// and the tab chosen with them, Home again (C6a).
     func synced(_ state: SyncState) {
         let keeps = state.keepsOpened(from: sync, at: Date())
+        let wasHeld = sync.flatMap(SignOutWords.held) != nil
         sync = state
+        // An unlock that held Sign out has gone: saying it has not would be stale — but only once
+        // a hold ends: "unsent" is said where the file holds one the engine's queue does not show,
+        // which the next publish would not change (Riders-2's santa, rounds 1 and 2).
+        if signOutFailed == SignOutWords.unsent, wasHeld, SignOutWords.held(state) == nil {
+            signOutFailed = nil
+        }
         guard !keeps else { return }
         select(.home)
         guard !opened.isEmpty else { return }
@@ -415,7 +440,11 @@ final class Phone {
                 self.remember(protection)
             }
         }
-        Task { for await signedIn in await signIn.signedIn() { self.signed(in: signedIn) } }
+        Task {
+            for await signedIn in await signIn.signedIn() {
+                self.signed(in: signedIn, as: signedIn ? await signIn.account() : nil)
+            }
+        }
         await engine.setForeground(foreground)
     }
 

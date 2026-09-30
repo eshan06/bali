@@ -96,6 +96,21 @@ struct UnlockedTests {
     }
 
     @Test(
+        "The unlock the screen reads is this class's (#119's review): another class's, stuck on the phone, is not said here, nor is its reason — the teacher can see this one — while one under a tap, or not filed yet, may be any class's"
+    )
+    func thisClass() async throws {
+        let (outbox, _) = try makeOutbox()
+        let other = try record(outbox, .unlock(session: "a", reason: .nurse))
+        try await send(outbox, other, 400, Answer.refused("invalid_request"))
+        let said = try #require(words(try unlocked(try outbox.records())))
+        #expect(said.stuck == nil && said.picker == nil)
+        #expect(plain(said.body)?.hasSuffix("Your teacher can see you unlocked.") == true)
+        let (tapped, _) = try makeOutbox()
+        try record(tapped, .unlockUnderTap(tap: "t", reason: .other))
+        #expect(words(try unlocked(try tapped.records()))?.picker == .given(.other))
+    }
+
+    @Test(
         "An unlock the server refused, or left unsettled to the bound, is said — still kept and retried (rule 5) — and too late for a reason"
     )
     func stuck() async throws {
@@ -128,6 +143,58 @@ struct ReasonTests {
         await rig.until { $0.queued.isEmpty }
         #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
         await rig.stop()
+    }
+
+    @Test(
+        "The server keeps the reason it recorded first (A1): an unlock's answer keeping none, or another, than the one the phone sent — its first send left unsettled, a reason given after a relaunch — is said in the reason's place, never the phone's claim (#119's review), until the phone's next change; one keeping the phone's own says nothing"
+    )
+    func reasonKept() async throws {
+        /// The unlock's retry answered: recorded before, with `reason` on record.
+        func replay(_ reason: String) -> String {
+            #"{"outcome":"replay","recordedAs":null,"state":"unlocked","session":\#(json(session())),"reason":\#(reason)}"#
+        }
+        let cases: [(String, UnlockedWords.Picker, ReasonKept?)] = [
+            ("null", .late, ReasonKept(session: "s", reason: nil)),
+            (#""bathroom""#, .given(.bathroom), ReasonKept(session: "s", reason: .bathroom)),
+            (#""nurse""#, .given(.nurse), nil),
+        ]
+        for (answer, picker, kept) in cases {
+            let rig = try Rig()
+            try await rig.tapIn()
+            try await rig.engine.record(.unlock(session: "s", reason: .nurse))
+            try await rig.server.next(unlockRoute).reply(200, replay(answer))
+            let state = await rig.until { $0.queued.isEmpty }
+            #expect(state.reasonKept == kept, "\(answer)")
+            #expect(UnlockedWords(state, given: .nurse)?.picker == picker, "\(answer)")
+            try await rig.engine.record(.refocus(session: "s"))
+            #expect(await rig.engine.state.reasonKept == nil, "\(answer)")
+            await rig.stop()
+        }
+        // An older unlock's answer landing after a newer unlock was pressed, still queued: the
+        // card is about the newer one, whose reason can still go — nothing said (santa's round 1).
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: .nurse))
+        let older = try await rig.server.next(unlockRoute)
+        #expect(await rig.engine.pressUnlock() == nil)
+        older.reply(200, replay("null"))
+        await rig.until { $0.queued.count == 1 }
+        #expect(await rig.engine.state.reasonKept == nil)
+        await rig.stop()
+        // Another class's unlock stuck in the queue is no matter: this class's card still says
+        // what the server kept (santa's round 2).
+        let (outbox, _) = try makeOutbox()
+        let stuck = try record(outbox, .unlock(session: "a", reason: nil))
+        try await send(outbox, stuck, 400, Answer.refused("invalid_request"))
+        let other = try Rig(outbox: outbox)
+        try await other.engine.record(.tap(tagId: "tag"))
+        try await other.server.next(tapRoute).reply(200, Answer.joined())
+        await other.until { $0.standing == .inSession(session(), .focused) }
+        try await other.engine.record(.unlock(session: "s", reason: .nurse))
+        try await other.server.next(unlockRoute).reply(200, replay("null"))
+        let state = await other.until { $0.queued.count == 1 }
+        #expect(state.reasonKept == ReasonKept(session: "s", reason: nil))
+        await other.stop()
     }
 
     @Test(

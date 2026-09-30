@@ -25,13 +25,15 @@ public struct Naming: Sendable, Hashable {
         (editing, name) = (true, current ?? "")
     }
 
-    /// The student typed `text`: kept to the whole characters that fit the longest name, so no
-    /// emoji is cut in two. What went wrong with the name before no longer applies. Nothing changes
-    /// while a save is under way.
+    /// The student typed `text`: kept as a name can be sent — a pasted tab or line break the space
+    /// it looks like, and what a name never carries left out (`printable`), so nothing unseen is
+    /// sent and refused (C6b-1's review) — and to the whole characters that fit the longest name,
+    /// so no emoji is cut in two. What went wrong with the name before no longer applies. Nothing
+    /// changes while a save is under way.
     public mutating func type(_ text: String) {
         guard !busy else { return }
         var (kept, count) = ("", 0)
-        for character in text {
+        for character in Self.printable(text) {
             count += character.unicodeScalars.count
             if count > Self.maxLength { break }
             kept.append(character)
@@ -40,18 +42,53 @@ public struct Naming: Sendable, Hashable {
         (name, failure) = (kept, nil)
     }
 
-    /// Something to save: a name that is not blank.
-    public var complete: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// `text` without what a name never carries, as the API refuses it (`UNPRINTABLE`,
+    /// apps/api/src/display-name.ts): control and format characters — but the joiners Persian,
+    /// Arabic and Indic names and emoji need — and line and paragraph separators; those that are
+    /// blank space made a space.
+    static func printable(_ text: String) -> String {
+        var kept = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate:
+                if scalar == "\u{200C}" || scalar == "\u{200D}" {
+                    kept.append(scalar)
+                } else if scalar.properties.isWhitespace {
+                    kept.append(" ")
+                }
+            default: kept.append(scalar)
+            }
+        }
+        return String(kept)
+    }
+
+    /// The name as the API stores it (`tidyDisplayName`): each run of blank space — the blank
+    /// braille cell and the null notehead among it — one space, and none at either end.
+    static func tidy(_ name: String) -> String {
+        name.split { $0.unicodeScalars.allSatisfy(blank) }.joined(separator: " ")
+    }
+
+    private static func blank(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.properties.isWhitespace || scalar == "\u{2800}" || scalar == "\u{1D159}"
+    }
+
+    /// Something to save: a name with something in it a reader would see — never one of blank
+    /// space and characters that draw nothing, which the API refuses (`INVISIBLE`).
+    public var complete: Bool {
+        !name.unicodeScalars.allSatisfy {
+            Self.blank($0) || $0.properties.isDefaultIgnorableCodePoint
+        }
+    }
 
     /// What the card says when a blank name is saved — the keyboard's Done — rather than nothing.
     public static let blank = "Type a name to save it."
 
-    /// A save begins: the name as typed, under its last try's event id while the name is the same,
-    /// busy until the answer comes, the last try's words gone.
+    /// A save begins: the name as typed, as the API will store it (`tidy`), under its last try's
+    /// event id while the name is the same, busy until the answer comes, the last try's words gone.
     public mutating func save(at now: Date) -> UpdateMeRequest {
         let id = eventId ?? EventID.mint(at: now)
         (eventId, busy, failure) = (id, true, nil)
-        return UpdateMeRequest(displayName: name, eventId: id)
+        return UpdateMeRequest(displayName: Self.tidy(name), eventId: id)
     }
 
     /// The answer to the save `request` sent: true once the name is set — applied, or a replay's

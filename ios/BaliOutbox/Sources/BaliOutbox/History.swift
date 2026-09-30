@@ -20,11 +20,13 @@ public struct History: Sendable, Hashable {
     /// newer moment added after older ones would be drawn out of order), or the one after
     /// `nextBefore` — its moments after those read, each once, or why not.
     /// True when the history must be read again from the top: a cursor it does not hold
-    /// (`unknown_cursor`), whose Try again would only be refused again.
+    /// (`unknown_cursor`), whose Try again would only be refused again — only where one was sent,
+    /// the page after `nextBefore`: a read from the top answered so would be read again forever
+    /// (C6a-2's review), so it is said as any other failure is.
     public mutating func answered(_ response: APIResponse<HistoryPage>) -> Bool {
         busy = false
         guard let page = response.answer else {
-            if response.error?.error.reason == .unknownCursor {
+            if response.error?.error.reason == .unknownCursor, nextBefore != nil {
                 self = History()
                 return true
             }
@@ -124,11 +126,10 @@ extension History.Moment {
             case .leftForOtherSession: "Switched to another class"
             case .enrollmentLeft: "Left the class"
             case .enrollmentRemoved: "Removed from the class"
-            // D1's words where they name the class, its em-dash kept until the owner's cleanup;
-            // with none named, no new em-dash (DESIGN.md).
+            // D1's words, in two sentences on the owner's ruling (2026-09-30): a class named with a
+            // dash of its own read as one line of two dashes.
             case .armedTapSkipped:
-                event.countedIn.map { "Tap not used — it already counted in \($0.name)" }
-                    ?? "Tap not used. It already counted in another class."
+                "Tap not used. It already counted in \(event.countedIn?.name ?? "another class")."
             case .sessionEnded, .sessionExpired: "Class ended"
             }
         note =

@@ -2,10 +2,9 @@ import BaliOutbox
 import SwiftUI
 import UIKit
 
-/// The student app's one root: the screen `Screen.choose` picks from what the phone knows
-/// (`Phone.screen`), light in every appearance — D1 is light. A screen a later step draws shows a
-/// placeholder naming that step meanwhile, never a blank. A Debug build keeps the device check's
-/// readout (ios/README.md, rounds 1–4) behind a **Readout** button.
+/// The student app's one root: the screen `Screen.choose` picks from what the phone knows, and its
+/// tab bar, in one ask (`Phone.shown`), light in every appearance — D1 is light. A Debug build
+/// keeps the device check's readout (ios/README.md, rounds 1–4) behind a **Readout** button.
 struct RootView: View {
     let phone: Phone
     #if DEBUG
@@ -19,8 +18,12 @@ struct RootView: View {
 
     var body: some View {
         let _ = rung
-        screen
-            .safeAreaInset(edge: .bottom, spacing: 0) { if phone.tabbed { TabBar(phone: phone) } }
+        // The screen and its bar from one ask of the router (C6a's review).
+        let shown = phone.shown
+        screen(shown.screen)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if shown.tabbed { TabBar(phone: phone, shown: shown.screen) }
+            }
             .task(id: phone.bell) {
                 guard let bell = phone.bell else { return }
                 await Screen.bell(bell, change: UIApplication.significantTimeChangeNotification)
@@ -38,8 +41,8 @@ struct RootView: View {
             #endif
     }
 
-    @ViewBuilder private var screen: some View {
-        switch phone.screen {
+    @ViewBuilder private func screen(_ shown: Screen) -> some View {
+        switch shown {
         case .starting:
             ScreenScaffold {
                 BaliMark(size: 72).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -61,32 +64,15 @@ struct RootView: View {
     }
 }
 
-/// What a screen a later step draws shows meanwhile: the mark and the step's name.
-struct StepPlaceholder: View {
-    let step: String
-
-    init(_ step: String) { self.step = step }
-
-    var body: some View {
-        ScreenScaffold {
-            VStack(spacing: 24) {
-                BaliMark(size: 40)
-                Text(step).textStyle(.caption).foregroundStyle(Theme.textTertiary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
-
-/// D1's tab bar, where the router honours a tab (C6a; `Phone.tabbed`): the one shown in the
+/// D1's tab bar, where the router honours a tab (C6a; `Phone.shown`): the one `shown` in the
 /// brand's ink, the others in the tertiary, on white under a hairline. As iOS's own tab bar does,
 /// its text grows no larger than the largest standard size and shows large on a long press, and
 /// VoiceOver reads it as tabs.
 struct TabBar: View {
     let phone: Phone
+    let shown: Screen
 
     var body: some View {
-        let shown = phone.screen
         HStack(spacing: 0) {
             ForEach(
                 [

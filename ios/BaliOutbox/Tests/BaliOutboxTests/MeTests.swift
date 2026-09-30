@@ -57,6 +57,43 @@ struct MeTests {
     }
 
     @Test(
+        "A name goes as the API would store it, so nothing unseen is sent and refused (C6b-1's review): a pasted tab or line break is the space it looks like, and what a name never carries — a zero-width space, a direction override, a control character — is left out as typed, while the joiners names need stay; blank space tidied as sent; and one of nothing a reader would see is nothing to save"
+    )
+    func printable() throws {
+        // The API's rules as this mirrors them: a change there fails here until the phone follows.
+        let api = Contract.repoRoot.appending(path: "apps/api/src/display-name.ts")
+        let shared = Contract.repoRoot.appending(path: "packages/shared/src/index.ts")
+        let rules = try String(contentsOf: api, encoding: .utf8)
+        let tidy = try String(contentsOf: shared, encoding: .utf8)
+        // Each by its parts, the joiners it keeps and the braille cell among them: `\u{5C}` is the
+        // backslash of a JavaScript escape.
+        let pins = [
+            #"UNPRINTABLE = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?!["#, #"])\p{Cf}/gu;"#,
+            "(?![\u{5C}u200c\u{5C}u200d])",
+            #"INVISIBLE = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}"#,
+            "_Code_Point}\u{5C}u2800\u{5C}u{1D159}]*$/u;",
+        ]
+        for pin in pins { #expect(rules.contains(pin), "\(pin)") }
+        #expect(tidy.contains(#"return name.replace(/[\s⠀\u{1D159}]+/gu, ' ').trim();"#))
+        var naming = Naming()
+        naming.edit(nil)
+        naming.type("Ana\tR.\n\u{200B}\u{202E}\u{7}")
+        #expect(naming.name == "Ana R. ")
+        naming.type("م\u{200C}ی \u{1F469}\u{200D}\u{1F393}")
+        #expect(naming.name == "م\u{200C}ی \u{1F469}\u{200D}\u{1F393}")
+        naming.type("  Ana \u{2800}\u{2028} Rodríguez ")
+        #expect(naming.complete)
+        let request = naming.save(at: t0)
+        #expect(request.displayName == "Ana Rodríguez")
+        for unseen in ["\u{3164}", "\u{FE0F}\u{200D}", "\u{2800} \u{1D159}", "\u{FEFF}"] {
+            var blank = Naming()
+            blank.edit(nil)
+            blank.type(unseen)
+            #expect(!blank.complete, "\(unseen.unicodeScalars.map(\.value))")
+        }
+    }
+
+    @Test(
         "A save goes under one event id while the name is the one it sent — a retry after no answer is its replay (rule 4) — and a name typed since is a new one; the name is fixed while it runs, and an answer to a save this editing did not send is dropped"
     )
     func saving() async throws {
