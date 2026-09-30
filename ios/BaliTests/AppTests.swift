@@ -215,6 +215,31 @@ struct AppTests {
     }
 
     @Test(
+        "Me's name and Sign out as the phone keeps them (C6b): a blank name's save says how on (santa's round 1); a frozen phone's save and Sign out say it has not started, never nothing, the name kept to try again; Sign out tries nothing while an Emergency Unlock is unsent; and a change of who is signed in takes a name being edited, and a failed Sign out, with it"
+    )
+    func nameAndSignOut() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        phone.naming.edit(" ")
+        await phone.saveName()
+        #expect(phone.naming.failure == Naming.blank && phone.naming.editing)
+        phone.naming.edit("Ana")
+        phone.naming.type("Ana R.")
+        await phone.saveName()
+        #expect(phone.naming.failure == Joining.notStarted && phone.naming.editing)
+        #expect(!phone.naming.busy && phone.naming.name == "Ana R.")
+        #expect(phone.sync.flatMap(SignOutWords.held) == nil)
+        await phone.signOut()
+        #expect(phone.signOutFailed == Joining.notStarted)
+        phone.signed(in: false)
+        #expect(phone.naming == Naming() && phone.signOutFailed == nil)
+        // Unlocked's unlock waits for its reason, unsent.
+        let unlocked = Phone(fixture: try #require(PreviewFixtures.all["unlocked"]))
+        #expect(unlocked.sync.flatMap(SignOutWords.held) != nil)
+        await unlocked.signOut()
+        #expect(unlocked.signOutFailed == nil)
+    }
+
+    @Test(
         "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it, and Join over that Home in turn, Back returning to each (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
     )
     func opened() async throws {
