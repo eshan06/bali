@@ -5,6 +5,7 @@ import {
   resolveTapTarget,
   sessionRunning,
   tapIn,
+  TransitionError,
 } from '@bali/db';
 import type { TapResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
@@ -51,22 +52,37 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
     const target = await resolveTapTarget(db, body.tagId, student.id);
     if (!target) throw ApiError.notFound('unknown block');
 
-    // The newest session still running by the server's clock: one past its
-    // bell is over, swept or not, so a tap then arms as when nothing runs
-    // (A17). The engine judges it again under the lock, at the same moment.
+    // The newest session running by the server's clock (`sessionRunning`,
+    // A17) — by this read, which takes no lock, and again under the session's
+    // lock in the engine, at the same moment. With none by this read, the
+    // newest not yet marked over is still tried: only its lock can say it is
+    // past its bell, since an extend may have moved the bell after this read.
+    // Over there too, nothing joinable runs, and the tap arms as when nothing
+    // does. One running by this read and marked over since is refused, as
+    // before (its retry arms).
     const now = clock();
-    const session = target.sessions.find((s) => sessionRunning(s, now));
-    if (session) {
-      const result = await mapTransitionError(() =>
-        tapIn(db, {
-          sessionId: session.id,
-          studentId: student.id,
-          eventId: body.eventId,
-          deviceTime,
-          order: body.order ?? null,
-          now,
-        }),
-      );
+    const running = target.sessions.find((s) => sessionRunning(s, now));
+    const session = running ?? target.sessions[0];
+    const result =
+      session &&
+      (await mapTransitionError(async () => {
+        try {
+          return await tapIn(db, {
+            sessionId: session.id,
+            studentId: student.id,
+            eventId: body.eventId,
+            deviceTime,
+            order: body.order ?? null,
+            now,
+          });
+        } catch (err) {
+          if (running || !(err instanceof TransitionError) || err.code !== 'SESSION_NOT_RUNNING') {
+            throw err;
+          }
+          return undefined;
+        }
+      }));
+    if (result) {
       return {
         outcome: result.outcome,
         session: result.session && {
@@ -90,7 +106,8 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
     // tap" — an engine test cannot catch this, because the throw is right
     // and only the status is wrong.
     //
-    // Its order is kept with it (A12), for the `tap_in` the Start records.
+    // Its order is kept with it (A12), for the `tap_in` the Start records;
+    // its day and its expiry are judged at the same moment, on the same clock.
     const armed = await mapTransitionError(() =>
       armTap(db, {
         studentId: student.id,
@@ -99,7 +116,8 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
         eventId: body.eventId,
         deviceTime,
         order: body.order ?? null,
-        expiresAt: endOfDay(new Date()),
+        expiresAt: endOfDay(now),
+        now,
       }),
     );
     return { outcome: armed.outcome, session: null, state: null };

@@ -936,6 +936,13 @@ async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promi
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
+    // The tap's own lock, as its landing takes it (`lockTap`): a delivery of
+    // this tap still landing in a session — its `tap_in` not yet committed,
+    // so the look below cannot see it — is waited out, and this is answered
+    // as its replay, never armed under an id about to be spent (A17: a retry
+    // heard past the bell arms while the tap itself lands before it).
+    await lockTap(tx, input.eventId);
+
     // An id already in `events` is a tap that LANDED, so there is nothing to
     // arm and the honest answer is `replay`.
     //
@@ -1544,10 +1551,11 @@ async function teacherOfClass(tx: Database, classId: string): Promise<string | u
 
 /**
  * Serialise a tap's landing (`tapIn`) with an unlock sent under it
- * (`unlockUnderTap`, decision 11). Neither can see the other's uncommitted
- * row, so arriving together each could miss the other: the unlock kept
- * unattached, the tap joined as focused over a phone its student unlocked.
- * Taken first in both, before the session: one lock order. A transaction
+ * (`unlockUnderTap`, decision 11), and with its arming (`armTap`, A17). None
+ * can see another's uncommitted row, so arriving together each could miss the
+ * other: the unlock kept unattached, the tap joined as focused over a phone its
+ * student unlocked; or a retry armed under an id its landing then spends.
+ * Taken first in each, before the session: one lock order. A transaction
  * advisory lock on a hash of the tap's id, released at commit — a collision
  * only makes two taps wait on each other.
  */
