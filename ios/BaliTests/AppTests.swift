@@ -149,15 +149,33 @@ struct AppTests {
         #expect(over.sync?.sessionOverWords(over.protection)?.hasSuffix("All your apps are back.") == true)
         over.closeSessionOver()
         #expect(over.screen == .home)
+        // Me (C6b): D1's name card, editing it and a refused save; Sign out held over an unsent
+        // unlock — pressed, nothing tried — and one that failed.
+        let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        #expect(me.sync?.me?.user.displayName == "Ana Rodríguez" && !me.naming.editing)
+        #expect(try #require(PreviewFixtures.all["meEditing"]).naming.name == "Ana R.")
+        let taken = Naming.words(.status(409), .displayNameTaken)
+        #expect(try #require(PreviewFixtures.all["meNameError"]).naming.failure == taken)
+        let held = Phone(fixture: try #require(PreviewFixtures.all["meSignOutHeld"]))
+        #expect(held.sync.flatMap(SignOutWords.held) != nil)
+        await held.signOut()
+        #expect(held.signOutFailed == nil && held.screen == .me)
+        #expect(me.sync.flatMap(SignOutWords.held) == nil)
+        let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
+        #expect(notOut.signOutFailed == SignOutWords.failed)
     }
 
     @Test(
-        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab"
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
-        let homes = ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "me"]
+        let (homes, editing) = (
+            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused"],
+            ["meEditing", "meNameError"]
+        )
         for (name, state) in PreviewFixtures.all {
-            let tabbed = homes.contains(name) || name.hasPrefix("history")
+            let me = name.hasPrefix("me") && !editing.contains(name)
+            let tabbed = homes.contains(name) || name.hasPrefix("history") || me
             #expect(Phone(fixture: state).tabbed == tabbed, "\(name)")
         }
         let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
@@ -189,6 +207,17 @@ struct AppTests {
         #expect(signedOut.screen == .signIn && signedOut.history == History())
         signedOut.signed(in: true)
         #expect(signedOut.screen == .home && signedOut.tab == .home)
+        // Me's Join a class opens Join over it — no tab bar there — and Back returns to Me.
+        let fromMe = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        fromMe.open(.join)
+        #expect(fromMe.screen == .join && fromMe.canGoBack && !fromMe.tabbed)
+        fromMe.back()
+        #expect(fromMe.screen == .me && fromMe.tabbed)
+        // Me's name edited: no tab bar, Save and Cancel the ways on; cancelled, the bar is back.
+        let named = Phone(fixture: try #require(PreviewFixtures.all["meEditing"]))
+        #expect(named.screen == .me && !named.tabbed)
+        named.naming = Naming()
+        #expect(named.screen == .me && named.tabbed)
     }
 
     @Test(
