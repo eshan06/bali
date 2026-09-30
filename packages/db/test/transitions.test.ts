@@ -3026,22 +3026,35 @@ describe('extendSession', () => {
     expect((await eventsFor(session.id)).some((e) => e.type === 'session_extended')).toBe(true);
   });
 
-  it('gives a session past its end but not yet swept a window starting from now', async () => {
-    // The other half of `base = max(at, endsAt)`, which moved from the route
-    // into the locked read with this change. The expiry sweep runs once a
-    // minute, so a teacher can press "add time" on a session whose end has
-    // just passed. Adding to the stale end would hand back a new end that is
-    // STILL in the past — the shield never comes back and the press looks
-    // like it did nothing.
+  it('refuses a session past its bell that the sweep has not ended yet (decision 12)', async () => {
+    // The owner's ruling (2026-09-30): past its bell by the server's clock
+    // the class is over, swept or not. Every phone let go at the bell by its
+    // own clock (decision 6), so a late extend would show them green while
+    // unlocked, and whether it took would turn on when the sweep ran. It gets
+    // a swept session's answer, and the teacher starts a new session. Phase 2
+    // gave it a fresh window from the press instead.
     const { klass } = await seedClass('extend-late');
     const w = window('2026-01-01T09:00:00Z');
     const { session } = await startSession(db, { classId: klass.id, ...w });
 
-    const at = new Date('2026-01-01T09:25:30Z'); // 30s past the 09:25 end
-    const updated = await extendSession(db, { sessionId: session.id, durationMinutes: 10, at });
+    // At the bell, and 30 s past it.
+    for (const at of [w.endsAt, new Date('2026-01-01T09:25:30Z')]) {
+      await expect(
+        extendSession(db, { sessionId: session.id, durationMinutes: 10, at, eventId: newUuidV7() }),
+      ).rejects.toMatchObject({ code: 'SESSION_NOT_RUNNING' });
+    }
+    const after = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
+    expect(after.endsAt).toEqual(w.endsAt);
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual(['session_started']);
 
-    expect(updated.endsAt.toISOString()).toBe(new Date(at.getTime() + 10 * 60_000).toISOString());
-    expect(updated.endsAt.getTime()).toBeGreaterThan(at.getTime());
+    // A second before the bell, it still extends.
+    const early = new Date(w.endsAt.getTime() - 1_000);
+    const updated = await extendSession(db, {
+      sessionId: session.id,
+      durationMinutes: 10,
+      at: early,
+    });
+    expect(updated.endsAt).toEqual(new Date(w.endsAt.getTime() + 10 * 60_000));
   });
 
   it('refuses an extension that would not move the end forward', async () => {
@@ -3088,8 +3101,8 @@ describe('extendSession', () => {
      * The guard that MAX_SESSION_MINUTES made unreachable from the direction
      * its old test came at it: `1e15` minutes used to land here, and now the
      * duration check two lines above rejects it first. What still reaches it
-     * is the case the guard was really for — `base` is `max(at, endsAt)` and
-     * `endsAt` comes from the STORED session, so a row already near the JS
+     * is the case the guard was really for — the new end is added to
+     * `endsAt` from the STORED session, so a row already near the JS
      * `Date` boundary overflows on a perfectly legal ten-minute press.
      * Unguarded, `newEndsAt` is an Invalid Date and `toISOString()` throws a
      * bare `RangeError`: an unmapped 500, where the point of these checks is

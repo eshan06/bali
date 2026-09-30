@@ -243,6 +243,27 @@ describe('POST /v1/sessions/:id/extend', () => {
     }
   });
 
+  it('cannot extend a session past its bell the sweep has not reached yet (409 session_not_running)', async () => {
+    // The owner's ruling (decision 12, 2026-09-30): past its bell by the
+    // server's clock the class is over, swept or not, so it gets a swept
+    // session's answer. It used to be a 200 with a fresh window.
+    const { klass, teacher } = await seedClassroom(db, 'extend-past-bell');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+    const res = await post(
+      await ctx.tokenFor(teacher.cognitoId),
+      `/v1/sessions/${session.id}/extend`,
+      { durationMinutes: 10, eventId: randomUUID() },
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: { code: 'conflict', reason: 'session_not_running', message: 'session has ended' },
+    });
+  });
+
   it('rejects a bad duration (400)', async () => {
     const { teacher, session } = await seedRunning('extend-baddur');
     const res = await post(
