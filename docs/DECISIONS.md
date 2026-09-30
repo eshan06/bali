@@ -8,6 +8,49 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **C6b-1: Me's engine side — the name, Sign out, and the last student's `me`.**
+  C6b in two PRs for size (santa's step 0 found 458 lines; the conductor split it as C5a and C6a
+  were): this one the rules and the engine, C6b-2, stacked on it, the screen. **The name** (A8's
+  `PATCH /v1/me`): `Naming` keeps it as typed, to the whole characters within
+  `DISPLAY_NAME_MAX_LENGTH` code points — a field cut at a code point could leave half an emoji, a
+  format character the server refuses — and a blank one is nothing to save. **One event id per
+  name tried** (rule 4): kept while the name is the one it sent, so a retry after an answer that
+  never came is answered as its replay, not a second rename; a name typed since is a new save. A
+  join mints one per press because the server knows its retry by the enrollment; a rename has only
+  its event id. An answer to a save the editing did not send — a sign-out meanwhile — is dropped.
+  Each refusal is said: a name a classmate uses ("Try another, like adding your last initial":
+  the way on, where a name like theirs is the likely clash), one Bali can't use, a teacher's
+  account, else the Join screen's words. `SyncEngine.rename` makes the name `me`'s at once, for
+  Home's greeting and Me; the engine's `joins` counter becomes `meChanges` — a join, a rename, a
+  forgetting — so a read of `GET /v1/me` sent before one never applies its `me`, and a rename
+  answered after `me` changed some other way reads the truth again rather than set a name on
+  another `me`. **Sign out, decided** (the owner's open note, B4's rule: a queued record waits for
+  the next sign-in and goes under whoever makes it): `Phone.signOut` forgets the sign-in's tokens
+  and nothing else — never the standing, its shields or a queued record — so the router shows Sign
+  in, or Focus while the shields are on, whose Emergency Unlock needs no token. Me, where Sign out
+  is, never shows while the shields are on, nor in place of Unlocked or Protection off (the
+  router's own rules, C6a), so it cannot be pressed from a session's screens. And it is held —
+  disabled, why said with Try again — while an Emergency Unlock is queued unsent
+  (`SignOutWords.held`: a session's, one under a tap, one not filed yet): signed out, that unlock
+  would wait for the next sign-in and, on a shared phone, be filed under another student. Only an
+  unlock holds it: the server records every unlock one reaches, so the hold ends once the phone is
+  online, while a refused tap stays queued for good (B3a) and would hold Sign out for ever. A
+  Keychain that cannot forget the tokens is said, nothing changed. **Not covered, disclosed:** a
+  sign-out the student did not make — Cognito refusing the refresh token — and an unlock made after
+  it, on Focus, still go under the next sign-in, as does any other record still queued at a
+  sign-out (a tap the server refused or left unsettled, say); the owner's note stays open for them.
+  **The last student's `me`:** where someone signs in after a sign-out
+  (`Phone.signed(in:)`, false to true), `SyncEngine.forgetMe` forgets `me` — the name and classes,
+  another student's on a shared phone — drops a read on its way and reads again, so Home and Me
+  never greet one student with another's name. At the sign-in, not the sign-out: signed out with
+  the shields on, Focus still names the class. A sign-in change also takes a name being edited
+  and a failed Sign out with it. **Tests:** `MeTests` (the name's characters and length, pinned to
+  `@bali/shared`; the event id across retries; A8's fixtures, each answer's words; Sign out held by
+  each unlock and by nothing else), `MeEngineTests` (`me` renamed at once, a refusal changing
+  nothing, a 401 renewed once; a stale read never taking the name back; `forgetMe` dropping a read
+  and a rename on their way), `AppTests.nameAndSignOut` (a frozen phone's save and Sign out said,
+  Sign out trying nothing over an unsent unlock, a sign-in change forgetting the name edited).
+
 - **2026-09-29** — **C5b: the Protection off and Session over screens, and the router around
   them.** **The permission gate:** the brief's red case — a permission not approved routing to the
   grant screen ahead of a running session's standing — was already closed on `main`: C1a's santa

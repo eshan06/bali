@@ -243,9 +243,9 @@ public actor SyncEngine {
     private var changes = 0
     private var foreground = false
     private var rereading = false
-    /// The joins the phone has made (`join`): a read of `GET /v1/me` sent before one never applies
-    /// its classes, which are older than it.
-    private var joins = 0
+    /// The changes the phone has made to `me` — a join, a rename, a sign-in forgetting the last
+    /// student's: a read of `GET /v1/me` sent before one never applies its `me`, older than it.
+    private var meChanges = 0
     /// Whether a fresh token was already tried since the last answer that was not a 401.
     private var refreshed = false
     /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
@@ -437,13 +437,39 @@ public actor SyncEngine {
     {
         let answer = await Joining.send(renewing: refresh) { await client.join(request) }
         guard let joined = answer.answer?.class else { return answer }
-        joins += 1
+        meChanges += 1
         if let me = state.me, !me.classes.contains(where: { $0.id == joined.id }) {
             state.me = MeResponse(
                 user: me.user, classes: me.classes + [joined], session: me.session)
         }
         reread()
         return answer
+    }
+
+    /// Sets the student's own name (`PATCH /v1/me`, A8): the Me screen's own call (C6b), its token
+    /// renewed once on a 401. Once set — applied, or a replay's name now — it is `me`'s at once, for
+    /// Home's greeting and Me's card, and a read sent before it never takes it back; where `me`
+    /// changed meanwhile — another join, a sign-in forgetting it — the truth is read again instead.
+    public func rename(_ request: UpdateMeRequest) async -> APIResponse<UpdateMeResponse> {
+        let changesThen = meChanges
+        let answer = await Joining.send(renewing: refresh) { await client.updateMe(request) }
+        guard let user = answer.answer?.user else { return answer }
+        if meChanges == changesThen, let me = state.me {
+            state.me = MeResponse(user: user, classes: me.classes, session: me.session)
+        } else {
+            reread()
+        }
+        meChanges += 1
+        return answer
+    }
+
+    /// Someone signs in where someone signed out (C6b): the last student's `me` — their name and
+    /// classes, another student's on a shared phone — is forgotten, a read on its way with it, and
+    /// read again. Nothing else: where the phone stands and its queue are the phone's (B4).
+    public func forgetMe() {
+        meChanges += 1
+        update { ($0.me, $0.meFailed) = (nil, nil) }
+        reread()
     }
 
     /// Everything queued goes now, and the truth is read again: the student's "retry" (rule 5), and
@@ -619,12 +645,12 @@ public actor SyncEngine {
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false
-                    let joinsThen = joins
+                    let changesThen = meChanges
                     let response = await client.me()
                     await heard(response.result, response.noAnswer)
                     if let me = response.answer {
-                        // Its classes, unless the phone joined one since it was sent.
-                        let current = joins == joinsThen
+                        // Its `me`, unless the phone changed that since it was sent.
+                        let current = meChanges == changesThen
                         reconcile(sent, standing(me)) {
                             if current { $0.me = me }
                             $0.meFailed = nil
