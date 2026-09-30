@@ -10,7 +10,8 @@
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
-        /// no screen opened over another and Home's tab chosen, unless said otherwise.
+        /// no screen opened over another, Home's tab chosen and no history read, unless said
+        /// otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -21,6 +22,7 @@
             var joining = Joining()
             var opened: [Screen] = []
             var tab = Screen.home
+            var history = History()
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -71,6 +73,11 @@
             "unlockedRecorded": State(sync: standing(.inSession(period3, .unlocked))),
             "unlockedRetap": State(sync: reported(standing(.inSession(period3, .unlocked)))),
             "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
+            "history": State(tab: .history, history: anaHistory()),
+            "historyEmpty": State(tab: .history, history: history(read: true)),
+            "historyError": State(
+                tab: .history, history: history(failure: History.words(.networkError))),
+            "historyLoading": State(tab: .history, history: history(busy: true)),
             "me": State(tab: .me),
             "storage": State(
                 problem: "The outbox could not be opened: SQLite error 14: unable to open database",
@@ -114,6 +121,53 @@
             var joining = Joining()
             (joining.code, joining.preview, joining.failure) = ("KWX49Q", opens, failure)
             return joining
+        }
+
+        /// The History screen, `read` or `busy` reading, or its read failed: `failure`.
+        private static func history(read: Bool = false, busy: Bool = false, failure: String? = nil)
+            -> History
+        {
+            var history = History()
+            (history.read, history.busy, history.failure) = (read, busy, failure)
+            return history
+        }
+
+        /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
+        /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier.
+        private static func anaHistory() -> History {
+            /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
+            func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
+                let calendar = Calendar.current
+                let day = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                let time = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)
+                return (time ?? day).formatted(Date.ISO8601FormatStyle())
+            }
+            /// Moment `id`, `type` at `time`, in Period `period` with its teacher.
+            func moment(
+                _ id: Int, _ type: String, _ time: String, _ period: Int, reason: String = "null",
+                countedIn: String = "null"
+            ) -> String {
+                let (name, teacher) = [
+                    3: ("Period 3 — Algebra II", "Ms. Rivera"),
+                    5: ("Period 5 — Chemistry", "Mr. Okafor"), 6: ("Period 6 — Geometry", "Ms. Chen"),
+                ][period]!
+                return #"{"eventId":"m\#(id)","type":"\#(type)","occurredAt":"\#(time)","class":{"id":"p\#(period)","name":"\#(name)"},"teacher":{"displayName":"\#(teacher)"},"session":null,"reason":\#(reason),"recordedAs":null,"countedIn":\#(countedIn)}"#
+            }
+            let events = [
+                moment(7, "session_expired", at(10, 45), 3), moment(6, "refocus", at(10, 16), 3),
+                moment(5, "unlock", at(10, 12), 3, reason: #""bathroom""#),
+                moment(4, "tap_in", at(9, 58), 3),
+                moment(
+                    3, "armed_tap_skipped", at(14, 48, 1), 6,
+                    countedIn: #"{"id":"p5","name":"Period 5 — Chemistry"}"#),
+                moment(2, "session_ended", at(13, 50, 1), 5), moment(1, "tap_in", at(13, 2, 1), 5),
+            ]
+            var ana = history(read: true)
+            let page = try? BaliJSON.makeDecoder().decode(
+                HistoryPage.self,
+                from: Data(#"{"events":[\#(events.joined(separator: ","))],"nextBefore":"m0"}"#.utf8))
+            (ana.events, ana.nextBefore) = (page?.events ?? [], page?.nextBefore)
+            return ana
         }
 
         /// What rule 3's check found: `permission`, checked.
