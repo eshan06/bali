@@ -270,15 +270,21 @@
 
         /// `state` with `change` made as the fixture was, not sent yet — for `hold`, an unlock
         /// waiting for its reason — kept in an outbox of the fixture's own: only an outbox makes one.
+        /// An outbox that fails stops here, saying why — never a fixture quietly holding nothing,
+        /// named for a screen it no longer shows (C4's review).
         private static func queued(_ state: SyncState, _ change: Change, holding hold: TimeInterval = 0)
             -> SyncState
         {
             var state = state
             let url = FileManager.default.temporaryDirectory.appending(
                 path: "fixture-\(UUID().uuidString).sqlite")
-            let outbox = try? Outbox(at: url)
-            _ = try? outbox?.record(change, now: Date(), holding: hold)
-            state.queued = (try? outbox?.records()) ?? []
+            do {
+                let outbox = try Outbox(at: url)
+                try outbox.record(change, now: Date(), holding: hold)
+                state.queued = try outbox.records()
+            } catch {
+                fatalError("A fixture's outbox failed: \(error)")
+            }
             return state
         }
 

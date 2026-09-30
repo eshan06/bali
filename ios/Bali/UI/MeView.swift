@@ -109,6 +109,9 @@ struct MeView: View {
                 .disabled(naming.busy)
         }
         .onAppear { typing = true }
+        // Fixed while its save ran; the keyboard back once a save that failed is over (C6b-2's
+        // review), as the Join screen's code does.
+        .onChange(of: naming.busy) { _, busy in if !busy, phone.naming.editing { typing = true } }
         // Said to VoiceOver too, whose focus stays on Save (rule 5).
         .onChange(of: naming.failure) { _, words in
             if let words { AccessibilityNotification.Announcement(words).post() }
@@ -117,11 +120,11 @@ struct MeView: View {
 
     private func save() { Task { await phone.saveName() } }
 
-    /// D1's card of Bali in class: what pauses and what never does, Screen Time's state — Settings,
-    /// where it changes — and what a teacher sees.
+    /// D1's card of Bali in class: what pauses and what never does, Screen Time on — Settings, where
+    /// it changes: the router never shows Me without it (Screen Time's own screen, or Protection
+    /// off, instead; C6b-2's review) — and what a teacher sees.
     private var about: some View {
-        let off = phone.protection?.permissionOff == true
-        return Card(padding: 0) {
+        Card(padding: 0) {
             VStack(spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "shield").font(.system(size: 20)).foregroundStyle(Theme.brand)
@@ -140,7 +143,7 @@ struct MeView: View {
                 .padding(.vertical, 14).padding(.horizontal, 16)
                 .accessibilityElement(children: .combine)
                 Rectangle().fill(Theme.border).frame(height: 1)
-                row("Screen Time", value: off ? ("Off", Theme.textSecondary) : ("On", Theme.brand)) {
+                row("Screen Time", value: ("On", Theme.brand)) {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 Rectangle().fill(Theme.border).frame(height: 1)
@@ -184,7 +187,9 @@ struct SignOutButton: View {
                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary).frame(minHeight: 44)
                 .disabled(held != nil).opacity(held == nil ? 1 : 0.6)
-            if let failed = phone.signOutFailed { Text(failed).textStyle(.body) }
+            // Held, the hold is the one reason said: a failure from before it is not (C6b-1's
+            // review).
+            if held == nil, let failed = phone.signOutFailed { Text(failed).textStyle(.body) }
         }
     }
 }

@@ -28,34 +28,40 @@ public enum Screen: Sendable, Hashable {
     /// the one under it shows, never over anything else; `tab`, the one chosen in D1's tab bar
     /// (C6a) — History or Me in place of the router's own Home with nothing opened over it, and
     /// nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it,
-    /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b).
+    /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b). And
+    /// whether the tab bar shows: wherever a tab is honoured — in the same answer, at the same
+    /// `now`, so the screen and its bar never disagree, at a bell either (C6a's review).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: SessionView?,
         opened: [Screen], tab: Screen, now: Date
-    ) -> Screen {
-        if let problem { return .storage(problem) }
+    ) -> (screen: Screen, tabbed: Bool) {
+        if let problem { return (.storage(problem), false) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
         // a session the phone's own clock says still runs (decision 6), or a tap not yet answered
         // holding them (decision 7, to its cap; not after decision 11's unlock, nor refused) — is
         // focus before anything else, the intro seen or not, signed out or not: the focus screen
         // holds Emergency Unlock, always allowed.
-        if let sync, sync.shieldedUntil(now) != nil { return .focus }
+        if let sync, sync.shieldedUntil(now) != nil { return (.focus, false) }
         // Where the phone stood not read, the last run's shields kept on (B6b): home, which holds
         // Emergency Unlock there, before the intro and the sign-in too.
-        if sync?.standing == .unread, protection?.shielded == true { return .home }
-        if !introSeen { return .intro }
-        guard let signedIn, let protection, protection.checked, let sync else { return .starting }
-        if !signedIn { return .signIn }
+        if sync?.standing == .unread, protection?.shielded == true { return (.home, false) }
+        if !introSeen { return (.intro, false) }
+        guard let signedIn, let protection, protection.checked, let sync else {
+            return (.starting, false)
+        }
+        if !signedIn { return (.signIn, false) }
         var shown = settled(sync, protection, everApproved, hasClasses, sessionOverClosed, now)
-        if shown == .home, opened.isEmpty, tab == .history || tab == .me { return tab }
+        if shown == .home, opened.isEmpty {
+            return (tab == .history || tab == .me ? tab : .home, true)
+        }
         for screen in opened {
             switch (shown, screen) {
             case (.home, .join), (.waiting, .home): shown = screen
-            default: return shown
+            default: return (shown, false)
             }
         }
-        return shown
+        return (shown, false)
     }
 
     /// The screen of where the phone stands, signed in and its permission checked.

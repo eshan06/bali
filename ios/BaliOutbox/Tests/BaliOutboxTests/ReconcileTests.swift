@@ -97,6 +97,23 @@ struct AnswerTests {
         await rig.until { $0.standing == .out && $0.queued.isEmpty }
         await rig.stop()
     }
+
+    @Test(
+        "The late unlock's answer these tests hand-write is the API's own, as its fixture records it (#119's review): recorded, superseded, no state, its session named"
+    )
+    func supersededGoneIsTheAPIs() throws {
+        let fixtures = try Contract.fixtures("unlock")
+        let fixture = try #require(fixtures.first { $0.name == "recorded-superseded-gone.json" })
+        let decoder = JSONDecoder()
+        let real = try decoder.decode([String: JSONValue].self, from: fixture.fixture.body.data)
+        let written = try decoder.decode(
+            [String: JSONValue].self, from: Data(Answer.supersededGone.utf8))
+        #expect(Set(real.keys) == Set(written.keys))
+        for key in ["outcome", "recordedAs", "state", "reason"] {
+            #expect(real[key] == written[key], "\(key)")
+        }
+        #expect(real["session"] != .null && written["session"] != .null)
+    }
 }
 
 @Suite("The check-in and the reads of the truth", .timeLimit(.minutes(3)))

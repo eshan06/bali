@@ -131,6 +131,11 @@ public struct SyncState: Sendable, Hashable {
     /// The session protection off was last reported in, since the phone's last tap
     /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
     public var reportedOff: String?
+    /// The reason the server kept for an unlock, where it is not the one the phone sent with it:
+    /// the one recorded first stands (A1) — the record, sent before, went unsettled, and a reason
+    /// was given after a relaunch (#119's review). Said on Unlocked in the reason's place until the
+    /// phone's next change.
+    public var reasonKept: ReasonKept?
     /// How long a tap not yet answered is shielded for: decision 7's `tapCap`, or the shorter one a
     /// Debug build sets for B5b's device check (`SyncEngine.setTapCap`).
     public var cap = SyncState.tapCap
@@ -186,6 +191,15 @@ public struct Refusal: Sendable, Hashable {
 
     public init(change: Change, status: Int?, reason: ApiErrorReason?, message: String?) {
         (self.change, self.status, self.reason, self.message) = (change, status, reason, message)
+    }
+}
+
+/// An unlock's session, and the reason the server kept for it: none, or another than the phone's.
+public struct ReasonKept: Sendable, Hashable {
+    public let session: String
+    public let reason: UnlockReason?
+    public init(session: String, reason: UnlockReason?) {
+        (self.session, self.reason) = (session, reason)
     }
 }
 
@@ -345,7 +359,7 @@ public actor SyncEngine {
         update {
             $0.standing = standing
             ($0.queued, $0.reportedOff) = (queued, reportedOff)
-            ($0.refused, $0.superseded) = (nil, nil)
+            ($0.refused, $0.superseded, $0.reasonKept) = (nil, nil, nil)
         }
         ring(.drain)
         return record
@@ -588,6 +602,12 @@ public actor SyncEngine {
         // kept and shown, and still stands on the phone (`holdsUnlock`).
         case nil, .unlock(.retryAndSurface)?: break
         case .tap(.applySession)?, .unlock(.recorded)?, .stateChange(.applySession)?:
+            // A reason the server did not keep, the one it recorded first standing (A1): said.
+            if disposition == .unlock(.recorded), let given = record.change.reason,
+                sent.reason != given, let session = sent.session
+            {
+                next.reasonKept = ReasonKept(session: session.id, reason: sent.reason)
+            }
             // A live participation names its session and its state; a note (an unlock after the
             // end names the session it ended) names no window to be in.
             guard let session = sent.session, var participation = sent.state else {

@@ -281,9 +281,11 @@ struct AppTests {
             await left.historyRead(await client(200, older).history(), for: read)
             #expect(left.history == History())
         }
+        // Show earlier's cursor, which the history does not hold: read again from the top.
         let cursor = #"{"error":{"code":"bad_input","reason":"unknown_cursor","message":"no"}}"#
-        await phone.historyRead(await client(400, cursor).history(before: "m0"), for: phone.reads)
-        #expect(phone.history.failure == Joining.notStarted && !phone.history.read)
+        let paged = Phone(fixture: try #require(PreviewFixtures.all["history"]))
+        await paged.historyRead(await client(400, cursor).history(before: "m0"), for: paged.reads)
+        #expect(paged.history.failure == Joining.notStarted && !paged.history.read)
     }
 
     @Test(
@@ -327,6 +329,67 @@ struct AppTests {
         let typed = Phone(fixture: try #require(PreviewFixtures.all["joinError"]))
         typed.signed(in: false)
         #expect(typed.joining == Joining())
+    }
+
+    @Test(
+        "History's pages through the phone's own engine (C6a-2's review): Show earlier asks for the page after those read — the cursor the last one named — and adds it, the history kept; a read from the top asks for none, and starts over; History gone from the screen, by any way, is forgotten"
+    )
+    func historyPages() async throws {
+        let server = StandIn(pages: [
+            page(["m2"], next: "m2"), page(["m1"], next: nil), page(["m3"], next: nil),
+        ])
+        let (phone, _) = try standIn(server)
+        await phone.readHistory()
+        #expect(phone.history.events.map(\.eventId) == ["m2"] && phone.history.nextBefore == "m2")
+        await phone.readHistory(more: true)
+        #expect(phone.history.events.map(\.eventId) == ["m2", "m1"])
+        #expect(phone.history.nextBefore == nil && phone.history.read)
+        await phone.readHistory()
+        #expect(phone.history.events.map(\.eventId) == ["m3"])
+        #expect(await server.befores == [nil, "m2", nil])
+        phone.forgetHistory()
+        #expect(phone.history == History())
+    }
+
+    @Test(
+        "Sign out through the phone's own sign-in and outbox (C6b-1's review): an Emergency Unlock the outbox file holds unsent, said and nothing tried; a Keychain that cannot forget the tokens now, said; forgotten, nothing said and nobody signed in — each try's words the last one's no more"
+    )
+    func signOutWiring() async throws {
+        let (held, engine) = try standIn(StandIn())
+        try await engine.record(.unlock(session: "s", reason: nil))
+        await held.signOut()
+        #expect(held.signOutFailed == SignOutWords.unsent)
+        let keychain = Keychain(account: "ana")
+        let (phone, _) = try standIn(StandIn(), keychain: keychain)
+        keychain.locked = true
+        await phone.signOut()
+        #expect(phone.signOutFailed == SignOutWords.failed)
+        keychain.locked = false
+        await phone.signOut()
+        #expect(phone.signOutFailed == nil && keychain.empty)
+        #expect(await phone.signIn?.account() == nil)
+    }
+
+    @Test(
+        "Another student's sign-in forgets the last one's name and classes, keyed on the account (C6b-1's review): the sign-out between the two not seen — a stream that keeps its newest value only can let it go by — the tabs start over and the engine's `me` goes; the same student again forgets nothing"
+    )
+    func forgetsAnother() async throws {
+        let ana = #"{"user":{"id":"u","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+        let server = StandIn(me: ana)
+        let (phone, engine) = try standIn(server)
+        let running = Task { await engine.run() }
+        await engine.setForeground(true)
+        try await until { await engine.state.me != nil }
+        phone.signed(in: true, as: "ana")
+        phone.select(.me)
+        phone.signed(in: true, as: "ana")
+        #expect(phone.tab == .me)
+        #expect(await engine.state.me != nil)
+        phone.signed(in: true, as: "bea")
+        #expect(phone.tab == .home && phone.signedIn == true)
+        try await until { await engine.state.me == nil }
+        running.cancel()
+        await running.value
     }
 
     @Test(
@@ -646,6 +709,113 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// A phone of the test's own over an engine `server` answers, and a sign-in over `keychain`: what
+/// `Phone.start` wires between them and the screens, with no Keychain or network of the phone's.
+@MainActor
+private func standIn(_ server: StandIn, keychain: Keychain = Keychain(account: "ana")) throws
+    -> (Phone, SyncEngine)
+{
+    struct Signed: TokenProvider {
+        func accessToken() async -> String? { "token" }
+    }
+    let url = FileManager.default.temporaryDirectory.appending(
+        path: "phone-\(UUID().uuidString).sqlite")
+    let client = APIClient(
+        baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(), transport: server)
+    let engine = SyncEngine(outbox: try Outbox(at: url), client: client)
+    let cognito = Cognito(
+        domain: URL(string: "https://bali.auth.test")!, clientId: "phone",
+        redirectURI: URL(string: "bali://auth/callback")!)
+    let signIn = SignIn(cognito: cognito, store: keychain, transport: server)
+    return (Phone(signIn: signIn, engine: engine), engine)
+}
+
+/// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after
+/// that, a read on its way for good, until the test ends — and history pages from `pages`, in
+/// turn, the cursor each asked for kept.
+private actor StandIn: HTTPTransport {
+    private var me: String?
+    private var pages: [String]
+    private(set) var befores: [String?] = []
+
+    init(me: String? = nil, pages: [String] = []) { (self.me, self.pages) = (me, pages) }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        var body: String
+        switch url.path() {
+        case "/v1/me/history":
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+            befores.append(query?.first { $0.name == "before" }?.value)
+            guard !pages.isEmpty else { throw URLError(.notConnectedToInternet) }
+            body = pages.removeFirst()
+        case "/v1/me" where me != nil:
+            (body, me) = (me ?? "", nil)
+        case "/v1/me":
+            try await Task.sleep(for: .seconds(3600))
+            throw URLError(.cancelled)
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
+/// A page of history as `GET /v1/me/history` answers it: a tap for each of `ids`, then `next`.
+private func page(_ ids: [String], next: String?) -> String {
+    let events = ids.map {
+        #"{"eventId":"\#($0)","type":"tap_in","occurredAt":"2026-09-01T13:00:00Z","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}"#
+    }
+    let cursor = next.map { #""\#($0)""# } ?? "null"
+    return #"{"events":[\#(events.joined(separator: ","))],"nextBefore":\#(cursor)}"#
+}
+
+/// The Keychain's stand-in: the tokens a sign-in of `account` keeps — its access token's payload
+/// naming it — or none; one a test can lock, as a locked phone's is.
+private final class Keychain: TokenStore, @unchecked Sendable {
+    struct Locked: Error {}
+    private let lock = NSLock()
+    private var saved: Data?
+    private var isLocked = false
+
+    init(account: String?) {
+        saved = account.map { account in
+            let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600}"#
+            let payload = Data(claims.utf8).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            return Data(#"{"access":"h.\#(payload).s","refresh":"r","until":1000000000}"#.utf8)
+        }
+    }
+
+    var locked: Bool {
+        get { lock.withLock { isLocked } }
+        set { lock.withLock { isLocked = newValue } }
+    }
+    var empty: Bool { lock.withLock { saved == nil } }
+
+    func load() throws -> Data? { try lock.withLock { if isLocked { throw Locked() } else { saved } } }
+    func save(_ tokens: Data) throws { try change(tokens) }
+    func clear() throws { try change(nil) }
+    private func change(_ data: Data?) throws {
+        try lock.withLock { if isLocked { throw Locked() } else { saved = data } }
+    }
+}
+
+/// Waits, in real time, for `condition`; never true within a minute fails the test.
+@MainActor
+private func until(_ condition: () async -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(60)
+    while ContinuousClock.now < deadline {
+        if await condition() { return }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    Issue.record("never came true")
+}
 
 /// The API as a stand-in answers it: every request with `status` and `body`, signed in.
 private func client(_ status: Int, _ body: String) -> APIClient {

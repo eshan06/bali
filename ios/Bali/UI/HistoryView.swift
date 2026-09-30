@@ -42,6 +42,9 @@ struct HistoryView: View {
         .onChange(of: phone.history == History(), initial: true) { _, fresh in
             if fresh { Task { await phone.readHistory() } }
         }
+        // Gone by any way — a tab, or the router taking it away, Screen Time turned off and on
+        // again, say — it is forgotten, so it is read anew when it shows again (C6a-2's review).
+        .onDisappear { phone.forgetHistory() }
     }
 
     /// The days read — or, with none and nothing older, that there is nothing yet — and Show

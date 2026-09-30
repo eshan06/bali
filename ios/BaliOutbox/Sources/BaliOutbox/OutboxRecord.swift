@@ -199,6 +199,8 @@ public struct Sent: Sendable {
     public let state: ParticipationState?
     /// An unlock recorded late: a return to focus went ahead of it (A10, A12).
     public let superseded: Bool
+    /// An unlock's reason as the server keeps it: the one recorded first, never a retry's (A1).
+    public let reason: UnlockReason?
 
     fileprivate init<Answer: ChangeAnswer>(
         _ eventId: String, _ response: APIResponse<Answer>, _ disposition: Disposition
@@ -208,6 +210,7 @@ public struct Sent: Sendable {
         (self.disposition, session, state) =
             (disposition, response.answer?.session, response.answer?.state?.known)
         superseded = response.answer?.superseded ?? false
+        reason = response.answer?.keptReason
     }
 
     var status: Int? { if case .status(let status) = result { status } else { nil } }
@@ -218,15 +221,18 @@ protocol ChangeAnswer: Decodable, Sendable {
     var session: SessionView? { get }
     var state: OrUnknown<ParticipationState>? { get }
     var superseded: Bool { get }
+    var keptReason: UnlockReason? { get }
 }
 
 extension ChangeAnswer {
     var superseded: Bool { false }
+    var keptReason: UnlockReason? { nil }
 }
 
 extension TapResponse: ChangeAnswer {}
 extension UnlockResponse: ChangeAnswer {
     var superseded: Bool { recordedAs?.known == .superseded }
+    var keptReason: UnlockReason? { reason?.known }
 }
 extension RefocusResponse: ChangeAnswer {}
 extension ProtectionOffResponse: ChangeAnswer {}
