@@ -134,7 +134,7 @@ struct AppTests {
     }
 
     @Test(
-        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read again from the top each time; the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab"
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab"
     )
     func tabs() async throws {
         let homes = ["home", "homeLoading", "homeError", "homeUnread", "me"]
@@ -149,6 +149,11 @@ struct AppTests {
         #expect(phone.screen == .history && phone.history == History())
         await phone.readHistory()
         #expect(phone.history.failure == Joining.notStarted)
+        // Chosen again while it shows: as it was — its screen does not appear anew, so a history
+        // forgotten now would say it is reading, forever, with nothing reading (santa's round 1).
+        phone.select(.history)
+        #expect(phone.history.failure == Joining.notStarted)
+        phone.select(.me)
         phone.select(.history)
         #expect(phone.history == History())
         var state = try #require(phone.sync)
@@ -166,6 +171,29 @@ struct AppTests {
         #expect(signedOut.screen == .signIn && signedOut.history == History())
         signedOut.signed(in: true)
         #expect(signedOut.screen == .home && signedOut.tab == .home)
+    }
+
+    @Test(
+        "A History read's answer (santa's round 1): kept while it is the latest read — a page after the first added after it, its cursor next — and dropped once the student has left History or signed out, so no student is shown another's; a cursor the history does not hold reads again from the top, which a frozen phone says it cannot"
+    )
+    func historyRead() async throws {
+        let older =
+            #"{"events":[{"eventId":"m0","type":"tap_in","occurredAt":"2026-09-01T13:00:00Z","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}],"nextBefore":null}"#
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["history"]))
+        let shown = phone.history.events.count
+        await phone.historyRead(await client(200, older).history(), for: phone.reads)
+        #expect(phone.history.events.count == shown + 1 && phone.history.nextBefore == nil)
+        let leaves: [@MainActor (Phone) -> Void] = [{ $0.select(.home) }, { $0.signed(in: false) }]
+        for leave in leaves {
+            let left = Phone(fixture: try #require(PreviewFixtures.all["history"]))
+            let read = left.reads
+            leave(left)
+            await left.historyRead(await client(200, older).history(), for: read)
+            #expect(left.history == History())
+        }
+        let cursor = #"{"error":{"code":"bad_input","reason":"unknown_cursor","message":"no"}}"#
+        await phone.historyRead(await client(400, cursor).history(before: "m0"), for: phone.reads)
+        #expect(phone.history.failure == Joining.notStarted && !phone.history.read)
     }
 
     @Test(
@@ -244,25 +272,8 @@ struct AppTests {
     func joined() async throws {
         /// `POST /v1/enrollments`, as the API answers it: `status`, `body`.
         func answer(_ status: Int, _ body: String) async -> APIResponse<EnrollmentJoinResponse> {
-            struct Answering: HTTPTransport {
-                let status: Int
-                let body: String
-                func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-                    guard let url = request.url,
-                        let response = HTTPURLResponse(
-                            url: url, statusCode: status, httpVersion: nil, headerFields: nil)
-                    else { throw URLError(.badURL) }
-                    return (Data(body.utf8), response)
-                }
-            }
-            struct Signed: TokenProvider {
-                func accessToken() async -> String? { "token" }
-            }
-            let client = APIClient(
-                baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
-                transport: Answering(status: status, body: body))
             let now = Date()
-            return await client.join(
+            return await client(status, body).join(
                 EnrollmentJoinRequest(
                     joinCode: "KWX49Q", eventId: EventID.mint(at: now), deviceTime: now))
         }
@@ -502,3 +513,24 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// The API as a stand-in answers it: every request with `status` and `body`, signed in.
+private func client(_ status: Int, _ body: String) -> APIClient {
+    struct Answering: HTTPTransport {
+        let status: Int
+        let body: String
+        func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            guard let url = request.url,
+                let response = HTTPURLResponse(
+                    url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+            else { throw URLError(.badURL) }
+            return (Data(body.utf8), response)
+        }
+    }
+    struct Signed: TokenProvider {
+        func accessToken() async -> String? { "token" }
+    }
+    return APIClient(
+        baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
+        transport: Answering(status: status, body: body))
+}

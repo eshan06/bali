@@ -84,9 +84,9 @@ final class Phone {
     /// or who is signed in changes.
     private(set) var tab = Screen.home
     /// The History screen's (C6a): the moments read, and why a read did not finish. `reads` counts
-    /// them, so an answer to one the student has left since is dropped.
+    /// them, and the history forgotten, so an answer to a read the student has left is dropped.
     private(set) var history = History()
-    private var reads = 0
+    private(set) var reads = 0
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -127,16 +127,17 @@ final class Phone {
             opened: opened, tab: tab, now: Date())
     }
 
-    /// A tab chosen (C6a): History is read again from the top — its screen's first appearance
-    /// reads it (`readHistory`).
+    /// A tab chosen (C6a). A change of tab forgets the history read, and any answer on its way, so
+    /// History is read anew each time the student comes to it — its screen's first appearance
+    /// reads it (`readHistory`). The tab shown, chosen again, changes nothing: its screen does not
+    /// appear anew, so nothing would read a history forgotten then (santa's round 1).
     func select(_ tab: Screen) {
-        if tab == .history { forgetHistory() }
+        if tab != self.tab { forgetHistory() }
         self.tab = tab
     }
 
     /// Reads the student's history through the engine: from the top, or `more`, the page after
-    /// those read — a cursor the history does not hold, from the top again. A phone whose engine
-    /// has not started — a frozen one too — says so (rule 5).
+    /// those read. A phone whose engine has not started — a frozen one too — says so (rule 5).
     func readHistory(more: Bool = false) async {
         guard !history.busy, !more || history.nextBefore != nil else { return }
         guard let engine else { return history.failure = Joining.notStarted }
@@ -144,7 +145,13 @@ final class Phone {
         if !more { forgetHistory() }
         (history.busy, history.failure, reads) = (true, nil, reads + 1)
         let read = reads
-        let page = await engine.history(before: before)
+        await historyRead(await engine.history(before: before), for: read)
+    }
+
+    /// The answer to read `read`: kept while no read has started since nor the history been
+    /// forgotten — a tab changed, a sign-out — and with a cursor the history does not hold, the
+    /// history read again from the top.
+    func historyRead(_ page: APIResponse<HistoryPage>, for read: Int) async {
         guard read == reads else { return }
         if history.answered(page) { await readHistory() }
     }

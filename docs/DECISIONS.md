@@ -8,13 +8,15 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-09-29** — **C6a-2: the History screen as D1 draws it, over C6a-1's rules.** **Read** from
-  the top each time the History tab is chosen — `Phone.select` forgets the last read, and the
-  screen's first appearance reads (a fixture's, read or not, stays as made) — through the engine
-  (`SyncEngine.history`, a 401 renewed once). No pull to refresh: choosing the tab again reads
-  anew. An answer to a read the student has left since — another tab chosen, a sign-out — is
-  dropped (`Phone.reads`), and a sign-out forgets the history read, so no student is shown
-  another's. **Paging:** A7's pages of 50; older ones on **Show earlier**, a secondary button under
+- **2026-09-29** — **C6a-2: the History screen as D1 draws it, over C6a-1's rules.** **Read** anew
+  from the top each time the student comes to the History tab — `Phone.select` forgets the history
+  read at any change of tab, and the screen's first appearance reads (a fixture's, read or not,
+  stays as made) — through the engine (`SyncEngine.history`, a 401 renewed once). The tab shown,
+  chosen again, changes nothing: its screen does not appear anew, so a history forgotten then was
+  read by nothing (santa's round 1, below). No pull to refresh: coming back to the tab reads anew.
+  An answer to a read the student has left — History left, a sign-out — is dropped
+  (`Phone.historyRead`, keyed on `Phone.reads`), and a sign-out forgets the history read, so no
+  student is shown another's. **Paging:** A7's pages of 50; older ones on **Show earlier**, a secondary button under
   the last day (D1 draws a history short enough to need none), a failed one said there with Try
   again, and a cursor the history does not hold read again from the top. Alternatives: loading the
   next page as the list's end appears (a failure still needs a place and a Try again, and a scroll
@@ -31,9 +33,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   words in the caption style. At the accessibility text sizes the teacher sits under the class and
   the time above the words, so none is squeezed. **Tests:** `AppTests.fixtures` (D1's days and
   cards in `history`, each state's fixture, a frozen phone's read saying it has not started),
-  `AppTests.tabs` (History read again at each choice, a sign-out forgetting it); the four fixtures,
-  `home` and `me` checked on the iPhone Air simulator at the default text size and the largest
-  accessibility one.
+  `AppTests.tabs` (History read anew each time the student comes to it, as it was when chosen
+  again, a sign-out forgetting it), `AppTests.historyRead` (an answer kept while it is the latest
+  read, dropped once History was left or the student signed out, and a cursor the history does not
+  hold read again from the top); the four fixtures, `home` and `me` checked on the iPhone Air
+  simulator at the default text size and the largest accessibility one. **Santa** (two Claude
+  reviewers — Codex refuses every model on this Mac, so they share a model family — and the design
+  check): round 1, one blocker, found by both and by the design check — the History tab chosen
+  again while it showed forgot the history, and its screen, never appearing anew, read nothing:
+  "Reading your history…" for good, no Try again. Fixed test first (`AppTests.tabs`, red before):
+  the tab shown, chosen again, changes nothing. The WARN — no test drove the phone's read past the
+  engine's absence — fixed: the answer's handling is `Phone.historyRead`, as a join's is `joined`,
+  and `AppTests.historyRead` drives it.
 
 - **2026-09-29** — **C6a-1: D1's tab bar as the router's input, and History's rules.** C6a in two
   PRs for size (santa's step 0 found it near 500 lines), as C5a was: this one the tab bar, History's
