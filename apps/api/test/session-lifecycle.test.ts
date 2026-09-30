@@ -1600,4 +1600,50 @@ describe('POST /v1/sessions/:id/refocus', () => {
     );
     expect(res.statusCode).toBe(404);
   });
+
+  it('past the bell, before the sweep, is a 409 session_not_running; an unlock and protection off are recorded as ever (A17)', async () => {
+    // Only a return to focus is refused in an over session — the grid would
+    // show green over a phone its bell unshielded. What the phone reports
+    // keeps its own rules there (A2c, A10, A11).
+    const { student, klass } = await seedClassroom(db, 'refocus-past-bell');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+    const before = new Date(Date.now() - 30_000);
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: before,
+      now: before,
+    });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const send = (route: string) =>
+      post(token, `/v1/sessions/${session.id}/${route}`, {
+        eventId: randomUUID(),
+        deviceTime: before.toISOString(),
+      });
+
+    const unlocked = await send('unlock');
+    expect(unlocked.statusCode).toBe(200);
+    expect(unlocked.json<UnlockResponse>()).toMatchObject({
+      outcome: 'applied',
+      state: 'unlocked',
+    });
+
+    const back = await send('refocus');
+    expect(back.statusCode).toBe(409);
+    expect(back.json()).toEqual({
+      error: { code: 'conflict', reason: 'session_not_running', message: 'session has ended' },
+    });
+
+    const off = await send('protection-off');
+    expect(off.statusCode).toBe(200);
+    expect(off.json<ProtectionOffResponse>()).toMatchObject({
+      outcome: 'applied',
+      state: 'protection_off',
+    });
+  });
 });

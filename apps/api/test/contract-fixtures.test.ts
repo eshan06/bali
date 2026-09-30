@@ -188,8 +188,16 @@ let closeDb: () => Promise<void>;
 let ctx: AuthedApp;
 /** What this run captured, by name. */
 const fixtures = new Map<string, Fixture>();
+/**
+ * When the server hears the call being sent: when its phone made it. Some
+ * lessons are on a fixed day, over by the real clock, and a tap or a return
+ * to focus is judged by the server's (A17).
+ */
+let heard = new Date();
 
 async function send(call: Call) {
+  const made = (call.body as { deviceTime?: string } | undefined)?.deviceTime;
+  heard = made === undefined ? new Date() : new Date(made);
   const res = await ctx.app.inject({
     method: call.method,
     url: call.path,
@@ -597,6 +605,7 @@ async function captureAll() {
     studentId: dee.id,
     eventId: retried,
     deviceTime: deviceTime11,
+    now: deviceTime11,
   });
   await startAt(p6.klass.id, '11:05', '11:50');
   // She leaves period 3 mid-lesson, is removed from period 5 mid-lesson, and
@@ -661,7 +670,7 @@ async function captureAll() {
 
 beforeAll(async () => {
   ({ db, close: closeDb } = await makeTestDb());
-  ctx = await makeAuthedApp(db);
+  ctx = await makeAuthedApp(db, () => heard);
   await captureAll();
 }, 60_000);
 

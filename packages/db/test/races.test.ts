@@ -286,6 +286,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        now: session.startedAt, // heard while it ran (A17)
       });
       await db
         .update(participations)
@@ -871,7 +872,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
           eventId: newUuidV7(),
           deviceTime: new Date(),
         });
-        await tapIn(db, change());
+        await tapIn(db, { ...change(), now: session.startedAt }); // heard while it ran (A17)
 
         // Odd rounds give the end a head start, so both orders get exercised:
         // the sweep scans before it locks, and the report otherwise wins it.
@@ -919,11 +920,14 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       for (const via of ['end', 'sweep', 'removal'] as const) {
         const { classId, studentId } = await seed(`race-retry-${via}-${round}`);
         const session = await openSession(classId, { due: via === 'sweep' });
+        // Heard while the lesson ran, the retry too: one reaching the server
+        // past the bell names no session whoever wins (A17).
         const tap = {
           sessionId: session.id,
           studentId,
           eventId: newUuidV7(),
           deviceTime: new Date(),
+          now: session.startedAt,
         };
         expect((await tapIn(db, tap)).outcome).toBe('joined');
         const enrollment = one(
@@ -1814,6 +1818,7 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        now: session.startedAt, // heard while it ran (A17)
       });
 
       const release = await holdSession(session.id);

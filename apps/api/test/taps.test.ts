@@ -3,6 +3,7 @@ import {
   type Database,
   endSession,
   enrollments,
+  expireDueSessions,
   participations,
   startSession,
   users,
@@ -77,6 +78,72 @@ describe('POST /v1/taps', () => {
     expect(status).toBe(200);
     expect(body.outcome).toBe('armed');
     expect(body.session).toBeNull();
+  });
+
+  it('a tap after the bell, before the sweep, arms as when nothing runs — never joins the session that just ended (A17)', async () => {
+    // Past its bell by the server's clock the class is over, swept or not:
+    // the phones let go at the bell (decision 6), so a join here would stand
+    // green on the grid over an unshielded phone until the sweep ran. The
+    // phone's claim says it tapped before the bell; the server's clock decides.
+    const { student, klass, block } = await seedClassroom(db, 'tap-past-bell');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+    const { status, body } = await tap(await ctx.tokenFor(student.cognitoId), {
+      tagId: block.tagId,
+      deviceTime: new Date(Date.now() - 30_000).toISOString(),
+    });
+    expect(status).toBe(200);
+    expect(body).toEqual({ outcome: 'armed', session: null, state: null });
+    expect(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    ).toEqual([]);
+
+    // Waiting for the teacher's next Start, as any armed tap: once the sweep
+    // has marked the old session over, the Start joins the student.
+    expect(await expireDueSessions(db, new Date())).toEqual([session.id]);
+    const next = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    expect(next).toMatchObject({ outcome: 'created', armedConverted: 1 });
+  });
+
+  it('joins the teacher’s running session over a newer one past its bell (A17)', async () => {
+    // The tap joins the newest session of the block's teacher the student is
+    // in that is still running — past its bell, a newer one is not.
+    const { student, teacher, school, klass, block } = await seedClassroom(db, 'tap-pick');
+    const second = one(
+      await db
+        .insert(classes)
+        .values({
+          teacherId: teacher.id,
+          schoolId: school.id,
+          name: 'Second period',
+          joinCode: 'JOIN-tap-pick-2',
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: second.id, studentId: student.id });
+    const running = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 120_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    await startSession(db, {
+      classId: second.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+
+    const { status, body } = await tap(await ctx.tokenFor(student.cognitoId), {
+      tagId: block.tagId,
+    });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ outcome: 'joined', session: { id: running.session.id } });
   });
 
   it('a non-enrolled student cannot join — the tap arms, never joins someone else class', async () => {
