@@ -174,8 +174,13 @@ describe('startSession', () => {
       endedReason: 'session_expired',
     });
     expect(await rowIn(next.session.id)).toMatchObject({ state: 'focused', endedAt: null });
-    // The sweep finds nothing left to end.
-    expect(await expireDueSessions(db, new Date('2026-01-01T09:26:00Z'))).toEqual([]);
+    // The sweep's own step finds nothing left to end.
+    const swept = await endSession(db, {
+      sessionId: old.id,
+      at: new Date('2026-01-01T09:26:00Z'),
+      reason: 'expired',
+    });
+    expect(swept.ended).toBe(false);
   });
 });
 
