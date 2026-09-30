@@ -111,22 +111,37 @@ public enum Bell {
     /// (`Protection.monitorUnscheduled`), and a wake that ends well — cleared, or its next wake
     /// taken, the backup's too — sets it back to none (#92's review). What it did, for the Debug
     /// readout.
+    ///
+    /// Stopping or replacing a window wakes the monitor under it at once (round 2,
+    /// `docs/DECISIONS.md`, 2026-09-29) — its own asks' replacements too, so a wake that asked for
+    /// a window iOS held under the other name could wake it again at once, and `tick` and `tock`
+    /// each other, back to back (#113's review). So `asked` keeps the end it last asked for under
+    /// each of its own names, and woken under one more than `retry` before that end — never that
+    /// window's end, which iOS reaches no earlier than a minute before it (`window`) — the wake is a
+    /// stop's or a replacement's, and asks nothing: what it asked for there is still to come, or the
+    /// app stopped it, for a new bell window or with the shields off (B5b-5). A clear still clears.
     public static func carryOut(
         _ wake: Wake, woken: Name?, at now: Date, in center: some BellCenter,
-        clearing clear: () -> Bool, refused: inout Date?
+        clearing clear: () -> Bool, refused: inout Date?, asked: inout [Name: Date]
     ) -> String {
-        let next: (window: DateInterval, done: String)
+        let next: (window: DateInterval, kept: String, then: String)
         switch wake {
         case .clear:
             let held = clear()
             refused = nil
             return held ? "cleared" : "nothing to clear"
-        case .keep(let window): next = (window, "kept until")
-        case .retry(let window): next = (window, "file not read — kept, again")
+        case .keep(let window): next = (window, "kept", " until")
+        case .retry(let window): next = (window, "file not read — kept", ", again")
         }
-        let said = "\(next.done) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        if let woken, let end = asked[woken], now < end - retry {
+            return "\(next.kept) — its window stopped or replaced, not ended: nothing asked"
+        }
+        let said =
+            "\(next.kept)\(next.then) \(next.window.end.formatted(date: .omitted, time: .shortened))"
+        let name = self.next(after: woken)
         do {
-            try start(next.window, as: self.next(after: woken), in: center)
+            try start(next.window, as: name, in: center)
+            asked[name] = next.window.end
             refused = nil
             return said
         } catch {
@@ -157,6 +172,10 @@ public enum Bell {
         }
         let bellIsNew = try ask(window, as: .bell, in: center, calendar: calendar)
         let backupIsNew = try ask(backup(of: window), as: .backup, in: center, calendar: calendar)
+        // Stopping and replacing windows wakes the monitor at once (round 2, `docs/DECISIONS.md`,
+        // 2026-09-29): the bell's and backup's wakes ask for a `tick` at the new bell — one wake
+        // there for nothing — and a stopped `tick` or `tock`'s, more than a minute before the end
+        // it asked for there, asks nothing (`carryOut`, B5b-5).
         if bellIsNew { center.stop([.tick, .tock]) }
         return bellIsNew || backupIsNew
     }

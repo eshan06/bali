@@ -37,9 +37,10 @@ final class SessionMonitor: DeviceActivityMonitor {
         #endif
         guard let url = Outbox.appGroupURL else { return "no app group — nothing read, kept" }
         let wake = Bell.wake(outboxAt: url, now: Date(), cap: cap)
-        // A wake iOS refuses is kept for the app to show at its next open (rule 5).
+        // A wake iOS refuses is kept for the app to show at its next open (rule 5); the ends it
+        // asked for, to tell a stop's or a replacement's wake from its window's end (B5b-5).
         return Bell.carryOut(
             wake, woken: woken, at: Date(), in: DeviceActivityCenter(), clearing: Bell.clearShields,
-            refused: &Bell.monitorUnscheduled)
+            refused: &Bell.monitorUnscheduled, asked: &Bell.monitorAsked)
     }
 }

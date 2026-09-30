@@ -61,6 +61,22 @@
             set { shared?.set(newValue, forKey: "monitorUnscheduled") }
         }
 
+        /// The end the monitor last asked for under each of its own names, in the app group's
+        /// defaults: how it tells a stop's or a replacement's wake from its window's end
+        /// (`carryOut`, B5b-5).
+        public static var monitorAsked: [Name: Date] {
+            get {
+                let kept = shared?.dictionary(forKey: "monitorAsked") as? [String: Date] ?? [:]
+                return kept.reduce(into: [:]) { asked, entry in
+                    if let name = Name(rawValue: entry.key) { asked[name] = entry.value }
+                }
+            }
+            set {
+                let kept = newValue.reduce(into: [String: Date]()) { $0[$1.key.rawValue] = $1.value }
+                shared?.set(kept, forKey: "monitorAsked")
+            }
+        }
+
         /// B5b's device check, in the app group's defaults that the app and the monitor share: the
         /// shorter cap on a tap not yet answered a Debug build may set (`floor`, not 50 minutes),
         /// and what the monitor's last wakes did (`logged`), which a Debug build's readout shows.

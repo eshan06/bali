@@ -8,6 +8,65 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **B5b-5: the monitor's own wakes never wake each other — a wake of `tick` or
+  `tock` more than a minute before the end the monitor asked for there asks nothing (#113's open
+  path, closed).** **Red first:** `RegisterTests.Center` now does what round 2 saw iOS do —
+  stopping or replacing a window it holds owes the monitor a wake under that name at once,
+  delivered after the running wake, one at a time (and, for a test that says so, a window that has
+  ended too: not seen either way) — and on `main` the monitor's own asks then set each other off,
+  `tick` and `tock` back to back until the harness's bound: two extensions in one class, the file
+  read or not; the fail-safe from the bell on, if replacing an ended window wakes the monitor; and,
+  found by running every three of the app's moves and iOS's ends, one extension followed by the
+  bell with the file unread, or by an Emergency Unlock whose wakes find the file busy — these two
+  with only the replacements round 2 saw. **Decided:** the monitor keeps the end it last asked
+  for under each of its own names (`Bell.monitorAsked`, the app group's defaults; written once
+  iOS takes the ask), and a wake under one of them more than `retry` before that end asks
+  nothing: the shields kept, no DeviceActivity call; a clear still clears. Such a wake is never
+  that window's end — iOS reaches an end no earlier than a minute before it (B5b's whole minute;
+  round 2 saw every end woken within 2 s after it) — so it is a stop's or a replacement's, and
+  what the monitor asked for there is still to come (its own replacement), or the app stopped it
+  (for a new bell window, whose own wake is to come, or with the shields off). Each ask of the
+  monitor's ends at least a minute on (`retry`, up to the whole minute), so the wake its
+  replacement owes comes more than a minute before that end and asks nothing: no ask of the
+  monitor's can wake it into another. **The boundary:** a wake exactly a minute before the end is
+  taken as the end — B5b-4's `spent`, iOS ending windows a minute early — so an echo that lands
+  past the first whole minute after its ask asks once more; that ask ends a minute further on,
+  and its own echo asks nothing. **Why this rule, the smallest that keeps them all:** B5b's guard
+  — never clear over a session still running or a file not read, the backup two minutes after
+  the bell — is untouched, a clear being the only way the shields come off; B5b-3's — no wake
+  asks anything of the window that woke it — holds, an echo asking nothing at all; B5b-4's — the
+  monitor asks its next wake anew, the app stops `tick` and `tock` only at a new bell window —
+  holds, every wake that asks still asking anew, never skipping for what iOS holds, and the app's
+  rules unchanged; B6c-2's — a clear makes no DeviceActivity call — unchanged. **Rejected:** the
+  skip back on the monitor's side (B5b's "not at all when iOS holds that window already"): B5b-4's
+  dropped wake, and a read of iOS's schedule inside a callback; the app's windows recognised too:
+  they never loop — the monitor never asks for `bell` or `backup` — and the app would have to keep
+  their ends. **#113's consequence (2):** a stopped `tick` or `tock` now wakes the monitor to ask
+  nothing, but the bell's and backup's replacements still wake it to ask for a `tick` at the new
+  bell: the bell still costs one wake for nothing, as round 2's step 5 saw; `register` points here
+  now (#113's rider). **Not covered, disclosed:** the record's storage (`PhoneBell`) is pinned on
+  the iOS Simulator only (`monitorAskedKept`), and the monitor passing it by a source test; a wake
+  iOS makes more than a minute before the end of a window of the monitor's own, never seen, would
+  read as a stop's and ask nothing — a time zone moved east while one is pending would do it, iOS
+  reading its wall-clock end anew while the record keeps the old instant. The bell's window or its
+  backup then wakes the monitor; but past the backup's end, the fail-safe's file still unread,
+  nothing would, and the shields would stay until the app is opened, where `main` asked again
+  (santa's review). The monitor's callbacks are taken to run one at a time, as its log already
+  takes them — the record is written back as a wake returns. **Tests** (Linux and the
+  iOS Simulator): `RegisterTests.twoExtensions`, `failSafe` and `noLoop` — every three of six
+  moves (an extension, a relaunch's pass, an Emergency Unlock, a refocus, a minute on, past the
+  bell), the file read or not at each, ended windows waking the monitor or not: no burst, and a
+  wake that keeps the shields while the app keeps them on leaves one to come — each red on
+  `main`; `echo`, the rule's edges; `cleanup` and `carriedOut` updated — a `tick` wake right after
+  the monitor asked for `tick` is that ask's echo now; `monitorsCalls` pins the record passed. The
+  same run over every five moves (about 500,000 runs, not committed) found no burst and no wake
+  left owed. Of 13 mutations of the rule — no check (`main`'s behaviour), the boundary an echo, no
+  margin or two minutes, the end recorded before the ask or not at all, under the name that woke
+  it, or the ask's time; the echo keyed on the name it would ask, ending the refusal note,
+  clearing, or taking a clear with it; the monitor's record not the app group's — all 13 turn a
+  test red. **📱 Round 2's new step 9** (`ios/README.md`): two extensions in one 3-minute class,
+  force-quit.
+
 - **2026-09-29** — **C5a-2: the Unlocked screen as D1 draws it, over C5a-1's engine; the screen
   chosen again at the bell by a task, not a timeline.** **The card:** the three while the reason can
   still go with the unlock (C5a-1's hold); the one given, in the brand's fill, the others dimmed —
@@ -145,7 +204,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   9:27:02, `bell · cleared` and `tock · nothing to clear` together. **Decided: no code change in
   this docs step.** Every wake round 2 saw read the truth, cleared nothing owed and took a fraction
   of a second — B5b's "a stale window only wakes the monitor, which reads the truth and does
-  nothing wrong". **Open, not seen (#113's Claude Review):** the monitor's own asks replace too.
+  nothing wrong". **Open, not seen (#113's Claude Review) — closed by B5b-5 (2026-09-29, above):**
+  the monitor's own asks replace too.
   Since B5b-4 a kept or unread wake asks for its next anew under the other name, replacing
   whatever iOS holds there, and a replacement wakes the monitor at once — so a wake that finds the
   other name's window held can wake the monitor again at once, and `tick` and `tock` can wake each

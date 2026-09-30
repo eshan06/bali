@@ -133,7 +133,10 @@ since on iOS 18 asking for that one can hang the monitor. A wake that takes the 
 `nothing to clear`; one iOS ended before it finished stays `not finished`. iOS also wakes the monitor
 the moment the app stops or replaces a window — at an Emergency Unlock, the end, an extension — and
 such a wake is like any other: it reads the truth, and with the shields already off says
-`nothing to clear` (`docs/DECISIONS.md`, 2026-09-29). Should iOS refuse the
+`nothing to clear` (`docs/DECISIONS.md`, 2026-09-29). One exception, so that the monitor's own wakes
+never set each other off (B5b-5): a `tick` or `tock` wake more than a minute before the end the
+monitor asked for there is a stop's or a replacement's, never its window's end, and asks for nothing
+— `kept — its window stopped or replaced, not ended: nothing asked`. Should iOS refuse the
 monitor its next wake, the `Screen Time:` line says so from the next open, unless a later wake
 ended well: `the monitor's bell NOT scheduled at <time>, app closed`. Its `bell NOT scheduled` is
 a window the app asked for — the bell's or its backup — refused, and asked for again.
@@ -195,6 +198,15 @@ hands the old session back.
    app, opened straight after each wake, started normally — no `The outbox could not be opened`, no
    `storage failed`. A wake that could not read the file says `file not read — kept, again <time>`,
    and the monitor tries again a minute on, as `tick` or `tock`.
+9. **Two extensions in one class: the monitor's own wakes never set each other off (B5b-5).**
+   Before step 7, which runs last. `start 3`, **Tap**, then `npm run dev:teacher -- extend 3` with
+   the app open until the next check-in moves `due until`, then `extend 3` again and another
+   check-in, then force-quit: still shielded past both earlier bells; off within a minute after the
+   last, `bell · cleared` — any `tick` or `tock` line beside it says `nothing to clear`. After each
+   check-in the newest `Monitor:` lines are the check-in's — `bell`, `backup`, perhaps a `tick`
+   saying `nothing asked`, a stop's wake — and a few seconds later (switch away from Bali and back)
+   they are the same: never `tick` and `tock` lines ticking on, one after another, each
+   `kept until` the bell.
 
 ### Round 3 (B5c): Bali's own shield
 
