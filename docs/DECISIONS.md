@@ -8,6 +8,63 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **The C riders, Riders-1: honesty and safety — the review WARNs C4–C6b left
+  open.** Seven, each where the phone said less than the truth or trapped a student. **Sign out on
+  Join:** a student in no class sees only the router's own Join — no tab bar, so not Me — and
+  signed in with the wrong account could not leave without joining a class. Join's code page now
+  offers C6b's Sign out where it is the router's own (`Phone.offersSignOut`: Me, and Join not
+  opened over another, whose way back reaches Me): one view, `SignOutButton`, moved out of Me, so
+  the two keep one rule — never the shields or the queue, held while an Emergency Unlock is unsent
+  and said why; waiting while a look-up runs. A class code typed goes with the student who typed
+  it (`Phone.signed(in:)`). Not on the class preview, whose "Not my class" returns to it. **What
+  Protection off takes over, it says:** where the permission judged off makes Protection off
+  preempt Unlocked or Home (C5b), their rule-5 words went unsaid — an unlock of this class stuck
+  on the phone, a tap the server refused (on the re-tap's screen, where a re-tap is the only way
+  back), the classes not read. `ProtectionOffWords.problems` carries them, in one card with Try
+  again; the stuck unlock is this class's (or one under a tap or not filed yet, which may be any),
+  never another class's — `SyncState.unlock(in:)`, which Riders-2 gives Unlocked too. **"Will see"
+  only over a report:** protection off the check found and could not save was said only where the
+  way is Settings or iOS's prompt; the re-tap's and the check's screens still said the teacher
+  would see it. Now one rule for every way (`untold`: unreported, and no report sent or queued)
+  — the re-tap's says Bali couldn't tell the teacher, without "keeps trying" (on again, the check
+  reports nothing more). **Session over's Done keeps the bell it closed:** `sessionOverClosed` was
+  a session id, so an extension after Done hid the real bell's Session over (the one screen that
+  says the apps are back), and Done pressed as a read put the phone in a new class closed that one.
+  It is the session as it was (its end with it), and Done closes only a session whose bell has
+  rung by the phone's clock. **A refusal stays a refusal:** every answer overwrites a record's
+  `lastStatus`, so a tap refused and then answered by the retry bound's worth of server errors read
+  as one the bound stuck — "It keeps trying", no longer "Tap in again" or the unknown block's words.
+  The outbox keeps the latest refusal's status on the record (`refusedStatus`, migration v5: one
+  added column — `ALTER TABLE`, no table made again, so it stays cheap in the monitor — and a
+  record a refusal last answered keeps it as it migrates); the words key on it before the last
+  answer. **Focus says what stops the teacher hearing:** the router ranks Focus above Sign in, so a
+  sign-out mid-class (Cognito refusing the refresh token), a sign-in that could not be renewed, or
+  storage refusing were said nowhere. `FocusWords.stalled`, in a card beside the countdown — never
+  over it: the shields' end is the phone's own clock's — says which, with the way on (sign in again
+  once class is over; Bali keeps trying; it tries again within a minute); and protection off the
+  check could not save is said with the claim of Screen Time off. **See history, wired:** D1's link
+  under Done, which C5b left out because the read after the bell changes the standing and C6a's tab
+  resets to Home at any change: History opened from Session over closed itself. `keepsOpened` now
+  counts a read saying out, once the bell has rung by the phone's clock, as no change — the class
+  was over for the phone already — so History, or Join opened over the Home that Done shows,
+  stays; a class ending before its bell is still a change. **Words, new (DESIGN.md's voice, no
+  em-dash):** Focus's three stalled lines and the unsaved report's sentence; Protection off's two
+  unsaved lines; "See history" is D1's. **Fixtures:** `joinSignOutHeld`, `focusSignedOut`,
+  `protectionOffError`; `join` and `sessionOver` gain Sign out and See history. **Tests, red first
+  where a bug:** `ScreenTests.refusalKept`, `.keepsOpened`, `.bellRung` (the extension),
+  `ProtectionOffScreenTests.unreported` and `.carried`, `FocusTests.stalled`,
+  `SchemaTests.fromV4` (and v5 pinned wherever v4 was), `ExtensionReadTests.older` (a v4 file
+  migrated where the monitor reads it); `AppTests` for Sign out's reach, See history held after
+  the read, and Done racing a read.
+
+- **2026-09-30** — **The shields with the app force-quit: decided (a) (the owner's ruling).**
+  ARCHITECTURE parked it with a lean to (a) — the shields stay until the session ends, the monitor
+  extension taking them off at the bell with the app closed, and Emergency Unlock the sanctioned
+  exit meanwhile — over (b), a watchdog taking them off after a force-quit, whose honest promise on
+  iOS's coarse wake clock is "within ~15 minutes". B5b built (a), and the owner's iPhone proved it
+  in round 2 of the device check (2026-09-27): with the app force-quit, the monitor cleared the
+  shields 31 s after the bell. ARCHITECTURE's rule now says so, and the item leaves "Decided later".
+
 - **2026-09-30** — **C6b-2: the Me screen as D1 draws it, over C6b-1's rules.** **Built over what
   exists:** the name card (the name, D1's line, the edit button); the classes with each teacher —
   Home's own section (`ClassesSection`, under D1's "Classes"), so the two lists never drift — with

@@ -573,9 +573,15 @@ and data types, so the two apps can't drift out of type-agreement.
   only reaches the server after the bell is still recorded, with a note, so the history says
   why the phone went quiet. This permanently kills v2's worst bug, which was pretending to be
   shielded after exactly this.
-- **A closed app still shows the truth fast.** When the app is force-quit, check-ins stop and
-  within about a minute the grid shows "app closed" honestly. (What should happen to the
-  shields themselves in that case is in "decided later" below.)
+- **A closed app still shows the truth fast, and keeps its shields to the bell.** When the app is
+  force-quit, check-ins stop and within about a minute the grid shows "app closed" honestly. The
+  shields stay until the session ends (decided 2026-09-30, the owner's ruling: option (a) of the
+  two once parked here): the monitor extension takes them off at the bell with the app closed —
+  seen on the owner's iPhone, round 2 of the device check, 31 s after the bell with the app
+  force-quit — and Emergency Unlock is the sanctioned exit during the session: a one-second hold
+  (ruled 2026-09-29), quick, yet no pocket touch files one, and one step under VoiceOver. Not
+  (b), a watchdog turning the shields off after a force-quit: iOS's coarse wake clock makes its
+  honest promise "off within ~15 minutes", not instant.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own
@@ -589,13 +595,6 @@ and data types, so the two apps can't drift out of type-agreement.
 
 ### Decided later, on purpose
 
-- **What the shields do when the app is force-quit.** Two options: (a) shields stay until the
-  session ends — the extension guarantees the unlock at the bell even with the app closed, and
-  Emergency Unlock is the sanctioned exit during the session: a one-second hold (ruled
-  2026-09-29), quick, yet no pocket touch files one, and one step under VoiceOver; or (b) a
-  watchdog turns shields off after force-quit, but iOS's coarse wake clock makes the honest
-  promise "off within ~15 minutes," not instant. Leaning (a). The teacher-portal half ("app
-  closed" within a minute) is locked regardless.
 - **A second enforcement layer: a local VPN filter.** The app installs a VPN profile whose
   traffic loops through a small filter on the phone itself, refusing connections to blocked
   destinations. It adds what Screen Time can't: starving apps of internet, blocking websites
