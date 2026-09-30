@@ -34,7 +34,7 @@ export interface AppDeps {
   logStream?: NodeJS.WritableStream;
   /**
    * The server's clock, which judges whether a session still runs — for a
-   * tap, a return to focus and an extend (A17). Unset, it is the system's;
+   * tap, a return to focus and an extend (A17), and a leave (A19). Unset, it is the system's;
    * tests whose lessons are on a fixed day set it to that day.
    */
   clock?: () => Date;
@@ -83,7 +83,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
   registerSessionsRoute(app, deps.db, clock);
-  registerEnrollmentsRoutes(app, deps.db);
+  registerEnrollmentsRoutes(app, deps.db, clock);
   registerClassesRoutes(app, deps.db);
   registerBlocksRoutes(app, deps.db);
   registerFeedRoutes(app, deps.db, deps.stream);

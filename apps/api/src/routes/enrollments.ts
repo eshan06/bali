@@ -27,6 +27,9 @@ const JoinBody = z.object({
   deviceTime: DeviceTime,
 });
 const Params = z.object({ id: z.string().uuid() });
+// Optional (A19): the endpoint shipped with no body, so a caller sending none
+// still ends the enrollment, under an id the engine mints.
+const EndBody = z.object({ eventId: z.string().uuid().optional() });
 const CodeParams = z.object({ code: JoinCode });
 
 // A teacher owns classes; they don't join one as a student (which would only
@@ -49,9 +52,15 @@ const teacherCannotJoin = () => ApiError.forbidden('teachers cannot join a class
  * ('removed_from_class'); anyone else gets 403 `enrollment_not_yours`, and a
  * caller with no account here yet 403 `unknown_user`. The removal is the engine's
  * one-transaction case: it ends any live participation and records the event, so
- * a mid-session removal reaches the grid and the phone honestly.
+ * a mid-session removal reaches the grid and the phone honestly. A student never
+ * leaves while the class has a session running: 409 `class_in_session` (A19).
+ * The body's optional `eventId` is what the event is recorded under.
  */
-export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): void {
+export function registerEnrollmentsRoutes(
+  app: FastifyInstance,
+  db: Database,
+  clock: () => Date,
+): void {
   app.get(
     '/v1/join-codes/:code',
     { preHandler: app.authenticate },
@@ -105,6 +114,7 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
     async (request): Promise<EndEnrollmentResponse> => {
       const identity = requireAuth(request);
       const { id: enrollmentId } = parse(Params, request.params);
+      const { eventId } = parse(EndBody, request.body ?? {});
 
       const user = await findUserByCognitoId(db, identity.sub);
       if (!user) throw ApiError.forbidden('unknown user', 'unknown_user');
@@ -132,7 +142,7 @@ export function registerEnrollmentsRoutes(app: FastifyInstance, db: Database): v
       }
 
       const result = await mapTransitionError(() =>
-        endEnrollment(db, { enrollmentId, reason, at: new Date() }),
+        endEnrollment(db, { enrollmentId, reason, at: clock(), eventId }),
       );
       return { outcome: result.outcome, reason, endedParticipation: result.endedParticipation };
     },

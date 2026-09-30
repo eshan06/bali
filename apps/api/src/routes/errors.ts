@@ -36,6 +36,13 @@ const REFUSALS: Record<
   // Owner decision 8: a classmate in a class the student shares already uses
   // the name, ignoring case and spacing. Nothing was changed.
   DISPLAY_NAME_TAKEN: ['conflict', 'display_name_taken', 'a classmate already uses that name'],
+  // A student leaving while the class has a session running (A19): nothing was
+  // recorded, and leaving works once the session is over.
+  CLASS_IN_SESSION: [
+    'conflict',
+    'class_in_session',
+    'the class is in session: leave after it ends',
+  ],
 };
 
 /**

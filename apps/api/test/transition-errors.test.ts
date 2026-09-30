@@ -73,6 +73,12 @@ const EXPECTED: Record<
     reason: 'protection_off',
     message: 'Screen Time permission is off: tap the block to rejoin',
   },
+  CLASS_IN_SESSION: {
+    code: 'conflict',
+    status: 409,
+    reason: 'class_in_session',
+    message: 'the class is in session: leave after it ends',
+  },
   DISPLAY_NAME_TAKEN: {
     code: 'conflict',
     status: 409,

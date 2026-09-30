@@ -101,6 +101,15 @@ struct ForwardCompatibilityTests {
         #expect(try encoded(unnamed).contains("teacher") == false)
     }
 
+    @Test("A class with no enrollment id — an older API's, or a teacher's own — decodes (A19)")
+    func classWithoutEnrollment() throws {
+        #expect(try decode(MeClass.self, #"{"id":"c","name":"Algebra"}"#).enrollmentId == nil)
+        let teachers = try decode(MeClass.self, #"{"id":"c","name":"Algebra","enrollmentId":null}"#)
+        #expect(teachers.enrollmentId == nil)
+        let students = try decode(MeClass.self, #"{"id":"c","name":"Algebra","enrollmentId":"e"}"#)
+        #expect(students.enrollmentId == "e")
+    }
+
     @Test("An error's reason this build does not know reads as none; a known one as itself")
     func errorReason() throws {
         let unknown = try decode(

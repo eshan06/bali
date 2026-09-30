@@ -60,6 +60,9 @@ export const API_ERROR_REASONS = [
   // (owner decision 8), a 409.
   'display_name_invalid',
   'display_name_taken',
+  // DELETE /v1/enrollments/{id} (A19): a student leaving a class while it has
+  // a session running by the server's clock — a 409; nothing was recorded.
+  'class_in_session',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

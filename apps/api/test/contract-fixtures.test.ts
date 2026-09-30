@@ -78,7 +78,7 @@ const SCENARIOS: Record<string, string> = {
   'unlock/recorded-protection-off':
     'An unlock while protection is off: recorded, never softened into an unlock.',
   'unlock/recorded-no-live-participation':
-    'An unlock after the student left the class: recorded all the same (ISSUES #2).',
+    'An unlock after the teacher removed the student from the class: recorded all the same (ISSUES #2).',
   'unlock/recorded-after-session-end':
     'An unlock that first reaches the server after the session ended.',
   'unlock/recorded-unknown-session':
@@ -88,7 +88,7 @@ const SCENARIOS: Record<string, string> = {
   'unlock/recorded-superseded':
     'A late unlock (A10), stuck on the phone while the student’s own refocus went ahead of it: recorded, the focus left alone.',
   'unlock/recorded-superseded-gone':
-    'Another late unlock of that student’s, reaching the server once they have left the class: still late, recorded with no state (A11), its session named.',
+    'Another late unlock of that student’s, reaching the server once they are out of the class: still late, recorded with no state (A11), its session named.',
   'unlock/409-event-id-conflict': 'An unlock under an id the student’s own tap holds (a bug).',
   'tap-unlock/applied':
     'An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.',
@@ -115,7 +115,7 @@ const SCENARIOS: Record<string, string> = {
   'refocus/applied': 'Back to focus after an unlock.',
   'refocus/replay': 'The retry of a refocus that landed, the student still in the session.',
   'refocus/replay-no-session':
-    'The retry of a refocus that landed, after the student left (A4): recorded, no session.',
+    'The retry of a refocus that landed, after the student was removed (A4): recorded, no session.',
   'refocus/409-protection-off': 'A refocus while protection is off: only a re-tap returns.',
   'refocus/409-not-participating': 'A refocus with no live participation in the session.',
   'refocus/409-session-not-running': 'A refocus after the session ended.',
@@ -127,8 +127,11 @@ const SCENARIOS: Record<string, string> = {
   'enrollments/joined': 'A student joins a class by its code.',
   'enrollments/already-enrolled': 'Joining a class the student is already in: a no-op.',
   'enrollments/404-class-not-found': 'A join code no class has.',
-  'enrollments/left': 'A student leaves their class mid-session: the participation ends too.',
-  'enrollments/already-removed': 'Leaving the class again: a no-op.',
+  'enrollments/left':
+    'A student leaves a class with no session running (A19): only the enrollment ends.',
+  'enrollments/already-removed': 'The retry of that leave: a no-op, answered with the truth now.',
+  'enrollments/409-class-in-session':
+    'A student leaving while the class has a session running: refused, nothing recorded (A19).',
   'enrollments/403-enrollment-not-yours': 'A student trying to remove a classmate’s enrollment.',
   'enrollments/403-unknown-user': 'Leaving by someone the server has no account for yet.',
   'enrollments/404-enrollment-not-found': 'Leaving an enrollment the server does not know.',
@@ -173,7 +176,13 @@ interface Call {
  */
 const deviceTime = '2026-01-01T09:00:00.000Z';
 const get = (as: string, path: string): Call => ({ as, method: 'GET', path });
-const del = (as: string, path: string): Call => ({ as, method: 'DELETE', path });
+/** A leave or a removal, under a fresh id unless given one: the phone always sends one (A19). */
+const del = (as: string, path: string, eventId: string = randomUUID()): Call => ({
+  as,
+  method: 'DELETE',
+  path,
+  body: { eventId },
+});
 const post = (as: string, path: string, body: object): Call => ({ as, method: 'POST', path, body });
 const tap = (as: string, tagId: string, eventId: string = randomUUID()) =>
   post(as, '/v1/taps', { tagId, eventId, deviceTime });
@@ -333,9 +342,11 @@ async function captureAll() {
   const orphan = { outcome: 'recorded', recordedAs: 'not_enrolled' };
   await capture('unlock/recorded-not-enrolled', change(newcomer, s.id, 'unlock'), 200, orphan);
 
-  const leave = del(ana, `/v1/enrollments/${await enrollmentOf(c.klass.id, c.student.id)}`);
-  await capture('enrollments/left', leave, 200, { outcome: 'ended' });
-  await capture('enrollments/already-removed', leave, 200, { outcome: 'already_removed' });
+  const anasEnrollment = `/v1/enrollments/${await enrollmentOf(c.klass.id, c.student.id)}`;
+  const inClass = { reason: 'class_in_session' };
+  await capture('enrollments/409-class-in-session', del(ana, anasEnrollment), 409, inClass);
+  // Only her teacher takes her out mid-lesson (A19).
+  await setup(del(await token(c.teacher.cognitoId), anasEnrollment));
   const gone = { outcome: 'replay', session: null };
   await capture('refocus/replay-no-session', refocus, 200, gone);
   await capture('checkin/gone', checkin(ana, s.id), 200, { status: 'gone' });
@@ -398,9 +409,13 @@ async function captureAll() {
   });
   const passed = { outcome: 'recorded', recordedAs: 'superseded', state: 'focused' };
   await capture('unlock/recorded-superseded', older, 200, passed);
-  // … and another, once the student has left the class: the answer the phone's engine tests
-  // hand-wrote until now (#119's review).
-  await setup(del(dan, `/v1/enrollments/${await enrollmentOf(stuck.klass.id, stuck.student.id)}`));
+  // … and another, once the student is out of the class — removed, since a student never
+  // leaves mid-lesson (A19): the answer the phone's engine tests hand-wrote until now (#119's
+  // review).
+  const dansTeacher = await token(stuck.teacher.cognitoId);
+  await setup(
+    del(dansTeacher, `/v1/enrollments/${await enrollmentOf(stuck.klass.id, stuck.student.id)}`),
+  );
   const lateGone = change(dan, period.id, 'unlock', randomUUID(), lessonAt('13:04'));
   const passedGone = { outcome: 'recorded', recordedAs: 'superseded', state: null };
   await capture('unlock/recorded-superseded-gone', lateGone, 200, passedGone);
@@ -536,6 +551,12 @@ async function captureAll() {
   const nobody = del(newcomer, `/v1/enrollments/${randomUUID()}`);
   const noEnrollment = { reason: 'enrollment_not_found' };
   await capture('enrollments/404-enrollment-not-found', nobody, 404, noEnrollment);
+  // Leaving it, with no session running (A19), and the retry of that leave.
+  const joinedTo = bodyOf(fixtures.get('enrollments/joined')!).enrollmentId as string;
+  const leaving = del(newcomer, `/v1/enrollments/${joinedTo}`);
+  const onlyIt = { outcome: 'ended', endedParticipation: false };
+  await capture('enrollments/left', leaving, 200, onlyIt);
+  await capture('enrollments/already-removed', leaving, 200, { outcome: 'already_removed' });
 
   // A malformed tap, one with no token, and one of no registered block.
   const bad = post(newcomer, '/v1/taps', { tagId: 'TAG-fx', eventId: 'x', deviceTime });
@@ -608,9 +629,10 @@ async function captureAll() {
     now: deviceTime11,
   });
   await startAt(p6.klass.id, '11:05', '11:50');
-  // She leaves period 3 mid-lesson, is removed from period 5 mid-lesson, and
-  // leaves period 6, whose lesson runs without her.
-  await setup(del(her, `/v1/enrollments/${await enrollmentOf(p3.klass.id, dee.id)}`));
+  // She is removed from period 3 mid-lesson and from period 5 (a student never
+  // leaves mid-lesson, A19), and leaves period 6, whose lesson runs without her.
+  const rivera = await token(p3.teacher.cognitoId);
+  await setup(del(rivera, `/v1/enrollments/${await enrollmentOf(p3.klass.id, dee.id)}`));
   await startAt(p5.klass.id, '12:00', '12:50');
   await setup(tapAt(p5.block.tagId, '12:01'));
   const okafor = await token(p5.teacher.cognitoId);

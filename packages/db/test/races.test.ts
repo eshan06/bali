@@ -1325,6 +1325,58 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     }
   }, 60_000);
 
+  it('a leave or a removal racing a Start never leaves the student in a class they are out of (A19)', async () => {
+    // The student's tap waits for the Start (decision 5), so a Start that
+    // misses the leave joins them. Both take the class shared and the Start
+    // exclusively, so they serialise. A leave: Start first, it finds the class
+    // in session and is refused, and the student stays, joined; the leave
+    // first, the Start finds them gone and joins nobody. A removal: Start
+    // first, it ends the participation the Start made; the removal first, the
+    // Start joins nobody. Never both — out of the class and live in its
+    // lesson — which one judging the session before the Start committed, and
+    // committing after it, would be (santa's round 1: the removal's half).
+    for (let round = 0; round < 24; round += 1) {
+      const reason = round < 12 ? 'left_class' : 'removed_from_class';
+      const { classId, studentId, teacherId } = await seed(`race-leave-start-${round}`);
+      await armTap(db, {
+        studentId,
+        teacherId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+      const enrollment = one(
+        await db
+          .select()
+          .from(enrollments)
+          .where(and(eq(enrollments.classId, classId), eq(enrollments.studentId, studentId))),
+      );
+
+      // Odd rounds give the leave a head start, so both orders get exercised.
+      const start = () => openSession(classId);
+      const [left, started] = await Promise.allSettled([
+        endEnrollment(db, { enrollmentId: enrollment.id, reason, at: new Date() }),
+        round % 2 === 1 ? new Promise((resolve) => setTimeout(resolve, 10)).then(start) : start(),
+      ]);
+
+      if (started.status === 'rejected') throw started.reason;
+      const live = await liveParticipations(started.value.id);
+      const removedAt = one(
+        await db.select().from(enrollments).where(eq(enrollments.id, enrollment.id)),
+      ).removedAt;
+      if (left.status === 'fulfilled') {
+        expect(left.value.outcome).toBe('ended');
+        expect(removedAt).not.toBeNull();
+        expect(live).toHaveLength(0);
+      } else {
+        expect(reason).toBe('left_class');
+        expect(left.reason).toMatchObject({ code: 'CLASS_IN_SESSION' });
+        expect(removedAt).toBeNull();
+        expect(live).toHaveLength(1);
+      }
+    }
+  }, 60_000);
+
   // Block registration (Step 4). Not an engine mutation, but the active-tag
   // index is arbitrated the same way the join-code index is, so this proves the
   // ON CONFLICT DO NOTHING path is race-safe: two simultaneous claims of one tag

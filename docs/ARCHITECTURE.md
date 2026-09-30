@@ -300,7 +300,8 @@ Student app:
   the row was created without, and never changes one it has. Each class carries its
   teacher (`teacher.displayName`, null when their account has none — the preview's and
   the history's shape; added 2026-09-26, C2a, additive): what Home and Me show under a
-  class, and Focus says "with".
+  class, and Focus says "with". And the caller's enrollment in it (`enrollmentId`, null on
+  a teacher's own class; added 2026-09-30, A19, additive): what leaving it deletes.
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
@@ -367,7 +368,12 @@ Student app:
 - `POST /v1/enrollments` — join a class by code, matched ignoring case and surrounding
   whitespace (A6); a code longer than every minted one is `400` before any lookup.
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
-  to the teacher, so quietly leaving to dodge a session is always on the record.
+  to the teacher, so quietly leaving to dodge a session is always on the record. Never
+  while the class has a session running by the server's clock, the student in it or not:
+  `409 class_in_session`, nothing recorded (owner, 2026-09-30; A19). Past its bell, not yet
+  swept, a leave ends the student's participation there at the bell, as a removal does. The
+  body's optional `eventId` is what the leave is recorded under; a retry of one that landed
+  is answered `already_removed`, never refused.
 - `GET /v1/me/history` — the student's own timeline screens (A7): what was recorded about
   them that the consent screen says a teacher sees, in every class they have been in,
   left ones too — tapped in, back to focus, unlocked (with its reason), protection off,

@@ -1,19 +1,19 @@
 {
   "endpoint": "DELETE /v1/enrollments/{id}",
-  "scenario": "Leaving by someone the server has no account for yet.",
+  "scenario": "A student leaving while the class has a session running: refused, nothing recorded (A19).",
   "request": {
     "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001",
     "body": {
       "eventId": "00000000-0000-7000-8000-000000000002"
     }
   },
-  "status": 403,
+  "status": 409,
   "type": "ApiErrorBody",
   "body": {
     "error": {
-      "code": "forbidden",
-      "reason": "unknown_user",
-      "message": "unknown user"
+      "code": "conflict",
+      "reason": "class_in_session",
+      "message": "the class is in session: leave after it ends"
     }
   }
 }

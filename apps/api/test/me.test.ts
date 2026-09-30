@@ -13,7 +13,7 @@ import type {
   SessionSnapshot,
   UpdateMeResponse,
 } from '@bali/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -481,13 +481,37 @@ describe('GET /v1/me', () => {
     );
   });
 
+  it('gives each of a student’s classes the enrollment that leaving it deletes (A19)', async () => {
+    const { student, klass } = await seedClassroom(db, 'me-enrollment');
+    const other = await seedClassroom(db, 'me-enrollment-other');
+    await db.insert(enrollments).values({ classId: other.klass.id, studentId: student.id });
+    // One left and joined again: its live enrollment, never the removed one.
+    await db
+      .update(enrollments)
+      .set({ removedAt: new Date() })
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
+
+    const live = await db
+      .select({ classId: enrollments.classId, id: enrollments.id })
+      .from(enrollments)
+      .where(and(eq(enrollments.studentId, student.id), isNull(enrollments.removedAt)));
+    const { body } = await me(await ctx.tokenFor(student.cognitoId));
+    expect(new Map(body.classes.map((c) => [c.id, c.enrollmentId]))).toEqual(
+      new Map(live.map((e) => [e.classId, e.id])),
+    );
+    expect(body.classes).toHaveLength(2);
+  });
+
   it('returns a teacher their taught classes (existing role preserved)', async () => {
     const { teacher, klass } = await seedClassroom(db, 'me-teacher');
     const { body } = await me(await ctx.tokenFor(teacher.cognitoId));
     expect(body.user.role).toBe('teacher');
     expect(body.classes.map((c) => c.id)).toEqual([klass.id]);
-    // A teacher's own classes name the caller — here, one with no name yet.
+    // A teacher's own classes name the caller — here, one with no name yet —
+    // and no enrollment: they teach it, and have none to leave (A19).
     expect(body.classes.map((c) => c.teacher)).toEqual([{ displayName: null }]);
+    expect(body.classes.map((c) => c.enrollmentId)).toEqual([null]);
   });
 
   it('fills a teacher’s missing display name too, and keeps the role', async () => {
