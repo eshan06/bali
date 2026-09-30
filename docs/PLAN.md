@@ -685,8 +685,10 @@ layer → roster import (CSV / Google Classroom).
     own clock (decision 6), a late extend would show those phones green on
     the grid while unlocked, and whether it took would depend on whether the
     sweep had run yet. So it gets a swept session's answer, `409
-    session_not_running`, and the teacher starts a new session. Phase 2 had
-    allowed it, with a fresh window from the press.
+    session_not_running`, and the teacher starts a new session once the
+    sweep has marked the old one (within the minute; until then a Start
+    answers with the old one). Phase 2 had allowed it, with a fresh window
+    from the press.
 
 Parked by design, blocking before real students: data-deletion policy,
 under-13 parental-consent machinery.

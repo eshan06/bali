@@ -42,8 +42,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   extend would show those phones green on the grid while they are unlocked; and whether it took
   would depend on whether the sweep had run yet. So `extendSession` refuses a session whose end
   is at or before `at`, by the server's clock, with a swept session's answer, `409
-  session_not_running` ("session has ended"), and the teacher starts a new session; `base` is
-  the stored end again. A `/v1` correction in place, `200` to `409` (API decision 2): no shipped
+  session_not_running` ("session has ended"); `base` is the stored end again. The teacher
+  starts a new session, which a Start opens once the sweep has marked the old one (within the
+  minute). Until then a Start answers with the old one, which predates this (A15's entry).
+  Both santa round-2 reviewers raised it as a WARN. It is left for the owner: a Start that ends
+  a due session itself would be a design change of its own. A `/v1` correction in place, `200` to `409` (API decision 2): no shipped
   client calls extend yet (the portal has no control; `npm run dev:teacher -- extend` stops on
   the `409`, its body printed). ARCHITECTURE's decision 6 says so now. Red first: Phase 2's test, flipped to the
   refusal (at the bell and 30 s past it, with a second before it still extending), and a wire
