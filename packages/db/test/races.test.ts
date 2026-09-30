@@ -1924,6 +1924,66 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
   }, 30_000);
 });
 
+describe.runIf(REAL_PG)('a Start past the bell (real Postgres, A18)', () => {
+  /** Until `n` of `calls` are parked on a lock or answered — a caller that never parks counts once it answers. */
+  async function parked(n: number, calls: Promise<unknown>[]): Promise<void> {
+    let answered = 0;
+    const done = () => {
+      answered += 1;
+    };
+    for (const call of calls) void call.then(done, done);
+    const deadline = Date.now() + 5_000;
+    while (answered + (await lockWaiters()) < n) {
+      if (Date.now() > deadline) throw new Error(`fewer than ${n} caller(s) ever parked`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  }
+
+  it('a Start racing the sweep over a session past its bell: one end, one new session, either order', async () => {
+    /*
+     * Both take the old session's row before ending it (the Start after the
+     * class's), so they serialise. Sweep first: it ends the session, and the
+     * Start, reading it again under the lock, finds it over and starts the new
+     * one. Start first: it ends the session as the sweep would, starts the new
+     * one, and the sweep finds nothing left to end. Staged both ways round
+     * with a holder on the old session's row.
+     */
+    for (const first of ['start', 'sweep'] as const) {
+      const { classId } = await seed(`race-start-sweep-${first}`);
+      const old = await openSession(classId, { due: true });
+      const release = await holdSession(old.id);
+      const now = new Date();
+      const press = { classId, startedAt: now, endsAt: new Date(now.getTime() + 25 * 60_000) };
+      const calls: Promise<unknown>[] = [];
+      let starting: ReturnType<typeof startSession> | undefined;
+      let sweeping: ReturnType<typeof expireDueSessions> | undefined;
+      const call = (which: 'start' | 'sweep') => {
+        if (which === 'start') calls.push((starting = startSession(db, press)));
+        else calls.push((sweeping = expireDueSessions(db, now)));
+      };
+      try {
+        call(first);
+        await parked(1, calls);
+        call(first === 'start' ? 'sweep' : 'start');
+        await parked(2, calls);
+      } finally {
+        await release();
+      }
+      const [started, swept] = await Promise.all([starting, sweeping]);
+      expect(started?.outcome, first).toBe('created');
+      expect(started?.session.id, first).not.toBe(old.id);
+      expect(swept, first).toEqual(first === 'sweep' ? [old.id] : []);
+      expect(await eventsOfType(old.id, 'session_expired'), first).toHaveLength(1);
+      const all = await db.select().from(sessions).where(eq(sessions.classId, classId));
+      expect(all, first).toHaveLength(2);
+      expect(
+        all.filter((s) => s.endedAt === null).map((s) => s.id),
+        first,
+      ).toEqual([started?.session.id]);
+    }
+  }, 30_000);
+});
+
 describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
   it('an arm waits out the same tap still landing in a session, and answers as its replay', async () => {
     /*

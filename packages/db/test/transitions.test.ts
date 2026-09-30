@@ -125,6 +125,58 @@ describe('startSession', () => {
     expect(again.outcome).toBe('existing');
     expect(again.session.id).toBe(first.session.id);
   });
+
+  it('ends a session past its bell the sweep has not reached, as the sweep would, and starts the next (A18)', async () => {
+    // Back-to-back classes, the owner's ruling (2026-09-30): past its bell by
+    // the server's clock the class is over, swept or not (decision 12), so a
+    // Start does not hand it back. It ends it as the sweep would — at its
+    // bell, its rows closed as session_expired, one session_expired — and
+    // starts the new one in the same transaction; a tap armed in the gap (A17)
+    // joins it.
+    const { teacher, klass, student } = await seedClass('start-past-bell');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session: old } = await startSession(db, { classId: klass.id, ...w });
+    await tapIn(db, {
+      sessionId: old.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    });
+
+    // A second before the bell, a Start still answers with the class running.
+    const early = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:24:59Z') });
+    expect(early).toMatchObject({ outcome: 'existing', session: { id: old.id } });
+
+    const gap = new Date('2026-01-01T09:25:10Z');
+    await armTap(db, {
+      studentId: student.id,
+      teacherId: teacher.id,
+      eventId: newUuidV7(),
+      deviceTime: gap,
+      expiresAt: new Date('2026-01-01T23:59:59Z'),
+      now: gap,
+    });
+    const next = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:25:30Z') });
+    expect(next).toMatchObject({ outcome: 'created', armedConverted: 1 });
+    expect(next.session.id).not.toBe(old.id);
+
+    const over = one(await db.select().from(sessions).where(eq(sessions.id, old.id)));
+    expect(over.endedAt).toEqual(w.endsAt);
+    expect((await eventsFor(old.id)).map((e) => e.type)).toEqual([
+      'session_started',
+      'tap_in',
+      'session_expired',
+    ]);
+    const rowIn = async (sessionId: string) =>
+      one(await db.select().from(participations).where(eq(participations.sessionId, sessionId)));
+    expect(await rowIn(old.id)).toMatchObject({
+      endedAt: w.endsAt,
+      endedReason: 'session_expired',
+    });
+    expect(await rowIn(next.session.id)).toMatchObject({ state: 'focused', endedAt: null });
+    // The sweep finds nothing left to end.
+    expect(await expireDueSessions(db, new Date('2026-01-01T09:26:00Z'))).toEqual([]);
+  });
 });
 
 describe('tapIn', () => {

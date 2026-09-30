@@ -1,5 +1,6 @@
-import { type Database, armTap } from '@bali/db';
+import { type Database, armTap, sessions, startSession } from '@bali/db';
 import type { StartSessionResponse } from '@bali/shared';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -63,6 +64,22 @@ describe('POST /v1/classes/:id/sessions', () => {
     const again = await start(token, klass.id);
     expect(again.body.outcome).toBe('existing');
     expect(again.body.session.id).toBe(first.body.session.id);
+  });
+
+  it('past the bell of a session the sweep has not reached, ends it and starts the next (A18)', async () => {
+    // Back-to-back classes: the teacher need not wait out the sweep's minute.
+    const { teacher, klass } = await seedClassroom(db, 'start-past-bell');
+    const { session: old } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+    const { status, body } = await start(await ctx.tokenFor(teacher.cognitoId), klass.id);
+    expect(status).toBe(200);
+    expect(body.outcome).toBe('created');
+    expect(body.session.id).not.toBe(old.id);
+    const [over] = await db.select().from(sessions).where(eq(sessions.id, old.id));
+    expect(over?.endedAt).toEqual(old.endsAt);
   });
 
   it("forbids starting another teacher's class", async () => {
