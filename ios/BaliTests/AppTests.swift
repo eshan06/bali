@@ -218,6 +218,17 @@ struct AppTests {
         #expect(named.screen == .me && !named.tabbed)
         named.naming = Naming()
         #expect(named.screen == .me && named.tabbed)
+        // Mid-edit, a change of standing sends the tab Home (santa's round 1): Home keeps its bar,
+        // and Me, chosen again, shows the edit as it was, without one.
+        let away = Phone(fixture: try #require(PreviewFixtures.all["meEditing"]))
+        var moved = try #require(away.sync)
+        moved.standing = .waiting
+        away.synced(moved)
+        moved.standing = .out
+        away.synced(moved)
+        #expect(away.screen == .home && away.tabbed && away.naming.editing)
+        away.select(.me)
+        #expect(away.screen == .me && !away.tabbed && away.naming.name == "Ana R.")
     }
 
     @Test(
