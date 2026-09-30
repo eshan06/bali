@@ -26,9 +26,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   which D1 does not draw:** in the card, DESIGN.md's input — the label above a sunken well
   (radius-sm), the focus ring's colour while typing, the helper and any error below — then
   **Save** (primary; again after a failure: Save is the way on) and **Cancel** (Join's "Not my
-  class" pattern); VoiceOver is told a failure, its focus left on Save. The tab bar hides while the
-  name is edited (`Phone.tabbed`): on the simulator it rode above the keyboard, and with it hidden
-  Save and Cancel are the ways on, as in an iOS edit mode. A student whose account has no name yet
+  class" pattern); VoiceOver is told a failure, its focus left on Save. The tab bar hides while Me
+  shows the name being edited (`Phone.tabbed`): on the simulator it rode above the keyboard, and
+  with it hidden Save and Cancel are the ways on, as in an iOS edit mode. Anywhere else it shows:
+  a change of standing that sends the tab Home mid-edit leaves Home its bar, and Me, chosen
+  again, shows the edit as it was (iOS keeps a tab as it was left). A student whose account has no name yet
   (a pool whose tokens carry none, PLAN's Now) sees "No name yet" and how to add one; the card
   shows once `GET /v1/me` has answered, Classes saying why not until then. **Sign out:** D1's text
   button, no confirmation (D1 draws none; signing back in is always possible); while an Emergency
@@ -44,7 +46,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the largest accessibility one, with the consent sheet and Join's way back tapped through.
   **Tests:** `AppTests.fixtures` (each look: the name, its edit, a refused save, Sign out held and
   failed), `AppTests.tabs` (the bar on Me but while its name is edited, and back once cancelled;
-  Join from Me and Back to it).
+  Join from Me and Back to it). **Santa** (two Claude reviewers, so they share a model family —
+  Codex refuses every model on this Mac — and the design check against DESIGN.md and D1's Me):
+  round 1, one blocker, found by both — the bar hid on every screen while an edit was open, and
+  nothing ends an edit when `synced` sends the tab Home, so a check-in finding the class gone
+  mid-edit left Home with no tab bar and no way back to Me until a relaunch. Fixed test first
+  (`AppTests.tabs`, red before): the bar hides only while Me shows the edit. WARNs: a blank
+  name saved with the keyboard's Done said nothing — fixed in C6b-1 (`Naming.blank`); and Sign
+  out lives on Me alone, which a signed-in student in no class (Join is the router's) or without
+  the Screen Time grant never reaches — so an account signed into by mistake cannot be left
+  without joining a class first: listed for the owner, not changed here (D1 draws Sign out on
+  Me only). The design check: the field's focus ring is drawn as the Join screen's is, a 2 pt
+  ring with no page-coloured gap (DESIGN.md §6), left as Join has it.
 
 - **2026-09-30** — **C6b-1: Me's engine side — the name, Sign out, and the last student's `me`.**
   C6b in two PRs for size (santa's step 0 found 458 lines; the conductor split it as C5a and C6a
