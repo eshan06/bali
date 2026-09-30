@@ -13,10 +13,10 @@ export interface AuthedApp {
   close(): Promise<void>;
 }
 
-/** Build an app backed by the given db and the test issuer's verifier. */
-export async function makeAuthedApp(db: Database): Promise<AuthedApp> {
+/** Build an app backed by the given db and the test issuer's verifier, on `clock` if given. */
+export async function makeAuthedApp(db: Database, clock?: () => Date): Promise<AuthedApp> {
   const issuer = await makeTestIssuer();
-  const app = buildApp(testEnv, { db, verifyToken: issuer.verifier });
+  const app = buildApp(testEnv, { db, verifyToken: issuer.verifier, clock });
   return {
     app,
     issuer,

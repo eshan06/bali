@@ -265,6 +265,21 @@ async function loadSession(
   return firstOrUndefined(await (opts.forUpdate ? query.for('update') : query));
 }
 
+/**
+ * Whether a session is running at `now`, by the server's clock: not marked
+ * over, and its bell still ahead. Past the bell the class is over whether or
+ * not the sweep has marked it yet — every phone let go at the bell by its own
+ * clock (decision 6) — so nothing adds time to it (decision 12), joins it or
+ * returns to focus in it (A17). The one rule for all of them: two copies of it
+ * would drift apart, which is v2's disease.
+ */
+export function sessionRunning(
+  session: Pick<SessionRow, 'endedAt' | 'endsAt'>,
+  now: Date,
+): boolean {
+  return session.endedAt === null && session.endsAt > now;
+}
+
 async function loadParticipation(
   tx: Database,
   sessionId: string,
@@ -885,6 +900,8 @@ async function takeOverStaleRow(
  * and re-reads the truth. Its `event_id` index is the arbiter: a rival delivery
  * of the same tap, uncommitted when `exact` looked, is answered as this one's
  * retry. Nothing deletes an `armed_taps` row, so the rival is always found.
+ * (Since A17 `armTap` holds the tap's own lock, so such a rival can only be a
+ * writer outside it; the arbiter stays as the defence.)
  */
 async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promise<ArmTapResult> {
   const recorded = firstOrUndefined(
@@ -921,6 +938,13 @@ async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promi
 export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapResult> {
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
+    // The tap's own lock, as its landing takes it (`lockTap`): a delivery of
+    // this tap still landing in a session — its `tap_in` not yet committed,
+    // so the look below cannot see it — is waited out, and this is answered
+    // as its replay, never armed under an id about to be spent (A17: a retry
+    // heard past the bell arms while the tap itself lands before it).
+    await lockTap(tx, input.eventId);
+
     // An id already in `events` is a tap that LANDED, so there is nothing to
     // arm and the honest answer is `replay`.
     //
@@ -1094,7 +1118,9 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // event_id index is answered as a replay, not a 500" stages the
       // interleaving with a held transaction, on the real-Postgres lane CI
       // runs; rethrowing instead of recovering, or dropping the savepoint,
-      // each turns it red.
+      // each turns it red. Since A17 this function holds the tap's own lock,
+      // so the concurrent delivery can only be a writer outside it (that
+      // test's is a raw insert); the recovery stays as the defence.
       let row: typeof armedTaps.$inferSelect | undefined;
       let idAlreadyTaken = false;
       try {
@@ -1238,10 +1264,9 @@ export async function extendSession(db: Database, input: ExtendSessionInput): Pr
       }
     }
 
-    // Past its bell by the server's clock, the class is over whether or not
-    // the sweep has marked it yet: every phone let go at the bell by its own
-    // clock (decision 6). The owner's ruling, 2026-09-30 (decision 12).
-    if (session.endedAt || session.endsAt <= input.at) {
+    // Past its bell by the server's clock the class is over, swept or not
+    // (decision 12, `sessionRunning`).
+    if (!sessionRunning(session, input.at)) {
       throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
     }
 
@@ -1501,6 +1526,8 @@ export interface TapInput {
   deviceTime: Date;
   /** The phone's own order for the tap (A12), if it sent one: it orders the tap against an unlock. */
   order?: ActionOrder | null;
+  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
+  now?: Date;
 }
 export interface TapResult {
   outcome: 'joined' | 'switched' | 'replay';
@@ -1528,10 +1555,11 @@ async function teacherOfClass(tx: Database, classId: string): Promise<string | u
 
 /**
  * Serialise a tap's landing (`tapIn`) with an unlock sent under it
- * (`unlockUnderTap`, decision 11). Neither can see the other's uncommitted
- * row, so arriving together each could miss the other: the unlock kept
- * unattached, the tap joined as focused over a phone its student unlocked.
- * Taken first in both, before the session: one lock order. A transaction
+ * (`unlockUnderTap`, decision 11), and with its arming (`armTap`, A17). None
+ * can see another's uncommitted row, so arriving together each could miss the
+ * other: the unlock kept unattached, the tap joined as focused over a phone its
+ * student unlocked; or a retry armed under an id its landing then spends.
+ * Taken first in each, before the session: one lock order. A transaction
  * advisory lock on a hash of the tap's id, released at commit — a collision
  * only makes two taps wait on each other.
  */
@@ -1555,8 +1583,11 @@ async function lockStudentTaps(tx: Database, studentId: string): Promise<void> {
 }
 
 /**
- * A tap into a running session. If the student is live in another session,
- * that participation is ended as `left_for_other_session` first (decision 4),
+ * A tap into a running session — running at `now`, by `sessionRunning`: past
+ * its bell, swept or not, it is refused as a swept one's is, and never joined
+ * (A17; the route arms such a tap, as when nothing runs). If the student is
+ * live in another session, that participation is ended as
+ * `left_for_other_session` first (decision 4),
  * so switching classes is never counted as an emergency unlock. Reactivating a
  * participation in a session the student previously left updates the existing
  * row (there is one row per student per session), never a duplicate. An
@@ -1576,6 +1607,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       await lockStudentTaps(tx, input.studentId);
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
+      const now = input.now ?? new Date();
 
       // Replay first — ahead of the ended-session guard, the placement
       // extendSession uses and for the same reason: a tap that DID land must
@@ -1616,13 +1648,15 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // the phone re-reads the truth.
       //
       // Measured reach: deleting `!current.endedAt` turns "replays a participation
-      // the student has since left with no session" red. `!recorded.endedAt`
-      // survives that check on its own, because ending a session ends every
-      // live participation in it in the same transaction (both endSession and
-      // expireDueSessions, each with its own test) — it is kept so this branch
-      // does not silently depend on reading the session BEFORE the
-      // participation, which is what makes that implication hold under READ
-      // COMMITTED.
+      // the student has since left with no session" red, and a session past
+      // its bell is over with its participations still live until the sweep,
+      // so `sessionRunning` has reach of its own ("a retry reaching the server
+      // past the bell names no session", A17). Its `ended_at` half survives
+      // on its own, because ending a session ends every live participation in
+      // it in the same transaction (both endSession and expireDueSessions,
+      // each with its own test) — it is kept so this branch does not silently
+      // depend on reading the session BEFORE the participation, which is what
+      // makes that implication hold under READ COMMITTED.
       //
       // What this gives up, since the server cannot tell a retry from a
       // deliberate reuse: a student's app resending a spent id for a second
@@ -1690,7 +1724,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         const recorded =
           prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
         const current = await loadParticipation(tx, prior.sessionId, input.studentId);
-        if (recorded && !recorded.endedAt && current && !current.endedAt) {
+        if (recorded && sessionRunning(recorded, now) && current && !current.endedAt) {
           return {
             outcome: 'replay',
             state: current.state,
@@ -1716,7 +1750,12 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         }
       }
 
-      if (session.endedAt) throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      // Running at `now`, the rule the route picked it by (A17). Marked over
+      // since — the sweep or its teacher, racing the pick — it is refused, and
+      // the retry resolves afresh: with nothing running, it arms.
+      if (!sessionRunning(session, now)) {
+        throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      }
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
       const order = knownOrder(input.order);
@@ -1931,6 +1970,11 @@ export interface StateChangeInput {
   /** The phone's own order for the change (A12), if it sent one: it orders a return against an unlock. */
   order?: ActionOrder | null;
 }
+/** A return to focus (refocus). */
+export interface RefocusInput extends StateChangeInput {
+  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
+  now?: Date;
+}
 export interface StateChangeResult {
   outcome: 'applied' | 'replay';
   /** The stored state; null on the replay of a change whose participation has since ended. */
@@ -1954,7 +1998,7 @@ export interface StateChangeResult {
  */
 async function changeState<Ended = never>(
   db: Database,
-  input: StateChangeInput,
+  input: RefocusInput,
   eventType: EventType,
   nextState: ParticipationState,
   rules: {
@@ -1964,7 +2008,10 @@ async function changeState<Ended = never>(
     replayNeedsLive?: boolean;
     /** Answer a change that reaches an ended session instead of refusing it; runs under the session lock. */
     afterEnd?: (tx: Database, session: SessionRow) => Promise<Ended>;
-    /** A return to focus: late, recorded but never applied, when an unlock came after it (A13). */
+    /**
+     * A return to focus: refused past the bell, swept or not (A17), and late —
+     * recorded but never applied — when an unlock came after it (A13).
+     */
     returning?: boolean;
   } = {},
 ): Promise<StateChangeResult | Ended> {
@@ -1983,8 +2030,14 @@ async function changeState<Ended = never>(
       // pointing the phone at a session that is over (rule 4). The refusal
       // costs nothing: the phone drops a refused change and re-reads the truth
       // (`stateChangeDisposition` in @bali/shared). A change that must be kept
-      // even then answers it itself (`afterEnd`: protection off).
-      if (session.endedAt) {
+      // even then answers it itself (`afterEnd`: protection off). A return to
+      // focus is over at the bell, by `sessionRunning` (A17): applied past it,
+      // the grid would show green over a phone its bell unshielded. A report
+      // of what the phone did keeps its rules until the session is marked over.
+      const over = returning
+        ? !sessionRunning(session, input.now ?? new Date())
+        : session.endedAt !== null;
+      if (over) {
         if (afterEnd) return afterEnd(tx, session);
         throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
       }
@@ -2698,9 +2751,10 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
  * re-shields — leaves protection off (ARCHITECTURE, iOS rules). A replay after
  * the participation ended while the session runs names no session (A4). One
  * the phone made before an unlock the server already has is late: recorded,
- * noted `superseded`, never applied, and answered as its retry is (A13).
+ * noted `superseded`, never applied, and answered as its retry is (A13). Past
+ * the bell, swept or not, it is refused as after the sweep (A17).
  */
-export function refocus(db: Database, input: StateChangeInput): Promise<StateChangeResult> {
+export function refocus(db: Database, input: RefocusInput): Promise<StateChangeResult> {
   return changeState(db, input, 'refocus', 'focused', {
     cannotLeave: {
       state: 'protection_off',

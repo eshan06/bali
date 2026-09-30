@@ -32,6 +32,12 @@ export interface AppDeps {
    * else, so production keeps pino's own default destination.
    */
   logStream?: NodeJS.WritableStream;
+  /**
+   * The server's clock, which judges whether a session still runs — for a
+   * tap, a return to focus and an extend (A17). Unset, it is the system's;
+   * tests whose lessons are on a fixed day set it to that day.
+   */
+  clock?: () => Date;
 }
 
 /**
@@ -72,10 +78,11 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env));
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
+  const clock = deps.clock ?? (() => new Date());
   registerMeRoute(app, deps.db);
   registerHistoryRoute(app, deps.db);
-  registerTapsRoute(app, deps.db);
-  registerSessionsRoute(app, deps.db);
+  registerTapsRoute(app, deps.db, clock);
+  registerSessionsRoute(app, deps.db, clock);
   registerEnrollmentsRoutes(app, deps.db);
   registerClassesRoutes(app, deps.db);
   registerBlocksRoutes(app, deps.db);

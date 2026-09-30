@@ -8,6 +8,74 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A17: a tap after the bell never joins the session that just ended — one
+  rule for "running", by the server's clock, judged under the lock** (#127's Claude Review; the
+  owner's ask). **The gap:** A16 refused an extend at or past the bell before the sweep marks the
+  session ended (decision 12), but the tap path still called such a session running:
+  `resolveTapTarget` picked any session with `ended_at` unset and `tapIn` checked only
+  `ended_at`. So a tap in that gap — up to a minute (A15) — joined the class that had just ended,
+  focused on the grid over a phone its bell had unshielded, and was spent there instead of waiting
+  for the next Start; a refocus there turned the grid green the same way; and a tap retried there
+  named the over session. **Decided:** one rule, `sessionRunning(session, now)` in the engine —
+  `ended_at` unset and `ends_at` after `now`, the server's clock — used by the extend (decision
+  12), the tap and a refocus; no second copy of it (v2's disease). **Join or arm is decided under
+  the locks.** The route lists the teacher's sessions not yet marked over in the student's
+  classes, newest first (at most one per class), and tries the newest that runs by that read —
+  else the newest of them all, since a read takes no lock and an extend may have moved its bell
+  since. `tapIn` judges the rule under the session's lock at the moment the route read, and only
+  a candidate past its bell there too leaves the tap to arm — the same path, answer (`200 armed`,
+  no session) and Start conversion as when nothing runs. One running by the read and marked over
+  since (the sweep or its teacher) is refused as before (`409 session_not_running`; its retry
+  arms). `tapIn`'s replay names the recorded session only while it runs by the rule, so a retry
+  in the gap is `200 replay` with no session (rule 4). A refocus past the bell is refused as after
+  the sweep, fresh or retried. **The races, as santa's round 1 found them** (both reviewers, the
+  same root: the choice made from the unlocked read): a tap's retry heard past the bell took the
+  arm path while the tap itself was still landing in the session, uncommitted, so `armTap` saw no
+  `tap_in` and armed the id — the landing then spent it, the next Start skipped the row, and the
+  phone told "armed" waited for nothing; and an extend committing between the route's read and
+  the lock left a tap armed while its class ran to the new bell. Both closed: the past-bell
+  candidate is tried under its lock, and `armTap` takes the tap's own lock (`lockTap`) first, as
+  the landing and an unlock sent under the tap do — so an arm waits out its own tap still landing
+  and answers as its replay, and an unlock under a tap racing its arm is kept `tap_armed`, never
+  `unknown_tap`. **Left, disclosed:** an extend pressed before the bell whose transaction reaches
+  the session's lock only after a tap heard past the bell was refused there — the tap arms, the
+  extend lands (it is judged by its press, decision 12), and the class runs on without that
+  student until they tap again: whichever takes the session first wins, as A16's extend and sweep
+  do; closing it would judge the extend at its commit, a change to decision 12's rule. The same
+  outcome, contrived: a student in two of a teacher's classes whose sessions are both past their
+  bells by the read — only the newest is tried under its lock, so an extend landing on the older
+  one first leaves the tap armed too. And one practically unreachable (santa's round 2): a delivery heard before the bell that loses a deadlock
+  lets go of the tap's lock for `withDeadlockRetry`'s 10–20 ms backoff, and a retry of it heard
+  past the bell in that moment arms before the re-run joins, at its own moment — told `armed`,
+  joined, and the Start skips the spent row. It needs the phone's retry, sent only once its
+  request times out, to land inside that backoff at the bell. **Kept:**
+  late records — an unlock or protection off in the gap is recorded as before the sweep, and after
+  it keeps its note (A2c, A10, A11); only joining or returning to focus in an over session is
+  refused. Start is untouched here. One knock-on, as after the sweep today: an unlock sent under a
+  tap and kept `unknown_tap` (decision 11) is filed when its tap lands — but a tap landing in the
+  gap arms, so that unlock is never filed into the session it was made in, and the Start joins the
+  student as focused without it (#77's rule for an armed tap). **The clock:** a tap and a refocus
+  take `now` (the server's clock, now by default, as `armTap`'s), and the API reads one injectable
+  clock (`AppDeps.clock`) for the tap — its arm, day and expiry too — the refocus and the extend;
+  tests whose lessons are on a fixed day hear each request when its phone made it. **`/v1`
+  corrections in place (API decision 2):** in the gap a tap was `200 joined` (now `200 armed`), a
+  refocus `200 applied` (now `409 session_not_running`), and a retried tap `200 replay` naming the
+  over session (now naming none) — each told the phone something false; every one is an answer
+  the phone's tables already read, and no fixture changes. **Weighed:** the check in the route
+  alone leaves the lock reading `ended_at`, a second rule; `ends_at > now` in the lookup's SQL
+  copies the rule; the queries importing it from the engine, which imports the queries, makes a
+  cycle — so the route picks with the engine's rule from the lookup's candidates, and the engine
+  decides under the lock. **Tests,** red first: PGlite — a tap past the bell, unswept (at it and
+  30 s on, the phone's claim before it), refused with nothing recorded, and a second before it
+  joined; its retry there naming no session; a refocus there refused, fresh and retried. The wire
+  — a tap in the gap armed, and joined by the next Start after the sweep; a running session
+  joined over a newer one past its bell; and in the gap a refocus `409` while an unlock and a
+  protection off record as ever. Real Postgres — an arm racing its own tap still landing answers
+  as its replay, and at the wire, the retry of a tap still landing, heard past the bell, is `200
+  replay` and never armed, and a tap past the bell by the read joins when an extend reached the
+  lock first; each red before (`armed`). The engine tests' lessons are in January, so their taps
+  and returns are heard when the phone made them.
+
 - **2026-09-30** — **The C riders, Riders-2: polish — History, Unlocked and Me's review WARNs.**
   **History:** `History.answered` reloads from the top on `unknown_cursor` only where a cursor was
   sent — the page after `nextBefore` — since a read from the top answered so would be read again

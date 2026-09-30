@@ -22,10 +22,10 @@ import {
   extendSession,
   joinClassByCode,
   protectionOff,
-  refocus,
+  refocus as refocusNow,
   renameStudent,
   startSession,
-  tapIn,
+  tapIn as tapInNow,
   tapsMadeSince,
   unlock,
   unlocksAwaitingTap,
@@ -33,6 +33,15 @@ import {
 } from '../src/transitions.js';
 import { makeTestDb } from '../src/testing.js';
 import type { Database } from '../src/types.js';
+
+/*
+ * A tap or a return to focus is judged by the server's clock (A17), and these
+ * lessons are in January, over by the real one. So each is heard when the
+ * phone made it, unless a test says when the server heard it (`now`).
+ */
+const tapIn: typeof tapInNow = (db, input) => tapInNow(db, { now: input.deviceTime, ...input });
+const refocus: typeof refocusNow = (db, input) =>
+  refocusNow(db, { now: input.deviceTime, ...input });
 
 let db: Database;
 let close: () => Promise<void>;
@@ -286,6 +295,68 @@ describe('tapIn', () => {
       }),
     ).rejects.toMatchObject({ code: 'SESSION_NOT_RUNNING' });
   });
+
+  it('refuses a tap past the bell the sweep has not reached, as it refuses one after (A17)', async () => {
+    // Past its bell by the server's clock the class is over, swept or not:
+    // every phone let go at the bell by its own clock (decision 6), so a
+    // student joined then stands focused on the grid over an unshielded phone
+    // until the sweep runs — decision 12's reason, for a tap. The route arms
+    // such a tap, as when nothing runs; one that meets the bell under the
+    // lock is refused as a swept session's is. The phone's claim decides
+    // nothing: this one says it tapped before the bell.
+    const { klass, student } = await seedClass('tap-past-bell');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const tap = (now: Date) => ({
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:24:00Z'),
+      now,
+    });
+
+    // At the bell, and 30 s past it.
+    for (const now of [w.endsAt, new Date('2026-01-01T09:25:30Z')]) {
+      await expect(tapIn(db, tap(now))).rejects.toMatchObject({ code: 'SESSION_NOT_RUNNING' });
+    }
+    expect(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    ).toEqual([]);
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual(['session_started']);
+
+    // A second before the bell, it joins.
+    const joined = await tapIn(db, tap(new Date(w.endsAt.getTime() - 1_000)));
+    expect(joined.outcome).toBe('joined');
+  });
+
+  it('a retry reaching the server past the bell names no session, swept or not (A17)', async () => {
+    // Rule 4: a retried tap names its session only while that is still true,
+    // and past the bell the session is over. Naming it would point the phone
+    // at a window that has closed; with none it re-reads the truth.
+    const { klass, student } = await seedClass('tap-past-bell-retry');
+    const w = window('2026-01-01T09:00:00Z');
+    const { session } = await startSession(db, { classId: klass.id, ...w });
+    const tap = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:10:00Z'),
+    };
+    expect((await tapIn(db, { ...tap, now: tap.deviceTime })).outcome).toBe('joined');
+
+    expect(await tapIn(db, { ...tap, now: new Date('2026-01-01T09:24:59Z') })).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+      session: { id: session.id },
+    });
+    expect(await tapIn(db, { ...tap, now: w.endsAt })).toEqual({
+      outcome: 'replay',
+      state: null,
+      participationId: null,
+      session: null,
+    });
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'tap_in')).toHaveLength(1);
+  });
 });
 
 describe('state changes', () => {
@@ -326,6 +397,38 @@ describe('state changes', () => {
       'unlock',
       'refocus',
     ]);
+  });
+
+  it('refuses a return to focus past the bell the sweep has not reached, and its retry (A17)', async () => {
+    // A refocus puts a student back in focus, so past its bell by the server's
+    // clock it is refused as after the sweep: applied, the grid would show
+    // green over a phone its bell unshielded (decision 12's reason). Its
+    // retry too, ahead of any replay, as after the sweep.
+    const { session, student } = await joined('refocus-past-bell');
+    const change = (minute: number) => ({
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date(`2026-01-01T09:${minute}:00Z`),
+    });
+    await unlock(db, change(10));
+    const early = { ...change(20), now: new Date(session.endsAt.getTime() - 1_000) };
+    expect((await refocus(db, early)).outcome).toBe('applied');
+    await unlock(db, change(22));
+
+    for (const now of [session.endsAt, new Date('2026-01-01T09:25:30Z')]) {
+      await expect(refocus(db, { ...change(24), now })).rejects.toMatchObject({
+        code: 'SESSION_NOT_RUNNING',
+      });
+      await expect(refocus(db, { ...early, now })).rejects.toMatchObject({
+        code: 'SESSION_NOT_RUNNING',
+      });
+    }
+    const row = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(row.state).toBe('unlocked');
+    expect((await eventsFor(session.id)).filter((e) => e.type === 'refocus')).toHaveLength(1);
   });
 
   it('protectionOff is its own state', async () => {
@@ -1574,12 +1677,14 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
         });
         const fast = () => new Date(Date.now() + 2 * 60 * 60_000);
         const honest = () => new Date(Date.now() + 1_000);
+        // Heard by the server now, whatever the phone's clock says (A17).
+        const heard = { now: new Date() };
         if (fastAt === 'tap') {
-          await tapIn(db, move(session, student, fast()));
+          await tapIn(db, { ...move(session, student, fast()), ...heard });
         } else {
           await tapIn(db, move(session, student, new Date()));
           await unlock(db, move(session, student, honest()));
-          await refocus(db, move(session, student, fast()));
+          await refocus(db, { ...move(session, student, fast()), ...heard });
         }
         const returned = (await eventsFor(session.id)).at(-1)!;
         expect(returned.occurredAt).toEqual(session.endsAt);
@@ -4155,6 +4260,7 @@ describe('armed taps', () => {
       studentId: student.id,
       eventId: spent,
       deviceTime: fastClaim,
+      now: new Date('2026-01-01T09:01:00Z'),
     });
     await endSession(db, {
       sessionId: first.session.id,
@@ -4531,8 +4637,9 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     // One student, enrolled with both teachers.
     await db.insert(enrollments).values({ classId: b.klass.id, studentId: a.student.id });
 
+    // Still running at the reuse, by the server's clock (A17).
     const sessionA = (
-      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z') })
+      await startSession(db, { classId: a.klass.id, ...window('2026-01-01T09:00:00Z', 90) })
     ).session;
     const eventId = newUuidV7();
     const joined = await tapIn(db, {

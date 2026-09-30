@@ -27,10 +27,16 @@ import { makeTestDb, seedClassroom } from './helpers/db.js';
 let db: Database;
 let closeDb: () => Promise<void>;
 let ctx: AuthedApp;
+/**
+ * When the server hears the request being sent: when its phone made it. The
+ * day is over by the real clock, and a tap or a return to focus is judged by
+ * the server's (A17).
+ */
+let heard = new Date();
 
 beforeAll(async () => {
   ({ db, close: closeDb } = await makeTestDb());
-  ctx = await makeAuthedApp(db);
+  ctx = await makeAuthedApp(db, () => heard);
 });
 
 afterAll(async () => {
@@ -48,6 +54,8 @@ const endAt = (sessionId: string, time: string, reason: 'ended' | 'expired') =>
   endSession(db, { sessionId, at: at(time), reason });
 
 function send(method: 'GET' | 'POST' | 'DELETE', token: string | null, url: string, body?: object) {
+  const made = (body as { deviceTime?: string } | undefined)?.deviceTime;
+  heard = made === undefined ? new Date() : new Date(made);
   return ctx.app.inject({
     method,
     url,
@@ -156,7 +164,14 @@ async function aDayOfClasses(tag: string) {
   const spent = randomUUID();
   expect((await ok(tap(token, p6.block.tagId, '10:45', spent))).outcome).toBe('armed');
   const d = await startAt(p3.klass.id, '11:00', '11:50');
-  await tapIn(db, { sessionId: d.id, studentId: ana.id, eventId: spent, deviceTime: at('11:01') });
+  const heardAt = at('11:01');
+  await tapIn(db, {
+    sessionId: d.id,
+    studentId: ana.id,
+    eventId: spent,
+    deviceTime: heardAt,
+    now: heardAt,
+  });
   const e = await startAt(p6.klass.id, '11:05', '11:50');
 
   await ok(leave(token, await enrollmentOf(p3.klass.id, ana.id)));

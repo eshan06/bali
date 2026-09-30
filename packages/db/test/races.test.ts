@@ -286,6 +286,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        now: session.startedAt, // heard while it ran (A17)
       });
       await db
         .update(participations)
@@ -871,7 +872,7 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
           eventId: newUuidV7(),
           deviceTime: new Date(),
         });
-        await tapIn(db, change());
+        await tapIn(db, { ...change(), now: session.startedAt }); // heard while it ran (A17)
 
         // Odd rounds give the end a head start, so both orders get exercised:
         // the sweep scans before it locks, and the report otherwise wins it.
@@ -919,11 +920,14 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       for (const via of ['end', 'sweep', 'removal'] as const) {
         const { classId, studentId } = await seed(`race-retry-${via}-${round}`);
         const session = await openSession(classId, { due: via === 'sweep' });
+        // Heard while the lesson ran, the retry too: one reaching the server
+        // past the bell names no session whoever wins (A17).
         const tap = {
           sessionId: session.id,
           studentId,
           eventId: newUuidV7(),
           deviceTime: new Date(),
+          now: session.startedAt,
         };
         expect((await tapIn(db, tap)).outcome).toBe('joined');
         const enrollment = one(
@@ -1814,6 +1818,7 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
         studentId,
         eventId: newUuidV7(),
         deviceTime: new Date(),
+        now: session.startedAt, // heard while it ran (A17)
       });
 
       const release = await holdSession(session.id);
@@ -1865,6 +1870,57 @@ describe.runIf(REAL_PG)('concurrent extends (real Postgres)', () => {
       }
     }
   }, 30_000);
+});
+
+describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
+  it('an arm waits out the same tap still landing in a session, and answers as its replay', async () => {
+    /*
+     * A tap's retry reaching the server past the bell takes the arm path while
+     * the tap itself may still be landing in the session, its `tap_in` not yet
+     * committed — so `armTap`'s look for it finds nothing. Armed there, the id
+     * is spent a moment later by the landing, the next Start skips the row as
+     * spent, and a phone told "armed" waits for a Start that never joins it.
+     * `armTap` takes the tap's own lock, as the landing does, so it waits the
+     * landing out and answers as its replay. Staged: a holder parks the
+     * landing on the session's row while it holds the tap's lock.
+     */
+    const { classId, studentId, teacherId } = await seed('race-arm-landing');
+    const session = await openSession(classId);
+    const eventId = newUuidV7();
+    const release = await holdSession(session.id);
+    const landing = tapIn(db, {
+      sessionId: session.id,
+      studentId,
+      eventId,
+      deviceTime: new Date(),
+    });
+    let arming: ReturnType<typeof armTap> | undefined;
+    let settled = false;
+    try {
+      await waitForBlockedBackend();
+      arming = armTap(db, {
+        studentId,
+        teacherId,
+        eventId,
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+      const done = () => {
+        settled = true;
+      };
+      void arming.then(done, done);
+      // Parked behind the landing on the tap's lock — or, without it, answered already.
+      const deadline = Date.now() + 5_000;
+      while (!settled && (await lockWaiters()) < 2 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    } finally {
+      await release();
+    }
+    expect((await landing).outcome).toBe('joined');
+    expect(await arming).toEqual({ outcome: 'replay' });
+    expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
+  }, 20_000);
 });
 
 /**

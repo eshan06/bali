@@ -181,12 +181,14 @@ describe('the API sweeping by itself', () => {
     });
     // A phone in it gone quiet, past the silence threshold: the sweep expires
     // first, which ends its row, so no silence episode opens on a phone the
-    // bell already sent home.
+    // bell already sent home. It tapped in while the session ran (A17).
+    const during = new Date(Date.now() - 45 * 60_000);
     await tapIn(db, {
       sessionId: session.id,
       studentId: student.id,
       eventId: randomUUID(),
-      deviceTime: new Date(),
+      deviceTime: during,
+      now: during,
     });
     await db
       .update(participations)

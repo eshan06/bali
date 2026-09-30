@@ -254,8 +254,12 @@ export async function getLiveParticipation(
 export interface TapTarget {
   blockId: string;
   teacherId: string;
-  /** The running session the tap should join, or null when the tap is armed. */
-  session: SessionRow | null;
+  /**
+   * The sessions not yet marked over in the teacher's classes the student is
+   * enrolled in, newest first: the tap joins the first running one by the
+   * engine's rule (`sessionRunning`), and arms when none is.
+   */
+  sessions: SessionRow[];
 }
 
 /**
@@ -264,7 +268,9 @@ export interface TapTarget {
  * of one of that teacher's classes the student is enrolled in. If exactly that
  * exists the tap joins it; if none, the caller arms the tap. Returns null only
  * when the tag matches no active block. When more than one enrolled class of the
- * teacher is running (rare), the most recently started wins.
+ * teacher is running (rare), the most recently started wins. Which is running is
+ * the engine's rule to say, by the server's clock (A17): this lists only those
+ * not marked over, one at most per class.
  */
 export async function resolveTapTarget(
   db: Database,
@@ -280,25 +286,22 @@ export async function resolveTapTarget(
   );
   if (!block) return null;
 
-  const session = first(
-    await db
-      .select({ session: sessions })
-      .from(sessions)
-      .innerJoin(classes, eq(sessions.classId, classes.id))
-      .innerJoin(enrollments, eq(enrollments.classId, classes.id))
-      .where(
-        and(
-          eq(classes.teacherId, block.teacherId),
-          isNull(sessions.endedAt),
-          eq(enrollments.studentId, studentId),
-          isNull(enrollments.removedAt),
-        ),
-      )
-      .orderBy(desc(sessions.startedAt))
-      .limit(1),
-  );
+  const open = await db
+    .select({ session: sessions })
+    .from(sessions)
+    .innerJoin(classes, eq(sessions.classId, classes.id))
+    .innerJoin(enrollments, eq(enrollments.classId, classes.id))
+    .where(
+      and(
+        eq(classes.teacherId, block.teacherId),
+        isNull(sessions.endedAt),
+        eq(enrollments.studentId, studentId),
+        isNull(enrollments.removedAt),
+      ),
+    )
+    .orderBy(desc(sessions.startedAt));
 
-  return { blockId: block.id, teacherId: block.teacherId, session: session?.session ?? null };
+  return { blockId: block.id, teacherId: block.teacherId, sessions: open.map((r) => r.session) };
 }
 
 export interface RosterEntry {
