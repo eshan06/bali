@@ -57,7 +57,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the Screen Time grant never reaches — so an account signed into by mistake cannot be left
   without joining a class first: listed for the owner, not changed here (D1 draws Sign out on
   Me only). The design check: the field's focus ring is drawn as the Join screen's is, a 2 pt
-  ring with no page-coloured gap (DESIGN.md §6), left as Join has it.
+  ring with no page-coloured gap (DESIGN.md §6), left as Join has it. Round 2: the fix holds —
+  no state leaves the bar hidden with no way on — no blockers, no WARNs.
 
 - **2026-09-30** — **C6b-1: Me's engine side — the name, Sign out, and the last student's `me`.**
   C6b in two PRs for size (santa's step 0 found 458 lines; the conductor split it as C5a and C6a
