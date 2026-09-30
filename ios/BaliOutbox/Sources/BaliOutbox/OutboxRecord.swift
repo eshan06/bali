@@ -68,6 +68,9 @@ public struct OutboxRecord: Sendable, Hashable {
     public let lastStatus: Int?
     public let lastReason: ApiErrorReason?
     public let lastMessage: String?
+    /// The status of the latest answer that refused it, kept whatever answers came after — each
+    /// overwrites `lastStatus` — so a refused tap stays said as refused (the riders); nil: never.
+    public let refusedStatus: Int?
     /// A refocus's: the unlock it returns from, while that is unrecorded.
     let follows: String?
     /// Where it sits in what the phone did (A12): the file's install and the record's `seq`, sent
@@ -137,6 +140,7 @@ extension OutboxRecord: FetchableRecord {
         lastReason = try row.decode(String?.self, forColumn: "lastReason")
             .flatMap(ApiErrorReason.init(rawValue:))
         lastMessage = try row.decode(forColumn: "lastMessage")
+        refusedStatus = try row.decode(forColumn: "refusedStatus")
         follows = try row.decode(forColumn: "follows")
         // A follow-up's order is its press's (B6d): the same act, filed a second time.
         let seq =

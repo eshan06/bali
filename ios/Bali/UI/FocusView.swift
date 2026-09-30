@@ -11,9 +11,11 @@ struct FocusView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        let (sync, protection) = (phone.sync, phone.protection)
+        let (sync, protection, signedIn) = (phone.sync, phone.protection, phone.signedIn)
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            if let sync { page(FocusWords(sync, protection, now: context.date)) }
+            if let sync {
+                page(FocusWords(sync, protection, now: context.date, signedIn: signedIn))
+            }
         }
     }
 
@@ -74,12 +76,12 @@ struct FocusView: View {
         if focus.offline != nil { Chip(kind: .notIn, icon: "wifi.slash", text: "No connection") }
     }
 
-    /// Why an unlock gave way (C5a); offline, D1's card; a wake iOS refused; then Emergency Unlock
-    /// and its line.
+    /// Why an unlock gave way (C5a); why nothing reaches the teacher; offline, D1's card; a wake
+    /// iOS refused; then Emergency Unlock and its line.
     private func lower(_ focus: FocusWords) -> some View {
         VStack(spacing: 24) {
-            if let late = focus.superseded {
-                Card { Text(late).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading) }
+            ForEach([focus.superseded, focus.stalled].compactMap { $0 }, id: \.self) { words in
+                Card { Text(words).textStyle(.body).frame(maxWidth: .infinity, alignment: .leading) }
                     .multilineTextAlignment(.leading)
             }
             if let offline = focus.offline {

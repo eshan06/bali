@@ -4,7 +4,7 @@ import SwiftUI
 /// Session over (C5b; D1's SessionOver), where the router sends a phone whose session's bell has
 /// rung by its own clock: the class that ended and when, and every app back once rule 3's check
 /// found no shield on. It leaves by itself once a read says where the phone stands; Done leaves
-/// sooner, to Home.
+/// sooner, to Home, and See history to History, which that read keeps (`keepsOpened`).
 struct SessionOverView: View {
     let phone: Phone
 
@@ -22,7 +22,13 @@ struct SessionOverView: View {
                     }
                     .multilineTextAlignment(.center)
                     Spacer()
-                    Button("Done") { phone.closeSessionOver() }.buttonStyle(PrimaryButtonStyle())
+                    VStack(spacing: 4) {
+                        Button("Done") { phone.closeSessionOver() }
+                            .buttonStyle(PrimaryButtonStyle())
+                        Button("See history") { phone.seeHistory() }
+                            .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                            .foregroundStyle(Theme.brand).frame(minHeight: 44)
+                    }
                 }
             }
         }

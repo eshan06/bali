@@ -104,6 +104,10 @@ struct AppTests {
         }
         let late = try #require(PreviewFixtures.all["focusSuperseded"])
         #expect(FocusWords(try #require(late.sync), late.protection, now: Date()).superseded != nil)
+        // Signed out mid-class: said beside the countdown, which still holds (C4's review).
+        let out = Phone(fixture: try #require(PreviewFixtures.all["focusSignedOut"]))
+        let said = FocusWords(try #require(out.sync), out.protection, now: Date(), signedIn: false)
+        #expect(out.screen == .focus && said.stalled != nil && said.claim == .paused)
         // Unlocked (C5a): each fixture's reason card and way back, and the bell the router chooses
         // again at; a frozen phone's reason and Back to focus say it has not started.
         let unlockedCases: [(String, UnlockedWords.Picker?, Bool)] = [
@@ -137,11 +141,13 @@ struct AppTests {
             ("protectionOff", .settings, false), ("protectionOffBackOn", .retap, false),
             ("protectionOffChecking", .checking, false), ("protectionOffAsk", .ask, false),
             ("protectionOffUnreported", .settings, false), ("protectionOffRefused", .settings, true),
+            ("protectionOffError", .settings, false),
         ]
         for (name, way, refused) in looks {
             let fixture = try #require(PreviewFixtures.all[name])
             let words = ProtectionOffWords(try #require(fixture.sync), fixture.protection)
             #expect(words?.way == way && (words?.refused != nil) == refused, "\(name)")
+            #expect(words?.problems.isEmpty == (name != "protectionOffError"), "\(name)")
         }
         #expect(UnlockedWords(try #require(PreviewFixtures.all["unlockedRefused"]?.sync))?.retap != nil)
         #expect(PreviewFixtures.all["homeRefused"]?.sync?.refusedRefocusWords(at: Date()) != nil)
@@ -149,6 +155,32 @@ struct AppTests {
         #expect(over.sync?.sessionOverWords(over.protection)?.hasSuffix("All your apps are back.") == true)
         over.closeSessionOver()
         #expect(over.screen == .home)
+        // Done as a read puts the phone in a class whose bell has not rung: not the one that
+        // ended, so nothing is closed — its own Session over stays to come (C5b's review).
+        let racing = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
+        var next = try #require(racing.sync)
+        let running = SessionView(id: "next", classId: "p3", endsAt: Date() + 60)
+        next.standing = .inSession(running, .focused)
+        racing.synced(next)
+        racing.closeSessionOver()
+        racing.seeHistory()
+        #expect(racing.sessionOverClosed == nil && racing.tab == .home)
+        // See history (D1's, C5b's hand-off): History shown, and kept once the read after the bell
+        // says where the phone stands.
+        let seen = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
+        seen.seeHistory()
+        #expect(seen.screen == .history && seen.tabbed)
+        var read = try #require(seen.sync)
+        read.standing = .out
+        seen.synced(read)
+        #expect(seen.screen == .history && seen.tabbed)
+        // Join opened before the bell (over a class's Home this build knows no state of) is left
+        // behind: History, never the Join the router would show in its place (santa's round 1).
+        let opened = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
+        opened.open(.join)
+        opened.joining.type("KWX")
+        opened.seeHistory()
+        #expect(opened.screen == .history && opened.opened.isEmpty && opened.joining == Joining())
         // Me (C6b): D1's name card, editing it and a refused save; Sign out held over an unsent
         // unlock — pressed, nothing tried — and one that failed.
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
@@ -277,6 +309,24 @@ struct AppTests {
         #expect(unlocked.sync.flatMap(SignOutWords.held) != nil)
         await unlocked.signOut()
         #expect(unlocked.signOutFailed == nil)
+        // Sign out is Me's, and the router's own Join's — a student in no class reaches nothing
+        // else, the wrong account's way out (the riders) — held there as on Me; never on a Join
+        // opened over Home or Me, whose way back reaches Me, nor elsewhere.
+        for (name, offers) in [
+            ("me", true), ("join", true), ("joinSignOutHeld", true), ("joinFromHome", false),
+            ("home", false), ("focus", false), ("signIn", false),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.offersSignOut == offers, "\(name)")
+        }
+        let joinHeld = Phone(fixture: try #require(PreviewFixtures.all["joinSignOutHeld"]))
+        #expect(joinHeld.screen == .join && joinHeld.sync.flatMap(SignOutWords.held) != nil)
+        await joinHeld.signOut()
+        #expect(joinHeld.signOutFailed == nil)
+        // Signed out from Join: the code typed goes with who typed it.
+        let typed = Phone(fixture: try #require(PreviewFixtures.all["joinError"]))
+        typed.signed(in: false)
+        #expect(typed.joining == Joining())
     }
 
     @Test(

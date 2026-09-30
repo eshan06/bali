@@ -75,6 +75,11 @@ struct JoinView: View {
         .scrollBounceBehavior(.basedOnSize)
         .onAppear { typing = true }
         action(busy ? "Checking…" : "Continue", enabled: phone.joining.complete, phone.lookUp)
+        // The router's own Join — a student in no class — reaches no tab bar, so not Me's: signed
+        // in with the wrong account, this is the way out (the riders).
+        if phone.offersSignOut {
+            SignOutButton(phone: phone).disabled(busy).frame(maxWidth: .infinity).padding(.top, 8)
+        }
     }
 
     /// What the code opens, before anything is joined (D1's ConsentPreview): "your teacher" when

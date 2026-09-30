@@ -13,7 +13,7 @@ private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, permissionOff: Bool? = nil, checked: Bool = true,
     shielded: Bool = false, everApproved: Bool = false, standing: Standing? = .out,
-    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, sessionOverClosed: String? = nil,
+    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, sessionOverClosed: SessionView? = nil,
     opened: [Screen] = [], tab: Screen = .home, now: Date = t0
 ) -> Screen {
     var protection: Protection?
@@ -145,7 +145,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "The bell rung by the phone's own clock (decision 6), no read yet: session over (C5b) — never focus, unlocked or protection off over shields that are off, whatever the classes — until the student closes it: home, the next session's own again; Screen Time first when the permission is not approved; a second before it, the session's screen"
+        "The bell rung by the phone's own clock (decision 6), no read yet: session over (C5b) — never focus, unlocked or protection off over shields that are off, whatever the classes — until the student closes it: home, the next session's own again, and the same session's own once its bell moved — an extension after Done rings a bell of its own (C5b's review); Screen Time first when the permission is not approved; a second before it, the session's screen"
     )
     func bellRung() {
         for state in [ParticipationState.focused, .unlocked, .protectionOff] {
@@ -153,14 +153,21 @@ struct ScreenTests {
             #expect(screen(standing: standing, now: at(3000)) == .sessionOver, "\(state)")
             #expect(screen(standing: standing, now: at(9000)) == .sessionOver, "\(state)")
             #expect(
-                screen(standing: standing, sessionOverClosed: "s", now: at(3000)) == .home,
+                screen(standing: standing, sessionOverClosed: session(), now: at(3000)) == .home,
                 "\(state)")
             #expect(
                 screen(permission: .denied, standing: standing, now: at(3000)) == .screenTime,
                 "\(state)")
         }
         let next = Standing.inSession(session("t"), .unlocked)
-        #expect(screen(standing: next, sessionOverClosed: "s", now: at(3000)) == .sessionOver)
+        #expect(screen(standing: next, sessionOverClosed: session(), now: at(3000)) == .sessionOver)
+        let extended = Standing.inSession(session(endsAt: 3600), .focused)
+        #expect(
+            screen(standing: extended, sessionOverClosed: session(), now: at(3600)) == .sessionOver)
+        // The bell as the file kept it, a millisecond off the server's (its dates are written to
+        // the millisecond, rounded down): the same bell, still closed (santa's round 1).
+        let read = Standing.inSession(session(endsAt: 3000.001), .focused)
+        #expect(screen(standing: read, sessionOverClosed: session(), now: at(3001)) == .home)
         #expect(screen(standing: .inSession(session(), .focused), now: at(2999)) == .focus)
         #expect(screen(standing: .inSession(session(), .unlocked), now: at(2999)) == .unlocked)
         #expect(
@@ -190,7 +197,7 @@ struct ScreenTests {
         #expect(screen() == .home)
         #expect(screen(hasClasses: true) == .home)
         #expect(screen(hasClasses: false) == .join)
-        #expect(screen(sessionOverClosed: "s") == .home)
+        #expect(screen(sessionOverClosed: session()) == .home)
         #expect(screen(standing: .unread, hasClasses: false) == .home)
     }
 
@@ -201,7 +208,7 @@ struct ScreenTests {
         #expect(screen(hasClasses: true, opened: [.join]) == .join)
         #expect(screen(opened: [.join]) == .join)
         let rung = Standing.inSession(session(), .focused)
-        #expect(screen(standing: rung, sessionOverClosed: "s", opened: [.join], now: at(3000)) == .join)
+        #expect(screen(standing: rung, sessionOverClosed: session(), opened: [.join], now: at(3000)) == .join)
         #expect(screen(standing: rung, opened: [.join], now: at(3000)) == .sessionOver)
         #expect(screen(standing: .waiting, opened: [.home]) == .home)
         #expect(screen(standing: .waiting, opened: [.home, .join]) == .join)
@@ -228,7 +235,7 @@ struct ScreenTests {
             #expect(screen(hasClasses: true, tab: tab) == tab)
             #expect(screen(standing: .unread, tab: tab) == tab)
             let rung = Standing.inSession(session(), .focused)
-            #expect(screen(standing: rung, sessionOverClosed: "s", tab: tab, now: at(3000)) == tab)
+            #expect(screen(standing: rung, sessionOverClosed: session(), tab: tab, now: at(3000)) == tab)
             #expect(screen(standing: rung, tab: tab, now: at(3000)) == .sessionOver)
             #expect(screen(standing: .inSession(session(), nil), tab: tab) == tab)
             #expect(screen(standing: .inSession(session(), .focused), tab: tab) == .focus)
@@ -252,40 +259,60 @@ struct ScreenTests {
     }
 
     @Test(
-        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes)"
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
     )
     func keepsOpened() async throws {
+        var rung = SyncState()
+        rung.standing = .inSession(session(), .focused)
+        var read = rung
+        read.standing = .out
+        #expect(read.keepsOpened(from: rung, at: at(3000)))
+        #expect(!read.keepsOpened(from: rung, at: at(2999)))
+        read.standing = .inSession(session("t"), .focused)
+        #expect(!read.keepsOpened(from: rung, at: at(3000)))
+        read.standing = .waiting
+        #expect(!read.keepsOpened(from: rung, at: at(3000)))
+        // The same class, still past its bell — the sweep not run yet, a state changed, or its
+        // bell a millisecond off the copy the file kept (santa's round 1): no change either; its
+        // bell moved on, an extension, is one.
+        read.standing = .inSession(session(endsAt: 3000.001), .unlocked)
+        #expect(read.keepsOpened(from: rung, at: at(3001)))
+        read.standing = .inSession(session(endsAt: 3600), .focused)
+        #expect(!read.keepsOpened(from: rung, at: at(3001)))
         var before = SyncState()
         before.standing = .waiting
         var after = before
         (after.link, after.meFailed, after.heardAt) = (.unreachable, .networkError, t0)
-        #expect(after.keepsOpened(from: before))
+        #expect(after.keepsOpened(from: before, at: t0))
         after.me = try BaliJSON.makeDecoder().decode(
             MeResponse.self, from: Data(Answer.me(nil, classes: [Answer.inClass("c")]).utf8))
-        #expect(after.keepsOpened(from: before))
+        #expect(after.keepsOpened(from: before, at: t0))
         // No classes while waiting — an armed tap needs no enrollment — is still Waiting's: the
         // Home and Join opened over it stay (santa's round 2). Only out is Join the router's own.
         let none = try BaliJSON.makeDecoder().decode(
             MeResponse.self, from: Data(Answer.me(nil).utf8))
         after.me = none
-        #expect(after.hasClasses == false && after.keepsOpened(from: before))
+        #expect(after.hasClasses == false && after.keepsOpened(from: before, at: t0))
         var out = SyncState()
         (out.standing, out.me) = (.out, none)
         var outBefore = out
         outBefore.me = nil
-        #expect(!out.keepsOpened(from: outBefore) && outBefore.keepsOpened(from: outBefore))
+        #expect(!out.keepsOpened(from: outBefore, at: t0))
+        #expect(outBefore.keepsOpened(from: outBefore, at: t0))
         after.me = nil
         after.standing = .out
-        #expect(!after.keepsOpened(from: before) && !before.keepsOpened(from: nil))
+        #expect(!after.keepsOpened(from: before, at: t0))
+        #expect(!before.keepsOpened(from: nil, at: t0))
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "tag"))
         var tapped = before
         tapped.queued = try outbox.records()
-        #expect(!tapped.keepsOpened(from: before) && !before.keepsOpened(from: tapped))
+        #expect(!tapped.keepsOpened(from: before, at: t0))
+        #expect(!before.keepsOpened(from: tapped, at: t0))
         try await send(outbox, tap, 503)
         var retried = tapped
         retried.queued = try outbox.records()
-        #expect(retried.queued.first?.attempts == 1 && retried.keepsOpened(from: tapped))
+        #expect(retried.queued.first?.attempts == 1 && retried.keepsOpened(from: tapped, at: t0))
     }
 
     @Test(
@@ -346,6 +373,29 @@ struct ScreenTests {
                 state.refusedTapWords
                     == "Bali couldn't record a tap. Tap in again, or ask your teacher.",
                 "\(status)")
+        }
+    }
+
+    @Test(
+        "A refused tap stays said as refused whatever answers come after it — the retry bound's worth of server errors included, each of which overwrites its last answer: the refusal is kept on the record (C4's review), an unknown block's words too"
+    )
+    func refusalKept() async throws {
+        for (status, said) in [
+            (409, "Bali couldn't record a tap. Tap in again, or ask your teacher."),
+            (
+                404,
+                "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
+            ),
+        ] {
+            let (outbox, _) = try makeOutbox()
+            let tap = try record(outbox, .tap(tagId: "tag"))
+            try await send(outbox, tap, status, Answer.refused("event_id_conflict"))
+            for _ in 1...Outbox.bound { try await send(outbox, tap, 503) }
+            var state = SyncState()
+            state.queued = try outbox.records()
+            let stuck = try #require(state.queued.first)
+            #expect(stuck.lastStatus == 503 && stuck.answers > Outbox.bound, "\(status)")
+            #expect(stuck.refusedStatus == status && state.refusedTapWords == said, "\(status)")
         }
     }
 

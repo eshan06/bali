@@ -17,6 +17,10 @@ public struct ProtectionOffWords: Sendable, Hashable {
     public let way: Way
     /// A Back to focus the server refused (rule 5).
     public let refused: String?
+    /// What the screens it takes over from would say, which it must not drop (rule 5; C5b's
+    /// review): an Emergency Unlock of this class stuck on the phone (Unlocked's), a tap the server
+    /// refused and the classes not read (Home's) — said with Try again.
+    public let problems: [String]
 
     /// Nil unless the phone stands in a session.
     public init?(
@@ -32,26 +36,38 @@ public struct ProtectionOffWords: Sendable, Hashable {
             : protection?.permissionOff != true
                 ? .checking : protection?.permission == .denied ? .settings : .ask
         // Recorded and gone, the teacher sees it; on the phone, or not reported yet, will (C5a's).
-        let sent =
-            state == .protectionOff
-            && !sync.queued.contains { $0.change == .protectionOff(session: session.id) }
+        let queued = sync.queued.contains { $0.change == .protectionOff(session: session.id) }
+        let sent = state == .protectionOff && !queued
         let sees = sent ? "sees" : "will see"
+        // Found and never saved, nothing yet makes it true that the teacher sees it, or will (rule
+        // 5) — whichever the way (C5b's review).
+        let untold = protection?.unreported == true && !sent && !queued
         switch way {
         case .settings, .ask:
             headline = "Screen Time is off"
-            // Found and not saved, nothing yet makes it true that the teacher will (rule 5).
             body =
-                protection?.unreported == true
+                untold
                 ? "Bali can't keep you focused without it. It couldn't tell your teacher yet, and keeps trying."
                 : "Bali can't keep you focused without it, so your teacher \(sees) 'Screen Time off'."
         case .retap:
             headline = "Screen Time is back on"
+            // On again, the check reports nothing more: no "keeps trying".
             body =
-                "Tap your teacher's block again to rejoin class. Until then, your teacher \(sees) 'Screen Time off'."
+                "Tap your teacher's block again to rejoin class. "
+                + (untold
+                    ? "Bali couldn't tell your teacher that Screen Time was off."
+                    : "Until then, your teacher \(sees) 'Screen Time off'.")
         case .checking:
             headline = "Checking Screen Time…"
-            body = "Your teacher \(sees) 'Screen Time off' until you tap your teacher's block again."
+            body =
+                untold
+                ? "Bali couldn't tell your teacher that Screen Time was off. It keeps trying."
+                : "Your teacher \(sees) 'Screen Time off' until you tap your teacher's block again."
         }
         refused = sync.refusedRefocus(in: session.id)
+        problems = [
+            sync.unlock(in: session.id)?.stuck == true ? UnlockedWords.unsent : nil,
+            sync.refusedTapWords, sync.meWords,
+        ].compactMap { $0 }
     }
 }

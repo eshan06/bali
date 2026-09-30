@@ -21,7 +21,8 @@ public enum Screen: Sendable, Hashable {
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
     /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
     /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `sessionOverClosed`,
-    /// the session whose Session over the student closed (C5b); `opened`, the
+    /// the session whose Session over the student closed, as it was then — its bell moved since, an
+    /// extension, it is another's to close (C5b; its review); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
     /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
     /// the one under it shows, never over anything else; `tab`, the one chosen in D1's tab bar
@@ -30,7 +31,7 @@ public enum Screen: Sendable, Hashable {
     /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
-        everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: String?,
+        everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: SessionView?,
         opened: [Screen], tab: Screen, now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
@@ -60,7 +61,7 @@ public enum Screen: Sendable, Hashable {
     /// The screen of where the phone stands, signed in and its permission checked.
     private static func settled(
         _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ hasClasses: Bool?,
-        _ sessionOverClosed: String?, _ now: Date
+        _ sessionOverClosed: SessionView?, _ now: Date
     ) -> Screen {
         switch sync.standing {
         // Not read from the phone yet: home says so, and Emergency Unlock works there (B6b).
@@ -84,12 +85,21 @@ public enum Screen: Sendable, Hashable {
             if !approved { return .screenTime }
             switch sync.standing {
             case .waiting: return .waiting
-            case .inSession(let session, _) where session.id != sessionOverClosed:
+            case .inSession(let session, _) where !session.rings(as: sessionOverClosed):
                 return .sessionOver
             case .out where hasClasses == false: return .join
             default: return .home
             }
         }
+    }
+}
+
+extension SessionView {
+    /// Whether `other` is this session with the same bell: to the second — an extension moves it
+    /// by minutes, while the copy the file keeps is written to the millisecond, rounded down, so
+    /// it can read a millisecond off the server's (santa's round 1).
+    func rings(as other: SessionView?) -> Bool {
+        other.map { $0.id == id && abs($0.endsAt.timeIntervalSince(endsAt)) < 1 } ?? false
     }
 }
 
@@ -122,26 +132,41 @@ extension Screen {
 }
 
 extension SyncState {
-    /// Whether the screens the student opened over another (C3) stay open once the engine's state
-    /// is this, after `before`: not once the standing changes, nor once a tap is made or answered
-    /// (a new arming is Waiting's again), nor, out, once the phone knows it has no classes (Join is
-    /// the router's own then). Waiting's whatever the classes: arming needs no enrollment.
-    public func keepsOpened(from before: SyncState?) -> Bool {
-        standing == before?.standing && pendingTap?.eventId == before?.pendingTap?.eventId
+    /// Whether the screens the student opened over another (C3) — and the tab they chose (C6a) —
+    /// stay once the engine's state is this, after `before`, at `now`: not once the standing
+    /// changes, nor once a tap is made or answered (a new arming is Waiting's again), nor, out,
+    /// once the phone knows it has no classes (Join is the router's own then). Waiting's whatever
+    /// the classes: arming needs no enrollment. A read saying out, or the same class still past
+    /// its bell (santa's round 1), once the bell has rung by the phone's clock changes nothing the
+    /// student sees — the class was over for the phone already — so History chosen from Session
+    /// over holds (C5b's hand-off).
+    public func keepsOpened(from before: SyncState?, at now: Date) -> Bool {
+        var over = false
+        if case .inSession(let ended, _)? = before?.standing, ended.endsAt <= now {
+            switch standing {
+            case .out: over = true
+            case .inSession(let session, _): over = session.rings(as: ended)
+            case .waiting, .unread: over = false
+            }
+        }
+        return (standing == before?.standing || over)
+            && pendingTap?.eventId == before?.pendingTap?.eventId
             && !(standing == .out && hasClasses == false)
     }
 
     /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried
-    /// until recorded, ARCHITECTURE tap step 10) or the retry bound left unsettled: keyed on its
-    /// last answer — a refusal where `tapDisposition` says one; nil while none is stuck. An answer
-    /// the outbox only retries (401, 408, 429, a server error, none) says nothing of why it is
-    /// stuck: short of the bound's count of answers only a refusal stuck it, whose words stand;
-    /// at the bound, it is still being sent (#114's review) — never "tap in again" then.
+    /// until recorded, ARCHITECTURE tap step 10) or the retry bound left unsettled: keyed on the
+    /// refusal the record keeps, whatever answers came since (the riders), else its last answer —
+    /// a refusal where `tapDisposition` says one; nil while none is stuck. An answer the outbox
+    /// only retries (401, 408, 429, a server error, none) says nothing of why it is stuck: short of
+    /// the bound's count of answers only a refusal stuck it — one a file older than its kept
+    /// refusal holds — whose words stand; at the bound, it is still being sent (#114's review) —
+    /// never "tap in again" then.
     public var refusedTapWords: String? {
         let stuck = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
         guard let stuck else { return nil }
         let tapAgain = "Bali couldn't record a tap. Tap in again, or ask your teacher."
-        switch stuck.lastStatus {
+        switch stuck.refusedStatus ?? stuck.lastStatus {
         case 404?:
             return
                 "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."

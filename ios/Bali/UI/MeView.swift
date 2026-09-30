@@ -37,7 +37,7 @@ struct MeView: View {
                     }
                     ClassesSection(phone: phone, title: "Classes")
                     about
-                    signOut
+                    SignOutButton(phone: phone)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -168,10 +168,15 @@ struct MeView: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    /// D1's Sign out — held while an Emergency Unlock is unsent, said why with Try again — and
-    /// why the last did not finish.
-    @ViewBuilder private var signOut: some View {
+/// D1's Sign out — held while an Emergency Unlock is unsent, said why with Try again — and why the
+/// last did not finish (C6b): Me's, and Join's where a student in no class reaches nothing else
+/// (`Phone.offersSignOut`).
+struct SignOutButton: View {
+    let phone: Phone
+
+    var body: some View {
         let held = phone.sync.flatMap(SignOutWords.held)
         if let held { Retry(words: held, phone: phone) }
         VStack(alignment: .leading, spacing: 4) {

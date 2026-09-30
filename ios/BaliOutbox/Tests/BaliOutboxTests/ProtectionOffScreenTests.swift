@@ -86,15 +86,56 @@ struct ProtectionOffScreenTests {
     }
 
     @Test(
-        "Protection off the check found but could not save is said so — never that the teacher sees or will see it, which nothing on the phone yet makes true (santa's review; rule 5)"
+        "Protection off the check found but could not save is said so — never that the teacher sees or will see it, which nothing on the phone yet makes true (santa's review; rule 5) — on the re-tap's and the check's screens too (C5b's review); a report queued, or the phone's row protection off already, is still one the teacher will see, or sees"
     )
     func unreported() throws {
-        let unsaved = try #require(
-            words(try synced(.inSession(bell1042, .unlocked)), checked(.denied, unreported: true)))
+        let unlocked = try synced(.inSession(bell1042, .unlocked))
+        let unsaved = try #require(words(unlocked, checked(.denied, unreported: true)))
         #expect(
             unsaved.body
                 == "Bali can't keep you focused without it. It couldn't tell your teacher yet, and keeps trying."
         )
+        #expect(
+            words(unlocked, checked(.approved, unreported: true))?.body
+                == "Tap your teacher's block again to rejoin class. Bali couldn't tell your teacher that Screen Time was off."
+        )
+        #expect(
+            words(unlocked, checked(.notDetermined, unreported: true))?.body
+                == "Bali couldn't tell your teacher that Screen Time was off. It keeps trying.")
+        let off = try synced(.inSession(bell1042, .protectionOff))
+        #expect(
+            words(off, checked(.approved, unreported: true))?.body
+                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees 'Screen Time off'."
+        )
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .protectionOff(session: "s"))
+        let queued = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
+        #expect(
+            words(queued, checked(.notDetermined, unreported: true))?.body
+                == "Your teacher will see 'Screen Time off' until you tap your teacher's block again.")
+    }
+
+    @Test(
+        "What the screens Protection off takes over from said is said there too, with Try again (C5b's review; rule 5): an Emergency Unlock of this class stuck on the phone — not another class's — a tap the server refused, and the classes not read"
+    )
+    func carried() async throws {
+        #expect(words(try synced(.inSession(bell1042, .unlocked)))?.problems == [])
+        let (outbox, _) = try makeOutbox()
+        let unlock = try record(outbox, .unlock(session: "s", reason: nil))
+        try await send(outbox, unlock, 400, Answer.refused("invalid_request"))
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        try await send(outbox, tap, 404, Answer.refused("session_not_found"))
+        var state = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
+        state.meFailed = .networkError
+        #expect(
+            words(state)?.problems == [
+                UnlockedWords.unsent,
+                "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up.",
+                "Can't reach the server. Check your connection and try again.",
+            ])
+        state.standing = .inSession(session("t", endsAt: 1720), .unlocked)
+        state.meFailed = nil
+        #expect(words(state)?.problems.first != UnlockedWords.unsent)
     }
 
     @Test(
