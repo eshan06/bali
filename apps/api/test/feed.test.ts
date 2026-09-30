@@ -332,10 +332,11 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
       at: new Date(),
     });
     await unlock(db, change(session.id, cal.id));
-    // Dan never tapped in and left: nothing on record here, so not carried.
+    // Dan never tapped in and was removed too: nothing on record here, so not
+    // carried. (A student never leaves mid-session, A19.)
     await endEnrollment(db, {
       enrollmentId: dan.enrollmentId,
-      reason: 'left_class',
+      reason: 'removed_from_class',
       at: new Date(),
     });
     await renameStudent(db, { studentId: cal.id, displayName: 'Cal R.', eventId: randomUUID() });

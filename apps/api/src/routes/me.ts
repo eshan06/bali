@@ -39,18 +39,21 @@ export function registerMeRoute(app: FastifyInstance, db: Database): void {
     );
 
     // Each class names its teacher (C2a): a teacher's own, the caller — already
-    // in hand; a student's, read with the class in one query.
+    // in hand; a student's, read with the class in one query, with the
+    // enrollment that leaving it deletes (A19).
     const classes: MeResponse['classes'] =
       user.role === 'teacher'
         ? (await getTaughtClasses(db, user.id)).map((c) => ({
             id: c.id,
             name: c.name,
             teacher: { displayName: user.displayName },
+            enrollmentId: null,
           }))
         : (await getEnrolledClasses(db, user.id)).map((c) => ({
             id: c.id,
             name: c.name,
             teacher: { displayName: c.teacherDisplayName },
+            enrollmentId: c.enrollmentId,
           }));
 
     let session: MeResponse['session'] = null;

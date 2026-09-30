@@ -2,7 +2,9 @@ import {
   classes,
   type Database,
   enrollments,
+  events,
   findUserByCognitoId,
+  participations,
   startSession,
   users,
 } from '@bali/db';
@@ -11,6 +13,7 @@ import type {
   EndEnrollmentResponse,
   EnrollmentJoinResponse,
   JoinCodePreviewResponse,
+  MeResponse,
   RosterResponse,
 } from '@bali/shared';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -54,11 +57,13 @@ function join(token: string, body: object) {
   return authedInject(ctx.app, token, { method: 'POST', url: '/v1/enrollments', payload: body });
 }
 
-function del(token: string, enrollmentId: string) {
+/** DELETE /v1/enrollments/:id — with no body, as the portal and older callers send it. */
+function del(token: string, enrollmentId: string, body?: object) {
   return ctx.app.inject({
     method: 'DELETE',
     url: `/v1/enrollments/${enrollmentId}`,
     headers: { authorization: `Bearer ${token}` },
+    payload: body,
   });
 }
 
@@ -354,6 +359,135 @@ describe('DELETE /v1/enrollments/:id', () => {
     const body = res.json<EndEnrollmentResponse>();
     expect(body.reason).toBe('removed_from_class');
     expect(body.endedParticipation).toBe(true);
+  });
+
+  it('a leave is recorded under the phone’s event id, and its retry is the truth now (A19)', async () => {
+    const { teacher, klass, student } = await seedClassroom(db, 'leave-id');
+    const enrollmentId = await activeEnrollmentId(klass.id, student.id);
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+
+    const res = await del(token, enrollmentId, { eventId });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      outcome: 'ended',
+      reason: 'left_class',
+      endedParticipation: false,
+    });
+    const recorded = await db.select().from(events).where(eq(events.eventId, eventId));
+    expect(recorded).toMatchObject([
+      { type: 'enrollment_left', userId: student.id, classId: klass.id, sessionId: null },
+    ]);
+    // Gone from their classes, and from the teacher's roster.
+    const me = await authedInject(ctx.app, token, { method: 'GET', url: '/v1/me' });
+    expect(me.json<MeResponse>().classes).toEqual([]);
+    const roster = await authedInject(ctx.app, await ctx.tokenFor(teacher.cognitoId), {
+      method: 'GET',
+      url: `/v1/classes/${klass.id}/roster`,
+    });
+    expect(roster.json<RosterResponse>().students).toEqual([]);
+
+    // Its answer lost, the phone sends it again once a lesson has started:
+    // the leave landed, so no refusal — the truth now, and nothing recorded twice.
+    await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const again = await del(token, enrollmentId, { eventId });
+    expect(again.statusCode).toBe(200);
+    expect(again.json()).toEqual({
+      outcome: 'already_removed',
+      reason: 'left_class',
+      endedParticipation: false,
+    });
+    const leaves = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.type, 'enrollment_left'), eq(events.userId, student.id)));
+    expect(leaves).toHaveLength(1);
+  });
+
+  it('a student never leaves while the class is in session, tapped in or not (A19)', async () => {
+    const { klass, student, block, school } = await seedClassroom(db, 'leave-in-session');
+    const [absent] = await db
+      .insert(users)
+      .values({
+        cognitoId: 'student-leave-in-session-absent',
+        role: 'student',
+        schoolId: school.id,
+      })
+      .returning();
+    await db.insert(enrollments).values({ classId: klass.id, studentId: absent!.id });
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const tapped = await authedInject(ctx.app, token, {
+      method: 'POST',
+      url: '/v1/taps',
+      payload: { tagId: block.tagId, eventId: randomUUID(), deviceTime: new Date().toISOString() },
+    });
+    expect(tapped.json()).toMatchObject({ outcome: 'joined' });
+
+    for (const [who, caller] of [
+      ['tapped in', student],
+      ['never tapped in', absent!],
+    ] as const) {
+      const enrollmentId = await activeEnrollmentId(klass.id, caller.id);
+      const res = await del(await ctx.tokenFor(caller.cognitoId), enrollmentId, {
+        eventId: randomUUID(),
+      });
+      expect(res.statusCode, who).toBe(409);
+      expect(res.json(), who).toEqual({
+        error: {
+          code: 'conflict',
+          reason: 'class_in_session',
+          message: 'the class is in session: leave after it ends',
+        },
+      });
+      // Nothing recorded: still in the class.
+      expect(await activeEnrollmentId(klass.id, caller.id), who).toBe(enrollmentId);
+    }
+    const [live] = await db
+      .select()
+      .from(participations)
+      .where(
+        and(eq(participations.sessionId, session.id), eq(participations.studentId, student.id)),
+      );
+    expect(live!.endedAt).toBeNull();
+    const leaves = await db.select().from(events).where(eq(events.type, 'enrollment_left'));
+    expect(leaves).toHaveLength(0);
+  });
+
+  it('refuses a malformed event id, and removes nothing', async () => {
+    const { klass, student } = await seedClassroom(db, 'leave-bad-id');
+    const enrollmentId = await activeEnrollmentId(klass.id, student.id);
+    const res = await del(await ctx.tokenFor(student.cognitoId), enrollmentId, { eventId: 'x' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: { code: 'bad_input' } });
+    expect(await activeEnrollmentId(klass.id, student.id)).toBe(enrollmentId);
+  });
+
+  it('refuses an event id another event holds (409 event_id_conflict), and removes nothing', async () => {
+    const { klass, student } = await seedClassroom(db, 'leave-spent');
+    const other = await seedClassroom(db, 'leave-spent-other');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const spent = randomUUID();
+    const joined = await join(token, {
+      joinCode: other.klass.joinCode,
+      eventId: spent,
+      deviceTime: new Date().toISOString(),
+    });
+    expect(joined.statusCode).toBe(200);
+
+    const enrollmentId = await activeEnrollmentId(klass.id, student.id);
+    const res = await del(token, enrollmentId, { eventId: spent });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: { reason: 'event_id_conflict' } });
+    expect(await activeEnrollmentId(klass.id, student.id)).toBe(enrollmentId);
   });
 
   const notYours = {

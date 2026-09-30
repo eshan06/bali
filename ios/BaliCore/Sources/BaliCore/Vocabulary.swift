@@ -110,4 +110,5 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case unknownUser = "unknown_user", enrollmentNotYours = "enrollment_not_yours"
     case invalidRequest = "invalid_request", unknownCursor = "unknown_cursor"
     case displayNameInvalid = "display_name_invalid", displayNameTaken = "display_name_taken"
+    case classInSession = "class_in_session"
 }

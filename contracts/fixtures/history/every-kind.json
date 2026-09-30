@@ -68,7 +68,7 @@
       },
       {
         "eventId": "00000000-0000-7000-8000-000000000007",
-        "type": "enrollment_left",
+        "type": "enrollment_removed",
         "occurredAt": "2000-01-01T00:05:00.000Z",
         "class": {
           "id": "00000000-0000-7000-8000-000000000008",

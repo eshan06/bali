@@ -734,9 +734,10 @@ describe('state changes', () => {
      * refocus rule keeps an honest client from sending it after a switch (a
      * later tap), but not after a removal, and a refocus already in flight
      * when the student switched still arrives. So the replay names no session
-     * and no state: delete it, and re-read the truth.
+     * and no state: delete it, and re-read the truth. (A student never
+     * leaves the class mid-session, A19: a removal or a switch ends it.)
      */
-    for (const ending of ['removed_from_class', 'left_class', 'switched'] as const) {
+    for (const ending of ['removed_from_class', 'switched'] as const) {
       const { school, teacher, student, klass } = await seedClass(`refocus-replay-${ending}`);
       const { session } = await startSession(db, {
         classId: klass.id,
@@ -828,7 +829,11 @@ describe('state changes', () => {
           and(eq(enrollments.classId, session.classId), eq(enrollments.studentId, student.id)),
         ),
     );
-    await endEnrollment(db, { enrollmentId: enrollment.id, reason: 'left_class', at: at(4) });
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: at(4),
+    });
     expect(await refocus(db, refocused)).toEqual({
       outcome: 'replay',
       state: null,
@@ -1193,9 +1198,10 @@ describe('state changes', () => {
       it('anyone who was not in the session when it ended keeps the refusal, and nothing is recorded', async () => {
         // The ruling covers a student who was in the session at its end.
         // Everyone else keeps the answer they had: a participation that ended
-        // first (removed, left the class, switched away), none at all (never
-        // tapped in), or no standing here (an outsider, the teacher) — so no
-        // one writes into a session they were not in at its end.
+        // first (removed, switched away — a student never leaves the class
+        // mid-session, A19), none at all (never tapped in), or no standing here
+        // (an outsider, the teacher) — so no one writes into a session they
+        // were not in at its end.
         const { school, teacher, student: stayed, klass } = await seedClass('protoff-late-who');
         const { session } = await startSession(db, {
           classId: klass.id,
@@ -1208,10 +1214,10 @@ describe('state changes', () => {
             ...window('2026-01-01T09:00:00Z'),
           })
         ).session;
-        const [removed, left, switched, absent] = await db
+        const [removed, switched, absent] = await db
           .insert(users)
           .values(
-            ['removed', 'left', 'switched', 'absent'].map((who) => ({
+            ['removed', 'switched', 'absent'].map((who) => ({
               cognitoId: `student-protoff-late-${who}`,
               role: 'student' as const,
               schoolId: school.id,
@@ -1221,7 +1227,7 @@ describe('state changes', () => {
         const enrolled = await db
           .insert(enrollments)
           .values(
-            [removed!, left!, switched!, absent!].map((s) => ({
+            [removed!, switched!, absent!].map((s) => ({
               classId: klass.id,
               studentId: s.id,
             })),
@@ -1230,17 +1236,11 @@ describe('state changes', () => {
         await db
           .insert(enrollments)
           .values({ classId: elsewhere.klass.id, studentId: switched!.id });
-        for (const s of [stayed, removed!, left!, switched!])
-          await tapIn(db, change(session, s, 2));
+        for (const s of [stayed, removed!, switched!]) await tapIn(db, change(session, s, 2));
         const enrollmentOf = (id: string) => enrolled.find((e) => e.studentId === id)!.id;
         await endEnrollment(db, {
           enrollmentId: enrollmentOf(removed!.id),
           reason: 'removed_from_class',
-          at: at(5),
-        });
-        await endEnrollment(db, {
-          enrollmentId: enrollmentOf(left!.id),
-          reason: 'left_class',
           at: at(5),
         });
         await tapIn(db, change(next, switched!, 5));
@@ -1248,7 +1248,6 @@ describe('state changes', () => {
 
         const notCovered = {
           removed: removed!,
-          left: left!,
           switched: switched!,
           absent: absent!,
           outsider: elsewhere.student,
@@ -4997,52 +4996,50 @@ describe('a retried tap the server re-resolves elsewhere', () => {
     expect(row.endedReason).toBe('left_for_other_session');
   });
 
-  it('replays a retry with no session after the student was removed from, or left, the class', async () => {
+  it('replays a retry with no session after the student was removed from the class', async () => {
     /*
      * The removal half of A4, and the retry that races one (see the real-
      * Postgres race). The tap lands and its answer is lost; the teacher
-     * removes the student (or they leave the class) while the session runs;
-     * the retry, resolved before the removal, reaches the session that
-     * recorded it. The id names this very tap, so it is no conflict — but the
-     * student is no longer in this session, so no answer may name it. Before
-     * A4 this was a 409 NOT_PARTICIPATING.
+     * removes the student while the session runs (a student never leaves it
+     * mid-session, A19); the retry, resolved before the removal, reaches the
+     * session that recorded it. The id names this very tap, so it is no
+     * conflict — but the student is no longer in this session, so no answer
+     * may name it. Before A4 this was a 409 NOT_PARTICIPATING.
      */
-    for (const reason of ['removed_from_class', 'left_class'] as const) {
-      const { klass, student } = await seedClass(`tap-retry-${reason}`);
-      const { session } = await startSession(db, {
-        classId: klass.id,
-        ...window('2026-01-01T09:00:00Z'),
-      });
-      const tap = {
-        sessionId: session.id,
-        studentId: student.id,
-        eventId: newUuidV7(),
-        deviceTime: new Date('2026-01-01T09:01:00Z'),
-      };
-      expect((await tapIn(db, tap)).outcome).toBe('joined');
-      const enrollment = one(
-        await db
-          .select()
-          .from(enrollments)
-          .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
-      );
-      await endEnrollment(db, {
-        enrollmentId: enrollment.id,
-        reason,
-        at: new Date('2026-01-01T09:05:00Z'),
-      });
+    const { klass, student } = await seedClass('tap-retry-removed');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const tap = {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: new Date('2026-01-01T09:01:00Z'),
+    };
+    expect((await tapIn(db, tap)).outcome).toBe('joined');
+    const enrollment = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id))),
+    );
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: new Date('2026-01-01T09:05:00Z'),
+    });
 
-      expect(await tapIn(db, tap), reason).toEqual({
-        outcome: 'replay',
-        state: null,
-        participationId: null,
-        session: null,
-      });
-      const row = one(
-        await db.select().from(participations).where(eq(participations.sessionId, session.id)),
-      );
-      expect(row.endedReason, reason).toBe(reason);
-    }
+    expect(await tapIn(db, tap)).toEqual({
+      outcome: 'replay',
+      state: null,
+      participationId: null,
+      session: null,
+    });
+    const row = one(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    );
+    expect(row.endedReason).toBe('removed_from_class');
   });
 
   it('replays a stale retry with no session when the session it resolved to ended in the gap', async () => {
@@ -5481,6 +5478,108 @@ describe('enrollment lifecycle', () => {
     expect(result.endedParticipation).toBe(false);
     const ev = one(await enrollmentEvents('enrollment_left', student.id));
     expect(ev.sessionId).toBeNull();
+  });
+
+  describe('a student leaving (A19)', () => {
+    const at = (hhmm: string) => new Date(`2026-01-01T${hhmm}:00Z`);
+    const leave = (enrollmentId: string, hhmm: string, eventId?: string) =>
+      endEnrollment(db, { enrollmentId, reason: 'left_class', at: at(hhmm), eventId });
+
+    /** A lesson 09:00–09:25 with the student tapped in at 09:01. */
+    async function inLesson(tag: string) {
+      const seeded = await seedClass(tag);
+      const { session } = await startSession(db, {
+        classId: seeded.klass.id,
+        ...window('2026-01-01T09:00:00Z'),
+      });
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId: seeded.student.id,
+        eventId: newUuidV7(),
+        deviceTime: at('09:01'),
+      });
+      const enrollment = one(await activeEnrollment(seeded.klass.id, seeded.student.id));
+      const participation = async () =>
+        one(
+          await db
+            .select()
+            .from(participations)
+            .where(
+              and(
+                eq(participations.sessionId, session.id),
+                eq(participations.studentId, seeded.student.id),
+              ),
+            ),
+        );
+      return { ...seeded, session, enrollment, participation };
+    }
+
+    it('is refused while the class has a session running, in it or not, and records nothing', async () => {
+      const { klass, student, school, enrollment, participation } = await inLesson('leave-running');
+      const absent = await freshStudent('leave-running-absent', school.id);
+      await db.insert(enrollments).values({ classId: klass.id, studentId: absent.id });
+
+      await expect(leave(enrollment.id, '09:05')).rejects.toMatchObject({
+        code: 'CLASS_IN_SESSION',
+      });
+      const absentsEnrollment = one(await activeEnrollment(klass.id, absent.id));
+      await expect(leave(absentsEnrollment.id, '09:05')).rejects.toMatchObject({
+        code: 'CLASS_IN_SESSION',
+      });
+      expect(await activeEnrollment(klass.id, student.id)).toHaveLength(1);
+      expect(await activeEnrollment(klass.id, absent.id)).toHaveLength(1);
+      expect((await participation()).endedAt).toBeNull();
+      expect(await enrollmentEvents('enrollment_left', student.id)).toHaveLength(0);
+      // The bell is the line: at it, the class is over.
+      expect((await leave(enrollment.id, '09:25')).outcome).toBe('ended');
+    });
+
+    it('after the bell, before the sweep, ends the participation at the bell, which no extend reopens', async () => {
+      const { student, session, enrollment, participation } = await inLesson('leave-after-bell');
+      const result = await leave(enrollment.id, '09:30');
+      expect(result).toMatchObject({ outcome: 'ended', endedParticipation: true });
+      expect(await participation()).toMatchObject({
+        endedReason: 'left_class',
+        endedAt: session.endsAt,
+      });
+      expect(one(await enrollmentEvents('enrollment_left', student.id)).sessionId).toBe(session.id);
+
+      // An extend whose clock read the bell a moment early lands after the leave (santa's
+      // round 1): the lesson runs on, without the student who left it.
+      await extendSession(db, { sessionId: session.id, durationMinutes: 10, at: at('09:24') });
+      expect((await participation()).endedAt).toEqual(session.endsAt);
+    });
+
+    it('is recorded under the phone’s event id, and its retry is the truth now, even in session', async () => {
+      const { klass, student } = await seedClass('leave-replay');
+      const enrollment = one(await activeEnrollment(klass.id, student.id));
+      const eventId = newUuidV7();
+      expect((await leave(enrollment.id, '08:00', eventId)).outcome).toBe('ended');
+      expect(one(await enrollmentEvents('enrollment_left', student.id)).eventId).toBe(eventId);
+
+      // A lesson starts, and the retry of the leave, its answer lost, arrives:
+      // the leave landed, so it is answered, never refused.
+      await startSession(db, { classId: klass.id, ...window('2026-01-01T09:00:00Z') });
+      expect((await leave(enrollment.id, '09:05', eventId)).outcome).toBe('already_removed');
+      expect(await enrollmentEvents('enrollment_left', student.id)).toHaveLength(1);
+    });
+
+    it('is refused under an id already on record, even another leave of the student’s', async () => {
+      // Same type, no session, same student: `insertEvent` alone would take
+      // the other class's leave for this one's replay, and remove the
+      // enrollment with no event of its own.
+      const { klass, student } = await seedClass('leave-spent');
+      const other = await seedClass('leave-spent-other');
+      await db.insert(enrollments).values({ classId: other.klass.id, studentId: student.id });
+      const spent = newUuidV7();
+      await leave(one(await activeEnrollment(other.klass.id, student.id)).id, '08:00', spent);
+
+      const enrollment = one(await activeEnrollment(klass.id, student.id));
+      await expect(leave(enrollment.id, '08:05', spent)).rejects.toMatchObject({
+        code: 'EVENT_ID_CONFLICT',
+      });
+      expect(await activeEnrollment(klass.id, student.id)).toHaveLength(1);
+    });
   });
 
   it('removing an already-removed enrollment is a no-op', async () => {

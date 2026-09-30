@@ -93,7 +93,11 @@ const sessionView = object<SessionView>()({
 });
 const meClass = object<MeClass>()({ id: z.uuid(), name: z.string() });
 const teacherView = object<TeacherView>()({ displayName: z.string().nullable() });
-const meClassWithTeacher = object<MeClassWithTeacher>()({ ...meClass.shape, teacher: teacherView });
+const meClassWithTeacher = object<MeClassWithTeacher>()({
+  ...meClass.shape,
+  teacher: teacherView,
+  enrollmentId: z.uuid().nullable(),
+});
 const meUser = object<MeUser>()({
   id: z.uuid(),
   role: z.enum(USER_ROLES),

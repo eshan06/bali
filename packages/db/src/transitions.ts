@@ -97,6 +97,7 @@ export const TRANSITION_ERROR_CODES = [
   'ENROLLMENT_NOT_FOUND',
   'PROTECTION_OFF',
   'DISPLAY_NAME_TAKEN',
+  'CLASS_IN_SESSION',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -3027,7 +3028,10 @@ export interface EndEnrollmentInput {
   enrollmentId: string;
   /** 'left_class' when the student leaves their own; 'removed_from_class' when the teacher removes them. */
   reason: 'left_class' | 'removed_from_class';
+  /** The server's clock: when it happened, and what a leave is judged in session by. */
   at: Date;
+  /** The client's idempotency key for the event (rule 4, A19); one is minted when absent. */
+  eventId?: string;
 }
 export interface EndEnrollmentResult {
   /** 'ended' this call removed it; 'already_removed' it was gone (idempotent no-op). */
@@ -3047,6 +3051,13 @@ export interface EndEnrollmentResult {
  * learns via the session feed (the event carries the session id), the phone's
  * next check-in reads 'gone' and unshields, and a later emergency unlock still
  * lands (ISSUES #2 / step 2). Idempotent: an already-removed enrollment no-ops.
+ *
+ * A student never leaves while the class is in session (owner, 2026-09-30; A19):
+ * `CLASS_IN_SESSION` while it has a session running by the server's clock, and
+ * nothing recorded. Past its bell, not yet swept, a leave ends the student's
+ * participation there as a removal does, at the bell — so an extend whose clock
+ * read the bell a moment early, landing after the leave, keeps no student who
+ * has left in the lesson.
  */
 export async function endEnrollment(
   db: Database,
@@ -3079,10 +3090,21 @@ export async function endEnrollment(
         };
       }
 
+      // The class, shared. A Start takes it exclusively, so the two serialise: a
+      // leave sees a session a Start committed first, and a Start sees the
+      // enrollment a leave removed first — never a leave that misses a session
+      // starting under it, whose Start then joins the student from their waiting
+      // tap into a class they have left (A19).
+      await tx
+        .select({ id: classes.id })
+        .from(classes)
+        .where(eq(classes.id, enrollment.classId))
+        .for('share');
+
       // This class's running session, locked so a concurrent tap/end into THIS
       // class serializes (a removal can't leave a live participation stranded in
       // an ended session, and endSession can't re-end this participation under a
-      // wrong reason).
+      // wrong reason), and a leave judges it with no extend landing in between.
       const session = firstOrUndefined(
         await tx
           .select()
@@ -3091,12 +3113,19 @@ export async function endEnrollment(
           .limit(1)
           .for('update'),
       );
+      if (input.reason === 'left_class' && session && sessionRunning(session, input.at)) {
+        throw new TransitionError('CLASS_IN_SESSION', 'the class is in session');
+      }
 
       await tx
         .update(enrollments)
         .set({ removedAt: input.at })
         .where(eq(enrollments.id, enrollment.id));
 
+      // Null when there was no live participation to end (no running session, or
+      // the student not in it): the event is then enrollment-level, with no
+      // session.
+      let ended: { sessionId: string; occurredAt: Date } | null = null;
       if (session) {
         // End the student's live participation with ONE guarded set-based UPDATE,
         // matching endSession — no read-then-update-by-id (that pattern, held
@@ -3104,7 +3133,7 @@ export async function endEnrollment(
         // isNull guard means a participation ended by a racing switch-tap is left
         // as-is rather than overwritten.
         const occurredAt = clampToWindow(input.at, session.startedAt, session.endsAt);
-        const ended = await tx
+        const rows = await tx
           .update(participations)
           .set({ endedAt: occurredAt, endedReason: participationReason })
           .where(
@@ -3115,39 +3144,28 @@ export async function endEnrollment(
             ),
           )
           .returning({ id: participations.id });
-        if (ended.length > 0) {
-          // A live participation was ended — record it on the session feed so the
-          // teacher's grid learns.
-          await insertEvent(tx, {
-            eventId: newUuidV7(),
-            type: eventType,
-            sessionId: session.id,
-            classId: enrollment.classId,
-            userId: enrollment.studentId,
-            occurredAt,
-          });
-          return {
-            outcome: 'ended',
-            endedParticipation: true,
-            classId: enrollment.classId,
-            studentId: enrollment.studentId,
-          };
-        }
+        // A live participation was ended: recorded on the session feed so the
+        // teacher's grid learns.
+        if (rows.length > 0) ended = { sessionId: session.id, occurredAt };
       }
 
-      // No live participation to end (no running session, or the student was not
-      // in it) — an enrollment-level event with no session.
-      await insertEvent(tx, {
-        eventId: newUuidV7(),
+      const isNew = await insertEvent(tx, {
+        eventId: input.eventId ?? newUuidV7(),
         type: eventType,
-        sessionId: null,
+        sessionId: ended?.sessionId ?? null,
         classId: enrollment.classId,
         userId: enrollment.studentId,
-        occurredAt: input.at,
+        occurredAt: ended?.occurredAt ?? input.at,
       });
+      // The enrollment was live, so nothing has recorded its end: an id already
+      // on record names another event, and answering "ended" would leave the
+      // removal with no event of its own.
+      if (!isNew) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
       return {
         outcome: 'ended',
-        endedParticipation: false,
+        endedParticipation: ended !== null,
         classId: enrollment.classId,
         studentId: enrollment.studentId,
       };

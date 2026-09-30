@@ -989,21 +989,26 @@ describe('a late return (A13)', () => {
     expect((await tapBlock(30, 2, stuckId)).json<TapResponse>()).toEqual(body);
   });
 
-  it('a late tap into a session the student has left names no session: deleted, and the truth re-read', async () => {
+  it('a late tap into a session the student was taken out of names no session: deleted, and the truth re-read', async () => {
     const { session, send, tapBlock, klass, student } = await lesson('late-left-api');
     await send('unlock', 30, { order: order(3) });
-    // Then the student left the class, and joined it again.
+    // Then the teacher removed the student from the class (a student never
+    // leaves it mid-session, A19), and they joined it again.
     const [enrollment] = await db
       .select()
       .from(enrollments)
       .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
-    await endEnrollment(db, { enrollmentId: enrollment!.id, reason: 'left_class', at: new Date() });
+    await endEnrollment(db, {
+      enrollmentId: enrollment!.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
     await db.insert(enrollments).values({ classId: klass.id, studentId: student.id });
 
     const res = await tapBlock(40, 2);
     expect(res.json<TapResponse>()).toEqual({ outcome: 'replay', state: null, session: null });
     expect(tapDisposition(res.statusCode, res.json())).toBe('reread');
-    expect((await stateOf(session.id))?.endedReason).toBe('left_class');
+    expect((await stateOf(session.id))?.endedReason).toBe('removed_from_class');
   });
 
   it('with no order the server can use, a return applies as it arrives, as before', async () => {

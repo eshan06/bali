@@ -2,7 +2,10 @@
   "endpoint": "DELETE /v1/enrollments/{id}",
   "scenario": "A student trying to remove a classmate’s enrollment.",
   "request": {
-    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001"
+    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002"
+    }
   },
   "status": 403,
   "type": "ApiErrorBody",

@@ -205,9 +205,11 @@ public struct APIClient: Sendable {
         await send("POST", "/v1/enrollments", request)
     }
 
-    /// `DELETE /v1/enrollments/{id}` — leave a class.
-    public func leave(enrollment id: String) async -> APIResponse<EndEnrollmentResponse> {
-        await send("DELETE", "/v1/enrollments/\(escaped(id))")
+    /// `DELETE /v1/enrollments/{id}` — leave a class, never while it is in session (A19).
+    public func leave(enrollment id: String, _ request: EndEnrollmentRequest) async
+        -> APIResponse<EndEnrollmentResponse>
+    {
+        await send("DELETE", "/v1/enrollments/\(escaped(id))", request)
     }
 
     /// `GET /v1/join-codes/{code}` — what a code opens, before joining it. The code goes as typed:

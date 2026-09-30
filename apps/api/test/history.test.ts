@@ -1,5 +1,6 @@
 import {
   type Database,
+  endEnrollment,
   endSession,
   enrollments,
   events,
@@ -129,7 +130,8 @@ async function walk(token: string, limit: number): Promise<HistoryEvent[][]> {
  * server after its bell; periods 5 and 6 run at once and the student switches
  * from one to the other, and 6 ends early; a tap of 6's block waits for Start
  * but its retry lands in period 3 first, so 6's next Start declines it; then
- * the student leaves period 3 mid-lesson and is removed from period 5.
+ * the student leaves period 3 once that lesson is over (never mid-lesson, A19)
+ * and is removed from period 5 mid-lesson.
  */
 async function aDayOfClasses(tag: string) {
   const p3 = await seedClassroom(db, `${tag}-p3`);
@@ -174,7 +176,11 @@ async function aDayOfClasses(tag: string) {
   });
   const e = await startAt(p6.klass.id, '11:05', '11:50');
 
-  await ok(leave(token, await enrollmentOf(p3.klass.id, ana.id)));
+  await endAt(d.id, '11:50', 'expired');
+  // Through the engine, at a time this test chose: the route stamps the
+  // server's own clock on a leave, which no session's window clamps.
+  const p3Enrollment = await enrollmentOf(p3.klass.id, ana.id);
+  await endEnrollment(db, { enrollmentId: p3Enrollment, reason: 'left_class', at: at('11:55') });
   const f = await startAt(p5.klass.id, '12:00', '12:50');
   await ok(tap(token, p5.block.tagId, '12:01'));
   const okafor = await ctx.tokenFor(p5.teacher.cognitoId);
@@ -193,7 +199,8 @@ describe('GET /v1/me/history', () => {
     expect(page.events.map(line)).toEqual([
       `enrollment_removed 12:50 ${c5}`,
       `tap_in 12:01 ${c5}`,
-      `enrollment_left 11:50 ${c3}`,
+      `enrollment_left 11:55 ${c3}`,
+      `session_expired 11:50 ${c3}`,
       // A declined tap, never a join: it counted in period 3 already.
       `armed_tap_skipped 11:05 ${c6} counted in ${c3}`,
       `tap_in 11:01 ${c3}`,
@@ -220,7 +227,7 @@ describe('GET /v1/me/history', () => {
       'tap_in',
     ]);
 
-    const [removed, , left, skipped] = page.events;
+    const [removed, , left, , skipped] = page.events;
     const { eventId: removal, ...rest } = removed!;
     expect(removal).toMatch(/^[0-9a-f-]{36}$/);
     expect(rest).toEqual({
@@ -239,6 +246,8 @@ describe('GET /v1/me/history', () => {
       countedIn: null,
     });
     expect(left!.teacher).toEqual({ displayName: 'Ms. Rivera' });
+    // After the lesson, so with no session.
+    expect(left!.session).toBeNull();
     expect(skipped).toMatchObject({
       class: { id: p6.klass.id, name: c6 },
       // Period 6's teacher never set a name.
@@ -377,8 +386,8 @@ describe('GET /v1/me/history', () => {
   it('pages through the whole history, each moment once, at any page size', async () => {
     const { token } = await aDayOfClasses('h-walk');
     const all = (await historyOf(token)).events.map((e) => e.eventId);
-    expect(all).toHaveLength(17);
-    for (const limit of [1, 2, 5, 16, 17]) {
+    expect(all).toHaveLength(18);
+    for (const limit of [1, 2, 5, 17, 18]) {
       const pages = await walk(token, limit);
       expect(pages.flat().map((e) => e.eventId)).toEqual(all);
       expect(pages.slice(0, -1).every((p) => p.length === limit)).toBe(true);

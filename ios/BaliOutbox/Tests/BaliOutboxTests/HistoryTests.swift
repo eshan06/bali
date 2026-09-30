@@ -136,7 +136,7 @@ struct HistoryTests {
                 "7:09 PM Class ended", "[Class fx-hist-p3 · Ms. Rivera]", "7:08 PM Tapped in",
                 "[Class fx-hist-p6 · -]",
                 "7:07 PM Tap not used. It already counted in Class fx-hist-p3.",
-                "[Class fx-hist-p3 · Ms. Rivera]", "7:05 PM Left the class",
+                "[Class fx-hist-p3 · Ms. Rivera]", "7:05 PM Removed from the class",
                 "[Class fx-hist-p5 · Mr. Okafor]", "7:04 PM Tapped in",
                 "7:02 PM Removed from the class", "[Class fx-hist-p6 · -]",
                 "7:01 PM Left the class",

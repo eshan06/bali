@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A19: a student leaves a class, never while it is in session (the
+  owner's approval, 2026-09-30).** **The rule:** `DELETE /v1/enrollments/{id}` on the
+  student's own enrollment is refused `409 class_in_session` (`API_ERROR_REASONS`, additive;
+  the engine's `CLASS_IN_SESSION`) while the class has a session running by the server's
+  clock, and nothing is recorded — whether or not the student tapped in, since leaving to
+  dodge a lesson is what the rule stops. A teacher's removal is unchanged, mid-session
+  included. **After the bell,** not yet swept, the class is not in session (decision 6, A16's
+  ruling), so a leave is allowed, and it ends the student's participation there at the bell, as
+  a removal does. Leaving it for the sweep, which would have closed it as `session_expired`,
+  was tried and dropped (santa's round 1): an extend whose clock read the bell a moment early
+  takes the session's lock after the leave and adds the time, and the student who left is live
+  in the lesson again, their phone handed its new bell. **Who may leave, and what the teacher
+  sees after — settled by the docs:** the enrollment's own student (another student's is `403
+  enrollment_not_yours`, no account `403 unknown_user`); a teacher's classes carry no
+  enrollment to leave (`enrollmentId: null`). Decision 3's roster skips the removed row, and
+  no later lesson's grid carries the student; `enrollment_left` is the record. **Idempotency:**
+  the body gains an optional `eventId` — optional because the endpoint shipped with none, and
+  the portal's removal and older callers still send none (the engine mints one). The leave's
+  event is recorded under it; the retry of a leave that landed is `already_removed`, checked
+  before the refusal, so a retry arriving once a lesson has started is answered, never
+  refused; an id already on record is `409 event_id_conflict` — an explicit check, since
+  `insertEvent` alone reads the student's own leave of another class (same type, no session)
+  as this one's replay, and the enrollment would end with no event of its own. **The race
+  with Start:** a leave that read the class's session before a Start committed, and removed the
+  enrollment after it, left the student out of the class and live in its lesson — the Start
+  joined them from their waiting tap. `endEnrollment` now takes the class row `FOR SHARE`
+  before it reads the session, which a Start's exclusive lock serialises with (a real-Postgres
+  race, red without it); the removal takes it too, as the same race put a removed student into
+  the next lesson. **`GET /v1/me`:** each class carries `enrollmentId` (additive). BaliCore:
+  `MeClass.enrollmentId`, optional; `EndEnrollmentRequest`; `leave(enrollment:_:)` sends it;
+  `classInSession`. **Tests reshaped:** a student can no longer leave mid-lesson, so the tests
+  that staged "left mid-session" stage a removal (the replay rules read an ended participation,
+  whatever ended it), and the fixtures' mid-lesson leave is now the refusal, and a leave with
+  no lesson running.
 - **2026-09-30** — **A17: a tap after the bell never joins the session that just ended — one
   rule for "running", by the server's clock, judged under the lock** (#127's Claude Review; the
   owner's ask). **The gap:** A16 refused an extend at or past the bell before the sweep marks the

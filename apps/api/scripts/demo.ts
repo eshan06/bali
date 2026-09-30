@@ -459,6 +459,17 @@ async function main(): Promise<void> {
       line('8:10am — Cal is removed mid-session, then his phone unlocks anyway (ISSUES #2)');
       const calEnrollment = enrollmentIds.get(cal.key);
       assert(calEnrollment, 'Cal must have an enrollment id');
+      // He cannot leave it himself: never while the class is in session (A19).
+      const stays = await call<ApiErrorBody>('DELETE', `/v1/enrollments/${calEnrollment}`, {
+        token: cal.token,
+        body: { eventId: randomUUID() },
+        expectStatus: 409,
+      });
+      assert(
+        stays.error.reason === 'class_in_session',
+        `Cal's own leave should be refused in session, got ${String(stays.error.reason)}`,
+      );
+      console.log(`  his own leave refused (409 ${stays.error.reason}): "${stays.error.message}"`);
       const removal = await call<EndEnrollmentResponse>(
         'DELETE',
         `/v1/enrollments/${calEnrollment}`,

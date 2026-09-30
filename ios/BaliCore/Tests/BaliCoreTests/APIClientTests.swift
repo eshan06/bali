@@ -133,7 +133,8 @@ struct APIClientFixtureTests {
             return try answered(await client.join(request), fixture)
         },
         "DELETE /v1/enrollments/{id}": { client, fixture in
-            try answered(await client.leave(enrollment: fixture.parameter), fixture)
+            let request = try fixture.sent(EndEnrollmentRequest.self)
+            return try answered(await client.leave(enrollment: fixture.parameter, request), fixture)
         },
         "GET /v1/join-codes/{code}": { client, fixture in
             try answered(await client.previewJoinCode(fixture.parameter), fixture)
@@ -378,7 +379,7 @@ struct APIClientTests {
         let client = APIClient(
             baseURL: Self.base, tokens: FixedToken(token: "t"), transport: transport)
         _ = await client.previewJoinCode(" 6bv/za5?x=1#é")
-        _ = await client.leave(enrollment: "../me")
+        _ = await client.leave(enrollment: "../me", EndEnrollmentRequest(eventId: "e"))
         _ = await client.checkIn(session: "s 1", CheckInRequest(deviceTime: Self.at))
         _ = await client.history(before: "e1&limit=50", limit: 5)
         let base = Self.base.absoluteString

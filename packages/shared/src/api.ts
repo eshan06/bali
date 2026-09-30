@@ -73,6 +73,12 @@ export interface TeacherView {
  */
 export interface MeClassWithTeacher extends MeClass {
   teacher: TeacherView;
+  /**
+   * The caller's enrollment in it (A19, additive): what leaving it deletes
+   * (`DELETE /v1/enrollments/{id}`). Null on a teacher's own class, which they
+   * teach and are not enrolled in.
+   */
+  enrollmentId: string | null;
 }
 export interface MeUser {
   id: string;
@@ -472,6 +478,18 @@ export interface BlockDetail {
 }
 
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
+// A student never leaves while the class has a session running by the server's
+// clock: `409 class_in_session`, nothing recorded (owner, 2026-09-30; A19).
+export interface EndEnrollmentRequest {
+  /**
+   * Client idempotency key for the leave's event (rule 4, A19). Optional, since
+   * the endpoint shipped without a body and `/v1` is additive-only: the server
+   * mints one when it is absent. The removal is idempotent on the enrollment
+   * either way — a retry of one that landed is `already_removed` — and an id
+   * already recorded for another event is `409 event_id_conflict`.
+   */
+  eventId?: string;
+}
 /** Every outcome ending an enrollment answers with (`EndEnrollmentResponse.outcome`). */
 export const END_ENROLLMENT_OUTCOMES = ['ended', 'already_removed'] as const;
 export type EndEnrollmentOutcome = (typeof END_ENROLLMENT_OUTCOMES)[number];

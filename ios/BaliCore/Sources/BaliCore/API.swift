@@ -32,6 +32,10 @@ public struct MeClass: Codable, Sendable, Hashable {
     /// named without one — a join's, a preview's, a history moment's — or from an older API:
     /// the wire is additive, and a field this build knows but was not sent is never a refusal.
     public let teacher: TeacherView?
+    /// The student's enrollment in it, as `GET /v1/me` gives one (A19): what leaving it deletes
+    /// (`APIClient.leave(enrollment:_:)`). Nil where a class is named without one, from an older
+    /// API, and on a teacher's own class.
+    public let enrollmentId: String?
 }
 
 public struct MeUser: Codable, Sendable, Hashable {
@@ -192,7 +196,14 @@ public struct EnrollmentJoinResponse: Codable, Sendable, Hashable {
     public let `class`: MeClass
 }
 
-/// `DELETE /v1/enrollments/{id}` — leave a class.
+/// `DELETE /v1/enrollments/{id}` — leave a class. Refused `409 class_in_session` while the class
+/// has a session running (A19).
+public struct EndEnrollmentRequest: Codable, Sendable, Hashable {
+    /// What the leave is recorded under; its retry is answered `already_removed` once it landed.
+    public let eventId: String
+    public init(eventId: String) { self.eventId = eventId }
+}
+
 public struct EndEnrollmentResponse: Codable, Sendable, Hashable {
     /// `END_ENROLLMENT_OUTCOMES`.
     public enum Outcome: String, CaseIterable, Sendable {
