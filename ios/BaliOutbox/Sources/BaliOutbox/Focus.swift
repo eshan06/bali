@@ -121,14 +121,15 @@ public enum UnlockFailure: Sendable, Hashable {
 
     /// In words (rule 5): the outbox refused the write, so nothing changed — the apps "still
     /// paused" only where the check verified them so (`paused`: rule 3) — or the phone has not
-    /// started; holding again is the way on. Nothing held: nothing to unlock, nothing recorded.
+    /// started; holding again is the way on. Nothing held: said of the unlock, never the shields,
+    /// which only the check may claim (rule 3).
     public func words(paused: Bool) -> String {
         switch self {
         case .notStarted: Joining.notStarted
         case .notSaved where paused:
             "Bali couldn't save your unlock, so your apps are still paused. Hold to try again."
         case .notSaved: "Bali couldn't save your unlock. Hold to try again."
-        case .nothing: "Nothing is paused now, so there was nothing to unlock."
+        case .nothing: "There was nothing to unlock, so nothing was recorded."
         }
     }
 }

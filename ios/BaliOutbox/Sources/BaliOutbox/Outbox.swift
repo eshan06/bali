@@ -479,19 +479,22 @@ public struct Outbox: Sendable {
     }
 
     /// The student's reason for their latest Emergency Unlock (C5a; A1), kept in its record while
-    /// it has never been sent — `sending`, the record on its way, has — which then goes at once:
-    /// false when it was too late.
-    public func explain(_ reason: UnlockReason, now: Date, sending: String?) throws -> Bool {
+    /// it has never been sent — `sent`, records sent and not settled, have — which then goes at once,
+    /// any other held unlock with it (a scan's press, B6d, ahead of its follow-up): false when it
+    /// was too late.
+    public func explain(_ reason: UnlockReason, now: Date, sent: Set<String>) throws -> Bool {
         try pool.write { db in
-            try !String.fetchAll(
+            guard let latest = try Self.state(db, Self.lastUnlockKey), !sent.contains(latest)
+            else { return false }
+            let kept = try !String.fetchAll(
                 db,
                 sql: """
-                    UPDATE outbox SET reason = ?, nextAttemptAt = ? WHERE kind = 'unlock'
-                      AND attempts = 0 AND eventId IS NOT ?
-                      AND eventId = (SELECT value FROM outboxState WHERE key = ?)
-                    RETURNING eventId
-                    """, arguments: [reason.rawValue, now, sending, Self.lastUnlockKey]
+                    UPDATE outbox SET reason = ?, nextAttemptAt = ?
+                    WHERE eventId = ? AND kind = 'unlock' AND attempts = 0 RETURNING eventId
+                    """, arguments: [reason.rawValue, now, latest]
             ).isEmpty
+            if kept { try Self.release(db, now: now) }
+            return kept
         }
     }
 

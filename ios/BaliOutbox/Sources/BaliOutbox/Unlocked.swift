@@ -32,11 +32,14 @@ public struct UnlockedWords: Sendable, Hashable {
             "Everything's open until you go back to focus or the bell at \(bell). "
             + (unlock == nil
                 ? "Your teacher can see you unlocked." : "Your teacher will see you unlocked.")
+        // What this screen gave comes first: a record still queued may be an older unlock, stuck.
         picker =
-            if let unlock {
+            if let given {
+                .given(given)
+            } else if let unlock {
                 unlock.change.reason.map(Picker.given) ?? (unlock.attempts == 0 ? .open : .late)
             } else {
-                given.map(Picker.given) ?? (asked ? .late : nil)
+                asked ? .late : nil
             }
         retap =
             sync.reportedOff == session.id

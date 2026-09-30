@@ -67,7 +67,7 @@ struct UnlockedTests {
     }
 
     @Test(
-        "The reason card: the one the unlock carries once given; too late once it has been sent without one; once it has gone, what this screen gave or saw — offered and none given, too late; never offered, no card"
+        "The reason card: the one this screen gave, first — a record still queued may be an older unlock, stuck (santa's review); the one the unlock carries once given; too late once it has been sent without one; once it has gone, offered and none given, too late; never offered, no card"
     )
     func picker() async throws {
         #expect(words(try unlocked(try pressed(reason: .nurse).queued))?.picker == .given(.nurse))
@@ -75,6 +75,7 @@ struct UnlockedTests {
         try await send(outbox, try #require(queued.first), nil)
         #expect(try outbox.records().first?.attempts == 1)
         #expect(words(try unlocked(try outbox.records()))?.picker == .late)
+        #expect(words(try unlocked(try outbox.records()), given: .other)?.picker == .given(.other))
         #expect(words(try unlocked(), given: .bathroom)?.picker == .given(.bathroom))
         #expect(words(try unlocked(), asked: true)?.picker == .late)
         #expect(words(try unlocked())?.picker == nil)
@@ -130,7 +131,7 @@ struct ReasonTests {
     }
 
     @Test(
-        "None given, it goes as the hold ends, without one: a reason given while it is on its way, or after, is too late"
+        "None given, it goes as the hold ends, without one: a reason given after a send with no answer — the server may have it — or while it is on its way, is too late"
     )
     func notGiven() async throws {
         let rig = try Rig()
@@ -138,12 +139,56 @@ struct ReasonTests {
         #expect(await rig.engine.pressUnlock() == nil)
         try await rig.sleeping([at(SyncEngine.reasonHold)])
         rig.clock.advance(by: SyncEngine.reasonHold)
-        let sent = try await rig.server.next(unlockRoute)
-        #expect(try reason(sent) == nil)
+        let first = try await rig.server.next(unlockRoute)
+        #expect(try reason(first) == nil)
+        // On its way, never sent by the file's count: the send would not carry it.
         #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
-        sent.reply(200, Answer.unlocked())
+        // No answer: the server may have it all the same, and would keep it without one.
+        first.reply(nil)
+        await rig.until { $0.queued.first?.attempts == 1 }
+        #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
+        rig.clock.advance(by: 2)
+        let again = try await rig.server.next(unlockRoute)
+        #expect(try reason(again) == nil)
+        again.reply(200, Answer.unlocked())
         await rig.until { $0.queued.isEmpty }
         await rig.stop()
+    }
+
+    @Test(
+        "Pressed in a session's last seconds, it waits for the reason only until the bell, so the class's grid shows it before the session is swept (santa's review)"
+    )
+    func beforeTheBell() async throws {
+        let rig = try Rig()
+        try await rig.tapIn(session(endsAt: 5))
+        #expect(await rig.engine.pressUnlock() == nil)
+        try await rig.sleeping([at(5)])
+        rig.clock.advance(by: 5)
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked(session(endsAt: 5)))
+        await rig.until { $0.queued.isEmpty }
+        await rig.stop()
+    }
+
+    @Test(
+        "A reason given for a press under a scan that joined no class (B6d) goes with its follow-up, the class's own record, at once — the press's hold ended with it (santa's review)"
+    )
+    func refiledReason() async throws {
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        try #require(
+            try outbox.record(
+                .unlockUnderTap(tap: tap.eventId, reason: nil), now: t0,
+                standing: .inSession(session(), .unlocked), holding: SyncEngine.reasonHold))
+        try await send(outbox, tap, 200, Answer.armed)
+        let followUp = try #require(
+            try outbox.records().first { if case .unlock = $0.change { true } else { false } })
+        #expect(try outbox.explain(.nurse, now: t0, sent: []))
+        #expect(try current(outbox, followUp.eventId)?.change.reason == .nurse)
+        guard case .send(let due) = try outbox.nextDue(now: t0) else {
+            Issue.record("the press's hold still holds the follow-up back")
+            return
+        }
+        #expect(due.change == .unlockUnderTap(tap: tap.eventId, reason: nil))
     }
 
     @Test(
@@ -178,7 +223,9 @@ struct ReasonTests {
         let rig = try Rig()
         #expect(await rig.engine.pressUnlock() == .nothing)
         #expect(await rig.engine.state.queued.isEmpty)
-        #expect(UnlockFailure.nothing.words(paused: true) == "Nothing is paused now, so there was nothing to unlock.")
+        #expect(
+            UnlockFailure.nothing.words(paused: true)
+                == "There was nothing to unlock, so nothing was recorded.")
         let tap = try #require(try await rig.engine.record(.tap(tagId: "tag")))
         #expect(await rig.engine.pressUnlock() == nil)
         try await rig.server.next(tapRoute).reply(200, Answer.joined())

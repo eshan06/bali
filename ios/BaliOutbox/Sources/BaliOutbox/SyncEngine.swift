@@ -247,8 +247,10 @@ public actor SyncEngine {
     /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
     private var reauth: Task<Bool, Never>?
     private var running = false
-    /// The record on its way to the server: a reason given now would not go with it.
-    private var sending: String?
+    /// The records sent and not yet settled — on their way, or answered in a write the file refused
+    /// (the app suspended, say) — which the file still counts as never sent: a reason given now would
+    /// not go with them (santa's review).
+    private var unsettled: Set<String> = []
     private enum Loop { case drain, read }
     private var waiters: [Loop: (pause: Int, wake: CheckedContinuation<Void, Never>)] = [:]
     private var rung: Set<Loop> = []
@@ -373,11 +375,15 @@ public actor SyncEngine {
     }
 
     /// Emergency Unlock as the screens press it (C4): its send held `reasonHold` where the Unlocked
-    /// screen then asks why — in a session (C5a) — or why it did not go through (rule 5): nothing
-    /// the phone knows holds the shields any more (#116's review), or the outbox refused it.
+    /// screen then asks why — in a session (C5a), and never past its bell, so the class's grid
+    /// shows it live — or why it did not go through (rule 5): nothing the phone knows holds the
+    /// shields any more (#116's review), or the outbox refused it.
     public func pressUnlock() -> UnlockFailure? {
         guard let unlock = state.emergencyUnlock(reason: nil) else { return .nothing }
-        let hold = state.standing.sessionId == nil ? 0 : Self.reasonHold
+        var hold: TimeInterval = 0
+        if case .inSession(let session, _) = state.standing {
+            hold = min(Self.reasonHold, max(0, session.endsAt.timeIntervalSince(clock.now())))
+        }
         do { try record(unlock, holding: hold) } catch { return .notSaved }
         return nil
     }
@@ -386,7 +392,7 @@ public actor SyncEngine {
     /// it has never been sent — or what the Unlocked screen says (rule 5): too late, or not saved.
     public func explain(_ reason: UnlockReason) -> String? {
         do {
-            let kept = try outbox.explain(reason, now: clock.now(), sending: sending)
+            let kept = try outbox.explain(reason, now: clock.now(), sent: unsettled)
             guard kept else { return UnlockedWords.late }
         } catch {
             return "Bali couldn't save your reason. Try again."
@@ -491,18 +497,21 @@ public actor SyncEngine {
                 switch try outbox.nextDue(now: clock.now()) {
                 case .send(let record):
                     // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
-                    sending = record.eventId
-                    let sent = await record.send(through: client)
-                    sending = nil
-                    guard let sent else { break }
+                    unsettled.insert(record.eventId)
+                    guard let sent = await record.send(through: client) else {
+                        unsettled.remove(record.eventId)
+                        break
+                    }
                     // No token: nothing went, so nothing is settled — the record waits on sign-in
                     // (a ring), or a minute. Never a sign-out, never a dropped record.
                     guard sent.noAnswer != .noToken else {
+                        unsettled.remove(record.eventId)
                         state.link = .signIn
                         wake = clock.now() + Outbox.backoffCap
                         break
                     }
                     let disposition = try outbox.settle(sent, now: clock.now())
+                    unsettled.remove(record.eventId)
                     await answered(record, sent, disposition)
                     continue
                 case .wait(let until): wake = until

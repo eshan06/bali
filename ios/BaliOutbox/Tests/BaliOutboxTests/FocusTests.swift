@@ -171,7 +171,7 @@ struct FocusTests {
                 "\(String(describing: protection))")
         }
         #expect(said(.notStarted) == Joining.notStarted)
-        #expect(said(.nothing) == "Nothing is paused now, so there was nothing to unlock.")
+        #expect(said(.nothing) == "There was nothing to unlock, so nothing was recorded.")
     }
 
     @Test(
