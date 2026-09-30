@@ -18,6 +18,7 @@ struct RootView: View {
     var body: some View {
         let _ = rung
         screen
+            .safeAreaInset(edge: .bottom, spacing: 0) { if phone.tabbed { TabBar(phone: phone) } }
             .task(id: phone.bell) {
                 guard let bell = phone.bell else { return }
                 // By the phone's clock, as the router reads it: set back meanwhile, it sleeps on.
@@ -54,6 +55,10 @@ struct RootView: View {
         case .unlocked: UnlockedView(phone: phone)
         case .protectionOff: StepPlaceholder("Protection off — C5")
         case .sessionOver: StepPlaceholder("Session over — C5")
+        // Placeholders, as every screen not drawn yet, so the tab bar is D1's whole one and each
+        // screen's step changes its line alone.
+        case .history: StepPlaceholder("History — C6a-2")
+        case .me: StepPlaceholder("Me — C6b")
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }
         }
     }
@@ -73,6 +78,42 @@ struct StepPlaceholder: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+/// D1's tab bar, where the router honours a tab (C6a; `Phone.tabbed`): the one shown in the
+/// brand's ink, the others in the tertiary, on white under a hairline. Its text grows no larger
+/// than the largest standard size, and shows large on a long press, as iOS's own tab bar does.
+struct TabBar: View {
+    let phone: Phone
+
+    var body: some View {
+        let shown = phone.screen
+        HStack(spacing: 0) {
+            ForEach(
+                [
+                    (Screen.home, "Home", "house"), (.history, "History", "clock.arrow.circlepath"),
+                    (.me, "Me", "person.crop.circle"),
+                ], id: \.0
+            ) { tab, title, icon in
+                Button {
+                    phone.select(tab)
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: icon).font(.system(size: 22)).frame(height: 24)
+                        Text(title).textStyle(
+                            TextStyle(size: 12, line: 16, weight: shown == tab ? .semibold : .medium))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(.rect)
+                }
+                .buttonStyle(.plain).foregroundStyle(shown == tab ? Theme.brand : Theme.textTertiary)
+                .accessibilityAddTraits(shown == tab ? .isSelected : [])
+                .accessibilityShowsLargeContentViewer()
+            }
+        }
+        .padding(.top, 8).background(Theme.card.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 

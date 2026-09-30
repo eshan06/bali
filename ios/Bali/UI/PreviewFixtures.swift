@@ -9,8 +9,8 @@
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
-        /// any session and in two classes, no ask for the permission failed, nothing typed to join
-        /// and no screen opened over another, unless said otherwise.
+        /// any session and in two classes, no ask for the permission failed, nothing typed to join,
+        /// no screen opened over another and Home's tab chosen, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -20,6 +20,7 @@
             var askFailed: ScreenTimeAskError?
             var joining = Joining()
             var opened: [Screen] = []
+            var tab = Screen.home
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -70,6 +71,7 @@
             "unlockedRecorded": State(sync: standing(.inSession(period3, .unlocked))),
             "unlockedRetap": State(sync: reported(standing(.inSession(period3, .unlocked)))),
             "protectionOff": State(sync: standing(.inSession(period3, .protectionOff))),
+            "me": State(tab: .me),
             "storage": State(
                 problem: "The outbox could not be opened: SQLite error 14: unable to open database",
                 signedIn: nil, protection: nil, sync: nil),
