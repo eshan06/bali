@@ -23,7 +23,7 @@ struct WaitingView: View {
                         VStack(spacing: 12) {
                             Text("Ready — waiting for your teacher").textStyle(.h1)
                             Text(
-                                "You tapped your teacher's block before class started. Your phone locks the moment class starts — no need to tap again."
+                                "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again."
                             )
                             .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                         }

@@ -591,10 +591,11 @@ and data types, so the two apps can't drift out of type-agreement.
 
 - **What the shields do when the app is force-quit.** Two options: (a) shields stay until the
   session ends — the extension guarantees the unlock at the bell even with the app closed, and
-  Emergency Unlock is the one-tap sanctioned exit during the session; or (b) a watchdog turns
-  shields off after force-quit, but iOS's coarse wake clock makes the honest promise "off
-  within ~15 minutes," not instant. Leaning (a). The teacher-portal half ("app closed" within
-  a minute) is locked regardless.
+  Emergency Unlock is the sanctioned exit during the session: a one-second hold (ruled
+  2026-09-29), quick, yet no pocket touch files one, and one step under VoiceOver; or (b) a
+  watchdog turns shields off after force-quit, but iOS's coarse wake clock makes the honest
+  promise "off within ~15 minutes," not instant. Leaning (a). The teacher-portal half ("app
+  closed" within a minute) is locked regardless.
 - **A second enforcement layer: a local VPN filter.** The app installs a VPN profile whose
   traffic loops through a small filter on the phone itself, refusing connections to blocked
   destinations. It adds what Screen Time can't: starving apps of internet, blocking websites
