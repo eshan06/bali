@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C6a-1: D1's tab bar as the router's input, and History's rules.** C6a in two
+  PRs for size (santa's step 0 found it near 500 lines), as C5a was: this one the tab bar, History's
+  rules and the engine's call; C6a-2, stacked on it, the screen. **The tab bar:** D1 draws it on
+  Home, History and Me alone. A tab chosen is `Screen.choose`'s input, as `opened` is: History or
+  Me shows in place of the router's own Home with nothing opened over it, and the bar shows wherever
+  a tab would be honoured (`Phone.tabbed`), so the one place that decides the screen decides the bar
+  too — never over the shields, a session's screens, Waiting (its lock promise) or a Home opened
+  over it (Back is the way on there), Join, session over, Screen Time, the sign-in, the intro, nor
+  the home the last run's shields keep (B6b: Emergency Unlock is there, and the sign-in may not be).
+  The tab is Home again once the screens opened close (`synced`: the standing changed, a tap made
+  or answered, no classes), so a session's end lands on Home, and once who is signed in changes, so
+  no student lands on another's tab. Alternatives: SwiftUI's `TabView` (iOS draws its own bar — on
+  iOS 26 a floating one, not D1's — and holds the selection, a second place deciding the screen);
+  the tab as an entry in `opened` (a tab is no screen opened over another: it would draw Back).
+  **Me** is C6b's: its tab shows a placeholder meanwhile, as every screen not drawn yet does, so the
+  bar is D1's whole one and C6b changes one line; History's does too until C6a-2. **History's
+  rules** (`History`, on Linux): the pages as read, each moment once (A7's `eventId`); the next
+  cursor; a read that gave no page said in the Join screen's words, a teacher's account its own; a
+  cursor the history does not hold (`unknown_cursor`) read again from the top, where a Try again
+  would only be refused again. D1's grouping: days newest first — Today, Yesterday, then the
+  weekday and date, its year once not this one — each oldest first, the page reversed and never
+  re-sorted (A7: a switch's two moments share an instant), in cards of one class's moments in a
+  row; the day and the time in the phone's locale and time zone. A kind this build does not know is
+  left out, as A7 asks. **Words D1 does not draw**, kept as written on the conductor's word
+  (2026-09-29) but for the one new em-dash, which DESIGN.md bans: "Screen Time off" (protection off,
+  the app's name for it since 2026-09-27), "Switched to another class", "Left the class", "Removed
+  from the class", "Tap not used. It already counted in another class." (a declined tap whose
+  class is not named), the notes "Arrived after class ended", "Arrived late, so it changed
+  nothing", "Arrived after you left this class" and "Screen Time was off, so it changed nothing",
+  and "This is a teacher's account, and History is only for students." D1's own words keep their
+  em-dashes ("The same moments your teachers see — nothing more.", "Tap not used — it already
+  counted in <class>") until the owner rules — the second reads twice where the class's name has
+  one of its own ("Period 5 — Chemistry"). **Tests:** `HistoryTests` (the grouping across days,
+  years and time zones; every kind in `history/every-kind`; what this build does not know; the pages;
+  each failure), `HistoryEngineTests` (the 401 renewal and the cursor), `ScreenTests.tabs`,
+  `AppTests.tabs`. **Santa** (two Claude reviewers — Codex refuses every model on this Mac, so they
+  share a model family — and the design check): round 1, no blockers; the WARNs fixed — a first
+  page is answered into a new `History`, said (one added after older moments would be drawn out
+  of order), and VoiceOver reads the bar as tabs, its icons hidden from it. Left: D1's em-dash,
+  the owner's.
+
 - **2026-09-29** — **B5b-5: the monitor's own wakes never wake each other — a wake of `tick` or
   `tock` more than a minute before the end the monitor asked for there asks nothing (#113's open
   path, closed).** **Red first:** `RegisterTests.Center` now does what round 2 saw iOS do —

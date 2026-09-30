@@ -8,6 +8,8 @@ public enum Screen: Sendable, Hashable {
     /// Nothing known yet: the sign-in, the engine or the enforcer has not spoken.
     case starting
     case intro, signIn, screenTime, join, home, waiting, focus, unlocked, protectionOff, sessionOver
+    /// Home's neighbours in D1's tab bar (C6): the student's own history, and Me.
+    case history, me
     /// The app could not start — its storage would not open, or its build is not set up — with why,
     /// shown with a way to try again (rule 5).
     case storage(String)
@@ -22,11 +24,14 @@ public enum Screen: Sendable, Hashable {
     /// session the phone was in that ended, until the student dismisses it (C5); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
     /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
-    /// the one under it shows, never over anything else.
+    /// the one under it shows, never over anything else; `tab`, the one chosen in D1's tab bar
+    /// (C6a) — History or Me in place of the router's own Home with nothing opened over it, and
+    /// nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it,
+    /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, lastSessionOver: SessionView?,
-        opened: [Screen], now: Date
+        opened: [Screen], tab: Screen, now: Date
     ) -> Screen {
         if let problem { return .storage(problem) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
@@ -42,6 +47,7 @@ public enum Screen: Sendable, Hashable {
         guard let signedIn, let protection, protection.checked, let sync else { return .starting }
         if !signedIn { return .signIn }
         var shown = settled(sync, protection, everApproved, hasClasses, lastSessionOver, now)
+        if shown == .home, opened.isEmpty, tab == .history || tab == .me { return tab }
         for screen in opened {
             switch (shown, screen) {
             case (.home, .join), (.waiting, .home): shown = screen

@@ -122,6 +122,36 @@ struct AppTests {
     }
 
     @Test(
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen; the tab is Home again once the screens opened close — the standing changed — or who is signed in changes; a read that keeps them keeps the tab"
+    )
+    func tabs() throws {
+        let homes = ["home", "homeLoading", "homeError", "homeUnread", "me"]
+        for (name, state) in PreviewFixtures.all {
+            #expect(Phone(fixture: state).tabbed == homes.contains(name), "\(name)")
+        }
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        phone.select(.me)
+        #expect(phone.screen == .me)
+        phone.select(.history)
+        #expect(phone.screen == .history)
+        var state = try #require(phone.sync)
+        state.heardAt = Date()
+        phone.synced(state)
+        #expect(phone.screen == .history)
+        state.standing = .waiting
+        phone.synced(state)
+        #expect(phone.tab == .home && phone.screen == .waiting && !phone.tabbed)
+        state.standing = .out
+        phone.synced(state)
+        #expect(phone.screen == .home && phone.tabbed)
+        let signedOut = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        signedOut.signed(in: false)
+        #expect(signedOut.screen == .signIn)
+        signedOut.signed(in: true)
+        #expect(signedOut.screen == .home && signedOut.tab == .home)
+    }
+
+    @Test(
         "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it, and Join over that Home in turn, Back returning to each (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
     )
     func opened() async throws {
