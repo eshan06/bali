@@ -162,7 +162,10 @@ scheduled program marks the session and its participations as ended and adds a
 the bell by the server's clock: past it, the phones have let go, so the session is over even
 before the sweep marks it, and an extend is refused as one for a session already ended (ruled
 2026-09-30). The teacher starts a new one instead, once the sweep has marked the old one over
-(within the minute); until then a Start answers with the old one.
+(within the minute); until then a Start answers with the old one. Nor does anyone join a
+session past its bell, or return to focus in it (A17 — one rule for all three): a tap then arms
+for the teacher's next Start, as when nothing runs, and a refocus is refused as after the sweep.
+What a phone reports there — an unlock, protection off — is recorded by its own rules.
 
 **7. The every-30-seconds "still here" message only updates one column — it never adds
 history rows.** During a session, each app tells the server every ~30 seconds: "still

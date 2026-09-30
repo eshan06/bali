@@ -8,6 +8,45 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **A17: a tap after the bell never joins the session that just ended — one
+  rule for "running", by the server's clock** (#127's Claude Review; the owner's ask). **The
+  gap:** A16 refused an extend at or past the bell before the sweep marks the session ended
+  (decision 12), but the tap path still called such a session running: `resolveTapTarget` picked
+  any session with `ended_at` unset and `tapIn` checked only `ended_at`. So a tap in that gap —
+  up to a minute (A15) — joined the class that had just ended, focused on the grid over a phone
+  its bell had unshielded, and was spent there instead of waiting for the next Start; a refocus
+  there turned the grid green the same way; and a tap retried there named the over session.
+  **Decided:** one rule, `sessionRunning(session, now)` in the engine — `ended_at` unset and
+  `ends_at` after `now`, the server's clock — used by the extend (decision 12), the tap and a
+  refocus; no second copy of it (v2's disease). The tap route lists the teacher's sessions not
+  yet marked over in the student's classes, newest first, and joins the first running one by the
+  rule; with none, the tap arms — the same path, answer (`200 armed`, no session) and Start
+  conversion as when nothing runs. `tapIn` judges it again under the lock, at the moment the route
+  picked by, so only a session the sweep or its teacher marked over since is refused there
+  (`409 session_not_running`, as before; its retry arms); its replay names the recorded session
+  only while it runs by the rule, so a retry in the gap is `200 replay` with no session (rule 4).
+  A refocus past the bell is refused as after the sweep, fresh or retried. **Kept:** late
+  records — an unlock or protection off in the gap is recorded as before the sweep, and after it
+  keeps its note (A2c, A10, A11); only joining or returning to focus in an over session is
+  refused. Start is untouched here. **The clock:** a tap and a refocus take `now` (the server's
+  clock, now by default, as `armTap`'s), and the API reads one injectable clock
+  (`AppDeps.clock`) for the tap, the refocus and the extend; tests whose lessons are on a fixed
+  day hear each request when its phone made it. **`/v1` corrections in place (API decision 2):**
+  in the gap a tap was `200 joined` (now `200 armed`), a refocus `200 applied` (now `409
+  session_not_running`), and a retried tap `200 replay` naming the over session (now naming
+  none) — each told the phone something false; every one is an answer the phone's tables already
+  read, and no fixture changes. **Weighed:** the check in the route alone leaves the lock
+  reading `ended_at`, a second rule; `ends_at > now` in the lookup's SQL copies the rule; the
+  queries importing it from the engine, which imports the queries, makes a cycle — so the route
+  picks with the engine's rule from the lookup's candidates, at most one per class. **Tests,**
+  red first: PGlite — a tap past the bell, unswept (at it and 30 s on, the phone's claim before
+  it), refused with nothing recorded, and a second before it joined; its retry there naming no
+  session; a refocus there refused, fresh and retried. The wire — a tap in the gap armed, and
+  joined by the next Start after the sweep; a running session joined over a newer one past its
+  bell; and in the gap a refocus `409` while an unlock and a protection off record as ever. No
+  race is new: the rule is judged under the session lock the old check was. The engine tests'
+  lessons are in January, so their taps and returns are heard when the phone made them.
+
 - **2026-09-30** — **The C riders, Riders-2: polish — History, Unlocked and Me's review WARNs.**
   **History:** `History.answered` reloads from the top on `unknown_cursor` only where a cursor was
   sent — the page after `nextBefore` — since a read from the top answered so would be read again
