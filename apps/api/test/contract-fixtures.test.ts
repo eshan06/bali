@@ -87,6 +87,8 @@ const SCENARIOS: Record<string, string> = {
     'An unlock from someone with no standing in the session: kept as an orphan record.',
   'unlock/recorded-superseded':
     'A late unlock (A10), stuck on the phone while the student’s own refocus went ahead of it: recorded, the focus left alone.',
+  'unlock/recorded-superseded-gone':
+    'Another late unlock of that student’s, reaching the server once they have left the class: still late, recorded with no state (A11), its session named.',
   'unlock/409-event-id-conflict': 'An unlock under an id the student’s own tap holds (a bug).',
   'tap-unlock/applied':
     'An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.',
@@ -388,6 +390,12 @@ async function captureAll() {
   });
   const passed = { outcome: 'recorded', recordedAs: 'superseded', state: 'focused' };
   await capture('unlock/recorded-superseded', older, 200, passed);
+  // … and another, once the student has left the class: the answer the phone's engine tests
+  // hand-wrote until now (#119's review).
+  await setup(del(dan, `/v1/enrollments/${await enrollmentOf(stuck.klass.id, stuck.student.id)}`));
+  const lateGone = change(dan, period.id, 'unlock', randomUUID(), lessonAt('13:04'));
+  const passedGone = { outcome: 'recorded', recordedAs: 'superseded', state: null };
+  await capture('unlock/recorded-superseded-gone', lateGone, 200, passedGone);
 
   // An unlock made while the phone's own tap was unanswered, sent under that
   // tap (owner decision 11): filed where it landed, or kept with no session.
