@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-29** — **C5a-2: the Unlocked screen as D1 draws it, over C5a-1's engine; the screen
+  chosen again at the bell by a task, not a timeline.** **The card:** the three while the reason can
+  still go with the unlock (C5a-1's hold); the one given, in the brand's fill, the others dimmed —
+  D1 draws none given, so this is for the owner's canvas; once gone without one, "Your unlock goes to
+  your teacher without a reason"; none for an unlock the phone did not make this run. A pick that
+  fails is said under the three until too late, when the late words take its place: there is
+  nothing left to try. The three sit side by side only while all three fit whole — each as wide as
+  the widest label — and stack at larger text sizes. **The body** says "Your teacher will see you
+  unlocked" while the unlock is on the phone and D1's "can see" once it has gone (honesty over the
+  artboard's one state). **The way back:** Back to focus; where protection off was reported in the
+  session since the phone's last tap, the words and Tap in — Home's scan (`Phone.tapIn`) — instead.
+  **At the bell** `RootView` asks the router again — a task that sleeps until `Phone.bell` and then
+  redraws it — since the router's bell rule reaches Unlocked only when something it watches changes
+  (C1a's hand-off). Found on the simulator: `TimelineView(.explicit([bell]))`, the hand-off's
+  suggestion, renders its first entry at once, the bell's own date, and never again — the screen
+  stayed Unlocked past the bell; `[.now, bell]` did no better. Checked with a fixture whose bell was
+  45 s away: Unlocked, then Home at the bell. **Wired:** `Phone.emergencyUnlock` presses through
+  `SyncEngine.pressUnlock`, so the hold is live from Focus and Home, and a press that found nothing
+  to unlock is said (#116's review); Focus draws a late unlock's words in a card. **Not covered,
+  disclosed:** an unlock under a tap made out of any session shows Home, not Unlocked (no class to
+  name); D1's "Saved on your phone first — it reaches…" keeps its em-dash (D1's own words). **Tests:**
+  `AppTests.fixtures` (the five fixtures' screens and cards, a frozen phone's reason and Back to
+  focus); the screens checked on the iPhone Air simulator, at the default and an accessibility text
+  size.
+
 - **2026-09-29** — **C5a-1: the Unlocked screen's engine side — the reason held for, never the
   unlock; Back to focus or a re-tap; a late unlock kept for Focus to say; and two riders.** C5a in
   two PRs for size (santa's step 0): this one, BaliOutbox; C5a-2 the screen. **The reason:** D1
