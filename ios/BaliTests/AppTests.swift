@@ -362,7 +362,11 @@ struct AppTests {
         try await engine.record(.unlock(session: "s", reason: nil))
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
-        // Once no unlock waits, saying one does is stale: gone (santa's round 1).
+        // Said where the engine's queue shows no unlock but the file holds one: an unrelated
+        // publish changes nothing; once a hold the queue showed ends, it goes (santa, 1 and 2).
+        held.synced(SyncState())
+        #expect(held.signOutFailed == SignOutWords.unsent)
+        held.synced(await engine.state)
         held.synced(SyncState())
         #expect(held.signOutFailed == nil)
         let keychain = Keychain(account: "ana")

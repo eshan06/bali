@@ -65,9 +65,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   why, where it held nothing quietly. **Santa** (two Claude reviewers, so they share a model
   family — Codex refuses every model on this Mac — and the design check): round 1, one blocker —
   the Screen Time row above, fixed test first — and, from its WARNs, the kept reason only where no
-  other unlock is queued (an older unlock's answer landing after a newer press no longer speaks
-  over the newer card), the account's stand-in dropped, the stale "hasn't reached" cleared, and
-  the API's joiner and braille escapes pinned too.
+  other unlock of the class is queued (an older unlock's answer landing after a newer press no
+  longer speaks over the newer card), the account's stand-in dropped, a stale "hasn't reached"
+  cleared once a hold ends, and the API's joiner and braille escapes pinned too. Round 2: one
+  blocker, in round 1's fix — its guard counted any class's queued unlock, so another class's
+  stuck one silenced the kept reason again; now the card's own lookup (`unlock(in:)`), red first;
+  and, from its WARNs, "hasn't reached" cleared only once a hold the queue showed ends (said
+  where the file holds one the queue does not, no unrelated publish clears it), and Me's Off row
+  pinned by its source too. The `.inactive` dismissal held with both reviewers.
 
 - **2026-09-30** — **A16: an extend racing the sweep — the expiry judged again under the
   session's lock** (#111's santa review; pre-existing). **The interleaving:** `expireDueSessions`

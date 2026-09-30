@@ -181,6 +181,20 @@ struct ReasonTests {
         await rig.until { $0.queued.count == 1 }
         #expect(await rig.engine.state.reasonKept == nil)
         await rig.stop()
+        // Another class's unlock stuck in the queue is no matter: this class's card still says
+        // what the server kept (santa's round 2).
+        let (outbox, _) = try makeOutbox()
+        let stuck = try record(outbox, .unlock(session: "a", reason: nil))
+        try await send(outbox, stuck, 400, Answer.refused("invalid_request"))
+        let other = try Rig(outbox: outbox)
+        try await other.engine.record(.tap(tagId: "tag"))
+        try await other.server.next(tapRoute).reply(200, Answer.joined())
+        await other.until { $0.standing == .inSession(session(), .focused) }
+        try await other.engine.record(.unlock(session: "s", reason: .nurse))
+        try await other.server.next(unlockRoute).reply(200, replay("null"))
+        let state = await other.until { $0.queued.count == 1 }
+        #expect(state.reasonKept == ReasonKept(session: "s", reason: nil))
+        await other.stop()
     }
 
     @Test(

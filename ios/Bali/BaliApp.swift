@@ -288,10 +288,12 @@ final class Phone {
     /// and the tab chosen with them, Home again (C6a).
     func synced(_ state: SyncState) {
         let keeps = state.keepsOpened(from: sync, at: Date())
+        let wasHeld = sync.flatMap(SignOutWords.held) != nil
         sync = state
-        // An unlock that held Sign out has gone: saying it has not would be stale (Riders-2's
-        // santa).
-        if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil {
+        // An unlock that held Sign out has gone: saying it has not would be stale — but only once
+        // a hold ends: "unsent" is said where the file holds one the engine's queue does not show,
+        // which the next publish would not change (Riders-2's santa, rounds 1 and 2).
+        if signOutFailed == SignOutWords.unsent, wasHeld, SignOutWords.held(state) == nil {
             signOutFailed = nil
         }
         guard !keeps else { return }

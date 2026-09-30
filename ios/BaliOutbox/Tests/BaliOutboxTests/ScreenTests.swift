@@ -381,6 +381,9 @@ struct ScreenTests {
         #expect(unlocked.contains("explaining = true") && unlocked.contains("explaining = false"))
         let me = try sourceCode("Bali/UI/MeView.swift")
         #expect(me.contains(".onChange(of: naming.busy) { _, busy in"))
+        // Me's Screen Time row says Off where the check judges the permission off: reachable
+        // over a standing not read (`meScreenTimeOff`; santa's rounds 1 and 2).
+        #expect(me.contains(#"value: off ? ("Off", Theme.textSecondary) : ("On", Theme.brand)"#))
     }
 
     @Test(
