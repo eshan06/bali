@@ -24,7 +24,8 @@ public struct UnlockedWords: Sendable, Hashable {
         public var caption: String {
             switch self {
             case .open: "Your teacher sees the reason you pick."
-            case .waiting: UnlockedWords.onItsWay
+            case .waiting(nil): UnlockedWords.onItsWay
+            case .waiting: "Your reason goes with your unlock. You can change it once it arrives."
             }
         }
     }
@@ -66,7 +67,7 @@ public struct UnlockedWords: Sendable, Hashable {
             }
         retap =
             sync.reportedOff == session.id
-            ? "Screen Time was off during this class, so tap your teacher's block to go back to focus."
+            ? "Screen Time was off during this class, so tap your teacher's block to lock your apps again."
             : sync.refusedRefocus(in: session.id)
         stuck = unlock?.stuck == true ? Self.unsent : nil
     }
@@ -75,15 +76,20 @@ public struct UnlockedWords: Sendable, Hashable {
     public static let onItsWay = "You can pick a reason once your unlock reaches your teacher."
 
     /// What the card says of a change of the reason that did not go (rule 5), keyed on the
-    /// refusal: the unlock over, the class over, not found — else the Join screen's words.
+    /// refusal: the unlock over, the class over, not found — else that it did not go, and how on.
     public static func notChanged(_ answer: APIResponse<UnlockReasonResponse>) -> String {
-        switch answer.error?.error.reason {
-        case .unlockSuperseded?: "This unlock is over, so its reason can't change."
-        case .sessionNotRunning?: "Class is over, so the reason can't change."
-        case .unlockNotFound?: "Bali couldn't find this unlock, so its reason can't change."
-        default: Joining.words(answer.result, nil)
+        switch (answer.error?.error.reason, answer.result) {
+        case (.unlockSuperseded?, _): "This unlock is over, so its reason can't change."
+        case (.sessionNotRunning?, _): "Class is over, so the reason can't change."
+        case (.unlockNotFound?, _): "Bali couldn't find this unlock, so its reason can't change."
+        case (_, .networkError): offline
+        default: "Bali couldn't change your reason. Try again in a moment."
         }
     }
+
+    /// What the card says of a change no answer came to.
+    public static let offline =
+        "Bali couldn't change your reason. Check your connection and try again."
 
     /// What a screen says of an Emergency Unlock stuck on the phone, kept and retried (rule 5).
     public static let unsent = "Bali couldn't send your unlock to your teacher yet. It keeps trying."

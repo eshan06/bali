@@ -39,12 +39,15 @@ private func screen(
 
 /// Whether D1's tab bar shows over the phone standing `standing`, with `opened`, at `now` — the
 /// router's own answer, beside its screen.
-private func tabbed(standing: Standing, opened: [Screen] = [], now: Date = t0) -> Bool {
+private func tabbed(
+    standing: Standing, opened: [Screen] = [], closed: SessionView? = nil, now: Date = t0
+) -> Bool {
     var (protection, sync) = (Protection(), SyncState())
     (protection.checked, protection.permission, sync.standing) = (true, .approved, standing)
     return Screen.choose(
         problem: nil, introSeen: true, signedIn: true, protection: protection, everApproved: false,
-        sync: sync, hasClasses: nil, sessionOverClosed: nil, opened: opened, tab: .history, now: now
+        sync: sync, hasClasses: nil, sessionOverClosed: closed, opened: opened, tab: .history,
+        now: now
     ).tabbed
 }
 
@@ -296,6 +299,15 @@ struct ScreenTests {
         #expect(screen(standing: off, opened: [.home]) == .protectionOff)
         #expect(screen(standing: unlocked, opened: [.home], now: at(3000)) == .sessionOver)
         #expect(!tabbed(standing: unlocked, opened: [.home], now: at(3000)))
+        // Its Unlocked gone — the bell rung, then Session over's Done, or a read saying out — the
+        // Home it opened is the router's own Home: its tab bar, its tabs (santa's round 1).
+        let rung = Standing.inSession(session(), .unlocked)
+        for (standing, closed) in [(rung, session()), (Standing.out, nil)] as [(Standing, SessionView?)] {
+            #expect(
+                screen(standing: standing, sessionOverClosed: closed, opened: [.home], tab: .me, now: at(3000))
+                    == .me)
+            #expect(tabbed(standing: standing, opened: [.home], closed: closed, now: at(3000)))
+        }
     }
 
     @Test(

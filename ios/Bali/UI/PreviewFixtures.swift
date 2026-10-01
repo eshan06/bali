@@ -99,7 +99,7 @@
                 sync: recorded(standing(.inSession(period3, .unlocked)), nil), picking: .nurse),
             "unlockedPickError": State(
                 sync: recorded(standing(.inSession(period3, .unlocked)), .bathroom),
-                pickFailed: Joining.words(.networkError, nil)),
+                pickFailed: UnlockedWords.offline),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
             "history": State(tab: .history, history: anaHistory()),

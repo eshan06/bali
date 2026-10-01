@@ -60,6 +60,9 @@ public enum Screen: Sendable, Hashable {
             switch (shown, screen) {
             case (.home, .join), (.waiting, .home), (.unlocked, .home):
                 (tabbed, shown) = (shown == .unlocked, screen)
+            // A Home opened over a screen that has since become Home itself — Unlocked's, after
+            // its bell (santa's round 1) — is that Home: no screen of its own.
+            case (.home, .home): continue
             default: return (shown, false)
             }
         }
@@ -204,8 +207,8 @@ extension SyncState {
     func refusedRefocus(in session: String) -> String? {
         guard let refused, refused.change == .refocus(session: session) else { return nil }
         return refused.reason == .protectionOff
-            ? "Bali couldn't lock your apps again, because Screen Time was off during this class. Tap your teacher's block to go back to focus."
-            : "Bali couldn't lock your apps again. Tap your teacher's block to go back, or ask your teacher."
+            ? "Bali couldn't lock your apps again, because Screen Time was off during this class. Tap your teacher's block to lock them again."
+            : "Bali couldn't lock your apps again. Tap your teacher's block to lock them again, or ask your teacher."
     }
 
     /// What Session over says (C5b; D1's SessionOver) of the session the phone stands in, its bell

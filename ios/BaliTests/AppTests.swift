@@ -122,7 +122,7 @@ struct AppTests {
         }
         #expect(Phone(fixture: try #require(PreviewFixtures.all["unlockedPicking"])).picking == .nurse)
         let pickError = Phone(fixture: try #require(PreviewFixtures.all["unlockedPickError"]))
-        #expect(pickError.pickFailed == Joining.words(.networkError, nil))
+        #expect(pickError.pickFailed == UnlockedWords.offline)
         let unlocked = Phone(fixture: try #require(PreviewFixtures.all["unlocked"]))
         await unlocked.pick(.bathroom)
         #expect(unlocked.pickFailed == Joining.notStarted && unlocked.picking == nil)
@@ -132,6 +132,10 @@ struct AppTests {
         #expect(overUnlocked.tabbed && overUnlocked.canGoBack)
         overUnlocked.back()
         #expect(overUnlocked.screen == .unlocked && !overUnlocked.tabbed)
+        // Its Unlocked gone, the Home it opened is the router's own: its tab bar, no Back
+        // (santa's round 1).
+        let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
+        #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         #expect(unlocked.bell != nil && home.bell == nil)
         // History (C6a): D1's days and cards, each state's fixture its own; a frozen phone's read

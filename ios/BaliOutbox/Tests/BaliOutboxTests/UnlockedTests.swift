@@ -96,7 +96,10 @@ struct UnlockedTests {
         #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.picker == nil)
         #expect(words(try unlocked())?.picker == nil)
         #expect(UnlockedWords.Picker.open(nil).caption == "Your teacher sees the reason you pick.")
-        #expect(UnlockedWords.Picker.waiting(.nurse).caption == UnlockedWords.onItsWay)
+        #expect(UnlockedWords.Picker.waiting(nil).caption == UnlockedWords.onItsWay)
+        #expect(
+            UnlockedWords.Picker.waiting(.nurse).caption
+                == "Your reason goes with your unlock. You can change it once it arrives.")
     }
 
     @Test(
@@ -107,7 +110,7 @@ struct UnlockedTests {
         state.reportedOff = bell1042.id
         #expect(
             words(state)?.retap
-                == "Screen Time was off during this class, so tap your teacher's block to go back to focus."
+                == "Screen Time was off during this class, so tap your teacher's block to lock your apps again."
         )
         state.reportedOff = "another"
         #expect(words(state)?.retap == nil)
@@ -157,8 +160,9 @@ struct UnlockedTests {
         #expect(
             await said(404, "unlock_not_found")
                 == "Bali couldn't find this unlock, so its reason can't change.")
-        #expect(await said(nil) == Joining.words(.networkError, nil))
-        #expect(await said(500) == Joining.words(.status(500), nil))
+        #expect(await said(nil) == UnlockedWords.offline)
+        #expect(
+            await said(500) == "Bali couldn't change your reason. Try again in a moment.")
     }
 }
 
@@ -263,7 +267,7 @@ struct ReasonTests {
         async let lost = rig.engine.explain(.other)
         let first = try await rig.server.next(route)
         first.reply(nil)
-        #expect(await lost == Joining.words(.networkError, nil))
+        #expect(await lost == UnlockedWords.offline)
         async let again = rig.engine.explain(.other)
         let second = try await rig.server.next(route)
         #expect(try eventId(second) == eventId(first))
@@ -431,7 +435,7 @@ struct ReasonTests {
         }
         #expect(await rig.engine.explain(.other) == "Bali couldn't save your reason. Try again.")
         try refuseRecords(rig.outbox)
-        #expect(await rig.engine.backToFocus() == "Bali couldn't lock your apps again. Try again.")
+        #expect(await rig.engine.backToFocus() == "Bali couldn't lock your apps. Try again.")
         #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
         await rig.stop()
     }
@@ -467,6 +471,8 @@ struct ReasonTests {
             let state = await rig.until { $0.queued.isEmpty }
             #expect(state.standing == .inSession(session(), .focused))
             #expect(state.superseded == Superseded(session: "s", ordered: ordered))
+            // Late, it is on no chip, and its reason never changes (A20): nothing to pick for.
+            #expect(state.recordedUnlock == nil)
             let said = FocusWords(state, nil, now: t0).superseded
             #expect(
                 said

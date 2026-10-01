@@ -80,8 +80,9 @@ struct UnlockedView: View {
         return ForEach(UnlockReason.allCases, id: \.self) { reason in
             let chosen = (phone.picking ?? picker.chosen) == reason
             Button {
-                // The one chosen, chosen again, changes nothing: a selected control's press.
-                guard !chosen else { return }
+                // The one chosen, chosen again, changes nothing: a selected control's press —
+                // unless the last pick failed, its answer lost: the server may hold another.
+                guard !chosen || phone.pickFailed != nil else { return }
                 Task {
                     await phone.pick(reason)
                     if let failed = phone.pickFailed { announce(failed) }
@@ -111,8 +112,11 @@ struct UnlockedView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             if let retap = words.retap {
-                Text(retap).textStyle(.body)
-                TapIn(phone: phone, primary: false)
+                VStack(spacing: 8) {
+                    Text(retap).textStyle(.body)
+                    TapIn(phone: phone, primary: false)
+                }
+                .padding(.top, 8)
             } else {
                 Button("Lock my apps again") {
                     Task {
@@ -169,20 +173,21 @@ struct TapIn: View {
 private struct ReasonLabel: View {
     let reason: UnlockReason
     let chosen: Bool
+    @ScaledMetric(relativeTo: .body) private var check: CGFloat = 12
 
     var body: some View {
         ZStack {
             ForEach(UnlockReason.allCases, id: \.self) {
-                Self.text($0, check: true).hidden().accessibilityHidden(true)
+                text($0, check: true).hidden().accessibilityHidden(true)
             }
-            Self.text(reason, check: chosen)
+            text(reason, check: chosen)
         }
     }
 
-    private static func text(_ reason: UnlockReason, check: Bool) -> some View {
+    private func text(_ reason: UnlockReason, check: Bool) -> some View {
         HStack(spacing: 4) {
             if check {
-                Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
+                Image(systemName: "checkmark").font(.system(size: self.check, weight: .bold))
                     .accessibilityHidden(true)
             }
             Text(reason.rawValue.capitalized)

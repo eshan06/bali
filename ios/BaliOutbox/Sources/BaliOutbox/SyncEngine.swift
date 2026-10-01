@@ -443,7 +443,7 @@ public actor SyncEngine {
     public func backToFocus() -> String? {
         guard case .inSession(let session, .unlocked?) = state.standing else { return nil }
         do { try record(.refocus(session: session.id)) } catch {
-            return "Bali couldn't lock your apps again. Try again."
+            return "Bali couldn't lock your apps. Try again."
         }
         return nil
     }
@@ -608,7 +608,6 @@ public actor SyncEngine {
                         break
                     }
                     let disposition = try outbox.settle(sent, now: clock.now())
-                    state.sending.remove(record.eventId)
                     await answered(record, sent, disposition)
                     continue
                 case .wait(let until): wake = until
@@ -631,7 +630,9 @@ public actor SyncEngine {
         let queued = queue()
         let applies = stored(outbox.awaiting) == 0
         var next = state
-        next.queued = queued
+        // Settled, and the queue read again, in one write: no screen sees the record neither on
+        // its way nor answered (santa's round 1).
+        (next.queued, next.sending) = (queued, next.sending.subtracting([record.eventId]))
         defer { state = next }
         switch disposition {
         case .tap(.retry)?, .unlock(.retry)?, .stateChange(.retry)?, .tap(.reauth)?,

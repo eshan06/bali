@@ -139,11 +139,16 @@ final class Phone {
     /// would otherwise ride above (C6b). Anywhere else — Home, where a change of standing sends the
     /// tab mid-edit — it shows. A view drawing both reads this once.
     var shown: (screen: Screen, tabbed: Bool) {
-        let shown = Screen.choose(
+        let shown = choose(opened)
+        return (shown.screen, shown.tabbed && !(naming.editing && shown.screen == .me))
+    }
+
+    /// The router's answer over what the phone knows, with `opened` as the screens opened.
+    private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
+        Screen.choose(
             problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
             everApproved: everApproved, sync: sync, hasClasses: hasClasses,
             sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: Date())
-        return (shown.screen, shown.tabbed && !(naming.editing && shown.screen == .me))
     }
 
     var screen: Screen { shown.screen }
@@ -288,8 +293,12 @@ final class Phone {
     /// Opens `screen` over what shows.
     func open(_ screen: Screen) { opened.append(screen) }
 
-    /// Whether the screen shown was opened over another, so it draws a way back to it (C3).
-    var canGoBack: Bool { opened.last == screen }
+    /// Whether the screen shown was opened over another, so it draws a way back to it (C3): only
+    /// where Back leads to another screen — never from a Home its Unlocked became after the bell
+    /// (santa's round 1).
+    var canGoBack: Bool {
+        opened.last == screen && choose(Array(opened.dropLast())).screen != screen
+    }
 
     /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
     /// a student in no class reaches no tab bar, so not Me: signed in with the wrong account, it is
@@ -308,6 +317,10 @@ final class Phone {
     func synced(_ state: SyncState) {
         let keeps = state.keepsOpened(from: sync, at: Date())
         let wasHeld = sync.flatMap(SignOutWords.held) != nil
+        // The unlock landed: a pick said to wait for it may go now (santa's round 1).
+        if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
+            pickFailed = nil
+        }
         sync = state
         // An unlock that held Sign out has gone: saying it has not would be stale — but only once
         // a hold ends: "unsent" is said where the file holds one the engine's queue does not show,
