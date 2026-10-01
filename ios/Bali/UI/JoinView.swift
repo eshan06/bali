@@ -72,7 +72,7 @@ struct JoinView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .scrollBounceBehavior(.basedOnSize).screenWide()
         .onAppear { typing = true }
         action(busy ? "Checking…" : "Continue", enabled: phone.joining.complete, phone.lookUp)
         // The router's own Join — a student in no class — reaches no tab bar, so not Me's: signed
@@ -101,7 +101,7 @@ struct JoinView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .scrollBounceBehavior(.basedOnSize).screenWide()
         action(
             busy ? "Joining…" : preview.alreadyEnrolled ? "Continue" : "Join \(preview.class.name)",
             enabled: true, phone.join)

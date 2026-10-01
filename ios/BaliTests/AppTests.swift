@@ -713,6 +713,39 @@ struct AppTests {
         }
     }
 
+    @Test(
+        "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro's pages and Me's What your teacher sees among them"
+    )
+    func scrollEdges() throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let screens =
+            PreviewFixtures.all.map { ($0.key, AnyView(RootView(phone: Phone(fixture: $0.value)))) }
+            + [("consentSheet", AnyView(ConsentSheet()))]
+        for (name, screen) in screens {
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.screen.bounds
+            window.rootViewController = UIHostingController(rootView: screen)
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            let scrolls = scrollViews(in: window)
+            // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
+            #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
+            expectEdges(of: scrolls, in: window, name)
+            // The intro's paging lays out only the page shown: each page, paged to, is checked.
+            for pager in scrolls where pager.isPagingEnabled {
+                for page in 1..<Int((pager.contentSize.width / pager.bounds.width).rounded()) {
+                    pager.contentOffset.x = CGFloat(page) * pager.bounds.width
+                    window.layoutIfNeeded()
+                    let shown = pager.subviews.filter { $0.frame.minX == pager.contentOffset.x }
+                    let scrolls = shown.flatMap(scrollViews(in:))
+                    #expect(!scrolls.isEmpty, "\(name), page \(page)")
+                    expectEdges(of: scrolls, in: window, "\(name), page \(page)")
+                }
+            }
+        }
+    }
+
     /// `mark`, 64 × 64, drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point
     /// counted from the top left.
     private func pixels(of mark: UIImage) throws -> (Int, Int) -> [Int] {
@@ -739,6 +772,27 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// Every scroll view in `view`, itself among them, outermost first.
+@MainActor
+private func scrollViews(in view: UIView) -> [UIScrollView] {
+    [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+}
+
+/// Each of `scrolls` out to `window`'s edges, its bar not inset with its content and — but the
+/// intro's paging, which holds pages, not content — its content inside the gutters.
+@MainActor
+private func expectEdges(of scrolls: [UIScrollView], in window: UIWindow, _ name: String) {
+    for scroll in scrolls {
+        let frame = scroll.convert(scroll.bounds, to: window)
+        #expect(frame.minX == 0 && frame.maxX == window.bounds.maxX, "\(name): \(frame)")
+        let bar = scroll.verticalScrollIndicatorInsets
+        #expect(bar.left == 0 && bar.right == 0, "\(name): \(bar)")
+        guard !scroll.isPagingEnabled else { continue }
+        let inset = scroll.adjustedContentInset
+        #expect(inset.left == Theme.gutter && inset.right == Theme.gutter, "\(name): \(inset)")
+    }
+}
 
 /// A phone of the test's own over an engine `server` answers, and a sign-in over `keychain`: what
 /// `Phone.start` wires between them and the screens, with no Keychain or network of the phone's.

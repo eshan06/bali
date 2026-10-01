@@ -43,7 +43,7 @@ struct MeView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollBounceBehavior(.basedOnSize).screenWide()
         }
         .sheet(isPresented: $consent) { ConsentSheet() }
     }
@@ -256,7 +256,7 @@ struct LeaveQuestion: View {
 }
 
 /// What a teacher sees, from Me's row: the intro's own page, in a sheet with Done.
-private struct ConsentSheet: View {
+struct ConsentSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -266,7 +266,7 @@ private struct ConsentSheet: View {
                 .foregroundStyle(Theme.brand)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
             ScrollView { IntroView.consent.padding(.vertical, 16) }
-                .scrollBounceBehavior(.basedOnSize)
+                .scrollBounceBehavior(.basedOnSize).screenWide()
         }
         .preferredColorScheme(.light)
     }

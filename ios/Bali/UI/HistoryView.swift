@@ -34,7 +34,7 @@ struct HistoryView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollBounceBehavior(.basedOnSize).screenWide()
         }
         // Shown with nothing read or reading — first shown since the tab was chosen, or forgotten
         // while it shows (santa's round 2) — it is read; a fixture's, read or not, stays as made.
