@@ -93,7 +93,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
       if (!klass) throw ApiError.notFound('class not found');
       if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
 
-      const startedAt = new Date();
+      const startedAt = clock();
       const endsAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
       const result = await startSession(db, { classId, startedAt, endsAt });
 

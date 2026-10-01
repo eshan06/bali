@@ -34,8 +34,9 @@ export interface AppDeps {
   logStream?: NodeJS.WritableStream;
   /**
    * The server's clock, which judges whether a session still runs — for a
-   * tap, a return to focus and an extend (A17), and a leave (A19). Unset, it is the system's;
-   * tests whose lessons are on a fixed day set it to that day.
+   * tap, a return to focus and an extend (A17), a Start (A18) and a leave
+   * (A19). Unset, it is the system's; tests whose lessons are on a fixed day
+   * set it to that day.
    */
   clock?: () => Date;
 }

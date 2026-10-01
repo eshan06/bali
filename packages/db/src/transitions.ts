@@ -381,27 +381,24 @@ export interface StartSessionResult {
 }
 
 /**
- * Convert this class's waiting armed taps into participations. Called inside the
- * start transaction: a tap the student made before the bell (saved as
- * student+teacher, decision 5) becomes a focused participation the moment the
- * teacher presses Start, emitting the deferred tap_in event with the armed
- * tap's original id so a later phone retry dedupes. When that id is already
- * this student's own `tap_in` the tap landed, so it is skipped and the skip
- * recorded as `armed_tap_skipped`; when any other event holds it, the tap
- * converts under a fresh id whose payload names the original. Returns the
- * count converted.
+ * The waiting taps a Start converts — this class's teacher's, unexpired at
+ * `at`, from students enrolled in the class — locked, and their students' tap
+ * locks taken in id order (A14). Taken before the Start touches any session
+ * or participation, the order A14 set: a tap takes its student's lock and then
+ * its session's row, so a Start holding a session's row — the class it ends
+ * past its bell (A18) — must never then wait on a student's lock.
  */
-async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
+async function lockWaitingTaps(tx: Database, classId: string, at: Date): Promise<ArmedTapRow[]> {
   const cls = firstOrUndefined(
-    await tx.select().from(classes).where(eq(classes.id, session.classId)).limit(1),
+    await tx.select().from(classes).where(eq(classes.id, classId)).limit(1),
   );
-  if (!cls) return 0;
+  if (!cls) return [];
 
   const enrolled = await tx
     .select({ studentId: enrollments.studentId })
     .from(enrollments)
     .where(and(eq(enrollments.classId, cls.id), isNull(enrollments.removedAt)));
-  if (enrolled.length === 0) return 0;
+  if (enrolled.length === 0) return [];
   const enrolledIds = enrolled.map((e) => e.studentId);
 
   // This teacher's still-waiting, unexpired taps from students in this class.
@@ -424,7 +421,7 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       and(
         eq(armedTaps.teacherId, cls.teacherId),
         isNull(armedTaps.consumedAt),
-        gt(armedTaps.expiresAt, session.startedAt),
+        gt(armedTaps.expiresAt, at),
         inArray(armedTaps.studentId, enrolledIds),
       ),
     )
@@ -433,7 +430,25 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
   for (const studentId of [...new Set(waiting.map((tap) => tap.studentId))].sort()) {
     await lockStudentTaps(tx, studentId);
   }
+  return waiting;
+}
 
+/**
+ * Convert the waiting taps a Start locked (`lockWaitingTaps`) into
+ * participations in its new session: a tap the student made before the bell
+ * (saved as student+teacher, decision 5) becomes a focused participation the
+ * moment the teacher presses Start, emitting the deferred tap_in event with the
+ * armed tap's original id so a later phone retry dedupes. When that id is
+ * already this student's own `tap_in` the tap landed, so it is skipped and the
+ * skip recorded as `armed_tap_skipped`; when any other event holds it, the tap
+ * converts under a fresh id whose payload names the original. Returns the
+ * count converted.
+ */
+async function convertArmedTaps(
+  tx: Database,
+  session: SessionRow,
+  waiting: ArmedTapRow[],
+): Promise<number> {
   let converted = 0;
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
@@ -623,7 +638,8 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
 
 /**
  * Start a focus session for a class. If one is already running, return it
- * rather than creating a duplicate (API-surface decision). Every unexpired
+ * rather than creating a duplicate (API-surface decision); one past its bell,
+ * not yet swept, is ended as the sweep would end it first (A18). Every unexpired
  * armed tap waiting for this class's teacher, from a student enrolled in the
  * class, becomes a focused participation (decision 5) — except one whose tap
  * had already landed, which is consumed and recorded as `armed_tap_skipped`.
@@ -643,21 +659,40 @@ export async function startSession(
       // Lock the class row so two simultaneous starts serialize: the loser waits,
       // then sees the running session and returns it rather than hitting the
       // one-running-per-class index with a raw unique violation (the doc's
-      // "from a phone and a laptop at once" promise).
+      // "from a phone and a laptop at once" promise). NO KEY UPDATE, which
+      // serialises Starts all the same but leaves the foreign-key checks of
+      // other writers' events free (A18): a Start then waits on the session's
+      // row, and the sweep or a tap holding that row inserts an event whose
+      // class key-share a FOR UPDATE here would refuse — a deadlock, measured.
       await tx
         .select({ id: classes.id })
         .from(classes)
         .where(eq(classes.id, input.classId))
-        .for('update');
+        .for('no key update');
 
+      // The taps this Start converts, and their students' locks, first (A14's
+      // order; `lockWaitingTaps`) — then the class's session not yet marked
+      // over, its row taken as the sweep takes it, so a sweep ending it
+      // meanwhile is waited out and then read as over. Running by the one rule (`sessionRunning`), it is the class
+      // the teacher already started, answered again. Past its bell the class
+      // is over, swept or not (decision 12): the Start ends it as the sweep
+      // would and starts the next — back-to-back classes never wait for the
+      // sweep (A18, the owner's ruling, 2026-09-30).
+      const waiting = await lockWaitingTaps(tx, input.classId, input.startedAt);
       const existing = firstOrUndefined(
         await tx
           .select()
           .from(sessions)
           .where(and(eq(sessions.classId, input.classId), isNull(sessions.endedAt)))
-          .limit(1),
+          .limit(1)
+          .for('update'),
       );
-      if (existing) return { outcome: 'existing', session: existing, armedConverted: 0 };
+      if (existing) {
+        if (sessionRunning(existing, input.startedAt)) {
+          return { outcome: 'existing', session: existing, armedConverted: 0 };
+        }
+        await endHeldSession(tx, existing, { at: input.startedAt, reason: 'expired' });
+      }
 
       const session = firstOrUndefined(
         await tx
@@ -675,7 +710,7 @@ export async function startSession(
         occurredAt: session.startedAt,
       });
 
-      const armedConverted = await convertArmedTaps(tx, session);
+      const armedConverted = await convertArmedTaps(tx, session, waiting);
       return { outcome: 'created', session, armedConverted };
     }),
   );
@@ -1369,36 +1404,49 @@ export async function endSession(db: Database, input: EndSessionInput): Promise<
     db.transaction(async (tx) => {
       const session = await loadSession(tx, input.sessionId, { forUpdate: true });
       if (!session) throw new TransitionError('SESSION_NOT_FOUND', 'no such session');
-      if (session.endedAt) return { ended: false, endedParticipations: 0 };
-      // An expiry is the bell's, so it is judged here, under the lock: the
-      // sweep picks sessions with an unlocked scan, and an extend committed
-      // since has moved the bell on. Ending it anyway told the teacher
-      // "extended" for a class that then ended (A16).
-      if (input.reason === 'expired' && session.endsAt > input.at) {
-        return { ended: false, endedParticipations: 0 };
-      }
-
-      const endedAt = clampToWindow(input.at, session.startedAt, session.endsAt);
-      await tx.update(sessions).set({ endedAt }).where(eq(sessions.id, session.id));
-
-      const participationReason: ParticipationEndedReason =
-        input.reason === 'expired' ? 'session_expired' : 'session_ended';
-      const endedRows = await tx
-        .update(participations)
-        .set({ endedAt, endedReason: participationReason })
-        .where(and(eq(participations.sessionId, session.id), isNull(participations.endedAt)))
-        .returning({ id: participations.id });
-
-      await insertEvent(tx, {
-        eventId: newUuidV7(),
-        type: input.reason === 'expired' ? 'session_expired' : 'session_ended',
-        sessionId: session.id,
-        classId: session.classId,
-        occurredAt: endedAt,
-      });
-      return { ended: true, endedParticipations: endedRows.length };
+      return endHeldSession(tx, session, input);
     }),
   );
+}
+
+/**
+ * `endSession`'s end, on a session row the caller holds FOR UPDATE — the one
+ * end transition, which a Start runs too when the class it finds is past its
+ * bell (A18), so a class ends the same way whoever ends it.
+ */
+async function endHeldSession(
+  tx: Database,
+  session: SessionRow,
+  input: Omit<EndSessionInput, 'sessionId'>,
+): Promise<EndSessionResult> {
+  if (session.endedAt) return { ended: false, endedParticipations: 0 };
+  // An expiry is the bell's, so it is judged here, under the lock: the
+  // sweep picks sessions with an unlocked scan, and an extend committed
+  // since has moved the bell on. Ending it anyway told the teacher
+  // "extended" for a class that then ended (A16).
+  if (input.reason === 'expired' && sessionRunning(session, input.at)) {
+    return { ended: false, endedParticipations: 0 };
+  }
+
+  const endedAt = clampToWindow(input.at, session.startedAt, session.endsAt);
+  await tx.update(sessions).set({ endedAt }).where(eq(sessions.id, session.id));
+
+  const participationReason: ParticipationEndedReason =
+    input.reason === 'expired' ? 'session_expired' : 'session_ended';
+  const endedRows = await tx
+    .update(participations)
+    .set({ endedAt, endedReason: participationReason })
+    .where(and(eq(participations.sessionId, session.id), isNull(participations.endedAt)))
+    .returning({ id: participations.id });
+
+  await insertEvent(tx, {
+    eventId: newUuidV7(),
+    type: input.reason === 'expired' ? 'session_expired' : 'session_ended',
+    sessionId: session.id,
+    classId: session.classId,
+    occurredAt: endedAt,
+  });
+  return { ended: true, endedParticipations: endedRows.length };
 }
 
 /**

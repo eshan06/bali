@@ -216,10 +216,10 @@ export async function findSessionById(
 }
 
 /**
- * A class's running session, if any — the same definition startSession uses to
- * decide "existing" (`ended_at IS NULL`), so the portal can recover the live
- * grid after a reload instead of offering to start a session that is already
- * running.
+ * A class's session not yet marked over (`ended_at IS NULL`), if any, so the
+ * portal can recover the live grid after a reload instead of offering to start
+ * a session that is already running. One past its bell counts until the sweep
+ * marks it, though a Start then ends it and starts the next (A18).
  */
 export async function findLiveSessionForClass(
   db: Database,
