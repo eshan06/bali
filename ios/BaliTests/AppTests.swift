@@ -731,16 +731,17 @@ struct AppTests {
             let scrolls = scrollViews(in: window)
             // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
             #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
-            for scroll in scrolls {
-                let frame = scroll.convert(scroll.bounds, to: window)
-                #expect(frame.minX == 0 && frame.maxX == window.bounds.maxX, "\(name): \(frame)")
-                // The bar drawn at the scroll view's own edge, not inset with the content.
-                let bar = scroll.verticalScrollIndicatorInsets
-                #expect(bar.left == 0 && bar.right == 0, "\(name): \(bar)")
-                // The intro's paging holds pages, not content: each page's scroll view is checked.
-                guard !scroll.isPagingEnabled else { continue }
-                let inset = scroll.adjustedContentInset
-                #expect(inset.left == Theme.gutter && inset.right == Theme.gutter, "\(name): \(inset)")
+            expectEdges(of: scrolls, in: window, name)
+            // The intro's paging lays out only the page shown: each page, paged to, is checked.
+            for pager in scrolls where pager.isPagingEnabled {
+                for page in 1..<Int((pager.contentSize.width / pager.bounds.width).rounded()) {
+                    pager.contentOffset.x = CGFloat(page) * pager.bounds.width
+                    window.layoutIfNeeded()
+                    let shown = pager.subviews.filter { $0.frame.minX == pager.contentOffset.x }
+                    let scrolls = shown.flatMap(scrollViews(in:))
+                    #expect(!scrolls.isEmpty, "\(name), page \(page)")
+                    expectEdges(of: scrolls, in: window, "\(name), page \(page)")
+                }
             }
         }
     }
@@ -776,6 +777,21 @@ private final class TestsBundle {}
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
     [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+}
+
+/// Each of `scrolls` out to `window`'s edges, its bar not inset with its content and — but the
+/// intro's paging, which holds pages, not content — its content inside the gutters.
+@MainActor
+private func expectEdges(of scrolls: [UIScrollView], in window: UIWindow, _ name: String) {
+    for scroll in scrolls {
+        let frame = scroll.convert(scroll.bounds, to: window)
+        #expect(frame.minX == 0 && frame.maxX == window.bounds.maxX, "\(name): \(frame)")
+        let bar = scroll.verticalScrollIndicatorInsets
+        #expect(bar.left == 0 && bar.right == 0, "\(name): \(bar)")
+        guard !scroll.isPagingEnabled else { continue }
+        let inset = scroll.adjustedContentInset
+        #expect(inset.left == Theme.gutter && inset.right == Theme.gutter, "\(name): \(inset)")
+    }
 }
 
 /// A phone of the test's own over an engine `server` answers, and a sign-in over `keychain`: what
