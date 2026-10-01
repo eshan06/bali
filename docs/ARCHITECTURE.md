@@ -334,6 +334,7 @@ Student app:
 - `POST /v1/sessions/{id}/unlock` and `POST /v1/sessions/{id}/refocus` — emergency
   unlock, and coming back from one. The unlock may carry an optional reason (bathroom,
   nurse, other); one the server does not recognise is recorded as none rather than refused.
+  The student may change it while the unlock stands (`PATCH /v1/unlocks/{eventId}`, below).
   A refocus replayed after the student's participation ended while the session runs
   (removed, left the class, switched away) is answered `replay` with no session and no
   state (ruled 2026-09-24), never with that ended row's last state and a window. A late
@@ -353,6 +354,17 @@ Student app:
   which no Start converts) or `unknown_tap` (no tap of the caller's has that id). A tap
   landing after an unlock sent under it files it then, so both arrival orders end alike;
   the two serialise on the tap. Never refused; a retry is answered where it was recorded.
+- `PATCH /v1/unlocks/{eventId}` — the student changes their unlock's reason (A20, the owner's
+  ruling 2026-09-30): `{ reason, eventId }`, the unlock named by its own event id. Recorded as
+  an `unlock_reason_changed` event of its own naming the unlock — the unlock's event is never
+  rewritten — and the grid, its stream and the history show the latest. Only while that unlock
+  is the one the teacher's grid shows (the student's latest turn in the session: no return to
+  focus, tap or other unlock of theirs there since, and not itself late) and the session runs
+  by the server's clock: else `409 unlock_superseded` or `409 session_not_running`; an id that
+  names no unlock of the caller's in a session — someone else's, one kept with none — is `404
+  unlock_not_found`. A refusal records nothing. A replay answers the reason now, whatever came
+  since, and so does the unlock's own replay. A reason outside the vocabulary is a `400`: this
+  is no unlock record.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
   (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state. A
   report that first reaches the server after the session ended, from a student who was in

@@ -279,19 +279,16 @@ export interface UnlockRequest {
   order?: ActionOrder | null;
 }
 
-// PATCH /v1/unlocks/{eventId} — the student changes the reason of their own
-// unlock, named by the unlock's event id (A20; the owner's ruling,
-// 2026-09-30). Recorded as its own event, never by rewriting the unlock's.
-// Only while that unlock is the one the teacher's grid shows — no return to
-// focus, tap or other unlock of theirs in that session since, and not itself
-// late — and the session runs by the server's clock: else `409
-// unlock_superseded` or `409 session_not_running`; an id that names no unlock
-// of the caller's in a session is `404 unlock_not_found`. Nothing is recorded
-// for a refusal.
+// PATCH /v1/unlocks/{eventId} — the student changes their unlock's reason (A20),
+// the unlock named by its own event id; recorded as an event of its own. Only
+// while it is the unlock the grid shows — no return, tap or unlock of theirs
+// there since — and the session runs: else `409 unlock_superseded` / `409
+// session_not_running`; no unlock of the caller's in a session, `404
+// unlock_not_found`. A refusal records nothing.
 export interface UnlockReasonRequest {
   /** One of `UNLOCK_REASONS`; anything else is a 400. */
   reason: UnlockReason;
-  /** Client idempotency key for this change (rule 4) — the unlock's own id is in the path. */
+  /** This change's idempotency key (rule 4); the unlock's own id is in the path. */
   eventId: string;
 }
 /** Every outcome a reason change answers with (`UnlockReasonResponse.outcome`). */

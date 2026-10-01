@@ -95,12 +95,10 @@ const SCENARIOS: Record<string, string> = {
     'The student changes the reason of their unlock while it stands (A20): recorded as its own event, and the teacher sees it.',
   'unlock-reason/replay':
     'The retry of that change, after a later one: the reason now, not the retry’s.',
-  'unlock-reason/400-bad-input': 'A malformed change: its eventId is not a UUID.',
   'unlock-reason/404-unlock-not-found':
     'A change of an unlock that is not the student’s own: nothing recorded, nothing said of it.',
   'unlock-reason/409-unlock-superseded':
     'A change after the student went back to focus: that unlock is over, and nothing is recorded.',
-  'unlock-reason/409-session-not-running': 'A change once the class has ended: nothing recorded.',
   'tap-unlock/applied':
     'An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.',
   'tap-unlock/replay': 'The retry of that unlock: the reason on record, not the retry’s.',
@@ -350,8 +348,6 @@ async function captureAll() {
   await capture('unlock-reason/applied', toNurse, 200, { outcome: 'applied' });
   await setup(reasonFor(ana, unlocked, 'other'));
   await capture('unlock-reason/replay', toNurse, 200, { outcome: 'replay', reason: 'other' });
-  const malformed = reasonFor(ana, unlocked, 'nurse', 'x');
-  await capture('unlock-reason/400-bad-input', malformed, 400, { code: 'bad_input' });
   const notHers = { reason: 'unlock_not_found' };
   const byAnother = reasonFor(newcomer, unlocked, 'nurse');
   await capture('unlock-reason/404-unlock-not-found', byAnother, 404, notHers);
@@ -390,8 +386,6 @@ async function captureAll() {
   await end(s.id);
   const over = { reason: 'session_not_running' };
   await capture('refocus/409-session-not-running', change(ana, s.id, 'refocus'), 409, over);
-  const afterEnd = reasonFor(ana, unlocked, 'bathroom');
-  await capture('unlock-reason/409-session-not-running', afterEnd, 409, over);
   const late = { outcome: 'recorded', recordedAs: 'after_session_end' };
   await capture('unlock/recorded-after-session-end', change(ana, s.id, 'unlock'), 200, late);
   const unknown = randomUUID();

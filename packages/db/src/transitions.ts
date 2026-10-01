@@ -2798,45 +2798,33 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
   );
 }
 
-/** A student's change to the reason of their own unlock (A20). */
+/** A student's change of their own unlock's reason (A20); `now` is the server's clock. */
 export interface UnlockReasonInput {
-  /** The unlock: its own event id, the one its phone minted. */
+  /** The unlock's own event id, as its phone minted it; `eventId` is this change's (rule 4). */
   unlockEventId: string;
   studentId: string;
-  /** This change's own idempotency key (rule 4). */
   eventId: string;
   reason: UnlockReason;
-  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
   now?: Date;
 }
 export interface UnlockReasonResult {
-  /** 'applied' recorded the change; 'replay' this event id already did, and nothing is applied again. */
   outcome: 'applied' | 'replay';
   /** The unlock's reason on record now: this one when applied; on a replay, the latest since. */
   reason: UnlockReason;
 }
 
 /**
- * The student changes the reason of their own unlock (A20; the owner's ruling,
- * 2026-09-30), and the teacher sees the latest — on the live grid and in the
- * history. History is append-only, so the unlock's own event is never
- * rewritten: the change is an `unlock_reason_changed` event of its own, in the
- * unlock's session, naming it, and `changedReasons` reads the latest.
- *
- * Only the unlock the teacher's grid shows takes a change: the student's latest
- * turn in that session (`latestTurn`, the snapshot's own rule). One a return to
- * focus, a tap or another unlock of theirs came after, or one itself late
- * (A10), is over: `UNLOCK_SUPERSEDED`. Nor once the session is over by the
- * server's clock (`sessionRunning`, A17's one rule): `SESSION_NOT_RUNNING`. An
- * id naming no unlock of the caller's in a session — someone else's, one kept
- * with none, none at all — is `UNLOCK_NOT_FOUND`. A refusal records nothing.
- *
- * It takes the session's lock, as every change there does, so it serialises
- * with a return, a tap or an unlock in that session: a change is never
- * recorded after the return that ended its unlock. Idempotent on its own event
- * id, looked up first under that lock: a retry is answered with the reason now,
- * whatever came since — a session over included; an id another event holds is
- * `EVENT_ID_CONFLICT`.
+ * The student changes their unlock's reason (A20; the owner's ruling,
+ * 2026-09-30): the teacher sees the latest. History is append-only, so the
+ * change is an `unlock_reason_changed` event of its own, naming the unlock, and
+ * `changedReasons` reads the latest. Only for the unlock the grid shows — the
+ * student's latest turn there (`latestTurn`, the snapshot's own rule), else
+ * `UNLOCK_SUPERSEDED` — while the session runs by the server's clock
+ * (`sessionRunning`), else `SESSION_NOT_RUNNING`; an id naming no unlock of
+ * the caller's in a session is `UNLOCK_NOT_FOUND`. A refusal records nothing.
+ * Under the session's lock, as every change there, so a change is never
+ * recorded after the return that ended its unlock. A retry is answered first,
+ * with the reason now — past the bell too.
  */
 export async function changeUnlockReason(
   db: Database,
@@ -2847,20 +2835,16 @@ export async function changeUnlockReason(
   const unlockId = input.unlockEventId;
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
-      // The caller's own unlock, filed in a session: never anyone else's.
-      const named = firstOrUndefined(
-        await tx
-          .select({ sessionId: events.sessionId })
-          .from(events)
-          .where(
-            and(
-              eq(events.eventId, unlockId),
-              eq(events.userId, input.studentId),
-              eq(events.type, 'unlock'),
-            ),
-          )
-          .limit(1),
-      );
+      const [named] = await tx
+        .select({ sessionId: events.sessionId })
+        .from(events)
+        .where(
+          and(
+            eq(events.eventId, unlockId),
+            eq(events.userId, input.studentId),
+            eq(events.type, 'unlock'),
+          ),
+        );
       const session = named?.sessionId
         ? await loadSession(tx, named.sessionId, { forUpdate: true })
         : undefined;
@@ -2868,23 +2852,17 @@ export async function changeUnlockReason(
         throw new TransitionError('UNLOCK_NOT_FOUND', 'no unlock of yours in a class has that id');
       }
 
-      const prior = firstOrUndefined(
-        await tx
-          .select({ type: events.type, userId: events.userId, payload: events.payload })
-          .from(events)
-          .where(eq(events.eventId, input.eventId))
-          .limit(1),
-      );
+      const [prior] = await tx
+        .select({ type: events.type, userId: events.userId, payload: events.payload })
+        .from(events)
+        .where(eq(events.eventId, input.eventId));
       if (prior) {
-        const of = (prior.payload as Record<string, unknown> | null)?.unlock_event_id;
-        if (
-          prior.type !== 'unlock_reason_changed' ||
-          prior.userId !== input.studentId ||
-          of !== unlockId
-        ) {
+        const of = (prior.payload as { unlock_event_id?: unknown } | null)?.unlock_event_id;
+        const mine = prior.type === 'unlock_reason_changed' && prior.userId === input.studentId;
+        if (!mine || of !== unlockId) {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
-        // It is on record, so the unlock has a changed reason to read.
+        // On record, so the unlock has a changed reason to read.
         return { outcome: 'replay', reason: (await recordedReason(tx, unlockId))! };
       }
 

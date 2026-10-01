@@ -262,9 +262,8 @@ export const events = pgTable(
     index('events_order_tap_idx')
       .on(t.orderInstall, t.orderSeq)
       .where(sql`${t.type} = 'tap_in'`),
-    // An unlock's reason now is its latest change's (A20, `changedReasons`):
-    // read by the unlock's id for a grid's snapshot, a history page and an
-    // unlock's replay. Partial, holding only the changes, so each is a probe.
+    // An unlock's reason now is its latest change's (A20, `changedReasons`), read
+    // by the unlock's id. Partial, holding only the changes, so each is a probe.
     index('events_unlock_reason_idx')
       .on(sql`(${t.payload}->>'unlock_event_id')`)
       .where(sql`${t.type} = 'unlock_reason_changed'`),

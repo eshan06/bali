@@ -392,11 +392,10 @@ const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly E
 const LATE: UnlockRecordedAs & ReturnRecordedAs = 'superseded';
 
 /**
- * A student's latest turn in a session — the record their chip shows (A9): a
- * tap or a return to focus, or an unlock; never a late one. `student` is an id,
- * or a column to correlate on. One rule for the grid's snapshot and a reason
- * change (A20), which only the unlock on the chip may make: two copies would
- * drift.
+ * A student's latest turn in a session — what their chip shows (A9): a tap, a
+ * return to focus or an unlock, never a late one. `student` is an id, or a
+ * column to correlate on. One rule for the grid's snapshot and a reason change
+ * (A20), which only the unlock on the chip may take.
  */
 export function latestTurn(db: Database, sessionId: string, student: string | typeof users.id) {
   return db
@@ -436,8 +435,7 @@ export function reasonChanges(db: Database, unlockEventIds: string[]) {
 
 /**
  * Each of these unlocks' reason now, where the student changed it (A20): its
- * latest change's — the unlock's own event is never rewritten. An unlock never
- * changed is absent; its reason is its own payload's.
+ * latest change's. An unlock never changed is absent: its own payload's stands.
  */
 export async function changedReasons(
   db: Database,
@@ -466,8 +464,7 @@ export async function changedReasons(
  * the turn looks past it to the one before — and whether a protection-off
  * report came after the end, which leaves the ended row alone (A2c). The
  * caller derives each display state; one statement, so the row and its
- * records are read at one instant — and then the unlocks' reasons now (A20),
- * which only a later change can have moved on.
+ * records are read at one instant — then the unlocks' reasons now (A20).
  */
 export async function getSessionRoster(
   db: Database,

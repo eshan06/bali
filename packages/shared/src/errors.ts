@@ -64,9 +64,8 @@ export const API_ERROR_REASONS = [
   // a session running by the server's clock — a 409; nothing was recorded.
   'class_in_session',
   // PATCH /v1/unlocks/{eventId} (A20): no unlock of the caller's in a session
-  // has that id — a 404; or a return to focus, a tap or another unlock of
-  // theirs there has come since, so it is no longer the one their teacher
-  // sees — a 409. Nothing was recorded.
+  // has that id — a 404; or a return, a tap or an unlock of theirs there came
+  // since, so their teacher no longer sees it — a 409. Nothing was recorded.
   'unlock_not_found',
   'unlock_superseded',
 ] as const;

@@ -95,7 +95,7 @@ const EXPECTED: Record<
     code: 'conflict',
     status: 409,
     reason: 'unlock_superseded',
-    message: 'a return to focus or another unlock came since: this unlock is over',
+    message: 'a later return or unlock ended it',
   },
 };
 

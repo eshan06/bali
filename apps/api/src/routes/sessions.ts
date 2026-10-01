@@ -80,8 +80,7 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
  * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
- * like a tap — an unlock sent under a tap too, which names its tap, not a session, and a change
- * of an unlock's reason, which names the unlock (A20). All are thin
+ * like a tap — an unlock sent under a tap too, which names its tap, not a session. All are thin
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
  * shape the response.
  */
@@ -229,10 +228,8 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
     },
   );
 
-  // PATCH /v1/unlocks/:eventId — the student changes the reason of their own
-  // unlock (A20), named by the unlock's own event id: recorded as its own
-  // event, while that unlock is the one their teacher sees and the session
-  // runs. Idempotent on the body's eventId; a refusal records nothing.
+  // PATCH /v1/unlocks/:eventId — the student changes their own unlock's reason
+  // (A20), the unlock named by its own event id; idempotent on the body's.
   app.patch(
     '/v1/unlocks/:eventId',
     { preHandler: app.authenticate },

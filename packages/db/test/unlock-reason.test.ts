@@ -249,7 +249,7 @@ describe('changing an unlock’s reason (A20)', () => {
   });
 
   it('refuses an id another event holds, recording nothing', async () => {
-    const { session, student, unlockId } = await unlocked('reason-conflict', 'bathroom');
+    const { session, student, unlockId, act } = await unlocked('reason-conflict', 'bathroom');
     const other = await unlocked('reason-conflict-other', 'nurse');
     const theirs = newUuidV7();
     await change(other.unlockId, other.student.id, 'other', theirs);
@@ -260,6 +260,16 @@ describe('changing an unlock’s reason (A20)', () => {
       });
     }
     expect(await changesOf(session.id)).toHaveLength(0);
+
+    // Their own change of another unlock of theirs is no replay of this one.
+    const mine = newUuidV7();
+    await change(unlockId, student.id, 'nurse', mine);
+    const againId = newUuidV7();
+    await unlock(db, { ...act(12), eventId: againId });
+    await expect(change(againId, student.id, 'other', mine)).rejects.toMatchObject({
+      code: 'EVENT_ID_CONFLICT',
+    });
+    expect(await changesOf(session.id)).toHaveLength(1);
   });
 
   it('stores only a known reason, whatever its caller passes', async () => {
