@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **The scroll bar at the screen's edge (the owner's phone check).** On the
+  phone, every scrolling screen's bar sat 24 pt in, over the cards' right edge: `ScreenScaffold`
+  pads its content by D1's gutters, and a scroll view inside was narrowed with it. **Fixed in the
+  shared layout, not per screen's look:** a scroll view in a scaffold gives the gutter back to its
+  frame and takes it as its content's margin (`screenWide`: `contentMargins(.horizontal, 24, for:
+  .scrollContent)`, so the bar is not inset with the content) — the content exactly where it
+  was, the bar at the edge. A screen's fixed parts (Back, the bottom buttons, Done) keep the
+  scaffold's padding, untouched; moving the gutter onto each of them instead would have touched
+  every screen's fixed parts to fix the scrolling ones. **The intro:** its paging view reaches the
+  screen's edges too, each page in the gutters its scroll view reaches past — a page's scroll
+  view cannot reach past a paging view that clips it — so a page swiped slides to the screen's
+  edge instead of being cut 24 pt short of it. **What else shows:** the narrowed view had clipped
+  the outer half of the Join code field's 2-pt border and of the cards' 1-pt shadow at the
+  content's edges; they draw whole, as D1 has them. `AppTests.scrollEdges` fails any scroll view
+  of any fixture's screen short of the edges or without the 24-pt content margins.
 - **2026-09-30** — **A18: a Start past the bell closes the class itself** (the owner's ruling,
   2026-09-30). **Why:** back-to-back classes. Past its bell by the server's clock a class is over,
   swept or not (decision 12), and an extend is already refused there; yet a Start handed the old

@@ -204,7 +204,8 @@ struct BackButton: View {
 }
 
 /// A screen's content laid out in its whole height — centred, or held apart by its spacers — and
-/// scrolling only once the phone's text size outgrows it, so no line is ever cut off.
+/// scrolling only once the phone's text size outgrows it, so no line is ever cut off; as wide as
+/// the screen, its content in the gutters (`screenWide`).
 struct PageScroll<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
@@ -215,11 +216,23 @@ struct PageScroll<Content: View>: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
+        .screenWide()
     }
 }
 
-/// A screen as D1 lays one out: the page colour to the edges, 24-pt gutters, and 16 pt between
-/// the status bar and the content (D1's 64 from the top of its 390 × 844 frame).
+extension View {
+    /// A scroll view out to the screen's edges, past `ScreenScaffold`'s gutters — its scroll bar at
+    /// the edge, never over the cards — with its content inside them, as the rest of the screen is.
+    /// Every scroll view in a scaffold takes it (`AppTests.scrollEdges`).
+    func screenWide() -> some View {
+        contentMargins(.horizontal, Theme.gutter, for: .scrollContent)
+            .padding(.horizontal, -Theme.gutter)
+    }
+}
+
+/// A screen as D1 lays one out: the page colour to the edges, 24-pt gutters — which its scroll
+/// views reach past (`screenWide`) — and 16 pt between the status bar and the content (D1's 64
+/// from the top of its 390 × 844 frame).
 struct ScreenScaffold<Content: View>: View {
     @ViewBuilder let content: () -> Content
 

@@ -43,7 +43,7 @@ struct MeView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollBounceBehavior(.basedOnSize).screenWide()
         }
         .sheet(isPresented: $consent) { ConsentSheet() }
     }
@@ -266,7 +266,7 @@ struct ConsentSheet: View {
                 .foregroundStyle(Theme.brand)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
             ScrollView { IntroView.consent.padding(.vertical, 16) }
-                .scrollBounceBehavior(.basedOnSize)
+                .scrollBounceBehavior(.basedOnSize).screenWide()
         }
         .preferredColorScheme(.light)
     }

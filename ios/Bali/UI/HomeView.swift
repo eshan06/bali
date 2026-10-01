@@ -58,7 +58,7 @@ struct HomeView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollBounceBehavior(.basedOnSize).screenWide()
         }
     }
 

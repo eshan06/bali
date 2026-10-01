@@ -26,12 +26,14 @@ struct IntroView: View {
 
     var body: some View {
         ScreenScaffold {
+            // The pages as wide as the screen, so a page's scroll bar is at its edge: each in the
+            // gutters its scroll view reaches past (`screenWide`).
             TabView(selection: $page) {
-                PageScroll { first }.tag(0)
-                PageScroll { Self.consent }.tag(1)
-                PageScroll { third }.tag(2)
+                PageScroll { first }.padding(.horizontal, Theme.gutter).tag(0)
+                PageScroll { Self.consent }.padding(.horizontal, Theme.gutter).tag(1)
+                PageScroll { third }.padding(.horizontal, Theme.gutter).tag(2)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .tabViewStyle(.page(indexDisplayMode: .never)).padding(.horizontal, -Theme.gutter)
             HStack(spacing: 8) {
                 ForEach(Self.pages, id: \.self) { dot in
                     Circle().fill(dot == page ? Theme.brand : Theme.borderStrong)
