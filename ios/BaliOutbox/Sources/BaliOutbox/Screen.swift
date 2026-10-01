@@ -25,8 +25,9 @@ public enum Screen: Sendable, Hashable {
     /// extension, it is another's to close (C5b; its review); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
     /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
-    /// the one under it shows, never over anything else; `tab`, the one chosen in D1's tab bar
-    /// (C6a) — History or Me in place of the router's own Home with nothing opened over it, and
+    /// the one under it shows, never over anything else — and Home over Unlocked, its primary way
+    /// on (C5c); `tab`, the one chosen in D1's tab bar (C6a) — History or Me in place of the
+    /// router's own Home with nothing opened over it, or of a Home opened over Unlocked, and
     /// nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it,
     /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b). And
     /// whether the tab bar shows: wherever a tab is honoured — in the same answer, at the same
@@ -52,16 +53,17 @@ public enum Screen: Sendable, Hashable {
         }
         if !signedIn { return (.signIn, false) }
         var shown = settled(sync, protection, everApproved, hasClasses, sessionOverClosed, now)
-        if shown == .home, opened.isEmpty {
-            return (tab == .history || tab == .me ? tab : .home, true)
-        }
+        // Home with its tab bar: the router's own, or opened over Unlocked — its primary way
+        // on, the apps still open (the owner's ruling, 2026-09-30; C5c).
+        var tabbed = shown == .home
         for screen in opened {
             switch (shown, screen) {
-            case (.home, .join), (.waiting, .home): shown = screen
+            case (.home, .join), (.waiting, .home), (.unlocked, .home):
+                (tabbed, shown) = (shown == .unlocked, screen)
             default: return (shown, false)
             }
         }
-        return (shown, false)
+        return tabbed ? (tab == .history || tab == .me ? tab : .home, true) : (shown, false)
     }
 
     /// The screen of where the phone stands, signed in and its permission checked.
@@ -202,8 +204,8 @@ extension SyncState {
     func refusedRefocus(in session: String) -> String? {
         guard let refused, refused.change == .refocus(session: session) else { return nil }
         return refused.reason == .protectionOff
-            ? "Bali couldn't take you back to focus, because Screen Time was off during this class. Tap your teacher's block to go back to focus."
-            : "Bali couldn't take you back to focus. Tap your teacher's block to go back, or ask your teacher."
+            ? "Bali couldn't lock your apps again, because Screen Time was off during this class. Tap your teacher's block to go back to focus."
+            : "Bali couldn't lock your apps again. Tap your teacher's block to go back, or ask your teacher."
     }
 
     /// What Session over says (C5b; D1's SessionOver) of the session the phone stands in, its bell

@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a), nor a leave (C6c) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Lock my apps again (C5a, C5c), nor a History read (C6a), nor a leave (C6c) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -108,19 +108,30 @@ struct AppTests {
         let out = Phone(fixture: try #require(PreviewFixtures.all["focusSignedOut"]))
         let said = FocusWords(try #require(out.sync), out.protection, now: Date(), signedIn: false)
         #expect(out.screen == .focus && said.stalled != nil && said.claim == .paused)
-        // Unlocked (C5a): each fixture's reason card and way back, and the bell the router chooses
-        // again at; a frozen phone's reason and Back to focus say it has not started.
+        // Unlocked (C5a, C5c): each fixture's reason card and way back, and the bell the router
+        // chooses again at; a frozen phone's pick and Lock my apps again say it has not started.
         let unlockedCases: [(String, UnlockedWords.Picker?, Bool)] = [
-            ("unlocked", .open, false), ("unlockedReason", .given(.bathroom), false),
+            ("unlocked", .open(nil), false), ("unlockedReason", .open(.bathroom), false),
             ("unlockedRecorded", nil, false), ("unlockedRetap", nil, true),
+            ("unlockedOnItsWay", .waiting(nil), false), ("unlockedChanged", .open(.nurse), false),
+            ("unlockedPicking", .open(nil), false), ("unlockedPickError", .open(.bathroom), false),
         ]
         for (name, picker, retap) in unlockedCases {
             let words = UnlockedWords(try #require(PreviewFixtures.all[name]?.sync))
             #expect(words?.picker == picker && (words?.retap != nil) == retap, "\(name)")
         }
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["unlockedPicking"])).picking == .nurse)
+        let pickError = Phone(fixture: try #require(PreviewFixtures.all["unlockedPickError"]))
+        #expect(pickError.pickFailed == Joining.words(.networkError, nil))
         let unlocked = Phone(fixture: try #require(PreviewFixtures.all["unlocked"]))
-        #expect(await unlocked.explain(.bathroom) == Joining.notStarted)
+        await unlocked.pick(.bathroom)
+        #expect(unlocked.pickFailed == Joining.notStarted && unlocked.picking == nil)
         #expect(await unlocked.backToFocus() == Joining.notStarted)
+        // Unlocked's Home (C5c): its tab bar, the apps still open, and its way back.
+        let overUnlocked = Phone(fixture: try #require(PreviewFixtures.all["homeFromUnlocked"]))
+        #expect(overUnlocked.tabbed && overUnlocked.canGoBack)
+        overUnlocked.back()
+        #expect(overUnlocked.screen == .unlocked && !overUnlocked.tabbed)
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         #expect(unlocked.bell != nil && home.bell == nil)
         // History (C6a): D1's days and cards, each state's fixture its own; a frozen phone's read

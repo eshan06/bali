@@ -97,6 +97,9 @@ final class Phone {
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
     var leaving = Leaving()
+    /// Unlocked's reason card (C5c): the reason picked, on its way, and why the last did not go.
+    private(set) var picking: UnlockReason?
+    private(set) var pickFailed: String?
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -120,7 +123,7 @@ final class Phone {
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
-            leaving = fixture.leaving
+            (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
         }
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
@@ -313,6 +316,7 @@ final class Phone {
             signOutFailed = nil
         }
         guard !keeps else { return }
+        pickFailed = nil
         select(.home)
         guard !opened.isEmpty else { return }
         let hadJoin = opened.contains(.join)
@@ -402,11 +406,16 @@ final class Phone {
         return await engine.pressUnlock()
     }
 
-    /// The reason for the latest Emergency Unlock (C5a), sent with it while it has never been
-    /// sent — or what the Unlocked screen says (rule 5); a phone not started says so.
-    func explain(_ reason: UnlockReason) async -> String? {
-        guard let engine else { return Joining.notStarted }
-        return await engine.explain(reason)
+    /// A reason picked on Unlocked (C5c): sent with the latest Emergency Unlock while it has never
+    /// been sent, else as a change of it once the server has it (A20) — the check on it at once,
+    /// the others held until it is kept — or why not, said (rule 5), the check back on the reason
+    /// on record. A phone not started says so.
+    func pick(_ reason: UnlockReason) async {
+        guard picking == nil else { return }
+        guard let engine else { return pickFailed = Joining.notStarted }
+        (picking, pickFailed) = (reason, nil)
+        pickFailed = await engine.explain(reason)
+        picking = nil
     }
 
     /// Back to focus from an Emergency Unlock (C5a) — or what the Unlocked screen says (rule 5).

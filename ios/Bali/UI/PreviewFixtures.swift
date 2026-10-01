@@ -11,7 +11,8 @@
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
-        /// edited, no sign-out failed and no class being left, unless said otherwise.
+        /// edited, no sign-out failed, no class being left and no reason picked, unless said
+        /// otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -26,6 +27,8 @@
             var naming = Naming()
             var signOutFailed: String?
             var leaving = Leaving()
+            var picking: UnlockReason?
+            var pickFailed: String?
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -84,6 +87,21 @@
                     .unlock(session: "session", reason: .bathroom))),
             "unlockedRecorded": State(sync: standing(.inSession(period3, .unlocked))),
             "unlockedRetap": State(sync: reported(standing(.inSession(period3, .unlocked)))),
+            // The reason card (C5c): on its way with the unlock, a pick waits for it; once the
+            // server has it, changed to Nurse; a change on its way; one that did not go.
+            "unlockedOnItsWay": State(
+                sync: sending(
+                    queued(
+                        standing(.inSession(period3, .unlocked)),
+                        .unlock(session: "session", reason: nil)))),
+            "unlockedChanged": State(sync: recorded(standing(.inSession(period3, .unlocked)), .nurse)),
+            "unlockedPicking": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), nil), picking: .nurse),
+            "unlockedPickError": State(
+                sync: recorded(standing(.inSession(period3, .unlocked)), .bathroom),
+                pickFailed: Joining.words(.networkError, nil)),
+            // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
+            "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
             "history": State(tab: .history, history: anaHistory()),
             "historyEmpty": State(tab: .history, history: history(read: true)),
             "historyError": State(
@@ -312,6 +330,21 @@
             } catch {
                 fatalError("A fixture's outbox failed: \(error)")
             }
+            return state
+        }
+
+        /// `state` with this phone's unlock in Period 3 recorded by the server, at `reason` (C5c).
+        private static func recorded(_ state: SyncState, _ reason: UnlockReason?) -> SyncState {
+            var state = state
+            state.recordedUnlock = RecordedUnlock(
+                session: period3.id, unlock: "unlock", reason: reason)
+            return state
+        }
+
+        /// `state` with what it has queued on its way to the server (C5c).
+        private static func sending(_ state: SyncState) -> SyncState {
+            var state = state
+            state.sending = Set(state.queued.map(\.eventId))
             return state
         }
 

@@ -9,10 +9,15 @@ import Testing
 #endif
 
 /// The Unlocked screen's words for `state`, on a US phone in New York.
-private func words(
-    _ state: SyncState, given: UnlockReason? = nil, asked: Bool = false
-) -> UnlockedWords? {
-    UnlockedWords(state, given: given, asked: asked, time: newYork)
+private func words(_ state: SyncState) -> UnlockedWords? { UnlockedWords(state, time: newYork) }
+
+/// `state` with an unlock the server recorded in session `session`, at `reason`.
+private func recorded(_ state: SyncState, _ reason: UnlockReason?, session: String = "s")
+    -> SyncState
+{
+    var state = state
+    state.recordedUnlock = RecordedUnlock(session: session, unlock: "u", reason: reason)
+    return state
 }
 
 /// Unlocked in Period 3, whose bell is at 10:42 AM, with `queued`.
@@ -27,6 +32,12 @@ private func pressed(reason: UnlockReason? = nil) throws -> (outbox: Outbox, que
         try outbox.record(
             .unlock(session: "s", reason: reason), now: t0, holding: SyncEngine.reasonHold))
     return (outbox, try outbox.records())
+}
+
+/// The event id a request carries.
+private func eventId(_ exchange: Server.Exchange) throws -> String {
+    struct Body: Decodable { let eventId: String }
+    return try JSONDecoder().decode(Body.self, from: try #require(exchange.request.httpBody)).eventId
 }
 
 /// The reason an unlock's request carries, if any.
@@ -46,13 +57,13 @@ struct UnlockedTests {
         #expect(plain(held.subtitle) == "with Ms. Rivera · ends 10:42 AM")
         #expect(
             plain(held.body)
-                == "Everything's open until you go back to focus or the bell at 10:42 AM. Your teacher will see you unlocked."
+                == "Everything's open until you lock your apps again or the bell at 10:42 AM. Your teacher will see you unlocked."
         )
-        #expect(held.picker == .open && held.retap == nil && held.stuck == nil)
+        #expect(held.picker == .open(nil) && held.retap == nil && held.stuck == nil)
         let gone = try #require(words(try unlocked()))
         #expect(
             plain(gone.body)
-                == "Everything's open until you go back to focus or the bell at 10:42 AM. Your teacher can see you unlocked."
+                == "Everything's open until you lock your apps again or the bell at 10:42 AM. Your teacher can see you unlocked."
         )
         #expect(gone.picker == nil)
         let unread = try synced(.inSession(bell1042, .unlocked), me: false)
@@ -67,18 +78,25 @@ struct UnlockedTests {
     }
 
     @Test(
-        "The reason card: the one this screen gave, first — a record still queued may be an older unlock, stuck (santa's review); the one the unlock carries once given; too late once it has been sent without one; once it has gone, offered and none given, too late; never offered, no card"
+        "The reason card (C5c): the check on the reason the unlock carries while it is on the phone, a pick open while it has never been sent — waiting, its buttons off, once it is on its way, sent with no answer, or stuck; once the server has it, open at the reason on record (A20); an unlock this run did not make, no card"
     )
     func picker() async throws {
-        #expect(words(try unlocked(try pressed(reason: .nurse).queued))?.picker == .given(.nurse))
-        let (outbox, queued) = try pressed()
-        try await send(outbox, try #require(queued.first), nil)
-        #expect(try outbox.records().first?.attempts == 1)
-        #expect(words(try unlocked(try outbox.records()))?.picker == .late)
-        #expect(words(try unlocked(try outbox.records()), given: .other)?.picker == .given(.other))
-        #expect(words(try unlocked(), given: .bathroom)?.picker == .given(.bathroom))
-        #expect(words(try unlocked(), asked: true)?.picker == .late)
+        let (held, queued) = try pressed(reason: .nurse)
+        #expect(words(try unlocked(queued))?.picker == .open(.nurse))
+        var onItsWay = try unlocked(queued)
+        onItsWay.sending = [try #require(queued.first).eventId]
+        #expect(words(onItsWay)?.picker == .waiting(.nurse))
+        try await send(held, try #require(queued.first), nil)
+        #expect(try held.records().first?.attempts == 1)
+        #expect(words(try unlocked(try held.records()))?.picker == .waiting(.nurse))
+        #expect(words(recorded(try unlocked(), .bathroom))?.picker == .open(.bathroom))
+        #expect(words(recorded(try unlocked(), nil))?.picker == .open(nil))
+        // A newer unlock of the class on the phone is the card's; another class's recorded is not.
+        #expect(words(recorded(try unlocked(queued), .bathroom))?.picker == .open(.nurse))
+        #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.picker == nil)
         #expect(words(try unlocked())?.picker == nil)
+        #expect(UnlockedWords.Picker.open(nil).caption == "Your teacher sees the reason you pick.")
+        #expect(UnlockedWords.Picker.waiting(.nurse).caption == UnlockedWords.onItsWay)
     }
 
     @Test(
@@ -107,18 +125,40 @@ struct UnlockedTests {
         #expect(plain(said.body)?.hasSuffix("Your teacher can see you unlocked.") == true)
         let (tapped, _) = try makeOutbox()
         try record(tapped, .unlockUnderTap(tap: "t", reason: .other))
-        #expect(words(try unlocked(try tapped.records()))?.picker == .given(.other))
+        #expect(words(try unlocked(try tapped.records()))?.picker == .open(.other))
     }
 
     @Test(
-        "An unlock the server refused, or left unsettled to the bound, is said — still kept and retried (rule 5) — and too late for a reason"
+        "An unlock the server refused, or left unsettled to the bound, is said — still kept and retried (rule 5) — and no pick can reach it until it lands"
     )
     func stuck() async throws {
         let (outbox, queued) = try pressed()
         try await send(outbox, try #require(queued.first), 400, Answer.refused("invalid_request"))
         let said = try #require(words(try unlocked(try outbox.records())))
         #expect(said.stuck == "Bali couldn't send your unlock to your teacher yet. It keeps trying.")
-        #expect(said.picker == .late)
+        #expect(said.picker == .waiting(nil))
+    }
+
+    @Test(
+        "A change the server did not take is said by its refusal (rule 5): the unlock over, the class over, not found — else the Join screen's words"
+    )
+    func notChanged() async {
+        func said(_ status: Int?, _ reason: String? = nil) async -> String {
+            let client = APIClient(
+                baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
+                transport: Canned(status: status, body: Data((reason.map(Answer.refused) ?? "").utf8)))
+            let request = UnlockReasonRequest(reason: .nurse, eventId: "e")
+            return UnlockedWords.notChanged(await client.changeReason(unlock: "u", request))
+        }
+        #expect(
+            await said(409, "unlock_superseded") == "This unlock is over, so its reason can't change.")
+        #expect(
+            await said(409, "session_not_running") == "Class is over, so the reason can't change.")
+        #expect(
+            await said(404, "unlock_not_found")
+                == "Bali couldn't find this unlock, so its reason can't change.")
+        #expect(await said(nil) == Joining.words(.networkError, nil))
+        #expect(await said(500) == Joining.words(.status(500), nil))
     }
 }
 
@@ -139,9 +179,17 @@ struct ReasonTests {
         #expect(await rig.engine.state.queued.first?.change.reason == .bathroom)
         let sent = try await rig.server.next(unlockRoute)
         #expect(try reason(sent) == "bathroom")
-        sent.reply(200, Answer.unlocked())
-        await rig.until { $0.queued.isEmpty }
-        #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
+        sent.reply(200, Answer.unlocked(reason: "bathroom"))
+        let recorded = await rig.until { $0.queued.isEmpty }
+        #expect(recorded.recordedUnlock?.reason == .bathroom)
+        let unlock = try #require(recorded.recordedUnlock?.unlock)
+        // Once the server has it, a pick is a change of it (A20).
+        async let picked = rig.engine.explain(.nurse)
+        let change = try await rig.server.next("PATCH /v1/unlocks/\(unlock)")
+        #expect(try reason(change) == "nurse")
+        change.reply(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        #expect(await picked == nil)
+        #expect(await rig.engine.state.recordedUnlock?.reason == .nurse)
         await rig.stop()
     }
 
@@ -153,21 +201,22 @@ struct ReasonTests {
         func replay(_ reason: String) -> String {
             #"{"outcome":"replay","recordedAs":null,"state":"unlocked","session":\#(json(session())),"reason":\#(reason)}"#
         }
-        let cases: [(String, UnlockedWords.Picker, ReasonKept?)] = [
-            ("null", .late, ReasonKept(session: "s", reason: nil)),
-            (#""bathroom""#, .given(.bathroom), ReasonKept(session: "s", reason: .bathroom)),
-            (#""nurse""#, .given(.nurse), nil),
+        let cases: [(String, UnlockReason?)] = [
+            ("null", nil), (#""bathroom""#, .bathroom), (#""nurse""#, .nurse),
         ]
-        for (answer, picker, kept) in cases {
+        for (answer, kept) in cases {
             let rig = try Rig()
             try await rig.tapIn()
-            try await rig.engine.record(.unlock(session: "s", reason: .nurse))
+            let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: .nurse)))
             try await rig.server.next(unlockRoute).reply(200, replay(answer))
             let state = await rig.until { $0.queued.isEmpty }
-            #expect(state.reasonKept == kept, "\(answer)")
-            #expect(UnlockedWords(state, given: .nurse)?.picker == picker, "\(answer)")
+            #expect(
+                state.recordedUnlock
+                    == RecordedUnlock(session: "s", unlock: unlock.eventId, reason: kept),
+                "\(answer)")
+            #expect(UnlockedWords(state)?.picker == .open(kept), "\(answer)")
             try await rig.engine.record(.refocus(session: "s"))
-            #expect(await rig.engine.state.reasonKept == nil, "\(answer)")
+            #expect(await rig.engine.state.recordedUnlock == nil, "\(answer)")
             await rig.stop()
         }
         // An older unlock's answer landing after a newer unlock was pressed, still queued: the
@@ -178,8 +227,8 @@ struct ReasonTests {
         let older = try await rig.server.next(unlockRoute)
         #expect(await rig.engine.pressUnlock() == nil)
         older.reply(200, replay("null"))
-        await rig.until { $0.queued.count == 1 }
-        #expect(await rig.engine.state.reasonKept == nil)
+        let newer = await rig.until { $0.queued.count == 1 }
+        #expect(UnlockedWords(newer)?.picker == .open(nil) && newer.recordedUnlock != nil)
         await rig.stop()
         // Another class's unlock stuck in the queue is no matter: this class's card still says
         // what the server kept (santa's round 2).
@@ -193,12 +242,46 @@ struct ReasonTests {
         try await other.engine.record(.unlock(session: "s", reason: .nurse))
         try await other.server.next(unlockRoute).reply(200, replay("null"))
         let state = await other.until { $0.queued.count == 1 }
-        #expect(state.reasonKept == ReasonKept(session: "s", reason: nil))
+        #expect(state.recordedUnlock?.reason == nil && UnlockedWords(state)?.picker == .open(nil))
         await other.stop()
     }
 
     @Test(
-        "None given, it goes as the hold ends, without one: a reason given after a send with no answer — the server may have it — or while it is on its way, is too late"
+        "Once the server has the unlock, a pick is a change of it (A20): a refusal said, the check left on the reason on record; no answer said, the same pick going again under its event id (rule 4); the phone moving on meanwhile, the answer moves no check"
+    )
+    func changed() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        try await rig.engine.record(.unlock(session: "s", reason: nil))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        let unlock = try #require(await rig.until { $0.queued.isEmpty }.recordedUnlock?.unlock)
+        let route = "PATCH /v1/unlocks/\(unlock)"
+        async let refused = rig.engine.explain(.nurse)
+        try await rig.server.next(route).reply(409, Answer.refused("unlock_superseded"))
+        #expect(await refused == "This unlock is over, so its reason can't change.")
+        #expect(await rig.engine.state.recordedUnlock?.reason == nil)
+        async let lost = rig.engine.explain(.other)
+        let first = try await rig.server.next(route)
+        first.reply(nil)
+        #expect(await lost == Joining.words(.networkError, nil))
+        async let again = rig.engine.explain(.other)
+        let second = try await rig.server.next(route)
+        #expect(try eventId(second) == eventId(first))
+        second.reply(200, #"{"outcome":"replay","reason":"other"}"#)
+        #expect(await again == nil)
+        #expect(await rig.engine.state.recordedUnlock?.reason == .other)
+        async let late = rig.engine.explain(.bathroom)
+        let third = try await rig.server.next(route)
+        #expect(try eventId(third) != eventId(first))
+        #expect(await rig.engine.backToFocus() == nil)
+        third.reply(200, #"{"outcome":"applied","reason":"bathroom"}"#)
+        #expect(await late == nil)
+        #expect(await rig.engine.state.recordedUnlock == nil)
+        await rig.stop()
+    }
+
+    @Test(
+        "None given, it goes as the hold ends, without one: a reason given after a send with no answer — the server may have it — or while it is on its way, waits for it to land"
     )
     func notGiven() async throws {
         let rig = try Rig()
@@ -209,11 +292,11 @@ struct ReasonTests {
         let first = try await rig.server.next(unlockRoute)
         #expect(try reason(first) == nil)
         // On its way, never sent by the file's count: the send would not carry it.
-        #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
+        #expect(await rig.engine.explain(.nurse) == UnlockedWords.onItsWay)
         // No answer: the server may have it all the same, and would keep it without one.
         first.reply(nil)
         await rig.until { $0.queued.first?.attempts == 1 }
-        #expect(await rig.engine.explain(.nurse) == UnlockedWords.late)
+        #expect(await rig.engine.explain(.nurse) == UnlockedWords.onItsWay)
         rig.clock.advance(by: 2)
         let again = try await rig.server.next(unlockRoute)
         #expect(try reason(again) == nil)
@@ -348,7 +431,7 @@ struct ReasonTests {
         }
         #expect(await rig.engine.explain(.other) == "Bali couldn't save your reason. Try again.")
         try refuseRecords(rig.outbox)
-        #expect(await rig.engine.backToFocus() == "Bali couldn't take you back to focus. Try again.")
+        #expect(await rig.engine.backToFocus() == "Bali couldn't lock your apps again. Try again.")
         #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
         await rig.stop()
     }
