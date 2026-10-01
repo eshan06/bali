@@ -256,7 +256,7 @@ struct LeaveQuestion: View {
 }
 
 /// What a teacher sees, from Me's row: the intro's own page, in a sheet with Done.
-private struct ConsentSheet: View {
+struct ConsentSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
