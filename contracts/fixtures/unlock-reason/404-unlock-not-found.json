@@ -1,0 +1,20 @@
+{
+  "endpoint": "PATCH /v1/unlocks/{eventId}",
+  "scenario": "A change of an unlock that is not the student’s own: nothing recorded, nothing said of it.",
+  "request": {
+    "path": "/v1/unlocks/00000000-0000-7000-8000-000000000001",
+    "body": {
+      "reason": "nurse",
+      "eventId": "00000000-0000-7000-8000-000000000002"
+    }
+  },
+  "status": 404,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "not_found",
+      "reason": "unlock_not_found",
+      "message": "no unlock of yours in a class has that id"
+    }
+  }
+}

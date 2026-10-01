@@ -20,7 +20,7 @@ import {
 import { and, asc, between, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
-import { liveClassWithCode, type UserRow } from './queries.js';
+import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
 import {
   armedTaps,
   classes,
@@ -98,6 +98,8 @@ export const TRANSITION_ERROR_CODES = [
   'PROTECTION_OFF',
   'DISPLAY_NAME_TAKEN',
   'CLASS_IN_SESSION',
+  'UNLOCK_NOT_FOUND',
+  'UNLOCK_SUPERSEDED',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -2229,11 +2231,14 @@ async function storedPayload(
 }
 
 /**
- * The reason stored on an unlock that already landed. A replay answers with
- * what was recorded (rule 4), not with whatever the retry carries, so a phone
- * that changed its answer between retries learns which one the teacher sees.
+ * The reason on record for an unlock that already landed: its latest change's
+ * (A20), else the one stored with it. A replay answers with the truth now (rule
+ * 4), not with whatever the retry carries, so a phone that changed its answer
+ * between retries learns which one the teacher sees.
  */
 async function recordedReason(tx: Database, eventId: string): Promise<UnlockReason | null> {
+  const changed = (await changedReasons(tx, [eventId])).get(eventId);
+  if (changed) return changed;
   const stored = (await storedPayload(tx, eventId))?.reason;
   return isUnlockReason(stored) ? stored : null;
 }
@@ -2789,6 +2794,119 @@ export async function unlockUnderTap(db: Database, input: TapUnlockInput): Promi
       return recordOrphanUnlock(tx, input, armed ? 'tap_armed' : 'unknown_tap', {
         claimed_tap_event_id: input.tapEventId,
       });
+    }),
+  );
+}
+
+/** A student's change to the reason of their own unlock (A20). */
+export interface UnlockReasonInput {
+  /** The unlock: its own event id, the one its phone minted. */
+  unlockEventId: string;
+  studentId: string;
+  /** This change's own idempotency key (rule 4). */
+  eventId: string;
+  reason: UnlockReason;
+  /** The server's clock, which the session must be running at (`sessionRunning`); now by default. */
+  now?: Date;
+}
+export interface UnlockReasonResult {
+  /** 'applied' recorded the change; 'replay' this event id already did, and nothing is applied again. */
+  outcome: 'applied' | 'replay';
+  /** The unlock's reason on record now: this one when applied; on a replay, the latest since. */
+  reason: UnlockReason;
+}
+
+/**
+ * The student changes the reason of their own unlock (A20; the owner's ruling,
+ * 2026-09-30), and the teacher sees the latest — on the live grid and in the
+ * history. History is append-only, so the unlock's own event is never
+ * rewritten: the change is an `unlock_reason_changed` event of its own, in the
+ * unlock's session, naming it, and `changedReasons` reads the latest.
+ *
+ * Only the unlock the teacher's grid shows takes a change: the student's latest
+ * turn in that session (`latestTurn`, the snapshot's own rule). One a return to
+ * focus, a tap or another unlock of theirs came after, or one itself late
+ * (A10), is over: `UNLOCK_SUPERSEDED`. Nor once the session is over by the
+ * server's clock (`sessionRunning`, A17's one rule): `SESSION_NOT_RUNNING`. An
+ * id naming no unlock of the caller's in a session — someone else's, one kept
+ * with none, none at all — is `UNLOCK_NOT_FOUND`. A refusal records nothing.
+ *
+ * It takes the session's lock, as every change there does, so it serialises
+ * with a return, a tap or an unlock in that session: a change is never
+ * recorded after the return that ended its unlock. Idempotent on its own event
+ * id, looked up first under that lock: a retry is answered with the reason now,
+ * whatever came since — a session over included; an id another event holds is
+ * `EVENT_ID_CONFLICT`.
+ */
+export async function changeUnlockReason(
+  db: Database,
+  input: UnlockReasonInput,
+): Promise<UnlockReasonResult> {
+  // The one writer of events stores only a known reason, whoever its caller is.
+  if (!isUnlockReason(input.reason)) throw new Error('changeUnlockReason: not a known reason');
+  const unlockId = input.unlockEventId;
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx) => {
+      // The caller's own unlock, filed in a session: never anyone else's.
+      const named = firstOrUndefined(
+        await tx
+          .select({ sessionId: events.sessionId })
+          .from(events)
+          .where(
+            and(
+              eq(events.eventId, unlockId),
+              eq(events.userId, input.studentId),
+              eq(events.type, 'unlock'),
+            ),
+          )
+          .limit(1),
+      );
+      const session = named?.sessionId
+        ? await loadSession(tx, named.sessionId, { forUpdate: true })
+        : undefined;
+      if (!session) {
+        throw new TransitionError('UNLOCK_NOT_FOUND', 'no unlock of yours in a class has that id');
+      }
+
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type, userId: events.userId, payload: events.payload })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (prior) {
+        const of = (prior.payload as Record<string, unknown> | null)?.unlock_event_id;
+        if (
+          prior.type !== 'unlock_reason_changed' ||
+          prior.userId !== input.studentId ||
+          of !== unlockId
+        ) {
+          throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+        }
+        // It is on record, so the unlock has a changed reason to read.
+        return { outcome: 'replay', reason: (await recordedReason(tx, unlockId))! };
+      }
+
+      const now = input.now ?? new Date();
+      if (!sessionRunning(session, now)) {
+        throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
+      }
+      const turn = firstOrUndefined(await latestTurn(tx, session.id, input.studentId));
+      if (turn?.eventId !== unlockId) {
+        throw new TransitionError('UNLOCK_SUPERSEDED', 'a return to focus or an unlock came since');
+      }
+      await insertEvent(tx, {
+        eventId: input.eventId,
+        type: 'unlock_reason_changed',
+        sessionId: session.id,
+        classId: session.classId,
+        userId: input.studentId,
+        // The server's clock, inside the window of a session still running (rule 1).
+        occurredAt: now,
+        payload: { unlock_event_id: unlockId, reason: input.reason },
+      });
+      return { outcome: 'applied', reason: input.reason };
     }),
   );
 }

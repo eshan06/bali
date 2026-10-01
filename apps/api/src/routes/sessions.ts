@@ -1,4 +1,5 @@
 import {
+  changeUnlockReason,
   checkIn,
   type Database,
   endSession,
@@ -20,6 +21,7 @@ import type {
   RefocusResponse,
   SessionView,
   StartSessionResponse,
+  UnlockReasonResponse,
   UnlockResponse,
 } from '@bali/shared';
 import { MAX_SESSION_MINUTES, UNLOCK_REASONS } from '@bali/shared';
@@ -56,6 +58,9 @@ const UnlockBody = StateChangeBody.extend({
 });
 
 const TapParams = z.object({ eventId: z.string().uuid() });
+// A reason change is no unlock record (A20): a reason outside the vocabulary is
+// refused, never recorded as none — the unlock it is for stands either way.
+const ReasonBody = z.object({ reason: z.enum(UNLOCK_REASONS), eventId: z.string().uuid() });
 
 function toSessionView(s: { id: string; classId: string; endsAt: Date }): SessionView {
   return { id: s.id, classId: s.classId, endsAt: s.endsAt.toISOString() };
@@ -75,7 +80,8 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
  * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
- * like a tap — an unlock sent under a tap too, which names its tap, not a session. All are thin
+ * like a tap — an unlock sent under a tap too, which names its tap, not a session, and a change
+ * of an unlock's reason, which names the unlock (A20). All are thin
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
  * shape the response.
  */
@@ -220,6 +226,31 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
         }),
       );
       return toUnlockResponse(result);
+    },
+  );
+
+  // PATCH /v1/unlocks/:eventId — the student changes the reason of their own
+  // unlock (A20), named by the unlock's own event id: recorded as its own
+  // event, while that unlock is the one their teacher sees and the session
+  // runs. Idempotent on the body's eventId; a refusal records nothing.
+  app.patch(
+    '/v1/unlocks/:eventId',
+    { preHandler: app.authenticate },
+    async (request): Promise<UnlockReasonResponse> => {
+      const identity = requireAuth(request);
+      const { eventId: unlockEventId } = parse(TapParams, request.params);
+      const body = parse(ReasonBody, request.body);
+      const student = await findOrCreateStudent(db, identity.sub);
+      const { outcome, reason } = await mapTransitionError(() =>
+        changeUnlockReason(db, {
+          unlockEventId,
+          studentId: student.id,
+          eventId: body.eventId,
+          reason: body.reason,
+          now: clock(),
+        }),
+      );
+      return { outcome, reason };
     },
   );
 

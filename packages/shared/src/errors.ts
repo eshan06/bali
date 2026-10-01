@@ -63,6 +63,12 @@ export const API_ERROR_REASONS = [
   // DELETE /v1/enrollments/{id} (A19): a student leaving a class while it has
   // a session running by the server's clock — a 409; nothing was recorded.
   'class_in_session',
+  // PATCH /v1/unlocks/{eventId} (A20): no unlock of the caller's in a session
+  // has that id — a 404; or a return to focus, a tap or another unlock of
+  // theirs there has come since, so it is no longer the one their teacher
+  // sees — a 409. Nothing was recorded.
+  'unlock_not_found',
+  'unlock_superseded',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

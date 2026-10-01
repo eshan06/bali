@@ -20,6 +20,7 @@ import {
 import { makeTestDb } from '../src/testing.js';
 import {
   armTap,
+  changeUnlockReason,
   checkIn,
   endEnrollment,
   endSession,
@@ -854,6 +855,62 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
     const filed = one(await eventsOfType(session.id, 'unlock'));
     expect(filed.payload).toEqual({ tap_event_id: tapId, unattached_event_id: unlockId });
   }, 20_000);
+
+  it('a reason change racing a return, a re-tap or another unlock is never recorded after it (A20)', async () => {
+    // A change is for the unlock the grid shows, and a return, a re-tap or a
+    // new unlock ends that. All take the session FOR UPDATE, so either order
+    // is whole: the change first, recorded before the rival; the rival first,
+    // the change refused. Never a change recorded after what ended its unlock.
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['refocus', 'tap', 'unlock'] as const) {
+        const { classId, studentId } = await seed(`race-reason-${rival}-${round}`);
+        const session = await openSession(classId);
+        const act = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        });
+        await tapIn(db, act());
+        const unlockId = newUuidV7();
+        await unlock(db, { ...act(), eventId: unlockId, reason: 'bathroom' });
+
+        const reasonChange = () =>
+          changeUnlockReason(db, {
+            unlockEventId: unlockId,
+            studentId,
+            eventId: newUuidV7(),
+            reason: 'nurse',
+          });
+        // Odd rounds give the rival a head start, so both orders get exercised.
+        const [changed, other] = await Promise.allSettled([
+          round % 2 === 1
+            ? new Promise((resolve) => setTimeout(resolve, 10)).then(reasonChange)
+            : reasonChange(),
+          rival === 'refocus'
+            ? refocus(db, act())
+            : rival === 'tap'
+              ? tapIn(db, act())
+              : unlock(db, act()),
+        ]);
+
+        if (other.status === 'rejected') throw other.reason;
+        const type = rival === 'tap' ? 'tap_in' : rival;
+        const ended = (await eventsOfType(session.id, type)).at(-1)!;
+        const changes = await eventsOfType(session.id, 'unlock_reason_changed');
+        if (changed.status === 'fulfilled') {
+          expect(changed.value).toEqual({ outcome: 'applied', reason: 'nurse' });
+          expect(one(changes).seq).toBeLessThan(ended.seq);
+        } else {
+          expect(changed.reason).toMatchObject({ code: 'UNLOCK_SUPERSEDED' });
+          expect(changes).toHaveLength(0);
+        }
+        expect(one(await liveParticipations(session.id)).state).toBe(
+          rival === 'unlock' ? 'unlocked' : 'focused',
+        );
+      }
+    }
+  }, 120_000);
 
   it('protection off racing the end of the session is recorded exactly once, whichever lands first', async () => {
     // Owner decision 10: a report that reaches a session already over is

@@ -37,9 +37,9 @@ export interface Student {
   /**
    * The student's latest unlock since they last tapped in or refocused: the
    * chip shows it, with its reason — a protection-off chip too, which it never
-   * relabels.
+   * relabels. Its event id is what a change of its reason names (A20).
    */
-  unlock: { reason: UnlockReason | null } | null;
+  unlock: { eventId: string; reason: UnlockReason | null } | null;
 }
 
 export type Students = Record<string, Student>;
@@ -64,9 +64,9 @@ const NOTHING_LIVE: readonly unknown[] = [
  * - noted `superseded`, it is late — the student's own refocus or tap went ahead
  *   of it — and the engine left the row as those made it: so does the chip.
  */
-function applyUnlock(s: Student, reason: unknown, note: unknown, at: Date): void {
+function applyUnlock(s: Student, eventId: string, reason: unknown, note: unknown, at: Date): void {
   if (note === ('superseded' satisfies UnlockRecordedAs)) return;
-  s.unlock = { reason: isUnlockReason(reason) ? reason : null };
+  s.unlock = { eventId, reason: isUnlockReason(reason) ? reason : null };
   s.state =
     note === ('protection_off' satisfies UnlockRecordedAs) || s.state === 'protection_off'
       ? 'protection_off'
@@ -109,7 +109,8 @@ export function fromSnapshot(snap: SessionSnapshot): Students {
     // refresh put a late record's chip back to plain "Left".
     if (s.protectionOffAfterEnd) student.state = 'protection_off';
     if (s.unlock) {
-      applyUnlock(student, s.unlock.reason, s.unlock.recordedAs, new Date(s.unlock.occurredAt));
+      const { eventId, reason, recordedAs, occurredAt } = s.unlock;
+      applyUnlock(student, eventId, reason, recordedAs, new Date(occurredAt));
     }
     out[s.studentId] = student;
   }
@@ -178,8 +179,16 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       break;
     case 'unlock': {
       const payload = payloadOf(e);
-      applyUnlock(s, payload.reason, payload.recorded_as, at);
+      applyUnlock(s, e.eventId, payload.reason, payload.recorded_as, at);
       s.lastSeenAt = advance(s.lastSeenAt, at);
+      break;
+    }
+    case 'unlock_reason_changed': {
+      // The latest reason the teacher sees (A20), on the unlock it names — and
+      // only that one, should the chip carry another by now.
+      const { unlock_event_id: of, reason } = payloadOf(e);
+      if (s.unlock === null || s.unlock.eventId !== of || !isUnlockReason(reason)) return prev;
+      s.unlock = { ...s.unlock, reason };
       break;
     }
     case 'refocus':

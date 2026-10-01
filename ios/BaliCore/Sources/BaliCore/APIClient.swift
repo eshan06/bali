@@ -185,6 +185,15 @@ public struct APIClient: Sendable {
         await send("POST", "/v1/taps/\(escaped(eventId))/unlock", request)
     }
 
+    /// `PATCH /v1/unlocks/{eventId}` — the student changes the reason of their unlock, named by
+    /// its own event id (A20). No outbox table reads it: the Unlocked screen sends it, and says
+    /// a refusal.
+    public func changeReason(unlock eventId: String, _ request: UnlockReasonRequest) async
+        -> APIResponse<UnlockReasonResponse>
+    {
+        await send("PATCH", "/v1/unlocks/\(escaped(eventId))", request)
+    }
+
     /// `POST /v1/sessions/{id}/refocus` — for `stateChangeDisposition`.
     public func refocus(session id: String, _ request: RefocusRequest) async
         -> APIResponse<RefocusResponse>

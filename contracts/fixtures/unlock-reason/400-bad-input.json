@@ -1,0 +1,25 @@
+{
+  "endpoint": "PATCH /v1/unlocks/{eventId}",
+  "scenario": "A malformed change: its eventId is not a UUID.",
+  "request": {
+    "path": "/v1/unlocks/00000000-0000-7000-8000-000000000001",
+    "body": {
+      "reason": "nurse",
+      "eventId": "x"
+    }
+  },
+  "status": 400,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "bad_input",
+      "message": "invalid request",
+      "details": [
+        {
+          "path": "eventId",
+          "message": "Invalid UUID"
+        }
+      ]
+    }
+  }
+}

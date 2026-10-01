@@ -114,6 +114,10 @@ struct APIClientFixtureTests {
             return try answered(
                 response, fixture, unlockDisposition(response.result, response.answer).rawValue)
         },
+        "PATCH /v1/unlocks/{eventId}": { client, fixture in
+            let request = try fixture.sent(UnlockReasonRequest.self)
+            return try answered(await client.changeReason(unlock: fixture.parameter, request), fixture)
+        },
         "POST /v1/sessions/{id}/refocus": { client, fixture in
             let request = try fixture.sent(RefocusRequest.self)
             let response = await client.refocus(session: fixture.parameter, request)

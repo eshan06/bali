@@ -384,12 +384,17 @@ describe('the unlock a chip carries (A9)', () => {
         {
           id: 'ana',
           state: 'unlocked',
-          unlock: { reason: 'bathroom', recordedAs: null, occurredAt: at },
+          unlock: { eventId: 'ev-u', reason: 'bathroom', recordedAs: null, occurredAt: at },
         },
         {
           id: 'ben',
           state: 'protection_off',
-          unlock: { reason: 'nurse', recordedAs: 'protection_off', occurredAt: at },
+          unlock: {
+            eventId: 'ev-u',
+            reason: 'nurse',
+            recordedAs: 'protection_off',
+            occurredAt: at,
+          },
         },
         { id: 'cal', state: 'unlocked' },
       ]),
@@ -407,12 +412,12 @@ describe('the unlock a chip carries (A9)', () => {
       {
         id: 'ana',
         state: 'unlocked',
-        unlock: { reason: 'nurse', recordedAs: null, occurredAt: at },
+        unlock: { eventId: 'ev-7', reason: 'nurse', recordedAs: null, occurredAt: at },
       },
       {
         id: 'ben',
         state: 'protection_off',
-        unlock: { reason: 'other', recordedAs: 'protection_off', occurredAt: at },
+        unlock: { eventId: 'ev-8', reason: 'other', recordedAs: 'protection_off', occurredAt: at },
       },
       { id: 'cal', state: 'focused' },
     ]);
@@ -431,6 +436,68 @@ describe('the unlock a chip carries (A9)', () => {
     const booted = fromSnapshot(boot);
     for (const id of ['ana', 'ben']) expect(chip(s, id)).toEqual(chip(booted, id));
     expect(chip(s, 'cal', new Date(T0))).toEqual(chip(booted, 'cal', new Date(T0)));
+  });
+});
+
+describe('a changed reason (A20)', () => {
+  const unlocked = (seq: number, id: string, payload: Record<string, unknown> | null = null) =>
+    evt(seq, 'unlock', id, T1, payload);
+  const changed = (seq: number, id: string, unlock: string, reason: string) =>
+    evt(seq, 'unlock_reason_changed', id, T1, { unlock_event_id: unlock, reason });
+
+  it('shows the latest reason on the chip of the unlock it names, live', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlocked(6, 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: null });
+    s = applyEvent(s, changed(7, 'ana', 'ev-6', 'nurse'));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
+    s = applyEvent(s, changed(8, 'ana', 'ev-6', 'bathroom'));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'bathroom' });
+  });
+
+  it('on a protection-off chip too, never relabelling it', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, unlocked(7, 'ana', { recorded_as: 'protection_off', reason: 'nurse' }));
+    s = applyEvent(s, changed(8, 'ana', 'ev-7', 'other'));
+    expect(chip(s, 'ana')).toEqual({ display: 'protection_off', note: 'unlocked · other reason' });
+  });
+
+  it('moves no other unlock’s reason, and paints no chip that carries none', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, unlocked(6, 'ana', { reason: 'bathroom' }));
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    s = applyEvent(s, unlocked(8, 'ana', { reason: 'other' }));
+    const before = s;
+    s = applyEvent(s, changed(9, 'ana', 'ev-6', 'nurse'));
+    s = applyEvent(s, changed(10, 'ben', 'ev-6', 'nurse'));
+    s = applyEvent(s, changed(11, 'ana', 'ev-8', 'a-reason-from-a-newer-server'));
+    s = applyEvent(s, changed(12, 'cal', 'ev-13', 'nurse'));
+    expect(s).toBe(before);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'other reason' });
+    expect(s.cal).toBeUndefined();
+  });
+
+  it('reads the same from the refresh, and replaying the overlap lands where it was', () => {
+    // The snapshot carries the reason now; the stream replays the unlock and
+    // its changes over it, in order.
+    const boot = snapshot(8, [
+      {
+        id: 'ana',
+        state: 'unlocked',
+        unlock: { eventId: 'ev-6', reason: 'bathroom', recordedAs: null, occurredAt: T1 },
+      },
+    ]);
+    let s = fromSnapshot(boot);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'bathroom' });
+    for (const e of [
+      unlocked(6, 'ana'),
+      changed(7, 'ana', 'ev-6', 'nurse'),
+      changed(8, 'ana', 'ev-6', 'bathroom'),
+    ]) {
+      s = applyEvent(s, e);
+    }
+    expect(chip(s, 'ana')).toEqual(chip(fromSnapshot(boot), 'ana'));
   });
 });
 
@@ -458,7 +525,12 @@ describe('a late unlock turns no chip (A10)', () => {
   });
 
   it('reads the same from a snapshot, were one to carry it', () => {
-    const unlock: SnapshotUnlock = { reason: 'nurse', recordedAs: 'superseded', occurredAt: T0 };
+    const unlock: SnapshotUnlock = {
+      eventId: 'ev-u',
+      reason: 'nurse',
+      recordedAs: 'superseded',
+      occurredAt: T0,
+    };
     const s = fromSnapshot(snapshot(5, [{ id: 'ana', unlock }]));
     expect(chip(s, 'ana', new Date(T0))).toEqual({ display: 'focused', note: null });
   });
@@ -491,7 +563,12 @@ describe('a late return turns no chip (A13)', () => {
       s = applyEvent(s, lateReturn(7, type, 'ana'));
       expect(chip(s, 'ana'), type).toEqual({ display: 'unlocked', note: 'nurse' });
       // The refresh's turn looks past the late return to the unlock before it.
-      const unlock: SnapshotUnlock = { reason: 'nurse', recordedAs: null, occurredAt: T0 };
+      const unlock: SnapshotUnlock = {
+        eventId: 'ev-u',
+        reason: 'nurse',
+        recordedAs: null,
+        occurredAt: T0,
+      };
       const booted = fromSnapshot(snapshot(7, [{ id: 'ana', state: 'unlocked', unlock }]));
       expect(chip(s, 'ana'), type).toEqual(chip(booted, 'ana'));
     }
@@ -542,7 +619,7 @@ describe('a late tap into a class the student’s later tap left behind (A14)', 
           id: 'ana',
           state: 'unlocked',
           endedAt: T1,
-          unlock: { reason: 'bathroom', recordedAs: null, occurredAt: T0 },
+          unlock: { eventId: 'ev-u', reason: 'bathroom', recordedAs: null, occurredAt: T0 },
         },
       ]),
     );
@@ -551,7 +628,12 @@ describe('a late tap into a class the student’s later tap left behind (A14)', 
         {
           id: 'ana',
           state: null,
-          unlock: { reason: 'bathroom', recordedAs: 'no_live_participation', occurredAt: T0 },
+          unlock: {
+            eventId: 'ev-u',
+            reason: 'bathroom',
+            recordedAs: 'no_live_participation',
+            occurredAt: T0,
+          },
         },
       ]),
     );
@@ -588,6 +670,7 @@ describe('a student the snapshot does not carry (A9)', () => {
     // Enrolled, never tapped in, and yet an unlock kept against the session:
     // the phone is unshielded and the student is not in it.
     const unlock: SnapshotUnlock = {
+      eventId: 'ev-u',
       reason: null,
       recordedAs: 'no_live_participation',
       occurredAt: T1,
@@ -608,6 +691,7 @@ describe('a late record survives the snapshot refresh (A9)', () => {
   // left it (A2c), so the refresh reads a plain ended row: the snapshot carries
   // the record beside it, and the grid reads it as the stream did.
   const lateUnlock: SnapshotUnlock = {
+    eventId: 'ev-u',
     reason: 'nurse',
     recordedAs: 'after_session_end',
     occurredAt: T1,

@@ -85,6 +85,18 @@ const EXPECTED: Record<
     reason: 'display_name_taken',
     message: 'a classmate already uses that name',
   },
+  UNLOCK_NOT_FOUND: {
+    code: 'not_found',
+    status: 404,
+    reason: 'unlock_not_found',
+    message: 'no unlock of yours in a class has that id',
+  },
+  UNLOCK_SUPERSEDED: {
+    code: 'conflict',
+    status: 409,
+    reason: 'unlock_superseded',
+    message: 'a return to focus or another unlock came since: this unlock is over',
+  },
 };
 
 /**

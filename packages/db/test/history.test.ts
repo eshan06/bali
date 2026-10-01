@@ -2,7 +2,7 @@ import { sql, type SQLWrapper } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { type HistoryKey, historyReads } from '../src/queries.js';
+import { type HistoryKey, historyReads, reasonChanges } from '../src/queries.js';
 import { makeTestDb } from '../src/testing.js';
 import type { Database } from '../src/types.js';
 
@@ -55,5 +55,11 @@ describe('the history reads', () => {
     const endedPlan = await planOf(ended);
     expect(endedPlan, endedPlan).toContain('participations_student_ended_idx');
     expect(endedPlan, endedPlan).not.toContain('Seq Scan');
+  });
+
+  it('read the reasons a page’s unlocks carry now through their own index (A20)', async () => {
+    const plan = await planOf(reasonChanges(db, [newUuidV7(), newUuidV7()]));
+    expect(plan, plan).toContain('events_unlock_reason_idx');
+    expect(plan, plan).not.toContain('Seq Scan');
   });
 });

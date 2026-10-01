@@ -1,0 +1,1 @@
+CREATE INDEX "events_unlock_reason_idx" ON "events" USING btree (("payload"->>'unlock_event_id')) WHERE "events"."type" = 'unlock_reason_changed';
