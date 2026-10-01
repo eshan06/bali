@@ -1939,49 +1939,115 @@ describe.runIf(REAL_PG)('a Start past the bell (real Postgres, A18)', () => {
     }
   }
 
-  it('a Start racing the sweep over a session past its bell: one end, one new session, either order', async () => {
-    /*
-     * Both take the old session's row before ending it (the Start after the
-     * class's), so they serialise. Sweep first: it ends the session, and the
-     * Start, reading it again under the lock, finds it over and starts the new
-     * one. Start first: it ends the session as the sweep would, starts the new
-     * one, and the sweep finds nothing left to end. Staged both ways round
-     * with a holder on the old session's row.
-     */
-    for (const first of ['start', 'sweep'] as const) {
-      const { classId } = await seed(`race-start-sweep-${first}`);
-      const old = await openSession(classId, { due: true });
-      const release = await holdSession(old.id);
-      const now = new Date();
-      const press = { classId, startedAt: now, endsAt: new Date(now.getTime() + 25 * 60_000) };
-      const calls: Promise<unknown>[] = [];
-      let starting: ReturnType<typeof startSession> | undefined;
-      let sweeping: ReturnType<typeof expireDueSessions> | undefined;
-      const call = (which: 'start' | 'sweep') => {
-        if (which === 'start') calls.push((starting = startSession(db, press)));
-        else calls.push((sweeping = expireDueSessions(db, now)));
-      };
-      try {
-        call(first);
-        await parked(1, calls);
-        call(first === 'start' ? 'sweep' : 'start');
-        await parked(2, calls);
-      } finally {
-        await release();
-      }
-      const [started, swept] = await Promise.all([starting, sweeping]);
-      expect(started?.outcome, first).toBe('created');
-      expect(started?.session.id, first).not.toBe(old.id);
-      expect(swept, first).toEqual(first === 'sweep' ? [old.id] : []);
-      expect(await eventsOfType(old.id, 'session_expired'), first).toHaveLength(1);
-      const all = await db.select().from(sessions).where(eq(sessions.classId, classId));
-      expect(all, first).toHaveLength(2);
-      expect(
-        all.filter((s) => s.endedAt === null).map((s) => s.id),
-        first,
-      ).toEqual([started?.session.id]);
-    }
-  }, 30_000);
+  it(
+    'a Start racing the sweep over a session past its bell: one end, one new session, either order',
+    () =>
+      onOwnDatabase(async () => {
+        /*
+         * Both take the old session's row before ending it (the Start after the
+         * class's), so they serialise. Sweep first: it ends the session, and the
+         * Start, reading it again under the lock, finds it over and starts the new
+         * one. Start first: it ends the session as the sweep would, starts the new
+         * one, and the sweep finds nothing left to end. Staged both ways round
+         * with a holder on the old session's row.
+         */
+        for (const first of ['start', 'sweep'] as const) {
+          const { classId } = await seed(`race-start-sweep-${first}`);
+          const old = await openSession(classId, { due: true });
+          const release = await holdSession(old.id);
+          const now = new Date();
+          const press = { classId, startedAt: now, endsAt: new Date(now.getTime() + 25 * 60_000) };
+          const calls: Promise<unknown>[] = [];
+          let starting: ReturnType<typeof startSession> | undefined;
+          let sweeping: ReturnType<typeof expireDueSessions> | undefined;
+          const call = (which: 'start' | 'sweep') => {
+            if (which === 'start') calls.push((starting = startSession(db, press)));
+            else calls.push((sweeping = expireDueSessions(db, now)));
+          };
+          try {
+            call(first);
+            await parked(1, calls);
+            call(first === 'start' ? 'sweep' : 'start');
+            await parked(2, calls);
+          } finally {
+            await release();
+          }
+          const [started, swept] = await Promise.all([starting, sweeping]);
+          expect(started?.outcome, first).toBe('created');
+          expect(started?.session.id, first).not.toBe(old.id);
+          expect(swept, first).toEqual(first === 'sweep' ? [old.id] : []);
+          expect(await eventsOfType(old.id, 'session_expired'), first).toHaveLength(1);
+          const all = await db.select().from(sessions).where(eq(sessions.classId, classId));
+          expect(all, first).toHaveLength(2);
+          expect(
+            all.filter((s) => s.endedAt === null).map((s) => s.id),
+            first,
+          ).toEqual([started?.session.id]);
+        }
+        // Not a deadlock a retry hid: the class row's NO KEY UPDATE leaves the
+        // sweep's event its key-share (with FOR UPDATE, 4 runs in 6 deadlocked).
+        expect(await deadlockCount(db), 'Postgres broke a deadlock — a retry hid it').toBe(0);
+      }),
+    30_000,
+  );
+
+  it(
+    'a Start ending a class past its bell, against a re-tap by a student whose tap waits: no deadlock',
+    () =>
+      onOwnDatabase(async () => {
+        /*
+         * A14's lock order, kept by a Start that ends a class (#133's round 1):
+         * it takes its waiting taps and their students' locks before the old
+         * session's row, so a tap — its student's lock, then the session's row —
+         * never holds what the Start then waits on. Staged with a holder on the
+         * waiting tap's row: out of that order, the Start parked there holding
+         * the old session's row while the re-tap parked on that row holding the
+         * student's lock, and Postgres broke the cycle.
+         */
+        const { classId, studentId, teacherId } = await seed('race-start-retap');
+        const old = await openSession(classId, { due: true });
+        const now = new Date();
+        const armed = await armTap(db, {
+          studentId,
+          teacherId,
+          eventId: newUuidV7(),
+          deviceTime: now,
+          expiresAt: new Date(now.getTime() + 3_600_000),
+          now,
+        });
+        const release = await holdArmedTap(armed.armedTapId!);
+        const calls: Promise<unknown>[] = [];
+        let starting: ReturnType<typeof startSession> | undefined;
+        let retapping: ReturnType<typeof tapIn> | undefined;
+        try {
+          const press = { classId, startedAt: now, endsAt: new Date(now.getTime() + 25 * 60_000) };
+          calls.push((starting = startSession(db, press)));
+          await parked(1, calls);
+          const retap = {
+            sessionId: old.id,
+            studentId,
+            eventId: newUuidV7(),
+            deviceTime: now,
+            now,
+          };
+          calls.push((retapping = tapIn(db, retap)));
+          await parked(2, calls);
+        } finally {
+          await release();
+        }
+        const [started, retapped] = await Promise.allSettled([starting, retapping]);
+        expect(started).toMatchObject({
+          status: 'fulfilled',
+          value: { outcome: 'created', armedConverted: 1 },
+        });
+        expect(retapped).toMatchObject({
+          status: 'rejected',
+          reason: { code: 'SESSION_NOT_RUNNING' },
+        });
+        expect(await deadlockCount(db), 'Postgres broke a deadlock — a retry hid it').toBe(0);
+      }),
+    30_000,
+  );
 });
 
 describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
@@ -2034,6 +2100,48 @@ describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
     expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
   }, 20_000);
 });
+
+/**
+ * Run `body` with this file's helpers on a database nothing else touches, so
+ * `deadlockCount` reads this test's deadlocks alone (see it). Tests in a file
+ * run one at a time, so the shared handle is put back before the next.
+ */
+async function onOwnDatabase(body: () => Promise<void>): Promise<void> {
+  const shared = db;
+  const own = await makeTestDb();
+  db = own.db;
+  try {
+    await body();
+  } finally {
+    db = shared;
+    await own.close();
+  }
+}
+
+/** Take a waiting tap's `armed_taps` row and hold it, as `holdSession` holds a session's. */
+async function holdArmedTap(armedTapId: string): Promise<() => Promise<void>> {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const hasLock = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db
+    .transaction(async (tx) => {
+      await tx.select().from(armedTaps).where(eq(armedTaps.id, armedTapId)).for('update');
+      locked();
+      await held;
+      throw new Error('rolled back on purpose');
+    })
+    .catch(() => undefined);
+  await hasLock;
+  return async () => {
+    release();
+    await holder;
+  };
+}
 
 /**
  * Take `sessionId`'s row lock and hold it. Whatever locks the row meanwhile
