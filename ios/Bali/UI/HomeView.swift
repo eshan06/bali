@@ -61,13 +61,16 @@ struct HomeView: View {
                         }
                         inSession(card)
                         // A read of the classes that did not go: the card may be older than it
-                        // says (santa's round 1).
-                        if let failed = phone.sync?.meWords { Retry(words: failed, phone: phone) }
+                        // says (santa's round 1) — said by the classes themselves while none is read.
+                        if phone.sync?.me != nil, let failed = phone.sync?.meWords {
+                            Retry(words: failed, phone: phone)
+                        }
                     } else {
                         tapIn
                     }
-                    // A Back to focus refused, in a class this build knows no state of (C5b).
-                    if let refused = phone.sync?.refusedRefocusWords(at: Date()) {
+                    // A Back to focus refused, in a class this build knows no state of (C5b) —
+                    // unlocked there, the card says it (santa's round 2).
+                    if card?.unlocked != true, let refused = phone.sync?.refusedRefocusWords(at: Date()) {
                         Card(padding: 16) {
                             Text(refused).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
