@@ -11,6 +11,7 @@ import {
   PROTECTION_OFF_OUTCOMES,
   REFOCUS_OUTCOMES,
   TAP_OUTCOMES,
+  UNLOCK_REASON_OUTCOMES,
   UNLOCK_RECORDED_AS,
   UNLOCK_RECORDED_OUTCOMES,
   UPDATE_ME_OUTCOMES,
@@ -90,6 +91,14 @@ const SCENARIOS: Record<string, string> = {
   'unlock/recorded-superseded-gone':
     'Another late unlock of that student’s, reaching the server once they are out of the class: still late, recorded with no state (A11), its session named.',
   'unlock/409-event-id-conflict': 'An unlock under an id the student’s own tap holds (a bug).',
+  'unlock-reason/applied':
+    'The student changes the reason of their unlock while it stands (A20): recorded as its own event, and the teacher sees it.',
+  'unlock-reason/replay':
+    'The retry of that change, after a later one: the reason now, not the retry’s.',
+  'unlock-reason/404-unlock-not-found':
+    'A change of an unlock that is not the student’s own: nothing recorded, nothing said of it.',
+  'unlock-reason/409-unlock-superseded':
+    'A change after the student went back to focus: that unlock is over, and nothing is recorded.',
   'tap-unlock/applied':
     'An unlock sent under the phone’s own tap, its answer still to come (decision 11): filed in the session the tap landed in.',
   'tap-unlock/replay': 'The retry of that unlock: the reason on record, not the retry’s.',
@@ -191,6 +200,13 @@ const change = (as: string, sessionId: string, route: string, eventId = randomUU
   post(as, `/v1/sessions/${sessionId}/${route}`, { eventId, deviceTime, ...extra });
 const checkin = (as: string, sessionId: string) =>
   post(as, `/v1/sessions/${sessionId}/checkin`, { deviceTime });
+/** A change of an unlock's reason (A20), under a fresh id unless given one. */
+const reasonFor = (as: string, unlockId: string, reason: string, eventId = randomUUID()): Call => ({
+  as,
+  method: 'PATCH',
+  path: `/v1/unlocks/${unlockId}`,
+  body: { reason, eventId },
+});
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -257,7 +273,8 @@ function routeOf(path: string) {
   const ids = path.split('?')[0]!.replace(/[0-9a-f-]{36}/g, '{id}');
   return ids
     .replace(/^\/v1\/join-codes\/[^/]*$/, '/v1/join-codes/{code}')
-    .replace(/^\/v1\/taps\/\{id\}\//, '/v1/taps/{eventId}/');
+    .replace(/^\/v1\/taps\/\{id\}\//, '/v1/taps/{eventId}/')
+    .replace(/^\/v1\/unlocks\/\{id\}$/, '/v1/unlocks/{eventId}');
 }
 
 /** A step that sets a scenario up: it must succeed, and it is no fixture. */
@@ -326,8 +343,19 @@ async function captureAll() {
   await capture('unlock/applied', bathroom, 200, { outcome: 'applied' });
   const nurse = change(ana, s.id, 'unlock', unlocked, { reason: 'nurse' });
   await capture('unlock/replay', nurse, 200, { outcome: 'replay', reason: 'bathroom' });
+  // The reason changed while the unlock stands (A20), then its retry after a later change.
+  const toNurse = reasonFor(ana, unlocked, 'nurse');
+  await capture('unlock-reason/applied', toNurse, 200, { outcome: 'applied' });
+  await setup(reasonFor(ana, unlocked, 'other'));
+  await capture('unlock-reason/replay', toNurse, 200, { outcome: 'replay', reason: 'other' });
+  const notHers = { reason: 'unlock_not_found' };
+  const byAnother = reasonFor(newcomer, unlocked, 'nurse');
+  await capture('unlock-reason/404-unlock-not-found', byAnother, 404, notHers);
   const refocus = change(ana, s.id, 'refocus');
   await capture('refocus/applied', refocus, 200, { outcome: 'applied' });
+  const backSince = { reason: 'unlock_superseded' };
+  const afterBack = reasonFor(ana, unlocked, 'bathroom');
+  await capture('unlock-reason/409-unlock-superseded', afterBack, 409, backSince);
   await capture('refocus/replay', refocus, 200, { outcome: 'replay' });
   const report = change(ana, s.id, 'protection-off');
   await capture('protection-off/applied', report, 200, { outcome: 'applied' });
@@ -734,6 +762,8 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(valuesOf('ProtectionOffResponse', 'outcome')).toEqual(new Set(PROTECTION_OFF_OUTCOMES));
     expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(CHECK_IN_STATUSES));
     expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(UPDATE_ME_OUTCOMES));
+    const reasonChanges = valuesOf('UnlockReasonResponse', 'outcome');
+    expect(reasonChanges).toEqual(new Set(UNLOCK_REASON_OUTCOMES));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');
     expect(joins).toEqual(new Set(ENROLLMENT_JOIN_OUTCOMES));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');

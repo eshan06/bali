@@ -203,8 +203,9 @@ export interface UnlockResponse {
   session: SessionView | null;
   /**
    * The reason on record for this unlock: the one this request carried when the
-   * unlock is new, the stored one on a replay. Null when none was given or the
-   * one sent was not recognised — so a phone can tell its reason did not land.
+   * unlock is new, the one on record now on a replay — its latest change, if
+   * the student changed it since (A20). Null when none was given or the one sent
+   * was not recognised — so a phone can tell its reason did not land.
    */
   reason: UnlockReason | null;
 }
@@ -265,9 +266,9 @@ export interface UnlockRequest {
   /**
    * Optional and skippable. A value the server does not recognise is recorded
    * as no reason rather than refused: validation must never be the reason an
-   * unlock goes unrecorded (docs/PLAN.md decision log, 2026-09-20). Fixed once
-   * recorded — a replay keeps the stored reason — so a phone that asks for one
-   * after unlocking has to hold the send until it is answered or skipped.
+   * unlock goes unrecorded (docs/PLAN.md decision log, 2026-09-20). A replay
+   * never applies the reason it carries: once the unlock is recorded, its
+   * reason changes only through `PATCH /v1/unlocks/{eventId}` (A20).
    */
   reason?: UnlockReason | null;
   /**
@@ -276,6 +277,28 @@ export interface UnlockRequest {
    * the server cannot use is taken as none, never refused.
    */
   order?: ActionOrder | null;
+}
+
+// PATCH /v1/unlocks/{eventId} — the student changes their unlock's reason (A20),
+// the unlock named by its own event id; recorded as an event of its own. Only
+// while it is the unlock the grid shows — no return, tap or unlock of theirs
+// there since — and the session runs: else `409 unlock_superseded` / `409
+// session_not_running`; no unlock of the caller's in a session, `404
+// unlock_not_found`. A refusal records nothing.
+export interface UnlockReasonRequest {
+  /** One of `UNLOCK_REASONS`; anything else is a 400. */
+  reason: UnlockReason;
+  /** This change's idempotency key (rule 4); the unlock's own id is in the path. */
+  eventId: string;
+}
+/** Every outcome a reason change answers with (`UnlockReasonResponse.outcome`). */
+export const UNLOCK_REASON_OUTCOMES = ['applied', 'replay'] as const;
+export type UnlockReasonOutcome = (typeof UNLOCK_REASON_OUTCOMES)[number];
+export interface UnlockReasonResponse {
+  /** 'applied' recorded the change; 'replay' this eventId already did, and nothing is applied again. */
+  outcome: UnlockReasonOutcome;
+  /** The unlock's reason on record now: this one when applied; on a replay, the latest since. */
+  reason: UnlockReason;
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
@@ -408,6 +431,7 @@ export interface HistoryEvent {
    * sessions ran.
    */
   session: { id: string; startedAt: string; endsAt: string; endedAt: string | null } | null;
+  /** An unlock's reason now: its latest change, if the student changed it (A20). */
   reason: UnlockReason | null;
   /**
    * Why an unlock, a protection off or a return to focus changed nothing —
@@ -517,7 +541,9 @@ export interface EndEnrollmentResponse {
 // from, in one round trip.
 /** An emergency unlock as the grid shows it on a student's chip (A9). */
 export interface SnapshotUnlock {
-  /** The reason the student gave (A1); null when none. */
+  /** Its event id (A20, additive): what a streamed `unlock_reason_changed` names. */
+  eventId: string;
+  /** The reason the student gave (A1) — its latest change, if they changed it (A20); null when none. */
   reason: UnlockReason | null;
   /**
    * Why it flipped nothing, when it flipped nothing (`payload.recorded_as`); null

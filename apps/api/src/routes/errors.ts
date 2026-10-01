@@ -43,6 +43,10 @@ const REFUSALS: Record<
     'class_in_session',
     'the class is in session: leave after it ends',
   ],
+  // A reason change (A20): no unlock of the caller's in a session has that id,
+  // or it is no longer the one the teacher sees. Nothing was recorded.
+  UNLOCK_NOT_FOUND: ['not_found', 'unlock_not_found', 'no unlock of yours in a class has that id'],
+  UNLOCK_SUPERSEDED: ['conflict', 'unlock_superseded', 'a later return or unlock ended it'],
 };
 
 /**

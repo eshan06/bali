@@ -354,6 +354,8 @@ export interface SnapshotRosterRow {
   endedAt: Date | null;
   /** Their latest unlock here since they last tapped in or refocused, or null. */
   unlock: {
+    eventId: string;
+    /** Its reason now: its latest change's, if the student changed it (A20). */
     reason: UnlockReason | null;
     recordedAs: UnlockRecordedAs | null;
     occurredAt: Date;
@@ -390,6 +392,63 @@ const CHIP_TURNS = ['tap_in', 'refocus', 'unlock'] as const satisfies readonly E
 const LATE: UnlockRecordedAs & ReturnRecordedAs = 'superseded';
 
 /**
+ * A student's latest turn in a session — what their chip shows (A9): a tap, a
+ * return to focus or an unlock, never a late one. `student` is an id, or a
+ * column to correlate on. One rule for the grid's snapshot and a reason change
+ * (A20), which only the unlock on the chip may take.
+ */
+export function latestTurn(db: Database, sessionId: string, student: string | typeof users.id) {
+  return db
+    .select({
+      eventId: events.eventId,
+      type: events.type,
+      payload: events.payload,
+      occurredAt: events.occurredAt,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.sessionId, sessionId),
+        eq(events.userId, student),
+        inArray(events.type, CHIP_TURNS),
+        // A late record's note, an unlock's or a return's.
+        sql`${events.payload}->>'recorded_as' is distinct from ${LATE}`,
+      ),
+    )
+    .orderBy(desc(events.seq))
+    .limit(1);
+}
+
+/**
+ * The changes of these unlocks' reasons (A20), the latest of each first,
+ * unexecuted — exported so a test can EXPLAIN it: the type is a literal, so the
+ * read is probes of `events_unlock_reason_idx`.
+ */
+export function reasonChanges(db: Database, unlockEventIds: string[]) {
+  const unlock = sql<string>`${events.payload}->>'unlock_event_id'`;
+  return db
+    .selectDistinctOn([unlock], { unlock, reason: sql<unknown>`${events.payload}->>'reason'` })
+    .from(events)
+    .where(and(sql`${events.type} = 'unlock_reason_changed'`, inArray(unlock, unlockEventIds)))
+    .orderBy(unlock, desc(events.seq));
+}
+
+/**
+ * Each of these unlocks' reason now, where the student changed it (A20): its
+ * latest change's. An unlock never changed is absent: its own payload's stands.
+ */
+export async function changedReasons(
+  db: Database,
+  unlockEventIds: string[],
+): Promise<Map<string, UnlockReason>> {
+  if (unlockEventIds.length === 0) return new Map();
+  const rows = await reasonChanges(db, unlockEventIds);
+  return new Map(
+    rows.flatMap((r) => (isUnlockReason(r.reason) ? [[r.unlock, r.reason] as const] : [])),
+  );
+}
+
+/**
  * The grid-boot roster for a session (decision 5): every student the session's
  * feed can name, with their participation IN THIS SESSION — the class's active
  * enrollments, so a student who hasn't tapped in yet still appears (with null
@@ -405,28 +464,14 @@ const LATE: UnlockRecordedAs & ReturnRecordedAs = 'superseded';
  * the turn looks past it to the one before — and whether a protection-off
  * report came after the end, which leaves the ended row alone (A2c). The
  * caller derives each display state; one statement, so the row and its
- * records are read at one instant.
+ * records are read at one instant — then the unlocks' reasons now (A20).
  */
 export async function getSessionRoster(
   db: Database,
   sessionId: string,
   classId: string,
 ): Promise<SnapshotRosterRow[]> {
-  const turn = db
-    .select({ type: events.type, payload: events.payload, occurredAt: events.occurredAt })
-    .from(events)
-    .where(
-      and(
-        eq(events.sessionId, sessionId),
-        eq(events.userId, users.id),
-        inArray(events.type, CHIP_TURNS),
-        // A late record's note, an unlock's or a return's.
-        sql`${events.payload}->>'recorded_as' is distinct from ${LATE}`,
-      ),
-    )
-    .orderBy(desc(events.seq))
-    .limit(1)
-    .as('turn');
+  const turn = latestTurn(db, sessionId, users.id).as('turn');
   const lateOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and ${events.type} = 'protection_off' and ${events.payload}->>'recorded_as' = 'after_session_end')`;
 
   const rows = await db
@@ -439,6 +484,7 @@ export async function getSessionRoster(
       joinedAt: participations.joinedAt,
       lastSeenAt: participations.lastSeenAt,
       endedAt: participations.endedAt,
+      turnEventId: turn.eventId,
       turnType: turn.type,
       turnPayload: turn.payload,
       turnAt: turn.occurredAt,
@@ -459,6 +505,10 @@ export async function getSessionRoster(
       ),
     )
     .orderBy(users.id, sql`${enrollments.removedAt} is null desc`, desc(enrollments.createdAt));
+  const unlocks = rows.flatMap((r) =>
+    r.turnType === 'unlock' && r.turnEventId !== null ? [r.turnEventId] : [],
+  );
+  const changed = await changedReasons(db, unlocks);
 
   return rows
     .sort((a, b) => a.enrolledAt.getTime() - b.enrolledAt.getTime())
@@ -473,9 +523,12 @@ export async function getSessionRoster(
         lastSeenAt: r.lastSeenAt,
         endedAt: r.endedAt,
         unlock:
-          r.turnType === 'unlock' && r.turnAt !== null
+          r.turnType === 'unlock' && r.turnAt !== null && r.turnEventId !== null
             ? {
-                reason: isUnlockReason(payload.reason) ? payload.reason : null,
+                eventId: r.turnEventId,
+                reason:
+                  changed.get(r.turnEventId) ??
+                  (isUnlockReason(payload.reason) ? payload.reason : null),
                 recordedAs: recordedAsOf(payload),
                 occurredAt: r.turnAt,
               }
@@ -717,6 +770,11 @@ export async function getHistoryPage(
           )
     ).map(({ eventId, ...cls }) => [eventId, cls]),
   );
+  // An unlock shows its reason now (A20).
+  const changed = await changedReasons(
+    db,
+    rows.filter((row) => row.type === 'unlock').map((row) => row.eventId),
+  );
 
   return {
     events: rows.map(({ payload, ...row }) => ({
@@ -724,7 +782,10 @@ export async function getHistoryPage(
       // Every row is of a shown type, and a class ending always has its end.
       type: row.type as HistoryEventType,
       occurredAt: row.occurredAt!,
-      reason: row.type === 'unlock' && isUnlockReason(payload.reason) ? payload.reason : null,
+      reason:
+        row.type === 'unlock'
+          ? (changed.get(row.eventId) ?? (isUnlockReason(payload.reason) ? payload.reason : null))
+          : null,
       recordedAs: (NOTED as readonly string[]).includes(row.type) ? recordedAsOf(payload) : null,
       countedIn:
         row.type === 'armed_tap_skipped'

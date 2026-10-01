@@ -1,4 +1,5 @@
 import {
+  changeUnlockReason,
   checkIn,
   type Database,
   endSession,
@@ -20,6 +21,7 @@ import type {
   RefocusResponse,
   SessionView,
   StartSessionResponse,
+  UnlockReasonResponse,
   UnlockResponse,
 } from '@bali/shared';
 import { MAX_SESSION_MINUTES, UNLOCK_REASONS } from '@bali/shared';
@@ -56,6 +58,9 @@ const UnlockBody = StateChangeBody.extend({
 });
 
 const TapParams = z.object({ eventId: z.string().uuid() });
+// A reason change is no unlock record (A20): a reason outside the vocabulary is
+// refused, never recorded as none — the unlock it is for stands either way.
+const ReasonBody = z.object({ reason: z.enum(UNLOCK_REASONS), eventId: z.string().uuid() });
 
 function toSessionView(s: { id: string; classId: string; endsAt: Date }): SessionView {
   return { id: s.id, classId: s.classId, endsAt: s.endsAt.toISOString() };
@@ -220,6 +225,29 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
         }),
       );
       return toUnlockResponse(result);
+    },
+  );
+
+  // PATCH /v1/unlocks/:eventId — the student changes their own unlock's reason
+  // (A20), the unlock named by its own event id; idempotent on the body's.
+  app.patch(
+    '/v1/unlocks/:eventId',
+    { preHandler: app.authenticate },
+    async (request): Promise<UnlockReasonResponse> => {
+      const identity = requireAuth(request);
+      const { eventId: unlockEventId } = parse(TapParams, request.params);
+      const body = parse(ReasonBody, request.body);
+      const student = await findOrCreateStudent(db, identity.sub);
+      const { outcome, reason } = await mapTransitionError(() =>
+        changeUnlockReason(db, {
+          unlockEventId,
+          studentId: student.id,
+          eventId: body.eventId,
+          reason: body.reason,
+          now: clock(),
+        }),
+      );
+      return { outcome, reason };
     },
   );
 

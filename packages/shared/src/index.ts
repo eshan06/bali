@@ -153,6 +153,10 @@ export const EVENT_TYPES = [
   // A student set their own display name (A8): no session, no class. Its
   // payload keeps the name and the one it replaced — what a teacher was shown.
   'display_name_changed',
+  // A student changed the reason of their unlock (A20): in the unlock's
+  // session, its payload the reason and the unlock's event id. The unlock's
+  // own event is never rewritten; its reason now is its latest change's.
+  'unlock_reason_changed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -235,7 +239,9 @@ export type ReturnRecordedAs = (typeof RETURN_RECORDED_AS)[number];
  * passes (PLAN.md: unlock with an optional, skippable reason). It lands in the
  * unlock event's `payload.reason`, so it reaches the teacher with the unlock.
  * Never a gate: an unlock with no reason, or one the server does not
- * recognise, is recorded all the same. Additive-only like the other vocab.
+ * recognise, is recorded all the same. The student may change it while the
+ * unlock stands (A20, `PATCH /v1/unlocks/{eventId}`): the teacher sees the
+ * latest. Additive-only like the other vocab.
  */
 export const UNLOCK_REASONS = ['bathroom', 'nurse', 'other'] as const;
 export type UnlockReason = (typeof UNLOCK_REASONS)[number];

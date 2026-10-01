@@ -30,10 +30,12 @@ import {
   tapDisposition,
   type TapResponse,
   type TeacherView,
+  UNLOCK_REASON_OUTCOMES,
   UNLOCK_REASONS,
   UNLOCK_RECORDED_AS,
   UNLOCK_RECORDED_OUTCOMES,
   unlockDisposition,
+  type UnlockReasonResponse,
   type UnlockResponse,
   UPDATE_ME_OUTCOMES,
   type UpdateMeResponse,
@@ -61,6 +63,7 @@ interface Contract {
   TapResponse: TapResponse;
   CheckInResponse: CheckInResponse;
   UnlockResponse: UnlockResponse;
+  UnlockReasonResponse: UnlockReasonResponse;
   RefocusResponse: RefocusResponse;
   ProtectionOffResponse: ProtectionOffResponse;
   EnrollmentJoinResponse: EnrollmentJoinResponse;
@@ -152,6 +155,10 @@ export const SCHEMAS = {
     session: sessionView.nullable(),
     reason: z.enum(UNLOCK_REASONS).nullable(),
   }),
+  UnlockReasonResponse: object<UnlockReasonResponse>()({
+    outcome: z.enum(UNLOCK_REASON_OUTCOMES),
+    reason: z.enum(UNLOCK_REASONS),
+  }),
   RefocusResponse: object<RefocusResponse>()({
     outcome: z.enum(REFOCUS_OUTCOMES),
     state: state.nullable(),
@@ -232,6 +239,8 @@ export const ENDPOINTS: Record<
   'GET /v1/me/history': { type: 'HistoryPage' },
   // Not an outbox record: the Me screen sends a rename while open (A8).
   'PATCH /v1/me': { type: 'UpdateMeResponse' },
+  // A change of an unlock's reason, keyed by the unlock's own id (A20).
+  'PATCH /v1/unlocks/{eventId}': { type: 'UnlockReasonResponse' },
 };
 
 /** One checked-in fixture: a real request, the answer it got, and what the phone does with it. */

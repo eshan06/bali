@@ -1,0 +1,17 @@
+{
+  "endpoint": "PATCH /v1/unlocks/{eventId}",
+  "scenario": "The retry of that change, after a later one: the reason now, not the retry’s.",
+  "request": {
+    "path": "/v1/unlocks/00000000-0000-7000-8000-000000000001",
+    "body": {
+      "reason": "nurse",
+      "eventId": "00000000-0000-7000-8000-000000000002"
+    }
+  },
+  "status": 200,
+  "type": "UnlockReasonResponse",
+  "body": {
+    "outcome": "replay",
+    "reason": "other"
+  }
+}

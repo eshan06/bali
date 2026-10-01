@@ -139,6 +139,24 @@ public struct UnlockResponse: Codable, Sendable, Hashable {
     public let reason: OrUnknown<UnlockReason>?
 }
 
+/// `PATCH /v1/unlocks/{eventId}` — the student changes the reason of their unlock (A20), named by
+/// the unlock's own event id; the change goes under its own.
+public struct UnlockReasonRequest: Codable, Sendable, Hashable {
+    public let reason: UnlockReason
+    public let eventId: String
+    public init(reason: UnlockReason, eventId: String) {
+        (self.reason, self.eventId) = (reason, eventId)
+    }
+}
+
+public struct UnlockReasonResponse: Codable, Sendable, Hashable {
+    /// `UNLOCK_REASON_OUTCOMES`.
+    public enum Outcome: String, CaseIterable, Sendable { case applied, replay }
+    public let outcome: OrUnknown<Outcome>
+    /// The unlock's reason now: this change's, or on a replay the latest since.
+    public let reason: OrUnknown<UnlockReason>
+}
+
 /// `POST /v1/sessions/{id}/refocus` — back to focus after an unlock.
 public struct RefocusRequest: Codable, Sendable, Hashable {
     public let eventId: String

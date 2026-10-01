@@ -8,6 +8,58 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **A20: an unlock's reason changes while it stands, recorded as its own event;
+  the grid and the history read the latest.** The owner's ruling (1), below. **Its own event,
+  never a rewrite:** `events` is append-only (data model decision 1; a trigger refuses an UPDATE),
+  so a change is an `unlock_reason_changed` event in the unlock's session, its payload the reason
+  and the unlock's event id (`changeUnlockReason`). An unlock's reason now is its latest change's,
+  read by the unlock's id through a partial index (`events_unlock_reason_idx`, `changedReasons`)
+  wherever a reason is shown: the grid's snapshot and its stream, the history, and the unlock's
+  own replay, whose `reason` was the one stored with it (rule 4: the truth now; an old phone,
+  which changes none, reads what it always did). Rejected: a second `unlock` carrying the new
+  reason (two unlocks in every report for one press, C5a-1's reason against it), and rewriting
+  the payload (the trigger refuses it, and the history would lose what the teacher was shown).
+  **Keyed by the unlock's own id**, `PATCH /v1/unlocks/{eventId}`, never by the session: a change
+  the phone made for one unlock never lands on a later one. **Which unlock takes one:** only the
+  one the teacher's grid shows, the student's latest turn in the session (`latestTurn`: a tap, a
+  return to focus or an unlock, never a late one) — the snapshot's own read, now one function for
+  both, so the two never drift — and only while the session runs by the server's clock
+  (`sessionRunning`, A17's rule). Else `409 unlock_superseded` (new) or `409 session_not_running`;
+  an id naming no unlock of the caller's in a session is `404 unlock_not_found` (new), one answer
+  for another student's, an orphan and none, so it says nothing of another's unlock. A reason
+  outside `UNLOCK_REASONS` is a `400`: the unlock's own reason is never a gate (2026-09-20), but a
+  change is no unlock record, and kept as none it would erase the reason the teacher sees. **The
+  race:** the change takes the session's lock, as a refocus, a tap and an unlock do, so it is
+  recorded before the return that ends its unlock or refused after it, never after it (a
+  real-Postgres race against a refocus, a re-tap and another unlock). **A replay first,** before
+  the bell's check and the turn's: a change that landed is answered `replay` with the reason now,
+  past the bell too, so a phone never reads a recorded change as refused. The server's clock
+  stamps it, inside the window of a session it requires running: no device time. **The grid's
+  stream** moves the reason on the chip of the unlock a change names only (`SnapshotUnlock` gains
+  its `eventId`, additive), so an old change replayed over a newer unlock moves nothing. **Not
+  covered, disclosed:** an unlock sent under a tap that has not landed is kept with no session
+  (`unknown_tap`) and filed under a server-minted id when the tap lands (decision 11), so the
+  phone's id names the orphan and its reason cannot change (`404`): a stuck tap's rare path.
+  **Santa** (two Claude reviewers, so they share a model family — Codex refuses every model on
+  this Mac): round 1, no blockers; both WARNs fixed — the unlock is named by its id as stored,
+  never as sent (a uuid matches an upper-case id, a string compare did not: the change's payload
+  and the turn's check now use the stored one), and the grid reads a reason it does not know as
+  none, as its refresh does.
+- **2026-09-30** — **The owner's rulings on the Unlocked screen and Home** (tonight's device
+  check; they override D1 where they differ). (1) **The reason is changeable.** After an
+  Emergency Unlock the student picks Bathroom, Nurse or Other; the one chosen shows a check mark,
+  no "Sent", with a light iOS haptic (selection feedback, as pressing an iOS control); picking
+  another moves the check, and the teacher sees the latest reason (the live grid, History). It
+  travelled once, with the unlock (A1; C5a's 15 s hold), so a change after the send needs the
+  server: A20. (2) **A way back to Home is Unlocked's primary action**, above the re-lock. (3)
+  **"Back to focus" is renamed "Lock my apps again"**, secondary: the owner pressed it expecting
+  Home, and the old label misled. (4) **Home, with the student's class in session and the student
+  not focused** (left to the conductor, who decided): a card at the top of Home in D1's look —
+  not tapped in, "<class> is in session. Tap your teacher's block to join." with Tap in
+  prominent; unlocked, "You're unlocked in <class> until <bell>." with "Lock my apps again";
+  protection off keeps its own screen. Home is reached from Unlocked by (2), with the tab bar, and
+  the apps stay unlocked meanwhile. Emergency Unlock stays D1's one-second hold (2026-09-29).
+  Built as A20 (the server), C5c (Unlocked) and C3c (Home's card).
 - **2026-09-30** — **The scroll bar at the screen's edge (the owner's phone check).** On the
   phone, every scrolling screen's bar sat 24 pt in, over the cards' right edge: `ScreenScaffold`
   pads its content by D1's gutters, and a scroll view inside was narrowed with it. **Fixed in the
