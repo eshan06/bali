@@ -232,11 +232,11 @@ struct AppTests {
     }
 
     @Test(
-        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c), History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
         let (homes, editing) = (
-            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused"],
+            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked"],
             ["meEditing", "meNameError"]
         )
         for (name, state) in PreviewFixtures.all {
