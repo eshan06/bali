@@ -276,6 +276,7 @@ final class Phone {
             return false
         }
         sessionOverClosed = session
+        select(.home)
         return true
     }
 

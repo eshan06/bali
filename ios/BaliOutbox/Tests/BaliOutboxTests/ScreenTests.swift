@@ -412,6 +412,7 @@ struct ScreenTests {
             unlocked.contains(
                 ".sensoryFeedback(.selection, trigger: phone.picking) { _, picked in picked != nil }"))
         #expect(unlocked.contains(".disabled(!open || phone.picking != nil && !chosen)"))
+        #expect(unlocked.contains("guard !chosen || phone.pickFailed != nil else { return }"))
         #expect(try sourceCode("Bali/BaliApp.swift").contains("guard picking == nil else { return }"))
         let me = try sourceCode("Bali/UI/MeView.swift")
         #expect(me.contains(".onChange(of: naming.busy) { _, busy in"))

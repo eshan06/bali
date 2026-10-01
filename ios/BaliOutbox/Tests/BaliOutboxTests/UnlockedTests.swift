@@ -285,6 +285,35 @@ struct ReasonTests {
     }
 
     @Test(
+        "Answered, the unlock leaves `sending` in the write that reads the queue again: no state published between shows it neither on its way nor answered, so the card never opens over an unlock already sent (santa's round 2)"
+    )
+    func settledInOneWrite() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        let unlock = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        let sent = try await rig.server.next(unlockRoute)
+        let states = await rig.engine.updates()
+        let (ready, isReady) = AsyncStream.makeStream(of: Void.self)
+        let opened = Task {
+            var (open, first) = (false, true)
+            for await state in states {
+                if first { (first, _) = (false, isReady.yield()) }
+                let queued = state.queued.contains { $0.eventId == unlock.eventId }
+                if queued, case .open? = UnlockedWords(state)?.picker { open = true }
+                if !queued { break }
+            }
+            return open
+        }
+        for await _ in ready { break }
+        // The watcher waiting for the next state, so the answer's first publish goes straight to
+        // it — the one a split write would show open.
+        try await Task.sleep(for: .milliseconds(100))
+        sent.reply(200, Answer.unlocked())
+        #expect(await opened.value == false)
+        await rig.stop()
+    }
+
+    @Test(
         "None given, it goes as the hold ends, without one: a reason given after a send with no answer — the server may have it — or while it is on its way, waits for it to land"
     )
     func notGiven() async throws {

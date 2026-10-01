@@ -136,6 +136,22 @@ struct AppTests {
         // (santa's round 1).
         let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
         #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
+        // A pick told to wait for the unlock may go once it lands: those words go then, and no
+        // other failure's do (santa's round 2).
+        var standing = SyncState()
+        standing.standing = .inSession(
+            SessionView(id: "s", classId: "c", endsAt: Date() + 600), .unlocked)
+        var landed = standing
+        landed.recordedUnlock = RecordedUnlock(session: "s", unlock: "u", reason: nil)
+        for (words, gone) in [(UnlockedWords.onItsWay, true), (UnlockedWords.offline, false)] {
+            let phone = Phone(fixture: PreviewFixtures.State(sync: standing, pickFailed: words))
+            phone.synced(standing)
+            #expect(phone.pickFailed == words)
+            phone.synced(landed)
+            #expect((phone.pickFailed == nil) == gone, "\(words)")
+            phone.synced(landed)
+            #expect((phone.pickFailed == nil) == gone, "\(words)")
+        }
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         #expect(unlocked.bell != nil && home.bell == nil)
         // History (C6a): D1's days and cards, each state's fixture its own; a frozen phone's read

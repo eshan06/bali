@@ -31,7 +31,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   was reported, Tap in is. **One vocabulary** (the conductor's ask): History's refocus moment
   reads "Locked apps again", and the body and the refused words say "lock your apps again".
   **Gone:** the card's too-late state (`UnlockedWords.late`): a reason is never too late while the
-  unlock stands.
+  unlock stands. **Santa** (two Claude reviewers, so they share a model family — Codex refuses
+  every model on this Mac — and the design check): round 1, one blocker, fixed red first — Home
+  opened over Unlocked outlived it: after the bell, Done or a read saying out left it over the
+  router's own Home, which lost its tab bar and gained a stray Back; now the router reads a Home
+  opened over a Home as that Home, and Back shows only where it leads elsewhere (`canGoBack`), and
+  Done lands on Home whatever tab was chosen over Unlocked. Its WARNs fixed: the record leaves
+  `sending` in the write that reads the queue again; "on its way" said of a pick goes once the
+  unlock lands; after a change no answer came to, the reason shown can be picked again; and the
+  design check's words (the waiting card with a reason chosen, "Bali couldn't change your reason",
+  one vocabulary, no "again" twice), the check scaled with the text and the re-tap line with its
+  Tap in. Round 2: two blockers, tests for two of those fixes, added and red-checked. Left: the
+  tight "✓ Bathroom" (4 pt padding, to keep D1's row), "Go to Home" naming the tab, and Home's
+  words over Unlocked, which C3c's card replaces.
 - **2026-09-30** — **A20: an unlock's reason changes while it stands, recorded as its own event;
   the grid and the history read the latest.** The owner's ruling (1), below. **Its own event,
   never a rewrite:** `events` is append-only (data model decision 1; a trigger refuses an UPDATE),
