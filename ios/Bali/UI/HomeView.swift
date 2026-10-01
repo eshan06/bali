@@ -6,13 +6,20 @@ import SwiftUI
 /// with each teacher (`GET /v1/me`), and Join a class, opened over Home with a way back. What the
 /// phone could not read or record is said with Try again (rule 5); where it stood unread with the
 /// last run's shields on, Emergency Unlock is here (B6b, C4). D1's tab bar under it is the
-/// router's to show (C6a, `RootView`).
+/// router's to show (C6a, `RootView`). A class of theirs in session, the student not focused in
+/// it, its card takes the hero's place (C3c).
 struct HomeView: View {
     let phone: Phone
+    /// The card's bell, rung: the card goes then, by the phone's clock (C3c).
+    @State private var rung: Date?
+    /// Why Lock my apps again did not go through (rule 5).
+    @State private var notBack: String?
 
     private var me: MeResponse? { phone.sync?.me }
 
     var body: some View {
+        let _ = rung
+        let card = phone.sync?.inSessionCard(at: Date())
         ScreenScaffold {
             // Opened over Waiting: back to "Ready — waiting for your teacher" (#114's review),
             // above the scroll as Join's is, so it never scrolls away.
@@ -25,8 +32,10 @@ struct HomeView: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(me?.user.displayName.map { "Hi, \($0)" } ?? "Hi there").textStyle(.h1)
-                        Text("Ready when your class is.").textStyle(.bodyLg)
-                            .foregroundStyle(Theme.textSecondary)
+                        if card == nil {
+                            Text("Ready when your class is.").textStyle(.bodyLg)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
                     }
                     if phone.sync?.standing == .unread {
                         Retry(
@@ -43,9 +52,25 @@ struct HomeView: View {
                     }
                     // In every build, as Emergency Unlock is wherever the shields can be on:
                     // nothing may shield a phone with no way out (ARCHITECTURE; FocusTests).
-                    tapIn
-                    // A Back to focus refused, in a class this build knows no state of (C5b).
-                    if let refused = phone.sync?.refusedRefocusWords(at: Date()) {
+                    if let card {
+                        // Its unlock stuck on the phone, said here too (C5c's review).
+                        if card.unlocked, let sync = phone.sync,
+                            let stuck = UnlockedWords(sync)?.stuck
+                        {
+                            Retry(words: stuck, phone: phone)
+                        }
+                        inSession(card)
+                        // A read of the classes that did not go: the card may be older than it
+                        // says (santa's round 1) — said by the classes themselves while none is read.
+                        if phone.sync?.me != nil, let failed = phone.sync?.meWords {
+                            Retry(words: failed, phone: phone)
+                        }
+                    } else {
+                        tapIn
+                    }
+                    // A Back to focus refused, in a class this build knows no state of (C5b) —
+                    // unlocked there, the card says it (santa's round 2).
+                    if card?.unlocked != true, let refused = phone.sync?.refusedRefocusWords(at: Date()) {
                         Card(padding: 16) {
                             Text(refused).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -59,6 +84,43 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
+        }
+    }
+
+    /// A class in session, the student not focused in it (C3c), in D1's look: the state's chip and
+    /// what is true, then the way on — Tap in, or Lock my apps again — gone at the bell.
+    private func inSession(_ card: InSessionCard) -> some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                Chip(
+                    kind: card.unlocked ? .unlocked : .notIn,
+                    text: card.unlocked ? "Unlocked" : "Not in")
+                Text(card.words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
+                if let retap = card.retap {
+                    // Unlocked's own rule: out of protection off, or its refocus refused, a
+                    // re-tap is the way back (A2; santa's round 1).
+                    Text(retap).textStyle(.body)
+                    TapIn(phone: phone, primary: false)
+                } else if card.unlocked {
+                    Button("Lock my apps again") {
+                        Task {
+                            notBack = await phone.backToFocus()
+                            if let notBack {
+                                AccessibilityNotification.Announcement(notBack).post()
+                            }
+                        }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    if let notBack { Text(notBack).textStyle(.body) }
+                } else {
+                    TapIn(phone: phone)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task(id: card.bell) {
+            await Screen.bell(card.bell, change: UIApplication.significantTimeChangeNotification)
+            if !Task.isCancelled { rung = card.bell }
         }
     }
 

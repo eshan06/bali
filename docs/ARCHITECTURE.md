@@ -302,7 +302,10 @@ Student app:
   teacher (`teacher.displayName`, null when their account has none — the preview's and
   the history's shape; added 2026-09-26, C2a, additive): what Home and Me show under a
   class, and Focus says "with". And the caller's enrollment in it (`enrollmentId`, null on
-  a teacher's own class; added 2026-09-30, A19, additive): what leaving it deletes.
+  a teacher's own class; added 2026-09-30, A19, additive): what leaving it deletes. And its
+  session running now by the server's clock, with its bell (`liveSession`, null when none runs
+  and on a teacher's own class; added 2026-09-30, C3c, additive): Home says the class is in
+  session to a student not in it.
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any

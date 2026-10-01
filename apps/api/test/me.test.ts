@@ -1,5 +1,6 @@
 import {
   type Database,
+  endSession,
   enrollments,
   events,
   findUserByCognitoId,
@@ -503,15 +504,54 @@ describe('GET /v1/me', () => {
     expect(body.classes).toHaveLength(2);
   });
 
+  it('gives each of a student’s classes its session running by the server’s clock, and its bell (C3c)', async () => {
+    const { student, klass: running } = await seedClassroom(db, 'me-live');
+    const others = await Promise.all(
+      ['me-live-past', 'me-live-ended', 'me-live-none'].map((tag) => seedClassroom(db, tag)),
+    );
+    await db
+      .insert(enrollments)
+      .values(others.map((c) => ({ classId: c.klass.id, studentId: student.id })));
+    const at = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    const { session } = await startSession(db, {
+      classId: running.id,
+      startedAt: at(-1),
+      endsAt: at(25),
+    });
+    // Past its bell, not swept yet: over all the same (A17). And one ended early.
+    await startSession(db, { classId: others[0]!.klass.id, startedAt: at(-30), endsAt: at(-1) });
+    const ended = await startSession(db, {
+      classId: others[1]!.klass.id,
+      startedAt: at(-1),
+      endsAt: at(25),
+    });
+    await endSession(db, { sessionId: ended.session.id, at: new Date(), reason: 'ended' });
+
+    const { body } = await me(await ctx.tokenFor(student.cognitoId));
+    expect(new Map(body.classes.map((c) => [c.id, c.liveSession]))).toEqual(
+      new Map([
+        [running.id, { id: session.id, endsAt: session.endsAt.toISOString() }],
+        ...others.map((c) => [c.klass.id, null] as const),
+      ]),
+    );
+  });
+
   it('returns a teacher their taught classes (existing role preserved)', async () => {
     const { teacher, klass } = await seedClassroom(db, 'me-teacher');
+    await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
     const { body } = await me(await ctx.tokenFor(teacher.cognitoId));
     expect(body.user.role).toBe('teacher');
     expect(body.classes.map((c) => c.id)).toEqual([klass.id]);
     // A teacher's own classes name the caller — here, one with no name yet —
-    // and no enrollment: they teach it, and have none to leave (A19).
+    // and no enrollment: they teach it, and have none to leave (A19); nor its
+    // session, which is for a student not in it (C3c).
     expect(body.classes.map((c) => c.teacher)).toEqual([{ displayName: null }]);
     expect(body.classes.map((c) => c.enrollmentId)).toEqual([null]);
+    expect(body.classes.map((c) => c.liveSession)).toEqual([null]);
   });
 
   it('fills a teacher’s missing display name too, and keeps the role', async () => {

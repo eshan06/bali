@@ -198,10 +198,9 @@ struct MeEngineTests {
         try await rig.server.next(renameRoute).reply(409, Answer.refused("display_name_taken"))
         #expect(await refused.error?.error.reason == .displayNameTaken)
         #expect(await rig.engine.state.me?.user.displayName == nil)
-        // No read asked for: one would have gone by the loop's next wake and kept it from
-        // sleeping on.
-        rig.clock.advance(by: 30)
-        try await rig.sleeping([at(60)])
+        // No read asked for: one would go at once, the loop rung before its next wake — which
+        // reads every 30 s in the foreground now, in a class (C3c).
+        try await rig.sleeping([at(30)])
         #expect(await rig.server.waiting.isEmpty)
         async let answer = rig.engine.rename(request)
         try await rig.server.next(renameRoute).reply(401)

@@ -8,6 +8,31 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **C3c: Home's card for a class in session, and the conductor's two decisions
+  under the owner's delegation** (ruling 4 of the owner's rulings below left Home-in-session to the
+  conductor). **(a) The class's running session on `GET /v1/me`:** a phone knows only its own
+  participation, so a class in session the student never tapped into was invisible to it. Each
+  class now carries `liveSession` — its session not marked over and before its bell by the
+  server's clock (A17's rule), with that bell — or null; null on a teacher's own class too, as
+  `enrollmentId` is (additive; BaliCore decodes it as optional). One query: a class has at most
+  one session not marked over. **(b) Home reads `GET /v1/me` every 30 s in the foreground**, by
+  decision 6's own rule for the wait for a Start: out of a session and in a class, at each wake
+  of the sync loop while Bali is open, never behind it — so a session that starts, or ends early,
+  while Home stays open shows within the check-in interval. **The card**, at the top of Home in
+  the hero's place (`SyncState.inSessionCard`), in D1's look: not in it — the Not in chip,
+  "<class> is in session. Tap your teacher's block to join." and Tap in, the primary button;
+  unlocked in it — Home opened over Unlocked (C5c) — the Unlocked chip, "You're unlocked in
+  <class> until <bell>." and Lock my apps again, secondary — or, by Unlocked's own rule, the
+  re-tap's words and Tap in where protection off was reported or the refocus refused (santa's
+  round 1) — with a stuck unlock said above it (C5c's review). It goes at the bell by the phone's clock (`Screen.bell`), whatever the last
+  read said. Protection off, Focus and Waiting stay their own screens. "Ready when your class
+  is." shows only with no card, and a read of the classes that failed is said under it. **Santa**
+  (two Claude reviewers, so they share a model family — Codex refuses every model on this Mac —
+  and the design check): round 1, one blocker, fixed red first — the unlocked card offered Lock
+  my apps again where Unlocked offers a re-tap (a refocus out of protection off is refused); its
+  WARNs fixed — "running" decided by the engine's `sessionRunning` in the route, not a copy in
+  SQL; a failed read said under the card; the stuck line out of the card. Round 2: no blockers;
+  two doubled lines removed. Left: `Card` shadows its children (pre-existing, every card).
 - **2026-09-30** — **C5c: the Unlocked screen on the owner's rulings — the reason changeable,
   Home its primary way on, "Lock my apps again".** **The reason:** the card's check is on the
   reason on record. While the unlock waits on the phone (C5a's hold), a pick is written into it

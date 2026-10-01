@@ -5,6 +5,7 @@ import {
   getLiveParticipation,
   getTaughtClasses,
   renameStudent,
+  sessionRunning,
 } from '@bali/db';
 import { deriveDisplayState, type MeResponse, type UpdateMeResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
@@ -29,7 +30,7 @@ const NewName = z.object({ displayName: DisplayName });
  * `eventId`: a replay applies nothing and answers the name now. A teacher's
  * name is not set here (403): the ruling is about students in a class.
  */
-export function registerMeRoute(app: FastifyInstance, db: Database): void {
+export function registerMeRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
     const identity = requireAuth(request);
     const user = await findOrCreateStudent(
@@ -48,12 +49,18 @@ export function registerMeRoute(app: FastifyInstance, db: Database): void {
             name: c.name,
             teacher: { displayName: user.displayName },
             enrollmentId: null,
+            liveSession: null,
           }))
         : (await getEnrolledClasses(db, user.id)).map((c) => ({
             id: c.id,
             name: c.name,
             teacher: { displayName: c.teacherDisplayName },
             enrollmentId: c.enrollmentId,
+            // Running by the server's clock, the engine's one rule (A17), or none (C3c).
+            liveSession:
+              c.live && sessionRunning(c.live, clock())
+                ? { id: c.live.id, endsAt: c.live.endsAt.toISOString() }
+                : null,
           }));
 
     let session: MeResponse['session'] = null;

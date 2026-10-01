@@ -36,6 +36,16 @@ public struct MeClass: Codable, Sendable, Hashable {
     /// (`APIClient.leave(enrollment:_:)`). Nil where a class is named without one, from an older
     /// API, and on a teacher's own class.
     public let enrollmentId: String?
+    /// Its session running now by the server's clock, and its bell, as `GET /v1/me` gives one
+    /// (C3c): Home says the class is in session to a student not in it. Nil where none runs, where
+    /// a class is named without one, from an older API, and on a teacher's own class.
+    public let liveSession: LiveSession?
+}
+
+/// A class's session running now, as `GET /v1/me` names it under the class (C3c).
+public struct LiveSession: Codable, Sendable, Hashable {
+    public let id: String
+    public let endsAt: Date
 }
 
 public struct MeUser: Codable, Sendable, Hashable {
