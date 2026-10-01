@@ -1,3 +1,4 @@
+import BaliCore
 import BaliOutbox
 import SwiftUI
 import UIKit
@@ -6,8 +7,9 @@ import UIKit
 /// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
 /// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
 /// and what a teacher sees (the intro's own page); and Sign out, which waits while an Emergency
-/// Unlock is unsent (`SignOutWords`). Every failure is said with its way on (rule 5). D1's Leave
-/// is not here: `GET /v1/me`'s classes carry no enrollment to leave by.
+/// Unlock is unsent (`SignOutWords`); and D1's Leave on each class, asked first, never while the
+/// phone stands in that class's lesson (C6c, `Leaving`). Every failure is said with its way on
+/// (rule 5).
 struct MeView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
@@ -35,7 +37,7 @@ struct MeView: View {
                             .padding(.vertical, 14).padding(.horizontal, 16)
                         }
                     }
-                    ClassesSection(phone: phone, title: "Classes")
+                    ClassesSection(phone: phone, title: "Classes", leaves: true)
                     about
                     SignOutButton(phone: phone)
                 }
@@ -195,6 +197,64 @@ struct SignOutButton: View {
     }
 }
 
+/// D1's Leave on a class of Me's (C6c): it asks its question under the class. Held, dimmed, while
+/// the phone stands in that class's lesson (`Leaving.held`, said under the class); none for a class
+/// named with no enrollment to leave by.
+struct LeaveButton: View {
+    let row: MeClass
+    let phone: Phone
+
+    var body: some View {
+        if row.enrollmentId != nil {
+            let held = phone.sync.flatMap { Leaving.held(row, $0, now: Date()) }
+            let waits = held != nil || phone.leaving.busy
+            Button("Leave") { phone.leaving.ask(row) }
+                .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary).padding(.horizontal, 4).frame(minHeight: 44)
+                .disabled(waits).opacity(waits ? 0.6 : 1)
+                .accessibilityLabel("Leave \(row.name)")
+        }
+    }
+}
+
+/// Under a class of Me's (C6c): why its Leave is held; or, once pressed, its question — the class
+/// named, what leaving costs, why the last try did not finish — with Leave class, the way to try
+/// again, and Cancel.
+struct LeaveQuestion: View {
+    let row: MeClass
+    let phone: Phone
+
+    var body: some View {
+        let leaving = phone.leaving
+        if let held = phone.sync.flatMap({ Leaving.held(row, $0, now: Date()) }) {
+            Text(held).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.bottom, 12)
+        } else if leaving.asks(row) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Leaving.question(row))
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                Text(Leaving.consequence).textStyle(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                if let failure = leaving.failure { Text(failure).textStyle(.body) }
+                Button(leaving.busy ? "Leaving…" : "Leave class") { Task { await phone.leave() } }
+                    .buttonStyle(SecondaryButtonStyle()).disabled(leaving.busy).padding(.top, 4)
+                Button("Cancel") { phone.leaving.cancel() }
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(leaving.busy).opacity(leaving.busy ? 0.6 : 1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 16)
+            // Said to VoiceOver as it appears, and a failure as it comes (rule 5).
+            .onAppear { AccessibilityNotification.Announcement(Leaving.question(row)).post() }
+            .onChange(of: leaving.failure) { _, words in
+                if let words { AccessibilityNotification.Announcement(words).post() }
+            }
+        }
+    }
+}
+
 /// What a teacher sees, from Me's row: the intro's own page, in a sheet with Done.
 private struct ConsentSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -216,5 +276,8 @@ private struct ConsentSheet: View {
     #Preview("Me") { RootView(phone: Phone(fixture: PreviewFixtures.all["me"]!)) }
     #Preview("Me — editing") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["meEditing"]!))
+    }
+    #Preview("Me — leaving") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["meLeaveAsk"]!))
     }
 #endif

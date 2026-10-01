@@ -123,6 +123,114 @@ public struct Naming: Sendable, Hashable {
     }
 }
 
+/// Leaving a class from the Me screen (C6c; D1's Leave, A19's `DELETE /v1/enrollments/{id}`) as
+/// the phone keeps it: the class whose Leave was pressed, its question asked under it; the leave
+/// under way, one at a time; and why the last did not finish, said under the question, whose
+/// Leave class is the way to try again (rule 5). Its rules and words, so they run on Linux; the
+/// app sends the call through the engine.
+public struct Leaving: Sendable, Hashable {
+    /// The class whose Leave was pressed: its question shows while this is set.
+    public private(set) var asking: MeClass?
+    /// The leave under way: the question stays as it is until the answer comes.
+    public private(set) var busy = false
+    /// Why the last leave did not finish, in words.
+    public var failure: String?
+    /// The last leave sent, kept while it is the same enrollment's (rule 4): a try after an answer
+    /// that never came goes under its event id, and is answered as its replay.
+    private var sent: Sent?
+
+    private struct Sent: Sendable, Hashable {
+        let enrollmentId: String
+        let eventId: String
+    }
+
+    public init() {}
+
+    /// Leave pressed on `row`: its question asked, what went wrong before gone. Nothing while a
+    /// leave is under way, nor for a class named with no enrollment to leave by.
+    public mutating func ask(_ row: MeClass) {
+        guard !busy, row.enrollmentId != nil else { return }
+        (asking, failure) = (row, nil)
+    }
+
+    /// Whether the question shows under `row`: asked about its enrollment. A class joined again
+    /// since is another enrollment, which shows none (santa's round 1): Leave class would send the
+    /// old one's leave, answered as already out.
+    public func asks(_ row: MeClass) -> Bool {
+        asking?.enrollmentId != nil && asking?.enrollmentId == row.enrollmentId
+    }
+
+    /// Cancel: no question — once a leave under way has its answer.
+    public mutating func cancel() {
+        guard !busy else { return }
+        (asking, failure) = (nil, nil)
+    }
+
+    /// Leave class pressed: the enrollment to leave and the request, busy until the answer comes,
+    /// the last try's words gone — under the last try's event id while it is the same enrollment's.
+    public mutating func send(at now: Date) -> (enrollmentId: String, request: EndEnrollmentRequest)? {
+        guard !busy, let enrollmentId = asking?.enrollmentId else { return nil }
+        let eventId =
+            sent.flatMap { $0.enrollmentId == enrollmentId ? $0.eventId : nil }
+            ?? EventID.mint(at: now)
+        sent = Sent(enrollmentId: enrollmentId, eventId: eventId)
+        (busy, failure) = (true, nil)
+        return (enrollmentId, EndEnrollmentRequest(eventId: eventId))
+    }
+
+    /// The answer to the leave of `enrollmentId`: true once the student is out of the class — it
+    /// ended, or they were out already — and the question goes. Else why not, said under it, to
+    /// try again. One for a leave this question did not send (a sign-out meanwhile) is dropped.
+    @discardableResult
+    public mutating func left(_ response: APIResponse<EndEnrollmentResponse>, for enrollmentId: String)
+        -> Bool
+    {
+        guard busy, let row = asking, row.enrollmentId == enrollmentId else { return false }
+        busy = false
+        if response.answer != nil {
+            self = Leaving()
+            return true
+        }
+        failure = Self.words(row, response.result, response.error?.error.reason)
+        return false
+    }
+
+    /// Why the phone holds `row`'s Leave: it stands in that class's lesson, whose bell has not rung
+    /// by its own clock. Nil: not held — the server says no to a lesson the phone is not in.
+    public static func held(_ row: MeClass, _ sync: SyncState, now: Date) -> String? {
+        guard case .inSession(let session, _) = sync.standing, session.classId == row.id,
+            session.endsAt > now
+        else { return nil }
+        return inSession(row)
+    }
+
+    /// The question asked under `row` before it is left.
+    public static func question(_ row: MeClass) -> String { "Leave \(row.name)?" }
+
+    public static let consequence = "You'll need the class code to join it again."
+
+    /// D1's line under the classes.
+    public static let recorded = "Leaving a class is recorded, and your teacher sees it."
+
+    /// Why a class cannot be left now: it is in session, the phone's knowledge or the server's no.
+    public static func inSession(_ row: MeClass) -> String {
+        "\(row.name) is in session. You can leave it once class is over."
+    }
+
+    /// What the question says when a leave did not finish (rule 5): keyed on the status and the
+    /// error's `reason`, never its message — else in the Join screen's words.
+    public static func words(_ row: MeClass, _ result: SendResult, _ reason: ApiErrorReason?)
+        -> String
+    {
+        switch reason {
+        case .classInSession?: inSession(row)
+        case .enrollmentNotFound?, .enrollmentNotYours?, .unknownUser?:
+            "Bali couldn't find you in this class. It's checking your classes again."
+        default: Joining.words(result, nil)
+        }
+    }
+}
+
 /// What the Me screen says of Sign out (C6b; rule 5).
 public enum SignOutWords {
     /// Why Sign out waits: an Emergency Unlock this phone recorded that the server has not. Signed

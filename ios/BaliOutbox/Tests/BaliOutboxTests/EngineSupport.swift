@@ -382,9 +382,11 @@ enum Answer {
         return
             #"{"user":{"id":"u","role":"student","displayName":null},"classes":[\#(classes.joined(separator: ","))],"session":\#(live ?? "null")}"#
     }
-    /// Class `id` as `GET /v1/me` names it, with its teacher.
-    static func inClass(_ id: String) -> String {
-        #"{"id":"\#(id)","name":"Class \#(id)","teacher":{"displayName":"Ms. Rivera"}}"#
+    /// Class `id` as `GET /v1/me` names it, with its teacher — and, since A19, the enrollment
+    /// leaving it deletes, `enrollment`.
+    static func inClass(_ id: String, enrollment: String? = nil) -> String {
+        let leaves = enrollment.map { #","enrollmentId":"\#($0)""# } ?? ""
+        return #"{"id":"\#(id)","name":"Class \#(id)","teacher":{"displayName":"Ms. Rivera"}\#(leaves)}"#
     }
     /// The join of class `id`, as `POST /v1/enrollments` answers it: a class named with no teacher.
     static func joinedClass(_ id: String, outcome: String = "joined") -> String {

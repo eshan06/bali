@@ -11,7 +11,7 @@
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
-        /// edited and no sign-out failed, unless said otherwise.
+        /// edited, no sign-out failed and no class being left, unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -25,6 +25,7 @@
             var history = History()
             var naming = Naming()
             var signOutFailed: String?
+            var leaving = Leaving()
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -106,6 +107,19 @@
             // Where the phone stood not read, Screen Time taken back: Me, its row Off.
             "meScreenTimeOff": State(
                 protection: screenTimeOff(), sync: standing(.unread, me: anaRodriguez), tab: .me),
+            // Leave (C6c): Period 3's question, the leave under way, one the server refused as the
+            // lesson runs, and Leave held while the phone stands in Period 3's lesson — in a state
+            // this build does not know, so Home, and so Me, can show.
+            "meLeaveAsk": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me, leaving: leavingPeriod3()),
+            "meLeaving": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me,
+                leaving: leavingPeriod3(sent: true)),
+            "meLeaveError": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me,
+                leaving: leavingPeriod3(failure: anaRodriguez?.classes.first.map(Leaving.inSession))),
+            "meLeaveInSession": State(
+                sync: standing(.inSession(period3, nil), me: anaRodriguez), tab: .me),
             "unlockedRefused": State(
                 sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
             "protectionOff": State(
@@ -173,6 +187,16 @@
             var joining = Joining()
             (joining.code, joining.preview, joining.failure) = ("KWX49Q", opens, failure)
             return joining
+        }
+
+        /// Me with Period 3's Leave pressed, its question asked — `sent`, the leave under way — and
+        /// why the last did not finish: `failure`.
+        private static func leavingPeriod3(sent: Bool = false, failure: String? = nil) -> Leaving {
+            var leaving = Leaving()
+            if let period3 = anaRodriguez?.classes.first { leaving.ask(period3) }
+            if sent { _ = leaving.send(at: Date()) }
+            leaving.failure = failure
+            return leaving
         }
 
         /// Me's name card editing, `name` typed — and why its save failed: `failure`.
@@ -329,12 +353,13 @@
         private static let anaRodriguez = ana(name: "Ana Rodríguez")
 
         /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
-        /// Okafor — or, a `newcomer`, in no class yet — named `name`.
+        /// Okafor, each with the enrollment leaving it deletes — or, a `newcomer`, in no class yet —
+        /// named `name`.
         private static func ana(newcomer: Bool = false, name: String = "Ana") -> MeResponse? {
             let classes =
                 newcomer
                 ? ""
-                : #"{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"}},{"id":"p5","name":"Period 5 — Chemistry","teacher":{"displayName":"Mr. Okafor"}}"#
+                : #"{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":"e3"},{"id":"p5","name":"Period 5 — Chemistry","teacher":{"displayName":"Mr. Okafor"},"enrollmentId":"e5"}"#
             return try? BaliJSON.makeDecoder().decode(
                 MeResponse.self,
                 from: Data(

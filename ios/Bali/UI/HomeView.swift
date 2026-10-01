@@ -88,10 +88,12 @@ struct HomeView: View {
 
 /// The student's classes as `GET /v1/me` names them, each with its teacher — or, until a read
 /// answers, why not — and Join a class, opened over the screen with a way back: Home's (C3) and
-/// Me's (C6b), under `title`.
+/// Me's (C6b), under `title`. Me's, `leaves`, has D1's Leave on each class, its question under
+/// it, and D1's line under them (C6c).
 struct ClassesSection: View {
     let phone: Phone
     let title: String
+    var leaves = false
 
     private var me: MeResponse? { phone.sync?.me }
 
@@ -106,20 +108,29 @@ struct ClassesSection: View {
                     VStack(spacing: 0) {
                         ForEach(Array(me.classes.enumerated()), id: \.element.id) { index, row in
                             if index > 0 { Rectangle().fill(Theme.border).frame(height: 1) }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.name)
-                                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-                                if let teacher = row.teacher?.displayName {
-                                    Text(teacher).textStyle(.caption)
-                                        .foregroundStyle(Theme.textTertiary)
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(row.name)
+                                        .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                                    if let teacher = row.teacher?.displayName {
+                                        Text(teacher).textStyle(.caption)
+                                            .foregroundStyle(Theme.textTertiary)
+                                    }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityElement(children: .combine)
+                                if leaves { LeaveButton(row: row, phone: phone) }
                             }
                             // Clear of the hairlines once the text size outgrows D1's 60.
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-                            .padding(.horizontal, 16).accessibilityElement(children: .combine)
+                            .padding(.horizontal, 16)
+                            if leaves { LeaveQuestion(row: row, phone: phone) }
                         }
                     }
+                }
+                if leaves {
+                    Text(Leaving.recorded).textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }
             } else if let words = phone.sync?.meWords {
                 Retry(words: words, phone: phone)
