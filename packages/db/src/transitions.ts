@@ -381,27 +381,24 @@ export interface StartSessionResult {
 }
 
 /**
- * Convert this class's waiting armed taps into participations. Called inside the
- * start transaction: a tap the student made before the bell (saved as
- * student+teacher, decision 5) becomes a focused participation the moment the
- * teacher presses Start, emitting the deferred tap_in event with the armed
- * tap's original id so a later phone retry dedupes. When that id is already
- * this student's own `tap_in` the tap landed, so it is skipped and the skip
- * recorded as `armed_tap_skipped`; when any other event holds it, the tap
- * converts under a fresh id whose payload names the original. Returns the
- * count converted.
+ * The waiting taps a Start converts — this class's teacher's, unexpired at
+ * `at`, from students enrolled in the class — locked, and their students' tap
+ * locks taken in id order (A14). Taken before the Start touches any session
+ * or participation, the order A14 set: a tap takes its student's lock and then
+ * its session's row, so a Start holding a session's row — the class it ends
+ * past its bell (A18) — must never then wait on a student's lock.
  */
-async function convertArmedTaps(tx: Database, session: SessionRow): Promise<number> {
+async function lockWaitingTaps(tx: Database, classId: string, at: Date): Promise<ArmedTapRow[]> {
   const cls = firstOrUndefined(
-    await tx.select().from(classes).where(eq(classes.id, session.classId)).limit(1),
+    await tx.select().from(classes).where(eq(classes.id, classId)).limit(1),
   );
-  if (!cls) return 0;
+  if (!cls) return [];
 
   const enrolled = await tx
     .select({ studentId: enrollments.studentId })
     .from(enrollments)
     .where(and(eq(enrollments.classId, cls.id), isNull(enrollments.removedAt)));
-  if (enrolled.length === 0) return 0;
+  if (enrolled.length === 0) return [];
   const enrolledIds = enrolled.map((e) => e.studentId);
 
   // This teacher's still-waiting, unexpired taps from students in this class.
@@ -424,7 +421,7 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
       and(
         eq(armedTaps.teacherId, cls.teacherId),
         isNull(armedTaps.consumedAt),
-        gt(armedTaps.expiresAt, session.startedAt),
+        gt(armedTaps.expiresAt, at),
         inArray(armedTaps.studentId, enrolledIds),
       ),
     )
@@ -433,7 +430,25 @@ async function convertArmedTaps(tx: Database, session: SessionRow): Promise<numb
   for (const studentId of [...new Set(waiting.map((tap) => tap.studentId))].sort()) {
     await lockStudentTaps(tx, studentId);
   }
+  return waiting;
+}
 
+/**
+ * Convert the waiting taps a Start locked (`lockWaitingTaps`) into
+ * participations in its new session: a tap the student made before the bell
+ * (saved as student+teacher, decision 5) becomes a focused participation the
+ * moment the teacher presses Start, emitting the deferred tap_in event with the
+ * armed tap's original id so a later phone retry dedupes. When that id is
+ * already this student's own `tap_in` the tap landed, so it is skipped and the
+ * skip recorded as `armed_tap_skipped`; when any other event holds it, the tap
+ * converts under a fresh id whose payload names the original. Returns the
+ * count converted.
+ */
+async function convertArmedTaps(
+  tx: Database,
+  session: SessionRow,
+  waiting: ArmedTapRow[],
+): Promise<number> {
   let converted = 0;
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
@@ -655,13 +670,15 @@ export async function startSession(
         .where(eq(classes.id, input.classId))
         .for('no key update');
 
-      // The class's session not yet marked over, its row taken as the sweep
-      // takes it — so a sweep ending it meanwhile is waited out and then read
-      // as over. Running by the one rule (`sessionRunning`), it is the class
+      // The taps this Start converts, and their students' locks, first (A14's
+      // order; `lockWaitingTaps`) — then the class's session not yet marked
+      // over, its row taken as the sweep takes it, so a sweep ending it
+      // meanwhile is waited out and then read as over. Running by the one rule (`sessionRunning`), it is the class
       // the teacher already started, answered again. Past its bell the class
       // is over, swept or not (decision 12): the Start ends it as the sweep
       // would and starts the next — back-to-back classes never wait for the
       // sweep (A18, the owner's ruling, 2026-09-30).
+      const waiting = await lockWaitingTaps(tx, input.classId, input.startedAt);
       const existing = firstOrUndefined(
         await tx
           .select()
@@ -693,7 +710,7 @@ export async function startSession(
         occurredAt: session.startedAt,
       });
 
-      const armedConverted = await convertArmedTaps(tx, session);
+      const armedConverted = await convertArmedTaps(tx, session, waiting);
       return { outcome: 'created', session, armedConverted };
     }),
   );

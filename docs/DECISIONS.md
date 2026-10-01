@@ -29,7 +29,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   UPDATE refuses — measured, 4 runs in 6 of the race below, each a second lost to Postgres's
   deadlock timeout before a retry converged. A tap, unlock or End holding the row meets the same.
   So the class row is taken FOR NO KEY UPDATE: two Starts still serialise on it, and other writers'
-  foreign-key checks pass. **Kept:** a Start before the bell still answers with the class running,
+  foreign-key checks pass. **And A14's order:** a tap takes its student's tap lock, then its
+  session's row, so the Start takes its waiting taps and their students' locks first
+  (`lockWaitingTaps`, split out of `convertArmedTaps`) and the old session's row after. Out of
+  that order — santa's round 1, confirmed — a Start ending a class held its row while waiting on a
+  student whose re-tap held that student's lock and waited on the row: a deadlock each run.
+  **Kept:** a Start before the bell still answers with the class running,
   and double presses still get one session. The route starts at the app's clock (`AppDeps.clock`,
   A17's). The portal's recovery read (`findLiveSessionForClass`) still counts a session past its
   bell until the sweep — its comment no longer claims Start's definition. **Tests,** red first:
@@ -38,7 +43,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the running one; and the sweep's own step then finds nothing to end. The wire — the same at `POST
   /v1/classes/{id}/sessions`. Real Postgres — a Start racing the sweep over a session past its
   bell, staged both ways round with a holder on the row: one `session_expired`, one new session,
-  the sweep ending it when first and finding nothing when second (8 of 8 with NO KEY UPDATE). Also
+  the sweep ending it when first and finding nothing when second (8 of 8 with NO KEY UPDATE); and
+  a Start ending a class past its bell against a re-tap by a student whose tap waits, staged with
+  a holder on the waiting tap's row — each on a database of its own, allowing no deadlock, which
+  pins the lock mode and the order (a deadlock each run before either). Also
   here, from A17's last review: A17's entry said an unlock under a tap racing its arm is "never"
   `unknown_tap`; true only when the arm takes the tap's lock first, and now worded so.
 
