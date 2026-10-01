@@ -2832,15 +2832,15 @@ export async function changeUnlockReason(
 ): Promise<UnlockReasonResult> {
   // The one writer of events stores only a known reason, whoever its caller is.
   if (!isUnlockReason(input.reason)) throw new Error('changeUnlockReason: not a known reason');
-  const unlockId = input.unlockEventId;
   return withDeadlockRetry(() =>
     db.transaction(async (tx) => {
+      // The id as stored, never as sent: a uuid matches in any case, a string in one.
       const [named] = await tx
-        .select({ sessionId: events.sessionId })
+        .select({ unlockId: events.eventId, sessionId: events.sessionId })
         .from(events)
         .where(
           and(
-            eq(events.eventId, unlockId),
+            eq(events.eventId, input.unlockEventId),
             eq(events.userId, input.studentId),
             eq(events.type, 'unlock'),
           ),
@@ -2848,9 +2848,10 @@ export async function changeUnlockReason(
       const session = named?.sessionId
         ? await loadSession(tx, named.sessionId, { forUpdate: true })
         : undefined;
-      if (!session) {
+      if (!named || !session) {
         throw new TransitionError('UNLOCK_NOT_FOUND', 'no unlock of yours in a class has that id');
       }
+      const { unlockId } = named;
 
       const [prior] = await tx
         .select({ type: events.type, userId: events.userId, payload: events.payload })

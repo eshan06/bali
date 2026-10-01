@@ -132,6 +132,23 @@ describe('changing an unlock’s reason (A20)', () => {
     expect(page?.events.find((e) => e.eventId === unlockId)?.reason).toBe('other');
   });
 
+  it('names the unlock as stored, whatever the case of the id sent (santa’s round 1)', async () => {
+    const { session, klass, student, unlockId } = await unlocked('reason-case', 'bathroom');
+    const loud = unlockId.toUpperCase();
+    const first = newUuidV7();
+
+    expect((await change(loud, student.id, 'nurse', first)).outcome).toBe('applied');
+    expect(one(await changesOf(session.id)).payload).toEqual({
+      unlock_event_id: unlockId,
+      reason: 'nurse',
+    });
+    expect(await gridReason(session.id, klass.id, student.id)).toBe('nurse');
+    expect(await change(loud, student.id, 'other', first)).toEqual({
+      outcome: 'replay',
+      reason: 'nurse',
+    });
+  });
+
   it('gives a reason to an unlock that went without one', async () => {
     const { session, klass, student, unlockId } = await unlocked('reason-first', null);
     expect(await gridReason(session.id, klass.id, student.id)).toBeNull();

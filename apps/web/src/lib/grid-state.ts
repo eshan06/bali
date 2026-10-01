@@ -185,10 +185,11 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
     }
     case 'unlock_reason_changed': {
       // The latest reason the teacher sees (A20), on the unlock it names — and
-      // only that one, should the chip carry another by now.
+      // only that one, should the chip carry another by now. One this tab does
+      // not know reads as none, as the refresh reads it.
       const { unlock_event_id: of, reason } = payloadOf(e);
-      if (s.unlock === null || s.unlock.eventId !== of || !isUnlockReason(reason)) return prev;
-      s.unlock = { ...s.unlock, reason };
+      if (s.unlock === null || s.unlock.eventId !== of) return prev;
+      s.unlock = { ...s.unlock, reason: isUnlockReason(reason) ? reason : null };
       break;
     }
     case 'refocus':

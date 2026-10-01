@@ -471,11 +471,17 @@ describe('a changed reason (A20)', () => {
     const before = s;
     s = applyEvent(s, changed(9, 'ana', 'ev-6', 'nurse'));
     s = applyEvent(s, changed(10, 'ben', 'ev-6', 'nurse'));
-    s = applyEvent(s, changed(11, 'ana', 'ev-8', 'a-reason-from-a-newer-server'));
-    s = applyEvent(s, changed(12, 'cal', 'ev-13', 'nurse'));
+    s = applyEvent(s, changed(11, 'cal', 'ev-13', 'nurse'));
     expect(s).toBe(before);
     expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'other reason' });
     expect(s.cal).toBeUndefined();
+  });
+
+  it('reads a reason this tab does not know as none, as the refresh does', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    s = applyEvent(s, unlocked(6, 'ana', { reason: 'bathroom' }));
+    s = applyEvent(s, changed(7, 'ana', 'ev-6', 'a-reason-from-a-newer-server'));
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: null });
   });
 
   it('reads the same from the refresh, and replaying the overlap lands where it was', () => {

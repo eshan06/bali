@@ -40,6 +40,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   covered, disclosed:** an unlock sent under a tap that has not landed is kept with no session
   (`unknown_tap`) and filed under a server-minted id when the tap lands (decision 11), so the
   phone's id names the orphan and its reason cannot change (`404`): a stuck tap's rare path.
+  **Santa** (two Claude reviewers, so they share a model family — Codex refuses every model on
+  this Mac): round 1, no blockers; both WARNs fixed — the unlock is named by its id as stored,
+  never as sent (a uuid matches an upper-case id, a string compare did not: the change's payload
+  and the turn's check now use the stored one), and the grid reads a reason it does not know as
+  none, as its refresh does.
 - **2026-09-30** — **The owner's rulings on the Unlocked screen and Home** (tonight's device
   check; they override D1 where they differ). (1) **The reason is changeable.** After an
   Emergency Unlock the student picks Bathroom, Nurse or Other; the one chosen shows a check mark,
