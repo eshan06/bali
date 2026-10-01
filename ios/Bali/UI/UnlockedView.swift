@@ -180,9 +180,9 @@ private struct ReasonLabel: View {
     }
 
     private static func text(_ reason: UnlockReason, check: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             if check {
-                Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
+                Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
                     .accessibilityHidden(true)
             }
             Text(reason.rawValue.capitalized)
@@ -199,7 +199,7 @@ private struct ReasonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-            .foregroundStyle(chosen ? .white : Theme.text).padding(.horizontal, 8)
+            .foregroundStyle(chosen ? .white : Theme.text).padding(.horizontal, 4)
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(
                 chosen ? Theme.brand : configuration.isPressed ? Theme.sunken : Theme.page,
