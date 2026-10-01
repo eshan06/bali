@@ -711,8 +711,11 @@ public actor SyncEngine {
             if foreground { await check?() }
             // Decision 6, the owner's ruling (2026-09-29; C3a): waiting for the teacher's Start,
             // the phone reads the truth at each wake in the foreground — the check-in's cadence —
-            // since no answer of its own brings the Start, and no feed does.
-            if foreground, state.standing == .waiting { rereading = true }
+            // since no answer of its own brings the Start, and no feed does. And out of a session,
+            // in a class, by the same rule: Home says when one of theirs is in session (C3c; the
+            // conductor's decision under the owner's delegation, 2026-09-30).
+            let outInClass = state.standing == .out && state.hasClasses == true
+            if foreground, state.standing == .waiting || outInClass { rereading = true }
             if let sent = stored(stamp) {
                 if rereading {
                     rereading = false

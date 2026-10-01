@@ -100,6 +100,10 @@ const meClassWithTeacher = object<MeClassWithTeacher>()({
   ...meClass.shape,
   teacher: teacherView,
   enrollmentId: z.uuid().nullable(),
+  liveSession: object<NonNullable<MeClassWithTeacher['liveSession']>>()({
+    id: z.uuid(),
+    endsAt: z.iso.datetime(),
+  }).nullable(),
 });
 const meUser = object<MeUser>()({
   id: z.uuid(),

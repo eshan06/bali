@@ -283,6 +283,41 @@ struct ScreenTests {
     }
 
     @Test(
+        "Home's card while a class of the student's is in session and they are not focused in it (C3c): unlocked there, what is true and until when; out, a class in session by the last read, its way in; gone at the bell by the phone's clock; none focused, under protection off, in a state not known, waiting, unread, or with no class running"
+    )
+    func homeInSession() throws {
+        let unlocked = try synced(.inSession(bell1042, .unlocked))
+        let card = try #require(unlocked.inSessionCard(at: t0, time: newYork))
+        #expect(card.unlocked && card.bell == bell1042.endsAt)
+        #expect(plain(card.words) == "You're unlocked in Period 3 — Algebra II until 10:42 AM.")
+        #expect(unlocked.inSessionCard(at: bell1042.endsAt) == nil)
+        let unread = try synced(.inSession(bell1042, .unlocked), me: false)
+        #expect(
+            plain(unread.inSessionCard(at: t0, time: newYork)?.words)
+                == "You're unlocked in your class until 10:42 AM.")
+        var out = try synced(.out)
+        out.me = try BaliJSON.makeDecoder().decode(
+            MeResponse.self,
+            from: Data(
+                #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[{"id":"p5","name":"Period 5 — Chemistry"},{"id":"c","name":"Period 3 — Algebra II","liveSession":{"id":"s","endsAt":"\#(iso(bell1042.endsAt))"}}],"session":null}"#
+                    .utf8))
+        let notIn = try #require(out.inSessionCard(at: t0))
+        #expect(!notIn.unlocked && notIn.bell == bell1042.endsAt)
+        #expect(notIn.words == "Period 3 — Algebra II is in session. Tap your teacher's block to join.")
+        #expect(out.inSessionCard(at: bell1042.endsAt) == nil)
+        #expect(try synced(.out).inSessionCard(at: t0) == nil)
+        let others: [Standing] = [
+            .inSession(bell1042, .focused), .inSession(bell1042, .protectionOff),
+            .inSession(bell1042, nil), .waiting, .unread,
+        ]
+        for standing in others {
+            var state = out
+            state.standing = standing
+            #expect(state.inSessionCard(at: t0) == nil, "\(standing)")
+        }
+    }
+
+    @Test(
         "Home over Unlocked (C5c; the owner's ruling, 2026-09-30): Unlocked's primary way on, the apps still open — with its tab bar, History and Me honoured there, and Join over it as over any Home; only while Unlocked is the router's own: never over Focus, Protection off or Session over"
     )
     func homeOverUnlocked() {

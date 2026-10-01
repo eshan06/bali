@@ -779,6 +779,9 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     const boots = all.filter((f) => f.type === 'MeResponse');
     const named = boots.flatMap((f) => (f.body as MeResponse).classes).map((c) => c.teacher);
     expect(new Set(named.map((t) => t.displayName === null))).toEqual(new Set([true, false]));
+    // And their running session (C3c): one in session, one not — optional to BaliCore.
+    const live = boots.flatMap((f) => (f.body as MeResponse).classes).map((c) => c.liveSession);
+    expect(new Set(live.map((s) => s === null))).toEqual(new Set([true, false]));
     // Every kind of moment a history shows (A7) — the declined tap naming
     // where it counted, both late notes, `superseded` on a refocus and on a
     // tap (A13, A14) — and fields BaliCore decodes as optional, present and

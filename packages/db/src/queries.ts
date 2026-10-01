@@ -105,22 +105,37 @@ export async function findOrCreateStudent(
 }
 
 /**
- * A student's active classes, each with its teacher's display name (C2a) and
- * the enrollment leaving it deletes (A19) — one query.
+ * A student's active classes, each with its teacher's display name (C2a), the
+ * enrollment leaving it deletes (A19) and its session running at `now` (C3c) —
+ * one query. A class has at most one session not marked over
+ * (`sessions_one_running_per_class`), and past its bell it runs no more (A17).
  */
 export async function getEnrolledClasses(
   db: Database,
   studentId: string,
-): Promise<(ClassRow & { teacherDisplayName: string | null; enrollmentId: string })[]> {
-  return db
+  now: Date,
+): Promise<
+  (ClassRow & {
+    teacherDisplayName: string | null;
+    enrollmentId: string;
+    live: { id: string; endsAt: Date } | null;
+  })[]
+> {
+  const rows = await db
     .select({
       ...classesColumns,
       teacherDisplayName: users.displayName,
       enrollmentId: enrollments.id,
+      liveId: sessions.id,
+      liveEndsAt: sessions.endsAt,
     })
     .from(classes)
     .innerJoin(enrollments, eq(enrollments.classId, classes.id))
     .innerJoin(users, eq(users.id, classes.teacherId))
+    .leftJoin(
+      sessions,
+      and(eq(sessions.classId, classes.id), isNull(sessions.endedAt), gt(sessions.endsAt, now)),
+    )
     .where(
       and(
         eq(enrollments.studentId, studentId),
@@ -128,6 +143,10 @@ export async function getEnrolledClasses(
         isNull(classes.removedAt),
       ),
     );
+  return rows.map(({ liveId, liveEndsAt, ...row }) => ({
+    ...row,
+    live: liveId !== null && liveEndsAt !== null ? { id: liveId, endsAt: liveEndsAt } : null,
+  }));
 }
 
 // Drizzle needs an explicit column map when selecting one table across a join.

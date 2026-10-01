@@ -79,6 +79,12 @@ export interface MeClassWithTeacher extends MeClass {
    * teach and are not enrolled in.
    */
   enrollmentId: string | null;
+  /**
+   * Its session running now by the server's clock, and its bell (C3c, additive):
+   * Home says the class is in session to a student not in it. Null when none
+   * runs, and on a teacher's own class.
+   */
+  liveSession: { id: string; endsAt: string } | null;
 }
 export interface MeUser {
   id: string;

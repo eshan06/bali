@@ -19,7 +19,8 @@
         "teacher": {
           "displayName": null
         },
-        "enrollmentId": "00000000-0000-7000-8000-000000000003"
+        "enrollmentId": "00000000-0000-7000-8000-000000000003",
+        "liveSession": null
       }
     ],
     "session": null

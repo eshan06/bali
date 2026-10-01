@@ -29,7 +29,7 @@ const NewName = z.object({ displayName: DisplayName });
  * `eventId`: a replay applies nothing and answers the name now. A teacher's
  * name is not set here (403): the ruling is about students in a class.
  */
-export function registerMeRoute(app: FastifyInstance, db: Database): void {
+export function registerMeRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
     const identity = requireAuth(request);
     const user = await findOrCreateStudent(
@@ -48,12 +48,14 @@ export function registerMeRoute(app: FastifyInstance, db: Database): void {
             name: c.name,
             teacher: { displayName: user.displayName },
             enrollmentId: null,
+            liveSession: null,
           }))
-        : (await getEnrolledClasses(db, user.id)).map((c) => ({
+        : (await getEnrolledClasses(db, user.id, clock())).map((c) => ({
             id: c.id,
             name: c.name,
             teacher: { displayName: c.teacherDisplayName },
             enrollmentId: c.enrollmentId,
+            liveSession: c.live && { id: c.live.id, endsAt: c.live.endsAt.toISOString() },
           }));
 
     let session: MeResponse['session'] = null;

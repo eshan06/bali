@@ -102,6 +102,8 @@
                 pickFailed: UnlockedWords.offline),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
+            // Period 3 in session, the student not in it (C3c): its card in the hero's place.
+            "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
             "history": State(tab: .history, history: anaHistory()),
             "historyEmpty": State(tab: .history, history: history(read: true)),
             "historyError": State(
@@ -388,11 +390,16 @@
         /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
         /// Okafor, each with the enrollment leaving it deletes — or, a `newcomer`, in no class yet —
         /// named `name`.
-        private static func ana(newcomer: Bool = false, name: String = "Ana") -> MeResponse? {
+        private static func ana(newcomer: Bool = false, name: String = "Ana", inSession: Bool = false)
+            -> MeResponse?
+        {
+            // Period 3's lesson, as the server names it under the class (C3c).
+            let bell = period3.endsAt.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            let live = inSession ? #","liveSession":{"id":"session","endsAt":"\#(bell)"}"# : ""
             let classes =
                 newcomer
                 ? ""
-                : #"{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":"e3"},{"id":"p5","name":"Period 5 — Chemistry","teacher":{"displayName":"Mr. Okafor"},"enrollmentId":"e5"}"#
+                : #"{"id":"p3","name":"Period 3 — Algebra II","teacher":{"displayName":"Ms. Rivera"},"enrollmentId":"e3"\#(live)},{"id":"p5","name":"Period 5 — Chemistry","teacher":{"displayName":"Mr. Okafor"},"enrollmentId":"e5"}"#
             return try? BaliJSON.makeDecoder().decode(
                 MeResponse.self,
                 from: Data(

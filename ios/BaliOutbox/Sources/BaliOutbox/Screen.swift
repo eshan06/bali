@@ -189,6 +189,32 @@ extension SyncState {
         }
     }
 
+    /// Home's card while a class of the student's is in session and they are not focused in it
+    /// (C3c; the conductor's decision under the owner's delegation, 2026-09-30), at `now` by the
+    /// phone's clock: unlocked there — Home opened over Unlocked — or, out, a class in session by
+    /// the last read of `GET /v1/me`; gone at its bell. Nil otherwise: Protection off, Focus and
+    /// Waiting are their own screens.
+    public func inSessionCard(
+        at now: Date, time: Date.FormatStyle = .init(date: .omitted, time: .shortened)
+    ) -> InSessionCard? {
+        switch standing {
+        case .inSession(let session, .unlocked?) where session.endsAt > now:
+            let name = me?.classes.first { $0.id == session.classId }?.name ?? "your class"
+            return InSessionCard(
+                unlocked: true, bell: session.endsAt,
+                words: "You're unlocked in \(name) until \(session.endsAt.formatted(time)).")
+        case .out:
+            guard
+                let running = me?.classes.first(where: { ($0.liveSession?.endsAt ?? now) > now }),
+                let bell = running.liveSession?.endsAt
+            else { return nil }
+            return InSessionCard(
+                unlocked: false, bell: bell,
+                words: "\(running.name) is in session. Tap your teacher's block to join.")
+        case .inSession, .waiting, .unread: return nil
+        }
+    }
+
     /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in
     /// the Join screen's words; nil while none failed.
     public var meWords: String? { meFailed.map { Joining.words($0, nil) } }
@@ -222,6 +248,14 @@ extension SyncState {
         let ended = "\(name) ended at \(session.endsAt.formatted(time))."
         return protection?.shielded == false ? ended + " All your apps are back." : ended
     }
+}
+
+/// Home's card for a class in session (C3c): `unlocked` there, its way back Lock my apps again —
+/// else not in it, its way in Tap in — what it says, and its bell, when it goes.
+public struct InSessionCard: Sendable, Hashable {
+    public let unlocked: Bool
+    public let bell: Date
+    public let words: String
 }
 
 extension BlockRead {

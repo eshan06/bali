@@ -136,6 +136,12 @@ struct AppTests {
         // (santa's round 1).
         let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
         #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
+        // Home's card for a class in session (C3c): not in it, and unlocked in it.
+        for (name, unlocked) in [("homeInSession", false), ("homeFromUnlocked", true)] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let card = phone.sync?.inSessionCard(at: Date())
+            #expect(phone.screen == .home && card?.unlocked == unlocked, "\(name)")
+        }
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
         var standing = SyncState()

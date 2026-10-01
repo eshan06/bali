@@ -80,7 +80,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
   const clock = deps.clock ?? (() => new Date());
-  registerMeRoute(app, deps.db);
+  registerMeRoute(app, deps.db, clock);
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
   registerSessionsRoute(app, deps.db, clock);

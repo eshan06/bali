@@ -531,6 +531,32 @@ struct ClassesTests {
     }
 
     @Test(
+        "Out of a session, in a class (C3c; the conductor's decision under the owner's delegation, 2026-09-30): in the foreground the phone reads the truth at each wake, every 30 s, as when waiting, so Home says a class of theirs in session; behind the app, or in no class, it reads nothing"
+    )
+    func outReads() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil, classes: [Answer.inClass("c")]))
+        #expect(await rig.engine.state.standing == .out)
+        rig.clock.advance(by: 30)
+        let live = #"{"id":"c","name":"Class c","teacher":{"displayName":null},"liveSession":{"id":"s","endsAt":"\#(iso(at(4000)))"}}"#
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil, classes: [live]))
+        let state = await rig.until { $0.me?.classes.first?.liveSession != nil }
+        #expect(state.inSessionCard(at: rig.clock.now())?.unlocked == false)
+        await rig.engine.setForeground(false)
+        rig.clock.advance(by: 30)
+        try await rig.sleeping([])
+        rig.clock.advance(by: 600)
+        #expect(await rig.server.waiting.isEmpty)
+        await rig.stop()
+        let none = try Rig()
+        try await none.foreground(Answer.me(nil))
+        none.clock.advance(by: 30)
+        try await none.sleeping([at(60)])
+        #expect(await none.server.waiting.isEmpty)
+        await none.stop()
+    }
+
+    @Test(
         "An arm answered while the phone stands in a session its own clock says is over — the sweep running late, so the server armed the tap — is the wait for the Start, read for as any (santa's round 1): arming ends no session still running (decision 4), and past its bell the phone is in none"
     )
     func armedPastTheBell() async throws {
