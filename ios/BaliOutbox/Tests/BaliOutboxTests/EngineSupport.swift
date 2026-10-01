@@ -350,8 +350,9 @@ enum Answer {
     }
     static let armed = #"{"outcome":"armed","session":null,"state":null}"#
     static let replayNoSession = #"{"outcome":"replay","session":null,"state":null}"#
-    static func unlocked(_ view: SessionView = session()) -> String {
-        #"{"outcome":"applied","recordedAs":null,"state":"unlocked","session":\#(json(view)),"reason":null}"#
+    static func unlocked(_ view: SessionView = session(), reason: String? = nil) -> String {
+        let reason = reason.map { #""\#($0)""# } ?? "null"
+        return #"{"outcome":"applied","recordedAs":null,"state":"unlocked","session":\#(json(view)),"reason":\#(reason)}"#
     }
     static let unlockNoted =
         #"{"outcome":"recorded","recordedAs":"no_live_participation","state":null,"session":null,"reason":null}"#

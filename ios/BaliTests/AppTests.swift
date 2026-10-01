@@ -58,7 +58,7 @@ struct AppTests {
     }
 
     @Test(
-        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Back to focus (C5a), nor a History read (C6a), nor a leave (C6c) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
+        "A Debug launch names a fixture — `-bali-screen <name>` — rendered in place of the live phone, frozen: never started, and an ask for the permission on it changes nothing (C1b), nor a join code's look-up or a join (C2b), nor an Emergency Unlock (C4), a reason or Lock my apps again (C5a, C5c), nor a History read (C6a), nor a leave (C6c) — which say the phone has not started, never nothing (#106's review); Session over's Done still closes it (C5b). A name not known, or none, is the live app; and every fixture shows the screen it is named for (C1a), then a state of it"
     )
     func fixtures() async throws {
         #expect(PreviewFixtures.chosen(from: ["Bali"]) == nil)
@@ -108,19 +108,50 @@ struct AppTests {
         let out = Phone(fixture: try #require(PreviewFixtures.all["focusSignedOut"]))
         let said = FocusWords(try #require(out.sync), out.protection, now: Date(), signedIn: false)
         #expect(out.screen == .focus && said.stalled != nil && said.claim == .paused)
-        // Unlocked (C5a): each fixture's reason card and way back, and the bell the router chooses
-        // again at; a frozen phone's reason and Back to focus say it has not started.
+        // Unlocked (C5a, C5c): each fixture's reason card and way back, and the bell the router
+        // chooses again at; a frozen phone's pick and Lock my apps again say it has not started.
         let unlockedCases: [(String, UnlockedWords.Picker?, Bool)] = [
-            ("unlocked", .open, false), ("unlockedReason", .given(.bathroom), false),
+            ("unlocked", .open(nil), false), ("unlockedReason", .open(.bathroom), false),
             ("unlockedRecorded", nil, false), ("unlockedRetap", nil, true),
+            ("unlockedOnItsWay", .waiting(nil), false), ("unlockedChanged", .open(.nurse), false),
+            ("unlockedPicking", .open(nil), false), ("unlockedPickError", .open(.bathroom), false),
         ]
         for (name, picker, retap) in unlockedCases {
             let words = UnlockedWords(try #require(PreviewFixtures.all[name]?.sync))
             #expect(words?.picker == picker && (words?.retap != nil) == retap, "\(name)")
         }
+        #expect(Phone(fixture: try #require(PreviewFixtures.all["unlockedPicking"])).picking == .nurse)
+        let pickError = Phone(fixture: try #require(PreviewFixtures.all["unlockedPickError"]))
+        #expect(pickError.pickFailed == UnlockedWords.offline)
         let unlocked = Phone(fixture: try #require(PreviewFixtures.all["unlocked"]))
-        #expect(await unlocked.explain(.bathroom) == Joining.notStarted)
+        await unlocked.pick(.bathroom)
+        #expect(unlocked.pickFailed == Joining.notStarted && unlocked.picking == nil)
         #expect(await unlocked.backToFocus() == Joining.notStarted)
+        // Unlocked's Home (C5c): its tab bar, the apps still open, and its way back.
+        let overUnlocked = Phone(fixture: try #require(PreviewFixtures.all["homeFromUnlocked"]))
+        #expect(overUnlocked.tabbed && overUnlocked.canGoBack)
+        overUnlocked.back()
+        #expect(overUnlocked.screen == .unlocked && !overUnlocked.tabbed)
+        // Its Unlocked gone, the Home it opened is the router's own: its tab bar, no Back
+        // (santa's round 1).
+        let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
+        #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
+        // A pick told to wait for the unlock may go once it lands: those words go then, and no
+        // other failure's do (santa's round 2).
+        var standing = SyncState()
+        standing.standing = .inSession(
+            SessionView(id: "s", classId: "c", endsAt: Date() + 600), .unlocked)
+        var landed = standing
+        landed.recordedUnlock = RecordedUnlock(session: "s", unlock: "u", reason: nil)
+        for (words, gone) in [(UnlockedWords.onItsWay, true), (UnlockedWords.offline, false)] {
+            let phone = Phone(fixture: PreviewFixtures.State(sync: standing, pickFailed: words))
+            phone.synced(standing)
+            #expect(phone.pickFailed == words)
+            phone.synced(landed)
+            #expect((phone.pickFailed == nil) == gone, "\(words)")
+            phone.synced(landed)
+            #expect((phone.pickFailed == nil) == gone, "\(words)")
+        }
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         #expect(unlocked.bell != nil && home.bell == nil)
         // History (C6a): D1's days and cards, each state's fixture its own; a frozen phone's read
@@ -221,11 +252,11 @@ struct AppTests {
     }
 
     @Test(
-        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c), History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History read anew each time the student comes to it and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
         let (homes, editing) = (
-            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused"],
+            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked"],
             ["meEditing", "meNameError"]
         )
         for (name, state) in PreviewFixtures.all {

@@ -8,6 +8,42 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-09-30** — **C5c: the Unlocked screen on the owner's rulings — the reason changeable,
+  Home its primary way on, "Lock my apps again".** **The reason:** the card's check is on the
+  reason on record. While the unlock waits on the phone (C5a's hold), a pick is written into it
+  and goes with it; once the server has recorded it, a pick is a change of it (A20), sent as the
+  screen's own call (`SyncEngine.explain`, a 401 renewed once), not an outbox record: the unlock
+  is the record that must never be lost, the reason is not, and a failure is said on the card
+  with the pick as the way to try again (rule 5) — a retry with no answer before it under the
+  same event id (rule 4). The engine keeps the unlock it last saw recorded in the session, its
+  event id and reason on record (`SyncState.recordedUnlock`, replacing `reasonKept`: the card now
+  always shows what the server kept, never only where it differs), until the phone's next
+  change. While the unlock is on its way, sent with no answer or stuck, no pick can reach it:
+  its buttons are off and the card says so ("You can pick a reason once your unlock reaches your
+  teacher."); the records on their way are `SyncState.sending`, the engine's `unsettled` made
+  visible to the screen. The pick shows its check at once and holds the others until it is kept,
+  the check going back to the reason on record if it is not; a light selection haptic as a pick
+  is pressed (`sensoryFeedback(.selection)`), none for a press that changes nothing; the one
+  chosen, pressed again, does nothing. **Home first:** "Go to Home", the primary button, opens
+  Home over Unlocked (`Screen.choose`: `(.unlocked, .home)`), with its tab bar — History and Me
+  reachable there, the apps still open — and Back to Unlocked; "Lock my apps again" (the old
+  "Back to focus", which the owner pressed expecting Home) is secondary, and where protection off
+  was reported, Tap in is. **One vocabulary** (the conductor's ask): History's refocus moment
+  reads "Locked apps again", and the body and the refused words say "lock your apps again".
+  **Gone:** the card's too-late state (`UnlockedWords.late`): a reason is never too late while the
+  unlock stands. **Santa** (two Claude reviewers, so they share a model family — Codex refuses
+  every model on this Mac — and the design check): round 1, one blocker, fixed red first — Home
+  opened over Unlocked outlived it: after the bell, Done or a read saying out left it over the
+  router's own Home, which lost its tab bar and gained a stray Back; now the router reads a Home
+  opened over a Home as that Home, and Back shows only where it leads elsewhere (`canGoBack`), and
+  Done lands on Home whatever tab was chosen over Unlocked. Its WARNs fixed: the record leaves
+  `sending` in the write that reads the queue again; "on its way" said of a pick goes once the
+  unlock lands; after a change no answer came to, the reason shown can be picked again; and the
+  design check's words (the waiting card with a reason chosen, "Bali couldn't change your reason",
+  one vocabulary, no "again" twice), the check scaled with the text and the re-tap line with its
+  Tap in. Round 2: two blockers, tests for two of those fixes, added and red-checked. Left: the
+  tight "✓ Bathroom" (4 pt padding, to keep D1's row), "Go to Home" naming the tab, and Home's
+  words over Unlocked, which C3c's card replaces.
 - **2026-09-30** — **A20: an unlock's reason changes while it stands, recorded as its own event;
   the grid and the history read the latest.** The owner's ruling (1), below. **Its own event,
   never a rewrite:** `events` is append-only (data model decision 1; a trigger refuses an UPDATE),

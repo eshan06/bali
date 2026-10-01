@@ -131,11 +131,14 @@ public struct SyncState: Sendable, Hashable {
     /// The session protection off was last reported in, since the phone's last tap
     /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
     public var reportedOff: String?
-    /// The reason the server kept for an unlock, where it is not the one the phone sent with it:
-    /// the one recorded first stands (A1) — the record, sent before, went unsettled, and a reason
-    /// was given after a relaunch (#119's review). Said on Unlocked in the reason's place until the
-    /// phone's next change.
-    public var reasonKept: ReasonKept?
+    /// This phone's latest Emergency Unlock the server has recorded in a session, and its reason
+    /// on record — the answer's, then each change's (A20): the Unlocked card's check, and what a
+    /// pick changes once the record has left the phone (C5c), until the phone's next change.
+    public var recordedUnlock: RecordedUnlock?
+    /// The records on their way — sent and not settled, or answered in a write the file refused
+    /// (the app suspended, say) — which the file still counts as never sent: a reason given now
+    /// would not go with them (santa's review), so the card offers none (C5c).
+    public var sending: Set<String> = []
     /// How long a tap not yet answered is shielded for: decision 7's `tapCap`, or the shorter one a
     /// Debug build sets for B5b's device check (`SyncEngine.setTapCap`).
     public var cap = SyncState.tapCap
@@ -194,12 +197,12 @@ public struct Refusal: Sendable, Hashable {
     }
 }
 
-/// An unlock's session, and the reason the server kept for it: none, or another than the phone's.
-public struct ReasonKept: Sendable, Hashable {
-    public let session: String
-    public let reason: UnlockReason?
-    public init(session: String, reason: UnlockReason?) {
-        (self.session, self.reason) = (session, reason)
+/// An unlock the server recorded in `session`: its event id, and its reason on record.
+public struct RecordedUnlock: Sendable, Hashable {
+    public let session: String, unlock: String
+    public var reason: UnlockReason?
+    public init(session: String, unlock: String, reason: UnlockReason?) {
+        (self.session, self.unlock, self.reason) = (session, unlock, reason)
     }
 }
 
@@ -265,10 +268,9 @@ public actor SyncEngine {
     /// The refresh under way, which every 401 heard while it runs shares: the drain's, a read's.
     private var reauth: Task<Bool, Never>?
     private var running = false
-    /// The records sent and not yet settled — on their way, or answered in a write the file refused
-    /// (the app suspended, say) — which the file still counts as never sent: a reason given now would
-    /// not go with them (santa's review).
-    private var unsettled: Set<String> = []
+    /// The last change of an unlock's reason no answer came to: tried again for the same unlock and
+    /// reason, it goes under the same event id (rule 4).
+    private var unanswered: (unlock: String, reason: UnlockReason, eventId: String)?
     private enum Loop { case drain, read }
     private var waiters: [Loop: (pause: Int, wake: CheckedContinuation<Void, Never>)] = [:]
     private var rung: Set<Loop> = []
@@ -359,7 +361,7 @@ public actor SyncEngine {
         update {
             $0.standing = standing
             ($0.queued, $0.reportedOff) = (queued, reportedOff)
-            ($0.refused, $0.superseded, $0.reasonKept) = (nil, nil, nil)
+            ($0.refused, $0.superseded, $0.recordedUnlock) = (nil, nil, nil)
         }
         ring(.drain)
         return record
@@ -406,17 +408,33 @@ public actor SyncEngine {
         return nil
     }
 
-    /// The student's reason for their latest Emergency Unlock (C5a; A1), sent with it at once while
-    /// it has never been sent — or what the Unlocked screen says (rule 5): too late, or not saved.
-    public func explain(_ reason: UnlockReason) -> String? {
+    /// The student's reason for their latest Emergency Unlock (C5a): sent with it, at once, while it
+    /// has never been sent; once the server has recorded it, a change of it (A20, `PATCH
+    /// /v1/unlocks/{eventId}`, its token renewed once on a 401) — or what the Unlocked screen says
+    /// (rule 5): not saved, on its way, or why the change did not go.
+    public func explain(_ reason: UnlockReason) async -> String? {
         do {
-            let kept = try outbox.explain(reason, now: clock.now(), sent: unsettled)
-            guard kept else { return UnlockedWords.late }
+            if try outbox.explain(reason, now: clock.now(), sent: state.sending) {
+                refreshQueue()
+                ring(.drain)
+                return nil
+            }
         } catch {
             return "Bali couldn't save your reason. Try again."
         }
-        refreshQueue()
-        ring(.drain)
+        guard case .inSession(let session, _) = state.standing, state.unlock(in: session.id) == nil,
+            let recorded = state.recordedUnlock, recorded.session == session.id
+        else { return UnlockedWords.onItsWay }
+        let again = unanswered.flatMap { $0.unlock == recorded.unlock && $0.reason == reason ? $0 : nil }
+        let request = UnlockReasonRequest(
+            reason: reason, eventId: again?.eventId ?? EventID.mint(at: clock.now()))
+        let answer = await Joining.send(renewing: refresh) {
+            await client.changeReason(unlock: recorded.unlock, request)
+        }
+        unanswered = answer.result == .networkError ? (recorded.unlock, reason, request.eventId) : nil
+        guard let kept = answer.answer?.reason.known else { return UnlockedWords.notChanged(answer) }
+        // Unless the phone has moved on meanwhile: a change of its own clears it.
+        if state.recordedUnlock?.unlock == recorded.unlock { state.recordedUnlock?.reason = kept }
         return nil
     }
 
@@ -425,7 +443,7 @@ public actor SyncEngine {
     public func backToFocus() -> String? {
         guard case .inSession(let session, .unlocked?) = state.standing else { return nil }
         do { try record(.refocus(session: session.id)) } catch {
-            return "Bali couldn't take you back to focus. Try again."
+            return "Bali couldn't lock your apps. Try again."
         }
         return nil
     }
@@ -576,21 +594,20 @@ public actor SyncEngine {
                 switch try outbox.nextDue(now: clock.now()) {
                 case .send(let record):
                     // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
-                    unsettled.insert(record.eventId)
+                    state.sending.insert(record.eventId)
                     guard let sent = await record.send(through: client) else {
-                        unsettled.remove(record.eventId)
+                        state.sending.remove(record.eventId)
                         break
                     }
                     // No token: nothing went, so nothing is settled — the record waits on sign-in
                     // (a ring), or a minute. Never a sign-out, never a dropped record.
                     guard sent.noAnswer != .noToken else {
-                        unsettled.remove(record.eventId)
+                        state.sending.remove(record.eventId)
                         state.link = .signIn
                         wake = clock.now() + Outbox.backoffCap
                         break
                     }
                     let disposition = try outbox.settle(sent, now: clock.now())
-                    unsettled.remove(record.eventId)
                     await answered(record, sent, disposition)
                     continue
                 case .wait(let until): wake = until
@@ -613,7 +630,9 @@ public actor SyncEngine {
         let queued = queue()
         let applies = stored(outbox.awaiting) == 0
         var next = state
-        next.queued = queued
+        // Settled, and the queue read again, in one write: no screen sees the record neither on
+        // its way nor answered (santa's round 1).
+        (next.queued, next.sending) = (queued, next.sending.subtracting([record.eventId]))
         defer { state = next }
         switch disposition {
         case .tap(.retry)?, .unlock(.retry)?, .stateChange(.retry)?, .tap(.reauth)?,
@@ -623,14 +642,14 @@ public actor SyncEngine {
         // kept and shown, and still stands on the phone (`holdsUnlock`).
         case nil, .unlock(.retryAndSurface)?: break
         case .tap(.applySession)?, .unlock(.recorded)?, .stateChange(.applySession)?:
-            // A reason the server did not keep, the one it recorded first standing (A1): said —
-            // unless another unlock of the class is queued, a newer one the card is about
-            // (Riders-2's santa: the card's own lookup, so another class's stuck one is no matter).
-            if disposition == .unlock(.recorded), let given = record.change.reason,
-                sent.reason != given, let session = sent.session,
-                next.unlock(in: session.id) == nil
+            // An unlock recorded in a session, not late: its reason on record, the card's check —
+            // its own, or the one the server kept, its first standing (A1) — and what a pick
+            // changes from now (A20). A newer unlock of the class still queued is the card's.
+            if disposition == .unlock(.recorded), record.change.isUnlock, !sent.superseded,
+                let session = sent.session
             {
-                next.reasonKept = ReasonKept(session: session.id, reason: sent.reason)
+                next.recordedUnlock = RecordedUnlock(
+                    session: session.id, unlock: record.eventId, reason: sent.reason)
             }
             // A live participation names its session and its state; a note (an unlock after the
             // end names the session it ended) names no window to be in.

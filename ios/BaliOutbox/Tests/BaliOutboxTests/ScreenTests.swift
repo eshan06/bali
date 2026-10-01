@@ -39,12 +39,15 @@ private func screen(
 
 /// Whether D1's tab bar shows over the phone standing `standing`, with `opened`, at `now` — the
 /// router's own answer, beside its screen.
-private func tabbed(standing: Standing, opened: [Screen] = [], now: Date = t0) -> Bool {
+private func tabbed(
+    standing: Standing, opened: [Screen] = [], closed: SessionView? = nil, now: Date = t0
+) -> Bool {
     var (protection, sync) = (Protection(), SyncState())
     (protection.checked, protection.permission, sync.standing) = (true, .approved, standing)
     return Screen.choose(
         problem: nil, introSeen: true, signedIn: true, protection: protection, everApproved: false,
-        sync: sync, hasClasses: nil, sessionOverClosed: nil, opened: opened, tab: .history, now: now
+        sync: sync, hasClasses: nil, sessionOverClosed: closed, opened: opened, tab: .history,
+        now: now
     ).tabbed
 }
 
@@ -280,6 +283,34 @@ struct ScreenTests {
     }
 
     @Test(
+        "Home over Unlocked (C5c; the owner's ruling, 2026-09-30): Unlocked's primary way on, the apps still open — with its tab bar, History and Me honoured there, and Join over it as over any Home; only while Unlocked is the router's own: never over Focus, Protection off or Session over"
+    )
+    func homeOverUnlocked() {
+        let unlocked = Standing.inSession(session(), .unlocked)
+        #expect(screen(standing: unlocked, opened: [.home]) == .home)
+        #expect(tabbed(standing: unlocked, opened: [.home]))
+        for tab in [Screen.history, .me] {
+            #expect(screen(standing: unlocked, opened: [.home], tab: tab) == tab)
+        }
+        #expect(screen(standing: unlocked, opened: [.home, .join], tab: .me) == .join)
+        #expect(!tabbed(standing: unlocked, opened: [.home, .join]))
+        #expect(screen(standing: .inSession(session(), .focused), opened: [.home]) == .focus)
+        let off = Standing.inSession(session(), .protectionOff)
+        #expect(screen(standing: off, opened: [.home]) == .protectionOff)
+        #expect(screen(standing: unlocked, opened: [.home], now: at(3000)) == .sessionOver)
+        #expect(!tabbed(standing: unlocked, opened: [.home], now: at(3000)))
+        // Its Unlocked gone — the bell rung, then Session over's Done, or a read saying out — the
+        // Home it opened is the router's own Home: its tab bar, its tabs (santa's round 1).
+        let rung = Standing.inSession(session(), .unlocked)
+        for (standing, closed) in [(rung, session()), (Standing.out, nil)] as [(Standing, SessionView?)] {
+            #expect(
+                screen(standing: standing, sessionOverClosed: closed, opened: [.home], tab: .me, now: at(3000))
+                    == .me)
+            #expect(tabbed(standing: standing, opened: [.home], closed: closed, now: at(3000)))
+        }
+    }
+
+    @Test(
         "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
     )
     func keepsOpened() async throws {
@@ -371,14 +402,18 @@ struct ScreenTests {
     }
 
     @Test(
-        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked takes one reason at a time; Me gives the keyboard back once a save is over"
+        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked takes one reason at a time, a light haptic as one is picked and no button tappable where a pick cannot act (C5c, the owner's ruling); Me gives the keyboard back once a save is over"
     )
     func ridersWiring() throws {
         let history = try sourceCode("Bali/UI/HistoryView.swift")
         #expect(history.contains(".onDisappear { phone.forgetHistory() }"))
         let unlocked = try sourceCode("Bali/UI/UnlockedView.swift")
-        #expect(unlocked.contains("guard !explaining, given == nil else { return }"))
-        #expect(unlocked.contains("explaining = true") && unlocked.contains("explaining = false"))
+        #expect(
+            unlocked.contains(
+                ".sensoryFeedback(.selection, trigger: phone.picking) { _, picked in picked != nil }"))
+        #expect(unlocked.contains(".disabled(!open || phone.picking != nil && !chosen)"))
+        #expect(unlocked.contains("guard !chosen || phone.pickFailed != nil else { return }"))
+        #expect(try sourceCode("Bali/BaliApp.swift").contains("guard picking == nil else { return }"))
         let me = try sourceCode("Bali/UI/MeView.swift")
         #expect(me.contains(".onChange(of: naming.busy) { _, busy in"))
         // Me's Screen Time row says Off where the check judges the permission off: reachable

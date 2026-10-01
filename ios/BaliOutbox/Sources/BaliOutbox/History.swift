@@ -118,7 +118,7 @@ extension History.Moment {
         words =
             switch type {
             case .tapIn: "Tapped in"
-            case .refocus: "Back to focus"
+            case .refocus: "Locked apps again"
             case .unlock:
                 ["Unlocked", event.reason?.known?.rawValue.capitalized].compactMap { $0 }
                     .joined(separator: " · ")

@@ -31,9 +31,9 @@ private func refused(_ reason: ApiErrorReason?, in session: String = "s") -> Ref
 }
 
 let offWords =
-    "Bali couldn't take you back to focus, because Screen Time was off during this class. Tap your teacher's block to go back to focus."
+    "Bali couldn't lock your apps again, because Screen Time was off during this class. Tap your teacher's block to lock them again."
 let refusedWords =
-    "Bali couldn't take you back to focus. Tap your teacher's block to go back, or ask your teacher."
+    "Bali couldn't lock your apps again. Tap your teacher's block to lock them again, or ask your teacher."
 
 @Suite("What the Protection off and Session over screens say (C5b)")
 struct ProtectionOffScreenTests {

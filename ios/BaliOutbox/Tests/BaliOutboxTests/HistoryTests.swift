@@ -94,7 +94,7 @@ struct HistoryTests {
         #expect(
             drawn(history.days(now: t0, time: us())) == [
                 "Today", "[Period 3 — Algebra II · Ms. Rivera]", "8:58 AM Tapped in",
-                "9:12 AM Unlocked · Bathroom", "9:16 AM Back to focus", "9:45 AM Class ended",
+                "9:12 AM Unlocked · Bathroom", "9:16 AM Locked apps again", "9:45 AM Class ended",
                 "Yesterday", "[Period 5 — Chemistry · Mr. Okafor]", "1:02 PM Tapped in",
                 "1:50 PM Class ended", "[Period 6 — Geometry · -]",
                 "2:48 PM Tap not used. It already counted in Period 5 — Chemistry.",
@@ -126,11 +126,11 @@ struct HistoryTests {
         #expect(
             drawn(days).dropFirst() == [
                 "[Class fx-hist-p3 · Ms. Rivera]", "7:24 PM Tapped in",
-                "7:23 PM Unlocked · Bathroom", "7:22 PM Back to focus", "7:21 PM Screen Time off",
+                "7:23 PM Unlocked · Bathroom", "7:22 PM Locked apps again", "7:21 PM Screen Time off",
                 "7:20 PM Tapped in", "7:19 PM Screen Time off (Arrived after class ended)",
                 "7:17 PM Class ended", "7:17 PM Unlocked (Arrived after class ended)",
                 "[Class fx-hist-p5 · Mr. Okafor]", "7:16 PM Tapped in",
-                "7:15 PM Back to focus (Arrived late, so it changed nothing)", "7:14 PM Unlocked",
+                "7:15 PM Locked apps again (Arrived late, so it changed nothing)", "7:14 PM Unlocked",
                 "7:13 PM Tapped in (Arrived late, so it changed nothing)",
                 "7:12 PM Switched to another class", "[Class fx-hist-p6 · -]", "7:12 PM Tapped in",
                 "7:09 PM Class ended", "[Class fx-hist-p3 · Ms. Rivera]", "7:08 PM Tapped in",
