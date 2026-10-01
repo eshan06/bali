@@ -262,7 +262,7 @@ struct AppTests {
     )
     func tabs() async throws {
         let (homes, editing) = (
-            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked"],
+            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked", "homeInSession"],
             ["meEditing", "meNameError"]
         )
         for (name, state) in PreviewFixtures.all {
