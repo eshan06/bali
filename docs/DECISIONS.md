@@ -33,7 +33,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   session's row, so the Start takes its waiting taps and their students' locks first
   (`lockWaitingTaps`, split out of `convertArmedTaps`) and the old session's row after. Out of
   that order — santa's round 1, confirmed — a Start ending a class held its row while waiting on a
-  student whose re-tap held that student's lock and waited on the row: a deadlock each run.
+  student whose re-tap held that student's lock and waited on the row: a deadlock each run. Its
+  cost, disclosed (round 2): a tap in the gap already holding or queued on the old row as Start is
+  pressed is refused there and arms after the Start read its waiting taps, so it waits for the
+  next Start, as any arm committing after a Start's read already does — the student taps again.
   **Kept:** a Start before the bell still answers with the class running,
   and double presses still get one session. The route starts at the app's clock (`AppDeps.clock`,
   A17's). The portal's recovery read (`findLiveSessionForClass`) still counts a session past its
