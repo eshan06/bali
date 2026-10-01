@@ -106,19 +106,18 @@ export async function findOrCreateStudent(
 
 /**
  * A student's active classes, each with its teacher's display name (C2a), the
- * enrollment leaving it deletes (A19) and its session running at `now` (C3c) —
- * one query. A class has at most one session not marked over
- * (`sessions_one_running_per_class`), and past its bell it runs no more (A17).
+ * enrollment leaving it deletes (A19) and its session not marked over, if any
+ * (C3c): a class has at most one (`sessions_one_running_per_class`). Whether it
+ * runs is the engine's one rule, `sessionRunning`, the caller's to apply.
  */
 export async function getEnrolledClasses(
   db: Database,
   studentId: string,
-  now: Date,
 ): Promise<
   (ClassRow & {
     teacherDisplayName: string | null;
     enrollmentId: string;
-    live: { id: string; endsAt: Date } | null;
+    live: { id: string; endsAt: Date; endedAt: null } | null;
   })[]
 > {
   const rows = await db
@@ -132,10 +131,7 @@ export async function getEnrolledClasses(
     .from(classes)
     .innerJoin(enrollments, eq(enrollments.classId, classes.id))
     .innerJoin(users, eq(users.id, classes.teacherId))
-    .leftJoin(
-      sessions,
-      and(eq(sessions.classId, classes.id), isNull(sessions.endedAt), gt(sessions.endsAt, now)),
-    )
+    .leftJoin(sessions, and(eq(sessions.classId, classes.id), isNull(sessions.endedAt)))
     .where(
       and(
         eq(enrollments.studentId, studentId),
@@ -145,7 +141,10 @@ export async function getEnrolledClasses(
     );
   return rows.map(({ liveId, liveEndsAt, ...row }) => ({
     ...row,
-    live: liveId !== null && liveEndsAt !== null ? { id: liveId, endsAt: liveEndsAt } : null,
+    live:
+      liveId !== null && liveEndsAt !== null
+        ? { id: liveId, endsAt: liveEndsAt, endedAt: null }
+        : null,
   }));
 }
 

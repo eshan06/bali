@@ -53,7 +53,16 @@ struct HomeView: View {
                     // In every build, as Emergency Unlock is wherever the shields can be on:
                     // nothing may shield a phone with no way out (ARCHITECTURE; FocusTests).
                     if let card {
+                        // Its unlock stuck on the phone, said here too (C5c's review).
+                        if card.unlocked, let sync = phone.sync,
+                            let stuck = UnlockedWords(sync)?.stuck
+                        {
+                            Retry(words: stuck, phone: phone)
+                        }
                         inSession(card)
+                        // A read of the classes that did not go: the card may be older than it
+                        // says (santa's round 1).
+                        if let failed = phone.sync?.meWords { Retry(words: failed, phone: phone) }
                     } else {
                         tapIn
                     }
@@ -84,11 +93,12 @@ struct HomeView: View {
                     kind: card.unlocked ? .unlocked : .notIn,
                     text: card.unlocked ? "Unlocked" : "Not in")
                 Text(card.words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
-                if card.unlocked {
-                    // Its unlock stuck on the phone, said here too (C5c's review).
-                    if let sync = phone.sync, let stuck = UnlockedWords(sync)?.stuck {
-                        Retry(words: stuck, phone: phone)
-                    }
+                if let retap = card.retap {
+                    // Unlocked's own rule: out of protection off, or its refocus refused, a
+                    // re-tap is the way back (A2; santa's round 1).
+                    Text(retap).textStyle(.body)
+                    TapIn(phone: phone, primary: false)
+                } else if card.unlocked {
                     Button("Lock my apps again") {
                         Task {
                             notBack = await phone.backToFocus()

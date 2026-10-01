@@ -137,10 +137,14 @@ struct AppTests {
         let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
         #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
         // Home's card for a class in session (C3c): not in it, and unlocked in it.
-        for (name, unlocked) in [("homeInSession", false), ("homeFromUnlocked", true)] {
+        for (name, unlocked, retap) in [
+            ("homeInSession", false, false), ("homeFromUnlocked", true, false),
+            ("homeFromUnlockedRetap", true, true),
+        ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             let card = phone.sync?.inSessionCard(at: Date())
             #expect(phone.screen == .home && card?.unlocked == unlocked, "\(name)")
+            #expect((card?.retap != nil) == retap, "\(name)")
         }
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
@@ -262,7 +266,10 @@ struct AppTests {
     )
     func tabs() async throws {
         let (homes, editing) = (
-            ["home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked", "homeInSession"],
+            [
+                "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
+                "homeFromUnlockedRetap", "homeInSession",
+            ],
             ["meEditing", "meNameError"]
         )
         for (name, state) in PreviewFixtures.all {

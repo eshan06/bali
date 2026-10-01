@@ -288,8 +288,14 @@ struct ScreenTests {
     func homeInSession() throws {
         let unlocked = try synced(.inSession(bell1042, .unlocked))
         let card = try #require(unlocked.inSessionCard(at: t0, time: newYork))
-        #expect(card.unlocked && card.bell == bell1042.endsAt)
+        #expect(card.unlocked && card.bell == bell1042.endsAt && card.retap == nil)
         #expect(plain(card.words) == "You're unlocked in Period 3 — Algebra II until 10:42 AM.")
+        // Protection off reported in the class, or its refocus refused: as on Unlocked, the way
+        // back is a re-tap, never a refocus the server refuses (santa's round 1).
+        var reported = unlocked
+        reported.reportedOff = bell1042.id
+        #expect(reported.inSessionCard(at: t0)?.retap == UnlockedWords(reported)?.retap)
+        #expect(reported.inSessionCard(at: t0)?.retap != nil)
         #expect(unlocked.inSessionCard(at: bell1042.endsAt) == nil)
         let unread = try synced(.inSession(bell1042, .unlocked), me: false)
         #expect(

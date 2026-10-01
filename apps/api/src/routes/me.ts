@@ -5,6 +5,7 @@ import {
   getLiveParticipation,
   getTaughtClasses,
   renameStudent,
+  sessionRunning,
 } from '@bali/db';
 import { deriveDisplayState, type MeResponse, type UpdateMeResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
@@ -50,12 +51,16 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
             enrollmentId: null,
             liveSession: null,
           }))
-        : (await getEnrolledClasses(db, user.id, clock())).map((c) => ({
+        : (await getEnrolledClasses(db, user.id)).map((c) => ({
             id: c.id,
             name: c.name,
             teacher: { displayName: c.teacherDisplayName },
             enrollmentId: c.enrollmentId,
-            liveSession: c.live && { id: c.live.id, endsAt: c.live.endsAt.toISOString() },
+            // Running by the server's clock, the engine's one rule (A17), or none (C3c).
+            liveSession:
+              c.live && sessionRunning(c.live, clock())
+                ? { id: c.live.id, endsAt: c.live.endsAt.toISOString() }
+                : null,
           }));
 
     let session: MeResponse['session'] = null;

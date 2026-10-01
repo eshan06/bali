@@ -102,6 +102,9 @@
                 pickFailed: UnlockedWords.offline),
             // Unlocked's Home (C5c): its tab bar, the apps still open, and Back to Unlocked.
             "homeFromUnlocked": State(sync: standing(.inSession(period3, .unlocked)), opened: [.home]),
+            // Protection off reported there: the card's way back is a re-tap, as Unlocked's.
+            "homeFromUnlockedRetap": State(
+                sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
             // Period 3 in session, the student not in it (C3c): its card in the hero's place.
             "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
             "history": State(tab: .history, history: anaHistory()),

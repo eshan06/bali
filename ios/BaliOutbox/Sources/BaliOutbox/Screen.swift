@@ -202,7 +202,8 @@ extension SyncState {
             let name = me?.classes.first { $0.id == session.classId }?.name ?? "your class"
             return InSessionCard(
                 unlocked: true, bell: session.endsAt,
-                words: "You're unlocked in \(name) until \(session.endsAt.formatted(time)).")
+                words: "You're unlocked in \(name) until \(session.endsAt.formatted(time)).",
+                retap: UnlockedWords(self)?.retap)
         case .out:
             guard
                 let running = me?.classes.first(where: { ($0.liveSession?.endsAt ?? now) > now }),
@@ -251,11 +252,13 @@ extension SyncState {
 }
 
 /// Home's card for a class in session (C3c): `unlocked` there, its way back Lock my apps again —
-/// else not in it, its way in Tap in — what it says, and its bell, when it goes.
+/// or, `retap`, why a re-tap is (Unlocked's own rule) — else not in it, its way in Tap in; what it
+/// says, and its bell, when it goes.
 public struct InSessionCard: Sendable, Hashable {
     public let unlocked: Bool
     public let bell: Date
     public let words: String
+    public var retap: String? = nil
 }
 
 extension BlockRead {
