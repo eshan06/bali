@@ -22,8 +22,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `activities`, which hung an extension on iOS 18, FB14664238). Only read: nothing is stopped or
   replaced, so the monitor is never woken by it, and B5b-5's echo rule is untouched. Not in the
   window's last minute, which iOS may end early on its own clock (`Bell.retry`, as B5b-5 uses it).
-  **Gone,** it is asked for again — no stop and no replacement either, since iOS holds none — and
-  iOS's answer decides: refused as unauthorized (`MonitoringError.unauthorized`, mapped to
+  **Gone,** it is asked for again — a fresh start, since iOS holds none, though `Bell.register` then
+  stops the monitor's own next wake as for any new bell window, which wakes it once to ask nothing
+  (B5b-5) — and iOS's answer decides: refused as unauthorized (`MonitoringError.unauthorized`, mapped to
   `ScreenTimeUnauthorized`), its own word, so the permission is judged off at once; taken yet still
   not held, a strong sign but not iOS's word, so the approved read is judged not determined —
   B5a-2's grace, then off a check-in later; taken and held, nothing was wrong: another app's grant
@@ -47,13 +48,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the two iOS 18.6 gives — a window gone, an `unauthorized`, or neither; the Debug readout's `iOS:`
   line (the read now, and the window iOS holds under each name, every 5 s) and `Found:` (each
   window found gone or refused) show it, and ios/README.md's round 1 step 12 says what to look for.
-  **Limits:** out of a session nothing is asked (no window); access taken back in a window's last
-  minute is left to the bell. **Tests**, red first (`RevokedWhileRunningTests`, Linux and the
+  **Limits:** out of a session, or unlocked in one, nothing is asked (no window): taken back then, it
+  is found when a tap or a refocus asks for a window again; in a window's last minute it is left to
+  the bell. **Tests**, red first (`RevokedWhileRunningTests`, Linux and the
   simulator): refused at the first check, the screen's way iOS's prompt; taken-not-held at the
   second; from behind at the check as Bali comes back; turned back on — Settings or the prompt —
   and re-tapped, no second report; another app's grant, never off and the claim never wavering; a
   re-ask refused otherwise, never off (red first too); the schedule intact, never off and nothing
-  asked; the last minute; and a relaunch over access taken back still waits out B5a-2's grace.
+  asked; the last minute; and a relaunch over access taken back still waits out B5a-2's grace. From
+  santa's round 1, each red with the line it guards removed: a check made while a pass is held
+  waits for it and reports as it returns; a doubt ends when iOS holds the window after all, or
+  when the re-tap's window is held. B5a-2's run is ended at the pass's read again, as before, never
+  at its end over a check's newer read.
 
 - **2026-10-01** — **F3 (#140): Unlocked's reasons picked at once — every reason open, one change
   on its way, the newest only.** The owner's device check: once the unlock had reached the server,

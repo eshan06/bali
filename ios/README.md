@@ -112,10 +112,13 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     `approved` (#144): `iOS: Family Controls reads Approved`, while iOS no longer holds `bell` —
     then within about a minute `Found:` says the bell window is gone (and `window refused:
     unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`, and `watch`
-    shows **protection off** — with no relaunch. Run it twice: with Bali in front, and with Bali
-    behind for a minute, then opened. Note in #144 which of the `iOS:` and `Found:` lines changed.
-    **Allow Screen Time** again: still no shields — only a re-tap leaves protection off — and
-    **Tap** brings the shields and focus back.
+    shows **protection off** — with no relaunch. Run it three times, a 50-minute class
+    (`-- start 50`): in front with more than 15 minutes to the bell (the bell's window, 15 minutes
+    long, not begun), in front within the last 15 (begun, as in #144), and with Bali behind for a
+    minute, then opened. Note in #144 which `iOS:` and `Found:` lines changed each time (a
+    `Monitor:` line for `tick` asking nothing may come with them: expected, B5b-5).
+    **Allow Screen Time** again — note whether iOS's prompt appeared: still no shields — only a
+    re-tap leaves protection off — and **Tap** brings the shields and focus back.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
     `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
     still shows focused — no false protection off after a relaunch: a permission Family Controls

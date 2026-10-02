@@ -210,8 +210,9 @@ public actor Enforcer {
     /// #144, at the pass a check asked for: whether iOS's DeviceActivity center still holds
     /// `window`, the bell's window it took — only read, so nothing is stopped or replaced and the
     /// monitor is not woken. Gone — more than a minute before its end, when iOS may have ended it
-    /// on its own clock — it is forgotten, so the pass asks for it again: neither a stop nor a
-    /// replacement either, and iOS's answer decides (`apply`). Whether it was gone.
+    /// on its own clock — it is forgotten, so the pass asks for it again, and iOS's answer decides
+    /// (`apply`): a fresh start, iOS holding none, though `Bell.register` then stops the monitor's
+    /// own next wake, which wakes it once to ask nothing (B5b-5). Whether it was gone.
     private func verify(_ window: DateInterval?) async -> Bool {
         verifying = false
         guard let window, window == scheduled, clock.now() < window.end - Bell.retry else {
@@ -291,6 +292,9 @@ public actor Enforcer {
             putOn = false
         }
         let read = await screenTime.permission()
+        // Ends a run of not determined at the read, as B5a-2 has it — never at the pass's end, over
+        // a check's newer read made meanwhile; an approved read doubted (#144) does not.
+        if judged(read).permission != .notDetermined { undetermined = nil }
         let inStore = await screenTime.isShielding()
         // B5b: iOS wakes the monitor at the end of the shields the store holds, for a closed app —
         // asked again as the end moves (a new session, an extension, a re-tap) and cancelled once
@@ -320,13 +324,14 @@ public actor Enforcer {
             }
         }
         let (permission, refused) = judged(read)
-        if permission != .notDetermined { undetermined = nil }
         let shielded = inStore && permission == .approved
         let monitorUnscheduled = await screenTime.monitorUnscheduled()
         // Read after the last wait, so a check made meanwhile keeps what it found (`unreported`).
         var next = protection
         (next.checked, next.permission, next.shielded) = (true, permission, shielded)
-        next.permissionOff = permission == .denied || refused || undeterminedLasting
+        next.permissionOff =
+            permission == .denied || refused
+            || (permission == .notDetermined && undeterminedLasting)
         (next.until, next.unscheduled, next.monitorUnscheduled) =
             (until, unscheduled, monitorUnscheduled)
         protection = next
