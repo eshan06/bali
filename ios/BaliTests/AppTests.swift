@@ -152,6 +152,15 @@ struct AppTests {
         #expect(homeWaiting.screen == .home && homeWaiting.tabbed && !homeWaiting.canGoBack)
         #expect(homeWaiting.sync?.waitingCard != nil)
         #expect(homeWaiting.sync?.inSessionCard(at: Date()) == nil)
+        // In no class any more (#143): Home, its tab bar and no Back, its card in the hero's
+        // place, never C3c's or the wait's; a newcomer in no class gets Join.
+        let noClasses = Phone(fixture: try #require(PreviewFixtures.all["homeNoClasses"]))
+        #expect(noClasses.screen == .home && noClasses.tabbed && !noClasses.canGoBack)
+        #expect(noClasses.everInClass && noClasses.sync?.noClassesCard != nil)
+        #expect(noClasses.sync?.inSessionCard(at: Date()) == nil)
+        #expect(noClasses.sync?.waitingCard == nil && !noClasses.offersSignOut)
+        let newcomer = Phone(fixture: try #require(PreviewFixtures.all["join"]))
+        #expect(newcomer.screen == .join && !newcomer.everInClass)
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
         var standing = SyncState()
@@ -301,7 +310,7 @@ struct AppTests {
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
-                "homeWaiting",
+                "homeWaiting", "homeNoClasses",
             ],
             ["meEditing", "meNameError"]
         )
@@ -1037,6 +1046,82 @@ struct AppTests {
         phone.remember(read(.approved))
         phone.remember(read(.denied, off: true))
         #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
+    }
+
+    @Test(
+        "Whose classes `GET /v1/me` has listed on this phone is kept in its own defaults (#143), as the permission once approved is, and a fresh Phone reads it back; a frozen fixture's stays its own (santa's round 1). In no class later, removed from their last, the student lands on Home, its tab bar and its card, and nothing they opened closes for it: Join opened over Home stays, its code typed, as it does over the empty Home at a read saying none again, and so does a tab chosen there, Me after the Leave of the last class too. Keyed on the student: the same student signing back in is still known; another student in no class gets Join, a late read of the last one's classes included, until listed in a class herself. The key as it was before is put back after"
+    )
+    func everInClass() throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.inClassKey)
+        defer { defaults.set(before, forKey: Phone.inClassKey) }
+        defaults.removeObject(forKey: Phone.inClassKey)
+        /// `GET /v1/me` as it answers student `id`, in `classes`.
+        func me(_ id: String, _ classes: String = "") throws -> MeResponse {
+            try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"\#(id)","role":"student","displayName":null},"classes":[\#(classes)],"session":null}"#
+                        .utf8))
+        }
+        let period3 = #"{"id":"p3","name":"Period 3 — Algebra II","enrollmentId":"e3"}"#
+        // Ana, in Period 3 and Period 5: the live phone keeps her, and a fresh one reads it back.
+        var state = try #require(PreviewFixtures.all["home"]?.sync)
+        let live = Phone()
+        live.synced(state)
+        #expect(live.inClass == "ana" && Phone().inClass == "ana")
+        defaults.removeObject(forKey: Phone.inClassKey)
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        phone.synced(state)
+        #expect(phone.inClass == "ana" && Phone().inClass == nil)
+        // Removed from both (the owner's phone) while Join a class, opened over Home, has a code
+        // typed: Join stays, the code kept; back, Home, its tab bar and its card, never Join.
+        phone.open(.join)
+        phone.joining.type("KWX")
+        state.me = try me("ana")
+        phone.synced(state)
+        #expect(phone.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
+        phone.back()
+        #expect(phone.screen == .home && phone.tabbed && !phone.canGoBack)
+        #expect(phone.everInClass && phone.sync?.noClassesCard != nil)
+        // Its own Join a class, then History chosen: a read saying none again, as each return to
+        // the front makes, closes neither.
+        phone.open(.join)
+        phone.joining.type("KWX")
+        state.heardAt = Date() + 1
+        phone.synced(state)
+        #expect(phone.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
+        phone.back()
+        phone.select(.history)
+        state.heardAt = Date() + 2
+        phone.synced(state)
+        #expect(phone.screen == .history && phone.tabbed)
+        // Ana signed out and back in, still in no class: still Home.
+        phone.signed(in: true, as: "ana")
+        phone.signed(in: false)
+        phone.signed(in: true, as: "ana")
+        phone.synced(state)
+        #expect(phone.screen == .home && phone.tabbed && phone.inClass == "ana")
+        // Bea signs in, in no class: Join, a late read of Ana's classes landing after her
+        // sign-in included; listed in a class herself, Bea is the one kept.
+        phone.signed(in: true, as: "bea")
+        state.me = try me("ana", period3)
+        phone.synced(state)
+        state.me = try me("bea")
+        phone.synced(state)
+        #expect(phone.screen == .join && !phone.tabbed && phone.inClass == "ana")
+        state.me = try me("bea", period3)
+        phone.synced(state)
+        #expect(phone.inClass == "bea")
+        // Me's Leave of the last class (C6c): Me stays, the class gone from it; Home has the card.
+        let leaving = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        var left = try #require(leaving.sync)
+        leaving.synced(left)
+        left.me = try me("ana")
+        leaving.synced(left)
+        #expect(leaving.screen == .me && leaving.tabbed)
+        leaving.select(.home)
+        #expect(leaving.screen == .home && leaving.sync?.noClassesCard != nil)
     }
 
     @Test(
