@@ -85,7 +85,8 @@ final class MemoryStore: TokenStore, @unchecked Sendable {
         throws -> MemoryStore
     {
         let store = MemoryStore()
-        try store.save(JSONEncoder().encode(Tokens(access: access, refresh: refresh, at: now)))
+        try store.save(
+            JSONEncoder().encode(Tokens(access: access, refresh: refresh, email: nil, at: now)))
         return store
     }
 }
@@ -646,6 +647,17 @@ struct TokenTests {
         #expect(await phone.accessToken() == jwt("a2"))
         #expect(await phone.email() == "ana@bali.test")
         #expect(store.tokens?.refresh == "refresh-1")
+    }
+
+    @Test(
+        "tokens are never made without a word on their email (#159's review): `Tokens.init` asks for it, with no default, so a sign-in or renewal path to come that leaves it out is the compiler's error, never tokens kept as a build before #147's were, Me saying nothing"
+    )
+    func emailAsked() throws {
+        let file = Contract.repoRoot.appending(path: "ios/BaliCore/Sources/BaliCore/SignIn.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        let asked = source.contains(
+            "init(access: String, refresh: String, email: String?, at now: Date)")
+        #expect(asked, "Tokens.init gives its email a default, or its signature moved")
     }
 
     @Test("a sign-out while a renewal runs is not undone by its answer")

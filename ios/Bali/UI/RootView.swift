@@ -68,19 +68,31 @@ struct RootView: View {
 
 /// A screen fading in (#150): its content over the page's own colour, there from the start. The
 /// screen it replaces is gone at once — SwiftUI keeps that one until the fade ends, drawing itself
-/// anew from what the phone says now, the next screen's — so it leaves unseen, with no animation,
-/// and this one's colour covers it too, whichever of the two is drawn above.
+/// anew from what the phone says now, the next screen's — so it leaves unseen, with no animation
+/// (`Replaced`), and this one's colour covers it too, whichever of the two is drawn above.
 struct Opening: ViewModifier {
     static var transition: AnyTransition {
         .asymmetric(
             insertion: .modifier(active: Opening(shown: false), identity: Opening(shown: true)),
-            removal: .opacity.animation(nil))
+            removal: .modifier(active: Replaced(gone: true), identity: Replaced(gone: false))
+                .animation(nil))
     }
 
     let shown: Bool
 
     func body(content: Content) -> some View {
         content.opacity(shown ? 1 : 0).background(Theme.page.ignoresSafeArea())
+    }
+
+    /// The screen an opening one replaces: gone at once — unseen, and, kept until the fade ends,
+    /// never touched nor read by VoiceOver, so a fast tap meant for the screen arriving cannot land
+    /// on it (#161's review).
+    struct Replaced: ViewModifier {
+        let gone: Bool
+
+        func body(content: Content) -> some View {
+            content.opacity(gone ? 0 : 1).allowsHitTesting(!gone).accessibilityHidden(gone)
+        }
     }
 }
 

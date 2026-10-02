@@ -463,6 +463,46 @@ struct AppTests {
     }
 
     @Test(
+        "A class code typed goes with who typed it, a look-up or a join on its way too (Riders-2's review): signed out, or another student signed in, while one runs, the code goes at once, and its answer, landing after, is dropped — the class it opens, or why not, never said to the next student, nor a look-up of theirs under way, the same code typed again, marked done by it: theirs answers for itself"
+    )
+    func joiningSignedOut() async throws {
+        let found =
+            #"{"class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"alreadyEnrolled":false}"#
+        let none = #"{"error":{"code":"not_found","reason":"class_not_found","message":"none"}}"#
+        let tries: [(@MainActor (Phone) async -> Void, (status: Int, body: String))] = [
+            ({ await $0.lookUp() }, (200, found)), ({ await $0.join() }, (404, none)),
+        ]
+        let leaves: [@MainActor (Phone) -> Void] = [
+            { $0.signed(in: false) }, { $0.signed(in: true, as: "bea") },
+        ]
+        for (attempt, answer) in tries {
+            for leave in leaves {
+                let server = StandIn(tries: [answer, (200, found)])
+                let (phone, _) = try standIn(server)
+                phone.signed(in: true, as: "ana")
+                phone.joining.type("KWX49Q")
+                let trying = Task { await attempt(phone) }
+                try await until { await server.asked.count == 1 }
+                leave(phone)
+                #expect(phone.joining == Joining())
+                // The next student types the same code and looks it up: theirs is under way when
+                // the last one's answer lands.
+                phone.signed(in: true, as: "bea")
+                phone.joining.type("KWX49Q")
+                let theirs = Task { await phone.lookUp() }
+                try await until { await server.asked.count == 2 }
+                await server.letGo()
+                await trying.value
+                #expect(phone.joining.busy && phone.joining.preview == nil)
+                #expect(phone.joining.failure == nil)
+                await server.letGo()
+                await theirs.value
+                #expect(!phone.joining.busy && phone.joining.preview?.class.id == "p3")
+            }
+        }
+    }
+
+    @Test(
         "History's pages through the phone's own engine (C6a-2's review): Show earlier asks for the page after those read — the cursor the last one named — and adds it, the history kept; a read from the top asks for none, and its page takes the place of those read (#141)"
     )
     func historyPages() async throws {
@@ -631,6 +671,57 @@ struct AppTests {
         phone.signed(in: true, as: "bea")
         #expect(phone.tab == .home && phone.signedIn == true)
         try await until { await engine.state.me == nil }
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
+        "Another student's sign-in shows nothing of the last one's, at any moment (#160's review): Ana, once in a class on this phone and in none now, signs out and Bea signs in — Ana's name and classes go from what the phone shows at the sign-in itself, before the engine has forgotten them, so Bea is never greeted as Ana nor shown Ana's empty Home; a state the engine sent before it forgot them, still on its way, shows none of them either; once it has, Bea's own show. Ana signing back in keeps hers. The key as it was before is put back after"
+    )
+    func nothingOfTheLast() async throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: Phone.inClassKey)
+        defer { defaults.set(before, forKey: Phone.inClassKey) }
+        /// `GET /v1/me` as it answers student `id`, named `name`, in `classes`.
+        func me(_ id: String, _ name: String, _ classes: String = "") throws -> MeResponse {
+            try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"\#(id)","role":"student","displayName":"\#(name)"},"classes":[\#(classes)],"session":null}"#
+                        .utf8))
+        }
+        let ana = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+        let (phone, engine) = try standIn(StandIn(me: ana))
+        let running = Task { await engine.run() }
+        await engine.setForeground(true)
+        try await until { await engine.state.me != nil }
+        // Ana's, as the engine sent it before any forget: in Period 3 once, and in no class now.
+        let anas = await engine.state
+        let period3 = #"{"id":"p3","name":"Period 3 — Algebra II","enrollmentId":"e3"}"#
+        var listed = anas
+        listed.me = try me("ana", "Ana", period3)
+        phone.signed(in: true, as: "ana")
+        phone.synced(listed)
+        phone.synced(anas)
+        #expect(phone.sync?.me?.user.displayName == "Ana" && phone.everInClass)
+        // Ana signs out and back in: hers, kept for her.
+        phone.signed(in: false)
+        phone.signed(in: true, as: "ana")
+        #expect(phone.sync?.me?.user.displayName == "Ana" && phone.everInClass)
+        // Bea signs in: nothing of Ana's, at once — and none from the state still on its way.
+        phone.signed(in: false)
+        phone.signed(in: true, as: "bea")
+        #expect(phone.sync?.me == nil && phone.hasClasses == nil && !phone.everInClass)
+        phone.synced(anas)
+        #expect(phone.sync?.me == nil && !phone.everInClass)
+        // The engine has forgotten Ana's: Bea's own, once read, show.
+        try await until { await engine.state.me == nil }
+        var beas = await engine.state
+        phone.synced(beas)
+        #expect(phone.sync?.me == nil)
+        beas.me = try me("bea", "Bea")
+        phone.synced(beas)
+        #expect(phone.sync?.me?.user.displayName == "Bea" && !phone.everInClass)
         running.cancel()
         await running.value
     }
@@ -972,7 +1063,39 @@ struct AppTests {
     }
 
     @Test(
-        "Back lets the keyboard go before the screen moves (#150): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in"
+        "A screen leaving takes no touch (#161's review): a tap where its code field was lands elsewhere at once — under the fade's own transition, and kept on screen for the whole of a slow fade under its removal's modifier (`Opening.Replaced`), as SwiftUI may keep a screen leaving — so a fast tap meant for the screen arriving never starts what the one leaving would have. The fade's removal is that modifier, as its type says (santa's round 1)"
+    )
+    func leavingTakesNoTouch() async throws {
+        // Read from its type, as `historyLazy` reads History's.
+        #expect(String(reflecting: Opening.transition).contains("Opening.Replaced"))
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let kept = AnyTransition.asymmetric(
+            insertion: .identity,
+            removal: .modifier(
+                active: Opening.Replaced(gone: true), identity: Opening.Replaced(gone: false)))
+        for (transition, keeps) in [(Opening.transition, false), (kept, true)] {
+            let shown = Shown()
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.screen.bounds
+            window.rootViewController = UIHostingController(
+                rootView: Switching(shown: shown, transition: transition))
+            window.isHidden = false
+            defer { window.isHidden = true }
+            try await until { textFields(in: window).first != nil }
+            let field = try #require(textFields(in: window).first)
+            let frame = field.convert(field.bounds, to: window)
+            let center = CGPoint(x: frame.midX, y: frame.midY)
+            #expect(window.hitTest(center, with: nil)?.isDescendant(of: field) == true)
+            withAnimation(.linear(duration: 60)) { shown.field = false }
+            // A render later, the fade a minute from its end.
+            try await Task.sleep(for: .milliseconds(100))
+            if keeps { #expect(field.window != nil) }
+            #expect(window.hitTest(center, with: nil)?.isDescendant(of: field) != true, "\(keeps)")
+        }
+    }
+
+    @Test(
+        "Back lets the keyboard go before the screen moves (#150): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in — nor takes it back while Join fades out and after: looked at after each render, past the fade's end (#161's review)"
     )
     func backLetsKeyboardGo() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -991,6 +1114,16 @@ struct AppTests {
         let field = try #require(textFields(in: window).first)
         phone.back()
         #expect(phone.screen == .home && !field.isFirstResponder)
+        // Each render through the fade, which SwiftUI keeps Join for, its focus still asked for,
+        // and past its end: no field has the keyboard back.
+        var taken = false
+        let end = ContinuousClock.now + .milliseconds(600)
+        while ContinuousClock.now < end, !taken {
+            try await Task.sleep(for: .milliseconds(5))
+            taken =
+                field.isFirstResponder || textFields(in: window).contains { $0.isFirstResponder }
+        }
+        #expect(!taken)
     }
 
     @Test(
@@ -1391,36 +1524,48 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 /// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after
 /// that, a read on its way for good, until the test ends — and history pages from `pages`, in
 /// turn, the cursor each asked for kept; a page asked for with `hold` as its cursor answered only
-/// once the test lets it go. And Cognito's token endpoint, with `grant` where it is given (#147).
+/// once the test lets it go. And Cognito's token endpoint, with `grant` where it is given (#147);
+/// and join codes' look-ups and joins with `tries`, in turn, each only once the test lets it go,
+/// the path each asked at kept (Riders-2's review).
 private actor StandIn: HTTPTransport {
     private var me: String?
     private var pages: [String]
     private(set) var befores: [String?] = []
     private let hold: String?
-    private var held: CheckedContinuation<Void, Never>?
+    private var held: [CheckedContinuation<Void, Never>] = []
     private let grant: String?
+    private var tries: [(status: Int, body: String)]
+    private(set) var asked: [String] = []
 
-    init(me: String? = nil, pages: [String] = [], hold: String? = nil, grant: String? = nil) {
-        (self.me, self.pages, self.hold, self.grant) = (me, pages, hold, grant)
+    init(
+        me: String? = nil, pages: [String] = [], hold: String? = nil, grant: String? = nil,
+        tries: [(status: Int, body: String)] = []
+    ) {
+        (self.me, self.pages, self.hold, self.grant, self.tries) = (me, pages, hold, grant, tries)
     }
 
-    /// The page held, answered now.
+    /// The request held longest, answered now.
     func letGo() {
-        held?.resume()
-        held = nil
+        guard !held.isEmpty else { return }
+        held.removeFirst().resume()
     }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw URLError(.badURL) }
-        var body: String
+        var (status, body) = (200, "")
         switch url.path() {
+        case let path where !tries.isEmpty
+            && (path.hasPrefix("/v1/join-codes/") || path == "/v1/enrollments"):
+            (status, body) = tries.removeFirst()
+            asked.append(path)
+            await withCheckedContinuation { held.append($0) }
         case "/v1/me/history":
             let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
             let before = query?.first { $0.name == "before" }?.value
             befores.append(before)
             guard !pages.isEmpty else { throw URLError(.notConnectedToInternet) }
             body = pages.removeFirst()
-            if let hold, before == hold { await withCheckedContinuation { held = $0 } }
+            if let hold, before == hold { await withCheckedContinuation { held.append($0) } }
         case "/v1/me" where me != nil:
             (body, me) = (me ?? "", nil)
         case "/v1/me":
@@ -1432,7 +1577,7 @@ private actor StandIn: HTTPTransport {
         }
         guard
             let response = HTTPURLResponse(
-                url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+                url: url, statusCode: status, httpVersion: nil, headerFields: nil)
         else { throw URLError(.badURL) }
         return (Data(body.utf8), response)
     }
@@ -1580,4 +1725,27 @@ private func client(_ status: Int, _ body: String) -> APIClient {
     return APIClient(
         baseURL: URL(string: "https://api.bali.test")!, tokens: Signed(),
         transport: Answering(status: status, body: body))
+}
+
+/// What a screen's switch shows (`Switching`): a code field, as Join's, or not.
+@MainActor @Observable private final class Shown { var field = true }
+
+/// Two screens switched as `RootView` switches its own: a code field, as Join's, while `shown`
+/// says, else a line of text — under `transition`.
+private struct Switching: View {
+    let shown: Shown
+    let transition: AnyTransition
+
+    var body: some View {
+        ZStack {
+            Group {
+                if shown.field {
+                    TextField("Class code", text: .constant("KWX49Q")).frame(width: 200, height: 64)
+                } else {
+                    Text("Home")
+                }
+            }
+            .transition(transition)
+        }
+    }
 }

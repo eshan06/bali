@@ -54,7 +54,8 @@ struct LockedKeychainTests {
         #expect(await first(nobody.signedIn()) == false)
         #expect(await nobody.accessToken() == nil)
 
-        let saved = try JSONEncoder().encode(Tokens(access: jwt("a1"), refresh: "r", at: Date()))
+        let saved = try JSONEncoder().encode(
+            Tokens(access: jwt("a1"), refresh: "r", email: nil, at: Date()))
         let store = FixedStore { saved }
         let someone = SignIn(cognito: cognito, store: store, transport: endpoint)
         #expect(await first(someone.signedIn()) == true)
