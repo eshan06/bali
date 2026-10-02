@@ -131,6 +131,9 @@ public struct SyncState: Sendable, Hashable {
     /// The session protection off was last reported in, since the phone's last tap
     /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
     public var reportedOff: String?
+    /// The phone's newest tap, as the outbox file keeps it (`Outbox.lastTap`): a refused tap is
+    /// said only while it is this one (#146). Nil: the file names none.
+    public var lastTap: String?
     /// This phone's latest Emergency Unlock the server has recorded in a session, and its reason
     /// on record — the answer's, then each change's (A20): the Unlocked card's check, and what a
     /// pick changes once the record has left the phone (C5c), until the phone's next change.
@@ -294,6 +297,7 @@ public actor SyncEngine {
         state.queued = queued ?? []
         if queued == nil { state.link = .storageFailed }
         state.reportedOff = try? outbox.reportedOff()
+        state.lastTap = try? outbox.lastTap()
         do {
             state.standing = try outbox.standing()
             // An unlock not filed yet acts on it, and the first change files it (`keepStanding`) —
@@ -362,6 +366,8 @@ public actor SyncEngine {
             $0.standing = standing
             ($0.queued, $0.reportedOff) = (queued, reportedOff)
             ($0.refused, $0.superseded, $0.recordedUnlock) = (nil, nil, nil)
+            // The file's newest tap now, written with it.
+            if case .tap = change { $0.lastTap = record.eventId }
         }
         ring(.drain)
         return record
@@ -870,7 +876,12 @@ public actor SyncEngine {
     private func refreshQueue() { state.queued = queue() }
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
-    private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
+    /// With it, the phone's newest tap while not known — a read at launch that failed, say (santa's
+    /// round 1) — or a refused tap a later one went ahead of would be said again (#146).
+    private func queue() -> [OutboxRecord] {
+        if state.lastTap == nil, let lastTap = try? outbox.lastTap() { state.lastTap = lastTap }
+        return stored(outbox.records) ?? state.queued
+    }
 
     /// Writes the standing to the file — filing into it, in the same write, every unlock made where
     /// the phone stood unread, which then goes (B6b): whatever the file holds, never what a read of

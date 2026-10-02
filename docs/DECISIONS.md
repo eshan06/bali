@@ -8,6 +8,33 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F6 (#146): a refused tap is said only while it is the phone's newest tap**
+  (the conductor's default, under the owner's delegation). **Found** (the owner's device check): a
+  3:51 PM scan of a block no teacher registered (`NOCLASS123`, answered 404) was still said — "Bali
+  doesn't know a block you tapped…", with Try again — at 4:31 PM, on the Screen Time off screen of
+  another class, through later taps that counted. Home, Waiting and Protection off all read
+  `SyncState.refusedTapWords`, which followed the latest stuck tap in the outbox; a refused tap is
+  kept and retried until recorded (ARCHITECTURE, tap step 10), and an unregistered block's never
+  is, so the card never went and Try again could only be refused again. **The rule:** the card
+  shows only while that tap is the phone's newest; any later tap — scanned or typed, on its way,
+  recorded or refused in its turn (then its own words) — ends it. The newest tap is the outbox
+  file's own (`lastTap`, which every tap's write keeps since B6b; `Outbox.lastTap`), read into
+  `SyncState.lastTap` when the engine starts (and again with the queue while not known, should
+  that read fail: santa's round 1) and set as each tap is recorded, so a relaunch keeps the card
+  gone; a file that names none (a tap kept before B6b) leaves the latest stuck tap said, as
+  before. Shown until the student acts again is how a refused refocus is said already
+  (`SyncState.refused`, "until the phone's next change"); here only a tap counts.
+  **Unchanged:** the refused tap itself — kept, retried on its backoff and listed in the Debug
+  readout's `Outbox:` line, its unlocks filed as B6d files them; which screen shows; and every
+  unlock record, never dropped (`unlock-contract.ts`). **Not chosen** (the issue's other options,
+  left to the owner): dropping a 404-refused tap at the end of its school day, or a dismiss
+  button. **Tests**, red first: `TapInTests.refusedTapThenTapped` (the engine end to end — said,
+  a later tap on its way and joined, the refused one retried and refused again, a relaunch, then a
+  later refusal said in its own words) failed on `main` at the four places the card stayed;
+  `ScreenTests.refusedTapNewest`, the three wordings read with the file's newest tap
+  (`refusedTap`, `retriedTap`, `refusalKept`), Protection off's `carried` (the owner's case), and
+  `TapInTests.refusedTapUnreadAtLaunch` (santa's round 1, red first); each line of the fix turns
+  one red when removed. Fixtures `homeTapRefused` and `homeTapRefusedThenTapped`.
 - **2026-10-01** — **F4 (#141): History kept while the app runs, read again quietly each time it
   shows.** The owner's device check saw History open on its title alone for about a second at every
   visit: C6a-2 read it from the top each time the student came to it and forgot it whenever it went

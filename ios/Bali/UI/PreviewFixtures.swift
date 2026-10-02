@@ -168,6 +168,10 @@
                 protection: screenTimeOff(),
                 sync: standing(.inSession(period3, .protectionOff), me: nil, failed: .networkError)),
             "homeRefused": State(sync: refused(standing(.inSession(period3, nil)), .eventIdConflict)),
+            // A scan of a block no teacher set up (#146): said with Try again while it is the
+            // phone's newest tap; a tap since counted, it is kept and retried, and said no more.
+            "homeTapRefused": State(sync: refusedTap(standing(.out))),
+            "homeTapRefusedThenTapped": State(sync: refusedTap(standing(.out), tappedSince: true)),
             "sessionOver": State(sync: standing(.inSession(periodOver, .focused))),
             "storage": State(
                 problem: "The outbox could not be opened: SQLite error 14: unable to open database",
@@ -341,6 +345,67 @@
                 fatalError("A fixture's outbox failed: \(error)")
             }
             return state
+        }
+
+        /// `state` with a scan of a block no teacher set up, refused (404) and so kept — and,
+        /// `tappedSince`, a tap after it the server recorded (#146) — in an outbox of the fixture's
+        /// own, each answer sent through the real client and settled as the engine does: only an
+        /// outbox makes a stuck tap. On a task of its own, waited for, since a fixture is made at
+        /// once: nothing the send or the settle does waits on the main thread.
+        private static func refusedTap(_ state: SyncState, tappedSince: Bool = false) -> SyncState {
+            final class Made: @unchecked Sendable { var state: SyncState? }
+            let (made, done) = (Made(), DispatchSemaphore(value: 0))
+            Task.detached { [state] in
+                // As the API answers them (`contracts/fixtures/taps`): an unknown block, then a
+                // tap recorded whose class is over now.
+                let taps = [
+                    ("NOCLASS123", 404, #"{"error":{"code":"not_found","message":"unknown block"}}"#),
+                    ("T7XK2M9QPF", 200, #"{"outcome":"replay","session":null,"state":null}"#),
+                ].prefix(tappedSince ? 2 : 1)
+                var state = state
+                do {
+                    let outbox = try Outbox(
+                        at: FileManager.default.temporaryDirectory.appending(
+                            path: "fixture-\(UUID().uuidString).sqlite"))
+                    for (tag, status, body) in taps {
+                        let tap = try outbox.record(.tap(tagId: tag), now: Date())
+                        let answering = Answering(status: status, body: body)
+                        guard let sent = await tap?.send(through: answering.client) else {
+                            throw URLError(.unknown)
+                        }
+                        try outbox.settle(sent, now: Date())
+                        state.lastTap = tap?.eventId
+                    }
+                    state.queued = try outbox.records()
+                } catch {
+                    fatalError("A fixture's outbox failed: \(error)")
+                }
+                made.state = state
+                done.signal()
+            }
+            done.wait()
+            return made.state ?? state
+        }
+
+        /// The API as a fixture's stand-in answers every request: `status` and `body`, signed in.
+        private struct Answering: HTTPTransport, TokenProvider {
+            let status: Int
+            let body: String
+
+            var client: APIClient {
+                APIClient(
+                    baseURL: URL(string: "https://fixture.invalid")!, tokens: self, transport: self)
+            }
+
+            func accessToken() async -> String? { "fixture" }
+
+            func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                guard let url = request.url,
+                    let response = HTTPURLResponse(
+                        url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+                else { throw URLError(.badURL) }
+                return (Data(body.utf8), response)
+            }
         }
 
         /// `state` with this phone's unlock in Period 3 recorded by the server, at `reason` (C5c).

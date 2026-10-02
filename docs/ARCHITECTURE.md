@@ -466,7 +466,9 @@ with no finer meaning than its status carries none.
   deleted only on a `2xx`, and the phone shields only to a session the answer names —
   `armed` waits for Start, and a recorded tap or change naming none re-reads the truth;
   a refused tap (a `4xx` but `401`, `408`, `429`) is kept, retried and shown
-  (`tapDisposition`). A refused refocus or protection-off report is dropped and the truth
+  (`tapDisposition`) — shown while it is the phone's newest tap: once the student taps again,
+  that later tap is the one that counts, and the refused one is kept and retried unsaid
+  (decided 2026-10-01, #146). A refused refocus or protection-off report is dropped and the truth
   re-read, never resent — final for its `event_id` (`stateChangeDisposition`). A read — a
   check-in, `GET /v1/me` — never overrides a newer state change of the phone's
   (`readMayReconcile`). The one exception is a record stuck after repeated failures

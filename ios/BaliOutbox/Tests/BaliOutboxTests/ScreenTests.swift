@@ -6,15 +6,17 @@ import Testing
 
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
 /// and checked (never read approved before, `everApproved`), the engine standing `standing` with
-/// `queued`, and Home's tab chosen, unless said otherwise — nil for a sign-in, an enforcer or an
-/// engine that has not spoken. The permission is judged off as the enforcer judges it: denied at
-/// once, not determined only where `permissionOff` says it has lasted past B5a-2's grace.
+/// `queued` and its newest tap `lastTap`, and Home's tab chosen, unless said otherwise — nil for a
+/// sign-in, an enforcer or an engine that has not spoken. The permission is judged off as the
+/// enforcer judges it: denied at once, not determined only where `permissionOff` says it has lasted
+/// past B5a-2's grace.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, permissionOff: Bool? = nil, checked: Bool = true,
     shielded: Bool = false, everApproved: Bool = false, standing: Standing? = .out,
-    queued: [OutboxRecord] = [], hasClasses: Bool? = nil, sessionOverClosed: SessionView? = nil,
-    opened: [Screen] = [], tab: Screen = .home, now: Date = t0
+    queued: [OutboxRecord] = [], lastTap: String? = nil, hasClasses: Bool? = nil,
+    sessionOverClosed: SessionView? = nil, opened: [Screen] = [], tab: Screen = .home,
+    now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -29,6 +31,7 @@ private func screen(
         sync = SyncState()
         sync?.standing = standing
         sync?.queued = queued
+        sync?.lastTap = lastTap
     }
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
@@ -53,6 +56,20 @@ private func tabbed(
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
 private let later = session(endsAt: 4000)
+
+/// The engine's truth over `outbox` as the file gives it back: its queue, and the phone's newest
+/// tap (#146).
+private func read(_ outbox: Outbox) throws -> SyncState {
+    var state = SyncState()
+    (state.queued, state.lastTap) = (try outbox.records(), try outbox.lastTap())
+    return state
+}
+
+/// The API's answer to a tap of a block no teacher registered (`taps/404-unknown-block`), and what
+/// Home, Waiting and Protection off say of it.
+private let notFound = #"{"error":{"code":"not_found","message":"unknown block"}}"#
+private let unknownBlock =
+    "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
 
 @Suite("Which screen the app shows (C1a)")
 struct ScreenTests {
@@ -471,8 +488,7 @@ struct ScreenTests {
             let lost = try record(unsettled, .tap(tagId: "tag"))
             for _ in 1...Outbox.bound { try await send(unsettled, lost, 503) }
             try await send(unsettled, lost, status)
-            var state = SyncState()
-            state.queued = try unsettled.records()
+            var state = try read(unsettled)
             #expect(state.queued.first?.stuck == true && state.queued.first?.lastStatus == status)
             #expect(
                 state.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.",
@@ -481,7 +497,7 @@ struct ScreenTests {
             let tap = try record(outbox, .tap(tagId: "tag"))
             try await send(outbox, tap, 409, Answer.refused("event_id_conflict"))
             try await send(outbox, tap, status)
-            state.queued = try outbox.records()
+            state = try read(outbox)
             #expect(
                 state.refusedTapWords
                     == "Bali couldn't record a tap. Tap in again, or ask your teacher.",
@@ -494,18 +510,13 @@ struct ScreenTests {
     )
     func refusalKept() async throws {
         for (status, said) in [
-            (409, "Bali couldn't record a tap. Tap in again, or ask your teacher."),
-            (
-                404,
-                "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
-            ),
+            (409, "Bali couldn't record a tap. Tap in again, or ask your teacher."), (404, unknownBlock),
         ] {
             let (outbox, _) = try makeOutbox()
             let tap = try record(outbox, .tap(tagId: "tag"))
             try await send(outbox, tap, status, Answer.refused("event_id_conflict"))
             for _ in 1...Outbox.bound { try await send(outbox, tap, 503) }
-            var state = SyncState()
-            state.queued = try outbox.records()
+            let state = try read(outbox)
             let stuck = try #require(state.queued.first)
             #expect(stuck.lastStatus == 503 && stuck.answers > Outbox.bound, "\(status)")
             #expect(stuck.refusedStatus == status && state.refusedTapWords == said, "\(status)")
@@ -518,34 +529,63 @@ struct ScreenTests {
     func refusedTap() async throws {
         let (outbox, _) = try makeOutbox()
         let tap = try record(outbox, .tap(tagId: "tag"))
-        var state = SyncState()
-        state.queued = try outbox.records()
+        var state = try read(outbox)
         #expect(state.refusedTapWords == nil)
-        let unknown = #"{"error":{"code":"not_found","message":"unknown block"}}"#
-        try await send(outbox, tap, 404, unknown)
-        state.queued = try outbox.records()
+        try await send(outbox, tap, 404, notFound)
+        state = try read(outbox)
         #expect(state.queued.first?.stuck == true && state.pendingTap == nil)
-        #expect(
-            state.refusedTapWords
-                == "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
-        )
+        #expect(state.refusedTapWords == unknownBlock)
         let conflict = try record(outbox, .tap(tagId: "tag"))
         try await send(outbox, conflict, 409, Answer.refused("event_id_conflict"))
-        state.queued = try outbox.records()
+        state = try read(outbox)
         #expect(
             state.refusedTapWords
                 == "Bali couldn't record a tap. Tap in again, or ask your teacher.")
         let (unsettled, _) = try makeOutbox()
         let lost = try record(unsettled, .tap(tagId: "tag"))
         for _ in 1...8 { try await send(unsettled, lost, 503) }
-        state.queued = try unsettled.records()
+        state = try read(unsettled)
         #expect(state.queued.first?.stuck == true)
         #expect(state.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.")
         let (other, _) = try makeOutbox()
         let unlock = try record(other, .unlock(session: "s", reason: nil))
         try await send(other, unlock, 400, Answer.refused("invalid_request"))
-        state.queued = try other.records()
+        state = try read(other)
         #expect(state.queued.first?.stuck == true && state.refusedTapWords == nil)
+    }
+
+    @Test(
+        "A refused tap is said only while it is the phone's newest tap (#146): a later one on its way, or recorded and gone, leaves the refused tap kept, stuck and unsaid — and the screen chosen as before, Home, Waiting or Protection off; one refused in its turn is said in its own words; a file that names no tap leaves the latest stuck one said"
+    )
+    func refusedTapNewest() async throws {
+        let (outbox, _) = try makeOutbox()
+        let refused = try record(outbox, .tap(tagId: "NOCLASS123"))
+        try await send(outbox, refused, 404, notFound)
+        #expect(try read(outbox).refusedTapWords == unknownBlock)
+        let next = try record(outbox, .tap(tagId: "tag"))
+        var state = try read(outbox)
+        #expect(state.refusedTapWords == nil && state.pendingTap == next)
+        try await send(outbox, next, 200, Answer.joined())
+        state = try read(outbox)
+        #expect(state.queued.map(\.eventId) == [refused.eventId] && state.queued[0].stuck)
+        #expect(state.lastTap == next.eventId && state.refusedTapWords == nil)
+        let standings: [(Standing, Screen)] = [
+            (.out, .home), (.waiting, .waiting), (.inSession(later, .protectionOff), .protectionOff),
+        ]
+        for (standing, shown) in standings {
+            for newest in [refused.eventId, next.eventId] {
+                #expect(
+                    screen(standing: standing, queued: state.queued, lastTap: newest) == shown,
+                    "\(standing)")
+            }
+        }
+        state.lastTap = nil
+        #expect(state.refusedTapWords == unknownBlock)
+        let again = try record(outbox, .tap(tagId: "tag"))
+        try await send(outbox, again, 409, Answer.refused("event_id_conflict"))
+        #expect(
+            try read(outbox).refusedTapWords
+                == "Bali couldn't record a tap. Tap in again, or ask your teacher.")
     }
 
     @Test(
@@ -672,6 +712,58 @@ struct TapInTests {
         try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE outbox RENAME TO gone") }
         #expect(await rig.engine.tapIn(.block("T7XK2M9QPF")) == BlockRead.notKept)
         try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
+        await rig.stop()
+    }
+
+    @Test(
+        "A refused tap is said only while it is the phone's newest tap (#146, the owner's phone: a 3:51 PM scan of a block no teacher set up still said at 4:31 PM, in another class): a later tap — on its way, then joined — ends its card, the refused one still kept, retried, refused again and listed; a relaunch reads the phone's newest tap from the file, and says nothing; a tap after it refused in its turn is said in its own words"
+    )
+    func refusedTapThenTapped() async throws {
+        let rig = try Rig()
+        try await rig.engine.record(.tap(tagId: "NOCLASS123"))
+        try await rig.server.next(tapRoute).reply(404, notFound)
+        await rig.until { $0.refusedTapWords == unknownBlock }
+        try await rig.engine.record(.tap(tagId: "T7XK2M9QPF"))
+        #expect(await rig.engine.state.refusedTapWords == nil)
+        try await rig.server.next(tapRoute).reply(200, Answer.joined())
+        let joined = await rig.until { $0.standing == .inSession(session(), .focused) }
+        #expect(joined.refusedTapWords == nil)
+        #expect(joined.queued.map(\.change) == [.tap(tagId: "NOCLASS123")])
+        #expect(joined.queued.first?.stuck == true)
+        // Kept and retried on its backoff (2 s, no jitter), refused again: never said again.
+        rig.clock.advance(by: 2)
+        try await rig.server.next(tapRoute).reply(404, notFound)
+        let retried = await rig.until { $0.queued.first?.attempts == 2 }
+        #expect(retried.refusedTapWords == nil && retried.queued.count == 1)
+        await rig.stop()
+        let relaunched = try Rig(outbox: rig.outbox)
+        #expect(await relaunched.engine.state.queued.map(\.change) == [.tap(tagId: "NOCLASS123")])
+        #expect(await relaunched.engine.state.refusedTapWords == nil)
+        try await relaunched.engine.record(.tap(tagId: "T7XK2M9QPF"))
+        try await relaunched.server.next(tapRoute).reply(409, Answer.refused("event_id_conflict"))
+        await relaunched.until {
+            $0.refusedTapWords == "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        }
+        await relaunched.stop()
+    }
+
+    @Test(
+        "A launch whose read of the file failed reads the phone's newest tap again with the queue, once the file reads (santa's round 1): a refused tap a later one went ahead of is still not said"
+    )
+    func refusedTapUnreadAtLaunch() async throws {
+        let (outbox, _) = try makeOutbox()
+        let refused = try record(outbox, .tap(tagId: "NOCLASS123"))
+        try await send(outbox, refused, 404, notFound)
+        let next = try record(outbox, .tap(tagId: "T7XK2M9QPF"))
+        try await send(outbox, next, 200, Answer.joined())
+        try await outbox.pool.write { try $0.execute(sql: "ALTER TABLE outboxState RENAME TO gone") }
+        let rig = try Rig(outbox: outbox)
+        await rig.until { $0.link == .storageFailed }
+        try await outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outboxState") }
+        await rig.engine.retryNow()
+        let read = await rig.until { !$0.queued.isEmpty }
+        #expect(read.queued.map(\.eventId) == [refused.eventId] && read.lastTap == next.eventId)
+        #expect(read.refusedTapWords == nil)
         await rig.stop()
     }
 }
