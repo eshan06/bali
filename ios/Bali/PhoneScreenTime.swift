@@ -29,11 +29,16 @@ final class PhoneScreenTime: ScreenTime {
     }
 
     func permission() -> Permission {
-        switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved: .approved
-        case .denied: .denied
-        default: .notDetermined
-        }
+        let read: Permission =
+            switch AuthorizationCenter.shared.authorizationStatus {
+            case .approved: .approved
+            case .denied: .denied
+            default: .notDetermined
+            }
+        #if DEBUG
+            Self.timed(read)
+        #endif
+        return read
     }
 
     /// iOS's own prompt; what it threw in the screen's words (C1b).
@@ -88,13 +93,48 @@ final class PhoneScreenTime: ScreenTime {
         static var signals: String {
             let center = DeviceActivityCenter()
             let held = Bell.Name.allCases.map { name in
-                "\(name) \(center.heldEnd(name).flatMap(Calendar.current.date(from:)).map(time) ?? "none")"
+                "\(name) \(center.heldEnd(name).flatMap(Calendar.current.date(from:)).map(window) ?? "none")"
             }
             return "Family Controls reads \(AuthorizationCenter.shared.authorizationStatus)"
                 + " · iOS holds " + held.joined(separator: ", ")
         }
 
+        /// A window iOS holds, by its end — marked while it has not begun, every window being the
+        /// floor long: whether iOS reports one before it begins is what the enforcer's guard waits
+        /// on (`Enforcer.held`; F1's review).
+        static func window(_ end: Date) -> String {
+            time(end) + (end.addingTimeInterval(-Bell.floor) > Date() ? " (not begun)" : "")
+        }
+
         static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .standard) }
+
+        /// #145's device check: when Family Controls was first read since this launch, by how long
+        /// the phone has run, and how long after it a read first said other than not determined,
+        /// and what — the moment `Enforcer.grace` must outlast on a phone whose access is on.
+        private static var firstRead: TimeInterval?
+        private static var settled: (after: TimeInterval, read: Permission)?
+
+        static func timed(_ read: Permission) {
+            let now = ProcessInfo.processInfo.systemUptime
+            let first = firstRead ?? now
+            firstRead = first
+            if settled == nil, read != .notDetermined { settled = (now - first, read) }
+        }
+
+        /// The readout's `Launch:` line: how long Family Controls read not determined after this
+        /// launch — or so far, judged off once it lasts the grace.
+        static var launch: String {
+            guard let firstRead else { return "not read yet" }
+            guard let settled else {
+                let so = ProcessInfo.processInfo.systemUptime - firstRead
+                return "not determined for \(seconds(so)) so far — off at \(seconds(Enforcer.grace))"
+            }
+            return settled.after == 0
+                ? "\(settled.read) at the first read"
+                : "not determined for \(seconds(settled.after)), then \(settled.read)"
+        }
+
+        static func seconds(_ span: TimeInterval) -> String { String(format: "%.1f s", span) }
     }
 #endif
 

@@ -912,7 +912,7 @@ struct AppTests {
     }
 
     @Test(
-        "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for a check-in interval), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
+        "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
         let defaults = UserDefaults.standard
@@ -934,8 +934,8 @@ struct AppTests {
         #expect(phone.everApproved && Phone().everApproved && phone.screen == .home)
         phone.remember(read(.notDetermined))
         #expect(phone.everApproved && phone.screen == .home)
-        // Not determined for a check-in interval: never granted, or a grant that did not come back
-        // with a restored backup, which restores these defaults.
+        // Not determined for the grace: never granted, access off, or a grant that did not come
+        // back with a restored backup, which restores these defaults.
         phone.remember(read(.notDetermined, off: true))
         #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
         phone.remember(read(.approved))

@@ -52,10 +52,10 @@ public struct Protection: Sendable, Hashable {
     /// says the access is gone, which a running app's read never does (#144).
     public var permission = Permission.notDetermined
     /// The permission as the check judges it — off: denied, refused by iOS's DeviceActivity center
-    /// (#144), or not determined for a check-in interval of the phone's running (B5a-2) — a phone
-    /// never granted it, or whose grant did not come back with a restored backup — never a
-    /// launch's moment. What is reported as protection off in a session, and what ends
-    /// `Phone.everApproved` (C1b).
+    /// (#144), or not determined for `Enforcer.grace` of the phone's running (B5a-2, #145) — a
+    /// phone never granted it, whose access is off, or whose grant did not come back with a
+    /// restored backup — never a launch's moment. What is reported as protection off in a session,
+    /// and what ends `Phone.everApproved` (C1b).
     public var permissionOff = false
     /// Verified: the store holds the shields, and the permission keeps them there.
     public var shielded = false
@@ -111,6 +111,16 @@ extension SyncState {
 /// 3's check at each foreground wake of the engine — before each check-in, and out of a session
 /// too (C1c). The app has one.
 public actor Enforcer {
+    /// How long Family Controls' read may say not determined before the check judges the permission
+    /// off (B5a-2; #145): it can read so for a moment just after a launch, approved all along, and a
+    /// phone whose access is off reads so for good. With access on, "Checking Screen Time…" showed
+    /// about 2 s after a launch on the owner's iPhone (2026-10-01), the read settled within it: five
+    /// times that. The Debug readout's `Launch:` line shows how long it lasts on a phone, to tune it.
+    public static let grace: TimeInterval = 10
+    /// Within the grace, how soon a check of Family Controls' own not determined is made again: the
+    /// grace ends as iOS settles, or lasts, never waiting on the engine's next wake (#145).
+    static let recheckAfter: TimeInterval = 1
+
     let engine: SyncEngine
     let screenTime: any ScreenTime
     let clock: any SyncClock
@@ -127,9 +137,11 @@ public actor Enforcer {
     /// Callers of `enforce(awaited:)` waiting for the passes under way to end.
     private(set) var awaiting: [CheckedContinuation<Void, Never>] = []
     private var alarm: Task<Void, Never>?
+    /// Within the grace, the check made again `recheckAfter` on (#145); nil: none due.
+    private var recheck: Task<Void, Never>?
     /// When the checks in a row that read the permission not determined began, by how long the
     /// phone has run, which no setting of its clock moves; nil after any read that did not: a
-    /// check's, or a pass's.
+    /// check's, or a pass's — and once a doubt over an approved read is over (`unverified`).
     private var undetermined: TimeInterval?
     /// Whether the store's shields are ones this enforcer put on, not the last run's: over a
     /// standing not read, those — a pending tap's — still come off at the cap. The last run's never
@@ -143,11 +155,18 @@ public actor Enforcer {
     /// for again, iOS took it without holding it. Another app's grant changing ends them too
     /// (Apple's forums, thread 749120), but those are held again once asked for. Until a window iOS
     /// takes is held, or its prompt is answered, an approved read is judged not determined: B5a-2's
-    /// grace, then off.
-    private var unverified = false
+    /// grace, then off. Wherever the doubt ends — at a pass too, after its read was judged — the
+    /// run of not determined it was judged into ends with it, as at a read of approved, so a read
+    /// of not determined after it has a grace of its own (F1's review).
+    private var unverified = false {
+        didSet { if oldValue, !unverified, !unauthorized { undetermined = nil } }
+    }
     /// #144: iOS refused a window for want of the permission — its own word, where the read stays
-    /// approved — until it takes one again, or its prompt is answered: off at once.
-    private var unauthorized = false
+    /// approved — until it takes one again, or its prompt is answered: off at once. Its end ends
+    /// the run as `unverified`'s does.
+    private var unauthorized = false {
+        didSet { if oldValue, !unauthorized, !unverified { undetermined = nil } }
+    }
     /// A check asked the next pass to see whether iOS still holds the window it took (`verify`).
     private var verifying = false
 
@@ -160,6 +179,7 @@ public actor Enforcer {
         await engine.atEachWake { [weak self] in await self?.check() }
         for await _ in await engine.updates() { await enforce() }
         alarm?.cancel()
+        recheck?.cancel()
     }
 
     /// Rule 3's check, at each foreground wake of the engine's read loop and as the app comes to
@@ -167,16 +187,18 @@ public actor Enforcer {
     /// found off in a session whose row is not protection off already, and which the phone's own
     /// clock says is not over, is reported — once there (the outbox's), and again whenever the
     /// phone stands focused there (the engine's `record`, A13). Denied is off at once. Not
-    /// determined is off only once checks have read it so for a check-in interval of the phone's
-    /// running — two in a row: Family Controls can read it so for a moment just after a launch,
-    /// and a phone never granted the permission reads it so for good. Approved is judged by iOS's
-    /// DeviceActivity center too, at a pass of its own first (`verify`, `judged`; #144).
+    /// determined is off only once checks have read it so for `grace` of the phone's running:
+    /// Family Controls can read it so for a moment just after a launch, and a phone never granted
+    /// the permission, or whose access is off, reads it so for good — so meanwhile the check is
+    /// made again every `recheckAfter`, never waiting on the next wake (#145). Approved is judged by
+    /// iOS's DeviceActivity center too, at a pass of its own first (`verify`, `judged`; #144).
     public func check() async {
         if scheduled != nil, await screenTime.permission() == .approved {
             verifying = true
             await enforce(awaited: true)
         }
-        let (permission, refused) = judged(await screenTime.permission())
+        let read = await screenTime.permission()
+        let (permission, refused) = judged(read)
         undetermined = permission == .notDetermined ? undetermined ?? clock.uptime() : nil
         let off = permission == .denied || refused || undeterminedLasting
         var unreported: Bool? = false
@@ -191,12 +213,24 @@ public actor Enforcer {
         }
         if let unreported { protection.unreported = unreported }
         await enforce()
+        // Family Controls' own not determined, within the grace: checked again a second on, so the
+        // grace ends as iOS settles, or Screen Time off shows once it lasts. Not an approved read
+        // doubted (#144): checked, iOS's center would be asked for the window again each second.
+        // By `off` as judged above, not the grace read again: a pass that ended past the grace
+        // claims off, and the report must follow it (santa's round 1).
+        recheck?.cancel()
+        recheck = nil
+        guard read == .notDetermined, !off, undetermined != nil else { return }
+        recheck = Task { [weak self, clock] in
+            do { try await clock.sleep(until: clock.now() + Self.recheckAfter) } catch { return }
+            await self?.check()
+        }
     }
 
-    /// Whether checks have read the permission not determined for a check-in interval of the
-    /// phone's running: not a launch's moment (B5a-2).
+    /// Whether checks have read the permission not determined for the grace of the phone's running:
+    /// not a launch's moment (B5a-2, #145).
     private var undeterminedLasting: Bool {
-        undetermined.map { clock.uptime() - $0 >= SyncEngine.checkInInterval } == true
+        undetermined.map { clock.uptime() - $0 >= Self.grace } == true
     }
 
     /// Family Controls' `read` as the check judges it (#144): approved, while iOS's DeviceActivity
@@ -209,21 +243,31 @@ public actor Enforcer {
 
     /// #144, at the pass a check asked for: whether iOS's DeviceActivity center still holds
     /// `window`, the bell's window it took — only read, so nothing is stopped or replaced and the
-    /// monitor is not woken. Gone — more than a minute before its end, when iOS may have ended it
-    /// on its own clock — it is forgotten, so the pass asks for it again, and iOS's answer decides
-    /// (`apply`): a fresh start, iOS holding none, though `Bell.register` then stops the monitor's
-    /// own next wake, which wakes it once to ask nothing (B5b-5). Whether it was gone.
+    /// monitor is not woken. Gone (`held`) — more than a minute before its end, when iOS may have
+    /// ended it on its own clock — it is forgotten, so the pass asks for it again, and iOS's answer
+    /// decides (`apply`): a fresh start, iOS holding none, though `Bell.register` then stops the
+    /// monitor's own next wake, which wakes it once to ask nothing (B5b-5). Whether it was gone.
     private func verify(_ window: DateInterval?) async -> Bool {
         verifying = false
-        guard let window, window == scheduled, clock.now() < window.end - Bell.retry else {
-            return false
-        }
-        if await screenTime.holds(window) {
+        guard let window, window == scheduled, clock.now() < window.end - Bell.retry,
+            let held = await self.held(window)
+        else { return false }
+        guard !held else {
             unverified = false
             return false
         }
         scheduled = nil
         return true
+    }
+
+    /// Whether iOS's center holds `window`, the bell's — nil while it has not begun: iOS may not
+    /// report one not begun yet, which a class longer than the floor asks for (F1's review), so
+    /// then it says nothing either way: no doubt starts on it, and none ends (santa's round 1) —
+    /// the permission read alone judges, with a doubt a begun window started. The Debug
+    /// readout's `iOS:` line shows whether the phone reports one; if it does, this guard can go.
+    private func held(_ window: DateInterval) async -> Bool? {
+        guard window.start <= clock.now() else { return nil }
+        return await screenTime.holds(window)
     }
 
     /// Asks the student for the Screen Time permission — C1's onboarding — and enforces with what
@@ -293,7 +337,8 @@ public actor Enforcer {
         }
         let read = await screenTime.permission()
         // Ends a run of not determined at the read, as B5a-2 has it — never at the pass's end, over
-        // a check's newer read made meanwhile; an approved read doubted (#144) does not.
+        // a check's newer read made meanwhile; an approved read doubted (#144) does not, though the
+        // doubt's end does, wherever it comes (`unverified`).
         if judged(read).permission != .notDetermined { undetermined = nil }
         let inStore = await screenTime.isShielding()
         // B5b: iOS wakes the monitor at the end of the shields the store holds, for a closed app —
@@ -313,10 +358,11 @@ public actor Enforcer {
                 (scheduled, unscheduled) = (window, false)
                 // Taken, the permission is there (#144) — and where the bell's window was gone,
                 // held again, nothing was wrong (another app's grant changed, say); not held, the
-                // doubt stands. Refused otherwise, it is unscheduled, as any refusal: no doubt.
+                // doubt stands; not begun, nothing is known of it, and the doubt is as it was
+                // (`held`). Refused otherwise, it is unscheduled, as any refusal: no doubt.
                 if let window {
                     unauthorized = false
-                    if gone || unverified { unverified = await !screenTime.holds(window) }
+                    if gone || unverified, let held = await self.held(window) { unverified = !held }
                 }
             } catch {
                 unscheduled = true

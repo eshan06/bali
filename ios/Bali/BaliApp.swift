@@ -64,8 +64,8 @@ final class Phone {
     /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
     /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
     /// phone that gave it. The check judging the permission off clears it — denied, or not
-    /// determined for a check-in interval: a grant taken back, or one that did not come back with
-    /// a restored backup, which restores these defaults — so the grant screen returns.
+    /// determined for `Enforcer.grace`: a grant taken back, or one that did not come back with a
+    /// restored backup, which restores these defaults — so the grant screen returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
@@ -564,10 +564,12 @@ final class Phone {
                 Text("Standing: \(standing)")
                 Text("Screen Time: \(shields)")
                 // #144: the signals the check judges the permission by, read live every 5 s, and
-                // what its checks found — which flips when access is taken back with Bali running.
+                // what its checks found — which flips when access is taken back with Bali running;
+                // #145: how long Family Controls read not determined after this launch.
                 TimelineView(.periodic(from: .now, by: 5)) { _ in
                     Text("iOS: \(PhoneScreenTime.signals)")
                     Text("Found: \(found)")
+                    Text("Launch: \(PhoneScreenTime.launch)")
                 }
                 Button("Allow Screen Time") {
                     run {
