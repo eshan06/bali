@@ -551,6 +551,12 @@ final class Phone {
                 }
                 Text("Standing: \(standing)")
                 Text("Screen Time: \(shields)")
+                // #144: the signals the check judges the permission by, read live every 5 s, and
+                // what its checks found — which flips when access is taken back with Bali running.
+                TimelineView(.periodic(from: .now, by: 5)) { _ in
+                    Text("iOS: \(PhoneScreenTime.signals)")
+                    Text("Found: \(found)")
+                }
                 Button("Allow Screen Time") {
                     run {
                         try await enforcer.requestPermission()
@@ -651,6 +657,12 @@ final class Phone {
         }
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+
+        /// What the checks found of iOS's DeviceActivity center, newest first (#144).
+        private var found: String {
+            PhoneScreenTime.findings.isEmpty
+                ? "nothing" : PhoneScreenTime.findings.joined(separator: "\n")
+        }
 
         /// What the monitor did at its last wakes, newest first — which window woke it, too.
         private var monitor: String {

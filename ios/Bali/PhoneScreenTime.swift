@@ -1,4 +1,5 @@
 import BaliOutbox
+@preconcurrency import DeviceActivity
 @preconcurrency import FamilyControls
 import Foundation
 @preconcurrency import ManagedSettings
@@ -44,10 +45,58 @@ final class PhoneScreenTime: ScreenTime {
         }
     }
 
-    func schedule(_ window: DateInterval?) throws { try Bell.register(window) }
+    func schedule(_ window: DateInterval?) throws {
+        do {
+            try Bell.register(window)
+        } catch {
+            #if DEBUG
+                Self.found("window refused: \(error)")
+            #endif
+            if case .unauthorized? = error as? DeviceActivityCenter.MonitoringError {
+                throw ScreenTimeUnauthorized()
+            }
+            throw error
+        }
+    }
+
+    func holds(_ window: DateInterval) -> Bool {
+        let held = Bell.holds(window, as: .bell, in: DeviceActivityCenter())
+        #if DEBUG
+            if !held { Self.found("bell window to \(Self.time(window.end)) gone from iOS") }
+        #endif
+        return held
+    }
 
     func monitorUnscheduled() -> Date? { Bell.monitorUnscheduled }
 }
+
+#if DEBUG
+    /// #144's device check, for the Debug readout: what the enforcer's checks found of iOS's
+    /// DeviceActivity center, and the signals as iOS gives them now — which one flips when Screen
+    /// Time access is taken back with the app running.
+    extension PhoneScreenTime {
+        /// A bell window gone, a window refused: newest first, three kept.
+        static var findings: [String] = []
+
+        static func found(_ finding: String) {
+            findings = Bell.logged(
+                "\(Date().formatted(date: .omitted, time: .standard)) · \(finding)", in: findings)
+        }
+
+        /// Family Controls' read now — which a running app keeps after the access is taken back —
+        /// and the window iOS's center holds under each of Bali's names.
+        static var signals: String {
+            let center = DeviceActivityCenter()
+            let held = Bell.Name.allCases.map { name in
+                "\(name) \(center.heldEnd(name).flatMap(Calendar.current.date(from:)).map(time) ?? "none")"
+            }
+            return "Family Controls reads \(AuthorizationCenter.shared.authorizationStatus)"
+                + " · iOS holds " + held.joined(separator: ", ")
+        }
+
+        static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .standard) }
+    }
+#endif
 
 extension ScreenTimeAskError {
     /// Family Controls' error from the ask, in the screen's words: Don't Allow — the permission

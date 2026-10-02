@@ -190,9 +190,18 @@ public enum Bell {
         _ window: DateInterval, as name: Name, in center: some BellCenter,
         calendar: Calendar = .current
     ) throws -> Bool {
-        if let held = center.heldEnd(name), calendar.date(from: held) == window.end { return false }
+        if holds(window, as: name, in: center, calendar: calendar) { return false }
         try start(window, as: name, in: center, calendar: calendar)
         return true
+    }
+
+    /// Whether `center` holds a window ending at `window`'s end under `name`, read in `calendar` —
+    /// the app's to read, never the monitor's (`BellCenter.heldEnd`).
+    public static func holds(
+        _ window: DateInterval, as name: Name, in center: some BellCenter,
+        calendar: Calendar = .current
+    ) -> Bool {
+        center.heldEnd(name).flatMap(calendar.date(from:)) == window.end
     }
 
     /// Asks `center` to wake the monitor at `window`'s end under `name`, to the second in
