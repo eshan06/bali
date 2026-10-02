@@ -226,6 +226,13 @@ final class Phone {
     /// Whose tokens these are (`SignIn.account`), the last one known: another student's sign-in
     /// is known by it, whether or not the sign-out between them was seen.
     private var account: String?
+    /// The forgets of the last student's `me` asked of the engine (`signed`): a state counting
+    /// fewer (`SyncState.forgets`) was sent before the latest, so its `me` is not shown (#160's
+    /// review).
+    private var forgets = 0
+    /// Counts the changes of who is signed in (`signed`): a look-up or a join sent before one is
+    /// the last student's, so its answer is dropped (Riders-2's review).
+    private var signIns = 0
     /// Whose sign-in this is, as the tokens name it now (`SignIn.email`, #147): Me says it by Sign
     /// out, so the name a student's teachers see is never taken for it. Nil when nobody is signed
     /// in or the tokens name none — never the last student's.
@@ -243,11 +250,14 @@ final class Phone {
 
     /// Who is signed in, as the Keychain says — `account`, theirs, where the sign-in could say, and
     /// `email`, whose sign-in it is (#147): a change starts the tabs over at Home, and the history
-    /// read, a name being edited, a failed Sign out and a class code typed go with it; so, where
-    /// another student signs in, does the engine's `me` — keyed on the account (C6b-1's review): a
-    /// sign-out the stream let go by between two sign-ins is no matter. With no account to tell by,
-    /// on a sign-in after a sign-out. Another student's is never shown (C6a, C6b). Signed in, the
-    /// student's history is read at once, so even their first visit to History shows it (#141).
+    /// read, a name being edited, a failed Sign out and a class code typed go with it — a look-up
+    /// or a join on its way too, its answer dropped (Riders-2's review); so, where another student
+    /// signs in, does the engine's `me` — keyed on the account (C6b-1's review): a sign-out the
+    /// stream let go by between two sign-ins is no matter. With no account to tell by, on a sign-in
+    /// after a sign-out. Another student's is never shown (C6a, C6b), at any moment: gone from what
+    /// the phone shows at once, and from the engine's states until the engine has forgotten it too
+    /// (`synced`; #160's review). Signed in, the student's history is read at once, so even their
+    /// first visit to History shows it (#141).
     func signed(in signedIn: Bool?, as account: String? = nil, email: String? = nil) {
         let another =
             account.map { self.account != nil && $0 != self.account }
@@ -257,9 +267,16 @@ final class Phone {
             tab = .home
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
-            if !joining.busy { joining = Joining() }
+            (joining, signIns) = (Joining(), signIns + 1)
         }
-        if another { Task { await engine?.forgetMe() } }
+        if another {
+            sync?.me = nil
+            sync?.meFailed = nil
+            if let engine {
+                forgets += 1
+                Task { await engine.forgetMe() }
+            }
+        }
         if let account { self.account = account }
         (self.signedIn, self.email) = (signedIn, email)
         if changed, signedIn == true, !frozen { Task { await readHistory() } }
@@ -362,8 +379,9 @@ final class Phone {
     }
 
     /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —
-    /// a student in no class reaches no tab bar, so not Me: signed in with the wrong account, it is
-    /// their way out (the riders).
+    /// shown to a student in no class and never in one on this phone (#143), who reaches no tab
+    /// bar, so not Me: signed in with the wrong account, it is their way out (the riders). One
+    /// once in a class here lands on Home with its tab bar, Me among it.
     var offersSignOut: Bool { screen == .me || screen == .join && !canGoBack }
 
     /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
@@ -380,8 +398,11 @@ final class Phone {
     /// The engine's state as it comes: the screens opened over another end as `keepsOpened` says,
     /// a Join among them starting over unless it still shows, the router's own now (santa, 2) —
     /// and the tab chosen with them, Home again (C6a). A student listed in a class is kept as
-    /// one (#143).
+    /// one (#143). One sent before the engine forgot the last student's `me` comes without it
+    /// (`signed`; #160's review).
     func synced(_ state: SyncState) {
+        var state = state
+        if state.forgets < forgets { (state.me, state.meFailed) = (nil, nil) }
         if let me = state.me, !me.classes.isEmpty, me.user.id != inClass {
             keepInClass(me.user.id)
         }
@@ -427,30 +448,35 @@ final class Phone {
     func retry() async { await engine?.retryNow() }
 
     /// Looks the typed code up (`GET /v1/join-codes/{code}`), through the engine: what it opens, or
-    /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes.
-    /// A phone whose engine has not started — a frozen one too — says so (rule 5).
+    /// why not — the last try's words gone meanwhile, the code kept as sent until the answer comes,
+    /// unless who is signed in changed meanwhile: the code went with them, and the answer goes
+    /// too (`signed`). A phone whose engine has not started — a frozen one too — says so (rule 5).
     func lookUp() async {
         guard !joining.busy else { return }
         guard let engine else { return joining.failure = Joining.notStarted }
-        let code = joining.code
+        let (code, signIns) = (joining.code, self.signIns)
         (joining.failure, joining.busy) = (nil, true)
         let answer = await engine.lookUp(code)
+        guard signIns == self.signIns else { return }
         joining.busy = false
         joining.looked(answer, for: code)
     }
 
     /// Joins the class the code opens (`POST /v1/enrollments`), through the engine — its event id
     /// minted per press, as the server knows a join's retry by its enrollment: once in, the class
-    /// is the engine's at once, so the router moves on; else why not, said. A phone whose engine
-    /// has not started — a frozen one too — says so (rule 5).
+    /// is the engine's at once, so the router moves on; else why not, said — but not once who is
+    /// signed in has changed meanwhile (`signed`). A phone whose engine has not started — a frozen
+    /// one too — says so (rule 5).
     func join() async {
         guard !joining.busy else { return }
         guard let engine else { return joining.failure = Joining.notStarted }
-        let now = Date()
+        let (now, signIns) = (Date(), self.signIns)
         let request = EnrollmentJoinRequest(
             joinCode: joining.code, eventId: EventID.mint(at: now), deviceTime: now)
         (joining.failure, joining.busy) = (nil, true)
-        joined(await engine.join(request))
+        let answer = await engine.join(request)
+        guard signIns == self.signIns else { return }
+        joined(answer)
     }
 
     /// A join's answer: in, a Join opened over Home closes, back to what it was opened over; else

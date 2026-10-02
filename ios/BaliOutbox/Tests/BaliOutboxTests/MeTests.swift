@@ -269,18 +269,19 @@ struct MeEngineTests {
     }
 
     @Test(
-        "Someone signing in where someone signed out forgets the last student's `me` — their name and classes — at once, a read on its way with it, and reads it again; a name the last student set, answered after, is not kept"
+        "Someone signing in where someone signed out forgets the last student's `me` — their name and classes — at once, a read on its way with it, and reads it again; a name the last student set, answered after, is not kept. Each forget is counted, and every state after it carries the count, so the app knows one sent before it (#160's review)"
     )
     func forgetMe() async throws {
         let rig = try Rig()
         try await rig.foreground(Answer.me(nil, classes: [Answer.inClass("c")]))
+        #expect(await rig.engine.state.forgets == 0)
         async let answer = rig.engine.rename(request)
         let rename = try await rig.server.next(renameRoute)
         await rig.engine.setForeground(true)
         let before = try await rig.server.next(meRoute)
         await rig.engine.forgetMe()
         var state = await rig.engine.state
-        #expect(state.me == nil && state.hasClasses == nil)
+        #expect(state.me == nil && state.hasClasses == nil && state.forgets == 1)
         rename.reply(200, named("Eve Park"))
         _ = await answer
         before.reply(200, Answer.me(nil, classes: [Answer.inClass("c")]))
@@ -290,6 +291,9 @@ struct MeEngineTests {
         after.reply(200, Answer.me(nil, classes: [Answer.inClass("d")]))
         state = await rig.until { $0.me != nil }
         #expect(state.me?.classes.map(\.id) == ["d"] && state.me?.user.displayName == nil)
+        #expect(state.forgets == 1)
+        await rig.engine.forgetMe()
+        #expect(await rig.engine.state.forgets == 2)
         await rig.stop()
     }
 }

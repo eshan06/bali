@@ -116,7 +116,8 @@ struct Tokens: Codable, Sendable {
     let refresh: String
     /// The account's email, as the ID token in the same answer named it (#147): whose sign-in this
     /// is, for Me to say. Nil when it named none — and in tokens a build before it kept, until
-    /// their first renewal.
+    /// their first renewal. Asked for by `init`, with no default, so no way of making tokens can
+    /// leave it out unseen (#159's review).
     let email: String?
     /// Until when, by the phone's clock, the access token is given: its own lifetime from when it
     /// came, less a margin. The lifetime is `exp` − `iat`, both the server's clock, so a phone clock
@@ -125,7 +126,7 @@ struct Tokens: Codable, Sendable {
     /// renews it (`SignIn.refresh`).
     var until: Date
 
-    init(access: String, refresh: String, email: String? = nil, at now: Date) {
+    init(access: String, refresh: String, email: String?, at now: Date) {
         (self.access, self.refresh, self.email) = (access, refresh, email)
         until = Self.lifetime(of: access).map { now + $0 - SignIn.margin } ?? .distantFuture
     }

@@ -152,6 +152,10 @@ public struct SyncState: Sendable, Hashable {
     /// Why the last read of `GET /v1/me` gave no answer — none came, or a status with no body this
     /// build reads — until one does: said where its classes would be (rule 5), never read as none.
     public var meFailed: SendResult?
+    /// How many times `me` has been forgotten for another student's sign-in
+    /// (`SyncEngine.forgetMe`): a state counting fewer forgets than the app asked for was sent
+    /// before the last one, so its `me` is the last student's (#160's review).
+    public var forgets = 0
 
     /// Whether the student is in any class, as `me` says: nil until a read answers (C3).
     public var hasClasses: Bool? { me.map { !$0.classes.isEmpty } }
@@ -537,10 +541,11 @@ public actor SyncEngine {
 
     /// Someone signs in where someone signed out (C6b): the last student's `me` — their name and
     /// classes, another student's on a shared phone — is forgotten, a read on its way with it, and
-    /// read again. Nothing else: where the phone stands and its queue are the phone's (B4).
+    /// read again; counted in `forgets`, so the app knows a state sent before it. Nothing else:
+    /// where the phone stands and its queue are the phone's (B4).
     public func forgetMe() {
         meChanges += 1
-        update { ($0.me, $0.meFailed) = (nil, nil) }
+        update { ($0.me, $0.meFailed, $0.forgets) = (nil, nil, $0.forgets + 1) }
         reread()
     }
 
