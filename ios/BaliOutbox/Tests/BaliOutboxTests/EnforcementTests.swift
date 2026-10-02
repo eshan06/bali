@@ -859,6 +859,11 @@ struct RevokedWhileRunningTests {
     )
     func heldAfterAll() async throws {
         let (rig, phone) = try await focused()
+        let claims = Task {
+            var seen: [Protection] = []
+            for await claim in await phone.enforcer.updates() { seen.append(claim) }
+            return seen
+        }
         await phone.screenTime.revokeUnseen(silently: true)
         rig.clock.advance(by: 30)
         try await rig.server.next(checkInRoute).reply(200, Answer.live())
@@ -872,6 +877,34 @@ struct RevokedWhileRunningTests {
         try await rig.checkInDue(at(90))
         #expect(try rig.outbox.records().isEmpty)
         #expect(await !rig.server.waiting.contains(protectionOffRoute))
+        // Never a claim of approved and off at once, the doubt's old run notwithstanding.
+        claims.cancel()
+        #expect(!(await claims.value).contains { $0.permission == .approved && $0.permissionOff })
+        await phone.stop()
+    }
+
+    @Test(
+        "B5a-2's order kept: a pass ends a run of not determined at its own read, so a check's newer read made while the pass is under way is never lost to it — reported a check-in later, not two"
+    )
+    func runKeptOverPass() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded && $0.until == session().endsAt }
+        // A pass that has read the permission approved, held at its second read of the store.
+        await phone.screenTime.hold(after: 1)
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(503)
+        try await eventually { await phone.screenTime.holding }
+        // Family Controls reads not determined now, and a check begins its run.
+        await phone.screenTime.reads(.notDetermined)
+        await phone.enforcer.check()
+        await phone.screenTime.release()
+        await phone.until { $0.permission == .notDetermined }
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
         await phone.stop()
     }
 
@@ -930,8 +963,8 @@ struct RevokedWhileRunningTests {
             await phone.enforcer.check()
             returned.raise()
         }
-        // While that pass is held, the check cannot have judged.
-        try await Task.sleep(for: .milliseconds(200))
+        // The check waits on that pass: it cannot have judged.
+        try await eventually { await phone.enforcer.awaiting.count == 1 }
         #expect(!returned.value)
         await phone.screenTime.release()
         await checking.value

@@ -125,7 +125,7 @@ public actor Enforcer {
     private var enforcing = false
     private var again = false
     /// Callers of `enforce(awaited:)` waiting for the passes under way to end.
-    private var awaiting: [CheckedContinuation<Void, Never>] = []
+    private(set) var awaiting: [CheckedContinuation<Void, Never>] = []
     private var alarm: Task<Void, Never>?
     /// When the checks in a row that read the permission not determined began, by how long the
     /// phone has run, which no setting of its clock moves; nil after any read that did not: a

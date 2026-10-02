@@ -56,10 +56,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   and re-tapped, no second report; another app's grant, never off and the claim never wavering; a
   re-ask refused otherwise, never off (red first too); the schedule intact, never off and nothing
   asked; the last minute; and a relaunch over access taken back still waits out B5a-2's grace. From
-  santa's round 1, each red with the line it guards removed: a check made while a pass is held
-  waits for it and reports as it returns; a doubt ends when iOS holds the window after all, or
-  when the re-tap's window is held. B5a-2's run is ended at the pass's read again, as before, never
-  at its end over a check's newer read.
+  santa, each red with the line it guards removed: a check made while a pass is held waits for it
+  and reports as it returns; a doubt ends when iOS holds the window after all, or when the re-tap's
+  window is held, and no claim is ever approved and off at once; and B5a-2's run is ended at the
+  pass's read again, as before, never at its end over a check's newer read (`runKeptOverPass`).
+  **Santa** (two Claude reviewers, so they share a model family — Codex refuses every model on
+  this Mac): round 1, two blockers, both missing tests (the awaited check; how the doubt ends),
+  fixed red first, and its WARNs — the run's reset, the re-ask's wording, the device check's
+  timing; round 2, no blockers, its pins added. Left for the phone to show: an `unauthorized`
+  refusal is off at once (iOS's own word, by the conductor's ruling), and iOS's prompt answered
+  clears the doubt (else Protection off could never offer the re-tap).
 
 - **2026-10-01** — **F3 (#140): Unlocked's reasons picked at once — every reason open, one change
   on its way, the newest only.** The owner's device check: once the unlock had reached the server,
