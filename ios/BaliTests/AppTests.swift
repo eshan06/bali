@@ -146,6 +146,12 @@ struct AppTests {
             #expect(phone.screen == .home && card?.unlocked == unlocked, "\(name)")
             #expect((card?.retap != nil) == retap, "\(name)")
         }
+        // Waiting's Back to home (#151): the regular Home, its tab bar and no Back, its card the
+        // wait's — never C3c's.
+        let homeWaiting = Phone(fixture: try #require(PreviewFixtures.all["homeWaiting"]))
+        #expect(homeWaiting.screen == .home && homeWaiting.tabbed && !homeWaiting.canGoBack)
+        #expect(homeWaiting.sync?.waitingCard != nil)
+        #expect(homeWaiting.sync?.inSessionCard(at: Date()) == nil)
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
         var standing = SyncState()
@@ -283,13 +289,14 @@ struct AppTests {
     }
 
     @Test(
-        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c), History and Me, but while Me's name is edited (C6b) — never over Home opened over Waiting, the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History's read kept from one visit to the next (#141) and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — the history read kept, or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
+        "D1's tab bar (C6a) shows wherever the router honours a tab — its own Home, Home opened over Unlocked (C5c) or over Waiting (#151), History and Me, but while Me's name is edited (C6b) — never over the last run's shields' Home, Waiting, Join or a session's screens; a tab chosen shows its screen, History's read kept from one visit to the next (#141) and as it was when chosen again while it shows (santa's round 1); the tab is Home again once the screens opened close — the standing changed — the history read kept, or who is signed in changes, the history read gone with it; a read that keeps them keeps the tab; Me's Join a class has its way back to Me (C6b)"
     )
     func tabs() async throws {
         let (homes, editing) = (
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
+                "homeWaiting",
             ],
             ["meEditing", "meNameError"]
         )
@@ -740,7 +747,7 @@ struct AppTests {
     }
 
     @Test(
-        "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it, and Join over that Home in turn, Back returning to each (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
+        "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens the regular Home over it (#151), and Join over that Home in turn, Back returning to that Home (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
     )
     func opened() async throws {
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
@@ -753,14 +760,11 @@ struct AppTests {
         let state = try #require(waiting.sync)
         waiting.open(.home)
         waiting.synced(state)
-        #expect(waiting.screen == .home)
+        #expect(waiting.screen == .home && waiting.tabbed && !waiting.canGoBack)
         waiting.open(.join)
-        #expect(waiting.screen == .join)
+        #expect(waiting.screen == .join && waiting.canGoBack)
         waiting.back()
-        #expect(waiting.screen == .home)
-        waiting.back()
-        #expect(waiting.screen == .waiting)
-        waiting.open(.home)
+        #expect(waiting.screen == .home && waiting.tabbed && !waiting.canGoBack)
         waiting.open(.join)
         waiting.joining.type("KWX")
         var out = state
@@ -792,21 +796,66 @@ struct AppTests {
     }
 
     @Test(
-        "Home opened over Waiting has a way back to it while the phone waits (#114's review), as Join opened over Home has; the router's own Home and Waiting have none, nor one the router shows over it"
+        "Join opened over Home has a way back to it; Home opened over Waiting has none — it is the regular Home, its card saying the wait (#151, the owner's decision; #114's review had drawn one); the router's own Home and Waiting have none, nor one the router shows over it"
     )
     func wayBack() throws {
         let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
         #expect(!waiting.canGoBack)
         waiting.open(.home)
-        #expect(waiting.screen == .home && waiting.canGoBack)
-        waiting.back()
-        #expect(waiting.screen == .waiting && !waiting.canGoBack)
+        #expect(waiting.screen == .home && !waiting.canGoBack)
         #expect(!Phone(fixture: try #require(PreviewFixtures.all["home"])).canGoBack)
         #expect(Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"])).canGoBack)
         // Opened over Home, but the shields on: focus, which has no way back.
         let focused = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
         focused.open(.join)
         #expect(focused.screen == .focus && !focused.canGoBack)
+    }
+
+    @Test(
+        "Waiting's Back to home, then the Start (#151): Home — or History or Me, chosen there — goes to Focus once the read finds the Start, the Home closed and the tab Home again; Bali opened again while waiting, nothing opened kept, lands on Waiting, the tap's answer"
+    )
+    func startFromHomeWaiting() throws {
+        let waiting = try #require(PreviewFixtures.all["waiting"])
+        for tab in [Screen.home, .history, .me] {
+            let phone = Phone(fixture: waiting)
+            phone.open(.home)
+            phone.select(tab)
+            #expect(phone.screen == tab && phone.tabbed, "\(tab)")
+            var started = try #require(phone.sync)
+            started.standing = .inSession(
+                SessionView(id: "s", classId: "p3", endsAt: Date() + 600), .focused)
+            phone.synced(started)
+            #expect(phone.screen == .focus && !phone.tabbed, "\(tab)")
+            #expect(phone.opened.isEmpty && phone.tab == .home, "\(tab)")
+        }
+        let opened = Phone(fixture: waiting)
+        #expect(opened.screen == .waiting && !opened.tabbed && !opened.canGoBack)
+    }
+
+    @Test(
+        "Waiting fits the smallest iPhone — the iPhone 17e's 390 × 844 less its safe areas, 47 pt above and 34 below — at the default text size, Back to home included, with its one card or a failed read said too (#149); once the text outgrows the screen, it scrolls"
+    )
+    func waitingFits() throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let cases: [(String, DynamicTypeSize)] = [
+            ("waiting", .large), ("waitingError", .large), ("waiting", .accessibility2),
+        ]
+        for (name, size) in cases {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let hosting = UIHostingController(
+                rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+            // The safe areas given by the frame, whatever phone runs the tests.
+            hosting.safeAreaRegions = []
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: 390, height: 844 - 47 - 34)
+            window.rootViewController = hosting
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            let scroll = try #require(scrollViews(in: window).first, "\(name)")
+            let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
+            #expect((content <= shown + 0.5) == (size == .large), "\(name), \(size): \(content) in \(shown)")
+        }
     }
 
     @Test(

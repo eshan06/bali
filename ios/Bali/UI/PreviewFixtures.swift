@@ -59,7 +59,8 @@
             "homeError": State(sync: standing(.out, me: nil, failed: .networkError)),
             "homeUnread": State(sync: standing(.unread)),
             "homeUnreadShielded": State(protection: shielded(), sync: standing(.unread)),
-            "homeFromWaiting": State(sync: standing(.waiting), opened: [.home]),
+            // Waiting's Back to home (#151): the regular Home, its card saying the wait.
+            "homeWaiting": State(sync: standing(.waiting), opened: [.home]),
             "waiting": State(sync: standing(.waiting)),
             "waitingError": State(sync: standing(.waiting, failed: .networkError)),
             "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),

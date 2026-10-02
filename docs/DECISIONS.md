@@ -8,6 +8,37 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F7 (#151, #149): Waiting's Back to home goes to the regular Home, whose card
+  says the wait; and Waiting fits the smallest iPhone.** **Found** (the owner's device check):
+  Back to home opened Home *over* Waiting (C3b's `(.waiting, .home)`) with a back arrow, no tab
+  bar, and the usual "Tap your teacher's block" card, as if the student had not tapped. **The
+  owner's decision (2026-10-01):** keep Waiting as the screen right after the tap (the issue's
+  default; the other option, Home's card replacing Waiting entirely, not chosen); Back to home goes
+  to the regular Home — its tab bar, no back arrow — with a card saying the student is tapped in
+  and waiting for class to start, in place of the tap card. **Built:** the router keeps Home
+  opened over Waiting as its input (`opened`, so `keepsOpened` still ends it at a Start or a new
+  tap) and treats it as Home opened over Unlocked is, tabbed, History and Me honoured;
+  `Phone.canGoBack` draws no Back to Waiting (C4b's Back, from #114's review, reversed). The card
+  (`SyncState.waitingCard`) is C3c's look: a Waiting chip in the not-in look with a clock (as
+  Focus's offline chip borrows it), the owner's suggested words, "You're tapped in. Your phone
+  locks when class starts, as long as Bali is open.", and Tap in, secondary. **Tap in kept (the
+  worker's default, for the owner to confirm):** only a Start or another tap ends the wait — no
+  read shows an armed tap, so a block tapped by mistake, or a Start that never comes, leaves the
+  phone waiting until the next tap — and Waiting draws no Tap in (D1), so without it on Home a
+  waiting student could never tap again. A read of the classes that failed is said under the card,
+  as under C3c's: the Start is found by that read. **Bali opened again while waiting** lands on
+  Waiting, the tap's answer: the standing is kept in the file and nothing opened is. Back from the
+  background, the student is where they were. Decision 6's read is the engine's, whatever the
+  screen; the Start found is Focus. **#149:** Waiting overflowed the owner's iPhone 15 Pro once a
+  refused-tap card showed beside D1's, Back to home under the home indicator, while the space above
+  the ring stayed large. It is now laid out as C4's Focus is: D1's two groups (the ring and its
+  words; the cards and Back to home) at their own heights, at least 24 pt apart, the cards 16 apart
+  (were 24), and only the spacers give, the one above the ring first (to D1's 16 pt under the
+  status bar), so a second card fits the iPhone 17e (390 × 844) at the default text size; larger
+  text scrolls. **Tests:** `ScreenTests.homeWaiting` and `.tabs`, `WaitingHomeTests.startFromHome`
+  (red first on the router); `AppTests.startFromHomeWaiting`, `.waitingFits` (red first: 782.7 pt
+  in the 17e's 747 with a failed read said), `.opened`, `.wayBack`, `.fixtures`. Fixture
+  `homeFromWaiting` renamed `homeWaiting`.
 - **2026-10-01** — **F2 (#145): Screen Time off within 10 s of a launch with access off — the
   check made again every second within the grace — and F1's review's two WARNs.** **Found** (the
   owner's device check, iPhone 15 Pro, iOS 18.6.2): opening Bali in a running class with Screen

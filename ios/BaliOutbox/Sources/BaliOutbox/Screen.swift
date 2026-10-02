@@ -24,14 +24,15 @@ public enum Screen: Sendable, Hashable {
     /// the session whose Session over the student closed, as it was then — its bell moved since, an
     /// extension, it is another's to close (C5b; its review); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
-    /// Back to home), Join over Home (Home's Join a class, with a way back) — each shown only while
-    /// the one under it shows, never over anything else — and Home over Unlocked, its primary way
-    /// on (C5c); `tab`, the one chosen in D1's tab bar (C6a) — History or Me in place of the
-    /// router's own Home with nothing opened over it, or of a Home opened over Unlocked, and
-    /// nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it,
-    /// the sign-in, the intro, Screen Time, nor the home the last run's shields keep (B6b). And
-    /// whether the tab bar shows: wherever a tab is honoured — in the same answer, at the same
-    /// `now`, so the screen and its bar never disagree, at a bell either (C6a's review).
+    /// Back to home: the regular Home, its card saying the wait; #151), Join over Home (Home's Join
+    /// a class, with a way back) — each shown only while the one under it shows, never over
+    /// anything else — and Home over Unlocked, its primary way on (C5c); `tab`, the one chosen in
+    /// D1's tab bar (C6a) — History or Me in place of the router's own Home with nothing opened
+    /// over it, or of a Home opened over Unlocked or Waiting, and nowhere else: never over the
+    /// shields, a session's screens, Waiting itself, the sign-in, the intro, Screen Time, nor the
+    /// home the last run's shields keep (B6b). And whether the tab bar shows: wherever a tab is
+    /// honoured — in the same answer, at the same `now`, so the screen and its bar never disagree,
+    /// at a bell either (C6a's review).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: SessionView?,
@@ -54,12 +55,13 @@ public enum Screen: Sendable, Hashable {
         if !signedIn { return (.signIn, false) }
         var shown = settled(sync, protection, everApproved, hasClasses, sessionOverClosed, now)
         // Home with its tab bar: the router's own, or opened over Unlocked — its primary way
-        // on, the apps still open (the owner's ruling, 2026-09-30; C5c).
+        // on, the apps still open (the owner's ruling, 2026-09-30; C5c) — or over Waiting, the
+        // regular Home there (the owner's decision, 2026-10-01; #151). Join opened has none.
         var tabbed = shown == .home
         for screen in opened {
             switch (shown, screen) {
             case (.home, .join), (.waiting, .home), (.unlocked, .home):
-                (tabbed, shown) = (shown == .unlocked, screen)
+                (tabbed, shown) = (screen == .home, screen)
             // A Home opened over a screen that has since become Home itself — Unlocked's, after
             // its bell (santa's round 1) — is that Home: no screen of its own.
             case (.home, .home): continue
@@ -216,6 +218,15 @@ extension SyncState {
                 words: "\(running.name) is in session. Tap your teacher's block to join.")
         case .inSession, .waiting, .unread: return nil
         }
+    }
+
+    /// What Home's card says while the phone waits for its teacher's Start (#151; the owner's
+    /// decision, 2026-10-01): Waiting's Back to home lands on the regular Home, which says the tap
+    /// counted and when the phone locks, in the hero's place — as C3c's card does — never "Tap
+    /// your teacher's block" as if it had not. Nil otherwise.
+    public var waitingCard: String? {
+        standing == .waiting
+            ? "You're tapped in. Your phone locks when class starts, as long as Bali is open." : nil
     }
 
     /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in

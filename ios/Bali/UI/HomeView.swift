@@ -7,7 +7,8 @@ import SwiftUI
 /// phone could not read or record is said with Try again (rule 5); where it stood unread with the
 /// last run's shields on, Emergency Unlock is here (B6b, C4). D1's tab bar under it is the
 /// router's to show (C6a, `RootView`). A class of theirs in session, the student not focused in
-/// it, its card takes the hero's place (C3c).
+/// it, its card takes the hero's place (C3c) — and so, waiting for their teacher's Start, does the
+/// wait's (#151).
 struct HomeView: View {
     let phone: Phone
     /// The card's bell, rung: the card goes then, by the phone's clock (C3c).
@@ -20,9 +21,10 @@ struct HomeView: View {
     var body: some View {
         let _ = rung
         let card = phone.sync?.inSessionCard(at: Date())
+        let waiting = phone.sync?.waitingCard
         ScreenScaffold {
-            // Opened over Waiting: back to "Ready — waiting for your teacher" (#114's review),
-            // above the scroll as Join's is, so it never scrolls away.
+            // Opened over Unlocked: back to it (C5c), above the scroll as Join's is, so it never
+            // scrolls away. Never to Waiting: its Home is the regular one (#151).
             if phone.canGoBack { BackButton { phone.back() } }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -32,7 +34,7 @@ struct HomeView: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(me?.user.displayName.map { "Hi, \($0)" } ?? "Hi there").textStyle(.h1)
-                        if card == nil {
+                        if card == nil, waiting == nil {
                             Text("Ready when your class is.").textStyle(.bodyLg)
                                 .foregroundStyle(Theme.textSecondary)
                         }
@@ -60,13 +62,18 @@ struct HomeView: View {
                             Retry(words: stuck, phone: phone)
                         }
                         inSession(card)
-                        // A read of the classes that did not go: the card may be older than it
-                        // says (santa's round 1) — said by the classes themselves while none is read.
-                        if phone.sync?.me != nil, let failed = phone.sync?.meWords {
-                            Retry(words: failed, phone: phone)
-                        }
+                    } else if let waiting {
+                        waitingCard(waiting)
                     } else {
                         tapIn
+                    }
+                    // A read of the classes that did not go: a card may be older than it says
+                    // (santa's round 1), and the wait's Start is found by that read (decision 6),
+                    // as Waiting says — said by the classes themselves while none is read.
+                    if card != nil || waiting != nil, phone.sync?.me != nil,
+                        let failed = phone.sync?.meWords
+                    {
+                        Retry(words: failed, phone: phone)
                     }
                     // A Back to focus refused, in a class this build knows no state of (C5b) —
                     // unlocked there, the card says it (santa's round 2).
@@ -121,6 +128,21 @@ struct HomeView: View {
         .task(id: card.bell) {
             await Screen.bell(card.bell, change: UIApplication.significantTimeChangeNotification)
             if !Task.isCancelled { rung = card.bell }
+        }
+    }
+
+    /// Waiting for the teacher's Start (#151; the owner's decision, 2026-10-01), in C3c's look: the
+    /// wait's chip, what is true — the tap counted, and when the phone locks — and Tap in,
+    /// secondary: only a Start or another tap ends the wait, so a block tapped by mistake, or a
+    /// Start that never comes, is never a dead end.
+    private func waitingCard(_ words: String) -> some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                Chip(kind: .notIn, icon: "clock", text: "Waiting")
+                Text(words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
+                TapIn(phone: phone, primary: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
