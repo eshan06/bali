@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F9 (#147): Me says whose sign-in this is.** On the owner's phone, a name
+  changed to an email was expected to sign in; the name is only what teachers see, and the
+  account's email showed nowhere. **Words and place:** "You're signed in as <email>." under Sign
+  out, a caption in `text-tertiary`: Sign out's helper, as "Your teachers see this name." is the
+  name's, any sign-out failure under it. DESIGN.md's voice (second person, a sentence) over the
+  issue's e.g. "Signed in as …"; D1's Me otherwise unchanged; Join's Sign out (a student in no
+  class) says none, not asked for. **Source:** the `email` claim of Cognito's ID token, which the
+  token endpoint already returned with every sign-in and renewal (scope `openid email profile`)
+  and the phone dropped: read unverified, shown only (as `SignIn.account` reads `sub`), and kept in
+  the Keychain record beside the tokens. Not `GET /v1/me` (a server change, and a read, for a fact
+  the phone holds); not the access token's `username` (a UUID in a pool that signs in by email).
+  Checked on dev: the phone's client grants `email`, and the demo accounts' `email` is their
+  username. **Edges:** a renewal naming none keeps the same account's, as the refresh token is
+  kept; tokens a build before kept name none, so nothing is said until their first renewal (within
+  the hour on dev), never a guess; another student's sign-in shows theirs or none, never the last
+  one's. **Out of scope:** changing the sign-in email from the app; a starting name from the
+  account's `name` (dev's demo accounts carry one; real students' pool unchecked).
 - **2026-10-01** — **F7 (#151, #149): Waiting's Back to home goes to the regular Home, whose card
   says the wait; and Waiting fits the smallest iPhone.** **Found** (the owner's device check):
   Back to home opened Home *over* Waiting (C3b's `(.waiting, .home)`) with a back arrow, no tab

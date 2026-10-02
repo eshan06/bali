@@ -6,10 +6,10 @@ import UIKit
 /// Me (C6b; D1's Me), where the router sends the Me tab: the name the student's teachers see,
 /// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
 /// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
-/// and what a teacher sees (the intro's own page); and Sign out, which waits while an Emergency
-/// Unlock is unsent (`SignOutWords`); and D1's Leave on each class, asked first, never while the
-/// phone stands in that class's lesson (C6c, `Leaving`). Every failure is said with its way on
-/// (rule 5).
+/// and what a teacher sees (the intro's own page); and Sign out, whose sign-in it ends said under
+/// it (#147), which waits while an Emergency Unlock is unsent (`SignOutWords`); and D1's Leave on
+/// each class, asked first, never while the phone stands in that class's lesson (C6c, `Leaving`).
+/// Every failure is said with its way on (rule 5).
 struct MeView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
@@ -39,7 +39,7 @@ struct MeView: View {
                     }
                     ClassesSection(phone: phone, title: "Classes", leaves: true)
                     about
-                    SignOutButton(phone: phone)
+                    SignOutButton(phone: phone, email: phone.email)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -178,9 +178,12 @@ struct MeView: View {
 
 /// D1's Sign out — held while an Emergency Unlock is unsent, said why with Try again — and why the
 /// last did not finish (C6b): Me's, and Join's where a student in no class reaches nothing else
-/// (`Phone.offersSignOut`).
+/// (`Phone.offersSignOut`). On Me, whose sign-in it ends, under it (#147).
 struct SignOutButton: View {
     let phone: Phone
+    /// The email of the sign-in Sign out ends, said under it as its helper (Me's, #147); nil says
+    /// nothing.
+    var email: String?
 
     var body: some View {
         let held = phone.sync.flatMap(SignOutWords.held)
@@ -190,6 +193,9 @@ struct SignOutButton: View {
                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary).frame(minHeight: 44)
                 .disabled(held != nil).opacity(held == nil ? 1 : 0.6)
+            if let signedIn = SignOutWords.signedIn(email) {
+                Text(signedIn).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+            }
             // Held, the hold is the one reason said: a failure from before it is not (C6b-1's
             // review).
             if held == nil, let failed = phone.signOutFailed { Text(failed).textStyle(.body) }

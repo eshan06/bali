@@ -263,6 +263,11 @@ struct AppTests {
         #expect(me.sync.flatMap(SignOutWords.held) == nil)
         let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
         #expect(notOut.signOutFailed == SignOutWords.failed)
+        // Whose sign-in this is (#147): Ana's email on every Me, said by its Sign out.
+        for (name, state) in PreviewFixtures.all {
+            let said = name.hasPrefix("me") ? "You're signed in as ana.rodriguez@bali.test." : nil
+            #expect(SignOutWords.signedIn(Phone(fixture: state).email) == said, "\(name)")
+        }
         // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
         let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
         #expect(off.screen == .me && off.tabbed && off.protection?.permissionOff == true)
@@ -561,6 +566,42 @@ struct AppTests {
         await phone.signOut()
         #expect(phone.signOutFailed == nil && keychain.empty)
         #expect(await phone.signIn?.account() == nil)
+    }
+
+    @Test(
+        "Me says whose sign-in this is (#147), through the phone's own sign-in: the email its tokens name, read with who is signed in at each change; none once signed out; and another student's sign-in shows theirs, or none where their tokens name none — never the last one's"
+    )
+    func signedInAs() async throws {
+        let (phone, _) = try standIn(StandIn(), keychain: Keychain(account: "ana", email: "ana@bali.test"))
+        let signIn = try #require(phone.signIn)
+        let following = Task { await phone.follow(signIn) }
+        try await until { phone.email != nil }
+        #expect(phone.signedIn == true && phone.email == "ana@bali.test")
+        await phone.signOut()
+        try await until { phone.signedIn == false }
+        #expect(phone.email == nil)
+        following.cancel()
+        await following.value
+        phone.signed(in: true, as: "ana", email: "ana@bali.test")
+        phone.signed(in: true, as: "bea", email: "bea@bali.test")
+        #expect(phone.email == "bea@bali.test")
+        phone.signed(in: true, as: "cara")
+        #expect(phone.email == nil)
+        // Tokens naming no email — kept by a build before #147 — say nothing, until a renewal's ID
+        // token names one: the same student's, Me then says it (santa's round 1).
+        let email = Data(#"{"sub":"ana","email":"ana@bali.test"}"#.utf8).base64EncodedString()
+            .replacingOccurrences(of: "=", with: "")
+        let server = StandIn(grant: #"{"access_token":"a2","id_token":"h.\#(email).s"}"#)
+        let (upgraded, _) = try standIn(server)
+        let upgradedSignIn = try #require(upgraded.signIn)
+        let quiet = Task { await upgraded.follow(upgradedSignIn) }
+        try await until { upgraded.signedIn == true }
+        #expect(upgraded.email == nil)
+        #expect(await upgradedSignIn.refresh())
+        try await until { upgraded.email != nil }
+        #expect(upgraded.email == "ana@bali.test" && upgraded.signedIn == true)
+        quiet.cancel()
+        await quiet.value
     }
 
     @Test(
@@ -1214,16 +1255,17 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 /// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after
 /// that, a read on its way for good, until the test ends — and history pages from `pages`, in
 /// turn, the cursor each asked for kept; a page asked for with `hold` as its cursor answered only
-/// once the test lets it go.
+/// once the test lets it go. And Cognito's token endpoint, with `grant` where it is given (#147).
 private actor StandIn: HTTPTransport {
     private var me: String?
     private var pages: [String]
     private(set) var befores: [String?] = []
     private let hold: String?
     private var held: CheckedContinuation<Void, Never>?
+    private let grant: String?
 
-    init(me: String? = nil, pages: [String] = [], hold: String? = nil) {
-        (self.me, self.pages, self.hold) = (me, pages, hold)
+    init(me: String? = nil, pages: [String] = [], hold: String? = nil, grant: String? = nil) {
+        (self.me, self.pages, self.hold, self.grant) = (me, pages, hold, grant)
     }
 
     /// The page held, answered now.
@@ -1248,6 +1290,8 @@ private actor StandIn: HTTPTransport {
         case "/v1/me":
             try await Task.sleep(for: .seconds(3600))
             throw URLError(.cancelled)
+        case "/oauth2/token" where grant != nil:
+            body = grant ?? ""
         default: throw URLError(.notConnectedToInternet)
         }
         guard
@@ -1337,20 +1381,22 @@ private func page(_ ids: [String], next: String?) -> String {
 }
 
 /// The Keychain's stand-in: the tokens a sign-in of `account` keeps — its access token's payload
-/// naming it — or none; one a test can lock, as a locked phone's is.
+/// naming it, and the `email` its ID token named (#147), if any — or none; one a test can lock, as a
+/// locked phone's is.
 private final class Keychain: TokenStore, @unchecked Sendable {
     struct Locked: Error {}
     private let lock = NSLock()
     private var saved: Data?
     private var isLocked = false
 
-    init(account: String?) {
+    init(account: String?, email: String? = nil) {
         saved = account.map { account in
             let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600}"#
             let payload = Data(claims.utf8).base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
                 .replacingOccurrences(of: "=", with: "")
-            return Data(#"{"access":"h.\#(payload).s","refresh":"r","until":1000000000}"#.utf8)
+            let named = email.map { #","email":"\#($0)""# } ?? ""
+            return Data(#"{"access":"h.\#(payload).s","refresh":"r","until":1000000000\#(named)}"#.utf8)
         }
     }
 

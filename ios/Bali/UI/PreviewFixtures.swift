@@ -11,8 +11,8 @@
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
-        /// edited, no sign-out failed, no class being left and no reason picked, unless said
-        /// otherwise.
+        /// edited, no sign-out failed, no class being left, no reason picked and no email named
+        /// (#147), unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -29,6 +29,7 @@
             var leaving = Leaving()
             var picking: UnlockReason?
             var pickFailed: String?
+            var email: String?
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -118,37 +119,44 @@
             // Shown again, the moments kept, and the newest page's read again failed (#141).
             "historyRefreshError": State(
                 tab: .history, history: anaHistory(failed: History.words(.networkError))),
-            "me": State(sync: standing(.out, me: anaRodriguez), tab: .me),
+            // Me says whose sign-in this is, by Sign out (#147): Ana's email, on every Me.
+            "me": State(sync: standing(.out, me: anaRodriguez), tab: .me, email: anaEmail),
             "meEditing": State(
-                sync: standing(.out, me: anaRodriguez), tab: .me, naming: naming("Ana R.")),
+                sync: standing(.out, me: anaRodriguez), tab: .me, naming: naming("Ana R."),
+                email: anaEmail),
             "meNameError": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me,
                 naming: naming(
-                    "Bea Ortiz", failure: Naming.words(.status(409), .displayNameTaken))),
+                    "Bea Ortiz", failure: Naming.words(.status(409), .displayNameTaken)),
+                email: anaEmail),
             // An unlock the bell rang on before it was sent: Sign out waits for it.
             "meSignOutHeld": State(
                 sync: queued(
                     standing(.out, me: anaRodriguez), .unlock(session: "session", reason: nil)),
-                tab: .me),
+                tab: .me, email: anaEmail),
             "meSignOutFailed": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me,
-                signOutFailed: SignOutWords.failed),
+                signOutFailed: SignOutWords.failed, email: anaEmail),
             // Where the phone stood not read, Screen Time taken back: Me, its row Off.
             "meScreenTimeOff": State(
-                protection: screenTimeOff(), sync: standing(.unread, me: anaRodriguez), tab: .me),
+                protection: screenTimeOff(), sync: standing(.unread, me: anaRodriguez), tab: .me,
+                email: anaEmail),
             // Leave (C6c): Period 3's question, the leave under way, one the server refused as the
             // lesson runs, and Leave held while the phone stands in Period 3's lesson — in a state
             // this build does not know, so Home, and so Me, can show.
             "meLeaveAsk": State(
-                sync: standing(.out, me: anaRodriguez), tab: .me, leaving: leavingPeriod3()),
+                sync: standing(.out, me: anaRodriguez), tab: .me, leaving: leavingPeriod3(),
+                email: anaEmail),
             "meLeaving": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me,
-                leaving: leavingPeriod3(sent: true)),
+                leaving: leavingPeriod3(sent: true), email: anaEmail),
             "meLeaveError": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me,
-                leaving: leavingPeriod3(failure: anaRodriguez?.classes.first.map(Leaving.inSession))),
+                leaving: leavingPeriod3(failure: anaRodriguez?.classes.first.map(Leaving.inSession)),
+                email: anaEmail),
             "meLeaveInSession": State(
-                sync: standing(.inSession(period3, nil), me: anaRodriguez), tab: .me),
+                sync: standing(.inSession(period3, nil), me: anaRodriguez), tab: .me,
+                email: anaEmail),
             "unlockedRefused": State(
                 sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
             "protectionOff": State(
@@ -462,6 +470,8 @@
 
         /// Ana as D1's Me names her.
         private static let anaRodriguez = ana(name: "Ana Rodríguez")
+        /// Her sign-in's email, as her ID token names it (#147).
+        private static let anaEmail = "ana.rodriguez@bali.test"
 
         /// Ana, as `GET /v1/me` answers her: in Period 3 with Ms. Rivera and Period 5 with Mr.
         /// Okafor, each with the enrollment leaving it deletes — or, a `newcomer`, in no class yet —

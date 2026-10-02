@@ -30,11 +30,14 @@ func jwt(_ name: String, lifetime: TimeInterval = 3600) -> String {
     return "eyJhbGciOiJSUzI1NiJ9.\(base64url(Data(payload.utf8))).signature"
 }
 
-/// The token endpoint's answer: the tokens, a refresh token only when given.
-func granted(_ access: String, refresh: String? = nil) -> String {
+/// The token endpoint's answer: the tokens, a refresh token only when given, and an ID token naming
+/// the account's `email` — one naming none when not given.
+func granted(_ access: String, refresh: String? = nil, email: String? = nil) -> String {
     let refresh = refresh.map { #""refresh_token":"\#($0)","# } ?? ""
+    let id = email.map { #"{"sub":"s","email":"\#($0)","token_use":"id"}"# } ?? #"{"sub":"s"}"#
+    let idToken = "eyJhbGciOiJSUzI1NiJ9.\(base64url(Data(id.utf8))).signature"
     return
-        #"{"id_token":"id","access_token":"\#(access)",\#(refresh)"expires_in":3600,"token_type":"Bearer"}"#
+        #"{"id_token":"\#(idToken)","access_token":"\#(access)",\#(refresh)"expires_in":3600,"token_type":"Bearer"}"#
 }
 
 /// Its OAuth refusal.
@@ -587,6 +590,62 @@ struct TokenTests {
         let unread = await signIn(opaque, TransportDouble(status: 500), told: Told())
         #expect(await unread.accessToken() == "not-a-jwt")
         #expect(await unread.account() == nil)
+    }
+
+    @Test(
+        "whose sign-in this is (#147): the account's email, read unverified from Cognito's ID token in the same answer — kept with the tokens and renewed with them, a renewal bringing none keeping it (the same account's), none once signed out — and another student's sign-in names theirs, or none where their ID token names none: never the last one's"
+    )
+    func email() async throws {
+        let answers = Answers((200, granted(jwt("a1"), refresh: "refresh-a", email: "ana@bali.test")))
+        let endpoint = TransportDouble { _ in
+            let (status, body) = try answers.next()
+            return (status, Data(body.utf8))
+        }
+        let (store, now) = (MemoryStore(), Now())
+        let phone = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await phone.email() == nil)
+        try await phone.signIn(through: signsIn)
+        #expect(await phone.email() == "ana@bali.test")
+        #expect(store.tokens?.email == "ana@bali.test")
+        answers.set((200, granted(jwt("a2"), email: "ana.r@bali.test")))
+        now.set(4000)
+        #expect(await phone.accessToken() == jwt("a2"))
+        #expect(await phone.email() == "ana.r@bali.test")
+        answers.set((200, granted(jwt("a3"))))
+        now.set(8000)
+        #expect(await phone.accessToken() == jwt("a3"))
+        #expect(await phone.email() == "ana.r@bali.test")
+        try await phone.signOut()
+        #expect(await phone.email() == nil)
+        answers.set((200, granted(jwt("b1"), refresh: "refresh-b", email: "bea@bali.test")))
+        try await phone.signIn(through: signsIn)
+        #expect(await phone.email() == "bea@bali.test")
+        answers.set((200, granted(jwt("c1"), refresh: "refresh-c")))
+        try await phone.signIn(through: signsIn)
+        #expect(await phone.account() == "c1")
+        #expect(await phone.email() == nil)
+        #expect(store.tokens?.email == nil)
+    }
+
+    @Test(
+        "tokens a build before #147 kept, with no email in them, still sign the student in (#147): no email to say until a renewal's ID token names one"
+    )
+    func earlierBuild() async throws {
+        let store = MemoryStore()
+        let until = (t0 + 3540).timeIntervalSinceReferenceDate
+        try store.save(Data(#"{"access":"\#(jwt("a1"))","refresh":"refresh-1","until":\#(until)}"#.utf8))
+        let endpoint = TransportDouble { _ in
+            (200, Data(granted(jwt("a2"), email: "ana@bali.test").utf8))
+        }
+        let now = Now()
+        let phone = await signIn(store, endpoint, now: now, told: Told())
+        #expect(await first(phone.signedIn()) == true)
+        #expect(await phone.accessToken() == jwt("a1"))
+        #expect(await phone.email() == nil)
+        now.set(4000)
+        #expect(await phone.accessToken() == jwt("a2"))
+        #expect(await phone.email() == "ana@bali.test")
+        #expect(store.tokens?.refresh == "refresh-1")
     }
 
     @Test("a sign-out while a renewal runs is not undone by its answer")

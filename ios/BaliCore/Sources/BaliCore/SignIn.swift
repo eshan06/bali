@@ -114,6 +114,10 @@ public enum SignInError: Error, Sendable, Hashable {
 struct Tokens: Codable, Sendable {
     let access: String
     let refresh: String
+    /// The account's email, as the ID token in the same answer named it (#147): whose sign-in this
+    /// is, for Me to say. Nil when it named none — and in tokens a build before it kept, until
+    /// their first renewal.
+    let email: String?
     /// Until when, by the phone's clock, the access token is given: its own lifetime from when it
     /// came, less a margin. The lifetime is `exp` − `iat`, both the server's clock, so a phone clock
     /// set wrong never makes a fresh token look expired, nor an expired one fresh (the server owns
@@ -121,8 +125,8 @@ struct Tokens: Codable, Sendable {
     /// renews it (`SignIn.refresh`).
     var until: Date
 
-    init(access: String, refresh: String, at now: Date) {
-        (self.access, self.refresh) = (access, refresh)
+    init(access: String, refresh: String, email: String? = nil, at now: Date) {
+        (self.access, self.refresh, self.email) = (access, refresh, email)
         until = Self.lifetime(of: access).map { now + $0 - SignIn.margin } ?? .distantFuture
     }
 
@@ -137,6 +141,12 @@ struct Tokens: Codable, Sendable {
     static func subject(of token: String) -> String? {
         struct Claims: Decodable { let sub: String }
         return claims(Claims.self, of: token)?.sub
+    }
+
+    /// `email` from an ID token's payload, unverified: only ever shown, to say whose sign-in this is.
+    static func email(of token: String) -> String? {
+        struct Claims: Decodable { let email: String }
+        return claims(Claims.self, of: token)?.email
     }
 
     /// The token's payload read as `T`, unverified; nil when it cannot be.
@@ -231,7 +241,7 @@ public actor SignIn: TokenProvider {
             ("code_verifier", attempt.verifier),
         ]).get()
         guard let refresh = grant.refresh else { throw .refused(nil) }
-        let tokens = Tokens(access: grant.access, refresh: refresh, at: now())
+        let tokens = Tokens(access: grant.access, refresh: refresh, email: grant.email, at: now())
         guard keep(tokens) else { throw .notKept }
         adopt(tokens)
         await tokenArrived?()
@@ -267,6 +277,13 @@ public actor SignIn: TokenProvider {
     /// 1: a rotated refresh token would read as another student at each renewal).
     public func account() -> String? {
         current().flatMap { Tokens.subject(of: $0.access) }
+    }
+
+    /// The account's email, as the tokens name it (#147): whose sign-in this is, which Me says, so
+    /// the name a student's teachers see is never taken for it. Nil when nobody is signed in, the
+    /// Keychain cannot be read yet, or the tokens name none.
+    public func email() -> String? {
+        current()?.email
     }
 
     /// The tokens, read from the store the first time it can be read. Only a store with nothing in
@@ -319,8 +336,11 @@ public actor SignIn: TokenProvider {
         switch answer {
         case .success(let grant):
             // A refresh token Cognito rotates replaces the one kept, which then stops working — so
-            // tokens the Keychain cannot take right now are saved again at the next ask.
-            let fresh = Tokens(access: grant.access, refresh: grant.refresh ?? refresh, at: now())
+            // tokens the Keychain cannot take right now are saved again at the next ask. The email
+            // is the same account's: an answer naming none keeps it, as it keeps the refresh token.
+            let fresh = Tokens(
+                access: grant.access, refresh: grant.refresh ?? refresh,
+                email: grant.email ?? tokens?.email, at: now())
             adopt(fresh, saved: keep(fresh))
             if telling { await tokenArrived?() }
             return true
@@ -337,12 +357,13 @@ public actor SignIn: TokenProvider {
         }
     }
 
-    /// The token endpoint's answer to `fields` (RFC 6749 §4.1.3, §6): the tokens on a 2xx, its
-    /// OAuth error on a 4xx — a refusal — and anything else no answer (a 5xx, a proxy's page).
+    /// The token endpoint's answer to `fields` (RFC 6749 §4.1.3, §6): the tokens on a 2xx — and the
+    /// email its ID token names (#147) — its OAuth error on a 4xx — a refusal — and anything else no
+    /// answer (a 5xx, a proxy's page).
     private func exchange(_ fields: [(String, String)]) async
-        -> Result<(access: String, refresh: String?), SignInError>
+        -> Result<(access: String, refresh: String?, email: String?), SignInError>
     {
-        struct Answer: Decodable { let accessToken, refreshToken, error: String? }
+        struct Answer: Decodable { let accessToken, refreshToken, idToken, error: String? }
         guard let url = URL(string: cognito.endpoint("oauth2/token")) else {
             return .failure(.unreachable)
         }
@@ -359,7 +380,9 @@ public actor SignIn: TokenProvider {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let answer = try? decoder.decode(Answer.self, from: body)
         switch (response.statusCode, answer?.accessToken, answer?.error) {
-        case (200..<300, let access?, _): return .success((access, answer?.refreshToken))
+        case (200..<300, let access?, _):
+            return .success(
+                (access, answer?.refreshToken, answer?.idToken.flatMap { Tokens.email(of: $0) }))
         case (400..<500, _, let error?): return .failure(.refused(error))
         default: return .failure(.unreachable)
         }
