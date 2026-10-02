@@ -139,6 +139,8 @@ const SCENARIOS: Record<string, string> = {
   'enrollments/left':
     'A student leaves a class with no session running (A19): only the enrollment ends.',
   'enrollments/already-removed': 'The retry of that leave: a no-op, answered with the truth now.',
+  'enrollments/left-past-bell':
+    'A student leaves a class past its bell, before the sweep ends its session (A19): their participation there ends too, at the bell.',
   'enrollments/409-class-in-session':
     'A student leaving while the class has a session running: refused, nothing recorded (A19).',
   'enrollments/403-enrollment-not-yours': 'A student trying to remove a classmate’s enrollment.',
@@ -585,6 +587,23 @@ async function captureAll() {
   const onlyIt = { outcome: 'ended', endedParticipation: false };
   await capture('enrollments/left', leaving, 200, onlyIt);
   await capture('enrollments/already-removed', leaving, 200, { outcome: 'already_removed' });
+  // Leaving past the bell, its session not swept yet (A19): heard by the real
+  // clock, long after this fixed lesson's bell, so the participation ends too.
+  const unswept = await seedClassroom(db, 'fx-leave-late');
+  await startSession(db, {
+    classId: unswept.klass.id,
+    startedAt: new Date(lessonAt('16:00').deviceTime),
+    endsAt: new Date(lessonAt('16:50').deviceTime),
+  });
+  const ivy = await token(unswept.student.cognitoId);
+  const tapsIn = { tagId: unswept.block.tagId, eventId: randomUUID(), ...lessonAt('16:01') };
+  await setup(post(ivy, '/v1/taps', tapsIn));
+  const pastBell = del(
+    ivy,
+    `/v1/enrollments/${await enrollmentOf(unswept.klass.id, unswept.student.id)}`,
+  );
+  const lessonToo = { outcome: 'ended', endedParticipation: true };
+  await capture('enrollments/left-past-bell', pastBell, 200, lessonToo);
 
   // A malformed tap, one with no token, and one of no registered block.
   const bad = post(newcomer, '/v1/taps', { tagId: 'TAG-fx', eventId: 'x', deviceTime });
@@ -768,6 +787,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(joins).toEqual(new Set(ENROLLMENT_JOIN_OUTCOMES));
     const leaves = valuesOf('EndEnrollmentResponse', 'outcome');
     expect(leaves).toEqual(new Set(END_ENROLLMENT_OUTCOMES));
+    // A leave that ended the student's participation too — past the bell, before the sweep —
+    // and one that ended only the enrollment (A19; #132's review).
+    const endedHere = valuesOf('EndEnrollmentResponse', 'endedParticipation');
+    expect(endedHere).toEqual(new Set([true, false]));
     const previews = valuesOf('JoinCodePreviewResponse', 'alreadyEnrolled');
     expect(previews).toEqual(new Set([true, false]));
     // A teacher with a name and one without: BaliCore decodes it as optional.

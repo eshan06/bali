@@ -1,0 +1,17 @@
+{
+  "endpoint": "DELETE /v1/enrollments/{id}",
+  "scenario": "A student leaves a class past its bell, before the sweep ends its session (A19): their participation there ends too, at the bell.",
+  "request": {
+    "path": "/v1/enrollments/00000000-0000-7000-8000-000000000001",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002"
+    }
+  },
+  "status": 200,
+  "type": "EndEnrollmentResponse",
+  "body": {
+    "outcome": "ended",
+    "reason": "left_class",
+    "endedParticipation": true
+  }
+}
