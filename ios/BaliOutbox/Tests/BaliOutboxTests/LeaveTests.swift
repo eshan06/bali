@@ -135,7 +135,7 @@ struct LeaveTests {
     )
     func answers() async throws {
         let p3 = try row("3", "Period 3 — Algebra II")
-        for name in ["left.json", "already-removed.json"] {
+        for name in ["left.json", "left-past-bell.json", "already-removed.json"] {
             var leaving = Leaving()
             leaving.ask(p3)
             _ = leaving.send(at: t0)
