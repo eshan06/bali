@@ -249,4 +249,12 @@ public enum SignOutWords {
 
     /// The Keychain could not forget the sign-in right now: nothing changed.
     public static let failed = "Bali couldn't sign you out. Try again."
+
+    /// Whose sign-in this is, said by Sign out (#147): the account's email, so the name a student's
+    /// teachers see is never taken for what they sign in with. Nil where no email is known: nothing
+    /// said, never a guess.
+    public static func signedIn(_ email: String?) -> String? {
+        guard let email, !email.isEmpty else { return nil }
+        return "You're signed in as \(email)."
+    }
 }

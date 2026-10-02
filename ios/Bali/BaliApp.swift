@@ -132,7 +132,7 @@ final class Phone {
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
-            (naming, signOutFailed) = (fixture.naming, fixture.signOutFailed)
+            (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
         }
 
@@ -208,15 +208,29 @@ final class Phone {
     /// Whose tokens these are (`SignIn.account`), the last one known: another student's sign-in
     /// is known by it, whether or not the sign-out between them was seen.
     private var account: String?
+    /// Whose sign-in this is, as the tokens name it now (`SignIn.email`, #147): Me says it by Sign
+    /// out, so the name a student's teachers see is never taken for it. Nil when nobody is signed
+    /// in or the tokens name none — never the last student's.
+    private(set) var email: String?
 
-    /// Who is signed in, as the Keychain says — `account`, theirs, where the sign-in could say: a
-    /// change starts the tabs over at Home, and the history read, a name being edited, a failed
-    /// Sign out and a class code typed go with it; so, where another student signs in, does the
-    /// engine's `me` — keyed on the account (C6b-1's review): a sign-out the stream let go by
-    /// between two sign-ins is no matter. With no account to tell by, on a sign-in after a sign-out.
-    /// Another student's is never shown (C6a, C6b). Signed in, the student's history is read at
-    /// once, so even their first visit to History shows it (#141).
-    func signed(in signedIn: Bool?, as account: String? = nil) {
+    /// Follows who is signed in on `signIn` for the app's life: each change to `signed`, with the
+    /// account and the email the tokens name then.
+    func follow(_ signIn: SignIn) async {
+        for await signedIn in await signIn.signedIn() {
+            signed(
+                in: signedIn, as: signedIn ? await signIn.account() : nil,
+                email: signedIn ? await signIn.email() : nil)
+        }
+    }
+
+    /// Who is signed in, as the Keychain says — `account`, theirs, where the sign-in could say, and
+    /// `email`, whose sign-in it is (#147): a change starts the tabs over at Home, and the history
+    /// read, a name being edited, a failed Sign out and a class code typed go with it; so, where
+    /// another student signs in, does the engine's `me` — keyed on the account (C6b-1's review): a
+    /// sign-out the stream let go by between two sign-ins is no matter. With no account to tell by,
+    /// on a sign-in after a sign-out. Another student's is never shown (C6a, C6b). Signed in, the
+    /// student's history is read at once, so even their first visit to History shows it (#141).
+    func signed(in signedIn: Bool?, as account: String? = nil, email: String? = nil) {
         let another =
             account.map { self.account != nil && $0 != self.account }
             ?? (signedIn == true && self.signedIn == false)
@@ -229,7 +243,7 @@ final class Phone {
         }
         if another { Task { await engine?.forgetMe() } }
         if let account { self.account = account }
-        self.signedIn = signedIn
+        (self.signedIn, self.email) = (signedIn, email)
         if changed, signedIn == true, !frozen { Task { await readHistory() } }
     }
 
@@ -517,11 +531,7 @@ final class Phone {
                 self.remember(protection)
             }
         }
-        Task {
-            for await signedIn in await signIn.signedIn() {
-                self.signed(in: signedIn, as: signedIn ? await signIn.account() : nil)
-            }
-        }
+        Task { await self.follow(signIn) }
         await engine.setForeground(foreground)
     }
 

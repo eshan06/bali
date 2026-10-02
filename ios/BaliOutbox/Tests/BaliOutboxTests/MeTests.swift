@@ -175,6 +175,15 @@ struct MeTests {
             #expect(SignOutWords.held(state)?.contains("Emergency Unlock") == true, "\(unlock)")
         }
     }
+
+    @Test(
+        "Sign out says whose sign-in this is (#147) — the account's email, so the name teachers see is never taken for it — and nothing where no email is known, never a guess"
+    )
+    func signedInAs() {
+        #expect(SignOutWords.signedIn("ana@bali.test") == "You're signed in as ana@bali.test.")
+        #expect(SignOutWords.signedIn(nil) == nil)
+        #expect(SignOutWords.signedIn("") == nil)
+    }
 }
 
 private let renameRoute = "PATCH /v1/me"
