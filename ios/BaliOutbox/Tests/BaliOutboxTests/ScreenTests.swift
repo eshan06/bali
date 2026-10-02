@@ -5,18 +5,18 @@ import Testing
 @testable import BaliOutbox
 
 /// The screen for what the phone knows at `now`: the intro seen, signed in, the permission approved
-/// and checked (never read approved before, `everApproved`), the engine standing `standing` with
-/// `queued` and its newest tap `lastTap`, and Home's tab chosen, unless said otherwise — nil for a
-/// sign-in, an enforcer or an engine that has not spoken. The permission is judged off as the
-/// enforcer judges it: denied at once, not determined only where `permissionOff` says it has lasted
-/// past B5a-2's grace.
+/// and checked (never read approved before, `everApproved`), the student never in a class on this
+/// phone (`everInClass`, #143), the engine standing `standing` with `queued` and its newest tap
+/// `lastTap`, and Home's tab chosen, unless said otherwise — nil for a sign-in, an enforcer or an
+/// engine that has not spoken. The permission is judged off as the enforcer judges it: denied at
+/// once, not determined only where `permissionOff` says it has lasted past B5a-2's grace.
 private func screen(
     problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, permissionOff: Bool? = nil, checked: Bool = true,
-    shielded: Bool = false, everApproved: Bool = false, standing: Standing? = .out,
-    queued: [OutboxRecord] = [], lastTap: String? = nil, hasClasses: Bool? = nil,
-    sessionOverClosed: SessionView? = nil, opened: [Screen] = [], tab: Screen = .home,
-    now: Date = t0
+    shielded: Bool = false, everApproved: Bool = false, everInClass: Bool = false,
+    standing: Standing? = .out, queued: [OutboxRecord] = [], lastTap: String? = nil,
+    hasClasses: Bool? = nil, sessionOverClosed: SessionView? = nil, opened: [Screen] = [],
+    tab: Screen = .home, now: Date = t0
 ) -> Screen {
     var protection: Protection?
     if let permission {
@@ -35,23 +35,30 @@ private func screen(
     }
     return Screen.choose(
         problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-        everApproved: everApproved, sync: sync, hasClasses: hasClasses,
+        everApproved: everApproved, everInClass: everInClass, sync: sync, hasClasses: hasClasses,
         sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: now
     ).screen
 }
 
 /// Whether D1's tab bar shows over the phone standing `standing`, with `opened`, at `now` — the
-/// router's own answer, beside its screen.
+/// router's own answer, beside its screen — the classes not read yet unless `hasClasses` says, the
+/// student never in one on this phone unless `everInClass` says (#143).
 private func tabbed(
-    standing: Standing, opened: [Screen] = [], closed: SessionView? = nil, now: Date = t0
+    standing: Standing, opened: [Screen] = [], closed: SessionView? = nil, now: Date = t0,
+    hasClasses: Bool? = nil, everInClass: Bool = false
 ) -> Bool {
     var (protection, sync) = (Protection(), SyncState())
     (protection.checked, protection.permission, sync.standing) = (true, .approved, standing)
     return Screen.choose(
         problem: nil, introSeen: true, signedIn: true, protection: protection, everApproved: false,
-        sync: sync, hasClasses: nil, sessionOverClosed: closed, opened: opened, tab: .history,
-        now: now
+        everInClass: everInClass, sync: sync, hasClasses: hasClasses, sessionOverClosed: closed,
+        opened: opened, tab: .history, now: now
     ).tabbed
+}
+
+/// `GET /v1/me`'s answer `json`, as the phone decodes it.
+private func me(_ json: String) throws -> MeResponse {
+    try BaliJSON.makeDecoder().decode(MeResponse.self, from: Data(json.utf8))
 }
 
 /// A session whose bell is a thousand seconds ahead of `t0`'s cap.
@@ -402,7 +409,74 @@ struct ScreenTests {
     }
 
     @Test(
-        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes: Join is the router's own then, with no way back (C3; santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
+        "Removed from their last class, or having left it (#143, the owner's ask, 2026-10-01): a student this phone has seen in a class lands on Home, its tab bar, History and Me honoured, Join a class opened over it with its way back, and its card in the hero's place says so, with Join a class; never the first-run Join, which a student never in a class here keeps, another student signed in on this phone too. Nothing else moves: the classes not read yet, waiting, a standing not read, a session's screens, Session over, Screen Time, the sign-in; and Home's other cards, a class in session (C3c) and the wait (#151), and a refused tap said (#146), stand as they were"
+    )
+    func removedFromLastClass() async throws {
+        // The owner's phone: unlocked in a class, then removed from its roster; the read after
+        // says out, in no class.
+        let unlocked = Standing.inSession(session(), .unlocked)
+        #expect(screen(everInClass: true, standing: unlocked, hasClasses: true) == .unlocked)
+        #expect(screen(everInClass: true, hasClasses: false) == .home)
+        #expect(tabbed(standing: .out, hasClasses: false, everInClass: true))
+        for tab in [Screen.history, .me] {
+            #expect(screen(everInClass: true, hasClasses: false, tab: tab) == tab)
+        }
+        #expect(screen(everInClass: true, hasClasses: false, opened: [.join]) == .join)
+        #expect(!tabbed(standing: .out, opened: [.join], hasClasses: false, everInClass: true))
+        // Never in a class here, a first run or another student signed in: Join, as before.
+        #expect(screen(hasClasses: false) == .join)
+        #expect(screen(hasClasses: false, tab: .me) == .join)
+        #expect(!tabbed(standing: .out, hasClasses: false))
+        // Nothing else moves.
+        #expect(screen(everInClass: true) == .home)
+        #expect(screen(everInClass: true, standing: .waiting, hasClasses: false) == .waiting)
+        #expect(screen(everInClass: true, standing: .unread, hasClasses: false) == .home)
+        #expect(screen(everInClass: true, standing: unlocked, hasClasses: false) == .unlocked)
+        #expect(
+            screen(everInClass: true, standing: unlocked, hasClasses: false, now: at(3000))
+                == .sessionOver)
+        #expect(screen(permission: .denied, everInClass: true, hasClasses: false) == .screenTime)
+        #expect(screen(signedIn: false, everInClass: true, hasClasses: false) == .signIn)
+        // Home's card in the hero's place: what is true, and the way on; out, in no class, only.
+        var out = SyncState()
+        (out.standing, out.me) = (.out, try me(Answer.me(nil)))
+        #expect(
+            out.noClassesCard
+                == "You're not in any classes. Join one with the class code from your teacher.")
+        #expect(out.inSessionCard(at: t0) == nil && out.waitingCard == nil)
+        let others: [Standing] = [
+            .waiting, .unread, .inSession(bell1042, .focused), .inSession(bell1042, .unlocked),
+            .inSession(bell1042, .protectionOff), .inSession(bell1042, nil),
+        ]
+        for standing in others {
+            var state = out
+            state.standing = standing
+            #expect(state.noClassesCard == nil, "\(standing)")
+        }
+        // The wait's card in no class too: an armed tap needs no enrollment (#151).
+        var waiting = out
+        waiting.standing = .waiting
+        #expect(waiting.waitingCard != nil)
+        // The classes not read, or one of them: none; C3c's card where that class is in session.
+        var notRead = out
+        notRead.me = nil
+        #expect(notRead.noClassesCard == nil)
+        var running = out
+        running.me = try me(
+            #"{"user":{"id":"u","role":"student","displayName":null},"classes":[{"id":"c","name":"Period 3 — Algebra II","liveSession":{"id":"s","endsAt":"\#(iso(bell1042.endsAt))"}}],"session":null}"#
+        )
+        #expect(running.noClassesCard == nil && running.inSessionCard(at: t0) != nil)
+        // A scan of a block no teacher set up is still said under it (#146).
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "NOCLASS123"))
+        try await send(outbox, tap, 404, notFound)
+        var refused = try read(outbox)
+        (refused.standing, refused.me) = (.out, out.me)
+        #expect(refused.noClassesCard != nil && refused.refusedTapWords == unknownBlock)
+    }
+
+    @Test(
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone learns it has no classes: the router's own then, Join with no way back, or Home for a student once in a class (C3; #143) — a read saying none again changes nothing, so Join opened over Home's empty state, or a tab chosen there, stays (santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
     )
     func keepsOpened() async throws {
         var rung = SyncState()
@@ -442,6 +516,13 @@ struct ScreenTests {
         outBefore.me = nil
         #expect(!out.keepsOpened(from: outBefore, at: t0))
         #expect(outBefore.keepsOpened(from: outBefore, at: t0))
+        // Known to have none, a read saying so again — every return to the front makes one —
+        // closes nothing (#143); the classes gone, removed or left, is a change.
+        #expect(out.keepsOpened(from: out, at: t0))
+        var inClass = out
+        inClass.me = try me(Answer.me(nil, classes: [Answer.inClass("c")]))
+        #expect(!out.keepsOpened(from: inClass, at: t0))
+        #expect(inClass.keepsOpened(from: out, at: t0))
         after.me = nil
         after.standing = .out
         #expect(!after.keepsOpened(from: before, at: t0))
@@ -810,7 +891,7 @@ struct WaitingHomeTests {
         (protection.checked, protection.permission) = (true, .approved)
         let shown = Screen.choose(
             problem: nil, introSeen: true, signedIn: true, protection: protection,
-            everApproved: false, sync: state, hasClasses: state.hasClasses,
+            everApproved: false, everInClass: false, sync: state, hasClasses: state.hasClasses,
             sessionOverClosed: nil, opened: opened, tab: .home, now: now)
         return (shown.screen, shown.tabbed)
     }

@@ -11,8 +11,9 @@
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
-        /// edited, no sign-out failed, no class being left, no reason picked and no email named
-        /// (#147), unless said otherwise.
+        /// edited, no sign-out failed, no class being left, no reason picked, no email named
+        /// (#147) and no class listed for the student on this phone before (#143), unless said
+        /// otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -30,6 +31,7 @@
             var picking: UnlockReason?
             var pickFailed: String?
             var email: String?
+            var everInClass = false
         }
 
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
@@ -111,6 +113,9 @@
                 sync: reported(standing(.inSession(period3, .unlocked))), opened: [.home]),
             // Period 3 in session, the student not in it (C3c): its card in the hero's place.
             "homeInSession": State(sync: standing(.out, me: ana(inSession: true))),
+            // Removed from her last class (#143): Ana, in a class on this phone before, is in none
+            // now. Home, its card in the hero's place; a newcomer gets Join.
+            "homeNoClasses": State(sync: standing(.out, me: ana(newcomer: true)), everInClass: true),
             "history": State(tab: .history, history: anaHistory()),
             "historyEmpty": State(tab: .history, history: history(read: true)),
             "historyError": State(

@@ -19,8 +19,11 @@ public enum Screen: Sendable, Hashable {
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
-    /// set such a read routes as approved, while denied never does; `sync`, the engine's truth, nil
-    /// until it runs; `hasClasses`, nil while `/v1/me` has not answered (C2); `sessionOverClosed`,
+    /// set such a read routes as approved, while denied never does; `everInClass`, whether the
+    /// student `/v1/me` names has been in a class on this phone (#143) — in none now, removed from
+    /// their last or having left it, Home and its empty state, where one never in a class here gets
+    /// Join; `sync`, the engine's truth, nil until it runs; `hasClasses`, nil while `/v1/me` has not
+    /// answered (C2); `sessionOverClosed`,
     /// the session whose Session over the student closed, as it was then — its bell moved since, an
     /// extension, it is another's to close (C5b; its review); `opened`, the
     /// screens the student opened over the one chosen, in order (C3) — Home over Waiting (Waiting's
@@ -35,8 +38,8 @@ public enum Screen: Sendable, Hashable {
     /// at a bell either (C6a's review).
     public static func choose(
         problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
-        everApproved: Bool, sync: SyncState?, hasClasses: Bool?, sessionOverClosed: SessionView?,
-        opened: [Screen], tab: Screen, now: Date
+        everApproved: Bool, everInClass: Bool, sync: SyncState?, hasClasses: Bool?,
+        sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
     ) -> (screen: Screen, tabbed: Bool) {
         if let problem { return (.storage(problem), false) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
@@ -53,7 +56,8 @@ public enum Screen: Sendable, Hashable {
             return (.starting, false)
         }
         if !signedIn { return (.signIn, false) }
-        var shown = settled(sync, protection, everApproved, hasClasses, sessionOverClosed, now)
+        let joinFirst = hasClasses == false && !everInClass
+        var shown = settled(sync, protection, everApproved, joinFirst, sessionOverClosed, now)
         // Home with its tab bar: the router's own, or opened over Unlocked — its primary way
         // on, the apps still open (the owner's ruling, 2026-09-30; C5c) — or over Waiting, the
         // regular Home there (the owner's decision, 2026-10-01; #151). Join opened has none.
@@ -71,9 +75,10 @@ public enum Screen: Sendable, Hashable {
         return tabbed ? (tab == .history || tab == .me ? tab : .home, true) : (shown, false)
     }
 
-    /// The screen of where the phone stands, signed in and its permission checked.
+    /// The screen of where the phone stands, signed in and its permission checked: `joinFirst`,
+    /// the student in no class and never in one on this phone (#143).
     private static func settled(
-        _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ hasClasses: Bool?,
+        _ sync: SyncState, _ protection: Protection, _ everApproved: Bool, _ joinFirst: Bool,
         _ sessionOverClosed: SessionView?, _ now: Date
     ) -> Screen {
         switch sync.standing {
@@ -100,7 +105,7 @@ public enum Screen: Sendable, Hashable {
             case .waiting: return .waiting
             case .inSession(let session, _) where !session.rings(as: sessionOverClosed):
                 return .sessionOver
-            case .out where hasClasses == false: return .join
+            case .out where joinFirst: return .join
             default: return .home
             }
         }
@@ -148,11 +153,13 @@ extension SyncState {
     /// Whether the screens the student opened over another (C3) — and the tab they chose (C6a) —
     /// stay once the engine's state is this, after `before`, at `now`: not once the standing
     /// changes, nor once a tap is made or answered (a new arming is Waiting's again), nor, out,
-    /// once the phone knows it has no classes (Join is the router's own then). Waiting's whatever
-    /// the classes: arming needs no enrollment. A read saying out, or the same class still past
-    /// its bell (santa's round 1), once the bell has rung by the phone's clock changes nothing the
-    /// student sees — the class was over for the phone already — so History chosen from Session
-    /// over holds (C5b's hand-off).
+    /// once the phone learns it has no classes — the router's own then: Join, or Home and its
+    /// empty state for a student once in a class here (#143), whose Join opened over it, or a tab
+    /// chosen there, a read saying none again leaves be. Waiting's whatever the classes: arming
+    /// needs no enrollment. A read saying out, or the same class still past its bell (santa's
+    /// round 1), once the bell has rung by the phone's clock changes nothing the student sees —
+    /// the class was over for the phone already — so History chosen from Session over holds (C5b's
+    /// hand-off).
     public func keepsOpened(from before: SyncState?, at now: Date) -> Bool {
         var over = false
         if case .inSession(let ended, _)? = before?.standing, ended.endsAt <= now {
@@ -164,7 +171,7 @@ extension SyncState {
         }
         return (standing == before?.standing || over)
             && pendingTap?.eventId == before?.pendingTap?.eventId
-            && !(standing == .out && hasClasses == false)
+            && !(standing == .out && hasClasses == false && before?.hasClasses != false)
     }
 
     /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried
@@ -227,6 +234,16 @@ extension SyncState {
     public var waitingCard: String? {
         standing == .waiting
             ? "You're tapped in. Your phone locks when class starts, as long as Bali is open." : nil
+    }
+
+    /// What Home's card says in the hero's place, out of any session, once `GET /v1/me` lists the
+    /// student in no class (#143; the owner's ask, 2026-10-01): the router shows Home then only to
+    /// a student once in a class here — removed from their last, or having left it — and the card
+    /// is their way back in, with Join a class. Tap in is no way in for them: a tap joins only a
+    /// class the student is in. Nil otherwise.
+    public var noClassesCard: String? {
+        standing == .out && hasClasses == false
+            ? "You're not in any classes. Join one with the class code from your teacher." : nil
     }
 
     /// What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in

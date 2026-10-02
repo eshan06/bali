@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-02** — **F8 (#143): a student removed from their last class lands on Home, its card
+  saying so, never the first-run Join.** **Found** (the owner's device check, E1, 2026-10-01): a
+  student removed from their last class by the teacher's roster landed, at the phone's next read,
+  on the first-run Join ("Enter your class code", a Sign out link, no tab bar), because the router
+  read no class as a new student (`settled`: out with no classes → Join). Their unlock was recorded
+  correctly: only where they land was wrong. **The owner's ask (2026-10-01):** bring them back to
+  Home; a student never in a class keeps Join. **How the phone knows "in a class before":** the
+  id of the student `GET /v1/me` lists in a class (`user.id`), kept in the app's own defaults as
+  `everApproved` is (`Phone.inClass`), forgotten at a sign-out and at another student's sign-in;
+  the router's new input `everInClass` is that id against the one each read names. Keyed on the
+  student, not a bare flag cleared at sign-out: the engine's `me` can still be the last student's
+  for a moment after another signs in (a state published before `forgetMe` lands), and a flag set
+  by it would be inherited, while an id only ever names the last student. Not chosen: the
+  student's history, which names a removal or a leave, but is read from the server, so unknown
+  offline and late at a launch (Join, then Home). An install from before this build learns the id
+  at its first read listing a class. **Where they land:** Home, its tab bar, History and Me, with
+  a card in the hero's place (`SyncState.noClassesCard`, out of any session in no class): "You're
+  not in any classes. Join one with the class code from your teacher." and Join a class, primary,
+  opened over Home with its way back (C3b). D1 has no artboard for it: C3c's look with no chip (no
+  class, so no state). No Tap in there (a tap joins only a class the student is in: it would arm,
+  and no Start converts an armed tap of a student in no class), and no classes section, whose
+  "No classes yet." and Join a class the card stands in for (one way in, never two). A failed read
+  of the classes is said under it, as under C3c's and the wait's. **`keepsOpened`** closed every
+  screen opened over another, and the tab, at each state saying out in no class: right while Join
+  was the router's own, but over the empty Home the read each return to the front makes would
+  close Join opened from it, its code typed, and send History or Me back to Home. It now closes
+  them only as the phone learns it has no classes (none after some, or after not knowing), so a
+  removal or a leave still lands on the router's own screen: Join, or the empty Home. Leaving the
+  last class on Me (C6c) lands on the empty Home, where it landed on Join. **Not in this step:**
+  saying what happened ("You're no longer in Device check") needs the owner's OK. **Tests:**
+  `ScreenTests.removedFromLastClass` and `.keepsOpened` (red first, on the router);
+  `AppTests.everInClass`, `.fixtures`, `.tabs`; fixture `homeNoClasses`.
 - **2026-10-01** — **F9 (#147): Me says whose sign-in this is.** On the owner's phone, a name
   changed to an email was expected to sign in; the name is only what teachers see, and the
   account's email showed nowhere. **Words and place:** "You're signed in as <email>." under Sign

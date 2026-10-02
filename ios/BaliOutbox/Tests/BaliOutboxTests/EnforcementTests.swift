@@ -1325,8 +1325,8 @@ struct LaunchGraceTests {
             #expect(!claim.permissionOff)
             let shown = Screen.choose(
                 problem: nil, introSeen: true, signedIn: true, protection: claim,
-                everApproved: true, sync: sync, hasClasses: true, sessionOverClosed: nil,
-                opened: [], tab: .home, now: rig.clock.now())
+                everApproved: true, everInClass: true, sync: sync, hasClasses: true,
+                sessionOverClosed: nil, opened: [], tab: .home, now: rig.clock.now())
             #expect(shown.screen == (standing == .out ? .home : .focus))
         }
         await phone.stop()

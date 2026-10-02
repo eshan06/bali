@@ -8,7 +8,7 @@ import SwiftUI
 /// last run's shields on, Emergency Unlock is here (B6b, C4). D1's tab bar under it is the
 /// router's to show (C6a, `RootView`). A class of theirs in session, the student not focused in
 /// it, its card takes the hero's place (C3c) — and so, waiting for their teacher's Start, does the
-/// wait's (#151).
+/// wait's (#151), and, in no class any more, the way back into one (#143).
 struct HomeView: View {
     let phone: Phone
     /// The card's bell, rung: the card goes then, by the phone's clock (C3c).
@@ -22,6 +22,7 @@ struct HomeView: View {
         let _ = rung
         let card = phone.sync?.inSessionCard(at: Date())
         let waiting = phone.sync?.waitingCard
+        let empty = phone.sync?.noClassesCard
         ScreenScaffold {
             // Opened over Unlocked: back to it (C5c), above the scroll as Join's is, so it never
             // scrolls away. Never to Waiting: its Home is the regular one (#151).
@@ -34,7 +35,7 @@ struct HomeView: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(me?.user.displayName.map { "Hi, \($0)" } ?? "Hi there").textStyle(.h1)
-                        if card == nil, waiting == nil {
+                        if card == nil, waiting == nil, empty == nil {
                             Text("Ready when your class is.").textStyle(.bodyLg)
                                 .foregroundStyle(Theme.textSecondary)
                         }
@@ -64,13 +65,15 @@ struct HomeView: View {
                         inSession(card)
                     } else if let waiting {
                         waitingCard(waiting)
+                    } else if let empty {
+                        noClasses(empty)
                     } else {
                         tapIn
                     }
                     // A read of the classes that did not go: a card may be older than it says
                     // (santa's round 1), and the wait's Start is found by that read (decision 6),
                     // as Waiting says — said by the classes themselves while none is read.
-                    if card != nil || waiting != nil, phone.sync?.me != nil,
+                    if card != nil || waiting != nil || empty != nil, phone.sync?.me != nil,
                         let failed = phone.sync?.meWords
                     {
                         Retry(words: failed, phone: phone)
@@ -86,7 +89,9 @@ struct HomeView: View {
                     if let refused = phone.sync?.refusedTapWords {
                         Retry(words: refused, phone: phone)
                     }
-                    ClassesSection(phone: phone, title: "Your classes")
+                    // In no class, the card is the classes' own empty state, its Join a class
+                    // theirs: one way in, never two (#143).
+                    if empty == nil { ClassesSection(phone: phone, title: "Your classes") }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -141,6 +146,24 @@ struct HomeView: View {
                 Chip(kind: .notIn, icon: "clock", text: "Waiting")
                 Text(words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
                 TapIn(phone: phone, primary: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// In no class any more (#143; D1 has no artboard for it, so C3c's look without a chip: no
+    /// class, no state): what is true and how back in, and Join a class, opened over Home with its
+    /// way back (C3b). No Tap in: a tap joins only a class the student is in.
+    private func noClasses(_ words: String) -> some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(words).textStyle(.bodyLg).fixedSize(horizontal: false, vertical: true)
+                Button {
+                    phone.open(.join)
+                } label: {
+                    Label("Join a class", systemImage: "plus")
+                }
+                .buttonStyle(PrimaryButtonStyle())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -263,5 +286,8 @@ struct Retry: View {
     }
     #Preview("Home — no answer") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["homeError"]!))
+    }
+    #Preview("Home — in no class") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["homeNoClasses"]!))
     }
 #endif
