@@ -66,14 +66,15 @@ struct RootView: View {
     }
 }
 
-/// A screen fading in (#150): its content over the page's own colour, there from the start — so
-/// the screen it replaces is gone at once, though SwiftUI keeps it until the fade ends, drawing
-/// itself anew from what the phone says now, the next screen's.
-private struct Opening: ViewModifier {
+/// A screen fading in (#150): its content over the page's own colour, there from the start. The
+/// screen it replaces is gone at once — SwiftUI keeps that one until the fade ends, drawing itself
+/// anew from what the phone says now, the next screen's — so it leaves unseen, with no animation,
+/// and this one's colour covers it too, whichever of the two is drawn above.
+struct Opening: ViewModifier {
     static var transition: AnyTransition {
         .asymmetric(
             insertion: .modifier(active: Opening(shown: false), identity: Opening(shown: true)),
-            removal: .identity)
+            removal: .opacity.animation(nil))
     }
 
     let shown: Bool

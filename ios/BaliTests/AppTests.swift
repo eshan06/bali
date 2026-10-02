@@ -957,6 +957,21 @@ struct AppTests {
     }
 
     @Test(
+        "A screen fading in (#150) starts as the page's own colour alone, opaque — so the screen it replaces, which SwiftUI keeps until the fade ends and which draws itself anew from the next screen's state, is gone at once — and ends as itself over that colour"
+    )
+    func opening() throws {
+        func drawn(_ shown: Bool) throws -> [Int] {
+            let renderer = ImageRenderer(
+                content: Rectangle().fill(Theme.text).frame(width: 8, height: 8)
+                    .modifier(Opening(shown: shown)))
+            renderer.scale = 1
+            return try pixels(of: try #require(renderer.uiImage))(4, 4)
+        }
+        #expect(try drawn(false) == [0xF7, 0xF5, 0xF2, 255])
+        #expect(try drawn(true) == [0x21, 0x1F, 0x1B, 255])
+    }
+
+    @Test(
         "Back lets the keyboard go before the screen moves (#150): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in"
     )
     func backLetsKeyboardGo() async throws {
