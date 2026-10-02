@@ -128,6 +128,12 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     Settings and open Bali: "Checking Screen Time…" for about 10 seconds — `Launch:` counting
     `not determined for … so far` — then the Screen Time off screen, and `watch` shows **protection
     off**. Turn access back on and **Tap**.
+    **A known case** (F2's review): access taken back in a class's last 15 minutes, turned back on
+    in Settings (not with **Allow Screen Time**), then a re-tap. The re-tap's own window, 50 minutes
+    from the tap, has not begun, so the phone can keep saying Screen Time is off, its shields on,
+    until the tap's answer comes (offline: the rest of the class) or **Allow Screen Time** is
+    tapped. The first run's `(not begun)` or `none` settles it: if iOS reports a window not begun,
+    that guard can go, and this case with it.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
     `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
     still shows focused — no false protection off after a relaunch: a permission Family Controls
