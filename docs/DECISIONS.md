@@ -8,6 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F1 (#144): a running Bali judges an approved read by iOS's DeviceActivity
+  center, since the read itself never changes.** **Found** (the owner's device check, iPhone 15 Pro,
+  iOS 18.6.2): access turned off in Settings mid-class, iOS dropped the shields and ended Bali's
+  `bali` window at once (UsageTrackingAgent's "did end"; the monitor woke and kept), yet the same
+  process kept reading `authorizationStatus` approved and the store's own shields — no protection
+  off, and the grid showed focused over open apps until a relaunch read not determined. Apple's
+  forums agree: the read stays stale until the app exits (thread 747915, since iOS 17.4), and the
+  `$authorizationStatus` publisher is silent without a debugger attached (thread 820796). **The
+  rule:** at each check (rule 3's, every 30 s in front and as Bali comes back), when the read is
+  approved and the enforcer has a bell window iOS took, a pass first asks iOS's center whether it
+  still holds it (`ScreenTime.holds`: `schedule(for:)`, the read `Bell.ask` already makes — never
+  `activities`, which hung an extension on iOS 18, FB14664238). Only read: nothing is stopped or
+  replaced, so the monitor is never woken by it, and B5b-5's echo rule is untouched. Not in the
+  window's last minute, which iOS may end early on its own clock (`Bell.retry`, as B5b-5 uses it).
+  **Gone,** it is asked for again — no stop and no replacement either, since iOS holds none — and
+  iOS's answer decides: refused as unauthorized (`MonitoringError.unauthorized`, mapped to
+  `ScreenTimeUnauthorized`), its own word, so the permission is judged off at once; taken yet still
+  not held, a strong sign but not iOS's word, so the approved read is judged not determined —
+  B5a-2's grace, then off a check-in later; taken and held, nothing was wrong: another app's grant
+  changing ends every app's windows (thread 749120), and the window is back; refused for any other
+  reason, it is unscheduled as any refusal is (B5b), and no doubt — B5b expects such refusals on an
+  approved phone, so one never becomes a "Screen Time off". A window iOS takes and holds later, or
+  its own prompt answered, ends the doubt. Judged so, the claim says it (`permission`
+  not determined, no shield claimed, `permissionOff` by the same rules), the off path is the old
+  one — protection off reported, the Screen Time off screen with iOS's prompt as its way on (what a
+  relaunch shows), then a re-tap — and only an approved read is ever overridden: denied and not
+  determined are as before, so B5a-2's launch grace is unchanged. Scheduling still goes by the read
+  itself, so a doubted window is asked for again and a cancel still cancels. **The pass is
+  awaited** (`enforce(awaited:)`): a check racing a pass already under way otherwise judged by the
+  last pass's findings and reported a check later. **Not chosen:** the publisher (silent without a
+  debugger — and with one, it would pass the phone test falsely); a probe registration at every
+  check (each replacement wakes the monitor at once: B5b-5's noise); `requestAuthorization` as a
+  probe (it prompts the student); the monitor's unexplained early wake (the issue's fourth lead) as
+  a signal — iOS's own replacements and stops wake it too, so telling them apart needs timing the
+  app group cannot give cleanly; its wakes are in the readout's `Monitor:` lines, the follow-up if
+  the phone shows neither signal flipping. **Unknown until the phone** (hence "Refs #144"): which of
+  the two iOS 18.6 gives — a window gone, an `unauthorized`, or neither; the Debug readout's `iOS:`
+  line (the read now, and the window iOS holds under each name, every 5 s) and `Found:` (each
+  window found gone or refused) show it, and ios/README.md's round 1 step 12 says what to look for.
+  **Limits:** out of a session nothing is asked (no window); access taken back in a window's last
+  minute is left to the bell. **Tests**, red first (`RevokedWhileRunningTests`, Linux and the
+  simulator): refused at the first check, the screen's way iOS's prompt; taken-not-held at the
+  second; from behind at the check as Bali comes back; turned back on — Settings or the prompt —
+  and re-tapped, no second report; another app's grant, never off and the claim never wavering; a
+  re-ask refused otherwise, never off (red first too); the schedule intact, never off and nothing
+  asked; the last minute; and a relaunch over access taken back still waits out B5a-2's grace.
+
 - **2026-10-01** — **F3 (#140): Unlocked's reasons picked at once — every reason open, one change
   on its way, the newest only.** The owner's device check: once the unlock had reached the server,
   each pick waited on its change (A20, about half a second on dev) with the other reasons off, so

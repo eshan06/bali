@@ -105,9 +105,15 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     7's cap — until the answer comes.)
 11. **Emergency Unlock**: the shields are off at once and the apps open; `watch` shows unlocked.
     **Tap** again: shielded and focused once more.
-12. Settings → Screen Time → Apps with Screen Time Access → turn Bali off, and go back to the
-    app: `denied · shields off` at once (`notDetermined`, if iOS reads it so: reported all the
-    same, a check-in later), and within about 30 seconds `watch` shows **protection off**.
+12. Settings → Screen Time → Apps with Screen Time Access (or Bali's own page in Settings) → turn
+    Bali off, and go back to the app **without closing it**: `denied · shields off` at once
+    (`notDetermined`, if iOS reads it so: reported all the same, a check-in later), and within
+    about 30 seconds `watch` shows **protection off**. On iOS 18 a running Bali can still read
+    `approved` (#144): `iOS: Family Controls reads Approved`, while iOS no longer holds `bell` —
+    then within about a minute `Found:` says the bell window is gone (and `window refused:
+    unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`, and `watch`
+    shows **protection off** — with no relaunch. Run it twice: with Bali in front, and with Bali
+    behind for a minute, then opened. Note in #144 which of the `iOS:` and `Found:` lines changed.
     **Allow Screen Time** again: still no shields — only a re-tap leaves protection off — and
     **Tap** brings the shields and focus back.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
