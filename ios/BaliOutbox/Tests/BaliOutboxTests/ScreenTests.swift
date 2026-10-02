@@ -443,11 +443,12 @@ struct ScreenTests {
     }
 
     @Test(
-        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked gives a light haptic as a reason is picked, and every reason is tappable but where a pick cannot act — the unlock on its way — a pick on its way holding none back (C5c, the owner's ruling; #140, whose picks the app's tests drive); Me gives the keyboard back once a save is over"
+        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History keeps its read when it goes, and reads its newest page again each time it shows (#141); Unlocked gives a light haptic as a reason is picked, and every reason is tappable but where a pick cannot act — the unlock on its way — a pick on its way holding none back (C5c, the owner's ruling; #140, whose picks the app's tests drive); Me gives the keyboard back once a save is over"
     )
     func ridersWiring() throws {
         let history = try sourceCode("Bali/UI/HistoryView.swift")
-        #expect(history.contains(".onDisappear { phone.forgetHistory() }"))
+        #expect(history.contains(".onAppear { Task { await phone.refreshHistory() } }"))
+        #expect(!history.contains("forgetHistory") && !history.contains("onDisappear"))
         let unlocked = try sourceCode("Bali/UI/UnlockedView.swift")
         #expect(
             unlocked.contains(

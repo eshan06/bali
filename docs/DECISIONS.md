@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F4 (#141): History kept while the app runs, read again quietly each time it
+  shows.** The owner's device check saw History open on its title alone for about a second at every
+  visit: C6a-2 read it from the top each time the student came to it and forgot it whenever it went
+  (Riders-2's `onDisappear`), its review's answer to "never shown stale". **Kept:** the moments read
+  stay for the app's run, so a visit shows them at once. **C6a-2's concern, answered by the read
+  again:** each time History shows, its screen reads the newest page from the top (`refreshHistory`,
+  on appear), and that page takes the place of all read once it lands — never merged into them: a
+  moment read before may have changed since (an unlock's reason, A20) and a late record can sort into
+  an older page, so the older pages go back under Show earlier. So a fresh moment shows within one
+  round trip of opening the tab, and what shows meanwhile is the last read, never a claim of now.
+  **Said, not silent (rule 5):** a read again that fails keeps the moments and says so above them,
+  "Bali couldn't update your history." and why, with Try again from the top; Show earlier's own
+  failure stays where it was pressed. `History.fromTop` tells the two reads apart, and `answered`
+  now knows Show earlier's page by it rather than by a cursor held — a kept history holds one through
+  a read from the top, which an `unknown_cursor` would otherwise have read again forever (C6a-2's
+  review). **Forgotten only when who is signed in changes** (`Phone.signed`, keyed on the account as
+  `me` is since C6b-1's review), an answer from before dropped by `reads`; leaving History drops
+  nothing now, an answer landing after it kept for the next visit. **Read at a sign-in too** (the
+  issue's optional half): one `GET /v1/me/history` per app open or sign-in, so even the first visit
+  is instant. Not done, unasked: a pull to refresh, a read again on coming back to the foreground
+  with History showing, keeping older pages across a read again.
+
 - **2026-10-01** — **F1 (#144): a running Bali judges an approved read by iOS's DeviceActivity
   center, since the read itself never changes.** **Found** (the owner's device check, iPhone 15 Pro,
   iOS 18.6.2): access turned off in Settings mid-class, iOS dropped the shields and ended Bali's
@@ -97,6 +119,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   longer overwrites the engine's one remembered unanswered change, so the next unlock's retry
   keeps its event id (`ReasonTests.changedLate`, red first), and the app tests now pin that a
   same-card state (the kept reason published, the session extended) keeps a waiting pick.
+
 - **2026-09-30** — **C3c: Home's card for a class in session, and the conductor's two decisions
   under the owner's delegation** (ruling 4 of the owner's rulings below left Home-in-session to the
   conductor). **(a) The class's running session on `GET /v1/me`:** a phone knows only its own
