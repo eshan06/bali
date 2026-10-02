@@ -8,7 +8,7 @@ import Foundation
 /// ticks over nothing shielded (rule 3: v2 showed one).
 public struct FocusWords: Sendable, Hashable {
     /// What the check verified: the shields on; Screen Time taken back — denied, or not determined
-    /// for a check-in interval, never a launch's moment (B5a-2); or nothing yet.
+    /// for `Enforcer.grace`, never a launch's moment (B5a-2, #145); or nothing yet.
     public enum Claim: Sendable, Hashable { case paused, screenTimeOff, unverified }
 
     /// The class, and under it its teacher and bell; a tap not answered yet knows neither.
