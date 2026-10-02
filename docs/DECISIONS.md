@@ -40,21 +40,29 @@ a real decision? Add a dated entry at the top: what was decided and why.
   loses its run, restarted at its next read a second on — later, never falsely. (2) iOS may not
   report a bell window not begun, and a class longer than the floor asks for one that begins later
   — F1's "taken but not held" would then doubt a phone with access on for most of a class. Now
-  "not held" is a sign only once the window has begun (`missing`): before, Family Controls' read
-  alone judges and nothing is asked again. **Its cost:** a running Bali notices access taken back
-  (#144) only from the window's start, the last 15 minutes of a longer class; before, as before
-  F1, at a relaunch or once the window begins. The readout's `iOS:` line marks a held window
-  `(not begun)`: if the phone shows iOS reports one, the guard can go and F1's reach is whole again.
-  A clock turned back past the window's start makes it not begun again — iOS's schedule follows the
-  wall clock too, a bypass family ARCHITECTURE names. **Tests**, red first on Linux
+  whether iOS holds the window is known only once it has begun (`held`, nil before): a window not
+  begun starts no doubt, and nothing is asked again — Family Controls' read judges — and it ends
+  none either: a doubt a begun window started stands through a class extended or a re-tap's cap,
+  never approved and shielded over access taken back (santa's round 1 found the first version
+  ending it there). **Its cost:** a running Bali notices access taken back (#144) only from the
+  window's start, the last 15 minutes of a longer class; before, as before F1, at a relaunch or
+  once the window begins. The readout's `iOS:` line marks a held window `(not begun)`: if the
+  phone shows iOS reports one, the guard can go and F1's reach is whole again. A clock turned back
+  past the window's start makes it not begun again — iOS's schedule follows the wall clock too, a
+  bypass family ARCHITECTURE names. **Santa's round 1** (two Claude reviewers — Codex refuses every
+  model on this Mac — no blockers) found, besides the doubt kept through a window not begun: a check
+  judged a moment before the grace's end whose pass ended past it claimed off yet scheduled no
+  re-check, so the report waited for the engine's next wake — now a check that did not report
+  always makes itself again while its run is under way (`!off`). **Tests**, red first on Linux
   (`LaunchGraceTests`, `RevokedWhileRunningTests`): access off at a launch, off at the grace and
-  nothing at 9 s, no wake needed; a launch's not determined settling at 3 s, approved that second,
-  never off nor reported — in a session, and out of one routed home on the flag; a doubted read
-  never checked every second; a doubt ended at a pass ends its run (it needed a change with one
-  pass — a second pass re-reading approved hides it, as the review said); a class longer than the
-  floor never doubted for a window iOS does not show, and from the window's start a window not held
-  is a sign again. F1's tests now run in a class within its window (`lesson`), where "not held" is
-  a sign. Each fix removed turns its test red.
+  nothing at 9 s, no wake needed; a check's pass crossing the grace's end, reported a second on;
+  a launch's not determined settling at 3 s, approved that second, never off nor reported — in a
+  session, and out of one routed home on the flag; a doubted read never checked every second; a
+  doubt ended at a pass ends its run (it needed a change with one pass — a second pass re-reading
+  approved hides it, as the review said); a class longer than the floor never doubted for a window
+  iOS does not show, from the window's start a window not held a sign again, and a doubt kept
+  through a class extended past the floor. F1's tests now run in a class within its window
+  (`lesson`), where "not held" is a sign. Each fix removed turns its test red.
 
 - **2026-10-01** — **F6 (#146): a refused tap is said only while it is the phone's newest tap**
   (the conductor's default, under the owner's delegation). **Found** (the owner's device check): a

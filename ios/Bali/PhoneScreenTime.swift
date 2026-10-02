@@ -101,7 +101,7 @@ final class PhoneScreenTime: ScreenTime {
 
         /// A window iOS holds, by its end — marked while it has not begun, every window being the
         /// floor long: whether iOS reports one before it begins is what the enforcer's guard waits
-        /// on (`missing`; F1's review).
+        /// on (`Enforcer.held`; F1's review).
         static func window(_ end: Date) -> String {
             time(end) + (end.addingTimeInterval(-Bell.floor) > Date() ? " (not begun)" : "")
         }

@@ -1159,6 +1159,31 @@ struct RevokedWhileRunningTests {
     }
 
     @Test(
+        "…and a doubt a begun window started is never ended by one not begun: the class extended past the floor, iOS's silence about the new window says nothing — the claim stays doubted, never approved and shielded over access taken back, and a check a grace on reports it (santa's round 1)"
+    )
+    func doubtOutlastsWindowNotBegun() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn(lesson)
+        await phone.until { $0.shielded && $0.until == lesson.endsAt }
+        // Doubted at a check: iOS took the window asked for again, and holds none — a run from 30 s.
+        await phone.screenTime.revokeUnseen(silently: true)
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        // The class extended: its new window, which iOS takes, begins at 1540 s.
+        let extended = session(endsAt: 2400)
+        #expect(Bell.window(until: extended.endsAt).start == at(1540))
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(200, Answer.me(extended))
+        let now = await phone.until { $0.until == extended.endsAt }
+        #expect(now.permission == .notDetermined && !now.shielded)
+        rig.clock.advance(by: Enforcer.grace)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
         "F1's review: a doubt that ends at a pass — the shields' end moved, and iOS takes and holds its window — ends its run of not determined there, though the pass judged its read before: a read of not determined after it has a grace of its own, never judged off at once"
     )
     func doubtEndsItsRun() async throws {
@@ -1192,7 +1217,7 @@ struct RevokedWhileRunningTests {
 }
 
 @Suite(
-    "#145: Screen Time off within a few seconds of a launch, never over an approved phone",
+    "#145: a launch's not determined — off once it lasts the grace, read again every second meanwhile; never over an approved phone settling within it",
     .timeLimit(.minutes(3)))
 struct LaunchGraceTests {
     /// A relaunch standing as `standing` — the store holding the last run's shields in a session —
@@ -1243,6 +1268,31 @@ struct LaunchGraceTests {
         #expect(ProtectionOffWords(state, claim)?.way == .ask)
         // Judged off, nothing is read every second: the engine's wakes check from here.
         try await rig.sleeping([])
+        await phone.stop()
+    }
+
+    @Test(
+        "A check judged a moment before the grace's end, its pass ending past it, is still made again a second on: the report follows the claim of Screen Time off, never left to the engine's next wake (santa's round 1)"
+    )
+    func passCrossesGrace() async throws {
+        let phone = try await launched(.inSession(session(), .focused), off: true)
+        let rig = phone.rig
+        try await seconds(Int(Enforcer.grace) - 2, rig)
+        // The check a second before the grace's end, held in its pass at its second read of the
+        // store while the grace runs out.
+        try await eventually { rig.clock.deadlines.contains(at(Enforcer.grace - 1)) }
+        await phone.screenTime.hold(after: 1)
+        rig.clock.advance(by: Enforcer.recheckAfter)
+        try await eventually { await phone.screenTime.holding }
+        rig.clock.advance(by: Enforcer.recheckAfter)
+        await phone.screenTime.release()
+        await phone.until { $0.permissionOff }
+        try await eventually { rig.clock.deadlines.contains(at(Enforcer.grace + 1)) }
+        rig.clock.advance(by: Enforcer.recheckAfter)
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
+        }
         await phone.stop()
     }
 

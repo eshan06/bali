@@ -216,9 +216,11 @@ public actor Enforcer {
         // Family Controls' own not determined, within the grace: checked again a second on, so the
         // grace ends as iOS settles, or Screen Time off shows once it lasts. Not an approved read
         // doubted (#144): checked, iOS's center would be asked for the window again each second.
+        // By `off` as judged above, not the grace read again: a pass that ended past the grace
+        // claims off, and the report must follow it (santa's round 1).
         recheck?.cancel()
         recheck = nil
-        guard read == .notDetermined, undetermined != nil, !undeterminedLasting else { return }
+        guard read == .notDetermined, !off, undetermined != nil else { return }
         recheck = Task { [weak self, clock] in
             do { try await clock.sleep(until: clock.now() + Self.recheckAfter) } catch { return }
             await self?.check()
@@ -241,16 +243,16 @@ public actor Enforcer {
 
     /// #144, at the pass a check asked for: whether iOS's DeviceActivity center still holds
     /// `window`, the bell's window it took — only read, so nothing is stopped or replaced and the
-    /// monitor is not woken. Gone (`missing`) — more than a minute before its end, when iOS may
-    /// have ended it on its own clock — it is forgotten, so the pass asks for it again, and iOS's
-    /// answer decides (`apply`): a fresh start, iOS holding none, though `Bell.register` then stops
-    /// the monitor's own next wake, which wakes it once to ask nothing (B5b-5). Whether it was gone.
+    /// monitor is not woken. Gone (`held`) — more than a minute before its end, when iOS may have
+    /// ended it on its own clock — it is forgotten, so the pass asks for it again, and iOS's answer
+    /// decides (`apply`): a fresh start, iOS holding none, though `Bell.register` then stops the
+    /// monitor's own next wake, which wakes it once to ask nothing (B5b-5). Whether it was gone.
     private func verify(_ window: DateInterval?) async -> Bool {
         verifying = false
-        guard let window, window == scheduled, clock.now() < window.end - Bell.retry else {
-            return false
-        }
-        guard await missing(window) else {
+        guard let window, window == scheduled, clock.now() < window.end - Bell.retry,
+            let held = await self.held(window)
+        else { return false }
+        guard !held else {
             unverified = false
             return false
         }
@@ -258,13 +260,14 @@ public actor Enforcer {
         return true
     }
 
-    /// Whether iOS's center does not hold `window`, the bell's — a sign only once the window has
-    /// begun: iOS may not report one not begun yet, which a class longer than the floor asks for,
-    /// so before then the permission read alone judges (F1's review). The Debug readout's `iOS:`
-    /// line shows whether the phone reports one; if it does, this guard can go.
-    private func missing(_ window: DateInterval) async -> Bool {
-        guard window.start <= clock.now() else { return false }
-        return await !screenTime.holds(window)
+    /// Whether iOS's center holds `window`, the bell's — nil while it has not begun: iOS may not
+    /// report one not begun yet, which a class longer than the floor asks for (F1's review), so
+    /// then it says nothing either way: no doubt starts on it, and none ends (santa's round 1) —
+    /// the permission read alone judges, with a doubt a begun window started. The Debug
+    /// readout's `iOS:` line shows whether the phone reports one; if it does, this guard can go.
+    private func held(_ window: DateInterval) async -> Bool? {
+        guard window.start <= clock.now() else { return nil }
+        return await screenTime.holds(window)
     }
 
     /// Asks the student for the Screen Time permission — C1's onboarding — and enforces with what
@@ -355,11 +358,11 @@ public actor Enforcer {
                 (scheduled, unscheduled) = (window, false)
                 // Taken, the permission is there (#144) — and where the bell's window was gone,
                 // held again, nothing was wrong (another app's grant changed, say); not held, the
-                // doubt stands, once the window has begun (`missing`). Refused otherwise, it is
-                // unscheduled, as any refusal: no doubt.
+                // doubt stands; not begun, nothing is known of it, and the doubt is as it was
+                // (`held`). Refused otherwise, it is unscheduled, as any refusal: no doubt.
                 if let window {
                     unauthorized = false
-                    if gone || unverified { unverified = await missing(window) }
+                    if gone || unverified, let held = await self.held(window) { unverified = !held }
                 }
             } catch {
                 unscheduled = true
