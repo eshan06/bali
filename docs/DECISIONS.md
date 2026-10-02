@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-02** — **F11a-1: the merged PRs' review WARNs, part 1 — sign-in and the fade.**
+  **Nothing of the last student's, at any moment** (#160's review): the engine forgets `me` when
+  another account signs in (`forgetMe`, C6b-1), but in a task — until it landed, the phone's copy,
+  and a state the engine had sent before it (its stream keeps the newest on its way), were the
+  last student's: "Hi, Ana" to Bea, and with F8, Ana's empty Home in place of Bea's Join. Gated
+  on the account, exactly: the engine counts its forgets in every state (`SyncState.forgets`), the
+  phone counts those it asked for, and a state counting fewer comes without its `me`; the phone's
+  own copy loses it at the sign-in itself. Not chosen: keying on the forgotten student's id (no
+  engine change), which misses a stale state where the phone held no `me` yet; nor clearing a
+  flag once the forget's task returns, which the main actor may run before the stale state's own
+  hop. A phone with no engine (a fixture) has nothing to forget it, so counts none. **A code typed
+  goes with who typed it, a try on its way too** (Riders-2's review): the code stayed while a
+  look-up or a join ran, and its answer — Ana's class and teacher, or "No class has that code" —
+  landed for the next student. Cleared at once now, and the answer dropped (`Phone.signIns`), the
+  join's too: its `busy = false` would otherwise end a try of the next student's under way.
+  **The screen leaving** (#161's review): `Opening.Replaced`, the removal's modifier, takes it out
+  of touch and VoiceOver as well as sight. Checked on the iPhone 17 simulator: under F10's removal
+  (`.opacity.animation(nil)`) iOS 26 lets go of the leaving screen at once (its field out of the
+  window within 5 ms), so nothing invisible was there to tap; where SwiftUI does keep one — an
+  animated removal, for the whole fade — its field took the tap until `allowsHitTesting(false)`
+  (`AppTests.leavingTakesNoTouch`, red first). VoiceOver's half cannot be seen from a unit test
+  (no accessibility tree there). **`backLetsKeyboardGo`** now looks after each render, past the
+  fade's end, as well as at Back. **`Tokens.init`'s email** has no default (#159's review), pinned
+  by `TokenTests.emailAsked` (its source, red first). No visual change, no server change.
 - **2026-10-02** — **F8 (#143): a student removed from their last class lands on Home, its card
   saying so, never the first-run Join.** **Found** (the owner's device check, E1, 2026-10-01): a
   student removed from their last class by the teacher's roster landed, at the phone's next read,
