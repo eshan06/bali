@@ -343,8 +343,14 @@ final class Phone {
         select(.history)
     }
 
-    /// Opens `screen` over what shows.
-    func open(_ screen: Screen) { opened.append(screen) }
+    /// Opens `screen` over what shows, fading in (#150).
+    func open(_ screen: Screen) { withAnimation(Phone.fade) { opened.append(screen) } }
+
+    /// How a screen the student opens comes and goes (#150), as Reduce Motion is set now. Only the
+    /// student's own moves fade: the router's — Focus at the Start — are never animated.
+    private static var fade: Animation? {
+        Theme.fade(reduceMotion: UIAccessibility.isReduceMotionEnabled)
+    }
 
     /// Whether the screen shown was opened over another, so it draws a way back to it (C3): only
     /// where Back leads to another screen — never from a Home its Unlocked became after the bell
@@ -360,9 +366,14 @@ final class Phone {
     /// their way out (the riders).
     var offersSignOut: Bool { screen == .me || screen == .join && !canGoBack }
 
-    /// Back from the screen opened last. A Join closed starts over, unless a try is under way.
+    /// Back from the screen opened last, the one under it fading back in (#150) — the keyboard let
+    /// go first, at once, so it goes down with the screen it was up for, never left over the next:
+    /// Join raises one as it shows. A Join closed starts over, unless a try is under way.
     func back() {
-        guard let closed = opened.popLast() else { return }
+        guard !opened.isEmpty else { return }
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        let closed = withAnimation(Phone.fade) { opened.removeLast() }
         if closed == .join, !joining.busy { joining = Joining() }
     }
 

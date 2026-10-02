@@ -18,9 +18,11 @@ struct RootView: View {
 
     var body: some View {
         let _ = rung
-        // The screen and its bar from one ask of the router (C6a's review).
+        // The screen and its bar from one ask of the router (C6a's review). A screen the student
+        // opens over another fades in, and the one under it fades back in at Back (`Phone.fade`,
+        // #150).
         let shown = phone.shown
-        screen(shown.screen)
+        ZStack { screen(shown.screen).transition(Opening.transition) }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if shown.tabbed { TabBar(phone: phone, shown: shown.screen) }
             }
@@ -61,6 +63,23 @@ struct RootView: View {
         case .me: MeView(phone: phone)
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }
         }
+    }
+}
+
+/// A screen fading in (#150): its content over the page's own colour, there from the start — so
+/// the screen it replaces is gone at once, though SwiftUI keeps it until the fade ends, drawing
+/// itself anew from what the phone says now, the next screen's.
+private struct Opening: ViewModifier {
+    static var transition: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(active: Opening(shown: false), identity: Opening(shown: true)),
+            removal: .identity)
+    }
+
+    let shown: Bool
+
+    func body(content: Content) -> some View {
+        content.opacity(shown ? 1 : 0).background(Theme.page.ignoresSafeArea())
     }
 }
 
