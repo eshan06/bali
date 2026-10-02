@@ -275,6 +275,24 @@ struct JoinEngineTests {
         await rig.stop()
     }
 
+    @Test(
+        "A join answered after another student's sign-in made the engine forget the last one's `me` adds its class to no one's — never to the next student's, read meanwhile (F11a-1, santa's round 1): the read it asks for says where they stand"
+    )
+    func joinedAcrossSignIn() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil))
+        async let answer = rig.engine.join(request)
+        let join = try await rig.server.next(joinRoute)
+        await rig.engine.forgetMe()
+        // The next student's own, read before the last one's join answers.
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil, classes: [Answer.inClass("d")]))
+        await rig.until { $0.me?.classes.map(\.id) == ["d"] }
+        join.reply(200, Answer.joinedClass("c"))
+        #expect(await answer.answer?.class.id == "c")
+        #expect(await rig.engine.state.me?.classes.map(\.id) == ["d"])
+        await rig.stop()
+    }
+
     @Test("A join refused adds no class and reads nothing: why is the screen's to say")
     func refused() async throws {
         let rig = try Rig()

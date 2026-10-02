@@ -32,6 +32,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (no accessibility tree there). **`backLetsKeyboardGo`** now looks after each render, past the
   fade's end, as well as at Back. **`Tokens.init`'s email** has no default (#159's review), pinned
   by `TokenTests.emailAsked` (its source, red first). No visual change, no server change.
+  **Santa** (two Claude reviewers, so one model family — Codex refuses every model on this Mac —
+  and the design check, nothing to say: no look or words change): no blockers. From round 1's
+  WARNs: `lookUp`'s drop pinned by a look-up of the next student's under way when the last one's
+  answer lands (both reviewers: the code's reset alone already dropped it, unless retyped); the
+  fade's removal pinned to `Replaced` by the transition's type, as `historyLazy` reads History's;
+  and an older gap closed — the engine added a joined class to whatever `me` it held when the
+  answer came, so a join answered after another student's sign-in put the last student's class in
+  the next one's `me`, and kept them as once in a class (`inClass`). Now only with no forget
+  between the send and the answer (`SyncEngine.join`; `JoinEngineTests.joinedAcrossSignIn`, red
+  first); a rename already guards so, and a leave filters out an enrollment no one else holds.
 - **2026-10-02** — **F8 (#143): a student removed from their last class lands on Home, its card
   saying so, never the first-run Join.** **Found** (the owner's device check, E1, 2026-10-01): a
   student removed from their last class by the teacher's roster landed, at the phone's next read,

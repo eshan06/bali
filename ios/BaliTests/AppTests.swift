@@ -463,7 +463,7 @@ struct AppTests {
     }
 
     @Test(
-        "A class code typed goes with who typed it, a look-up or a join on its way too (Riders-2's review): signed out, or another student signed in, while one runs, the code goes at once, and its answer, landing after, is dropped — the class it opens, or why not, never said to the next student, nor a try of theirs marked done by it"
+        "A class code typed goes with who typed it, a look-up or a join on its way too (Riders-2's review): signed out, or another student signed in, while one runs, the code goes at once, and its answer, landing after, is dropped — the class it opens, or why not, never said to the next student, nor a look-up of theirs under way, the same code typed again, marked done by it: theirs answers for itself"
     )
     func joiningSignedOut() async throws {
         let found =
@@ -477,7 +477,7 @@ struct AppTests {
         ]
         for (attempt, answer) in tries {
             for leave in leaves {
-                let server = StandIn(tried: answer)
+                let server = StandIn(tries: [answer, (200, found)])
                 let (phone, _) = try standIn(server)
                 phone.signed(in: true, as: "ana")
                 phone.joining.type("KWX49Q")
@@ -485,9 +485,19 @@ struct AppTests {
                 try await until { await server.asked.count == 1 }
                 leave(phone)
                 #expect(phone.joining == Joining())
+                // The next student types the same code and looks it up: theirs is under way when
+                // the last one's answer lands.
+                phone.signed(in: true, as: "bea")
+                phone.joining.type("KWX49Q")
+                let theirs = Task { await phone.lookUp() }
+                try await until { await server.asked.count == 2 }
                 await server.letGo()
                 await trying.value
-                #expect(phone.joining == Joining())
+                #expect(phone.joining.busy && phone.joining.preview == nil)
+                #expect(phone.joining.failure == nil)
+                await server.letGo()
+                await theirs.value
+                #expect(!phone.joining.busy && phone.joining.preview?.class.id == "p3")
             }
         }
     }
@@ -1053,9 +1063,11 @@ struct AppTests {
     }
 
     @Test(
-        "A screen leaving takes no touch (#161's review): a tap where its code field was lands elsewhere at once — under the fade's own transition, and kept on screen for the whole of a slow fade under its removal's modifier (`Opening.Replaced`), as SwiftUI may keep a screen leaving — so a fast tap meant for the screen arriving never starts what the one leaving would have"
+        "A screen leaving takes no touch (#161's review): a tap where its code field was lands elsewhere at once — under the fade's own transition, and kept on screen for the whole of a slow fade under its removal's modifier (`Opening.Replaced`), as SwiftUI may keep a screen leaving — so a fast tap meant for the screen arriving never starts what the one leaving would have. The fade's removal is that modifier, as its type says (santa's round 1)"
     )
     func leavingTakesNoTouch() async throws {
+        // Read from its type, as `historyLazy` reads History's.
+        #expect(String(reflecting: Opening.transition).contains("Opening.Replaced"))
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let kept = AnyTransition.asymmetric(
             insertion: .identity,
@@ -1513,47 +1525,47 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 /// that, a read on its way for good, until the test ends — and history pages from `pages`, in
 /// turn, the cursor each asked for kept; a page asked for with `hold` as its cursor answered only
 /// once the test lets it go. And Cognito's token endpoint, with `grant` where it is given (#147);
-/// and a join code's look-up, and a join, with `tried` where it is given, each only once the test
-/// lets it go, the path each asked at kept (Riders-2's review).
+/// and join codes' look-ups and joins with `tries`, in turn, each only once the test lets it go,
+/// the path each asked at kept (Riders-2's review).
 private actor StandIn: HTTPTransport {
     private var me: String?
     private var pages: [String]
     private(set) var befores: [String?] = []
     private let hold: String?
-    private var held: CheckedContinuation<Void, Never>?
+    private var held: [CheckedContinuation<Void, Never>] = []
     private let grant: String?
-    private let tried: (status: Int, body: String)?
+    private var tries: [(status: Int, body: String)]
     private(set) var asked: [String] = []
 
     init(
         me: String? = nil, pages: [String] = [], hold: String? = nil, grant: String? = nil,
-        tried: (status: Int, body: String)? = nil
+        tries: [(status: Int, body: String)] = []
     ) {
-        (self.me, self.pages, self.hold, self.grant, self.tried) = (me, pages, hold, grant, tried)
+        (self.me, self.pages, self.hold, self.grant, self.tries) = (me, pages, hold, grant, tries)
     }
 
-    /// The page held, answered now.
+    /// The request held longest, answered now.
     func letGo() {
-        held?.resume()
-        held = nil
+        guard !held.isEmpty else { return }
+        held.removeFirst().resume()
     }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw URLError(.badURL) }
         var (status, body) = (200, "")
         switch url.path() {
-        case let path where tried != nil
+        case let path where !tries.isEmpty
             && (path.hasPrefix("/v1/join-codes/") || path == "/v1/enrollments"):
+            (status, body) = tries.removeFirst()
             asked.append(path)
-            await withCheckedContinuation { held = $0 }
-            (status, body) = tried ?? (status, body)
+            await withCheckedContinuation { held.append($0) }
         case "/v1/me/history":
             let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
             let before = query?.first { $0.name == "before" }?.value
             befores.append(before)
             guard !pages.isEmpty else { throw URLError(.notConnectedToInternet) }
             body = pages.removeFirst()
-            if let hold, before == hold { await withCheckedContinuation { held = $0 } }
+            if let hold, before == hold { await withCheckedContinuation { held.append($0) } }
         case "/v1/me" where me != nil:
             (body, me) = (me ?? "", nil)
         case "/v1/me":

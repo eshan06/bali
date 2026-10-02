@@ -478,14 +478,19 @@ public actor SyncEngine {
     /// Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), its
     /// token renewed once on a 401. Once in, the class is in `me` at once where a read has answered
     /// — so the router moves on — else the read it asks for brings it, as it brings its teacher's
-    /// name; a read sent before the join never takes the class away (C3; #110's review).
+    /// name; a read sent before the join never takes the class away (C3; #110's review). Never
+    /// into the `me` of a student who signed in since: `me` forgotten meanwhile, the class is the
+    /// last student's (F11a-1).
     public func join(_ request: EnrollmentJoinRequest) async
         -> APIResponse<EnrollmentJoinResponse>
     {
+        let forgets = state.forgets
         let answer = await Joining.send(renewing: refresh) { await client.join(request) }
         guard let joined = answer.answer?.class else { return answer }
         meChanges += 1
-        if let me = state.me, !me.classes.contains(where: { $0.id == joined.id }) {
+        if state.forgets == forgets, let me = state.me,
+            !me.classes.contains(where: { $0.id == joined.id })
+        {
             state.me = MeResponse(
                 user: me.user, classes: me.classes + [joined], session: me.session)
         }
