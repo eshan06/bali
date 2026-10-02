@@ -110,9 +110,9 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     (`notDetermined`, if iOS reads it so: reported all the same, a check-in later), and within
     about 30 seconds `watch` shows **protection off**. On iOS 18 a running Bali can still read
     `approved` (#144): `iOS: Family Controls reads Approved`, while iOS no longer holds `bell` —
-    then within about a minute `Found:` says the bell window is gone (and `window refused:
-    unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`, and `watch`
-    shows **protection off** — with no relaunch. Run it three times, a 50-minute class
+    then within about a minute `Found:` says the bell window is gone (and
+    `window refused: unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`,
+    and `watch` shows **protection off** — with no relaunch. Run it three times, a 50-minute class
     (`-- start 50`): in front with more than 15 minutes to the bell (the bell's window, 15 minutes
     long, not begun), in front within the last 15 (begun, as in #144), and with Bali behind for a
     minute, then opened. Note in #144 which `iOS:` and `Found:` lines changed each time (a
