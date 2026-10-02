@@ -206,6 +206,13 @@ struct AppTests {
         }
         #expect(UnlockedWords(try #require(PreviewFixtures.all["unlockedRefused"]?.sync))?.retap != nil)
         #expect(PreviewFixtures.all["homeRefused"]?.sync?.refusedRefocusWords(at: Date()) != nil)
+        // A scan of a block no teacher set up (#146): said while it is the phone's newest tap; a
+        // tap since counted, kept and listed, said no more.
+        let refusedTap = try #require(PreviewFixtures.all["homeTapRefused"]?.sync)
+        #expect(refusedTap.refusedTapWords?.hasPrefix("Bali doesn't know a block you tapped") == true)
+        let tappedSince = try #require(PreviewFixtures.all["homeTapRefusedThenTapped"]?.sync)
+        #expect(tappedSince.queued.count == 1 && tappedSince.queued.first?.stuck == true)
+        #expect(tappedSince.refusedTapWords == nil && tappedSince.lastTap != nil)
         let over = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
         #expect(over.sync?.sessionOverWords(over.protection)?.hasSuffix("All your apps are back.") == true)
         over.closeSessionOver()
@@ -282,7 +289,7 @@ struct AppTests {
         let (homes, editing) = (
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
-                "homeFromUnlockedRetap", "homeInSession",
+                "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
             ],
             ["meEditing", "meNameError"]
         )
