@@ -169,11 +169,13 @@ struct HistoryTests {
     func pages() async throws {
         var history = History()
         #expect(!history.read && history.days(now: t0).isEmpty && history.fromTop)
-        history.busy = true
+        history.reading(more: false)
+        #expect(history.busy && history.fromTop)
         #expect(!history.answered(try await answer("first-page.json")))
         #expect(history.read && !history.busy && history.events.count == 3)
         #expect(history.nextBefore == "00000000-0000-7000-8000-000000000006")
-        history.fromTop = false
+        history.reading(more: true)
+        #expect(history.busy && !history.fromTop)
         #expect(!history.answered(try await answer("first-page.json")))
         #expect(history.events.count == 3)
         #expect(!history.answered(await client(nil).history(before: history.nextBefore)))
@@ -189,23 +191,32 @@ struct HistoryTests {
     }
 
     @Test(
-        "Read again from the top over the moments read (#141): they stay meanwhile, and its page takes their place — the newest moments in, the older pages back under Show earlier — and a read that fails keeps them, said above them as not updated with why (rule 5), until an answer clears it"
+        "Read again from the top over the moments read (#141): they stay meanwhile, and its page takes their place — the newest moments in, the older pages back under Show earlier — and a read that fails keeps them, said above them as not updated with why (rule 5), Show earlier's pages meanwhile, come or not, leaving that said, until a read from the top starts again or answers"
     )
     func readAgain() async throws {
         var history = History()
         _ = history.answered(try await answer("first-page.json"))
-        history.fromTop = false
+        history.reading(more: true)
         _ = history.answered(try await answer("next-page.json"))
         #expect(history.events.count == 6 && history.notUpdated == nil)
-        (history.fromTop, history.busy) = (true, true)
+        history.reading(more: false)
+        #expect(history.events.count == 6 && history.read && history.busy)
         #expect(!history.answered(await client(nil).history()))
         #expect(history.events.count == 6 && history.read && !history.busy)
         #expect(history.nextBefore == "00000000-0000-7000-8000-000000000008")
-        #expect(
-            history.notUpdated
-                == "Bali couldn't update your history. Can't reach the server. Check your connection and try again."
-        )
-        history.busy = true
+        let notUpdated =
+            "Bali couldn't update your history. Can't reach the server. Check your connection and try again."
+        #expect(history.notUpdated == notUpdated && history.failure == nil)
+        // Show earlier meanwhile: its own failure in its place, and the newest still not read.
+        history.reading(more: true)
+        #expect(!history.answered(await client(nil).history(before: history.nextBefore)))
+        #expect(history.notUpdated == notUpdated && history.failure != nil)
+        history.reading(more: true)
+        #expect(!history.answered(try await answer("empty.json")))
+        #expect(history.notUpdated == notUpdated && history.failure == nil && history.nextBefore == nil)
+        // Try again from the top: the words go while it reads, and its page leaves none.
+        history.reading(more: false)
+        #expect(history.notUpdated == nil && history.events.count == 6)
         #expect(!history.answered(try await answer("first-page.json")))
         #expect(history.events.count == 3 && history.failure == nil && history.notUpdated == nil)
         #expect(history.nextBefore == "00000000-0000-7000-8000-000000000006" && history.read)
@@ -229,16 +240,16 @@ struct HistoryTests {
         #expect(!history.answered(try await answer("400-bad-limit.json")))
         #expect(history.failure == "Something went wrong at Bali. Try again in a moment.")
         _ = history.answered(try await answer("first-page.json"))
-        (history.fromTop, history.busy) = (false, true)
+        history.reading(more: true)
         #expect(history.answered(try await answer("400-bad-cursor.json")))
         #expect(history.events.count == 3 && history.read && !history.busy && history.failure == nil)
         // A read from the top — no cursor sent — so answered is said, never read again: that
         // would be refused again, forever (C6a-2's review) — over nothing read, or the moments kept.
-        (history.fromTop, history.busy) = (true, true)
+        history.reading(more: false)
         #expect(!history.answered(try await answer("400-bad-cursor.json")))
         #expect(history.events.count == 3 && history.notUpdated != nil && !history.busy)
         var top = History()
-        top.busy = true
+        top.reading(more: false)
         #expect(!top.answered(try await answer("400-bad-cursor.json")))
         #expect(top.failure == "Something went wrong at Bali. Try again in a moment.")
         #expect(!top.read && !top.busy && top.notUpdated == nil)

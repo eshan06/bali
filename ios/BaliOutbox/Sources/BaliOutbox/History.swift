@@ -12,13 +12,37 @@ public struct History: Sendable, Hashable {
     /// Whether a page has answered: until then the screen says it is reading, or why it could not.
     public var read = false
     public var busy = false
+    /// Why the last read did not finish, said in its place (rule 5): with nothing read, in the
+    /// moments' place; else Show earlier's page, where it was pressed.
     public var failure: String?
+    /// Said above the moments read where reading them again from the top did not finish (#141):
+    /// they may not be the newest, and why (rule 5) — through Show earlier's pages too, until a
+    /// read from the top starts again or answers.
+    public var notUpdated: String?
     /// Whether the read under way, or the last one, is from the top — no cursor sent — not Show
     /// earlier's page (#141): its page takes the place of the moments read, which show until it
-    /// comes, and its failure keeps them, said above them (`notUpdated`).
+    /// comes.
     public var fromTop = true
 
     public init() {}
+
+    /// A read starts: from the top, or `more`, Show earlier's page — the last one's words gone, and
+    /// from the top that the moments are not updated too, said again should it fail.
+    public mutating func reading(more: Bool) {
+        (fromTop, busy, failure) = (!more, true, nil)
+        if !more { notUpdated = nil }
+    }
+
+    /// A read that did not finish, said where it belongs (rule 5): a read from the top's over the
+    /// moments read, above them (#141); any other in its own place.
+    public mutating func failed(_ words: String) {
+        busy = false
+        if fromTop, read {
+            notUpdated = "Bali couldn't update your history. \(words)"
+        } else {
+            failure = words
+        }
+    }
 
     /// A page came back — from the top, in place of the moments read (a newer moment added after
     /// older ones would be drawn out of order, and a moment read before may have changed since: an
@@ -32,7 +56,7 @@ public struct History: Sendable, Hashable {
         busy = false
         guard let page = response.answer else {
             if response.error?.error.reason == .unknownCursor, !fromTop { return true }
-            failure = Self.words(response.result)
+            failed(Self.words(response.result))
             return false
         }
         if fromTop { self = History() }
@@ -40,13 +64,6 @@ public struct History: Sendable, Hashable {
         events += page.events.filter { !known.contains($0.eventId) }
         (nextBefore, read, failure) = (page.nextBefore, true, nil)
         return false
-    }
-
-    /// Said above the moments read where reading them again from the top did not finish (#141):
-    /// they may not be the newest, and why (rule 5) — nil otherwise.
-    public var notUpdated: String? {
-        guard read, fromTop, let failure else { return nil }
-        return "Bali couldn't update your history. \(failure)"
     }
 
     /// What the screen says when a read gave no page (rule 5): in the Join screen's words — a

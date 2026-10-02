@@ -166,23 +166,27 @@ final class Phone {
     /// at once, and its screen reads the newest page again each time it shows (`refreshHistory`).
     func select(_ tab: Screen) { self.tab = tab }
 
-    /// History shows — its screen's own call, each time it appears — or a student signed in: the
-    /// moments kept show meanwhile, and the newest page is read again from the top, quietly (#141).
-    /// Nothing on a frozen phone: a fixture stays as made.
+    /// History shows — its screen's own call, each time it appears: the moments kept show meanwhile,
+    /// and the newest page is read again from the top, quietly (#141). A frozen phone's fixture
+    /// stays as made; with no history at all, its read says it has not started, never nothing
+    /// (#106's review; santa's round 1).
     func refreshHistory() async {
-        guard !frozen else { return }
+        guard !frozen || history == History() else { return }
         await readHistory()
     }
 
     /// Reads the student's history through the engine: from the top — the moments read kept until
-    /// its page takes their place (#141) — or `more`, the page after those read. A phone whose
-    /// engine has not started — a frozen one too — says so (rule 5).
+    /// its page takes their place (#141) — or `more`, the page after those read. One at a time, but
+    /// a read from the top goes ahead of Show earlier's page under way, whose answer it drops: its
+    /// own takes the place of all read. A phone whose engine has not started — a frozen one too —
+    /// says so (rule 5).
     func readHistory(more: Bool = false) async {
-        guard !history.busy, !more || history.nextBefore != nil else { return }
-        history.fromTop = !more
-        guard let engine else { return history.failure = Joining.notStarted }
+        guard !history.busy || !more && !history.fromTop, !more || history.nextBefore != nil
+        else { return }
         let before = more ? history.nextBefore : nil
-        (history.busy, history.failure, reads) = (true, nil, reads + 1)
+        history.reading(more: more)
+        guard let engine else { return history.failed(Joining.notStarted) }
+        reads += 1
         let read = reads
         await historyRead(await engine.history(before: before), for: read)
     }
@@ -224,7 +228,7 @@ final class Phone {
         if another { Task { await engine?.forgetMe() } }
         if let account { self.account = account }
         self.signedIn = signedIn
-        if changed, signedIn == true { Task { await refreshHistory() } }
+        if changed, signedIn == true, !frozen { Task { await readHistory() } }
     }
 
     /// Saves the name as typed (`PATCH /v1/me`), through the engine: set, editing ends and the name

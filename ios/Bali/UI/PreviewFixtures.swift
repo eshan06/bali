@@ -114,7 +114,7 @@
             "historyLoading": State(tab: .history, history: history(busy: true)),
             // Shown again, the moments kept, and the newest page's read again failed (#141).
             "historyRefreshError": State(
-                tab: .history, history: anaHistory(failure: History.words(.networkError))),
+                tab: .history, history: anaHistory(failed: History.words(.networkError))),
             "me": State(sync: standing(.out, me: anaRodriguez), tab: .me),
             "meEditing": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me, naming: naming("Ana R.")),
@@ -244,8 +244,8 @@
 
         /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
         /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier —
-        /// kept, where reading them again from the top failed: `failure` (#141).
-        private static func anaHistory(failure: String? = nil) -> History {
+        /// kept, where reading them again from the top failed: `failed` (#141).
+        private static func anaHistory(failed: String? = nil) -> History {
             /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
             func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
                 let calendar = Calendar.current
@@ -273,11 +273,12 @@
                     countedIn: #"{"id":"p5","name":"Period 5 — Chemistry"}"#),
                 moment(2, "session_ended", at(13, 50, 1), 5), moment(1, "tap_in", at(13, 2, 1), 5),
             ]
-            var ana = history(read: true, failure: failure)
+            var ana = history(read: true)
             let page = try? BaliJSON.makeDecoder().decode(
                 HistoryPage.self,
                 from: Data(#"{"events":[\#(events.joined(separator: ","))],"nextBefore":"m0"}"#.utf8))
             (ana.events, ana.nextBefore) = (page?.events ?? [], page?.nextBefore)
+            if let failed { ana.failed(failed) }
             return ana
         }
 

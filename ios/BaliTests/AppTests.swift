@@ -178,12 +178,18 @@ struct AppTests {
         let notUpdated = try #require(PreviewFixtures.all["historyRefreshError"]?.history)
         #expect(notUpdated.events == history.events && notUpdated.nextBefore == history.nextBefore)
         #expect(notUpdated.notUpdated?.hasPrefix("Bali couldn't update your history.") == true)
+        #expect(notUpdated.failure == nil && !notUpdated.busy)
         let error = Phone(fixture: try #require(PreviewFixtures.all["historyError"]))
         await error.readHistory()
         #expect(error.history.failure == Joining.notStarted && !error.history.read)
         let shown = Phone(fixture: try #require(PreviewFixtures.all["history"]))
         await shown.refreshHistory()
         #expect(shown.history == history)
+        // With no history at all — Home's, its History chosen — that read says so (santa's round 1).
+        let unread = Phone(fixture: try #require(PreviewFixtures.all["home"]))
+        unread.select(.history)
+        await unread.refreshHistory()
+        #expect(unread.history.failure == Joining.notStarted && !unread.history.read)
         // Protection off and Session over (C5b): each look's step and words, a refused Back to
         // focus said where the student lands, and Done closing Session over — Home past the bell.
         let looks: [(String, ProtectionOffWords.Way, Bool)] = [
@@ -447,7 +453,7 @@ struct AppTests {
     }
 
     @Test(
-        "History kept while the app runs (#141), through the phone's own engine: a second visit shows what the first read at once — the tab changed, and Home again after a read — and its screen reads the newest page again, which takes its place; a read again that fails keeps the moments and says so above them, its Try again from the top (rule 5)"
+        "History kept while the app runs (#141), through the phone's own engine: a second visit shows what the first read at once — the tab changed, and Home again after a read — and its screen reads the newest page again, which takes its place; a read again that fails keeps the moments and says so above them, its Try again from the top (rule 5), Show earlier meanwhile leaving that said"
     )
     func historyKept() async throws {
         let server = StandIn(pages: [page(["m2"], next: "m2"), page(["m3", "m2"], next: "m2")])
@@ -470,6 +476,33 @@ struct AppTests {
                 == "Bali couldn't update your history. Can't reach the server. Check your connection and try again."
         )
         #expect(!phone.history.busy && phone.history.nextBefore == "m2")
+        // Show earlier meanwhile, its page not come either: each said in its own place.
+        await phone.readHistory(more: true)
+        #expect(phone.history.notUpdated != nil && phone.history.failure != nil)
+        #expect(await server.befores == [nil, nil, nil, "m2"])
+    }
+
+    @Test(
+        "A visit's read from the top goes ahead of Show earlier's page still on its way (#141, santa's round 1): the newest page read all the same, in place of all read, and the older page, landing after, dropped; the button reads Reading… for its own page only"
+    )
+    func historyAhead() async throws {
+        let server = StandIn(
+            pages: [page(["m2"], next: "m2"), page(["m1"], next: nil), page(["m3", "m2"], next: "m2")],
+            hold: "m2")
+        let (phone, _) = try standIn(server)
+        await phone.refreshHistory()
+        async let earlier: Void = phone.readHistory(more: true)
+        try await until { await server.befores.count == 2 }
+        #expect(phone.history.busy && !phone.history.fromTop)
+        phone.select(.home)
+        phone.select(.history)
+        await phone.refreshHistory()
+        #expect(phone.history.events.map(\.eventId) == ["m3", "m2"] && !phone.history.busy)
+        await server.letGo()
+        await earlier
+        #expect(phone.history.events.map(\.eventId) == ["m3", "m2"])
+        #expect(phone.history.nextBefore == "m2" && !phone.history.busy)
+        #expect(await server.befores == [nil, "m2", nil])
     }
 
     @Test(
@@ -1094,13 +1127,24 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 
 /// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after
 /// that, a read on its way for good, until the test ends — and history pages from `pages`, in
-/// turn, the cursor each asked for kept.
+/// turn, the cursor each asked for kept; a page asked for with `hold` as its cursor answered only
+/// once the test lets it go.
 private actor StandIn: HTTPTransport {
     private var me: String?
     private var pages: [String]
     private(set) var befores: [String?] = []
+    private let hold: String?
+    private var held: CheckedContinuation<Void, Never>?
 
-    init(me: String? = nil, pages: [String] = []) { (self.me, self.pages) = (me, pages) }
+    init(me: String? = nil, pages: [String] = [], hold: String? = nil) {
+        (self.me, self.pages, self.hold) = (me, pages, hold)
+    }
+
+    /// The page held, answered now.
+    func letGo() {
+        held?.resume()
+        held = nil
+    }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw URLError(.badURL) }
@@ -1108,9 +1152,11 @@ private actor StandIn: HTTPTransport {
         switch url.path() {
         case "/v1/me/history":
             let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
-            befores.append(query?.first { $0.name == "before" }?.value)
+            let before = query?.first { $0.name == "before" }?.value
+            befores.append(before)
             guard !pages.isEmpty else { throw URLError(.notConnectedToInternet) }
             body = pages.removeFirst()
+            if let hold, before == hold { await withCheckedContinuation { held = $0 } }
         case "/v1/me" where me != nil:
             (body, me) = (me ?? "", nil)
         case "/v1/me":

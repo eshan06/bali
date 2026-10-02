@@ -19,11 +19,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   an older page, so the older pages go back under Show earlier. So a fresh moment shows within one
   round trip of opening the tab, and what shows meanwhile is the last read, never a claim of now.
   **Said, not silent (rule 5):** a read again that fails keeps the moments and says so above them,
-  "Bali couldn't update your history." and why, with Try again from the top; Show earlier's own
-  failure stays where it was pressed. `History.fromTop` tells the two reads apart, and `answered`
-  now knows Show earlier's page by it rather than by a cursor held — a kept history holds one through
-  a read from the top, which an `unknown_cursor` would otherwise have read again forever (C6a-2's
-  review). **Forgotten only when who is signed in changes** (`Phone.signed`, keyed on the account as
+  "Bali couldn't update your history." and why, with Try again from the top (`History.notUpdated`),
+  said through Show earlier's pages too until a read from the top starts again or answers — those
+  pages leave the newest unread; Show earlier's own failure stays where it was pressed
+  (`History.failed` puts each where it belongs). `History.fromTop` tells the two reads apart, and
+  `answered` now knows Show earlier's page by it rather than by a cursor held — a kept history holds
+  one through a read from the top, which an `unknown_cursor` would otherwise have read again forever
+  (C6a-2's review). **Forgotten only when who is signed in changes** (`Phone.signed`, keyed on the account as
   `me` is since C6b-1's review), an answer from before dropped by `reads`; leaving History drops
   nothing now, an answer landing after it kept for the next visit. **Read at a sign-in too** (the
   issue's optional half): one `GET /v1/me/history` per app open or sign-in, so even the first visit

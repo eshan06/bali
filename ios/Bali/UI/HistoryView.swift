@@ -71,10 +71,12 @@ struct HistoryView: View {
             ForEach(Array(day.cards.enumerated()), id: \.offset) { _, card in ClassCard(card: card) }
         }
         if history.nextBefore != nil {
-            if let failure = history.failure, !history.fromTop {
+            if let failure = history.failure {
                 Retry(words: failure, phone: phone) { await phone.readHistory(more: true) }
             } else {
-                Button(history.busy ? "Reading…" : "Show earlier") {
+                // Held while any read is under way, but "Reading…" only for its own page: the read
+                // again from the top each visit makes stays quiet (#141).
+                Button(history.busy && !history.fromTop ? "Reading…" : "Show earlier") {
                     Task { await phone.readHistory(more: true) }
                 }
                 .buttonStyle(SecondaryButtonStyle()).disabled(history.busy).padding(.top, 4)
