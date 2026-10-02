@@ -7,7 +7,8 @@ import SwiftUI
 /// class cards, times in the phone's locale and time zone (`History.days`, tested on Linux). Kept
 /// while the app runs and shown at once, its newest page read again quietly each time it shows
 /// (#141); reading, nothing yet and a read that failed are each said, a failure with Try again
-/// (rule 5) — one over the moments kept said above them; an older page on Show earlier.
+/// (rule 5) — one over the moments kept said above them; an older page on Show earlier. Built as it
+/// scrolls: only the days and cards on screen, each card by its own id (#139).
 struct HistoryView: View {
     let phone: Phone
 
@@ -15,7 +16,7 @@ struct HistoryView: View {
         let history = phone.history
         ScreenScaffold {
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                LazyVStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("History").textStyle(.h1).accessibilityAddTraits(.isHeader)
                         Text("The same moments your teachers see — nothing more.").textStyle(.body)
@@ -68,7 +69,7 @@ struct HistoryView: View {
             Text(day.title).textStyle(.label).textCase(.uppercase)
                 .foregroundStyle(Theme.textTertiary).padding(.top, index == 0 ? 0 : 4)
                 .accessibilityAddTraits(.isHeader)
-            ForEach(Array(day.cards.enumerated()), id: \.offset) { _, card in ClassCard(card: card) }
+            ForEach(day.cards) { ClassCard(card: $0) }
         }
         if history.nextBefore != nil {
             if let failure = history.failure {

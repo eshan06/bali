@@ -80,8 +80,10 @@ public struct History: Sendable, Hashable {
         public let cards: [Card]
     }
 
-    /// One class's moments in a row, under its name and its teacher's (none when unnamed).
-    public struct Card: Sendable, Hashable {
+    /// One class's moments in a row, under its name and its teacher's (none when unnamed). Known by
+    /// its first moment's id, so a newer moment joining it keeps it the card it was (#139).
+    public struct Card: Sendable, Hashable, Identifiable {
+        public let id: String
         public let name: String
         public let teacher: String?
         public let moments: [Moment]
@@ -113,8 +115,8 @@ public struct History: Sendable, Hashable {
         return runs(shown) { calendar.startOfDay(for: $0.event.occurredAt) }.map { day in
             let cards = runs(day.reversed()) { $0.event.class.id }.map { run in
                 Card(
-                    name: run[0].event.class.name, teacher: run[0].event.teacher.displayName,
-                    moments: run.map(\.moment))
+                    id: run[0].moment.id, name: run[0].event.class.name,
+                    teacher: run[0].event.teacher.displayName, moments: run.map(\.moment))
             }
             return Day(title: title(day[0].event.occurredAt, now, calendar, time), cards: cards)
         }

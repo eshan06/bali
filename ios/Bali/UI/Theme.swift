@@ -123,15 +123,18 @@ struct SecondaryButtonStyle: ButtonStyle {
     }
 }
 
-/// A card: white, radius 20, shadow-1, D1's 20-pt padding unless a screen packs rows into it.
+/// A card: white, radius 20, shadow-1, D1's 20-pt padding unless a screen packs rows into it. Its
+/// shadow is its shape's alone, drawn once at its edge: one over the whole card shadows every line,
+/// chip and button inside it too, each redrawn as a screen scrolls (#139).
 struct Card<Content: View>: View {
     var padding: CGFloat = 20
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content().padding(padding).frame(maxWidth: .infinity)
-            .background(Theme.card, in: .rect(cornerRadius: Theme.Radius.lg))
-            .shadow(color: Theme.shadow, radius: 1, y: 1)
+            .background(
+                Theme.card.shadow(.drop(color: Theme.shadow, radius: 1, y: 1)),
+                in: .rect(cornerRadius: Theme.Radius.lg))
     }
 }
 
