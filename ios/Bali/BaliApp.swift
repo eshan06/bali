@@ -97,9 +97,12 @@ final class Phone {
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
     var leaving = Leaving()
-    /// Unlocked's reason card (C5c): the reason picked, on its way, and why the last did not go.
+    /// Unlocked's reason card (C5c): the newest reason picked, its check shown until it is
+    /// answered, and why the last did not go.
     private(set) var picking: UnlockReason?
     private(set) var pickFailed: String?
+    /// Whether a pick is on its way: one made meanwhile only moves the check (#140).
+    private var pickSending = false
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -422,14 +425,22 @@ final class Phone {
 
     /// A reason picked on Unlocked (C5c): sent with the latest Emergency Unlock while it has never
     /// been sent, else as a change of it once the server has it (A20) — the check on it at once,
-    /// the others held until it is kept — or why not, said (rule 5), the check back on the reason
-    /// on record. A phone not started says so.
+    /// and no pick ever waits on another (#140): one goes at a time, so the server records them in
+    /// the order the student made them, and once it answers the newest goes unless it is the one
+    /// just sent, the picks between never sent. Why the newest did not go is said (rule 5), the
+    /// check back on the reason on record. A phone not started says so.
     func pick(_ reason: UnlockReason) async {
-        guard picking == nil else { return }
         guard let engine else { return pickFailed = Joining.notStarted }
         (picking, pickFailed) = (reason, nil)
-        pickFailed = await engine.explain(reason)
-        picking = nil
+        guard !pickSending else { return }
+        pickSending = true
+        var sent: UnlockReason?
+        while let next = picking, next != sent {
+            sent = next
+            let failed = await engine.explain(next)
+            if picking == next { pickFailed = failed }
+        }
+        (pickSending, picking) = (false, nil)
     }
 
     /// Back to focus from an Emergency Unlock (C5a) — or what the Unlocked screen says (rule 5).

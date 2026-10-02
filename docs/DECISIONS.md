@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F3 (#140): Unlocked's reasons picked at once — every reason open, one change
+  on its way, the newest only.** The owner's device check: once the unlock had reached the server,
+  each pick waited on its change (A20, about half a second on dev) with the other reasons off, so
+  switching felt choppy (four picks in two seconds, each waiting on the last). Now a pick shows its
+  check and the light haptic at once and every reason stays open. `Phone.pick` keeps one change on
+  its way; a pick made meanwhile only moves the check, and once that change answers, the newest pick
+  goes unless it is the one just sent — the picks between are never sent. Each change is its own
+  event and the grid and History read the latest (A20), so nothing the teacher sees is lost, and one
+  change at a time keeps the server's order the student's. Only the newest pick's answer is said: a
+  change on its way that did not go is no matter once a newer one goes; the newest that did not go
+  is said, the check back on the reason on record, and picked again it goes under its event id
+  where no answer came (rule 4). **On the phone, not in the engine:** the taps are ordered on the
+  main actor, where the check (`picking`) is, so the newest sent is the student's last tap however
+  the engine's actor orders its calls; `SyncEngine.explain` stays one call, one change. Before the
+  unlock is sent, a pick still writes it into the record (C5a's hold), unchanged. This replaces
+  Riders-2's "reason taps go one at a time (a second while the first is on its way does nothing)":
+  that kept the card and the record agreeing by refusing taps; one change on its way keeps them
+  agreeing without. No server change.
 - **2026-09-30** — **C3c: Home's card for a class in session, and the conductor's two decisions
   under the owner's delegation** (ruling 4 of the owner's rulings below left Home-in-session to the
   conductor). **(a) The class's running session on `GET /v1/me`:** a phone knows only its own

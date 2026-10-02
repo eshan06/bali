@@ -467,6 +467,113 @@ struct AppTests {
     }
 
     @Test(
+        "Reasons picked on Unlocked while a change of the reason is on its way (#140): each shows its check at once and none is refused, and once the one on its way answers, only the newest goes, the picks between never sent; a pick back to the one on its way sends nothing more",
+        .timeLimit(.minutes(3)))
+    func picksAtOnce() async throws {
+        let (phone, engine, server, running) = try await unlockRecorded()
+        let first = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 1 }
+        #expect(phone.picking == .nurse)
+        await phone.pick(.other)
+        #expect(phone.picking == .other)
+        await phone.pick(.bathroom)
+        #expect(phone.picking == .bathroom && phone.pickFailed == nil)
+        await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        try await until { await server.changes.count == 2 }
+        #expect(phone.picking == .bathroom)
+        await server.answer(200, #"{"outcome":"applied","reason":"bathroom"}"#)
+        await first.value
+        #expect(await server.changes.map(\.reason) == ["nurse", "bathroom"])
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        #expect(await engine.state.recordedUnlock?.reason == .bathroom)
+        let back = Task { await phone.pick(.other) }
+        try await until { await server.changes.count == 3 }
+        await phone.pick(.nurse)
+        await phone.pick(.other)
+        await server.answer(200, #"{"outcome":"applied","reason":"other"}"#)
+        await back.value
+        #expect(await server.changes.map(\.reason) == ["nurse", "bathroom", "other"])
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        #expect(await engine.state.recordedUnlock?.reason == .other)
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
+        "A pick that did not go is said (#140, rule 5): one on its way with a newer pick behind it is no matter — the newer goes, its own answer said; the newest with no answer, said, the check back on the reason on record, and picked again it goes under the same event id (rule 4); the newest refused, its refusal said, the check on the one kept before it",
+        .timeLimit(.minutes(3)))
+    func picksNotSent() async throws {
+        let (phone, engine, server, running) = try await unlockRecorded()
+        let first = Task { await phone.pick(.bathroom) }
+        try await until { await server.changes.count == 1 }
+        await phone.pick(.other)
+        await server.answer(nil)
+        try await until { await server.changes.count == 2 }
+        await server.answer(200, #"{"outcome":"applied","reason":"other"}"#)
+        await first.value
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        #expect(await engine.state.recordedUnlock?.reason == .other)
+        let lost = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 3 }
+        await server.answer(nil)
+        await lost.value
+        #expect(phone.picking == nil && phone.pickFailed == UnlockedWords.offline)
+        #expect(await engine.state.recordedUnlock?.reason == .other)
+        let again = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 4 }
+        await server.answer(200, #"{"outcome":"replay","reason":"nurse"}"#)
+        await again.value
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        #expect(await engine.state.recordedUnlock?.reason == .nurse)
+        let last = Task { await phone.pick(.bathroom) }
+        try await until { await server.changes.count == 5 }
+        await phone.pick(.other)
+        await server.answer(200, #"{"outcome":"applied","reason":"bathroom"}"#)
+        try await until { await server.changes.count == 6 }
+        let over = #"{"error":{"code":"conflict","reason":"unlock_superseded","message":"over"}}"#
+        await server.answer(409, over)
+        await last.value
+        #expect(phone.picking == nil)
+        #expect(phone.pickFailed == "This unlock is over, so its reason can't change.")
+        #expect(await engine.state.recordedUnlock?.reason == .bathroom)
+        let changes = await server.changes
+        let sent: [String?] = ["bathroom", "other", "nurse", "nurse", "bathroom", "other"]
+        #expect(changes.map(\.reason) == sent)
+        // Picked again after no answer: the same change, under its event id (rule 4); a newer
+        // pick after one with no answer is a change of its own.
+        #expect(changes[3].eventId == changes[2].eventId)
+        #expect(changes[1].eventId != changes[0].eventId)
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
+        "Picks while the unlock is still on the phone are written into it, each at once (C5a's hold, unchanged by #140): no change of the reason is sent, and the unlock goes with the newest",
+        .timeLimit(.minutes(3)))
+    func picksOnThePhone() async throws {
+        let server = Reasons()
+        let (phone, engine) = try standIn(server)
+        var running = Task { await engine.run() }
+        try await engine.record(.tap(tagId: "tag"))
+        try await until { await engine.state.queued.isEmpty }
+        // Nothing sent from here until the picks are made: the unlock stays on the phone.
+        running.cancel()
+        await running.value
+        #expect(await engine.pressUnlock() == nil)
+        for reason in [UnlockReason.nurse, .other, .bathroom] {
+            await phone.pick(reason)
+            #expect(phone.picking == nil && phone.pickFailed == nil, "\(reason)")
+        }
+        #expect(UnlockedWords(await engine.state)?.picker == .open(.bathroom))
+        running = Task { await engine.run() }
+        try await until { await engine.state.recordedUnlock != nil }
+        #expect(await server.unlocks == ["bathroom"])
+        #expect(await server.changes.isEmpty)
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
         "Home's Join a class opens Join over it, and Back closes it — the code typed there gone; Waiting's Back to home opens Home over it, and Join over that Home in turn, Back returning to each (santa's round 1: Join fell back to Waiting there); all end once where the phone stands changes, a Join among them starting over (C3). A frozen phone's Tap in says it has not started, never nothing"
     )
     func opened() async throws {
@@ -841,8 +948,8 @@ private func expectEdges(of scrolls: [UIScrollView], in window: UIWindow, _ name
 /// A phone of the test's own over an engine `server` answers, and a sign-in over `keychain`: what
 /// `Phone.start` wires between them and the screens, with no Keychain or network of the phone's.
 @MainActor
-private func standIn(_ server: StandIn, keychain: Keychain = Keychain(account: "ana")) throws
-    -> (Phone, SyncEngine)
+private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(account: "ana"))
+    throws -> (Phone, SyncEngine)
 {
     struct Signed: TokenProvider {
         func accessToken() async -> String? { "token" }
@@ -890,6 +997,70 @@ private actor StandIn: HTTPTransport {
                 url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
         else { throw URLError(.badURL) }
         return (Data(body.utf8), response)
+    }
+}
+
+/// A phone of the test's own over `Reasons`, its engine running (#140): tapped into session "s"
+/// and unlocked there, the unlock recorded with no reason, so Unlocked's picks are changes of it.
+@MainActor
+private func unlockRecorded() async throws -> (Phone, SyncEngine, Reasons, Task<Void, Never>) {
+    let server = Reasons()
+    let (phone, engine) = try standIn(server)
+    let running = Task { await engine.run() }
+    try await engine.record(.tap(tagId: "tag"))
+    try await until { await engine.state.queued.isEmpty }
+    try await engine.record(.unlock(session: "s", reason: nil))
+    try await until { await engine.state.recordedUnlock != nil }
+    return (phone, engine, server, running)
+}
+
+/// The API as a stand-in answers Unlocked's reason (#140): a tap joins session "s"; an unlock
+/// there is recorded with the reason it carries, kept in `unlocks`; and each change of an unlock's
+/// reason (`PATCH /v1/unlocks/{eventId}`, A20) is kept in `changes`, its reason and event id, and
+/// waits for the test's `answer`. Anything else gets no answer.
+private actor Reasons: HTTPTransport {
+    private(set) var unlocks: [String?] = []
+    private(set) var changes: [(reason: String?, eventId: String?)] = []
+    private var waiting: [CheckedContinuation<(status: Int, body: String)?, Never>] = []
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        struct Body: Decodable {
+            let reason: String?
+            let eventId: String?
+        }
+        guard let url = request.url else { throw URLError(.badURL) }
+        let body = request.httpBody.flatMap { try? JSONDecoder().decode(Body.self, from: $0) }
+        let session = #"{"id":"s","classId":"c","endsAt":"2099-01-01T00:00:00.000Z"}"#
+        var answer: (status: Int, body: String)?
+        switch (request.httpMethod ?? "", url.path()) {
+        case ("POST", "/v1/taps"):
+            answer = (200, #"{"outcome":"joined","session":\#(session),"state":"focused"}"#)
+        case ("POST", "/v1/sessions/s/unlock"):
+            unlocks.append(body?.reason)
+            let reason = body?.reason.map { #""\#($0)""# } ?? "null"
+            answer = (
+                200,
+                #"{"outcome":"applied","recordedAs":null,"state":"unlocked","session":\#(session),"reason":\#(reason)}"#
+            )
+        case ("PATCH", let path) where path.hasPrefix("/v1/unlocks/"):
+            changes.append((body?.reason, body?.eventId))
+            answer = await withCheckedContinuation { waiting.append($0) }
+        default: break
+        }
+        guard let answer,
+            let response = HTTPURLResponse(
+                url: url, statusCode: answer.status, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.notConnectedToInternet) }
+        return (Data(answer.body.utf8), response)
+    }
+
+    /// Answers the change waiting longest: `status` and `body`, or no answer at all when nil.
+    func answer(_ status: Int?, _ body: String = "") {
+        guard !waiting.isEmpty else {
+            Issue.record("no change of the reason is waiting")
+            return
+        }
+        waiting.removeFirst().resume(returning: status.map { ($0, body) })
     }
 }
 
