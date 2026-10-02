@@ -172,10 +172,12 @@ extension SyncState {
     /// only retries (401, 408, 429, a server error, none) says nothing of why it is stuck: short of
     /// the bound's count of answers only a refusal stuck it — one a file older than its kept
     /// refusal holds — whose words stand; at the bound, it is still being sent (#114's review) —
-    /// never "tap in again" then.
+    /// never "tap in again" then. Only while it is the phone's newest tap (#146): once the student
+    /// taps again, the later tap is the one that counts — still kept and retried, it says nothing
+    /// more (the readout lists it). A file that names no tap leaves the latest stuck one said.
     public var refusedTapWords: String? {
         let stuck = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
-        guard let stuck else { return nil }
+        guard let stuck, (lastTap ?? stuck.eventId) == stuck.eventId else { return nil }
         let tapAgain = "Bali couldn't record a tap. Tap in again, or ask your teacher."
         switch stuck.refusedStatus ?? stuck.lastStatus {
         case 404?:

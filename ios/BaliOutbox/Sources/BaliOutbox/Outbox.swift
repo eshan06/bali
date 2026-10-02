@@ -515,6 +515,10 @@ public struct Outbox: Sendable {
         try pool.read { try Self.state($0, Self.reportedKey) }
     }
 
+    /// The phone's newest tap's event id, queued or answered and gone — kept by each tap's own
+    /// write — or nil before this file kept one: only it is said refused (#146).
+    func lastTap() throws -> String? { try pool.read { try Self.state($0, Self.lastTapKey) } }
+
     /// A later revocation is a new one, reported again: the Screen Time permission is back, or the
     /// phone's row is focused again (`SyncEngine.record`, A13).
     public func protectionRestored() throws {

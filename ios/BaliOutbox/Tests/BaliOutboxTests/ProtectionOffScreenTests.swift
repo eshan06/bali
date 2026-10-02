@@ -116,7 +116,7 @@ struct ProtectionOffScreenTests {
     }
 
     @Test(
-        "What the screens Protection off takes over from said is said there too, with Try again (C5b's review; rule 5): an Emergency Unlock of this class stuck on the phone — not another class's — a tap the server refused, and the classes not read"
+        "What the screens Protection off takes over from said is said there too, with Try again (C5b's review; rule 5): an Emergency Unlock of this class stuck on the phone — not another class's — a tap the server refused while it is the phone's newest (#146: the owner's phone said one an hour later, in another class), and the classes not read"
     )
     func carried() async throws {
         #expect(words(try synced(.inSession(bell1042, .unlocked)))?.problems == [])
@@ -136,6 +136,16 @@ struct ProtectionOffScreenTests {
         state.standing = .inSession(session("t", endsAt: 1720), .unlocked)
         state.meFailed = nil
         #expect(words(state)?.problems.first != UnlockedWords.unsent)
+        // A tap since, joined: the refused one, still kept, is no longer said; the rest still is.
+        let next = try record(outbox, .tap(tagId: "tag"))
+        try await send(outbox, next, 200, Answer.joined())
+        state = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
+        (state.lastTap, state.meFailed) = (try outbox.lastTap(), .networkError)
+        #expect(state.queued.contains { $0.eventId == tap.eventId })
+        #expect(
+            words(state)?.problems == [
+                UnlockedWords.unsent, "Can't reach the server. Check your connection and try again.",
+            ])
     }
 
     @Test(
