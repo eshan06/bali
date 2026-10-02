@@ -876,7 +876,12 @@ public actor SyncEngine {
     private func refreshQueue() { state.queued = queue() }
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
-    private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
+    /// With it, the phone's newest tap while not known — a read at launch that failed, say (santa's
+    /// round 1) — or a refused tap a later one went ahead of would be said again (#146).
+    private func queue() -> [OutboxRecord] {
+        if state.lastTap == nil, let lastTap = try? outbox.lastTap() { state.lastTap = lastTap }
+        return stored(outbox.records) ?? state.queued
+    }
 
     /// Writes the standing to the file — filing into it, in the same write, every unlock made where
     /// the phone stood unread, which then goes (B6b): whatever the file holds, never what a read of

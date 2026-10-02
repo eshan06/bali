@@ -746,6 +746,26 @@ struct TapInTests {
         }
         await relaunched.stop()
     }
+
+    @Test(
+        "A launch whose read of the file failed reads the phone's newest tap again with the queue, once the file reads (santa's round 1): a refused tap a later one went ahead of is still not said"
+    )
+    func refusedTapUnreadAtLaunch() async throws {
+        let (outbox, _) = try makeOutbox()
+        let refused = try record(outbox, .tap(tagId: "NOCLASS123"))
+        try await send(outbox, refused, 404, notFound)
+        let next = try record(outbox, .tap(tagId: "T7XK2M9QPF"))
+        try await send(outbox, next, 200, Answer.joined())
+        try await outbox.pool.write { try $0.execute(sql: "ALTER TABLE outboxState RENAME TO gone") }
+        let rig = try Rig(outbox: outbox)
+        await rig.until { $0.link == .storageFailed }
+        try await outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outboxState") }
+        await rig.engine.retryNow()
+        let read = await rig.until { !$0.queued.isEmpty }
+        #expect(read.queued.map(\.eventId) == [refused.eventId] && read.lastTap == next.eventId)
+        #expect(read.refusedTapWords == nil)
+        await rig.stop()
+    }
 }
 
 /// The phone's clock as the bell's wait reads it: a test clock's time, each read counted. The wait
