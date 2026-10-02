@@ -74,7 +74,9 @@ final class Phone {
     /// The Join screen's (C2b): the code as typed, what it opens, why a try did not finish.
     var joining = Joining()
     /// The screens the student opened over the router's, in order (C3): Home, from Waiting's Back
-    /// to home; Join, from Home's Join a class. Back closes the last; `synced`, as the state says.
+    /// to home — the regular Home there, with no Back (#151) — or Unlocked's Go to Home; Join, from
+    /// Home's Join a class. Back closes the last where it draws one (`canGoBack`); `synced`, as the
+    /// state says.
     private(set) var opened: [Screen] = []
     /// Home's Tap in: a scan under way, and why the last recorded no tap (rule 5).
     private(set) var scanning = false
@@ -314,9 +316,11 @@ final class Phone {
 
     /// Whether the screen shown was opened over another, so it draws a way back to it (C3): only
     /// where Back leads to another screen — never from a Home its Unlocked became after the bell
-    /// (santa's round 1).
+    /// (santa's round 1), nor to Waiting: the Home opened over it is the regular Home, its card
+    /// saying the wait (#151, the owner's decision).
     var canGoBack: Bool {
-        opened.last == screen && choose(Array(opened.dropLast())).screen != screen
+        let under = choose(Array(opened.dropLast())).screen
+        return opened.last == screen && under != screen && under != .waiting
     }
 
     /// Whether the screen shown offers Sign out (C6b): Me, and Join where it is the router's own —

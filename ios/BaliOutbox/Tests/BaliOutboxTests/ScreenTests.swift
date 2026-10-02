@@ -259,7 +259,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "D1's tab bar (C6a): History or Me in place of the router's own Home — out, not read, past the bell once session over is closed (C5b), a state not known — and Home's tab is Home; nowhere else: never over the shields, a session's screens, Waiting or a Home opened over it, Join (its own, or opened over Home), session over, Screen Time, the sign-in, the intro, starting, nor the home the last run's shields keep over a standing not read (B6b)"
+        "D1's tab bar (C6a): History or Me in place of the router's own Home — out, not read, past the bell once session over is closed (C5b), a state not known — and of a Home opened over Waiting, the regular Home there (#151); Home's tab is Home; nowhere else: never over the shields, a session's screens, Waiting itself, Join (its own, or opened over Home), session over, Screen Time, the sign-in, the intro, starting, nor the home the last run's shields keep over a standing not read (B6b)"
     )
     func tabs() {
         for tab in [Screen.history, .me] {
@@ -275,7 +275,7 @@ struct ScreenTests {
             let off = Standing.inSession(session(), .protectionOff)
             #expect(screen(standing: off, tab: tab) == .protectionOff)
             #expect(screen(standing: .waiting, tab: tab) == .waiting)
-            #expect(screen(standing: .waiting, opened: [.home], tab: tab) == .home)
+            #expect(screen(standing: .waiting, opened: [.home], tab: tab) == tab)
             #expect(screen(opened: [.join], tab: tab) == .join)
             #expect(screen(hasClasses: false, tab: tab) == .join)
             #expect(screen(permission: .denied, tab: tab) == .screenTime)
@@ -292,10 +292,11 @@ struct ScreenTests {
         // Screen Time row can read Off (santa's round 1, Riders-2).
         #expect(screen(permission: .denied, standing: .unread, tab: .me) == .me)
         // The bar in the same answer as the screen, at the same moment (C6a's review): a class's
-        // screen has none, the router's own Home has one; Waiting, and anything opened, none.
+        // screen has none, the router's own Home has one, and so has the Home opened over Waiting
+        // (#151); Waiting itself, and Join opened over Home, none.
         #expect(!tabbed(standing: .inSession(session(), .unlocked), now: at(2999)))
         #expect(tabbed(standing: .out) && tabbed(standing: .inSession(session(), nil)))
-        #expect(!tabbed(standing: .waiting) && !tabbed(standing: .waiting, opened: [.home]))
+        #expect(!tabbed(standing: .waiting) && tabbed(standing: .waiting, opened: [.home]))
         #expect(!tabbed(standing: .out, opened: [.join]))
     }
 
@@ -365,6 +366,38 @@ struct ScreenTests {
                 screen(standing: standing, sessionOverClosed: closed, opened: [.home], tab: .me, now: at(3000))
                     == .me)
             #expect(tabbed(standing: standing, opened: [.home], closed: closed, now: at(3000)))
+        }
+    }
+
+    @Test(
+        "Waiting's Back to home (#151, the owner's decision, 2026-10-01): the regular Home — its tab bar, History and Me honoured there, Join over it as over any Home — never a Home stacked over Waiting; Waiting itself stays the tap's answer, with no bar; the Start found is Focus, whatever was opened or chosen; and Home's card says the wait in the hero's place: the tap counted and when the phone locks, only while waiting — C3c's card never then"
+    )
+    func homeWaiting() throws {
+        #expect(screen(standing: .waiting) == .waiting && !tabbed(standing: .waiting))
+        #expect(screen(standing: .waiting, opened: [.home]) == .home)
+        #expect(tabbed(standing: .waiting, opened: [.home]))
+        for tab in [Screen.history, .me] {
+            #expect(screen(standing: .waiting, opened: [.home], tab: tab) == tab)
+        }
+        #expect(screen(standing: .waiting, opened: [.home, .join], tab: .me) == .join)
+        #expect(!tabbed(standing: .waiting, opened: [.home, .join]))
+        let started = Standing.inSession(session(), .focused)
+        for tab in [Screen.home, .history, .me] {
+            #expect(screen(standing: started, opened: [.home], tab: tab) == .focus, "\(tab)")
+            #expect(screen(standing: started, opened: [.home, .join], tab: tab) == .focus, "\(tab)")
+        }
+        var waiting = try synced(.waiting)
+        #expect(
+            waiting.waitingCard
+                == "You're tapped in. Your phone locks when class starts, as long as Bali is open.")
+        #expect(waiting.inSessionCard(at: t0) == nil)
+        let others: [Standing] = [
+            .out, .unread, .inSession(bell1042, .focused), .inSession(bell1042, .unlocked),
+            .inSession(bell1042, .protectionOff), .inSession(bell1042, nil),
+        ]
+        for standing in others {
+            waiting.standing = standing
+            #expect(waiting.waitingCard == nil, "\(standing)")
         }
     }
 
@@ -765,6 +798,46 @@ struct TapInTests {
         #expect(read.queued.map(\.eventId) == [refused.eventId] && read.lastTap == next.eventId)
         #expect(read.refusedTapWords == nil)
         await rig.stop()
+    }
+}
+
+@Suite("Waiting's Back to home, and the Start (#151)", .timeLimit(.minutes(3)))
+struct WaitingHomeTests {
+    /// The screen for `state` at `now`, and whether its tab bar shows, with `opened` — the router's
+    /// answer for a phone signed in, its permission approved and checked, Home's tab chosen.
+    private func shown(_ state: SyncState, opened: [Screen], now: Date = t0) -> (Screen, Bool) {
+        var protection = Protection()
+        (protection.checked, protection.permission) = (true, .approved)
+        let shown = Screen.choose(
+            problem: nil, introSeen: true, signedIn: true, protection: protection,
+            everApproved: false, sync: state, hasClasses: state.hasClasses,
+            sessionOverClosed: nil, opened: opened, tab: .home, now: now)
+        return (shown.screen, shown.tabbed)
+    }
+
+    @Test(
+        "Bali opened again while waiting lands on Waiting, the tap's answer: where the phone stands is kept in the file, and nothing the student opened is (#151). The read every 30 s in the foreground (decision 6) runs whatever the screen — the Home opened over Waiting is no input of the engine's — and the Start it finds is Focus, that Home closed"
+    )
+    func startFromHome() async throws {
+        let rig = try Rig()
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await rig.until { $0.standing == .waiting && $0.queued.isEmpty }
+        await rig.stop()
+        let relaunched = try Rig(outbox: rig.outbox)
+        let waiting = await relaunched.engine.state
+        #expect(waiting.standing == .waiting)
+        #expect(shown(waiting, opened: []) == (.waiting, false))
+        #expect(shown(waiting, opened: [.home]) == (.home, true))
+        try await relaunched.foreground(Answer.me(nil))
+        relaunched.clock.advance(by: 30)
+        try await relaunched.server.next(meRoute).reply(200, Answer.me(session(endsAt: 4000)))
+        let started = await relaunched.until { $0.standing != .waiting }
+        let now = relaunched.clock.now()
+        #expect(started.standing == .inSession(session(endsAt: 4000), .focused))
+        #expect(!started.keepsOpened(from: waiting, at: now))
+        #expect(shown(started, opened: [.home], now: now) == (.focus, false))
+        await relaunched.stop()
     }
 }
 
