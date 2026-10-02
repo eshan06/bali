@@ -24,11 +24,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   landed for the next student. Cleared at once now, and the answer dropped (`Phone.signIns`), the
   join's too: its `busy = false` would otherwise end a try of the next student's under way.
   **The screen leaving** (#161's review): `Opening.Replaced`, the removal's modifier, takes it out
-  of touch and VoiceOver as well as sight. Checked on the iPhone 17 simulator: under F10's removal
-  (`.opacity.animation(nil)`) iOS 26 lets go of the leaving screen at once (its field out of the
-  window within 5 ms), so nothing invisible was there to tap; where SwiftUI does keep one — an
-  animated removal, for the whole fade — its field took the tap until `allowsHitTesting(false)`
-  (`AppTests.leavingTakesNoTouch`, red first). VoiceOver's half cannot be seen from a unit test
+  of touch and VoiceOver as well as sight. Checked on the iPhone 17 simulator, in a test that
+  switches two screens as `RootView` does: under F10's removal (`.opacity.animation(nil)`) iOS 26
+  let go of the leaving one at once (its field out of the window within 5 ms), so likely nothing
+  invisible was there to tap; where SwiftUI does keep one — an animated removal, for the whole
+  fade — its field took the tap until `allowsHitTesting(false)` (`AppTests.leavingTakesNoTouch`,
+  red first). VoiceOver's half cannot be seen from a unit test
   (no accessibility tree there). **`backLetsKeyboardGo`** now looks after each render, past the
   fade's end, as well as at Back. **`Tokens.init`'s email** has no default (#159's review), pinned
   by `TokenTests.emailAsked` (its source, red first). No visual change, no server change.
