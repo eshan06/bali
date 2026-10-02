@@ -116,6 +116,30 @@ struct HistoryTests {
     }
 
     @Test(
+        "Each card is known by its own id, its first moment's, so the screen keeps it as it is (#139): no two cards share one, through every day; read again from the top, a newer moment of its class joins it under the same id, and one of another class makes a card of its own after it, every card before kept"
+    )
+    func cardIds() throws {
+        let moments = [
+            moment("unlock", "2026-09-21T13:12:00Z", reason: "bathroom"),
+            moment("tap_in", "2026-09-21T12:58:00Z"),
+            moment("session_ended", "2026-09-20T17:50:00Z", period: 5),
+            moment("tap_in", "2026-09-20T17:02:00Z", period: 5),
+            moment("tap_in", "2026-09-20T15:00:00Z"),
+        ]
+        func cards(_ moments: [String]) throws -> [History.Card] {
+            try read(moments).days(now: t0, time: us()).flatMap(\.cards)
+        }
+        let shown = try cards(moments)
+        #expect(shown.map(\.id) == shown.map(\.moments[0].id) && Set(shown.map(\.id)).count == 3)
+        let refocus = moment("refocus", "2026-09-21T13:16:00Z")
+        let joined = try cards([refocus] + moments)
+        #expect(joined.map(\.id) == shown.map(\.id) && joined[0].moments.count == 3)
+        let after = try cards([moment("tap_in", "2026-09-21T13:20:00Z", period: 5), refocus] + moments)
+        #expect(after.count == 4 && after[1].name == "Period 5 — Chemistry")
+        #expect(after.map(\.id) == [shown[0].id, after[1].moments[0].id] + shown.dropFirst().map(\.id))
+    }
+
+    @Test(
         "Every kind of moment A7 shows, in D1's words or the step's: the page reversed, never re-sorted — a switch's leave comes before the tap it caused though they share one instant — a card per class in a row, a teacher with no name none, and a note where the record changed nothing: late, or after the class ended"
     )
     func everyKind() async throws {

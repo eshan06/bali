@@ -1063,27 +1063,51 @@ struct AppTests {
         }
     }
 
-    /// `mark`, 64 × 64, drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point
-    /// counted from the top left.
-    private func pixels(of mark: UIImage) throws -> (Int, Int) -> [Int] {
-        let size = CGSize(width: 64, height: 64)
+    @Test(
+        "A card's shadow is D1's shadow-1 at its edge alone (#139): drawn once, on the card's shape — never on each line, chip or button inside it, which History redrew line by line as it scrolled — so inside, the card is its own white, and under it, its shadow"
+    )
+    func cardShadow() throws {
+        // A card 80 × 48 on the page, 10 from its edges: its line at 30–70 × 30–38, its bottom 58.
+        let renderer = ImageRenderer(
+            content: Card { Rectangle().fill(Theme.text).frame(width: 40, height: 8) }
+                .frame(width: 80).padding(10).background(Theme.page))
+        renderer.scale = 1
+        let pixel = try pixels(of: try #require(renderer.uiImage))
+        for y in 38...40 { #expect(pixel(50, y) == [255, 255, 255, 255], "\(y): \(pixel(50, y))") }
+        let page = [0xF7, 0xF5, 0xF2]
+        #expect(zip(pixel(50, 58), page).allSatisfy { $0 < $1 }, "\(pixel(50, 58))")
+    }
+
+    @Test(
+        "History builds its days and cards as they come on screen (#139): a lazy stack, each card known by its own id (`HistoryTests.cardIds`), never every moment of a long history at once"
+    )
+    func historyLazy() throws {
+        let history = HistoryView(phone: Phone(fixture: try #require(PreviewFixtures.all["history"])))
+        #expect(String(reflecting: type(of: history.body)).contains("LazyVStack"))
+    }
+
+    /// `image` drawn at 1× and read as sRGB bytes — red, green, blue, alpha — at a point counted
+    /// from the top left.
+    private func pixels(of image: UIImage) throws -> (Int, Int) -> [Int] {
+        let (width, height) = (Int(image.size.width), Int(image.size.height))
+        let size = CGSize(width: width, height: height)
         let format = UIGraphicsImageRendererFormat()
         (format.scale, format.preferredRange) = (1, .standard)
         let drawn = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            mark.draw(in: CGRect(origin: .zero, size: size))
+            image.draw(in: CGRect(origin: .zero, size: size))
         }
-        let image = try #require(drawn.cgImage)
-        var bytes = [UInt8](repeating: 0, count: 64 * 64 * 4)
+        let cgImage = try #require(drawn.cgImage)
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
         let read = bytes.withUnsafeMutableBytes { buffer in
             let context = CGContext(
-                data: buffer.baseAddress, width: 64, height: 64, bitsPerComponent: 8,
-                bytesPerRow: 64 * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-            context?.draw(image, in: CGRect(origin: .zero, size: size))
+            context?.draw(cgImage, in: CGRect(origin: .zero, size: size))
             return context != nil
         }
         #expect(read)
-        return { x, y in (0..<4).map { Int(bytes[(y * 64 + x) * 4 + $0]) } }
+        return { x, y in (0..<4).map { Int(bytes[(y * width + x) * 4 + $0]) } }
     }
 }
 
