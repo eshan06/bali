@@ -83,8 +83,10 @@ final class Phone {
     /// Me, honoured in place of its own Home only. Home again once `synced` closes what was opened,
     /// or who is signed in changes.
     private(set) var tab = Screen.home
-    /// The History screen's (C6a): the moments read, and why a read did not finish. `reads` counts
-    /// them, and the history forgotten, so an answer to a read the student has left is dropped.
+    /// The History screen's (C6a): the moments read, and why a read did not finish — kept while the
+    /// app runs, so a visit shows them at once (#141), and forgotten only when who is signed in
+    /// changes. `reads` counts them, and the history forgotten, so an answer to a read no longer the
+    /// latest, or another student's, is dropped.
     private(set) var history = History()
     private(set) var reads = 0
     /// The session whose Session over the student closed, as it was then (C5b): Home past its bell,
@@ -160,38 +162,45 @@ final class Phone {
     var screen: Screen { shown.screen }
     var tabbed: Bool { shown.tabbed }
 
-    /// A tab chosen (C6a) — or `synced`'s Home. A change of tab forgets the history read, and any
-    /// answer on its way, so History is read anew each time the student comes to it: its screen
-    /// reads whenever it shows none (`readHistory`). The tab shown, chosen again, changes nothing
-    /// (santa's round 1: nothing read a history forgotten so).
-    func select(_ tab: Screen) {
-        if tab != self.tab { forgetHistory() }
-        self.tab = tab
+    /// A tab chosen (C6a) — or `synced`'s Home. The history read is kept (#141): History shows it
+    /// at once, and its screen reads the newest page again each time it shows (`refreshHistory`).
+    func select(_ tab: Screen) { self.tab = tab }
+
+    /// History shows — its screen's own call, each time it appears: the moments kept show meanwhile,
+    /// and the newest page is read again from the top, quietly (#141). A frozen phone's fixture
+    /// stays as made; with no history at all, its read says it has not started, never nothing
+    /// (#106's review; santa's round 1).
+    func refreshHistory() async {
+        guard !frozen || history == History() else { return }
+        await readHistory()
     }
 
-    /// Reads the student's history through the engine: from the top, or `more`, the page after
-    /// those read. A phone whose engine has not started — a frozen one too — says so (rule 5).
+    /// Reads the student's history through the engine: from the top — the moments read kept until
+    /// its page takes their place (#141) — or `more`, the page after those read. One at a time, but
+    /// a read from the top goes ahead of Show earlier's page under way, whose answer it drops: its
+    /// own takes the place of all read. A phone whose engine has not started — a frozen one too —
+    /// says so (rule 5).
     func readHistory(more: Bool = false) async {
-        guard !history.busy, !more || history.nextBefore != nil else { return }
-        guard let engine else { return history.failure = Joining.notStarted }
+        guard !history.busy || !more && !history.fromTop, !more || history.nextBefore != nil
+        else { return }
         let before = more ? history.nextBefore : nil
-        if !more { forgetHistory() }
-        (history.busy, history.failure, reads) = (true, nil, reads + 1)
+        history.reading(more: more)
+        guard let engine else { return history.failed(Joining.notStarted) }
+        reads += 1
         let read = reads
         await historyRead(await engine.history(before: before), for: read)
     }
 
     /// The answer to read `read`: kept while no read has started since nor the history been
-    /// forgotten — a tab changed, a sign-out — and with a cursor the history does not hold, the
-    /// history read again from the top.
+    /// forgotten — who is signed in changed — the student on History or not (#141); and with Show
+    /// earlier's cursor one the history does not hold, the history read again from the top.
     func historyRead(_ page: APIResponse<HistoryPage>, for read: Int) async {
         guard read == reads else { return }
         if history.answered(page) { await readHistory() }
     }
 
-    /// No history read, and none under way that could still land: History's screen, gone from the
-    /// phone by any way — a tab, or the router taking it away (Screen Time off, say) — forgets it,
-    /// so it is read anew when it shows again (C6a-2's review).
+    /// No history read, and none under way that could still land: who is signed in changed
+    /// (`signed`), so no student is shown another's.
     func forgetHistory() { (history, reads) = (History(), reads + 1) }
 
     /// Whose tokens these are (`SignIn.account`), the last one known: another student's sign-in
@@ -203,12 +212,14 @@ final class Phone {
     /// Sign out and a class code typed go with it; so, where another student signs in, does the
     /// engine's `me` — keyed on the account (C6b-1's review): a sign-out the stream let go by
     /// between two sign-ins is no matter. With no account to tell by, on a sign-in after a sign-out.
-    /// Another student's is never shown (C6a, C6b).
+    /// Another student's is never shown (C6a, C6b). Signed in, the student's history is read at
+    /// once, so even their first visit to History shows it (#141).
     func signed(in signedIn: Bool?, as account: String? = nil) {
         let another =
             account.map { self.account != nil && $0 != self.account }
             ?? (signedIn == true && self.signedIn == false)
-        if signedIn != self.signedIn || another {
+        let changed = signedIn != self.signedIn || another
+        if changed {
             tab = .home
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
@@ -217,6 +228,7 @@ final class Phone {
         if another { Task { await engine?.forgetMe() } }
         if let account { self.account = account }
         self.signedIn = signedIn
+        if changed, signedIn == true, !frozen { Task { await readHistory() } }
     }
 
     /// Saves the name as typed (`PATCH /v1/me`), through the engine: set, editing ends and the name

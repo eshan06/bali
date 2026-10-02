@@ -112,6 +112,9 @@
             "historyError": State(
                 tab: .history, history: history(failure: History.words(.networkError))),
             "historyLoading": State(tab: .history, history: history(busy: true)),
+            // Shown again, the moments kept, and the newest page's read again failed (#141).
+            "historyRefreshError": State(
+                tab: .history, history: anaHistory(failed: History.words(.networkError))),
             "me": State(sync: standing(.out, me: anaRodriguez), tab: .me),
             "meEditing": State(
                 sync: standing(.out, me: anaRodriguez), tab: .me, naming: naming("Ana R.")),
@@ -240,8 +243,9 @@
         }
 
         /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
-        /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier.
-        private static func anaHistory() -> History {
+        /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier —
+        /// kept, where reading them again from the top failed: `failed` (#141).
+        private static func anaHistory(failed: String? = nil) -> History {
             /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
             func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
                 let calendar = Calendar.current
@@ -274,6 +278,7 @@
                 HistoryPage.self,
                 from: Data(#"{"events":[\#(events.joined(separator: ","))],"nextBefore":"m0"}"#.utf8))
             (ana.events, ana.nextBefore) = (page?.events ?? [], page?.nextBefore)
+            if let failed { ana.failed(failed) }
             return ana
         }
 

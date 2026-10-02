@@ -4,7 +4,7 @@ import Foundation
 /// The History screen (C6a; D1's History) as the phone keeps it: the student's own moments, as the
 /// pages of `GET /v1/me/history` came — newest first, each moment once — the next page's cursor,
 /// and why the last read did not finish, in words (rule 5). Its rules, so they run on Linux; the
-/// app sends the calls (C6a-2's screen).
+/// app sends the calls (C6a-2's screen) and keeps it while it runs (#141).
 public struct History: Sendable, Hashable {
     public var events: [HistoryEvent] = []
     /// The next, older page's cursor: nil at the end, and before any answer.
@@ -12,27 +12,54 @@ public struct History: Sendable, Hashable {
     /// Whether a page has answered: until then the screen says it is reading, or why it could not.
     public var read = false
     public var busy = false
+    /// Why the last read did not finish, said in its place (rule 5): with nothing read, in the
+    /// moments' place; else Show earlier's page, where it was pressed.
     public var failure: String?
+    /// Said above the moments read where reading them again from the top did not finish (#141):
+    /// they may not be the newest, and why (rule 5) — through Show earlier's pages too, until a
+    /// read from the top starts again or answers.
+    public var notUpdated: String?
+    /// Whether the read under way, or the last one, is from the top — no cursor sent — not Show
+    /// earlier's page (#141): its page takes the place of the moments read, which show until it
+    /// comes.
+    public var fromTop = true
 
     public init() {}
 
-    /// A page came back — the first, into a new `History` (a read from the top starts from one: a
-    /// newer moment added after older ones would be drawn out of order), or the one after
-    /// `nextBefore` — its moments after those read, each once, or why not.
-    /// True when the history must be read again from the top: a cursor it does not hold
-    /// (`unknown_cursor`), whose Try again would only be refused again — only where one was sent,
-    /// the page after `nextBefore`: a read from the top answered so would be read again forever
-    /// (C6a-2's review), so it is said as any other failure is.
+    /// A read starts: from the top, or `more`, Show earlier's page — the last one's words gone, and
+    /// from the top that the moments are not updated too, said again should it fail.
+    public mutating func reading(more: Bool) {
+        (fromTop, busy, failure) = (!more, true, nil)
+        if !more { notUpdated = nil }
+    }
+
+    /// A read that did not finish, said where it belongs (rule 5): a read from the top's over the
+    /// moments read, above them (#141); any other in its own place.
+    public mutating func failed(_ words: String) {
+        busy = false
+        if fromTop, read {
+            notUpdated = "Bali couldn't update your history. \(words)"
+        } else {
+            failure = words
+        }
+    }
+
+    /// A page came back — from the top, in place of the moments read (a newer moment added after
+    /// older ones would be drawn out of order, and a moment read before may have changed since: an
+    /// unlock's reason, A20), or Show earlier's, its moments after those read, each once — or why
+    /// not, the moments read kept.
+    /// True when the history must be read again from the top: Show earlier's cursor, one it does
+    /// not hold (`unknown_cursor`), whose Try again would only be refused again — never a read from
+    /// the top answered so, which would be read again forever (C6a-2's review): that is said as any
+    /// other failure is.
     public mutating func answered(_ response: APIResponse<HistoryPage>) -> Bool {
         busy = false
         guard let page = response.answer else {
-            if response.error?.error.reason == .unknownCursor, nextBefore != nil {
-                self = History()
-                return true
-            }
-            failure = Self.words(response.result)
+            if response.error?.error.reason == .unknownCursor, !fromTop { return true }
+            failed(Self.words(response.result))
             return false
         }
+        if fromTop { self = History() }
         let known = Set(events.map(\.eventId))
         events += page.events.filter { !known.contains($0.eventId) }
         (nextBefore, read, failure) = (page.nextBefore, true, nil)

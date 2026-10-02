@@ -4,9 +4,10 @@ import SwiftUI
 
 /// History (C6a; D1's History), where the router sends the History tab: the student's own moments
 /// as `GET /v1/me/history` gives them — what their teachers see, nothing more — in D1's days and
-/// class cards, times in the phone's locale and time zone (`History.days`, tested on Linux). Read
-/// from the top each time the student comes to the tab; reading, nothing yet and a read that failed
-/// are each said, a failure with Try again (rule 5); an older page on Show earlier.
+/// class cards, times in the phone's locale and time zone (`History.days`, tested on Linux). Kept
+/// while the app runs and shown at once, its newest page read again quietly each time it shows
+/// (#141); reading, nothing yet and a read that failed are each said, a failure with Try again
+/// (rule 5) — one over the moments kept said above them; an older page on Show earlier.
 struct HistoryView: View {
     let phone: Phone
 
@@ -29,6 +30,9 @@ struct HistoryView: View {
                                 .foregroundStyle(Theme.textTertiary)
                         }
                     } else {
+                        if let notUpdated = history.notUpdated {
+                            Retry(words: notUpdated, phone: phone) { await phone.readHistory() }
+                        }
                         moments(history)
                     }
                 }
@@ -36,19 +40,18 @@ struct HistoryView: View {
             }
             .scrollBounceBehavior(.basedOnSize).screenWide()
         }
-        // Shown with nothing read or reading — first shown since the tab was chosen, or forgotten
-        // while it shows (santa's round 2) — it is read; a fixture's, read or not, stays as made.
-        // Its own task, which leaving the screen does not cancel: an answer it outlives is dropped.
-        .onChange(of: phone.history == History(), initial: true) { _, fresh in
-            if fresh { Task { await phone.readHistory() } }
+        // Each time it shows, the moments kept show at once and the newest page is read again from
+        // the top (#141) — and, forgotten while it shows (santa's round 2), it is read all the same.
+        // Their own tasks, which leaving the screen does not cancel: an answer it outlives is kept
+        // for the next visit. A fixture's stays as made.
+        .onAppear { Task { await phone.refreshHistory() } }
+        .onChange(of: phone.history == History()) { _, fresh in
+            if fresh { Task { await phone.refreshHistory() } }
         }
-        // Gone by any way — a tab, or the router taking it away, Screen Time turned off and on
-        // again, say — it is forgotten, so it is read anew when it shows again (C6a-2's review).
-        .onDisappear { phone.forgetHistory() }
     }
 
     /// The days read — or, with none and nothing older, that there is nothing yet — and Show
-    /// earlier while an older page is left, a failed one said there with Try again.
+    /// earlier while an older page is left, its own failed page said there with Try again.
     @ViewBuilder private func moments(_ history: History) -> some View {
         let days = history.days(now: Date())
         if days.isEmpty, history.nextBefore == nil {
@@ -71,7 +74,9 @@ struct HistoryView: View {
             if let failure = history.failure {
                 Retry(words: failure, phone: phone) { await phone.readHistory(more: true) }
             } else {
-                Button(history.busy ? "Reading…" : "Show earlier") {
+                // Held while any read is under way, but "Reading…" only for its own page: the read
+                // again from the top each visit makes stays quiet (#141).
+                Button(history.busy && !history.fromTop ? "Reading…" : "Show earlier") {
                     Task { await phone.readHistory(more: true) }
                 }
                 .buttonStyle(SecondaryButtonStyle()).disabled(history.busy).padding(.top, 4)
