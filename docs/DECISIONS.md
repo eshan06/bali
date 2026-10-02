@@ -19,13 +19,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   change at a time keeps the server's order the student's. Only the newest pick's answer is said: a
   change on its way that did not go is no matter once a newer one goes; the newest that did not go
   is said, the check back on the reason on record, and picked again it goes under its event id
-  where no answer came (rule 4). **On the phone, not in the engine:** the taps are ordered on the
-  main actor, where the check (`picking`) is, so the newest sent is the student's last tap however
-  the engine's actor orders its calls; `SyncEngine.explain` stays one call, one change. Before the
-  unlock is sent, a pick still writes it into the record (C5a's hold), unchanged. This replaces
-  Riders-2's "reason taps go one at a time (a second while the first is on its way does nothing)":
-  that kept the card and the record agreeing by refusing taps; one change on its way keeps them
-  agreeing without. No server change.
+  where no answer came (rule 4). **A pick is for the unlock whose card it was made on** (santa's
+  round 1): the card names its unlock (`UnlockedWords.unlock`), and once it names another, or none
+  — the student locked their apps again, say, and unlocked anew — the pick waiting for the last one
+  is dropped with its check, never sent to the next, and the change still on its way says nothing
+  there; a pick on the new card goes at once. **On the phone, not in the engine:** the taps are
+  ordered on the main actor, where the check (`picking`) is, so the newest sent is the student's
+  last tap however the engine's actor orders its calls; `SyncEngine.explain` stays one call, one
+  change. Before the unlock is sent, a pick still writes it into the record (C5a's hold),
+  unchanged. This replaces Riders-2's "reason taps go one at a time (a second while the first is
+  on its way does nothing)": that kept the card and the record agreeing by refusing taps; one
+  change on its way keeps them agreeing without. No server change. **Santa** (two Claude
+  reviewers, so they share a model family — Codex refuses every model on this Mac — and the
+  design check): round 1, one blocker, both reviewers' — a pick waiting behind a change went to
+  whichever unlock was current when it went, so a student who locked their apps again and
+  unlocked anew had it land on the new unlock — fixed red first (`AppTests.picksForTheirUnlock`).
 - **2026-09-30** — **C3c: Home's card for a class in session, and the conductor's two decisions
   under the owner's delegation** (ruling 4 of the owner's rulings below left Home-in-session to the
   conductor). **(a) The class's running session on `GET /v1/me`:** a phone knows only its own

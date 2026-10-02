@@ -548,7 +548,50 @@ struct AppTests {
     }
 
     @Test(
-        "Picks while the unlock is still on the phone are written into it, each at once (C5a's hold, unchanged by #140): no change of the reason is sent, and the unlock goes with the newest",
+        "A pick goes only to the unlock whose card it was made on (#140, santa's round 1): the student locking their apps again and unlocking anew while a change is on its way, the pick waiting behind it is never sent, to either unlock, nor checked on the new card; a pick on the new card goes to it at once, the change on its way no matter",
+        .timeLimit(.minutes(3)))
+    func picksForTheirUnlock() async throws {
+        let (phone, engine, server, running) = try await unlockRecorded()
+        /// The student locks their apps again, and unlocks anew: the card is the new unlock's.
+        func unlockAnew() async throws {
+            #expect(await phone.backToFocus() == nil)
+            try await until { await engine.state.queued.isEmpty }
+            phone.synced(await engine.state)
+            #expect(await phone.emergencyUnlock() == nil)
+            phone.synced(await engine.state)
+        }
+        phone.synced(await engine.state)
+        // Nurse on its way for the first unlock, Other waiting behind it.
+        let first = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 1 }
+        await phone.pick(.other)
+        try await unlockAnew()
+        #expect(phone.picking == nil)
+        await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        await first.value
+        #expect(UnlockedWords(await engine.state)?.picker == .open(nil))
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        // The second unlock recorded with Bathroom, Nurse on its way for it; unlocked anew, a pick
+        // on the third card goes to the third unlock at once.
+        await phone.pick(.bathroom)
+        try await until { await engine.state.recordedUnlock?.reason == .bathroom }
+        let second = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 2 }
+        try await unlockAnew()
+        await phone.pick(.other)
+        #expect(UnlockedWords(await engine.state)?.picker?.chosen == .other)
+        await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        await second.value
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        try await until { await engine.state.recordedUnlock?.reason == .other }
+        #expect(await server.unlocks == [nil, "bathroom", "other"])
+        #expect(await server.changes.map(\.reason) == ["nurse", "nurse"])
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
+        "Picks made one after another while the unlock is still on the phone are each written into it at once (C5a's hold): no change of the reason is sent, and the unlock goes with the newest",
         .timeLimit(.minutes(3)))
     func picksOnThePhone() async throws {
         let server = Reasons()
@@ -1014,10 +1057,11 @@ private func unlockRecorded() async throws -> (Phone, SyncEngine, Reasons, Task<
     return (phone, engine, server, running)
 }
 
-/// The API as a stand-in answers Unlocked's reason (#140): a tap joins session "s"; an unlock
-/// there is recorded with the reason it carries, kept in `unlocks`; and each change of an unlock's
-/// reason (`PATCH /v1/unlocks/{eventId}`, A20) is kept in `changes`, its reason and event id, and
-/// waits for the test's `answer`. Anything else gets no answer.
+/// The API as a stand-in answers Unlocked's reason (#140): a tap joins session "s", and a refocus
+/// there is applied; an unlock there is recorded with the reason it carries, kept in `unlocks`;
+/// and each change of an unlock's reason (`PATCH /v1/unlocks/{eventId}`, A20) is kept in
+/// `changes`, its reason and event id, and waits for the test's `answer`. Anything else gets no
+/// answer.
 private actor Reasons: HTTPTransport {
     private(set) var unlocks: [String?] = []
     private(set) var changes: [(reason: String?, eventId: String?)] = []
@@ -1035,6 +1079,8 @@ private actor Reasons: HTTPTransport {
         switch (request.httpMethod ?? "", url.path()) {
         case ("POST", "/v1/taps"):
             answer = (200, #"{"outcome":"joined","session":\#(session),"state":"focused"}"#)
+        case ("POST", "/v1/sessions/s/refocus"):
+            answer = (200, #"{"outcome":"applied","state":"focused","session":\#(session)}"#)
         case ("POST", "/v1/sessions/s/unlock"):
             unlocks.append(body?.reason)
             let reason = body?.reason.map { #""\#($0)""# } ?? "null"

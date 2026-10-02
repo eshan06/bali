@@ -95,6 +95,13 @@ struct UnlockedTests {
         #expect(words(recorded(try unlocked(queued), .bathroom))?.picker == .open(.nurse))
         #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.picker == nil)
         #expect(words(try unlocked())?.picker == nil)
+        // The unlock the card is about, which a pick is for alone (#140): the same one, by its id.
+        let onThePhone = try #require(queued.first).eventId
+        #expect(words(try unlocked(queued))?.unlock == onThePhone)
+        #expect(words(recorded(try unlocked(queued), .bathroom))?.unlock == onThePhone)
+        #expect(words(recorded(try unlocked(), .bathroom))?.unlock == "u")
+        #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.unlock == nil)
+        #expect(words(try unlocked())?.unlock == nil)
         #expect(UnlockedWords.Picker.open(nil).caption == "Your teacher sees the reason you pick.")
         #expect(UnlockedWords.Picker.waiting(nil).caption == UnlockedWords.onItsWay)
         #expect(

@@ -103,6 +103,9 @@ final class Phone {
     private(set) var pickFailed: String?
     /// Whether a pick is on its way: one made meanwhile only moves the check (#140).
     private var pickSending = false
+    /// Counts the unlocks Unlocked's card has been about: a pick on its way for one the card has
+    /// left says and sends nothing more (#140, santa's round 1).
+    private var cards = 0
 
     /// Whether the student is in any class, as the engine's `GET /v1/me` says — a join made since
     /// counted at once — nil until a read answers (C3). The router shows Join while it is false.
@@ -325,6 +328,11 @@ final class Phone {
         if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
             pickFailed = nil
         }
+        // The card is about another unlock, or none: a pick waiting for the last one goes with it,
+        // never to the next, and so does its check (#140, santa's round 1).
+        if UnlockedWords(state)?.unlock != sync.flatMap({ UnlockedWords($0) })?.unlock {
+            (picking, pickSending, cards) = (nil, false, cards + 1)
+        }
         sync = state
         // An unlock that held Sign out has gone: saying it has not would be stale — but only once
         // a hold ends: "unsent" is said where the file holds one the engine's queue does not show,
@@ -427,17 +435,20 @@ final class Phone {
     /// been sent, else as a change of it once the server has it (A20) — the check on it at once,
     /// and no pick ever waits on another (#140): one goes at a time, so the server records them in
     /// the order the student made them, and once it answers the newest goes unless it is the one
-    /// just sent, the picks between never sent. Why the newest did not go is said (rule 5), the
-    /// check back on the reason on record. A phone not started says so.
+    /// just sent, the picks between never sent — nor any once the card has left the unlock they
+    /// were made for (`synced`). Why the newest did not go is said (rule 5), the check back on the
+    /// reason on record. A phone not started says so.
     func pick(_ reason: UnlockReason) async {
         guard let engine else { return pickFailed = Joining.notStarted }
         (picking, pickFailed) = (reason, nil)
         guard !pickSending else { return }
         pickSending = true
+        let card = cards
         var sent: UnlockReason?
         while let next = picking, next != sent {
             sent = next
             let failed = await engine.explain(next)
+            guard card == cards else { return }
             if picking == next { pickFailed = failed }
         }
         (pickSending, picking) = (false, nil)
