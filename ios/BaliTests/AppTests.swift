@@ -481,6 +481,18 @@ struct AppTests {
         await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
         try await until { await server.changes.count == 2 }
         #expect(phone.picking == .bathroom)
+        // The same card while the newest is on its way — the reason kept published, the session
+        // extended — keeps its check (santa's round 2).
+        var extended = await engine.state
+        phone.synced(extended)
+        #expect(phone.picking == .bathroom)
+        if case .inSession(let session, let state) = extended.standing {
+            extended.standing = .inSession(
+                SessionView(id: session.id, classId: session.classId, endsAt: session.endsAt + 600),
+                state)
+        }
+        phone.synced(extended)
+        #expect(phone.picking == .bathroom)
         await server.answer(200, #"{"outcome":"applied","reason":"bathroom"}"#)
         await first.value
         #expect(await server.changes.map(\.reason) == ["nurse", "bathroom"])
@@ -560,7 +572,6 @@ struct AppTests {
             #expect(await phone.emergencyUnlock() == nil)
             phone.synced(await engine.state)
         }
-        phone.synced(await engine.state)
         // Nurse on its way for the first unlock, Other waiting behind it.
         let first = Task { await phone.pick(.nurse) }
         try await until { await server.changes.count == 1 }
@@ -1044,7 +1055,8 @@ private actor StandIn: HTTPTransport {
 }
 
 /// A phone of the test's own over `Reasons`, its engine running (#140): tapped into session "s"
-/// and unlocked there, the unlock recorded with no reason, so Unlocked's picks are changes of it.
+/// and unlocked there, the unlock recorded with no reason, so Unlocked's picks are changes of it —
+/// and the phone told so, as the engine's updates tell the app's.
 @MainActor
 private func unlockRecorded() async throws -> (Phone, SyncEngine, Reasons, Task<Void, Never>) {
     let server = Reasons()
@@ -1054,6 +1066,7 @@ private func unlockRecorded() async throws -> (Phone, SyncEngine, Reasons, Task<
     try await until { await engine.state.queued.isEmpty }
     try await engine.record(.unlock(session: "s", reason: nil))
     try await until { await engine.state.recordedUnlock != nil }
+    phone.synced(await engine.state)
     return (phone, engine, server, running)
 }
 

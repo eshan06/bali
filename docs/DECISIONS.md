@@ -34,6 +34,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   design check): round 1, one blocker, both reviewers' — a pick waiting behind a change went to
   whichever unlock was current when it went, so a student who locked their apps again and
   unlocked anew had it land on the new unlock — fixed red first (`AppTests.picksForTheirUnlock`).
+  Round 2: no blockers; both WARNs fixed — a late answer for an unlock the phone has left no
+  longer overwrites the engine's one remembered unanswered change, so the next unlock's retry
+  keeps its event id (`ReasonTests.changedLate`, red first), and the app tests now pin that a
+  same-card state (the kept reason published, the session extended) keeps a waiting pick.
 - **2026-09-30** — **C3c: Home's card for a class in session, and the conductor's two decisions
   under the owner's delegation** (ruling 4 of the owner's rulings below left Home-in-session to the
   conductor). **(a) The class's running session on `GET /v1/me`:** a phone knows only its own

@@ -292,6 +292,39 @@ struct ReasonTests {
     }
 
     @Test(
+        "A change for an unlock the phone has moved on from, answered late, leaves the next unlock's change alone (#140, santa's round 2): one of the new unlock's with no answer, picked again, still goes under its event id (rule 4)"
+    )
+    func changedLate() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        let first = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        await rig.until { $0.recordedUnlock?.unlock == first.eventId }
+        async let old = rig.engine.explain(.nurse)
+        let oldChange = try await rig.server.next("PATCH /v1/unlocks/\(first.eventId)")
+        // Locked again and unlocked anew, the change for the first still on its way.
+        try await rig.engine.record(.refocus(session: "s"))
+        try await rig.server.next(refocusRoute).reply(200, Answer.refocused())
+        let second = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        await rig.until { $0.recordedUnlock?.unlock == second.eventId }
+        let route = "PATCH /v1/unlocks/\(second.eventId)"
+        async let lost = rig.engine.explain(.other)
+        let lostChange = try await rig.server.next(route)
+        lostChange.reply(nil)
+        #expect(await lost == UnlockedWords.offline)
+        oldChange.reply(nil)
+        #expect(await old == UnlockedWords.offline)
+        async let again = rig.engine.explain(.other)
+        let retried = try await rig.server.next(route)
+        #expect(try eventId(retried) == eventId(lostChange))
+        retried.reply(200, #"{"outcome":"replay","reason":"other"}"#)
+        #expect(await again == nil)
+        #expect(await rig.engine.state.recordedUnlock?.reason == .other)
+        await rig.stop()
+    }
+
+    @Test(
         "Answered, the unlock leaves `sending` in the write that reads the queue again: no state published between shows it neither on its way nor answered, so the card never opens over an unlock already sent (santa's round 2)"
     )
     func settledInOneWrite() async throws {
