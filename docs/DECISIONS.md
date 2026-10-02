@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-02** — **F12 (CI): a PR merges only after its Claude Review has passed.** **Found**
+  (#154; first seen by B4c's worker and kept only as a GOTCHAS note): the review job skipped drafts
+  by its `if`, and GitHub counts a skipped required check as passing, so a draft marked ready read
+  as mergeable for the seconds before the `ready_for_review` run began — #154 was marked ready at
+  02:29:42 UTC and merged by `gh pr merge --auto` at 02:29:45, its review starting at 02:29:49 (it
+  passed, by luck). **Decided:** the job runs on drafts too, and there does no review and fails
+  ("Draft: the review runs when the PR is marked ready."), so no commit carries a passing "Claude
+  Review" it did not earn, draft or not, `--auto` or not. The check keeps its name, so
+  `protect-main` is unchanged. **Why the draft's failure clears:** GitHub reads only a workflow's
+  newest run on the commit, per event — #61's merge box and `gh pr checks` list "No Claude
+  attribution" passing from its `edited` run, the `opened` run's failure neither listed nor counted,
+  and apache/datafusion-comet#6159 saw the merge gate itself do it for a required check, ignoring an
+  older run that had passed — so the run `ready_for_review` starts takes the draft run's place:
+  until it begins the draft's failure stands, then the review's own state does, pending and then
+  its verdict. Not yet seen here for a required check that failed and then passed: the first PR
+  marked ready after this lands should read CLEAN once its review passes (were it to stay BLOCKED,
+  a push clears it). **The API keeps the old run:** the head commit's check runs and GraphQL's
+  `statusCheckRollup` (state FAILURE) still carry a draft's failure after the review passes, so a
+  PR is judged by `mergeStateStatus` or `gh pr checks` (GOTCHAS). Concurrency unchanged: a draft's
+  run shares the PR's group, so marking ready cancels one still going, and a draft's event landing
+  after the ready one would cancel the review and fail — blocked, never passed. A re-run replays the
+  draft's event and fails again, so the way out is converting the PR to draft and back, or a push;
+  the draft's message says so. **Not chosen:** a draft run under another name, so no "Claude
+  Review" check exists until ready. It would not lean on GitHub reading the newest run, but the
+  required check would sit "Expected" on every draft with its reason on another row, and a job
+  skipped under another name shows the raw expression (a skipped job's name is never evaluated,
+  actions/runner#1215). **Cost:** a draft shows a red ✗ for Claude Review until
+  it is marked ready, its message saying why; its run takes seconds and reviews nothing. **This PR
+  merges through the owner's one-time ruleset toggle:** editing `claude-review.yml` trips the
+  action's tamper guard (GOTCHAS), so its own review fails closed. **Known ceiling:** a
+  `pull_request` run uses the PR's own copy of this workflow, so a PR that rewrote the job to pass
+  without reviewing would pass the check; closing that is a ruleset question for the owner.
+  GOTCHAS' entry "a draft marked ready reads green before its review has run" is deleted, and one
+  says the API keeps a draft's failed review (santa's round 1).
 - **2026-10-02** — **F11a-1: the merged PRs' review WARNs, part 1 — sign-in and the fade.**
   **Nothing of the last student's, at any moment** (#160's review): the engine forgets `me` when
   another account signs in (`forgetMe`, C6b-1), but in a task — until it landed, the phone's copy,
