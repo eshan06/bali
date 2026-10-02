@@ -443,7 +443,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked takes one reason at a time, a light haptic as one is picked and no button tappable where a pick cannot act (C5c, the owner's ruling); Me gives the keyboard back once a save is over"
+        "The screens' own wiring the riders fixed, read from their source — no SwiftUI view can be driven from a test (Riders-2's santa): History forgets its read whenever it goes, so it is read anew; Unlocked gives a light haptic as a reason is picked, and every reason is tappable but where a pick cannot act — the unlock on its way — a pick on its way holding none back (C5c, the owner's ruling; #140, whose picks the app's tests drive); Me gives the keyboard back once a save is over"
     )
     func ridersWiring() throws {
         let history = try sourceCode("Bali/UI/HistoryView.swift")
@@ -452,9 +452,8 @@ struct ScreenTests {
         #expect(
             unlocked.contains(
                 ".sensoryFeedback(.selection, trigger: phone.picking) { _, picked in picked != nil }"))
-        #expect(unlocked.contains(".disabled(!open || phone.picking != nil && !chosen)"))
+        #expect(unlocked.contains(".disabled(!open)"))
         #expect(unlocked.contains("guard !chosen || phone.pickFailed != nil else { return }"))
-        #expect(try sourceCode("Bali/BaliApp.swift").contains("guard picking == nil else { return }"))
         let me = try sourceCode("Bali/UI/MeView.swift")
         #expect(me.contains(".onChange(of: naming.busy) { _, busy in"))
         // Me's Screen Time row says Off where the check judges the permission off: reachable

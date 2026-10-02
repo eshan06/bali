@@ -95,6 +95,13 @@ struct UnlockedTests {
         #expect(words(recorded(try unlocked(queued), .bathroom))?.picker == .open(.nurse))
         #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.picker == nil)
         #expect(words(try unlocked())?.picker == nil)
+        // The unlock the card is about, which a pick is for alone (#140): the same one, by its id.
+        let onThePhone = try #require(queued.first).eventId
+        #expect(words(try unlocked(queued))?.unlock == onThePhone)
+        #expect(words(recorded(try unlocked(queued), .bathroom))?.unlock == onThePhone)
+        #expect(words(recorded(try unlocked(), .bathroom))?.unlock == "u")
+        #expect(words(recorded(try unlocked(), .bathroom, session: "a"))?.unlock == nil)
+        #expect(words(try unlocked())?.unlock == nil)
         #expect(UnlockedWords.Picker.open(nil).caption == "Your teacher sees the reason you pick.")
         #expect(UnlockedWords.Picker.waiting(nil).caption == UnlockedWords.onItsWay)
         #expect(
@@ -281,6 +288,39 @@ struct ReasonTests {
         third.reply(200, #"{"outcome":"applied","reason":"bathroom"}"#)
         #expect(await late == nil)
         #expect(await rig.engine.state.recordedUnlock == nil)
+        await rig.stop()
+    }
+
+    @Test(
+        "A change for an unlock the phone has moved on from, answered late, leaves the next unlock's change alone (#140, santa's round 2): one of the new unlock's with no answer, picked again, still goes under its event id (rule 4)"
+    )
+    func changedLate() async throws {
+        let rig = try Rig()
+        try await rig.tapIn()
+        let first = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        await rig.until { $0.recordedUnlock?.unlock == first.eventId }
+        async let old = rig.engine.explain(.nurse)
+        let oldChange = try await rig.server.next("PATCH /v1/unlocks/\(first.eventId)")
+        // Locked again and unlocked anew, the change for the first still on its way.
+        try await rig.engine.record(.refocus(session: "s"))
+        try await rig.server.next(refocusRoute).reply(200, Answer.refocused())
+        let second = try #require(try await rig.engine.record(.unlock(session: "s", reason: nil)))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+        await rig.until { $0.recordedUnlock?.unlock == second.eventId }
+        let route = "PATCH /v1/unlocks/\(second.eventId)"
+        async let lost = rig.engine.explain(.other)
+        let lostChange = try await rig.server.next(route)
+        lostChange.reply(nil)
+        #expect(await lost == UnlockedWords.offline)
+        oldChange.reply(nil)
+        #expect(await old == UnlockedWords.offline)
+        async let again = rig.engine.explain(.other)
+        let retried = try await rig.server.next(route)
+        #expect(try eventId(retried) == eventId(lostChange))
+        retried.reply(200, #"{"outcome":"replay","reason":"other"}"#)
+        #expect(await again == nil)
+        #expect(await rig.engine.state.recordedUnlock?.reason == .other)
         await rig.stop()
     }
 

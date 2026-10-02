@@ -33,6 +33,9 @@ public struct UnlockedWords: Sendable, Hashable {
     public let title: String, subtitle: String, body: String
     /// Nil: no unlock of this phone's to give a reason for — one before a relaunch, say.
     public let picker: Picker?
+    /// The unlock the card is about, by its event id: a pick is for it alone (#140). Nil with no
+    /// card.
+    public let unlock: String?
     /// Why the way back is a re-tap, not Lock my apps again: protection off was reported in this
     /// session since the phone's last tap, and a refocus out of it is refused (A2; #96's review) —
     /// or the server refused this session's refocus (C5b).
@@ -65,6 +68,7 @@ public struct UnlockedWords: Sendable, Hashable {
             } else {
                 nil
             }
+        self.unlock = picker == nil ? nil : unlock?.eventId ?? sync.recordedUnlock?.unlock
         retap =
             sync.reportedOff == session.id
             ? "Screen Time was off during this class, so tap your teacher's block to lock your apps again."

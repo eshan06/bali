@@ -54,8 +54,8 @@ struct UnlockedView: View {
         }
     }
 
-    /// D1's card: why, optional — the three, the check on the reason on record, or on the one
-    /// picked while it is on its way; what a pick does, or why the last did not go.
+    /// D1's card: why, optional — the three, the check on the reason on record, or on the newest
+    /// picked while a pick is on its way; what a pick does, or why the last did not go.
     private func reasons(_ picker: UnlockedWords.Picker) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
@@ -91,8 +91,9 @@ struct UnlockedView: View {
                 ReasonLabel(reason: reason, chosen: chosen)
             }
             .buttonStyle(ReasonStyle(chosen: chosen))
-            // Never tappable where a pick cannot act: the unlock on its way, or a pick on its way.
-            .disabled(!open || phone.picking != nil && !chosen)
+            // Never tappable where a pick cannot act: the unlock on its way. A pick on its way
+            // holds none back: the newest goes once it answers (#140).
+            .disabled(!open)
             .accessibilityAddTraits(chosen ? .isSelected : [])
         }
     }

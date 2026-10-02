@@ -431,10 +431,15 @@ public actor SyncEngine {
         let answer = await Joining.send(renewing: refresh) {
             await client.changeReason(unlock: recorded.unlock, request)
         }
-        unanswered = answer.result == .networkError ? (recorded.unlock, reason, request.eventId) : nil
+        // Unless the phone has moved on meanwhile: a change of its own clears it — and then this
+        // answer leaves the next unlock's last change alone (#140, santa's round 2).
+        let current = state.recordedUnlock?.unlock == recorded.unlock
+        if current {
+            unanswered =
+                answer.result == .networkError ? (recorded.unlock, reason, request.eventId) : nil
+        }
         guard let kept = answer.answer?.reason.known else { return UnlockedWords.notChanged(answer) }
-        // Unless the phone has moved on meanwhile: a change of its own clears it.
-        if state.recordedUnlock?.unlock == recorded.unlock { state.recordedUnlock?.reason = kept }
+        if current { state.recordedUnlock?.reason = kept }
         return nil
     }
 
