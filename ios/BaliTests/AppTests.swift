@@ -833,28 +833,34 @@ struct AppTests {
     }
 
     @Test(
-        "Waiting fits the smallest iPhone — the iPhone 17e's 390 × 844 less its safe areas, 47 pt above and 34 below — at the default text size, Back to home included, with its one card or a failed read said too (#149); once the text outgrows the screen, it scrolls"
+        "Waiting fits the smallest iPhone — the iPhone 17e's 390 × 844 less its safe areas, 47 pt above and 34 below — and the owner's iPhone 15 Pro, 393 × 852 less 59 and 34, at the default text size, Back to home included, with its one card, or a failed read or a refused tap said too (#149: the owner's phone); once the text outgrows the screen, it scrolls"
     )
     func waitingFits() throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let cases: [(String, DynamicTypeSize)] = [
-            ("waiting", .large), ("waitingError", .large), ("waiting", .accessibility2),
+            ("waiting", .large), ("waitingError", .large), ("waitingTapRefused", .large),
+            ("waiting", .accessibility2),
         ]
+        let phones = [CGSize(width: 390, height: 844 - 47 - 34), CGSize(width: 393, height: 852 - 59 - 34)]
         for (name, size) in cases {
-            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
-            let hosting = UIHostingController(
-                rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
-            // The safe areas given by the frame, whatever phone runs the tests.
-            hosting.safeAreaRegions = []
-            let window = UIWindow(windowScene: scene)
-            window.frame = CGRect(x: 0, y: 0, width: 390, height: 844 - 47 - 34)
-            window.rootViewController = hosting
-            window.isHidden = false
-            defer { window.isHidden = true }
-            window.layoutIfNeeded()
-            let scroll = try #require(scrollViews(in: window).first, "\(name)")
-            let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
-            #expect((content <= shown + 0.5) == (size == .large), "\(name), \(size): \(content) in \(shown)")
+            for frame in phones {
+                let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                let hosting = UIHostingController(
+                    rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                // The safe areas given by the frame, whatever phone runs the tests.
+                hosting.safeAreaRegions = []
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(origin: .zero, size: frame)
+                window.rootViewController = hosting
+                window.isHidden = false
+                defer { window.isHidden = true }
+                window.layoutIfNeeded()
+                let scroll = try #require(scrollViews(in: window).first, "\(name)")
+                let (content, shown) = (scroll.contentSize.height, scroll.bounds.height)
+                #expect(
+                    (content <= shown + 0.5) == (size == .large),
+                    "\(name), \(size), \(frame): \(content) in \(shown)")
+            }
         }
     }
 

@@ -34,11 +34,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the ring stayed large. It is now laid out as C4's Focus is: D1's two groups (the ring and its
   words; the cards and Back to home) at their own heights, at least 24 pt apart, the cards 16 apart
   (were 24), and only the spacers give, the one above the ring first (to D1's 16 pt under the
-  status bar), so a second card fits the iPhone 17e (390 × 844) at the default text size; larger
-  text scrolls. **Tests:** `ScreenTests.homeWaiting` and `.tabs`, `WaitingHomeTests.startFromHome`
-  (red first on the router); `AppTests.startFromHomeWaiting`, `.waitingFits` (red first: 782.7 pt
-  in the 17e's 747 with a failed read said), `.opened`, `.wayBack`, `.fixtures`. Fixture
-  `homeFromWaiting` renamed `homeWaiting`.
+  status bar), so a second card fits the iPhone 17e (390 × 844) and the owner's iPhone 15 Pro at the
+  default text size (fixture `waitingTapRefused`, the owner's case); larger text scrolls.
+  **Tests:** `ScreenTests.homeWaiting` and `.tabs`, `WaitingHomeTests.startFromHome` (red first on
+  the router); `AppTests.startFromHomeWaiting`, `.waitingFits` (red first: 782.7 pt
+  in the 17e's 747 with a failed read said; santa's round 1 added the refused tap and the 15 Pro's
+  frame), `.opened`, `.wayBack`, `.fixtures`. Fixture `homeFromWaiting` renamed `homeWaiting`.
+  **Santa** (two Claude reviewers, so they share a model family — Codex refuses every model on this
+  Mac — and the design check): no blockers. **Left for the owner** (round 1's WARN): with Me
+  reachable while waiting, Sign out leaves the wait to whoever signs in next on a shared phone — the
+  standing is the phone's, never the account's (B4) — and a Leave of the class leaves it standing,
+  each until a tap, which the card offers; holding Sign out and Leave while waiting, or ending the
+  wait at a change of account, is the owner's call.
 - **2026-10-01** — **F2 (#145): Screen Time off within 10 s of a launch with access off — the
   check made again every second within the grace — and F1's review's two WARNs.** **Found** (the
   owner's device check, iPhone 15 Pro, iOS 18.6.2): opening Bali in a running class with Screen

@@ -63,6 +63,8 @@
             "homeWaiting": State(sync: standing(.waiting), opened: [.home]),
             "waiting": State(sync: standing(.waiting)),
             "waitingError": State(sync: standing(.waiting, failed: .networkError)),
+            // The owner's phone (#149): a scan of a block no teacher set up, said beside D1's card.
+            "waitingTapRefused": State(sync: refusedTap(standing(.waiting))),
             "focus": State(protection: shielded(), sync: standing(.inSession(period3, .focused))),
             "focusFinal": State(
                 protection: shielded(), sync: standing(.inSession(lastMinutes, .focused))),
