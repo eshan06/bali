@@ -68,11 +68,13 @@ final class Phone {
     /// restored backup, which restores these defaults — so the grant screen returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
-    /// The student `GET /v1/me` has listed in a class on this phone, by their id, kept as
+    /// The student `GET /v1/me` last listed in a class on this phone, by their id, kept as
     /// `everApproved` is (#143): in no class later, removed from their last or having left it, they
     /// land on Home and its empty state, never the first-run Join, which a student never in a class
-    /// here still gets. Keyed on the student, so another student's sign-in never inherits it, a
-    /// late read of the last one's classes included; forgotten at a sign-out.
+    /// here still gets. Keyed on the student, so another student signing in never inherits it, a
+    /// late read of the last one's classes included; kept across a sign-out, as the engine keeps
+    /// their classes then (C6b-1), and replaced once another student is listed in a class. A
+    /// fixture's is its own, never the phone's defaults.
     private(set) var inClass = UserDefaults.standard.string(forKey: Phone.inClassKey)
     static let inClassKey = "inClass"
     /// The last ask for the Screen Time permission that did not finish (C1b), said on its screen
@@ -124,7 +126,10 @@ final class Phone {
     var hasClasses: Bool? { sync?.hasClasses }
 
     /// Whether the student `GET /v1/me` names has been listed in a class on this phone (#143).
-    var everInClass: Bool { sync?.me.map { $0.user.id == inClass } ?? false }
+    var everInClass: Bool { listed(sync?.me) }
+
+    /// Whether the student `me` names is the one listed in a class on this phone (#143).
+    private func listed(_ me: MeResponse?) -> Bool { me.map { $0.user.id == inClass } ?? false }
 
     init() {}
 
@@ -242,8 +247,7 @@ final class Phone {
     /// another student signs in, does the engine's `me` — keyed on the account (C6b-1's review): a
     /// sign-out the stream let go by between two sign-ins is no matter. With no account to tell by,
     /// on a sign-in after a sign-out. Another student's is never shown (C6a, C6b). Signed in, the
-    /// student's history is read at once, so even their first visit to History shows it (#141). A
-    /// sign-out, or another student's sign-in, forgets whose classes were listed here (#143).
+    /// student's history is read at once, so even their first visit to History shows it (#141).
     func signed(in signedIn: Bool?, as account: String? = nil, email: String? = nil) {
         let another =
             account.map { self.account != nil && $0 != self.account }
@@ -255,7 +259,6 @@ final class Phone {
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             if !joining.busy { joining = Joining() }
         }
-        if signedIn == false || another { keepInClass(nil) }
         if another { Task { await engine?.forgetMe() } }
         if let account { self.account = account }
         (self.signedIn, self.email) = (signedIn, email)
@@ -371,7 +374,7 @@ final class Phone {
         if let me = state.me, !me.classes.isEmpty, me.user.id != inClass {
             keepInClass(me.user.id)
         }
-        let keeps = state.keepsOpened(from: sync, at: Date())
+        let keeps = state.keepsOpened(from: sync, at: Date(), everInClass: listed(state.me))
         let wasHeld = sync.flatMap(SignOutWords.held) != nil
         // The unlock landed: a pick said to wait for it may go now (santa's round 1).
         if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
@@ -451,10 +454,11 @@ final class Phone {
         UserDefaults.standard.set(true, forKey: Phone.introSeenKey)
     }
 
-    /// Keeps `id` as the student listed in a class on this phone (nil: none), in its own defaults.
-    private func keepInClass(_ id: String?) {
+    /// Keeps `id` as the student listed in a class on this phone, in its own defaults — a frozen
+    /// fixture's in itself only, so no test leaves it there for another (santa's round 1).
+    private func keepInClass(_ id: String) {
         inClass = id
-        UserDefaults.standard.set(id, forKey: Phone.inClassKey)
+        if !frozen { UserDefaults.standard.set(id, forKey: Phone.inClassKey) }
     }
 
     /// Keeps `everApproved` as a pass read the permission: set at approved, cleared once the check

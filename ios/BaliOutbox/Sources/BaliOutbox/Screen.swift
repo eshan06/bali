@@ -153,14 +153,16 @@ extension SyncState {
     /// Whether the screens the student opened over another (C3) — and the tab they chose (C6a) —
     /// stay once the engine's state is this, after `before`, at `now`: not once the standing
     /// changes, nor once a tap is made or answered (a new arming is Waiting's again), nor, out,
-    /// once the phone learns it has no classes — the router's own then: Join, or Home and its
-    /// empty state for a student once in a class here (#143), whose Join opened over it, or a tab
-    /// chosen there, a read saying none again leaves be. Waiting's whatever the classes: arming
-    /// needs no enrollment. A read saying out, or the same class still past its bell (santa's
-    /// round 1), once the bell has rung by the phone's clock changes nothing the student sees —
-    /// the class was over for the phone already — so History chosen from Session over holds (C5b's
+    /// once the phone knows it has no classes and Join is the router's own: never for a student
+    /// once in a class here (`everInClass`, #143), whose own is Home, so Join opened over it, its
+    /// code typed, and a tab chosen there stay. Waiting's whatever the classes: arming needs no
+    /// enrollment. A read saying out, or the same class still past its bell (santa's round 1),
+    /// once the bell has rung by the phone's clock changes nothing the student sees — the class
+    /// was over for the phone already — so History chosen from Session over holds (C5b's
     /// hand-off).
-    public func keepsOpened(from before: SyncState?, at now: Date) -> Bool {
+    public func keepsOpened(from before: SyncState?, at now: Date, everInClass: Bool = false)
+        -> Bool
+    {
         var over = false
         if case .inSession(let ended, _)? = before?.standing, ended.endsAt <= now {
             switch standing {
@@ -171,7 +173,7 @@ extension SyncState {
         }
         return (standing == before?.standing || over)
             && pendingTap?.eventId == before?.pendingTap?.eventId
-            && !(standing == .out && hasClasses == false && before?.hasClasses != false)
+            && !(standing == .out && hasClasses == false && !everInClass)
     }
 
     /// What Home and Waiting say of the latest tap the server refused (rule 5; kept and retried

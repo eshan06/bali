@@ -476,7 +476,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone learns it has no classes: the router's own then, Join with no way back, or Home for a student once in a class (C3; #143) — a read saying none again changes nothing, so Join opened over Home's empty state, or a tab chosen there, stays (santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
+        "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes and Join is the router's own then, with no way back (C3) — never for a student once in a class here, whose own is Home (#143): Join opened over it, its code typed, and a tab chosen there stay, the classes gone or a read saying none again (santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
     )
     func keepsOpened() async throws {
         var rung = SyncState()
@@ -516,12 +516,18 @@ struct ScreenTests {
         outBefore.me = nil
         #expect(!out.keepsOpened(from: outBefore, at: t0))
         #expect(outBefore.keepsOpened(from: outBefore, at: t0))
-        // Known to have none, a read saying so again — every return to the front makes one —
-        // closes nothing (#143); the classes gone, removed or left, is a change.
-        #expect(out.keepsOpened(from: out, at: t0))
+        // Once in a class here, Join is not the router's own in none (#143): the classes gone,
+        // removed or left, a read saying none again (every return to the front makes one), the
+        // first read since a launch, close nothing; where the phone stands changing still does.
         var inClass = out
         inClass.me = try me(Answer.me(nil, classes: [Answer.inClass("c")]))
-        #expect(!out.keepsOpened(from: inClass, at: t0))
+        #expect(!out.keepsOpened(from: inClass, at: t0) && !out.keepsOpened(from: out, at: t0))
+        for from in [inClass, out, outBefore] {
+            #expect(out.keepsOpened(from: from, at: t0, everInClass: true))
+        }
+        var unlocked = inClass
+        unlocked.standing = .inSession(session(), .unlocked)
+        #expect(!out.keepsOpened(from: unlocked, at: t0, everInClass: true))
         #expect(inClass.keepsOpened(from: out, at: t0))
         after.me = nil
         after.standing = .out
