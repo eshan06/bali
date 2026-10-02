@@ -587,12 +587,19 @@ struct AppTests {
         #expect(phone.email == "bea@bali.test")
         phone.signed(in: true, as: "cara")
         #expect(phone.email == nil)
-        // Tokens naming no email — kept by a build before #147 — say nothing.
-        let (unnamed, _) = try standIn(StandIn())
-        let unnamedSignIn = try #require(unnamed.signIn)
-        let quiet = Task { await unnamed.follow(unnamedSignIn) }
-        try await until { unnamed.signedIn == true }
-        #expect(unnamed.email == nil)
+        // Tokens naming no email — kept by a build before #147 — say nothing, until a renewal's ID
+        // token names one: the same student's, Me then says it (santa's round 1).
+        let email = Data(#"{"sub":"ana","email":"ana@bali.test"}"#.utf8).base64EncodedString()
+            .replacingOccurrences(of: "=", with: "")
+        let server = StandIn(grant: #"{"access_token":"a2","id_token":"h.\#(email).s"}"#)
+        let (upgraded, _) = try standIn(server)
+        let upgradedSignIn = try #require(upgraded.signIn)
+        let quiet = Task { await upgraded.follow(upgradedSignIn) }
+        try await until { upgraded.signedIn == true }
+        #expect(upgraded.email == nil)
+        #expect(await upgradedSignIn.refresh())
+        try await until { upgraded.email != nil }
+        #expect(upgraded.email == "ana@bali.test" && upgraded.signedIn == true)
         quiet.cancel()
         await quiet.value
     }
@@ -1248,16 +1255,17 @@ private func standIn(_ server: any HTTPTransport, keychain: Keychain = Keychain(
 /// The API as a stand-in answers a phone of the test's own: `GET /v1/me` once, with `me` — after
 /// that, a read on its way for good, until the test ends — and history pages from `pages`, in
 /// turn, the cursor each asked for kept; a page asked for with `hold` as its cursor answered only
-/// once the test lets it go.
+/// once the test lets it go. And Cognito's token endpoint, with `grant` where it is given (#147).
 private actor StandIn: HTTPTransport {
     private var me: String?
     private var pages: [String]
     private(set) var befores: [String?] = []
     private let hold: String?
     private var held: CheckedContinuation<Void, Never>?
+    private let grant: String?
 
-    init(me: String? = nil, pages: [String] = [], hold: String? = nil) {
-        (self.me, self.pages, self.hold) = (me, pages, hold)
+    init(me: String? = nil, pages: [String] = [], hold: String? = nil, grant: String? = nil) {
+        (self.me, self.pages, self.hold, self.grant) = (me, pages, hold, grant)
     }
 
     /// The page held, answered now.
@@ -1282,6 +1290,8 @@ private actor StandIn: HTTPTransport {
         case "/v1/me":
             try await Task.sleep(for: .seconds(3600))
             throw URLError(.cancelled)
+        case "/oauth2/token" where grant != nil:
+            body = grant ?? ""
         default: throw URLError(.notConnectedToInternet)
         }
         guard
