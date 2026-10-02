@@ -36,13 +36,14 @@ actor FakeScreenTime: ScreenTime {
         unshields += 1
     }
     func permission() -> Permission { granted }
-    /// Given — or, once `refusesAsk`, not: the student's Don't Allow, a throw and denied.
+    /// Given — or, once `refusesAsk`, not: the student's Don't Allow, a throw and denied. Given,
+    /// access taken back is back (#144).
     func requestPermission() throws {
         if refusesAsk {
             granted = .denied
             throw Refused()
         }
-        granted = .approved
+        (granted, revoked) = (.approved, nil)
     }
     private var refusesAsk = false
     func refuseAsk() { refusesAsk = true }
@@ -56,11 +57,36 @@ actor FakeScreenTime: ScreenTime {
 
     func schedule(_ window: DateInterval?) throws {
         if refusing, window != nil { throw Refused() }
+        if revoked == .refusing, window != nil { throw ScreenTimeUnauthorized() }
         // Only a window iOS takes anew ends the monitor's refusal: one it holds asks nothing (#103).
         if window != nil, window != registered { refusedMonitor = nil }
         windows.append(window)
+        if revoked != .silently { bellWindow = window }
     }
     func refuse(_ refusing: Bool = true) { self.refusing = refusing }
+
+    /// The bell's window iOS's DeviceActivity center holds: the last it took — none once cancelled,
+    /// or dropped behind the app's back (`revokeUnseen`, `dropWindows`).
+    private var bellWindow: DateInterval?
+    func holds(_ window: DateInterval) -> Bool { bellWindow == window }
+    /// Access taken back, as iOS answers the windows asked for since (#144): refused as
+    /// unauthorized — or, `silently`, taken and never held.
+    enum Revoked { case refusing, silently }
+    private var revoked: Revoked?
+
+    /// #144: the student takes Bali's Screen Time access back in Settings, and a running app never
+    /// hears of it — iOS drops the shields and every window, while Family Controls' read and the
+    /// store's own values stay as they were.
+    func revokeUnseen(silently: Bool = false) {
+        (bellWindow, revoked) = (nil, silently ? .silently : .refusing)
+    }
+    /// …and turns it back on in Settings: iOS takes windows again, the read still as it was.
+    func regrant() { revoked = nil }
+    /// …and iOS holds the last window it took after all — one taken and never held, before.
+    func holdLastTaken() { (bellWindow, revoked) = (registered, nil) }
+    /// Another app's Screen Time grant changes, which ends every app's windows (Apple's forums,
+    /// thread 749120): this one's access is untouched.
+    func dropWindows() { bellWindow = nil }
 
     /// When iOS refused the monitor its next window, the app closed, as the app group keeps it.
     private var refusedMonitor: Date?
@@ -772,6 +798,328 @@ struct ProtectionOffTests {
         await phone.until { $0.permission == .notDetermined && $0.permissionOff }
         #expect(try rig.outbox.records().isEmpty)
         #expect(await rig.server.waiting.isEmpty)
+        await phone.stop()
+    }
+}
+
+@Suite(
+    "#144: access taken back while Bali runs, Family Controls still reading approved",
+    .timeLimit(.minutes(3)))
+struct RevokedWhileRunningTests {
+    /// Focused in a session, the app in front, the read loop asleep until the check-in at 30 s.
+    func focused() async throws -> (Rig, Enforced) {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        try await rig.foreground()
+        await phone.until { $0.shielded && $0.until == session().endsAt }
+        return (rig, phone)
+    }
+
+    @Test(
+        "Taken back in Settings with Bali in front, the store still holding its own shields: at the next check iOS holds no bell window, and asked for it again refuses it as unauthorized — protection off reported then, within the check-in interval, and the screen says Screen Time is off, never back on"
+    )
+    func refused() async throws {
+        let (rig, phone) = try await focused()
+        await phone.screenTime.revokeUnseen()
+        rig.clock.advance(by: 30)
+        let report = try await rig.server.next(protectionOffRoute)
+        let now = await phone.until { $0.permissionOff }
+        #expect(now.permission == .notDetermined && !now.shielded)
+        #expect(await rig.engine.state.standing == .inSession(session(), .protectionOff))
+        report.reply(200, Answer.protectionOff())
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        let state = await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
+        }
+        #expect(ProtectionOffWords(state, await phone.enforcer.protection)?.way == .ask)
+        await phone.stop()
+    }
+
+    @Test(
+        "…where iOS takes the window asked for again yet holds none, the read is judged not determined from that check — no shield claimed — and protection off is reported once that lasts a check-in interval, as B5a-2 reports one never granted"
+    )
+    func dropped() async throws {
+        let (rig, phone) = try await focused()
+        await phone.screenTime.revokeUnseen(silently: true)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        let now = await phone.until { $0.permission == .notDetermined }
+        #expect(!now.shielded && !now.permissionOff)
+        #expect(try rig.outbox.records().isEmpty)
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        await rig.until { $0.standing == .inSession(session(), .protectionOff) }
+        await phone.stop()
+    }
+
+    @Test(
+        "Doubted — iOS took the window again and held none — then iOS holds it after all: the next check finds it held, and the doubt ends there, never reported"
+    )
+    func heldAfterAll() async throws {
+        let (rig, phone) = try await focused()
+        let claims = Task {
+            var seen: [Protection] = []
+            for await claim in await phone.enforcer.updates() { seen.append(claim) }
+            return seen
+        }
+        await phone.screenTime.revokeUnseen(silently: true)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        await phone.until { $0.permission == .notDetermined }
+        await phone.screenTime.holdLastTaken()
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        let now = await phone.until { $0.permission == .approved }
+        #expect(now.shielded && !now.permissionOff)
+        try await rig.checkInDue(at(90))
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await !rig.server.waiting.contains(protectionOffRoute))
+        // Never a claim of approved and off at once, the doubt's old run notwithstanding.
+        claims.cancel()
+        #expect(!(await claims.value).contains { $0.permission == .approved && $0.permissionOff })
+        await phone.stop()
+    }
+
+    @Test(
+        "B5a-2's order kept: a pass ends a run of not determined at its own read, so a check's newer read made while the pass is under way is never lost to it — reported a check-in later, not two"
+    )
+    func runKeptOverPass() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded && $0.until == session().endsAt }
+        // A pass that has read the permission approved, held at its second read of the store.
+        await phone.screenTime.hold(after: 1)
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(503)
+        try await eventually { await phone.screenTime.holding }
+        // Family Controls reads not determined now, and a check begins its run.
+        await phone.screenTime.reads(.notDetermined)
+        await phone.enforcer.check()
+        await phone.screenTime.release()
+        await phone.until { $0.permission == .notDetermined }
+        rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "…and reported on that doubt, then turned back on and tapped in again: the window iOS takes and holds ends it — approved and shielded at once, no second report"
+    )
+    func turnedBackOnAfterDoubt() async throws {
+        let (rig, phone) = try await focused()
+        await phone.screenTime.revokeUnseen(silently: true)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        try await rig.checkInDue(at(60))
+        rig.clock.advance(by: 30)
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
+        }
+        await phone.screenTime.regrant()
+        try await rig.checkInDue(at(90))
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined(session()))
+        let now = await phone.until { $0.shielded && $0.until == session().endsAt }
+        #expect(now.permission == .approved && !now.permissionOff)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        try await rig.checkInDue(at(120))
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await !rig.server.waiting.contains(protectionOffRoute))
+        await phone.stop()
+    }
+
+    @Test(
+        "A check made while a pass is under way waits for a pass that asks iOS, and judges by it: protection off reported as the check returns, never a check-in later"
+    )
+    func checkDuringPass() async throws {
+        final class Flag: @unchecked Sendable {
+            private let lock = NSLock()
+            private var raised = false
+            func raise() { lock.withLock { raised = true } }
+            var value: Bool { lock.withLock { raised } }
+        }
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded && $0.until == session().endsAt }
+        await phone.screenTime.revokeUnseen()
+        // A pass on the next state the engine publishes, held at its second read of the store.
+        await phone.screenTime.hold(after: 1)
+        rig.clock.advance(by: 1)
+        await rig.engine.retryNow()
+        try await rig.server.next(meRoute).reply(503)
+        try await eventually { await phone.screenTime.holding }
+        let returned = Flag()
+        let checking = Task {
+            await phone.enforcer.check()
+            returned.raise()
+        }
+        // The check waits on that pass: it cannot have judged.
+        try await eventually { await phone.enforcer.awaiting.count == 1 }
+        #expect(!returned.value)
+        await phone.screenTime.release()
+        await checking.value
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "Taken back while Bali was behind, the check as it comes back to the front finds it: reported then, with no relaunch"
+    )
+    func behind() async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        try await rig.tapIn()
+        await phone.until { $0.shielded && $0.until == session().endsAt }
+        await phone.screenTime.revokeUnseen()
+        rig.clock.advance(by: 600)
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "Turned back on, and tapped in again: the window iOS takes ends the doubt — approved and shielded at once, the check after reports nothing more; or asked from Protection off, iOS's prompt answering, the way on is the re-tap",
+        arguments: [false, true])
+    func turnedBackOn(prompt: Bool) async throws {
+        let (rig, phone) = try await focused()
+        await phone.screenTime.revokeUnseen()
+        rig.clock.advance(by: 30)
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        try await rig.server.next(checkInRoute).reply(200, Answer.live(state: "protection_off"))
+        let state = await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff)
+        }
+        if prompt {
+            try await phone.enforcer.requestPermission()
+            let claim = await phone.until { $0.permission == .approved }
+            #expect(!claim.permissionOff)
+            #expect(ProtectionOffWords(state, claim)?.way == .retap)
+        } else {
+            await phone.screenTime.regrant()
+        }
+        try await rig.checkInDue(at(60))
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.joined(session()))
+        let now = await phone.until { $0.shielded && $0.until == session().endsAt }
+        #expect(now.permission == .approved && !now.permissionOff)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(checkInRoute).reply(200, Answer.live())
+        try await rig.checkInDue(at(90))
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await !rig.server.waiting.contains(protectionOffRoute))
+        await phone.stop()
+    }
+
+    @Test(
+        "Approved, the windows dropped anyway — another app's Screen Time grant changed, which ends every app's (Apple's forums, thread 749120): asked for again, iOS takes and holds it — never judged off, no claim wavering, and nothing asked again after"
+    )
+    func anotherAppsGrant() async throws {
+        let (rig, phone) = try await focused()
+        let claims = Task {
+            var seen: [Permission] = []
+            for await claim in await phone.enforcer.updates() { seen.append(claim.permission) }
+            return seen
+        }
+        let (bell, windows) = (Bell.window(until: session().endsAt), await phone.screenTime.windows)
+        await phone.screenTime.dropWindows()
+        for check in 1...2 {
+            rig.clock.advance(by: 30)
+            try await rig.server.next(checkInRoute).reply(200, Answer.live())
+            try await rig.checkInDue(at(30 * Double(check + 1)))
+        }
+        #expect(await phone.screenTime.windows == windows + [bell])
+        #expect(await phone.screenTime.holds(bell))
+        let now = await phone.enforcer.protection
+        #expect(now.permission == .approved && now.shielded && !now.permissionOff)
+        #expect(try rig.outbox.records().isEmpty)
+        claims.cancel()
+        #expect(await claims.value.allSatisfy { $0 == .approved })
+        await phone.stop()
+    }
+
+    @Test(
+        "Approved, the window gone and asked for again refused for another reason than the permission: shown unscheduled, as any refusal, and never judged off"
+    )
+    func refusedOtherwise() async throws {
+        let (rig, phone) = try await focused()
+        await phone.screenTime.dropWindows()
+        await phone.screenTime.refuse()
+        for check in 1...2 {
+            rig.clock.advance(by: 30)
+            try await rig.server.next(checkInRoute).reply(200, Answer.live())
+            try await rig.checkInDue(at(30 * Double(check + 1)))
+        }
+        let now = await phone.enforcer.protection
+        #expect(now.unscheduled && now.permission == .approved && !now.permissionOff)
+        #expect(try rig.outbox.records().isEmpty)
+        await phone.stop()
+    }
+
+    @Test(
+        "Approved with the schedule intact: never off, check after check — iOS's center only read, no window stopped or replaced, so the monitor is never woken for it"
+    )
+    func intact() async throws {
+        let (rig, phone) = try await focused()
+        let windows = await phone.screenTime.windows
+        for check in 1...3 {
+            rig.clock.advance(by: 30)
+            try await rig.server.next(checkInRoute).reply(200, Answer.live())
+            try await rig.checkInDue(at(30 * Double(check + 1)))
+        }
+        #expect(await phone.screenTime.windows == windows)
+        #expect(try rig.outbox.records().isEmpty)
+        let now = await phone.enforcer.protection
+        #expect(now.permission == .approved && now.shielded && !now.permissionOff)
+        await phone.stop()
+    }
+
+    @Test(
+        "In the last minute before the bell's window ends, iOS may have ended it on its own clock: a window gone then is no sign, and nothing is asked",
+        arguments: [(99.0, true), (100.0, false)])
+    func lastMinute(seconds: TimeInterval, asked: Bool) async throws {
+        let rig = try Rig()
+        let phone = Enforced(rig)
+        let view = session(endsAt: 150)
+        // Its window ends at the whole minute after the bell: 160 s after t0.
+        #expect(Bell.window(until: view.endsAt).end == at(160))
+        try await rig.tapIn(view)
+        await phone.until { $0.until == at(150) }
+        let windows = await phone.screenTime.windows
+        rig.clock.advance(by: seconds)
+        await phone.screenTime.dropWindows()
+        await phone.enforcer.check()
+        #expect(await phone.screenTime.windows.count == windows.count + (asked ? 1 : 0))
+        #expect(await phone.enforcer.protection.permission == .approved)
+        await phone.stop()
+    }
+
+    @Test(
+        "B5a-2's launch grace unchanged: a relaunch over access taken back reads not determined — and iOS would refuse its windows — yet it is reported only once the read lasts a check-in interval"
+    )
+    func relaunch() async throws {
+        let (outbox, url) = try makeOutbox()
+        try outbox.keep(.inSession(session(), .focused))
+        let screenTime = FakeScreenTime()
+        await screenTime.reads(.notDetermined)
+        await screenTime.revokeUnseen()
+        let phone = Enforced(try Rig(outbox: try open(url)), screenTime)
+        await phone.until { $0.checked }
+        await phone.enforcer.check()
+        #expect(try phone.rig.outbox.records().isEmpty)
+        #expect(await !phone.enforcer.protection.permissionOff)
+        phone.rig.clock.advance(by: 30)
+        await phone.enforcer.check()
+        #expect(try phone.rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
         await phone.stop()
     }
 }

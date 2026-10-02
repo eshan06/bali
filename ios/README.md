@@ -105,11 +105,20 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     7's cap — until the answer comes.)
 11. **Emergency Unlock**: the shields are off at once and the apps open; `watch` shows unlocked.
     **Tap** again: shielded and focused once more.
-12. Settings → Screen Time → Apps with Screen Time Access → turn Bali off, and go back to the
-    app: `denied · shields off` at once (`notDetermined`, if iOS reads it so: reported all the
-    same, a check-in later), and within about 30 seconds `watch` shows **protection off**.
-    **Allow Screen Time** again: still no shields — only a re-tap leaves protection off — and
-    **Tap** brings the shields and focus back.
+12. Settings → Screen Time → Apps with Screen Time Access (or Bali's own page in Settings) → turn
+    Bali off, and go back to the app **without closing it**: `denied · shields off` at once
+    (`notDetermined`, if iOS reads it so: reported all the same, a check-in later), and within
+    about 30 seconds `watch` shows **protection off**. On iOS 18 a running Bali can still read
+    `approved` (#144): `iOS: Family Controls reads Approved`, while iOS no longer holds `bell` —
+    then within about a minute `Found:` says the bell window is gone (and
+    `window refused: unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`,
+    and `watch` shows **protection off** — with no relaunch. Run it three times, a 50-minute class
+    (`-- start 50`): in front with more than 15 minutes to the bell (the bell's window, 15 minutes
+    long, not begun), in front within the last 15 (begun, as in #144), and with Bali behind for a
+    minute, then opened. Note in #144 which `iOS:` and `Found:` lines changed each time (a
+    `Monitor:` line for `tick` asking nothing may come with them: expected, B5b-5).
+    **Allow Screen Time** again — note whether iOS's prompt appeared: still no shields — only a
+    re-tap leaves protection off — and **Tap** brings the shields and focus back.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
     `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
     still shows focused — no false protection off after a relaunch: a permission Family Controls
