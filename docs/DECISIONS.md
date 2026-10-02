@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-01** — **F2 (#145): Screen Time off within 10 s of a launch with access off — the
+  check made again every second within the grace — and F1's review's two WARNs.** **Found** (the
+  owner's device check, iPhone 15 Pro, iOS 18.6.2): opening Bali in a running class with Screen
+  Time access off showed "Checking Screen Time…" for about 30 s before the Screen Time off screen;
+  with access on, about 2 s. B5a-2's grace: a read of not determined is judged off only once checks
+  have read it so for a check-in interval, 30 s, and checks came only at the engine's wakes (every
+  30 s in front) and as Bali came to the front. **The bound:** `Enforcer.grace`, 10 s, one named
+  constant. Nothing measured how long iOS's false not determined lasts after a launch — B5a-2
+  assumed it settles within 30 s, and round 1's step 13 passed at 30 — so the bound rests on this
+  check's one sample: with access on, "Checking Screen Time…" lasted about 2 s, so the read had
+  settled by then; 10 s is five times that. The Debug readout's new `Launch:` line shows how long
+  Family Controls read not determined after the launch, from Bali's first read, so the phone's
+  re-test can tune it (round 1, steps 12 and 13). **Read again every second within the grace**
+  (`recheckAfter`): a check that reads Family Controls' own not determined, its run under way and
+  not lasting, makes itself again a second on — the enforcer's own timer, so no engine wake is
+  needed and the check-in's cadence is unchanged. The grace so ends the moment iOS reads approved
+  or denied, or is judged off once it lasts; at most ten checks a run, then the engine's wakes as
+  before. **Not over F1's doubt:** an approved read judged not determined (#144) keeps the engine's
+  wakes — each check there asks iOS's center for the bell's window again, and every second would
+  re-register it and wake the monitor (B5b-5); off a check-in later, as F1 has it. **Unchanged:**
+  denied is off at once; the off path; and out of a session `everApproved` with not determined
+  still routes as approved. The risk taken: a phone whose false not determined outlasts 10 s
+  would show Screen Time off and report a protection off, a permanent record — what the `Launch:`
+  line measures; seen anywhere near it, the bound goes up. **F1's review (#154), two WARNs, on the
+  conductor's word.** (1) A doubt that ended at a pass left its run of not determined behind: the
+  pass judged its read — not determined, the doubt in place — before the doubt ended later in the
+  same pass, so a read of not determined after it skipped the grace, a false off at once. Now the
+  run ends wherever the doubt does (`unverified`'s and `unauthorized`'s `didSet`): a pass, a
+  check, iOS's prompt answered. A check made during that pass reading a genuine not determined
+  loses its run, restarted at its next read a second on — later, never falsely. (2) iOS may not
+  report a bell window not begun, and a class longer than the floor asks for one that begins later
+  — F1's "taken but not held" would then doubt a phone with access on for most of a class. Now
+  "not held" is a sign only once the window has begun (`missing`): before, Family Controls' read
+  alone judges and nothing is asked again. **Its cost:** a running Bali notices access taken back
+  (#144) only from the window's start, the last 15 minutes of a longer class; before, as before
+  F1, at a relaunch or once the window begins. The readout's `iOS:` line marks a held window
+  `(not begun)`: if the phone shows iOS reports one, the guard can go and F1's reach is whole again.
+  A clock turned back past the window's start makes it not begun again — iOS's schedule follows the
+  wall clock too, a bypass family ARCHITECTURE names. **Tests**, red first on Linux
+  (`LaunchGraceTests`, `RevokedWhileRunningTests`): access off at a launch, off at the grace and
+  nothing at 9 s, no wake needed; a launch's not determined settling at 3 s, approved that second,
+  never off nor reported — in a session, and out of one routed home on the flag; a doubted read
+  never checked every second; a doubt ended at a pass ends its run (it needed a change with one
+  pass — a second pass re-reading approved hides it, as the review said); a class longer than the
+  floor never doubted for a window iOS does not show, and from the window's start a window not held
+  is a sign again. F1's tests now run in a class within its window (`lesson`), where "not held" is
+  a sign. Each fix removed turns its test red.
+
 - **2026-10-01** — **F6 (#146): a refused tap is said only while it is the phone's newest tap**
   (the conductor's default, under the owner's delegation). **Found** (the owner's device check): a
   3:51 PM scan of a block no teacher registered (`NOCLASS123`, answered 404) was still said — "Bali
@@ -35,6 +83,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`refusedTap`, `retriedTap`, `refusalKept`), Protection off's `carried` (the owner's case), and
   `TapInTests.refusedTapUnreadAtLaunch` (santa's round 1, red first); each line of the fix turns
   one red when removed. Fixtures `homeTapRefused` and `homeTapRefusedThenTapped`.
+
 - **2026-10-01** — **F4 (#141): History kept while the app runs, read again quietly each time it
   shows.** The owner's device check saw History open on its title alone for about a second at every
   visit: C6a-2 read it from the top each time the student came to it and forgot it whenever it went
