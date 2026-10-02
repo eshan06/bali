@@ -31,6 +31,13 @@ enum Theme {
     enum Radius {
         static let xs: CGFloat = 6, sm: CGFloat = 10, md: CGFloat = 14, lg: CGFloat = 20
     }
+
+    /// A screen the student opens over another fading in, and the one under it fading back in as
+    /// they go back (#150): the design system's `base`, 200 ms, on its `standard` easing. None under
+    /// Reduce Motion, where every animation is off and a fade is instant (DESIGN.md).
+    static func fade(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .timingCurve(0.2, 0, 0, 1, duration: 0.2)
+    }
 }
 
 extension Color {

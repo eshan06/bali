@@ -949,6 +949,51 @@ struct AppTests {
     }
 
     @Test(
+        "A screen the student opens over another fades in, and the one under it fades back in as they go back (#150): the design system's base 200 ms on its standard easing — and under Reduce Motion no animation at all, the fade instant (DESIGN.md)"
+    )
+    func fade() {
+        #expect(Theme.fade(reduceMotion: false) == .timingCurve(0.2, 0, 0, 1, duration: 0.2))
+        #expect(Theme.fade(reduceMotion: true) == nil)
+    }
+
+    @Test(
+        "A screen fading in (#150) starts as the page's own colour alone, opaque — so the screen it replaces, which SwiftUI keeps until the fade ends and which draws itself anew from the next screen's state, is gone at once — and ends as itself over that colour"
+    )
+    func opening() throws {
+        func drawn(_ shown: Bool) throws -> [Int] {
+            let renderer = ImageRenderer(
+                content: Rectangle().fill(Theme.text).frame(width: 8, height: 8)
+                    .modifier(Opening(shown: shown)))
+            renderer.scale = 1
+            return try pixels(of: try #require(renderer.uiImage))(4, 4)
+        }
+        #expect(try drawn(false) == [0xF7, 0xF5, 0xF2, 255])
+        #expect(try drawn(true) == [0x21, 0x1F, 0x1B, 255])
+    }
+
+    @Test(
+        "Back lets the keyboard go before the screen moves (#150): Join's code field, focused as Join shows, types in nothing once Back is pressed — the keyboard going down with Join, never left over Home as Home fades back in"
+    )
+    func backLetsKeyboardGo() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let (phone, key) = (
+            Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"])), scene.keyWindow
+        )
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
+        window.rootViewController = UIHostingController(rootView: RootView(phone: phone))
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            key?.makeKey()
+        }
+        try await until { textFields(in: window).first?.isFirstResponder == true }
+        let field = try #require(textFields(in: window).first)
+        phone.back()
+        #expect(phone.screen == .home && !field.isFirstResponder)
+    }
+
+    @Test(
         "Every colour `Theme` draws, and each chip's, is D1's light value of its token in `bali-tokens.json` — the design system's own file, a token's reference to another followed — shadow-1's opacity too, so the two cannot drift apart unnoticed (#101's review)"
     )
     func tokens() throws {
@@ -1299,6 +1344,12 @@ private final class TestsBundle {}
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
     [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+}
+
+/// Every text field in `view`, itself among them, outermost first.
+@MainActor
+private func textFields(in view: UIView) -> [UITextField] {
+    [view as? UITextField].compactMap { $0 } + view.subviews.flatMap(textFields(in:))
 }
 
 /// Each of `scrolls` out to `window`'s edges, its bar not inset with its content and — but the
