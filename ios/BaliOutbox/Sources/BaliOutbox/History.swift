@@ -167,7 +167,8 @@ extension History.Moment {
             case .afterSessionEnd?: "Arrived after class ended"
             case .superseded?: "Arrived late, so it changed nothing"
             case .noLiveParticipation?: "Arrived after you left this class"
-            case .protectionOff?: "Screen Time was off, so it changed nothing"
+            // Not "changed nothing": Screen Time back on returns the student to it (#167).
+            case .protectionOff?: "Screen Time was off at the time"
             // Never in a class's history (kept with none), or a note this build does not know.
             default: nil
             }

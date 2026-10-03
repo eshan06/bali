@@ -2581,11 +2581,13 @@ async function unlockIn(
   // off is not flipped: that state is never softened into an unlock
   // (ARCHITECTURE, iOS rules: "never green, never an unlock") — iOS already
   // dropped the shields, and the grid must keep saying the permission is off
-  // until a re-tap. Nor is one who came back to focus after this unlock: it is
-  // late, and the return stands (owner ruling, 2026-09-24) — whether or not
-  // they are still here, so an unlock from before their own refocus, landing
-  // after the bell or a removal, never reads "left unlocked" over a phone that
-  // was shielded when it left (#76's review). Otherwise, with no live
+  // until a re-tap or Screen Time back on — which then returns the student to
+  // this unlock, their latest turn (#167). Nor is one who came back to focus
+  // after this unlock: it is late, and the return stands (owner ruling,
+  // 2026-09-24) — whether or not they are still here, so an unlock from before
+  // their own refocus, landing after the bell or a removal, never reads "left
+  // unlocked" over a phone that was shielded when it left (#76's review).
+  // Otherwise, with no live
   // participation an ended session dominates (the whole session is over), else
   // it's a student removed from the class mid-session — the ISSUES #2 case.
   // Recorded all the same, never refused.

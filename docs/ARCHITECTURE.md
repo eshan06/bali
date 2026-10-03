@@ -463,7 +463,8 @@ with no finer meaning than its status carries none.
   `after_session_end` / `unknown_session` / `not_enrolled`, and for one sent under its
   tap `tap_armed` / `unknown_tap`) when there is no live participation to flip,
   `protection_off` when there is one but its protection is off (never softened into an
-  unlock), and `superseded` when the student's own refocus or tap in that session came
+  unlock while it is off; Screen Time back on returns the student to it, #167), and
+  `superseded` when the student's own refocus or tap in that session came
   after it — a late unlock, recorded and answered with the state it left alone, or with
   none once the student has left the session (ruled 2026-09-24, A10: "after" by the
   clamped times, a return's never later than the server recorded it, and a tie flips;

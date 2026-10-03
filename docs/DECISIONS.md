@@ -29,15 +29,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (A12): one made before a protection off of the student's own the server already has is
   recorded, noted `superseded`, never applied — else a back-on stuck behind a later revocation
   would paint green over a phone with no shields; an unlock made after it needs no rule, the
-  latest turn reads it. **Disclosed:** an unlock that lands under protection off is noted
-  `protection_off` ahead of `superseded` (A2's precedence, unchanged), so one the phone made
-  before a refocus, stuck until after the revocation, counts as the latest turn and the restore
-  is unlocked — never green over an unshielded phone, and reachable only with an unlock stuck
-  while the two records behind it land. **The claim is the phone's,** as a re-tap's is; the
+  latest turn reads it. **Disclosed** (santa's round 1): the latest turn is by arrival, so two
+  orders a stuck record makes restore unlocked where the phone's last turn was a return — an
+  unlock stuck past the outbox's bound that lands under protection off after a re-tap the phone
+  made later (noted `protection_off` ahead of `superseded`, A2's precedence, unchanged), and a
+  refocus stuck until after the revocation, then refused with nothing recorded. Both err toward
+  unlocked, never green over an unshielded phone. **The grid's refresh** reads a row Screen Time
+  back on returned to that unlock as Unlocked: the stored row wins over the unlock's note there
+  (`fromSnapshot`; santa's round 1, both reviewers). **The claim is the phone's,** as a re-tap's is; the
   owner's reasoning covers the block it no longer needs. **The grid:** a `protection_on` chip
   reads Unlocked when it carries an unlock, else Focused; a late one is contact. **History:**
   `protection_on` joins `HISTORY_EVENT_TYPES` — "Screen Time back on" on the phone, Screen Time
-  off's shield whole, in a neutral ink (it returns to focus or to an unlock). **The phone half**
+  off's shield whole, in a neutral ink (it returns to focus or to an unlock); an unlock noted
+  `protection_off` now reads "Screen Time was off at the time", no longer "so it changed nothing",
+  since Screen Time back on returns the student to it. **The phone half**
   is F13b, next: sent through the outbox after Turn on Screen Time is answered, the shields back
   where the answer says. **Also here, F1b's three Claude Review WARNs (#169), red first:** the
   monitor's note is forgotten only once the marker reads back (`Marker.written`), so a loss found

@@ -458,6 +458,38 @@ describe('the unlock a chip carries (A9)', () => {
     for (const id of ['ana', 'ben']) expect(chip(s, id)).toEqual(chip(booted, id));
     expect(chip(s, 'cal', new Date(T0))).toEqual(chip(booted, 'cal', new Date(T0)));
   });
+
+  it('a row Screen Time back on returned to its unlock — one noted protection off — reads unlocked on a refresh too, live or at the bell (#167)', () => {
+    // The unlock moved nothing when it landed, and Screen Time back on returned the row to the
+    // unlocked it says: the stored row is the truth, so no refresh paints Protection off again.
+    const unlock = { eventId: 'ev-8', reason: 'nurse' as const, occurredAt: T1 };
+    const boot = snapshot(9, [
+      { id: 'ana', state: 'unlocked', unlock: { ...unlock, recordedAs: 'protection_off' } },
+      {
+        id: 'ben',
+        state: 'unlocked',
+        endedAt: T1,
+        unlock: { ...unlock, recordedAs: 'protection_off' },
+      },
+      { id: 'cal', state: 'protection_off', unlock: { ...unlock, recordedAs: 'protection_off' } },
+    ]);
+    let s = fromSnapshot(boot);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
+    expect(chip(s, 'ben')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+    expect(chip(s, 'cal')).toEqual({ display: 'protection_off', note: 'unlocked · nurse' });
+    // The stream lands where the snapshot does.
+    let live = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    for (const e of [
+      evt(6, 'protection_off', 'ana'),
+      evt(8, 'unlock', 'ana', T1, { recorded_as: 'protection_off', reason: 'nurse' }),
+      evt(9, 'protection_on', 'ana'),
+    ]) {
+      live = applyEvent(live, e);
+    }
+    expect(chip(live, 'ana')).toEqual(chip(s, 'ana'));
+    s = mergeSnapshot(live, boot);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
+  });
 });
 
 describe('a changed reason (A20)', () => {

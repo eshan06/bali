@@ -112,6 +112,11 @@ export function fromSnapshot(snap: SessionSnapshot): Students {
     if (s.unlock) {
       const { eventId, reason, recordedAs, occurredAt } = s.unlock;
       applyUnlock(student, eventId, reason, recordedAs, new Date(occurredAt));
+      // Noted protection off, it moved nothing when it landed — and Screen Time back on (#167)
+      // may since have returned the row to the unlocked it says: the stored row is the truth.
+      if (recordedAs === 'protection_off' && s.state === 'unlocked' && !s.protectionOffAfterEnd) {
+        student.state = 'unlocked';
+      }
     }
     out[s.studentId] = student;
   }
