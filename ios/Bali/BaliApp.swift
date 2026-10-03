@@ -11,6 +11,10 @@ struct BaliApp: App {
     @Environment(\.scenePhase) private var phase
     @State private var phone = Phone.launched()
 
+    #if DEBUG
+        init() { AppProbe.start() }  // PROBE (#144's experiment build)
+    #endif
+
     var body: some Scene {
         WindowGroup {
             RootView(phone: phone).task { await phone.start() }
@@ -19,6 +23,9 @@ struct BaliApp: App {
         // it, the app would be killed (0xdead10cc). So it takes none behind the app, and takes them
         // again in front — where the engine checks in.
         .onChange(of: phase, initial: true) { _, phase in
+            #if DEBUG
+                AppProbe.phaseChanged(phase)  // PROBE (#144's experiment build)
+            #endif
             if phase == .background { Outbox.suspend() } else { Outbox.resume() }
             phone.setForeground(phase == .active)
         }
@@ -585,7 +592,11 @@ final class Phone {
         #endif
         // The shields follow the engine from its first state — where the phone stood when the app
         // last ran, kept in the app group — so a relaunch never takes them off (B5).
-        let enforcer = Enforcer(engine: engine, screenTime: PhoneScreenTime())
+        let screenTime = PhoneScreenTime()
+        #if DEBUG
+            AppProbe.screenTime = screenTime  // PROBE (#144's experiment build)
+        #endif
+        let enforcer = Enforcer(engine: engine, screenTime: screenTime)
         (self.signIn, self.engine, self.enforcer) = (signIn, engine, enforcer)
         onPhase = ({ await engine.setForeground($0) }, { await enforcer.check() })
         Task { await engine.run() }
@@ -699,6 +710,13 @@ final class Phone {
                     .onChange(of: losesBell) { _, on in Bell.deviceCheckLosesBell = on }
                 Text("Monitor: \(monitor)")
                 Text(note)
+                // PROBE (#144's experiment build, never merged): iOS's prompt asked directly, and
+                // the probe's last lines — the app's, the enforcer's, the monitor's — newest first.
+                Text("Probe").bold()
+                Button("Probe: ask iOS") { Task { await AppProbe.askIOS() } }
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Text(Probe.ring.reversed().joined(separator: "\n")).textSelection(.enabled)
+                }
             }
             .font(.footnote.monospaced())
             .buttonStyle(.bordered)

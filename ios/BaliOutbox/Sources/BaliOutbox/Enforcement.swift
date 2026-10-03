@@ -327,6 +327,13 @@ public actor Enforcer {
         let until = state.shieldedUntil(clock.now())
         let shielding = await screenTime.isShielding()
         if until != nil, !shielding {
+            #if DEBUG && os(iOS)
+                // PROBE (#144's experiment build): put back on over a store read empty — or a first
+                // put-on, the tap's — kept as main does it, so the run matches main.
+                Probe.log(
+                    putOn || protection.shielded
+                        ? "re-shield: store empty while expected on" : "shield: store empty, put on")
+            #endif
             await screenTime.shield()
             putOn = true
         } else if until == nil, shielding,

@@ -108,6 +108,9 @@ final class PhoneScreenTime: ScreenTime {
 
         static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .standard) }
 
+        /// PROBE (#144's experiment build): this enforcer's long-lived store, read (`AppProbe`).
+        var probeStoreRead: Bool { store.shield.applicationCategories != nil }
+
         /// #145's device check: when Family Controls was first read since this launch, by how long
         /// the phone has run, and how long after it a read first said other than not determined,
         /// and what — the moment `Enforcer.grace` must outlast on a phone whose access is on.

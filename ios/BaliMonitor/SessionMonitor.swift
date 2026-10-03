@@ -2,6 +2,11 @@ import BaliOutbox
 import DeviceActivity
 import Foundation
 
+#if DEBUG
+    @preconcurrency import FamilyControls
+    @preconcurrency import ManagedSettings
+#endif
+
 // The DeviceActivity monitor (ARCHITECTURE, "iOS app structure", decision 2; B5b): iOS wakes it at
 // the end of the windows the app registered — the bell, or decision 7's cap, and its backup — and of
 // the ones it asked for itself, with the app open or force-quit. What it does is `Bell.wake`'s and
@@ -13,6 +18,9 @@ import Foundation
 final class SessionMonitor: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
+        #if DEBUG
+            let storeAtWake = Self.probeStore  // PROBE (#144's experiment build)
+        #endif
         let started = ContinuousClock.now
         // Which window woke it: the bell's, its backup, or one it asked for itself (`tick`, `tock`).
         let woken = Bell.Name(rawValue: activity.rawValue)
@@ -23,7 +31,34 @@ final class SessionMonitor: DeviceActivityMonitor {
         Bell.wakes = Bell.logged(begun, in: Bell.wakes)
         let done = "\(wake) · \(carryOut(woken)) · \(ContinuousClock.now - started)"
         Bell.wakes = Bell.logged(done, replacing: begun, in: Bell.wakes)
+        #if DEBUG
+            Self.probe("intervalDidEnd", activity, store: storeAtWake, did: done)
+        #endif
     }
+
+    #if DEBUG
+        // PROBE — #144's experiment build, never merged (`Probe`): every wake, logged after what
+        // main does at it — the callback and window, this process's id, its own Family Controls
+        // read and its store's, read at the wake. The start of a window wakes it too, which main
+        // leaves to `DeviceActivityMonitor`'s own nothing.
+        override func intervalDidStart(for activity: DeviceActivityName) {
+            super.intervalDidStart(for: activity)
+            Self.probe("intervalDidStart", activity, store: Self.probeStore)
+        }
+
+        private static var probeStore: String {
+            ManagedSettingsStore(named: .bali).shield.applicationCategories != nil ? "on" : "off"
+        }
+
+        private static func probe(
+            _ callback: String, _ activity: DeviceActivityName, store: String, did: String? = nil
+        ) {
+            Probe.log(
+                "monitor \(callback) \(activity.rawValue) · pid \(ProcessInfo.processInfo.processIdentifier)"
+                    + " · auth \(AuthorizationCenter.shared.authorizationStatus) · store \(store) at wake"
+                    + (did.map { " · did \($0)" } ?? ""))
+        }
+    #endif
 
     private func carryOut(_ woken: Bell.Name?) -> String {
         #if DEBUG
