@@ -108,9 +108,9 @@ final class Phone {
     /// finish (rule 5).
     var naming = Naming()
     private(set) var signOutFailed: String?
-    /// Counts Sign out's presses: an ask of the outbox file begun before one says nothing of its
-    /// words (`synced`).
-    private var signOutTries = 0
+    /// The outbox file asked whether an unlock still waits, while Me says one has not gone
+    /// (`synced`): a test waits on it.
+    @ObservationIgnored private(set) var unsentCheck: Task<Void, Never>?
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
     var leaving = Leaving()
@@ -320,7 +320,7 @@ final class Phone {
     func signOut() async {
         // The last try's words go, whatever this one does: never two reasons at once (C6b-1's
         // review).
-        (signOutFailed, signOutTries) = (nil, signOutTries + 1)
+        signOutFailed = nil
         guard sync.flatMap(SignOutWords.held) == nil else { return }
         guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
         switch await engine.unlockUnsent() {
@@ -412,6 +412,7 @@ final class Phone {
             keepInClass(me.user.id)
         }
         let keeps = state.keepsOpened(from: sync, at: Date(), everInClass: listed(state.me))
+        let wasHeld = sync.flatMap(SignOutWords.held) != nil
         // The unlock landed: a pick said to wait for it may go now (santa's round 1).
         if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
             pickFailed = nil
@@ -423,15 +424,22 @@ final class Phone {
         }
         sync = state
         // "Unsent" is said where the file holds an unlock the engine's queue does not show
-        // (`signOut`): at each state whose queue shows none, the file is asked again, and the
-        // words go once it holds none — the unlock gone, whether or not a queue ever showed it,
-        // its reads failing throughout (#129's review) — never while it still does (Riders-2's
-        // santa), nor over a Sign out pressed since.
-        if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil, let engine {
-            let tries = signOutTries
-            Task {
-                guard await engine.unlockUnsent() == false, tries == signOutTries else { return }
+        // (`signOut`). A hold the queue showed ending is that unlock gone: the words go at once,
+        // never a moment late under an enabled Sign out. Where none showed, its reads failing
+        // throughout (#129's review), the file is asked again at each state whose queue shows no
+        // unlock, and they go once it holds none, never while it does (Riders-2's santa). Its
+        // answer lands after any press's whose read came first, the two executors keeping order,
+        // so it clears only these words, never ones a press set since.
+        if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil {
+            if wasHeld {
                 signOutFailed = nil
+            } else if let engine {
+                unsentCheck = Task {
+                    guard await engine.unlockUnsent() == false,
+                        signOutFailed == SignOutWords.unsent
+                    else { return }
+                    signOutFailed = nil
+                }
             }
         }
         guard !keeps else { return }

@@ -403,7 +403,8 @@ struct AppTests {
             window.layoutIfNeeded()
             return window
         }
-        let bell = Date() + 2
+        // Far enough ahead for a slow simulator to draw both first.
+        let bell = Date() + 15
         let (ringing, rung) = (me(ringing: bell), me(ringing: Date() - 60))
         defer { (ringing.isHidden, rung.isHidden) = (true, true) }
         let past = drawn(rung)
@@ -629,7 +630,7 @@ struct AppTests {
     }
 
     @Test(
-        "Sign out through the phone's own sign-in and outbox (C6b-1's review): an Emergency Unlock the outbox file holds unsent, said and nothing tried — said while the file holds it, a state whose queue shows none changing nothing, and gone once it has gone, whether or not a queue the phone was given ever showed it (#129's review: its reads may fail throughout); a Keychain that cannot forget the tokens now, said; forgotten, nothing said and nobody signed in — each try's words the last one's no more",
+        "Sign out through the phone's own sign-in and outbox (C6b-1's review): an Emergency Unlock the outbox file holds unsent, said and nothing tried — still said while the file holds it, a state whose queue shows none changing nothing; gone at once when a hold the queue showed ends, never a moment late under an enabled Sign out; and gone once the unlock has gone where no queue the phone was given ever showed it (#129's review: its reads may fail throughout); a Keychain that cannot forget the tokens now, said; forgotten, nothing said and nobody signed in — each try's words the last one's no more",
         .timeLimit(.minutes(3)))
     func signOutWiring() async throws {
         let (held, engine) = try standIn(Reasons())
@@ -637,15 +638,27 @@ struct AppTests {
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
         // A state whose queue shows no unlock — as a failed read of the queue leaves it — while
-        // the file still holds one: still said.
+        // the file still holds one: still said, the file asked.
         held.synced(SyncState())
-        #expect(await engine.unlockUnsent() == true)
+        await held.unsentCheck?.value
         #expect(held.signOutFailed == SignOutWords.unsent)
-        // The unlock goes, never shown in a queue the phone was given: the words go with it.
-        let running = Task { await engine.run() }
+        // The queue shows it, then it goes: the hold's end clears the words at once.
+        held.synced(await engine.state)
+        var running = Task { await engine.run() }
+        try await until { await engine.unlockUnsent() == false }
+        held.synced(await engine.state)
+        #expect(held.signOutFailed == nil)
+        running.cancel()
+        await running.value
+        // Another, never shown in a queue the phone was given: said, and gone once it has gone.
+        try await engine.record(.unlock(session: "s", reason: nil))
+        await held.signOut()
+        #expect(held.signOutFailed == SignOutWords.unsent)
+        running = Task { await engine.run() }
         try await until { await engine.unlockUnsent() == false }
         held.synced(SyncState())
-        try await until { held.signOutFailed == nil }
+        await held.unsentCheck?.value
+        #expect(held.signOutFailed == nil)
         running.cancel()
         await running.value
         let keychain = Keychain(account: "ana")

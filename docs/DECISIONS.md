@@ -13,11 +13,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (#129's review): Me says it where the outbox file holds an unlock the engine's queue does not
   show, and Riders-2's santa (round 2) cleared it only once a hold the queue showed ended, so that
   no unrelated publish could clear it. Where the queue's reads failed throughout, no hold ever
-  showed, and the words stood, untrue, beside an enabled Sign out once the unlock had gone. Now
-  each state whose queue shows no unlock asks the file again (`unlockUnsent`, the read that set
-  the words), and they go once it holds none; an ask begun before a press of Sign out says
-  nothing (`signOutTries`). Santa's rule holds: while the file holds the unlock, nothing clears
-  it. **A pick's hold is the loop's own** (#152's review): kept as the card it was made on, and
+  showed, and the words stood, untrue, beside an enabled Sign out once the unlock had gone. The
+  hold's end still clears them at once (a moment's wait there showed them under an enabled Sign
+  out; santa's WARN); where no hold showed, each state whose queue shows no unlock asks the file
+  again (`unlockUnsent`, the read that set the words), and they go once it holds none, if they are
+  still those words. Santa's rule holds: while the file holds the unlock, nothing clears it. No
+  count of presses guards the ask (the first version had one; santa found it untested, and it is
+  not needed): the main actor and the engine each run their jobs in order, so the ask's answer lands after any press's whose read
+  came first, and a press reading after it sets its words after its clear. **A pick's hold is the loop's own** (#152's review): kept as the card it was made on, and
   let go as the loop ends, whichever way, only if it is still that card's, so a card moving on
   never latches it (the WARN's case: every later pick would move the check and send nothing) and
   a loop ending for an old card never frees a newer one's (two changes at once). `synced` no
