@@ -5,6 +5,7 @@ import {
   enrollments,
   events,
   findUserByCognitoId,
+  getLiveParticipation,
   startSession,
   users,
 } from '@bali/db';
@@ -18,10 +19,17 @@ import type {
 } from '@bali/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
+
+// `/v1/me`'s read of the live session, as it is, so a test can land a Start
+// just after it (#166's review).
+vi.mock('@bali/db', async (actual) => {
+  const db = await actual<typeof import('@bali/db')>();
+  return { ...db, getLiveParticipation: vi.fn(db.getLiveParticipation) };
+});
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -576,6 +584,28 @@ describe('GET /v1/me', () => {
     expect(body.session).toBeNull();
     // A read: no tap consumed, refreshed or added.
     expect(await db.select().from(armedTaps)).toEqual(kept);
+  });
+
+  it('a Start landing between its reads never answers no session and no tap waiting, which would send a phone the Start just joined to Home, unshielded (#166’s review)', async () => {
+    const { student, klass, block } = await seedClassroom(db, 'me-armed-race');
+    const token = await ctx.tokenFor(student.cognitoId);
+    expect((await tap(token, block.tagId)).outcome).toBe('armed');
+    const { getLiveParticipation: read } =
+      await vi.importActual<typeof import('@bali/db')>('@bali/db');
+    vi.mocked(getLiveParticipation).mockImplementationOnce(async (...args) => {
+      const live = await read(...args);
+      const at = Date.now();
+      const started = await startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(at - 60_000),
+        endsAt: new Date(at + 25 * 60_000),
+      });
+      expect(started.armedConverted).toBe(1);
+      return live;
+    });
+    const { body } = await me(token);
+    // Still waiting, read before the Start; or in its session, read after it.
+    expect(body.session !== null || body.armed).toBe(true);
   });
 
   it('after the end of its school day, a Start joins no one: no session, no tap waiting, and the class in session — Home’s card, Tap in (#166)', async () => {

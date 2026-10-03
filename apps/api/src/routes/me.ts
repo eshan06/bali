@@ -41,6 +41,12 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
       displayNameFromClaims(identity.claims),
     );
 
+    // A tap of theirs waiting for a Start, by the server's clock (#166): none,
+    // and a phone waiting for its teacher's Start stops waiting. Read before the
+    // session, so a Start landing between the two answers with its session —
+    // never with no session and no tap waiting (#166's review).
+    const armed = user.role === 'student' && (await hasArmedTap(db, user.id, clock()));
+
     // Each class names its teacher (C2a): a teacher's own, the caller — already
     // in hand; a student's, read with the class in one query, with the
     // enrollment that leaving it deletes (A19).
@@ -90,9 +96,7 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
       user: { id: user.id, role: user.role, displayName: user.displayName },
       classes,
       session,
-      // A tap of theirs waiting for a Start, by the server's clock: none, and a
-      // phone waiting for its teacher's Start stops waiting (#166).
-      armed: user.role === 'student' && (await hasArmedTap(db, user.id, clock())),
+      armed,
     };
   });
 

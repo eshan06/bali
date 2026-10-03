@@ -28,9 +28,9 @@ public enum Standing: Sendable, Hashable {
     /// Armed, waiting for the teacher's Start (decision 5): nothing to shield yet. In the foreground
     /// it reads the truth every 30 s for the Start (decision 6, the owner's ruling, 2026-09-29;
     /// C3a); a read naming no session leaves it waiting while it says a tap of the student's waits
-    /// (`MeResponse.armed`), and ends the wait once none does — its school day over, or the class
-    /// that took it over too — as the end of that day by the phone's own clock does, offline
-    /// (`SyncState.waitEnds`): never Waiting where no Start would lock the phone (#166).
+    /// (`MeResponse.armed`), and ends the wait once none does — its school day over, or taken by a
+    /// Start whose class is over too — as the end of that day by the phone's own clock does,
+    /// offline (`SyncState.waitEnds`): never Waiting where no Start would lock the phone (#166).
     case waiting
     /// In `session`: shielded only while `focused` (nil is a state this build does not know), and
     /// only until its `endsAt`, which the phone's own clock keeps (data model, decision 6).
@@ -275,7 +275,7 @@ public actor SyncEngine {
     private var kept: Standing?
     /// A tap answered armed while where the phone stood was unread, which cannot show it: carried
     /// until the standing is known — onto an out the file gives back, or a read of the truth that
-    /// names no session — since no read shows an armed tap.
+    /// names no session — unless that read says no tap of the student's waits (#166).
     private var armed = false
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
     /// Rule 3's check of the shields, run at each wake in the foreground — before each check-in,

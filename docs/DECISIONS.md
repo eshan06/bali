@@ -41,7 +41,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Start's own taps), the fixtures `me/no-session` (`armed: true`) and `me/armed-expired`,
   `DroppedWaitTests` (a read saying none, a Start after expiry, offline at the end and each arming
   moving it, relaunched and an earlier build's wait, the end's rule over a day an hour short) and
-  `AnswerTests.waitingStays`.
+  `ReadTests.waitingStays`. **Santa, round 1** (Reviewer B the Claude fallback: Codex refuses every
+  model on this Mac): one blocker, from Reviewer A, which B raised as a WARN — `/v1/me` read the
+  live session before `armed`, as two statements, so a Start committing between them answered no
+  session and no tap waiting, true at no moment, and the phone the Start had just joined went to
+  Home unshielded until its next read. Fixed red first (a Start landed just after the session's
+  read, `me.test.ts`): `armed` is read first, so every interleaving answers the wait or the
+  session. WARNs fixed: the wait's end kept before the answer's state is copied (a refused write
+  stays shown), the carried arming's comment, a test of a class over unswept with no tap waiting
+  (Session over, `takenAndOver`), and this entry's test name. One left: a write of the end the file
+  refuses is not tried again — only a suspension landing between the answer's settle and it can
+  refuse it, and a relaunch then ends the wait early or reads none, the safe side.
 
 - **2026-10-03** — **F11a-2: the merged PRs' review WARNs, part 2 — Me, Leave, Home and Unlocked.**
   **"Hasn't reached your teacher yet" is cleared by the file too, not the queue's edge alone**

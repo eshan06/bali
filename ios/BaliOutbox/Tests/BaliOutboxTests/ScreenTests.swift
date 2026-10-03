@@ -989,7 +989,7 @@ struct DroppedWaitTests {
         #"{"id":"c","name":"Class c","teacher":{"displayName":null},"liveSession":{"id":"s","endsAt":"\#(iso(at(4000)))"}}"#
 
     @Test(
-        "A read saying no tap of the student's waits — its school day over, or the class that took it over too — ends the wait: Home, never Waiting, and no wait said on it"
+        "A read saying no tap of the student's waits — its school day over, or taken by a Start whose class is over too — ends the wait: Home, never Waiting, and no wait said on it"
     )
     func dropped() async throws {
         let rig = try Rig()
@@ -1021,6 +1021,19 @@ struct DroppedWaitTests {
         let card = try #require(state.inSessionCard(at: now))
         #expect(!card.unlocked && card.bell == at(4000))
         #expect(card.words == "Class c is in session. Tap your teacher's block to join.")
+        await rig.stop()
+    }
+
+    @Test(
+        "A read naming a class over by the phone's clock, the sweep yet to run, and no tap waiting — a Start took the tap and the class has rung — is that class: Session over, never Waiting (santa's round 1)"
+    )
+    func takenAndOver() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(session(endsAt: -60), armed: false))
+        let state = await rig.engine.state
+        #expect(state.standing == .inSession(session(endsAt: -60), .focused))
+        #expect(shown(state, opened: []) == (.sessionOver, false))
         await rig.stop()
     }
 
