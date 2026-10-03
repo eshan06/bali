@@ -51,6 +51,19 @@ app threw the record away. Unshielded phone, zero trace, nobody ever knew.
 **Done when:** killing the Wi-Fi mid-unlock, force-quitting the app, and the
 "removed from class" case all still end with the record visible to the teacher.
 
+**Status: done on hardware (2026-10-01).** On the owner's iPhone against dev (Phase 3's
+E1), all three cases ended with the record visible to the teacher:
+- **Wi-Fi off mid-unlock** (Airplane Mode): the unlock made at 3:40:07 PM was delivered at
+  3:41:41 PM, once the phone was back online.
+- **The app force-quit right after an unlock:** made offline at 3:56:43 PM; the relaunched
+  app delivered it at 3:57:05 PM.
+- **Removed from class mid-session:** an unlock made offline at 4:12:54 PM reached the
+  server after the removal (4:13:09 PM) and was recorded with the note
+  `no_live_participation`; the teacher saw the student as "left · unlocked".
+
+The phone half — save first, retry until the server confirms — is the iOS app's outbox
+(Phase 3).
+
 **Status (Phase 2 — server half done):** the transition engine's `unlock` now
 always commits the event. A live participation flips to `unlocked` as before —
 unless its protection is off, which an unlock never softens: the unlock is then

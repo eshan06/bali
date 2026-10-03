@@ -8,6 +8,16 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-03** — **Phase 3 closed (2026-10-03).** The iOS student app is on `main`; Phase 3 ends
+  here and Phase 4 is next. The evidence, all on the owner's iPhone 15 Pro (iOS 18.6.2) against
+  dev: E1, ISSUES #2 on hardware, passed on 2026-10-01 — Wi-Fi off mid-unlock, a force-quit right
+  after an unlock and a student removed mid-class each ended with the record visible to the
+  teacher (the times are in `docs/PLAN.md`'s E1 line and ISSUES #2's status); the 2026-10-02
+  re-test passed every fix from the 2026-10-01 check but #144's; and the final phone check
+  (2026-10-03) proved #144 (F1b), #167 (F13b) and #166 (F14) — `docs/PLAN.md`'s F line. What is
+  not fixed is carried forward rather than holding the phase: `docs/PLAN.md`, "Phase 3: known
+  edges, carried forward", each with its issue where one exists, beside the open owner items.
+
 - **2026-10-03** — **F11b: the merged PRs' review WARNs, part 3 — History, and the tests' hygiene.**
   **The sign-in's history read waits for `GET /v1/me`** (#153's review): it went at the sign-in
   itself, before the phone knew whose account it was, so a teacher signing in to the student app
