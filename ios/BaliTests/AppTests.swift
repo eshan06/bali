@@ -195,6 +195,14 @@ struct AppTests {
         #expect(notUpdated.events == history.events && notUpdated.nextBefore == history.nextBefore)
         #expect(notUpdated.notUpdated?.hasPrefix("Bali couldn't update your history.") == true)
         #expect(notUpdated.failure == nil && !notUpdated.busy)
+        // Its Try again under way, the words kept beside Reading…; a sign-in Bali couldn't check,
+        // in one sentence (F4's review).
+        let tryingAgain = try #require(PreviewFixtures.all["historyRefreshReading"]?.history)
+        #expect(tryingAgain.notUpdated == notUpdated.notUpdated)
+        #expect(tryingAgain.busy && tryingAgain.fromTop && tryingAgain.events == history.events)
+        #expect(
+            PreviewFixtures.all["historyRefreshSignIn"]?.history.notUpdated
+                == "Bali couldn't check your sign-in to update your history. Try again.")
         let error = Phone(fixture: try #require(PreviewFixtures.all["historyError"]))
         await error.readHistory()
         #expect(error.history.failure == Joining.notStarted && !error.history.read)
@@ -455,6 +463,54 @@ struct AppTests {
         await paged.historyRead(await client(400, cursor).history(before: "m0"), for: paged.reads)
         #expect(paged.history.events.count == shown && paged.history.fromTop)
         #expect(paged.history.notUpdated == "Bali couldn't update your history. \(Joining.notStarted)")
+        // A read from the top goes ahead of Show earlier's page on its way — on a phone not
+        // started too, which says so — so that page, landing after, is dropped, never taken for
+        // the newest in place of the moments read (F4's review).
+        var onItsWay = paging
+        onItsWay.busy = true
+        let ahead = Phone(fixture: PreviewFixtures.State(tab: .history, history: onItsWay))
+        let showEarlier = ahead.reads
+        await ahead.readHistory()
+        await ahead.historyRead(await client(200, older).history(before: "m1"), for: showEarlier)
+        #expect(ahead.history.events.count == shown && ahead.history.nextBefore != nil)
+        #expect(ahead.history.notUpdated == "Bali couldn't update your history. \(Joining.notStarted)")
+    }
+
+    @Test(
+        "History on screen as the app comes back to the front reads its newest page again, quietly, as each visit does (F4's review: it does not appear again) — never under another screen, nor again while the app stays in front"
+    )
+    func historyInFront() async {
+        let shown = Phone(fixture: PreviewFixtures.State(tab: .history))
+        #expect(shown.shown.screen == .history)
+        shown.setForeground(true)
+        // A hop queued on the main actor after the read's: once it has run, so has the read.
+        await Task {}.value
+        #expect(shown.history.failure == Joining.notStarted)
+        shown.forgetHistory()
+        shown.setForeground(true)
+        await Task {}.value
+        #expect(shown.history == History())
+        let away = Phone(fixture: PreviewFixtures.State(tab: .me))
+        away.setForeground(true)
+        await Task {}.value
+        #expect(away.history == History())
+    }
+
+    @Test(
+        "History's days are drawn once per change of the moments read — or of the day — never at each pass of its screen (F5's review): a read's flags flipping keeps them, and a page that changes the moments draws them anew"
+    )
+    func historyDays() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["history"]))
+        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
+        await phone.readHistory()
+        #expect(phone.history.notUpdated != nil)
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
+        let top = #"{"events":[{"eventId":"m0","type":"tap_in","occurredAt":"2026-09-01T13:00:00Z","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}],"nextBefore":null}"#
+        await phone.historyRead(await client(200, top).history(), for: phone.reads)
+        #expect(phone.history.events.map(\.eventId) == ["m0"])
+        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [1])
     }
 
     @Test(
@@ -612,19 +668,39 @@ struct AppTests {
     }
 
     @Test(
-        "History follows who is signed in (#141): a sign-in reads the student's history at once, so even their first visit shows it; another student's sign-in forgets the last one's on the spot, before theirs is read, and a sign-out forgets it — no student is ever shown another's"
+        "History follows who is signed in (#141): a sign-in reads the student's history once `GET /v1/me` names them a student, so even their first visit shows it — never a teacher's account's, which the API refuses (F4's review); another student's sign-in forgets the last one's on the spot, before theirs is read, and a sign-out forgets it — no student is ever shown another's"
     )
     func historySignedIn() async throws {
         let server = StandIn(pages: [page(["a1"], next: nil), page(["b1"], next: nil)])
         let (phone, _) = try standIn(server)
+        /// The engine's state once `GET /v1/me` named `id`, a `role`, after `forgets` students'.
+        func named(_ id: String, _ role: String = "student", forgets: Int = 0) throws -> SyncState {
+            var state = SyncState()
+            state.me = try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"\#(id)","role":"\#(role)","displayName":null},"classes":[],"session":null}"#
+                        .utf8))
+            state.forgets = forgets
+            return state
+        }
         phone.signed(in: true, as: "ana")
+        // A hop queued on the main actor after any read's: once it has run, a read would show.
+        await Task {}.value
+        #expect(phone.history == History())
+        phone.synced(try named("ana"))
         try await until { phone.history.read }
         #expect(phone.history.events.map(\.eventId) == ["a1"])
         phone.signed(in: true, as: "bea")
         #expect(phone.history == History())
+        phone.synced(try named("bea", forgets: 1))
         try await until { phone.history.read }
         #expect(phone.history.events.map(\.eventId) == ["b1"])
         phone.signed(in: false)
+        #expect(phone.history == History())
+        phone.signed(in: true, as: "tom")
+        phone.synced(try named("tom", "teacher", forgets: 2))
+        await Task {}.value
         #expect(phone.history == History())
         #expect(await server.befores == [nil, nil])
     }

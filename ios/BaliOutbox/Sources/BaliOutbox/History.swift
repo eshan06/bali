@@ -17,7 +17,8 @@ public struct History: Sendable, Hashable {
     public var failure: String?
     /// Said above the moments read where reading them again from the top did not finish (#141):
     /// they may not be the newest, and why (rule 5) — through Show earlier's pages too, until a
-    /// read from the top starts again or answers.
+    /// read from the top answers. While one is under way, its Try again reads Reading… (F4's
+    /// review), never the words gone with nothing in their place.
     public var notUpdated: String?
     /// Whether the read under way, or the last one, is from the top — no cursor sent — not Show
     /// earlier's page (#141): its page takes the place of the moments read, which show until it
@@ -26,11 +27,10 @@ public struct History: Sendable, Hashable {
 
     public init() {}
 
-    /// A read starts: from the top, or `more`, Show earlier's page — the last one's words gone, and
-    /// from the top that the moments are not updated too, said again should it fail.
+    /// A read starts: from the top, or `more`, Show earlier's page — the last one's words gone, but
+    /// that the moments are not updated, which stays said until a read from the top answers.
     public mutating func reading(more: Bool) {
         (fromTop, busy, failure) = (!more, true, nil)
-        if !more { notUpdated = nil }
     }
 
     /// A read that did not finish, said where it belongs (rule 5): a read from the top's over the
@@ -38,10 +38,18 @@ public struct History: Sendable, Hashable {
     public mutating func failed(_ words: String) {
         busy = false
         if fromTop, read {
-            notUpdated = "Bali couldn't update your history. \(words)"
+            notUpdated = Self.notUpdated(words)
         } else {
             failure = words
         }
+    }
+
+    /// The moments read not updated, and why — a sign-in Bali couldn't check in one sentence with
+    /// it, never "Bali couldn't" twice (F4's review).
+    static func notUpdated(_ why: String) -> String {
+        why == Joining.words(.status(401), nil)
+            ? "Bali couldn't check your sign-in to update your history. Try again."
+            : "Bali couldn't update your history. \(why)"
     }
 
     /// A page came back — from the top, in place of the moments read (a newer moment added after
@@ -81,7 +89,10 @@ public struct History: Sendable, Hashable {
     }
 
     /// One class's moments in a row, under its name and its teacher's (none when unnamed). Known by
-    /// its first moment's id, so a newer moment joining it keeps it the card it was (#139).
+    /// its day, its class and how many of that class's cards come after it that day — never a
+    /// moment at either end — so it stays the card it was (#139) whether a newer moment joins it,
+    /// read from the top, or an older one, Show earlier's (F5's review). Only a class come back to
+    /// after another, read from the top, renews its earlier cards that day.
     public struct Card: Sendable, Hashable, Identifiable {
         public let id: String
         public let name: String
@@ -113,9 +124,13 @@ public struct History: Sendable, Hashable {
             Moment(event, time).map { (event: event, moment: $0) }
         }
         return runs(shown) { calendar.startOfDay(for: $0.event.occurredAt) }.map { day in
-            let cards = runs(day.reversed()) { $0.event.class.id }.map { run in
-                Card(
-                    id: run[0].moment.id, name: run[0].event.class.name,
+            let start = Int(calendar.startOfDay(for: day[0].event.occurredAt).timeIntervalSince1970)
+            let classes = runs(day.reversed()) { $0.event.class.id }
+            let cards = classes.indices.map { index in
+                let (run, id) = (classes[index], classes[index][0].event.class.id)
+                let later = classes[(index + 1)...].count { $0[0].event.class.id == id }
+                return Card(
+                    id: "\(start)-\(id)-\(later)", name: run[0].event.class.name,
                     teacher: run[0].event.teacher.displayName, moments: run.map(\.moment))
             }
             return Day(title: title(day[0].event.occurredAt, now, calendar, time), cards: cards)
