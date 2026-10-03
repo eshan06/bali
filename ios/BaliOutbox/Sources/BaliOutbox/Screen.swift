@@ -186,11 +186,16 @@ extension SyncState {
     /// refusal holds — whose words stand; at the bound, it is still being sent (#114's review) —
     /// never "tap in again" then. Only while it is the phone's newest tap (#146): once the student
     /// taps again, the later tap is the one that counts — still kept and retried, it says nothing
-    /// more (the readout lists it). A file that names no tap leaves the latest stuck one said.
+    /// more (the readout lists it). A file that names no tap leaves the latest stuck one said. On
+    /// Home in no class, which has no Tap in (#143), the way on is the Try again beside it (#160's
+    /// review).
     public var refusedTapWords: String? {
         let stuck = queued.last { if case .tap = $0.change { $0.stuck } else { false } }
         guard let stuck, (lastTap ?? stuck.eventId) == stuck.eventId else { return nil }
-        let tapAgain = "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        let tapAgain =
+            noClassesCard == nil
+            ? "Bali couldn't record a tap. Tap in again, or ask your teacher."
+            : "Bali couldn't record a tap. Try again, or ask your teacher."
         switch stuck.refusedStatus ?? stuck.lastStatus {
         case 404?:
             return

@@ -650,14 +650,34 @@ struct TokenTests {
     }
 
     @Test(
-        "tokens are never made without a word on their email (#159's review): `Tokens.init` asks for it, with no default, so a sign-in or renewal path to come that leaves it out is the compiler's error, never tokens kept as a build before #147's were, Me saying nothing"
+        "every way the phone makes tokens keeps the email its answer names (#159's review; #164's: by what the phone does, never a read of `Tokens.init`'s source) — a sign-in, a renewal at the token's expiry, and the engine's renewal after the API refused one, a renewal naming none keeping the one kept — and a relaunch reads each back from the Keychain: no way of making them leaves it out, Me saying nothing"
     )
-    func emailAsked() throws {
-        let file = Contract.repoRoot.appending(path: "ios/BaliCore/Sources/BaliCore/SignIn.swift")
-        let source = try String(contentsOf: file, encoding: .utf8)
-        let asked = source.contains(
-            "init(access: String, refresh: String, email: String?, at now: Date)")
-        #expect(asked, "Tokens.init gives its email a default, or its signature moved")
+    func emailEveryWay() async throws {
+        let answers = Answers((200, granted(jwt("a1"), refresh: "refresh-a", email: "ana@bali.test")))
+        let endpoint = TransportDouble { _ in
+            let (status, body) = try answers.next()
+            return (status, Data(body.utf8))
+        }
+        let (store, now) = (MemoryStore(), Now())
+        let phone = await signIn(store, endpoint, now: now, told: Told())
+        /// The email the phone names now, and the one a relaunch reads back from the Keychain.
+        func named() async -> [String?] {
+            let relaunched = await signIn(store, endpoint, now: now, told: Told())
+            return [await phone.email(), await relaunched.email()]
+        }
+        try await phone.signIn(through: signsIn)
+        #expect(await named() == ["ana@bali.test", "ana@bali.test"])
+        answers.set((200, granted(jwt("a2"), email: "ana.r@bali.test")))
+        now.set(4000)
+        #expect(await phone.accessToken() == jwt("a2"))
+        #expect(await named() == ["ana.r@bali.test", "ana.r@bali.test"])
+        answers.set((200, granted(jwt("a3"), email: "ana.rodriguez@bali.test")))
+        #expect(await phone.refresh())
+        #expect(await named() == ["ana.rodriguez@bali.test", "ana.rodriguez@bali.test"])
+        answers.set((200, granted(jwt("a4"))))
+        #expect(await phone.refresh())
+        #expect(await phone.accessToken() == jwt("a4"))
+        #expect(await named() == ["ana.rodriguez@bali.test", "ana.rodriguez@bali.test"])
     }
 
     @Test("a sign-out while a renewal runs is not undone by its answer")

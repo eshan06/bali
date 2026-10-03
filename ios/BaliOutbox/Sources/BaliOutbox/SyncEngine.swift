@@ -538,14 +538,17 @@ public actor SyncEngine {
     /// token renewed once on a 401. Out — it ended, or they were out already — the class leaves
     /// `me` at once; and with any answer the truth is read again, which a read sent before it
     /// never overrides — a refusal says why, and a class the server does not know is read away.
+    /// Never from the `me` of a student who signed in since, as a join never adds to it (#164's
+    /// review): `me` forgotten meanwhile, the enrollment was the last student's.
     public func leave(enrollment id: String, _ request: EndEnrollmentRequest) async
         -> APIResponse<EndEnrollmentResponse>
     {
+        let forgets = state.forgets
         let answer = await Joining.send(renewing: refresh) {
             await client.leave(enrollment: id, request)
         }
         guard case .status = answer.result else { return answer }
-        if answer.answer != nil, let me = state.me {
+        if answer.answer != nil, state.forgets == forgets, let me = state.me {
             state.me = MeResponse(
                 user: me.user, classes: me.classes.filter { $0.enrollmentId != id },
                 session: me.session)
