@@ -396,7 +396,9 @@
         /// `tappedSince`, a tap after it the server recorded (#146) — in an outbox of the fixture's
         /// own, each answer sent through the real client and settled as the engine does: only an
         /// outbox makes a stuck tap. On a task of its own, waited for, since a fixture is made at
-        /// once: nothing the send or the settle does waits on the main thread.
+        /// once: nothing the send or the settle does waits on the main thread. Waited for 30 s at
+        /// most, then stopped, saying so: a test pool with no thread to spare for that task fails
+        /// here, never hangs CI (#155's review).
         private static func refusedTap(
             _ state: SyncState, tappedSince: Bool = false, conflict: Bool = false
         ) -> SyncState {
@@ -437,7 +439,9 @@
                 made.state = state
                 done.signal()
             }
-            done.wait()
+            guard done.wait(timeout: .now() + 30) == .success else {
+                fatalError("A fixture's outbox did not answer within 30 s")
+            }
             return made.state ?? state
         }
 

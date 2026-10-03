@@ -289,10 +289,12 @@ struct AppTests {
         #expect(me.sync.flatMap(SignOutWords.held) == nil)
         let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
         #expect(notOut.signOutFailed == SignOutWords.failed)
-        // Whose sign-in this is (#147): Ana's email on every Me, said by its Sign out.
+        // Whose sign-in this is (#147): Ana's email on every Me, said by its Sign out — each
+        // fixture whose screen is Me, whatever its name (#159's review).
         for (name, state) in PreviewFixtures.all {
-            let said = name.hasPrefix("me") ? "You're signed in as ana.rodriguez@bali.test." : nil
-            #expect(SignOutWords.signedIn(Phone(fixture: state).email) == said, "\(name)")
+            let phone = Phone(fixture: state)
+            let said = phone.shown.screen == .me ? "You're signed in as ana.rodriguez@bali.test." : nil
+            #expect(SignOutWords.signedIn(phone.email) == said, "\(name)")
         }
         // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
         let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
@@ -411,12 +413,18 @@ struct AppTests {
             window.layoutIfNeeded()
             return window
         }
-        // Far enough ahead for a slow simulator to draw both first.
+        // Held, and past the bell, drawn first, with no bell to beat: the first window a test
+        // draws is the slow one. A held Leave is drawn otherwise than one past its bell.
+        let (rung, held) = (me(ringing: Date() - 60), me(ringing: Date() + 3600))
+        let (past, holding) = (drawn(rung), drawn(held))
+        #expect(holding != past)
+        // Then one whose bell is near: drawn as the held one is, until its bell rings — so it is
+        // only this window's own drawing, in one pass on the main actor, that must beat the bell
+        // (#172's review: both windows' first drawing had to).
         let bell = Date() + 15
-        let (ringing, rung) = (me(ringing: bell), me(ringing: Date() - 60))
-        defer { (ringing.isHidden, rung.isHidden) = (true, true) }
-        let past = drawn(rung)
-        #expect(drawn(ringing) != past)
+        let ringing = me(ringing: bell)
+        defer { (ringing.isHidden, rung.isHidden, held.isHidden) = (true, true, true) }
+        #expect(drawn(ringing) == holding)
         try await until { Date() > bell && drawn(ringing) == past }
     }
 
@@ -714,8 +722,12 @@ struct AppTests {
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
         // A state whose queue shows no unlock — as a failed read of the queue leaves it — while
-        // the file still holds one: still said, the file asked.
+        // the file still holds one: still said, the file asked; one ask at a time, each state's
+        // cancelling the last's, whose answer is older (#172's review).
         held.synced(SyncState())
+        let first = try #require(held.unsentCheck)
+        held.synced(SyncState())
+        #expect(first.isCancelled && held.unsentCheck?.isCancelled == false)
         await held.unsentCheck?.value
         #expect(held.signOutFailed == SignOutWords.unsent)
         // The queue shows it, then it goes: the hold's end clears the words at once.
@@ -1558,13 +1570,18 @@ struct AppTests {
     }
 
     @Test(
-        "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro's pages and Me's What your teacher sees among them"
+        "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro opened at each of its pages and Me's What your teacher sees among them"
     )
     func scrollEdges() throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        // The intro's paging lays out only the page shown, so it is opened at each of its pages
+        // (`IntroView.pages`; #135's review: paged by hand, the pager's slots were checked, not
+        // its pages, and a pager with no width would have stopped the suite).
+        let intro = IntroView.pages.map { ("intro, page \($0)", AnyView(IntroView(page: $0) {})) }
         let screens =
             PreviewFixtures.all.map { ($0.key, AnyView(RootView(phone: Phone(fixture: $0.value)))) }
-            + [("consentSheet", AnyView(ConsentSheet()))]
+            + [("consentSheet", AnyView(ConsentSheet()))] + intro
+        var introDrawn: Set<Data> = []
         for (name, screen) in screens {
             let window = UIWindow(windowScene: scene)
             window.frame = scene.screen.bounds
@@ -1576,18 +1593,17 @@ struct AppTests {
             // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
             #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
             expectEdges(of: scrolls, in: window, name)
-            // The intro's paging lays out only the page shown: each page, paged to, is checked.
+            // The page a pager shows is among those checked: its own scroll view.
             for pager in scrolls where pager.isPagingEnabled {
-                for page in 1..<Int((pager.contentSize.width / pager.bounds.width).rounded()) {
-                    pager.contentOffset.x = CGFloat(page) * pager.bounds.width
-                    window.layoutIfNeeded()
-                    let shown = pager.subviews.filter { $0.frame.minX == pager.contentOffset.x }
-                    let scrolls = shown.flatMap(scrollViews(in:))
-                    #expect(!scrolls.isEmpty, "\(name), page \(page)")
-                    expectEdges(of: scrolls, in: window, "\(name), page \(page)")
-                }
+                let page = scrolls.contains { $0 !== pager && $0.isDescendant(of: pager) }
+                #expect(page, "\(name): no page shown")
+            }
+            if intro.contains(where: { $0.0 == name }), let drawn = drawn(window) {
+                introDrawn.insert(drawn)
             }
         }
+        // Each opened at a page of its own.
+        #expect(introDrawn.count == IntroView.pages.count)
     }
 
     @Test(
@@ -1641,10 +1657,15 @@ struct AppTests {
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
 
-/// Every scroll view in `view`, itself among them, outermost first.
+/// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
+/// one it shows: the others it lays out lie off screen.
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
-    [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+    let scroll = view as? UIScrollView
+    let shown = view.subviews.filter { subview in
+        scroll.map { !$0.isPagingEnabled || subview.frame.minX == $0.contentOffset.x } ?? true
+    }
+    return [scroll].compactMap { $0 } + shown.flatMap(scrollViews(in:))
 }
 
 /// `window` as the screen would show it now: its pixels, drawn after any update due.

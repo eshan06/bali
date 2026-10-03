@@ -680,6 +680,18 @@ struct TokenTests {
         #expect(await named() == ["ana.rodriguez@bali.test", "ana.rodriguez@bali.test"])
     }
 
+    @Test(
+        "`Tokens.init` gives the email no default (#159's review), beside `emailEveryWay`, which runs the ways there are: read from SignIn.swift's source, however it is laid out, so a default added back fails here — a way of making tokens to come cannot leave the email out unseen (#172's review)"
+    )
+    func emailNoDefault() throws {
+        let file = Contract.repoRoot.appending(path: "ios/BaliCore/Sources/BaliCore/SignIn.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        let declared = try #require(
+            source.firstMatch(of: /init\(\s*access:\s*String\s*,[^)]*\)/), "Tokens.init moved")
+        #expect(declared.output.contains(/email:\s*String\?/), "\(declared.output)")
+        #expect(!declared.output.contains(/email:\s*String\?\s*=/), "\(declared.output)")
+    }
+
     @Test("a sign-out while a renewal runs is not undone by its answer")
     func signOutMidRenewal() async throws {
         let endpoint = HeldEndpoint()

@@ -115,7 +115,7 @@ final class Phone {
     var naming = Naming()
     private(set) var signOutFailed: String?
     /// The outbox file asked whether an unlock still waits, while Me says one has not gone
-    /// (`synced`): a test waits on it.
+    /// (`synced`): the latest ask, cancelled by the next, whose answer is newer (#172's review).
     @ObservationIgnored private(set) var unsentCheck: Task<Void, Never>?
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
@@ -458,16 +458,18 @@ final class Phone {
         // (`signOut`). A hold the queue showed ending is that unlock gone: the words go at once,
         // never a moment late under an enabled Sign out. Where none showed, its reads failing
         // throughout (#129's review), the file is asked again at each state whose queue shows no
-        // unlock, and they go once it holds none, never while it does (Riders-2's santa). Its
-        // answer lands after any press's whose read came first, the two executors keeping order,
-        // so it clears only these words, never ones a press set since.
+        // unlock, and they go once it holds none, never while it does (Riders-2's santa). One ask
+        // at a time: each cancels the last, whose answer is older (#172's review). Its answer
+        // lands after any press's whose read came first, the two executors keeping order, so it
+        // clears only these words, never ones a press set since.
         if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil {
             if wasHeld {
                 signOutFailed = nil
             } else if let engine {
+                unsentCheck?.cancel()
                 unsentCheck = Task {
-                    guard await engine.unlockUnsent() == false,
-                        signOutFailed == SignOutWords.unsent
+                    guard !Task.isCancelled, await engine.unlockUnsent() == false,
+                        !Task.isCancelled, signOutFailed == SignOutWords.unsent
                     else { return }
                     signOutFailed = nil
                 }

@@ -269,10 +269,7 @@ async function capture(
   const checked = SCHEMAS[type].safeParse(res.body);
   if (!checked.success) throw new Error(`${name}: not a ${type}: ${checked.error.message}`);
   const got = (type === 'ApiErrorBody' ? res.body.error : res.body) as Record<string, unknown>;
-  for (const [key, want] of Object.entries(expected)) {
-    const value = got[key];
-    if (value !== want) throw new Error(`${name}: ${key} is ${String(value)}, not ${String(want)}`);
-  }
+  holds(name, got, expected);
   const disposition = contract.outbox && DISPOSITIONS[contract.outbox](res.status, res.body);
   fixtures.set(name, {
     endpoint,
@@ -294,10 +291,23 @@ function routeOf(path: string) {
     .replace(/^\/v1\/unlocks\/\{id\}$/, '/v1/unlocks/{eventId}');
 }
 
-/** A step that sets a scenario up: it must succeed, and it is no fixture. */
-async function setup(call: Call) {
+/** Throw, naming `what`, unless `got` holds each of `expected`'s values. */
+function holds(what: string, got: Record<string, unknown>, expected: Record<string, unknown>) {
+  for (const [key, want] of Object.entries(expected)) {
+    const value = got[key];
+    if (value !== want) throw new Error(`${what}: ${key} is ${String(value)}, not ${String(want)}`);
+  }
+}
+
+/**
+ * A step that sets a scenario up: it must succeed — answered with `expected`
+ * too, where given, so a premise that moved fails where it moved — and it is
+ * no fixture.
+ */
+async function setup(call: Call, expected: Record<string, unknown> = {}) {
   const res = await send(call);
   if (res.status !== 200) throw new Error(`setup ${call.path} answered ${res.status}`);
+  holds(`setup ${call.path}`, res.body, expected);
 }
 
 async function start(classId: string) {
@@ -633,7 +643,8 @@ async function captureAll() {
   });
   const ivy = await token(unswept.student.cognitoId);
   const tapsIn = { tagId: unswept.block.tagId, eventId: randomUUID(), ...lessonAt('16:01') };
-  await setup(post(ivy, '/v1/taps', tapsIn));
+  // Joined, so there is a participation for the leave to end: an armed tap is a 200 too.
+  await setup(post(ivy, '/v1/taps', tapsIn), { outcome: 'joined' });
   const pastBell = del(
     ivy,
     `/v1/enrollments/${await enrollmentOf(unswept.klass.id, unswept.student.id)}`,
