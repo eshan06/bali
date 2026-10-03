@@ -1092,6 +1092,31 @@ struct RegisterTests {
     }
 
     @Test(
+        "Woken with Screen Time access lost — the marker gone, its flag set (F1b) — the monitor asks iOS for no next wake, iOS having deleted Bali's windows with it, and leaves the rest to the app's next run; a clear still clears, so the shields never outlive the bell over a marker misread"
+    )
+    func accessLost() {
+        let wakes: [Bell.Wake] = [.keep(Bell.window(until: at(1200))), .retry(Bell.window(until: at(60)))]
+        for wake in wakes {
+            let center = Center()
+            var refused = Date?.some(at(-600))
+            let said = Bell.carryOut(
+                wake, woken: .bell, at: t0, in: center, clearing: { true }, refused: &refused,
+                asked: &center.asked, accessLost: true)
+            #expect(center.calls.isEmpty && center.asked.isEmpty, "\(wake): \(said)")
+            #expect(refused == at(-600) && said.hasSuffix("access lost: nothing asked"), "\(wake)")
+        }
+        let center = Center()
+        var (cleared, refused) = (false, Date?.none)
+        let said = Bell.carryOut(
+            .clear, woken: .bell, at: t0, in: center,
+            clearing: {
+                cleared = true
+                return true
+            }, refused: &refused, asked: &center.asked, accessLost: true)
+        #expect(said == "cleared" && cleared && center.calls.isEmpty)
+    }
+
+    @Test(
         "The monitor's wake carried out: cleared — or nothing to clear, the shields off already, as the bell's backup finds them after the bell's own wake — or its next wake taken: a refusal kept before is gone; its next wake refused, the time is kept for the app to show, and nothing is cleared (#92's review, B5b-3)"
     )
     func carriedOut() {
@@ -1167,8 +1192,10 @@ struct RegisterTests {
     func monitorsCalls() throws {
         let monitor = try sourceCode("BaliMonitor/SessionMonitor.swift")
         #expect(monitor.contains("Bell.carryOut("))
-        // With the ends it asked for kept in the app group, so an echo is known at its next wake.
-        #expect(monitor.contains("asked: &Bell.monitorAsked)"))
+        // With the ends it asked for kept in the app group, so an echo is known at its next wake —
+        // and the marker looked at, so a wake over access lost asks nothing (F1b).
+        #expect(monitor.contains("asked: &Bell.monitorAsked"))
+        #expect(monitor.contains("Marker.noted(at:") && monitor.contains("accessLost: accessLost)"))
         for call in [
             "startMonitoring", "stopMonitoring", "schedule(for", "Bell.register", ".activities",
         ] {

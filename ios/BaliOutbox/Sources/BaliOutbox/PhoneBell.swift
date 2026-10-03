@@ -11,6 +11,51 @@
     extension ManagedSettingsStore.Name {
         /// The app's one store: the app shields through it, and the monitor clears it.
         public static let bali = Self("bali")
+        /// The marker's own store (F1b): never the shields', which the monitor clears at the bell.
+        public static let baliMarker = Self("bali.marker")
+    }
+
+    extension Marker {
+        /// The marker as this phone holds it now: its flag, in the app group's defaults, which a
+        /// revocation leaves, and the marker itself, which iOS deletes with the rest of Bali's
+        /// settings — "Removing unauthorized client record" (#144's experiment).
+        public static var now: Marker {
+            guard shared?.bool(forKey: "markerWritten") == true else { return .unwritten }
+            return ManagedSettingsStore(named: .baliMarker).media.denyExplicitContent == nil
+                ? .missing : .present
+        }
+
+        /// Writes the marker — explicit content not denied: the least any store can say, so it
+        /// restricts nothing — and its flag, which is set only once the marker reads back, so a
+        /// marker iOS would not keep never reads as access taken back; and forgets the monitor's
+        /// note. After an authorization iOS confirmed, only.
+        public static func write() {
+            let store = ManagedSettingsStore(named: .baliMarker)
+            store.media.denyExplicitContent = false
+            shared?.set(store.media.denyExplicitContent != nil, forKey: "markerWritten")
+            lostAt = nil
+        }
+
+        /// When the monitor, woken with the app closed, first found the marker gone since it was
+        /// written: in the app group's defaults, for the app's next run to report (F1b).
+        public static var lostAt: Date? {
+            get { shared?.object(forKey: "markerLostAt") as? Date }
+            set { shared?.set(newValue, forKey: "markerLostAt") }
+        }
+
+        /// The monitor's look at the marker at a wake: gone, with the shields' store empty too — as
+        /// iOS leaves both, so a store still holding shields is a misread, never a revocation —
+        /// it is noted at `date`, the first such wake's time kept. Whether it was gone.
+        public static func noted(at date: Date) -> Bool {
+            let shield = ManagedSettingsStore(named: .bali).shield
+            guard now == .missing, shield.applicationCategories == nil,
+                shield.webDomainCategories == nil
+            else { return false }
+            if lostAt == nil { lostAt = date }
+            return true
+        }
+
+        private static var shared: UserDefaults? { UserDefaults(suiteName: Outbox.appGroup) }
     }
 
     extension DeviceActivityCenter: BellCenter {

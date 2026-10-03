@@ -7,10 +7,17 @@ import Foundation
 // the ones it asked for itself, with the app open or force-quit. What it does is `Bell.wake`'s and
 // `Bell.carryOut`'s, tested on Linux; this carries it out, synchronously, since iOS may suspend it
 // the moment it returns, and asks iOS for nothing else: every call it makes of DeviceActivity is
-// `carryOut`'s, never for the window that woke it (B5b-3). The windows' start is nothing of Bali's:
-// the app shields at the tap itself and registers the windows after. Its principal class, named in
-// its Info.plist.
+// `carryOut`'s, never for the window that woke it (B5b-3). At a window's start it only looks at the
+// marker (F1b): the app shields at the tap itself and registers the windows after. Its principal
+// class, named in its Info.plist.
 final class SessionMonitor: DeviceActivityMonitor {
+    /// A window's start: the marker looked at, and found gone, noted for the app's next run (F1b) —
+    /// nothing else read or asked.
+    override func intervalDidStart(for activity: DeviceActivityName) {
+        super.intervalDidStart(for: activity)
+        _ = Marker.noted(at: Date())
+    }
+
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         let started = ContinuousClock.now
@@ -26,6 +33,9 @@ final class SessionMonitor: DeviceActivityMonitor {
     }
 
     private func carryOut(_ woken: Bell.Name?) -> String {
+        // Screen Time access taken back — the marker gone (F1b) — is noted for the app, which
+        // reports it at its next run; the wake then asks iOS for no next one.
+        let accessLost = Marker.noted(at: Date())
         #if DEBUG
             if woken == .bell, Bell.deviceCheckLosesBell {
                 Bell.deviceCheckLosesBell = false
@@ -41,6 +51,6 @@ final class SessionMonitor: DeviceActivityMonitor {
         // asked for, to tell a stop's or a replacement's wake from its window's end (B5b-5).
         return Bell.carryOut(
             wake, woken: woken, at: Date(), in: DeviceActivityCenter(), clearing: Bell.clearShields,
-            refused: &Bell.monitorUnscheduled, asked: &Bell.monitorAsked)
+            refused: &Bell.monitorUnscheduled, asked: &Bell.monitorAsked, accessLost: accessLost)
     }
 }

@@ -598,13 +598,18 @@ and data types, so the two apps can't drift out of type-agreement.
 
 - **Turning off Screen Time permission is handled by being honest, not by fighting it.** iOS
   itself drops all shields the instant the permission is revoked — we can't prevent it. So the
-  next check-in notices and reports it (`POST /v1/sessions/{id}/protection-off`), the server
+  next check — at each check-in, and as the app starts or comes back to the front — notices and
+  reports it (`POST /v1/sessions/{id}/protection-off`), the server
   records it as its own event, and the grid shows "turned protection off" (a distinct state —
   never green, never an unlock: an unlock arriving then is recorded without softening it).
   Returning to focus needs an explicit re-tap; refocus is refused out of it. A report that
   only reaches the server after the bell is still recorded, with a note, so the history says
   why the phone went quiet. This permanently kills v2's worst bug, which was pretending to be
-  shielded after exactly this.
+  shielded after exactly this. The phone notices by a marker, never by the permission's own
+  read, which a running app keeps reading approved: a setting of no effect, written once iOS
+  confirms the grant, which iOS deletes with the shields (F1b, #144). It never puts shields back
+  while the marker is gone — iOS would keep them without enforcing them — and, taken back with
+  the app closed, the monitor notes it for the app to report at its next run.
 - **A closed app still shows the truth fast, and keeps its shields to the bell.** When the app is
   force-quit, check-ins stop and within about a minute the grid shows "app closed" honestly. The
   shields stay until the session ends (decided 2026-09-30, the owner's ruling: option (a) of the
@@ -697,7 +702,8 @@ Each exists because v2 broke it and shipped a real bug
    "what state is this student in" with the same shared code. (v2: teacher saw
    "No device" while the student saw "Focused.")
 3. **Verify shields on every check-in.** Each time the app sends its every-30-seconds
-   request, it also checks the shields are actually on and re-applies them if not; the
+   request, it also checks the shields are actually on and re-applies them if not — unless
+   Screen Time access is gone, which it reports instead (iOS app structure, rules); the
    screen only claims what was verified. (v2: showed a ticking focus timer while nothing
    was shielded.)
 4. **Every write carries an `event_id`.** Sending twice counts once. Retrying is always

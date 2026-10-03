@@ -120,9 +120,15 @@ public enum Bell {
     /// window's end, which iOS reaches no earlier than a minute before it (`window`) — the wake is a
     /// stop's or a replacement's, and asks nothing: what it asked for there is still to come, or the
     /// app stopped it, for a new bell window or with the shields off (B5b-5). A clear still clears.
+    ///
+    /// `accessLost` — the marker gone, its flag set, the shields' store empty (F1b, #144;
+    /// `Marker.noted`) — asks nothing either: iOS deleted Bali's windows with the access, and the
+    /// app reports it at its next run. A store still holding shields never reads as lost, and a
+    /// clear still clears, so a misread never keeps the shields past their end.
     public static func carryOut(
         _ wake: Wake, woken: Name?, at now: Date, in center: some BellCenter,
-        clearing clear: () -> Bool, refused: inout Date?, asked: inout [Name: Date]
+        clearing clear: () -> Bool, refused: inout Date?, asked: inout [Name: Date],
+        accessLost: Bool = false
     ) -> String {
         let next: (window: DateInterval, kept: String, then: String)
         switch wake {
@@ -133,6 +139,7 @@ public enum Bell {
         case .keep(let window): next = (window, "kept", " until")
         case .retry(let window): next = (window, "file not read — kept", ", again")
         }
+        if accessLost { return "\(next.kept) — Screen Time access lost: nothing asked" }
         if let woken, let end = asked[woken], now < end - retry {
             return "\(next.kept) — its window stopped or replaced, not ended: nothing asked"
         }
