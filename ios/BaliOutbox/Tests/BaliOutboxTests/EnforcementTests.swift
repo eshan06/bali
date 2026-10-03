@@ -615,6 +615,8 @@ struct ProtectionOffTests {
     func notDeterminedPassing() async throws {
         let rig = try Rig()
         let phone = Enforced(rig)
+        // No marker ever written — the silent ask fails — so B5a-2's grace judges (F1b).
+        await phone.screenTime.failAsk()
         try await rig.tapIn()
         try await rig.foreground()
         await phone.until { $0.shielded }

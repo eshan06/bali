@@ -43,10 +43,14 @@
             set { shared?.set(newValue, forKey: "markerLostAt") }
         }
 
-        /// The monitor's look at the marker at a wake: gone, it is noted at `date` — the first such
-        /// wake's time kept. Whether it was gone.
+        /// The monitor's look at the marker at a wake: gone, with the shields' store empty too — as
+        /// iOS leaves both, so a store still holding shields is a misread, never a revocation —
+        /// it is noted at `date`, the first such wake's time kept. Whether it was gone.
         public static func noted(at date: Date) -> Bool {
-            guard now == .missing else { return false }
+            let shield = ManagedSettingsStore(named: .bali).shield
+            guard now == .missing, shield.applicationCategories == nil,
+                shield.webDomainCategories == nil
+            else { return false }
             if lostAt == nil { lostAt = date }
             return true
         }

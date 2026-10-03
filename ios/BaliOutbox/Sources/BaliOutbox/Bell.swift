@@ -121,9 +121,10 @@ public enum Bell {
     /// stop's or a replacement's, and asks nothing: what it asked for there is still to come, or the
     /// app stopped it, for a new bell window or with the shields off (B5b-5). A clear still clears.
     ///
-    /// `accessLost` — the marker gone, its flag set (F1b, #144) — asks nothing either: iOS deleted
-    /// Bali's windows with the access, and the app reports it at its next run. A clear still
-    /// clears, so a marker misread never keeps the shields past the bell.
+    /// `accessLost` — the marker gone, its flag set, the shields' store empty (F1b, #144;
+    /// `Marker.noted`) — asks nothing either: iOS deleted Bali's windows with the access, and the
+    /// app reports it at its next run. A store still holding shields never reads as lost, and a
+    /// clear still clears, so a misread never keeps the shields past their end.
     public static func carryOut(
         _ wake: Wake, woken: Name?, at now: Date, in center: some BellCenter,
         clearing clear: () -> Bool, refused: inout Date?, asked: inout [Name: Date],

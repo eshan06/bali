@@ -40,9 +40,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   one; given, the bell's window is asked for anew (one iOS holds still is asked nothing) and the
   shields come back where the standing calls for them — a re-tap still leaves protection off
   (#167 is the separate step that relocks without one). **The monitor:** at a window's end or
-  start it reads the marker; gone with its flag set, it notes when in the app group (the first
-  such wake kept) and asks iOS for no next wake — a clear still clears, so a misread never keeps
-  the shields past the bell. The app reports it at its next run: a session the phone stood in is
+  start it reads the marker; gone with its flag set and the shields' store empty too — as iOS
+  leaves both, so a store still holding shields is a misread (santa's round 1) — it notes when in
+  the app group (the first such wake kept) and asks iOS for no next wake; a clear still clears,
+  so a misread never keeps the shields past their end. The app reports it at its next run: a session the phone stood in is
   reportable while it was running when the note says access went, so a revocation found closed
   and opened past the bell is still recorded (the server keeps a late report, `after_session_end`).
   **Retired:** F1's doubt over a window iOS no longer held, and its `unauthorized` refusal

@@ -121,9 +121,11 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     after Bali came to the front **protection off** showed on `watch`.
     **Turn on Screen Time**: iOS's prompt appears; **Allow**: a new `Asked iOS:` line, `given in …`,
     `Marker: present`, and the screen says Screen Time is back on — still no shields: only a re-tap
-    leaves protection off. **Tap** brings the shields and focus back, and `iOS:` holds `bali` to the
-    bell again. Next time, press **Turn on Screen Time** twice quickly: one prompt, one new
-    `Asked iOS:` line, and no error under the button.
+    leaves protection off. Watch `Marker:` for a minute: it must stay `present` (iOS empties the
+    stores as access comes back; a marker emptied after it was written would read as access taken
+    back again). **Tap** brings the shields and focus back, and `iOS:` holds `bali` to the bell
+    again. Next time, press **Turn on Screen Time** twice quickly: one prompt, one new `Asked iOS:`
+    line, and no error under the button.
     **Then a launch with access off (#145):** focused again, swipe Bali away, turn its access off in
     Settings and open Bali: the Screen Time off screen at once — no "Checking Screen Time…" wait —
     and `watch` shows **protection off** within seconds. Turn access back on and **Tap**.
