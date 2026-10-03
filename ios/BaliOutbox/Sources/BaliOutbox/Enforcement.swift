@@ -234,6 +234,7 @@ public actor Enforcer {
             }
         }
         if let unreported { protection.unreported = unreported }
+        if !off { await backOn() }
         await enforce()
         // Family Controls' own not determined, within the grace: checked again a second on, so the
         // grace ends as iOS settles, or Screen Time off shows once it lasts. By `off` as judged
@@ -271,7 +272,8 @@ public actor Enforcer {
     /// Asks the student for the Screen Time permission — C1's onboarding, and Turn on Screen Time
     /// once access was taken back — and enforces with what it reads after, given or not: Don't
     /// Allow is a throw and a read of denied, which the screen shows at once, not a check-in later.
-    /// Given, the marker is written again (`authorize`) and the shields and the bell's window come
+    /// Given, the marker is written again (`authorize`), the phone goes back where it stood in a
+    /// class it was protection off in (`backOn`, #167), and the shields and the bell's window come
     /// back where the standing calls for them: the window asked for anew, as iOS deletes it with
     /// the access — one it holds still is asked nothing (`Bell.ask`).
     public func requestPermission() async throws {
@@ -280,11 +282,28 @@ public actor Enforcer {
             try await authorize()
             scheduled = nil
             asked = .success(())
+            await backOn()
         } catch {
             asked = .failure(error)
         }
         await enforce()
         try asked.get()
+    }
+
+    /// Screen Time back on in the class the phone was protection off in (#167, the owner's
+    /// decision 2026-10-02): with the marker there again — written only once iOS confirmed the
+    /// access — and that class still running by the phone's own clock, the phone goes back where it
+    /// stood before it, at once, and tells the server, which returns the row there too: no re-tap.
+    /// Made once: the engine records it only out of protection off, so a check overlapping this one
+    /// records none (`SyncEngine.record`). Not saved — the file refusing it — the next check makes
+    /// it again, and meanwhile the screen offers the re-tap.
+    /// Out of a class, or past its bell, nothing changes.
+    private func backOn() async {
+        guard await screenTime.marker() == .present,
+            case .inSession(let session, .protectionOff?) = await engine.state.standing,
+            session.endsAt > clock.now()
+        else { return }
+        _ = try? await engine.record(.protectionOn(session: session.id))
     }
 
     /// One ask of iOS for the access at a time (F1b): a call made while one is under way waits for

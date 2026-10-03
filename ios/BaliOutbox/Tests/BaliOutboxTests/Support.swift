@@ -12,7 +12,7 @@ import Testing
 let t0 = Date(timeIntervalSince1970: 1_790_000_000)
 
 /// Every migration of the outbox's file, in order, as the tests pin them: a new one joins here.
-let migrations = ["v1", "v2", "v3", "v4", "v5"]
+let migrations = ["v1", "v2", "v3", "v4", "v5", "v6"]
 
 /// A fresh outbox in a file of its own, its jitter fixed at `random`.
 func makeOutbox(random: Double = 0) throws -> (outbox: Outbox, url: URL) {
@@ -130,6 +130,7 @@ enum Contract {
         ("tap-unlock", .unlockUnderTap(tap: "tap", reason: nil)),
         ("refocus", .refocus(session: "session")),
         ("protection-off", .protectionOff(session: "session")),
+        ("protection-on", .protectionOn(session: "session")),
     ]
 
     static func fixtures(_ folder: String) throws -> [(name: String, fixture: Fixture)] {

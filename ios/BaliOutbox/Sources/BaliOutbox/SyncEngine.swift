@@ -40,14 +40,16 @@ public enum Standing: Sendable, Hashable {
 
     /// The phone's own change, at once: a state change of the session it is in. A tap changes
     /// nothing here — it is `SyncState.pendingTap` until answered; an unlock under it, or one not
-    /// filed yet, any session.
-    func acting(_ change: Change) -> Standing {
+    /// filed yet, any session. Screen Time back on returns to `offFrom`, where the phone stood
+    /// before protection off (#167) — which `SyncEngine.record` always names.
+    func acting(_ change: Change, offFrom: ParticipationState? = nil) -> Standing {
         guard case .inSession(let session, _) = self else { return self }
         switch change {
         case .unlock(session.id, _), .unlockUnderTap, .unlockUnfiled:
             return .inSession(session, .unlocked)
         case .refocus(session.id): return .inSession(session, .focused)
         case .protectionOff(session.id): return .inSession(session, .protectionOff)
+        case .protectionOn(session.id): return .inSession(session, offFrom ?? .focused)
         default: return self
         }
     }
@@ -128,15 +130,16 @@ public struct SyncState: Sendable, Hashable {
     /// A12) — which put the shields back with no return of this phone's since: said on Focus
     /// (C5a) until the phone's next change.
     public var superseded: Superseded?
-    /// The session protection off was last reported in, since the phone's last tap
-    /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
+    /// The session protection off was last reported in, since the phone's last tap or Screen Time
+    /// back on (`Outbox.reportedOff`): only those leave it there (A2; #167).
     public var reportedOff: String?
     /// The phone's newest tap, as the outbox file keeps it (`Outbox.lastTap`): a refused tap is
     /// said only while it is this one (#146). Nil: the file names none.
     public var lastTap: String?
     /// This phone's latest Emergency Unlock the server has recorded in a session, and its reason
     /// on record — the answer's, then each change's (A20): the Unlocked card's check, and what a
-    /// pick changes once the record has left the phone (C5c), until the phone's next change.
+    /// pick changes once the record has left the phone (C5c), until the student's next turn:
+    /// Screen Time going off or coming back is none (#167).
     public var recordedUnlock: RecordedUnlock?
     /// The records on their way — sent and not settled, or answered in a write the file refused
     /// (the app suspended, say) — which the file still counts as never sent: a reason given now
@@ -341,7 +344,8 @@ public actor SyncEngine {
     }
 
     /// Queues what the phone just did — acted on at once — and sends it; nil when there is nothing
-    /// to send (protection off already reported). Throws when it could not be written: the caller
+    /// to send (protection off already reported, or Screen Time back on where the phone is not
+    /// protection off). Throws when it could not be written: the caller
     /// shows it (rule 5). The student acting again ends a refusal's showing. An Emergency Unlock
     /// goes through `emergencyUnlock`, which files it where decision 11 says; `hold` delays the send
     /// of one waiting for its reason (C5a). Acting again ends a late unlock's showing too.
@@ -352,9 +356,20 @@ public actor SyncEngine {
         if case .protectionOff(let session) = change, state.standing.isFocused(in: session) {
             try outbox.protectionRestored()
         }
+        // Screen Time back on (#167) only out of protection off there: a second, from a check that
+        // overlapped the first, finds the phone back where it stood and records nothing (santa's
+        // round 1). It returns where the phone stood before protection off; not known, past the
+        // unlock guard: an Emergency Unlock still queued there keeps it unlocked.
+        var offFrom: ParticipationState?
+        if case .protectionOn(let session) = change {
+            guard case .inSession(let view, .protectionOff?) = state.standing, view.id == session
+            else { return nil }
+            offFrom =
+                (stored(outbox.offFrom) ?? nil) ?? (keepsUnlocked(session) ? .unlocked : .focused)
+        }
         // Where it leaves the phone is kept in the change's own write: killed between two, a
         // relaunch would stand where the phone stood before — shielded over an Emergency Unlock.
-        let standing = state.standing.acting(change)
+        let standing = state.standing.acting(change, offFrom: offFrom)
         let keeping = standing == .unread ? nil : standing
         guard
             let record = try outbox.record(
@@ -369,7 +384,10 @@ public actor SyncEngine {
         update {
             $0.standing = standing
             ($0.queued, $0.reportedOff) = (queued, reportedOff)
-            ($0.refused, $0.superseded, $0.recordedUnlock) = (nil, nil, nil)
+            ($0.refused, $0.superseded) = (nil, nil)
+            // Screen Time going off or coming back is no turn of the student's (A9): the unlock
+            // recorded still stands, its reason changeable once back on (A20; santa's round 1).
+            if change.isUnlock || change.isReturn { $0.recordedUnlock = nil }
             // The file's newest tap now, written with it.
             if case .tap = change { $0.lastTap = record.eventId }
         }
@@ -835,7 +853,8 @@ public actor SyncEngine {
     /// focused there already, or the answer is to their own return made after it, by the phone's
     /// order (`after`, that return's place in it). Focused already means returned since only while
     /// every unlock takes the phone out of focus at once (`Standing.acting`) and nothing brings it
-    /// back but a refocus or an answer or a read past this guard: keep both so.
+    /// back but a refocus or an answer or a read past this guard, or Screen Time back on to where
+    /// the phone stood before protection off or, not known, past this guard (#167): keep both so.
     private func keepsUnlocked(_ session: String, after: Int = 0) -> Bool {
         !state.standing.isFocused(in: session)
             && stored({ try outbox.holdsUnlock(session: session, after: after) }) ?? true

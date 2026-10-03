@@ -18,6 +18,7 @@ struct SettleTests {
             ("unlock", .unlockUnderTap(tap: "t", reason: nil)),
             ("state-change", .refocus(session: "s")),
             ("state-change", .protectionOff(session: "s")),
+            ("state-change", .protectionOn(session: "s")),
         ])
     func everyGeneratedCase(table: String, change: Change) async throws {
         let (outbox, _) = try makeOutbox()

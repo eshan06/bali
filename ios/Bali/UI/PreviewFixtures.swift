@@ -121,6 +121,8 @@
             "historyError": State(
                 tab: .history, history: history(failure: History.words(.networkError))),
             "historyLoading": State(tab: .history, history: history(busy: true)),
+            // Screen Time off in Period 3, an Emergency Unlock under it, then back on (#167).
+            "historyScreenTime": State(tab: .history, history: anaHistory(screenTime: true)),
             // Shown again, the moments kept, and the newest page's read again failed (#141).
             "historyRefreshError": State(
                 tab: .history, history: anaHistory(failed: History.words(.networkError))),
@@ -264,8 +266,9 @@
 
         /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
         /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier —
-        /// kept, where reading them again from the top failed: `failed` (#141).
-        private static func anaHistory(failed: String? = nil) -> History {
+        /// kept, where reading them again from the top failed: `failed` (#141). `screenTime`: in
+        /// today's class, Screen Time off, an Emergency Unlock under it, then back on (#167).
+        private static func anaHistory(failed: String? = nil, screenTime: Bool = false) -> History {
             /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
             func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
                 let calendar = Calendar.current
@@ -276,17 +279,26 @@
             /// Moment `id`, `type` at `time`, in Period `period` with its teacher.
             func moment(
                 _ id: Int, _ type: String, _ time: String, _ period: Int, reason: String = "null",
-                countedIn: String = "null"
+                recordedAs: String = "null", countedIn: String = "null"
             ) -> String {
                 let (name, teacher) = [
                     3: ("Period 3 — Algebra II", "Ms. Rivera"),
                     5: ("Period 5 — Chemistry", "Mr. Okafor"), 6: ("Period 6 — Geometry", "Ms. Chen"),
                 ][period]!
-                return #"{"eventId":"m\#(id)","type":"\#(type)","occurredAt":"\#(time)","class":{"id":"p\#(period)","name":"\#(name)"},"teacher":{"displayName":"\#(teacher)"},"session":null,"reason":\#(reason),"recordedAs":null,"countedIn":\#(countedIn)}"#
+                return #"{"eventId":"m\#(id)","type":"\#(type)","occurredAt":"\#(time)","class":{"id":"p\#(period)","name":"\#(name)"},"teacher":{"displayName":"\#(teacher)"},"session":null,"reason":\#(reason),"recordedAs":\#(recordedAs),"countedIn":\#(countedIn)}"#
             }
-            let events = [
-                moment(7, "session_expired", at(10, 45), 3), moment(6, "refocus", at(10, 16), 3),
-                moment(5, "unlock", at(10, 12), 3, reason: #""bathroom""#),
+            let unlocked =
+                screenTime
+                ? [
+                    moment(9, "protection_on", at(10, 9), 3),
+                    moment(
+                        5, "unlock", at(10, 7), 3, reason: #""bathroom""#,
+                        recordedAs: #""protection_off""#),
+                    moment(8, "protection_off", at(10, 5), 3),
+                ] : [moment(5, "unlock", at(10, 12), 3, reason: #""bathroom""#)]
+            let events =
+                [moment(7, "session_expired", at(10, 45), 3), moment(6, "refocus", at(10, 16), 3)]
+                + unlocked + [
                 moment(4, "tap_in", at(9, 58), 3),
                 moment(
                     3, "armed_tap_skipped", at(14, 48, 1), 6,

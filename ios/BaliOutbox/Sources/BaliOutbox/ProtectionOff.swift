@@ -3,18 +3,23 @@ import Foundation
 
 /// What the Protection off screen shows (C5b; D1's ProtectionOff) in a running session where the
 /// Screen Time permission is off, or was: the class, what happened and that the teacher sees it,
-/// and the way back — Screen Time on again, then a re-tap. A refocus out of protection off is
-/// refused (A2), so the screen never offers Back to focus.
+/// and the way back — Screen Time on again, which puts the phone back where it stood by itself
+/// (#167), or a re-tap where that could not be done. A refocus out of protection off is refused
+/// (A2), so the screen never offers Back to focus.
 public struct ProtectionOffWords: Sendable, Hashable {
     /// The way on, from what rule 3's check verified of the permission: Settings where it is
     /// denied; iOS's own prompt where it reads not determined past B5a-2's grace — never given on
     /// this phone, or lost with a restored backup, where Settings lists no Bali; the re-tap once it
-    /// reads on again; none yet while a read not determined is within the grace (C4's
-    /// "Checking Screen Time…"), never "off" over a grant a relaunch has not read back yet.
+    /// reads on again here, which Screen Time back on leaves at once wherever it can (#167); none
+    /// yet while a read not determined is within the grace (C4's "Checking Screen Time…"), never
+    /// "off" over a grant a relaunch has not read back yet.
     public enum Way: Sendable, Hashable { case settings, ask, retap, checking }
 
     public let title: String, subtitle: String, headline: String, body: String
     public let way: Way
+    /// D1's card, the steps back to class: Screen Time on again, then Bali putting the student back
+    /// by itself (#167) — or, on the re-tap's way, the tap.
+    public let steps: [String]
     /// A Back to focus the server refused (rule 5).
     public let refused: String?
     /// What the screens it takes over from would say, which it must not drop (rule 5; C5b's
@@ -62,8 +67,13 @@ public struct ProtectionOffWords: Sendable, Hashable {
             body =
                 untold
                 ? "Bali couldn't tell your teacher that Screen Time was off. It keeps trying."
-                : "Your teacher \(sees) 'Screen Time off' until you tap your teacher's block again."
+                : "Your teacher \(sees) 'Screen Time off' until it's back on."
         }
+        steps = [
+            "Turn Screen Time back on for Bali",
+            way == .retap
+                ? "Tap your teacher's block again" : "Bali puts you back in class by itself",
+        ]
         refused = sync.refusedRefocus(in: session.id)
         problems = [
             sync.unlock(in: session.id)?.stuck == true ? UnlockedWords.unsent : nil,

@@ -69,6 +69,8 @@ struct SchemaTests {
             "('g', 'refocus', NULL, 's', 't', 0, 0, NULL)",  // a refocus filed under a tap
             "('h', 'protection_off', NULL, NULL, 't', 0, 0, NULL)",  // protection off, no session
             "('k', 'refocus', NULL, 's', NULL, 0, 0, 1)",  // a refocus in another's place
+            "('m', 'protection_on', NULL, NULL, NULL, 0, 0, NULL)",  // back on, no session
+            "('n', 'protection_on', NULL, 's', 't', 0, 0, NULL)",  // back on, under a tap
         ] {
             #expect(throws: DatabaseError.self, "\(values)") {
                 try outbox.pool.write { try $0.execute(sql: "\(insert) VALUES \(values)") }
@@ -211,6 +213,81 @@ struct SchemaTests {
         #expect(kept.map(\.eventId) == ["refused", "unlock", "bound", "retried", "renewing"])
         #expect(kept.map(\.refusedStatus) == [404, 409, nil, nil, nil])
         #expect(try record(outbox, .tap(tagId: "tag")).order?.seq == 6)
+    }
+
+    @Test(
+        "A file the riders' build made keeps what it queued — a refusal, a follow-up's place — and its counter, the queue drained or not; and takes Screen Time back on, which v5 refused (#167)"
+    )
+    func fromV5() throws {
+        for drained in [true, false] {
+            let url = temporaryFile()
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let old = try DatabasePool(path: url.path(percentEncoded: false))
+            try Outbox.migrator.migrate(old, upTo: "v5")
+            try old.write { db in
+                #expect(throws: DatabaseError.self) {
+                    try db.execute(
+                        sql: """
+                            INSERT INTO outbox (eventId, kind, sessionId, recordedAt, nextAttemptAt)
+                            VALUES ('on', 'protection_on', 's', ?, ?)
+                            """, arguments: [t0, t0])
+                }
+                try db.execute(
+                    sql: """
+                        INSERT INTO outbox (eventId, kind, tagId, sessionId, recordedAt,
+                          nextAttemptAt, stuck, lastStatus, refusedStatus, orderSeq)
+                        VALUES ('tap', 'tap', 'tag', NULL, ?, ?, 1, 404, 404, NULL),
+                          ('unlock', 'unlock', NULL, 's', ?, ?, 0, NULL, NULL, 1),
+                          ('off', 'protection_off', NULL, 's', ?, ?, 0, NULL, NULL, NULL)
+                        """, arguments: [t0, t0, t0, t0, t0, t0])
+                try db.execute(
+                    sql: "DELETE FROM outbox WHERE eventId != 'unlock' OR ?", arguments: [drained])
+            }
+            try old.close()
+
+            let outbox = try open(url)
+            #expect(try outbox.pool.read { try Outbox.migrator.appliedMigrations($0) } == migrations)
+            let kept = try outbox.records()
+            let install = try #require(try installOf(outbox))
+            #expect(kept.map(\.eventId) == (drained ? [] : ["unlock"]))
+            #expect(kept.map(\.order) == (drained ? [] : [ActionOrder(install: install, seq: 1)]))
+            let backOn = try record(outbox, .protectionOn(session: "s"))
+            #expect(backOn.order?.seq == 4)
+            #expect(try current(outbox, backOn.eventId)?.change == .protectionOn(session: "s"))
+        }
+    }
+
+    @Test(
+        "Protection off keeps where the phone stood before it in that session — focused, or unlocked — which Screen Time back on returns to, and keeps for a back on made again (santa's round 1); the next report writes it anew, a tap forgets it; reported again from protection off, it keeps the first (#167)"
+    )
+    func offFrom() throws {
+        let (outbox, _) = try makeOutbox()
+        for (before, kept) in [
+            (ParticipationState.unlocked, ParticipationState.unlocked), (.focused, .focused),
+        ] {
+            try outbox.keep(.inSession(session(), before))
+            try record(outbox, .protectionOff(session: "s"))
+            #expect(try outbox.offFrom() == kept && outbox.reportedOff() == "s")
+            try record(outbox, .protectionOn(session: "s"))
+            #expect(try outbox.offFrom() == kept && outbox.reportedOff() == nil)
+        }
+        // An Emergency Unlock since — the latest turn the server records, under protection off
+        // too — is where a back on made again returns (santa's round 2).
+        try record(outbox, .unlock(session: "s", reason: nil))
+        #expect(try outbox.offFrom() == .unlocked)
+        // Standing in protection off already, or in another session, nothing new is known.
+        try outbox.keep(.inSession(session(), .unlocked))
+        try record(outbox, .protectionOff(session: "s"))
+        try outbox.keep(.inSession(session(), .protectionOff))
+        try outbox.protectionRestored()
+        try record(outbox, .protectionOff(session: "s"))
+        #expect(try outbox.offFrom() == .unlocked)
+        try record(outbox, .tap(tagId: "tag"))
+        #expect(try outbox.offFrom() == nil)
+        try outbox.keep(.inSession(session("t"), .unlocked))
+        try record(outbox, .protectionOff(session: "s"))
+        #expect(try outbox.offFrom() == nil)
     }
 }
 

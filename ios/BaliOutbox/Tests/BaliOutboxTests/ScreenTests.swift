@@ -151,6 +151,20 @@ struct ScreenTests {
     }
 
     @Test(
+        "Screen Time back on leaves the Screen Time off screen with no tap (#167): the phone back where it stood before protection off, at once — Focus, or Unlocked after an Emergency Unlock, focused where that is not known — and another class's, or none, moves nothing"
+    )
+    func backOn() {
+        let off = Standing.inSession(session(), .protectionOff)
+        let on = Change.protectionOn(session: "s")
+        #expect(screen(standing: off) == .protectionOff)
+        #expect(screen(standing: off.acting(on)) == .focus)
+        #expect(screen(standing: off.acting(on, offFrom: .focused)) == .focus)
+        #expect(screen(standing: off.acting(on, offFrom: .unlocked)) == .unlocked)
+        #expect(off.acting(.protectionOn(session: "t")) == off)
+        #expect(Standing.out.acting(on) == .out && Standing.waiting.acting(on) == .waiting)
+    }
+
+    @Test(
         "In a running session, the permission judged off — denied, or not determined past B5a-2's grace — is Protection off, whose screen says how back (Settings, then a re-tap), whatever the standing says before the check's report lands: unlocked, or a state this build does not know (C5b). Focus still wins where the enforcer keeps the shields — Emergency Unlock is there — and so does Home over the last run's; a read not determined within the grace changes nothing; the grant screen only outside a session"
     )
     func permissionOffInSession() throws {
