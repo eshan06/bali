@@ -92,7 +92,10 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 5. Lock the phone, unlock it and relaunch: still signed in — a locked Keychain is never a sign-out.
 6. The Keychain works on the device: 1 saved, 2 and 5 loaded, 3 cleared. A failure shows — a
    sign-in `notKept`, "not known yet" on an unlocked phone, a sign-out's `Failure(status: …)`.
-7. **Allow Screen Time**: iOS asks for Face ID or the passcode; then `Screen Time: approved`.
+7. **Allow Screen Time**: iOS asks for Face ID or the passcode; then `Screen Time: approved` and
+   `Marker: present` (F1b). Installed over an earlier build with access already allowed, nothing is
+   asked: opened, `Asked iOS:` shows one line no press made — Bali's silent check, `given in` a few
+   hundredths of a second, with no prompt on screen — and `Marker: present`.
 8. **Join** with the code `class` printed: `joined Device check`.
 9. `npm run dev:teacher -- start` (20 minutes; `-- start 5` for five, `-- extend` adds ten), then
    `npm run dev:teacher -- watch`, left running: it prints each student's state as the portal's
@@ -106,42 +109,37 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
 11. **Emergency Unlock**: the shields are off at once and the apps open; `watch` shows unlocked.
     **Tap** again: shielded and focused once more.
 12. Settings → Screen Time → Apps with Screen Time Access (or Bali's own page in Settings) → turn
-    Bali off, and go back to the app **without closing it**: `denied · shields off` at once
-    (`notDetermined`, if iOS reads it so: reported all the same, about 10 seconds later), and
-    within about 30 seconds `watch` shows **protection off**. On iOS 18 a running Bali can still
-    read `approved` (#144): `iOS: Family Controls reads Approved`, while iOS no longer holds `bell`
-    — then within about a minute `Found:` says the bell window is gone (and
-    `window refused: unauthorized` where iOS says so), `Screen Time: notDetermined · shields off`,
-    and `watch` shows **protection off** — with no relaunch. Run it three times, a 50-minute class
-    (`-- start 50`): in front with more than 15 minutes to the bell (the bell's window, 15 minutes
-    long, not begun), in front within the last 15 (begun, as in #144), and with Bali behind for a
-    minute, then opened. In the first, before turning Bali off, note in #145 what `iOS:` says of
-    `bell`: its end marked `(not begun)` (iOS reports a window not begun yet) or `none` (it does
-    not). Until the window begins, Bali judges by Family Controls' read alone — a window iOS may
-    not report is no sign yet (F1's review; if iOS reports it, that guard can go) — so with the
-    read still `approved`, nothing changes until then: note when **protection off** comes. Note in
-    #144 which `iOS:` and `Found:` lines changed each time (a `Monitor:` line for `tick` asking
-    nothing may come with them: expected, B5b-5).
-    **Allow Screen Time** again — note whether iOS's prompt appeared: still no shields — only a
-    re-tap leaves protection off — and **Tap** brings the shields and focus back.
-    **Then #145, a launch with access off:** focused again, swipe Bali away, turn its access off in
-    Settings and open Bali: "Checking Screen Time…" for about 10 seconds — `Launch:` counting
-    `not determined for … so far` — then the Screen Time off screen, and `watch` shows **protection
-    off**. Turn access back on and **Tap**.
-    **A known case** (F2's review): access taken back in a class's last 15 minutes, turned back on
-    in Settings (not with **Allow Screen Time**), then a re-tap. The re-tap's own window, the last
-    15 minutes of its 50-minute cap, has not begun, so the phone can keep saying Screen Time is off,
-    its shields on, until the tap's answer comes — offline, until that window begins, 35 minutes
-    after the re-tap and past the bell — or **Allow Screen Time** is tapped. The first run's
-    `(not begun)` or `none` settles it: if iOS reports a window not begun, that guard can go, and
-    this case with it.
+    Bali off, and go back to the app **without closing it**. A running Bali still reads `approved`
+    (#144: `iOS: Family Controls reads Approved`), so it judges by its marker (F1b): as it comes
+    back to the front, `Marker: MISSING — access taken back`,
+    `Screen Time: notDetermined · shields off`, the Screen Time off screen with **Turn on Screen
+    Time**, and within seconds `watch` shows **protection off** — with no relaunch. The blocked
+    apps open (iOS dropped the shields), and `Screen Time:` never says `shields on` again until
+    access is back: Bali puts none back over a missing marker. Run it three times, a 50-minute
+    class (`-- start 50`): in front with more than 15 minutes to the bell, in front within the last
+    15, and with Bali behind for a minute, then opened — the same each time. Note in #144 how long
+    after Bali came to the front **protection off** showed on `watch`.
+    **Turn on Screen Time**: iOS's prompt appears; **Allow**: a new `Asked iOS:` line, `given in …`,
+    `Marker: present`, and the screen says Screen Time is back on — still no shields: only a re-tap
+    leaves protection off. **Tap** brings the shields and focus back, and `iOS:` holds `bali` to the
+    bell again. Next time, press **Turn on Screen Time** twice quickly: one prompt, one new
+    `Asked iOS:` line, and no error under the button.
+    **Then a launch with access off (#145):** focused again, swipe Bali away, turn its access off in
+    Settings and open Bali: the Screen Time off screen at once — no "Checking Screen Time…" wait —
+    and `watch` shows **protection off** within seconds. Turn access back on and **Tap**.
+    **Then through the bell with Bali closed (the monitor's note):** `-- start 20`, **Tap**, swipe
+    Bali away, and in the class's last 15 minutes (the bell's window running) turn its access off;
+    open Bali only after the bell: `Marker:` ends `the monitor found it gone at` about when you
+    turned it off, and Bali's History shows **Screen Time off** in that class, "Arrived after class
+    ended" — the server records a late report so.
+    **The marker restricts nothing:** Settings → Screen Time → Content & Privacy Restrictions reads
+    as before Bali ran and can be changed, and explicit music still plays.
 13. Swipe the app away while shielded, turn on Airplane Mode and open it: still shielded,
     `due until` the bell — a relaunch starts where the phone stood. Airplane Mode off: `watch`
-    still shows focused — no false protection off after a relaunch: a permission Family Controls
-    reads as `notDetermined` for a moment is reported only if it still reads so 10 seconds on
-    (the grace, #145). Swipe it away and open it twice more: never a Screen Time off screen, and
-    note in #145 what `Launch:` says each time — `approved at the first read`, or
-    `not determined for 1.2 s, then approved` — the grace must outlast the longest by a margin.
+    still shows focused — no false protection off after a relaunch. Swipe it away and open it twice
+    more: never a Screen Time off screen nor "Checking Screen Time…" — `Marker: present` decides at
+    once — and note in #145 what `Launch:` says each time (Family Controls' own read, which only a
+    phone with no marker written yet waits on, for up to 10 seconds).
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
 

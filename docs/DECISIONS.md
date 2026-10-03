@@ -8,6 +8,63 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-02** — **F1b (#144): a running Bali notices Screen Time access taken back by a
+  marker, never by Family Controls' read — F1's DeviceActivity doubt and F2's not-begun guard
+  retired.** **The evidence** (the owner's device experiment, iPhone 15 Pro, iOS 18.6.2, probe
+  build #168, two revocations mid-class, every signal logged each second; #144's comment of
+  2026-10-02): the `$authorizationStatus` publisher never fired at a revocation; the read stayed
+  approved in the running app, and the monitor extension always reads not determined; iOS removed
+  the app's whole ManagedSettings record ("Removing unauthorized client record"), so the first
+  store read after the app came back was empty — the long-lived store and a fresh one alike, the
+  one reliable signal — and the enforcer then shielded again into a store iOS kept but did not
+  enforce, so later reads said "on" over open apps; the DeviceActivity schedules were deleted, yet
+  `startMonitoring` was still accepted; `requestAuthorization(for: .individual)` returned in
+  0.01 s with no prompt where access was on, prompted where it was taken back (Allow restoring
+  it), and two at once threw `authorizationConflict`; after Allow the stores read empty again.
+  **The marker:** a value of no effect — `media.denyExplicitContent = false`, the least any store
+  can say, so it restricts nothing — in a store of its own (`bali.marker`; never the shields',
+  which the monitor clears at the bell), written only once iOS has confirmed the authorization,
+  and a flag in the app group's defaults, which a revocation leaves, set only once the marker
+  reads back (so a marker iOS would not keep never reads as access taken back). **The rule**
+  (`Enforcer.judged`): denied is off at once, as before; the marker there is approved at once —
+  a launch's not determined too, so "Checking Screen Time…" no longer waits (#145) — and the
+  marker gone, its flag set, is off at once, whatever the read. It is read at every check (each
+  check-in, each return to the front, the engine's first wake at a launch) and by every pass, and
+  no pass puts the shields on over a marker gone: iOS would keep them and enforce none. **No
+  marker yet** (a first run, or a phone of a build before this): the read judges as before,
+  B5a-2's grace (10 s) and all — the one place a short bound is kept — and an approved read is
+  proven silently: one `requestAuthorization` in the background, never over a read of not
+  determined (iOS would prompt), never reported off on its own; given, the marker is written.
+  **One ask at a time:** the enforcer holds the calls made while an ask is under way and hands
+  them its answer (`asking`), so Turn on Screen Time pressed twice, or over the silent check, makes
+  one; given, the bell's window is asked for anew (one iOS holds still is asked nothing) and the
+  shields come back where the standing calls for them — a re-tap still leaves protection off
+  (#167 is the separate step that relocks without one). **The monitor:** at a window's end or
+  start it reads the marker; gone with its flag set, it notes when in the app group (the first
+  such wake kept) and asks iOS for no next wake — a clear still clears, so a misread never keeps
+  the shields past the bell. The app reports it at its next run: a session the phone stood in is
+  reportable while it was running when the note says access went, so a revocation found closed
+  and opened past the bell is still recorded (the server keeps a late report, `after_session_end`).
+  **Retired:** F1's doubt over a window iOS no longer held, and its `unauthorized` refusal
+  (`ScreenTime.holds`, `ScreenTimeUnauthorized`), and F2's not-begun guard — iOS does report a
+  window not begun (the conductor, from the experiment) — and an approved read as proof of
+  anything. **Its cost, owned:** access turned off and back on in Settings while Bali was away
+  reads off until Turn on Screen Time, which iOS then answers at once with no prompt — the shields
+  were gone meanwhile, so protection off is the truth; and a window iOS drops while access stands
+  (another app's grant, thread 749120) is no longer asked for again at each check — B5b's
+  behavior before F1, a follow-up if a phone ever shows it. **Unknown until the phone** (hence
+  "Refs #144"): that the marker reads back on iOS 18.6, restricts nothing, and reads present at
+  every launch with access on — a store read empty then would be a false protection off; round 1,
+  steps 7, 12 and 13, look for each. **Tests**, red first on Linux (`RevokedWhileRunningTests`,
+  `LaunchGraceTests.markerAtLaunch`, `RegisterTests.accessLost`): revoked in front and behind,
+  reported, nothing shielded; the marker there, never off, a launch's not determined approved at
+  once; the monitor's clear, no revocation; Allow, the marker and a re-tap's shields and window
+  back — over a standing not read too, where no pass cancels the window; the silent check, failed
+  then given, never reported; one ask for two presses over the silent one (the fake refuses a
+  second ask under way, as iOS does, so losing the single flight fails the test, never hangs it);
+  the monitor's note reported past the bell, and not one from after it; and a launch with the
+  marker gone off at once. Each new rule, removed alone, turns a test red (nine mutations).
+
 - **2026-10-02** — **F12 (CI): a PR merges only after its Claude Review has passed.** **Found**
   (#154; first seen by B4c's worker and kept only as a GOTCHAS note): the review job skipped drafts
   by its `if`, and GitHub counts a skipped required check as passing, so a draft marked ready read
