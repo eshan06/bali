@@ -218,13 +218,16 @@ public struct Leaving: Sendable, Hashable {
     }
 
     /// What the question says when a leave did not finish (rule 5): keyed on the status and the
-    /// error's `reason`, never its message — else in the Join screen's words.
+    /// error's `reason`, never its message — else in the Join screen's words. Every 403 the route
+    /// gives is its no to this account leaving this enrollment, one whose reason this build does
+    /// not know too, never the Join screen's words for a 403 (#134's review).
     public static func words(_ row: MeClass, _ result: SendResult, _ reason: ApiErrorReason?)
         -> String
     {
-        switch reason {
-        case .classInSession?: inSession(row)
-        case .enrollmentNotFound?, .enrollmentNotYours?, .unknownUser?:
+        switch (reason, result) {
+        case (.classInSession?, _): inSession(row)
+        case (.enrollmentNotFound?, _), (.enrollmentNotYours?, _), (.unknownUser?, _),
+            (_, .status(403)):
             "Bali couldn't find you in this class. It's checking your classes again."
         default: Joining.words(result, nil)
         }

@@ -11,11 +11,11 @@ private struct Fixture: Decodable {
 }
 
 /// `DELETE /v1/enrollments/{id}` answered with `contracts/fixtures/enrollments/<name>` — or, with
-/// none named, no answer; or `status` alone.
-private func answered(_ name: String? = nil, status: Int? = nil) async throws
+/// none named, no answer; or `status` alone, with `json` its body.
+private func answered(_ name: String? = nil, status: Int? = nil, json: String = "") async throws
     -> APIResponse<EndEnrollmentResponse>
 {
-    var (answer, body): (Int?, Data) = (status, Data())
+    var (answer, body): (Int?, Data) = (status, Data(json.utf8))
     if let name {
         let url = Contract.repoRoot.appending(path: "contracts/fixtures/enrollments/\(name)")
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
@@ -131,7 +131,7 @@ struct LeaveTests {
     }
 
     @Test(
-        "A leave as the API answers it (A19's fixtures): out — it ended, or they were out already — the question goes; refused — the class in session, an enrollment not theirs or not known — or no answer, 401, 429 or a server error, each said under the question, to try again or cancel"
+        "A leave as the API answers it (A19's fixtures): out — it ended, or they were out already — the question goes; refused — the class in session, an enrollment not theirs or not known — or no answer, 401, 429 or a server error, each said under the question, to try again or cancel. Keyed on the status as well as the reason (#134's review): a 403 whose reason this build does not know is the route's own no, never the join's words for a 403"
     )
     func answers() async throws {
         let p3 = try row("3", "Period 3 — Algebra II")
@@ -147,6 +147,13 @@ struct LeaveTests {
             (try await answered("404-enrollment-not-found.json"), lost),
             (try await answered("403-enrollment-not-yours.json"), lost),
             (try await answered("403-unknown-user.json"), lost),
+            (
+                try await answered(
+                    status: 403,
+                    json: #"{"error":{"code":"forbidden","reason":"a_later_reason","message":"no"}}"#),
+                lost
+            ),
+            (try await answered(status: 403), lost),
             (try await answered(), unreachable),
             (try await answered(status: 401), "Bali couldn't check your sign-in. Try again."),
             (try await answered(status: 429), "Too many tries for now. Wait a minute, then try again."),
@@ -233,6 +240,25 @@ struct LeaveEngineTests {
         #expect(await rig.engine.state.me?.classes.map(\.id) == ["d"])
         after.reply(200, Answer.me(nil, classes: [classes[1]]))
         await rig.until { $0.me?.classes.map(\.id) == ["d"] }
+        await rig.stop()
+    }
+
+    @Test(
+        "A leave answered after another student's sign-in made the engine forget the last one's `me` takes no class from the next student's, read meanwhile — as a join adds none (F11a-1; #164's review): not even one under the very enrollment id left, which no two enrollments share, so the forget, not that, is what keeps it"
+    )
+    func leftAcrossSignIn() async throws {
+        let rig = try Rig()
+        try await rig.foreground(Answer.me(nil, classes: [Answer.inClass("c", enrollment: "e3")]))
+        async let answer = rig.engine.leave(enrollment: "e3", request)
+        let leave = try await rig.server.next(leaveRoute)
+        await rig.engine.forgetMe()
+        // The next student's own, read before the last one's leave answers.
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(nil, classes: [Answer.inClass("d", enrollment: "e3")]))
+        await rig.until { $0.me?.classes.map(\.id) == ["d"] }
+        leave.reply(200, #"{"outcome":"ended","reason":"left_class","endedParticipation":false}"#)
+        #expect(await answer.answer?.outcome == .known(.ended))
+        #expect(await rig.engine.state.me?.classes.map(\.id) == ["d"])
         await rig.stop()
     }
 }

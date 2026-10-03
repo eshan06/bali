@@ -490,6 +490,39 @@ struct ScreenTests {
     }
 
     @Test(
+        "A tap refused for anything but an unknown block names a way on the screen saying it has (#160's review): on Home in no class, which has no Tap in (#143), its Try again, in plain words with no em-dash; Tap in again everywhere else, in a class, waiting or out with the classes not read; a tap still being sent at the retry bound says so on that Home too"
+    )
+    func refusedTapInNoClass() async throws {
+        let (tryAgain, tapAgain) = (
+            "Bali couldn't record a tap. Try again, or ask your teacher.",
+            "Bali couldn't record a tap. Tap in again, or ask your teacher."
+        )
+        let (outbox, _) = try makeOutbox()
+        let tap = try record(outbox, .tap(tagId: "tag"))
+        try await send(outbox, tap, 409, Answer.refused("event_id_conflict"))
+        var state = try read(outbox)
+        (state.standing, state.me) = (.out, try me(Answer.me(nil)))
+        #expect(state.noClassesCard != nil && state.refusedTapWords == tryAgain)
+        #expect(!tryAgain.contains("—") && !tryAgain.contains("–"))
+        var inClass = state
+        inClass.me = try me(Answer.me(nil, classes: [Answer.inClass("c")]))
+        var waiting = state
+        waiting.standing = .waiting
+        var unread = state
+        unread.me = nil
+        for elsewhere in [inClass, waiting, unread] {
+            #expect(elsewhere.noClassesCard == nil, "\(elsewhere.standing)")
+            #expect(elsewhere.refusedTapWords == tapAgain, "\(elsewhere.standing)")
+        }
+        let (unsettled, _) = try makeOutbox()
+        let lost = try record(unsettled, .tap(tagId: "tag"))
+        for _ in 1...Outbox.bound { try await send(unsettled, lost, 503) }
+        var trying = try read(unsettled)
+        (trying.standing, trying.me) = (.out, state.me)
+        #expect(trying.refusedTapWords == "Bali couldn't record a tap yet. It keeps trying.")
+    }
+
+    @Test(
         "A screen opened over another stays open while where the phone stands holds — the classes read, the link, a failed read change nothing, nor a tap sent again — and closes once the standing changes, a tap is made or answered, or, out, the phone knows it has no classes and Join is the router's own then, with no way back (C3) — never for a student once in a class here, whose own is Home (#143): Join opened over it, its code typed, and a tab chosen there stay, the classes gone or a read saying none again (santa's rounds 1 and 2: never while waiting, whose screen is Waiting's whatever the classes). A read saying out, once the bell has rung by the phone's clock, changes nothing the student sees — the class was over for the phone already — so it keeps what they opened or chose since, History from Session over (C5b's hand-off); before the bell, the class ending is a change"
     )
     func keepsOpened() async throws {
