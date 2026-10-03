@@ -20,9 +20,21 @@ permissions:
 jobs:
   review:
     name: Claude Review
-    if: ${{ !github.event.pull_request.draft }}
+    # A draft is not reviewed, and its run fails. Skipped, this check would
+    # count as passing: a draft marked ready read as mergeable until the
+    # ready_for_review run began, and #154 merged unreviewed that way. GitHub
+    # reads only this workflow's newest run on the commit, so the review that
+    # ready_for_review starts takes the draft run's place, and the merge waits
+    # for its verdict.
     runs-on: ubuntu-latest
     steps:
+      - name: A draft is not reviewed
+        if: ${{ github.event.pull_request.draft }}
+        # A re-run replays the draft's event, so it can only fail again.
+        run: |
+          echo "::error::Draft: the review runs when the PR is marked ready. Already ready? Re-running this run fails again: convert the PR to draft and back, or push a commit."
+          exit 1
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -68,7 +80,8 @@ jobs:
             blockers) or exactly `VERDICT: FAIL`.
 
       - name: Post review and enforce verdict
-        if: always()
+        # Not on a draft: there is no review to post, and the first step said why.
+        if: ${{ always() && !github.event.pull_request.draft }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
