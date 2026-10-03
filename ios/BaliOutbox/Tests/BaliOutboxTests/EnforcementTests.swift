@@ -1138,6 +1138,160 @@ struct RevokedWhileRunningTests {
     }
 }
 
+let protectionOnRoute = "POST /v1/sessions/s/protection-on"
+
+extension Answer {
+    /// Screen Time back on, applied: the state it returned the student to (#167).
+    static func protectionOn(_ view: SessionView = session(), state: String = "focused") -> String {
+        #"{"outcome":"applied","state":"\#(state)","session":\#(json(view))}"#
+    }
+}
+
+@Suite(
+    "#167: Screen Time back on in the class the phone was protection off in puts it back where it stood — focused, or still unlocked — with no re-tap",
+    .timeLimit(.minutes(3)))
+struct BackOnTests {
+    /// Tapped into session "s" — and, `unlocked`, out of focus by an Emergency Unlock the server
+    /// recorded — then access taken back and the report answered: the phone protection off there.
+    func off(unlocked: Bool = false, screenTime: FakeScreenTime = FakeScreenTime(marked: true))
+        async throws -> (Rig, Enforced)
+    {
+        let rig = try Rig()
+        let phone = Enforced(rig, screenTime)
+        try await rig.tapIn()
+        await phone.until { $0.shielded }
+        if unlocked {
+            try await rig.engine.emergencyUnlock()
+            try await rig.server.next(unlockRoute).reply(200, Answer.unlocked())
+            await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        }
+        await screenTime.revokeUnseen()
+        await phone.enforcer.check()
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        return (rig, phone)
+    }
+
+    @Test(
+        "Turned back on at iOS's prompt, in the class: focused again at once — the shields back on, the Screen Time off screen left — and the server told under the phone's order, its answer applied; no tap made, and a later revocation reported again"
+    )
+    func focusedAgain() async throws {
+        let (rig, phone) = try await off()
+        try await phone.enforcer.requestPermission()
+        let now = await phone.until { $0.shielded }
+        #expect(!now.permissionOff && now.until == session().endsAt)
+        let state = await rig.engine.state
+        #expect(state.standing == .inSession(session(), .focused) && state.reportedOff == nil)
+        #expect(state.queued.map(\.change) == [.protectionOn(session: "s")])
+        #expect(state.queued.first?.order != nil)
+        try await rig.server.next(protectionOnRoute).reply(200, Answer.protectionOn())
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .focused) }
+        #expect(await rig.server.waiting.isEmpty)
+        // Taken back again, it is a new revocation: reported again.
+        await phone.screenTime.revokeUnseen()
+        await phone.enforcer.check()
+        #expect(try rig.outbox.records().map(\.change) == [.protectionOff(session: "s")])
+        await phone.stop()
+    }
+
+    @Test(
+        "Unlocked before Screen Time went off: still unlocked once it is back on — never relocked over the Emergency Unlock — at once and by the server's answer"
+    )
+    func stillUnlocked() async throws {
+        let (rig, phone) = try await off(unlocked: true)
+        let shields = await phone.screenTime.shields
+        try await phone.enforcer.requestPermission()
+        await rig.until { $0.standing == .inSession(session(), .unlocked) }
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.protectionOn(state: "unlocked"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        let now = await phone.until { !$0.permissionOff }
+        #expect(!now.shielded && now.until == nil)
+        #expect(await phone.screenTime.shields == shields)
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    @Test(
+        "Past the class's bell by the phone's clock, or out of a class, Screen Time back on changes nothing and sends nothing"
+    )
+    func overOrOut() async throws {
+        let (rig, phone) = try await off()
+        rig.clock.advance(by: 3000)
+        try await phone.enforcer.requestPermission()
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await rig.engine.state.standing == .inSession(session(), .protectionOff))
+        await phone.stop()
+    }
+
+    @Test(
+        "A marker that does not read back proves nothing: no Screen Time back on over Family Controls' read alone — the Screen Time off screen keeps the re-tap as the way on"
+    )
+    func markerNotBack() async throws {
+        let screenTime = FakeScreenTime(marked: true)
+        let (rig, phone) = try await off(screenTime: screenTime)
+        await screenTime.markerSticks(false)
+        try await phone.enforcer.requestPermission()
+        let now = await phone.until { $0.permission == .approved }
+        #expect(try rig.outbox.records().isEmpty)
+        let state = await rig.engine.state
+        #expect(ProtectionOffWords(state, now)?.way == .retap)
+        await phone.stop()
+    }
+
+    @Test(
+        "Relaunched in protection off, access turned back on at iOS's prompt before Bali closed: its first check puts it back where it stood — unlocked, as the file kept it — after the report still queued"
+    )
+    func relaunched() async throws {
+        let (outbox, url) = try makeOutbox()
+        try outbox.keep(.inSession(session(), .unlocked))
+        try record(outbox, .protectionOff(session: "s"))
+        try outbox.keep(.inSession(session(), .protectionOff))
+        let phone = Enforced(try Rig(outbox: try open(url)), FakeScreenTime(marked: true))
+        let rig = phone.rig
+        await phone.until { $0.checked }
+        await phone.enforcer.check()
+        await rig.until { $0.standing == .inSession(session(), .unlocked) }
+        #expect(
+            try rig.outbox.records().map(\.change) == [
+                .protectionOff(session: "s"), .protectionOn(session: "s"),
+            ])
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        // The report's answer is older than the phone's truth: it holds until back on's comes.
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.protectionOn(state: "unlocked"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    @Test(
+        "Refused — protection no longer off on the server, a re-tap having left it — it is dropped and the truth read again, never sent again; and a late answer, a later protection off on record, is applied and made good at the next check"
+    )
+    func refusedOrLate() async throws {
+        let (rig, phone) = try await off()
+        try await phone.enforcer.requestPermission()
+        try await rig.server.next(protectionOnRoute).reply(409, Answer.refused("protection_not_off"))
+        try await rig.server.next(meRoute).reply(200, Answer.me())
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .focused) }
+        #expect(await rig.engine.state.refused?.change == .protectionOn(session: "s"))
+        // Off again, and back on — the server holding a protection off of the phone's made after
+        // it: answered as its retry is, the truth now, which the next check makes good.
+        await phone.screenTime.revokeUnseen()
+        await phone.enforcer.check()
+        try await rig.server.next(protectionOffRoute).reply(200, Answer.protectionOff())
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        try await phone.enforcer.requestPermission()
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.replay(state: "protection_off"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        await phone.enforcer.check()
+        try await rig.server.next(protectionOnRoute).reply(200, Answer.protectionOn())
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .focused) }
+        await phone.stop()
+    }
+}
+
 @Suite(
     "#145: a launch's not determined, no marker written yet — off once it lasts the grace, read again every second meanwhile; never over an approved phone settling within it — and the marker deciding at once",
     .timeLimit(.minutes(3)))

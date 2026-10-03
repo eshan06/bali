@@ -107,7 +107,7 @@ extension SyncState {
             switch $0.change {
             case .unlock(let id, _): id == session
             case .unlockUnderTap, .unlockUnfiled: true
-            case .tap, .refocus, .protectionOff: false
+            case .tap, .refocus, .protectionOff, .protectionOn: false
             }
         }
     }

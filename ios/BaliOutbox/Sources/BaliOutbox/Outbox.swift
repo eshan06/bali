@@ -384,12 +384,45 @@ public struct Outbox: Sendable {
                       AND lastStatus BETWEEN 400 AND 499 AND lastStatus NOT IN (401, 408, 429);
                     """)
         }
+        // #167: Screen Time back on, a state change of its own, `protection_on` — which v4's CHECK
+        // on the kinds forbids, so the table is made again as v5 left it, its counter carried over.
+        migrator.registerMigration("v6") { db in
+            let columns = """
+                seq, eventId, kind, tagId, sessionId, tapId, reason, follows, recordedAt, attempts,
+                  answers, nextAttemptAt, stuck, lastStatus, lastReason, lastMessage, orderSeq,
+                  refusedStatus
+                """
+            try db.execute(
+                sql: """
+                    ALTER TABLE outbox RENAME TO outboxV5;
+                    CREATE TABLE outbox (
+                      seq INTEGER PRIMARY KEY AUTOINCREMENT, eventId TEXT NOT NULL UNIQUE,
+                      kind TEXT NOT NULL CHECK (kind IN
+                        ('tap', 'unlock', 'refocus', 'protection_off', 'protection_on')),
+                      tagId TEXT CHECK ((kind = 'tap') = (tagId IS NOT NULL)),
+                      sessionId TEXT
+                        CHECK (kind = 'unlock' OR (kind = 'tap') = (sessionId IS NULL)),
+                      tapId TEXT CHECK (tapId IS NULL OR kind = 'unlock'),
+                      reason TEXT, follows TEXT, recordedAt TEXT NOT NULL,
+                      attempts INTEGER NOT NULL DEFAULT 0, answers INTEGER NOT NULL DEFAULT 0,
+                      nextAttemptAt TEXT NOT NULL, stuck INTEGER NOT NULL DEFAULT 0,
+                      lastStatus INTEGER, lastReason TEXT, lastMessage TEXT,
+                      orderSeq INTEGER CHECK (orderSeq IS NULL OR kind = 'unlock'),
+                      refusedStatus INTEGER);
+                    INSERT INTO outbox (\(columns)) SELECT \(columns) FROM outboxV5;
+                    DELETE FROM sqlite_sequence WHERE name = 'outbox';
+                    INSERT INTO sqlite_sequence (name, seq)
+                      SELECT 'outbox', seq FROM sqlite_sequence WHERE name = 'outboxV5';
+                    DROP TABLE outboxV5;
+                    """)
+        }
         return migrator
     }
 
-    /// The session protection off was last reported for, the latest unlock's id, the file's
-    /// install, the phone's standing, and the latest tap's id.
+    /// The session protection off was last reported for, and where the phone stood there before
+    /// it, the latest unlock's id, the file's install, the phone's standing, and the latest tap's id.
     static let reportedKey = "protectionOffReported"
+    static let offFromKey = "protectionOffFrom"
     static let lastUnlockKey = "lastUnlock"
     static let installKey = "install"
     static let standingKey = "standing"
@@ -409,8 +442,10 @@ public struct Outbox: Sendable {
     /// other. A tap or an unlock supersedes every queued refocus (deleted, never sent: it could
     /// only make the truth older). Protection off is reported once per revocation — nil when
     /// already reported in this session — and again after a tap, which returns the row to
-    /// focused, or `protectionRestored`. An unlock waiting for its reason is due `hold` later
-    /// (C5a), and whatever the phone does next sends one at once: the student has moved on.
+    /// focused, Screen Time back on (#167), or `protectionRestored`; with it, where the phone stood
+    /// there before it (`offFrom`), which Screen Time back on returns to. An unlock waiting for its
+    /// reason is due `hold` later (C5a), and whatever the phone does next sends one at once: the
+    /// student has moved on.
     @discardableResult
     public func record(
         _ change: Change, now: Date, standing: Standing? = nil, holding hold: TimeInterval = 0
@@ -422,6 +457,10 @@ public struct Outbox: Sendable {
                 return nil
             }
             try Self.release(db, now: now)
+            // Where the phone stood before protection off, read before this record's standing is
+            // kept: its own changes there, as the server's latest turn says (#167). One the file
+            // will not give back is none, never a record refused.
+            let before = try? Self.standing(db)
             // Kept as `file` keeps it, before what this does: an unlock not filed yet — a filing
             // that failed, say — goes where the phone stood, or under the last tap before this.
             if let standing { try Self.file(db, standing) }
@@ -433,6 +472,7 @@ public struct Outbox: Sendable {
             case .tap(let tagId):
                 try db.execute(sql: "DELETE FROM outbox WHERE kind = 'refocus'")
                 try Self.setState(db, Self.reportedKey, nil)
+                try Self.setState(db, Self.offFromKey, nil)
                 try Self.setState(db, Self.lastTapKey, eventId)
                 row = ("tap", tagId, nil, nil)
             case .unlock(let session, let reason):
@@ -462,7 +502,16 @@ public struct Outbox: Sendable {
                 row = ("refocus", nil, session, nil)
             case .protectionOff(let session):
                 try Self.setState(db, Self.reportedKey, session)
+                if case .inSession(let view, let state?)? = before, view.id == session,
+                    state != .protectionOff
+                {
+                    try Self.setState(db, Self.offFromKey, state.rawValue)
+                }
                 row = ("protection_off", nil, session, nil)
+            case .protectionOn(let session):
+                try Self.setState(db, Self.reportedKey, nil)
+                try Self.setState(db, Self.offFromKey, nil)
+                row = ("protection_on", nil, session, nil)
             }
             try db.execute(
                 sql: """
@@ -509,10 +558,17 @@ public struct Outbox: Sendable {
         }
     }
 
-    /// The session protection off was last reported in, since the phone's last tap: a refocus out
-    /// of it is refused and a re-tap returns (A2), so the Unlocked screen offers that there (C5a).
+    /// The session protection off was last reported in, since the phone's last tap or Screen Time
+    /// back on (#167): a refocus out of it is refused and a re-tap returns (A2), so the Unlocked
+    /// screen offers that there (C5a).
     public func reportedOff() throws -> String? {
         try pool.read { try Self.state($0, Self.reportedKey) }
+    }
+
+    /// Where the phone stood in that session before protection off — focused, or unlocked — which
+    /// Screen Time back on returns it to at once (#167); nil: not known.
+    func offFrom() throws -> ParticipationState? {
+        try pool.read { try Self.state($0, Self.offFromKey).flatMap(ParticipationState.init) }
     }
 
     /// The phone's newest tap's event id, queued or answered and gone — kept by each tap's own

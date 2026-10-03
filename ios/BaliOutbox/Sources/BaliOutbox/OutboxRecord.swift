@@ -20,12 +20,15 @@ public enum Change: Sendable, Hashable {
     case refocus(session: String)
     /// `POST /v1/sessions/{id}/protection-off`: the Screen Time permission was found revoked.
     case protectionOff(session: String)
+    /// `POST /v1/sessions/{id}/protection-on`: Screen Time back on in the class the phone was
+    /// protection off in (#167) — the student back where they stood before it, with no re-tap.
+    case protectionOn(session: String)
 
     /// Any unlock: a session's, one filed under a tap, or one not filed yet.
     var isUnlock: Bool {
         switch self {
         case .unlock, .unlockUnderTap, .unlockUnfiled: true
-        case .tap, .refocus, .protectionOff: false
+        case .tap, .refocus, .protectionOff, .protectionOn: false
         }
     }
 
@@ -36,16 +39,17 @@ public enum Change: Sendable, Hashable {
         switch self {
         case .unlock(_, let reason), .unlockUnderTap(_, let reason), .unlockUnfiled(let reason):
             reason
-        case .tap, .refocus, .protectionOff: nil
+        case .tap, .refocus, .protectionOff, .protectionOn: nil
         }
     }
 
     /// The student's own return to focus — a tap, or a refocus — whose answer an unlock made before
-    /// it, by the phone's order, never holds back (A13).
+    /// it, by the phone's order, never holds back (A13). Screen Time back on is none: it returns
+    /// them where they stood, and an unlock the server has yet to record still guards its session.
     var isReturn: Bool {
         switch self {
         case .tap, .refocus: true
-        case .unlock, .unlockUnderTap, .unlockUnfiled, .protectionOff: false
+        case .unlock, .unlockUnderTap, .unlockUnfiled, .protectionOff, .protectionOn: false
         }
     }
 }
@@ -84,6 +88,7 @@ public struct OutboxRecord: Sendable, Hashable {
         case unlockUnderTap(tap: String, UnlockRequest)
         case refocus(session: String, RefocusRequest)
         case protectionOff(session: String, ProtectionOffRequest)
+        case protectionOn(session: String, ProtectionOnRequest)
     }
 
     /// The request to send, built from what was stored: every attempt sends the same. None for an
@@ -104,6 +109,9 @@ public struct OutboxRecord: Sendable, Hashable {
         case .protectionOff(let session):
             .protectionOff(
                 session: session, ProtectionOffRequest(eventId: id, deviceTime: time, order: order))
+        case .protectionOn(let session):
+            .protectionOn(
+                session: session, ProtectionOnRequest(eventId: id, deviceTime: time, order: order))
         }
     }
 }
@@ -128,6 +136,8 @@ extension OutboxRecord: FetchableRecord {
         case "refocus": change = .refocus(session: try row.decode(forColumn: "sessionId"))
         case "protection_off":
             change = .protectionOff(session: try row.decode(forColumn: "sessionId"))
+        case "protection_on":
+            change = .protectionOn(session: try row.decode(forColumn: "sessionId"))
         case let kind: throw UnknownKind(kind: kind)
         }
         eventId = try row.decode(forColumn: "eventId")
@@ -173,6 +183,10 @@ extension OutboxRecord {
             return Sent(eventId, response, .stateChange(disposition))
         case .protectionOff(let session, let request)?:
             let response = await client.protectionOff(session: session, request)
+            let disposition = stateChangeDisposition(response.result, response.answer)
+            return Sent(eventId, response, .stateChange(disposition))
+        case .protectionOn(let session, let request)?:
+            let response = await client.protectionOn(session: session, request)
             let disposition = stateChangeDisposition(response.result, response.answer)
             return Sent(eventId, response, .stateChange(disposition))
         case nil: return nil
@@ -236,6 +250,7 @@ extension UnlockResponse: ChangeAnswer {
 }
 extension RefocusResponse: ChangeAnswer {}
 extension ProtectionOffResponse: ChangeAnswer {}
+extension ProtectionOnResponse: ChangeAnswer {}
 
 /// What one answer means for a record, by its kind's table — BaliCore's, never decided here.
 public enum Disposition: Sendable, Hashable {

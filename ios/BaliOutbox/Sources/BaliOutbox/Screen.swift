@@ -86,8 +86,9 @@ public enum Screen: Sendable, Hashable {
         case .unread: return .home
         // In a session still running: its state's screen — and protection off, whatever the state,
         // once the check judges the permission off (denied, or not determined past B5a-2's
-        // grace): the check reports it within a moment, and that screen says how back (Settings,
-        // then a re-tap), where Screen Time's would not (C5b). Focused is the rule above; a state
+        // grace): the check reports it within a moment, and that screen says how back (Settings or
+        // iOS's prompt, which puts the phone back where it stood, #167), where Screen Time's would
+        // not (C5b). Focused is the rule above; a state
         // this build does not know is home — never focus, which the enforcer does not shield for,
         // and never an unlock the student did not make.
         case .inSession(let session, let state) where session.endsAt > now:

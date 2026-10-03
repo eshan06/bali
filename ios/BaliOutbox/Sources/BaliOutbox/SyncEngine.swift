@@ -40,14 +40,16 @@ public enum Standing: Sendable, Hashable {
 
     /// The phone's own change, at once: a state change of the session it is in. A tap changes
     /// nothing here — it is `SyncState.pendingTap` until answered; an unlock under it, or one not
-    /// filed yet, any session.
-    func acting(_ change: Change) -> Standing {
+    /// filed yet, any session. Screen Time back on returns to `offFrom`, where the phone stood
+    /// before protection off (#167) — focused, the stricter, where that is not known.
+    func acting(_ change: Change, offFrom: ParticipationState? = nil) -> Standing {
         guard case .inSession(let session, _) = self else { return self }
         switch change {
         case .unlock(session.id, _), .unlockUnderTap, .unlockUnfiled:
             return .inSession(session, .unlocked)
         case .refocus(session.id): return .inSession(session, .focused)
         case .protectionOff(session.id): return .inSession(session, .protectionOff)
+        case .protectionOn(session.id): return .inSession(session, offFrom ?? .focused)
         default: return self
         }
     }
@@ -128,8 +130,8 @@ public struct SyncState: Sendable, Hashable {
     /// A12) — which put the shields back with no return of this phone's since: said on Focus
     /// (C5a) until the phone's next change.
     public var superseded: Superseded?
-    /// The session protection off was last reported in, since the phone's last tap
-    /// (`Outbox.reportedOff`): only a re-tap leaves it there (A2).
+    /// The session protection off was last reported in, since the phone's last tap or Screen Time
+    /// back on (`Outbox.reportedOff`): only those leave it there (A2; #167).
     public var reportedOff: String?
     /// The phone's newest tap, as the outbox file keeps it (`Outbox.lastTap`): a refused tap is
     /// said only while it is this one (#146). Nil: the file names none.
@@ -354,7 +356,10 @@ public actor SyncEngine {
         }
         // Where it leaves the phone is kept in the change's own write: killed between two, a
         // relaunch would stand where the phone stood before — shielded over an Emergency Unlock.
-        let standing = state.standing.acting(change)
+        // Screen Time back on, where the phone stood before protection off (#167).
+        let offFrom: ParticipationState? =
+            if case .protectionOn = change { stored(outbox.offFrom) ?? nil } else { nil }
+        let standing = state.standing.acting(change, offFrom: offFrom)
         let keeping = standing == .unread ? nil : standing
         guard
             let record = try outbox.record(

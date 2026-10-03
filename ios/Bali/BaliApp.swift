@@ -799,6 +799,7 @@ final class Phone {
                     case .unlockUnfiled: "unlock, its class not known yet"
                     case .refocus: "refocus"
                     case .protectionOff: "protection off"
+                    case .protectionOn: "Screen Time back on"
                     }
                 let answer = record.lastStatus.map { "\($0)" } ?? "no answer"
                 return kind + (record.stuck ? " (stuck: \(answer))" : "")
