@@ -4,9 +4,10 @@ import UIKit
 
 /// Protection off (C5b; D1's ProtectionOff), where the router sends a phone in a running session
 /// whose Screen Time permission is off, or was: what happened, that the teacher sees it, and the
-/// way back — Screen Time on again, in Settings or at iOS's prompt, then the block tapped again. A
-/// refocus out of protection off is refused (A2), so there is no way back but the re-tap. In
-/// `ProtectionOffWords`' words (BaliOutbox, tested on Linux).
+/// way back — Screen Time on again, in Settings or at iOS's prompt, which puts the phone back where
+/// it stood by itself (#167), or the block tapped again where that could not be done. A refocus out
+/// of protection off is refused (A2), so there is no Back to focus. In `ProtectionOffWords`' words
+/// (BaliOutbox, tested on Linux).
 struct ProtectionOffView: View {
     let phone: Phone
     @Environment(\.openURL) private var openURL
@@ -43,7 +44,7 @@ struct ProtectionOffView: View {
                             Retry(words: words.problems.joined(separator: "\n"), phone: phone)
                                 .multilineTextAlignment(.leading)
                         }
-                        steps(backOn: words.way == .retap)
+                        steps(words.steps, backOn: words.way == .retap)
                         action(words.way)
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -54,13 +55,14 @@ struct ProtectionOffView: View {
     }
 
     /// D1's card: the two steps back to class, the first ticked off once Screen Time reads on.
-    private func steps(backOn: Bool) -> some View {
+    private func steps(_ steps: [String], backOn: Bool) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 Text("To rejoin class").textStyle(.label).textCase(.uppercase)
                     .foregroundStyle(Theme.textTertiary)
-                step("1", "Turn Screen Time back on for Bali", done: backOn)
-                step("2", "Tap your teacher's block again", done: false)
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, text in
+                    step("\(index + 1)", text, done: index == 0 && backOn)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

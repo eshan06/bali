@@ -62,6 +62,10 @@ struct ProtectionOffScreenTests {
             back.body
                 == "Tap your teacher's block again to rejoin class. Until then, your teacher sees 'Screen Time off'."
         )
+        // The steps back (#167): Screen Time on again puts the phone back by itself — the re-tap is
+        // the second step only where Screen Time reads on and that could not be done.
+        #expect(off.steps == ["Turn Screen Time back on for Bali", "Bali puts you back in class by itself"])
+        #expect(back.steps == ["Turn Screen Time back on for Bali", "Tap your teacher's block again"])
         #expect(words(try synced(.inSession(bell1042, .protectionOff), me: false))?.title == "Your class")
         for standing in [Standing.out, .waiting, .unread] {
             #expect(words(try synced(standing)) == nil, "\(standing)")
@@ -81,8 +85,8 @@ struct ProtectionOffScreenTests {
         let checking = try #require(words(off, checked(.notDetermined)))
         #expect(checking.way == .checking && checking.headline == "Checking Screen Time…")
         #expect(
-            checking.body
-                == "Your teacher sees 'Screen Time off' until you tap your teacher's block again.")
+            checking.body == "Your teacher sees 'Screen Time off' until it's back on.")
+        #expect(checking.steps.last == "Bali puts you back in class by itself")
     }
 
     @Test(
@@ -112,7 +116,7 @@ struct ProtectionOffScreenTests {
         let queued = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
         #expect(
             words(queued, checked(.notDetermined, unreported: true))?.body
-                == "Your teacher will see 'Screen Time off' until you tap your teacher's block again.")
+                == "Your teacher will see 'Screen Time off' until it's back on.")
     }
 
     @Test(
