@@ -116,6 +116,11 @@
             // Removed from her last class (#143): Ana, in a class on this phone before, is in none
             // now. Home, its card in the hero's place; a newcomer gets Join.
             "homeNoClasses": State(sync: standing(.out, me: ana(newcomer: true)), everInClass: true),
+            // There, a tap refused for anything but an unknown block (#160's review): the way on
+            // is the Try again beside it, as this Home has no Tap in.
+            "homeNoClassesTapStuck": State(
+                sync: refusedTap(standing(.out, me: ana(newcomer: true)), conflict: true),
+                everInClass: true),
             "history": State(tab: .history, history: anaHistory()),
             "historyEmpty": State(tab: .history, history: history(read: true)),
             "historyError": State(
@@ -375,19 +380,29 @@
             return state
         }
 
-        /// `state` with a scan of a block no teacher set up, refused (404) and so kept — and,
+        /// `state` with a scan of a block no teacher set up, refused (404) and so kept — or,
+        /// `conflict`, a tap refused for another reason (409, its id another event's) — and,
         /// `tappedSince`, a tap after it the server recorded (#146) — in an outbox of the fixture's
         /// own, each answer sent through the real client and settled as the engine does: only an
         /// outbox makes a stuck tap. On a task of its own, waited for, since a fixture is made at
         /// once: nothing the send or the settle does waits on the main thread.
-        private static func refusedTap(_ state: SyncState, tappedSince: Bool = false) -> SyncState {
+        private static func refusedTap(
+            _ state: SyncState, tappedSince: Bool = false, conflict: Bool = false
+        ) -> SyncState {
             final class Made: @unchecked Sendable { var state: SyncState? }
             let (made, done) = (Made(), DispatchSemaphore(value: 0))
             Task.detached { [state] in
-                // As the API answers them (`contracts/fixtures/taps`): an unknown block, then a
-                // tap recorded whose class is over now.
+                // As the API answers them (`contracts/fixtures/taps`): an unknown block, or an id
+                // another event holds, then a tap recorded whose class is over now.
+                let refused =
+                    conflict
+                    ? (
+                        "T7XK2M9QPF", 409,
+                        #"{"error":{"code":"conflict","reason":"event_id_conflict","message":"event_id already used by another event"}}"#
+                    )
+                    : ("NOCLASS123", 404, #"{"error":{"code":"not_found","message":"unknown block"}}"#)
                 let taps = [
-                    ("NOCLASS123", 404, #"{"error":{"code":"not_found","message":"unknown block"}}"#),
+                    refused,
                     ("T7XK2M9QPF", 200, #"{"outcome":"replay","session":null,"state":null}"#),
                 ].prefix(tappedSince ? 2 : 1)
                 var state = state

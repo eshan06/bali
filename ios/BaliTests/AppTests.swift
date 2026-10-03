@@ -66,15 +66,16 @@ struct AppTests {
         #expect(PreviewFixtures.chosen(from: ["Bali", "-bali-screen", "nope"]) == nil)
         let chosen = try #require(PreviewFixtures.chosen(from: ["Bali", "-bali-screen", "signIn"]))
         let phone = Phone(fixture: chosen)
-        #expect(phone.screen == .signIn)
+        #expect(phone.shown.screen == .signIn)
         await phone.start()
-        #expect(phone.engine == nil && phone.screen == .signIn)
+        #expect(phone.engine == nil && phone.shown.screen == .signIn)
         for (name, state) in PreviewFixtures.all {
-            let screen = String(describing: Phone(fixture: state).screen).prefix { $0 != "(" }
+            let screen = String(describing: Phone(fixture: state).shown.screen).prefix { $0 != "(" }
             #expect(name.hasPrefix(screen), "\(name): \(screen)")
         }
         let failed = Phone(fixture: try #require(PreviewFixtures.all["screenTimeError"]))
-        #expect(failed.screen == .screenTime && failed.askFailed?.words(.notDetermined) != nil)
+        #expect(failed.shown.screen == .screenTime)
+        #expect(failed.askFailed?.words(.notDetermined) != nil)
         await failed.askScreenTime()
         #expect(failed.askFailed?.words(.notDetermined) != nil)
         let previewing = Phone(fixture: try #require(PreviewFixtures.all["joinPreview"]))
@@ -107,7 +108,7 @@ struct AppTests {
         // Signed out mid-class: said beside the countdown, which still holds (C4's review).
         let out = Phone(fixture: try #require(PreviewFixtures.all["focusSignedOut"]))
         let said = FocusWords(try #require(out.sync), out.protection, now: Date(), signedIn: false)
-        #expect(out.screen == .focus && said.stalled != nil && said.claim == .paused)
+        #expect(out.shown.screen == .focus && said.stalled != nil && said.claim == .paused)
         // Unlocked (C5a, C5c): each fixture's reason card and way back, and the bell the router
         // chooses again at; a frozen phone's pick and Lock my apps again say it has not started.
         let unlockedCases: [(String, UnlockedWords.Picker?, Bool)] = [
@@ -129,13 +130,13 @@ struct AppTests {
         #expect(await unlocked.backToFocus() == Joining.notStarted)
         // Unlocked's Home (C5c): its tab bar, the apps still open, and its way back.
         let overUnlocked = Phone(fixture: try #require(PreviewFixtures.all["homeFromUnlocked"]))
-        #expect(overUnlocked.tabbed && overUnlocked.canGoBack)
+        #expect(overUnlocked.shown.tabbed && overUnlocked.canGoBack)
         overUnlocked.back()
-        #expect(overUnlocked.screen == .unlocked && !overUnlocked.tabbed)
+        #expect(overUnlocked.shown == (.unlocked, false))
         // Its Unlocked gone, the Home it opened is the router's own: its tab bar, no Back
         // (santa's round 1).
         let afterBell = Phone(fixture: PreviewFixtures.State(opened: [.home]))
-        #expect(afterBell.screen == .home && afterBell.tabbed && !afterBell.canGoBack)
+        #expect(afterBell.shown == (.home, true) && !afterBell.canGoBack)
         // Home's card for a class in session (C3c): not in it, and unlocked in it.
         for (name, unlocked, retap) in [
             ("homeInSession", false, false), ("homeFromUnlocked", true, false),
@@ -143,24 +144,24 @@ struct AppTests {
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             let card = phone.sync?.inSessionCard(at: Date())
-            #expect(phone.screen == .home && card?.unlocked == unlocked, "\(name)")
+            #expect(phone.shown.screen == .home && card?.unlocked == unlocked, "\(name)")
             #expect((card?.retap != nil) == retap, "\(name)")
         }
         // Waiting's Back to home (#151): the regular Home, its tab bar and no Back, its card the
         // wait's — never C3c's.
         let homeWaiting = Phone(fixture: try #require(PreviewFixtures.all["homeWaiting"]))
-        #expect(homeWaiting.screen == .home && homeWaiting.tabbed && !homeWaiting.canGoBack)
+        #expect(homeWaiting.shown == (.home, true) && !homeWaiting.canGoBack)
         #expect(homeWaiting.sync?.waitingCard != nil)
         #expect(homeWaiting.sync?.inSessionCard(at: Date()) == nil)
         // In no class any more (#143): Home, its tab bar and no Back, its card in the hero's
         // place, never C3c's or the wait's; a newcomer in no class gets Join.
         let noClasses = Phone(fixture: try #require(PreviewFixtures.all["homeNoClasses"]))
-        #expect(noClasses.screen == .home && noClasses.tabbed && !noClasses.canGoBack)
+        #expect(noClasses.shown == (.home, true) && !noClasses.canGoBack)
         #expect(noClasses.everInClass && noClasses.sync?.noClassesCard != nil)
         #expect(noClasses.sync?.inSessionCard(at: Date()) == nil)
         #expect(noClasses.sync?.waitingCard == nil && !noClasses.offersSignOut)
         let newcomer = Phone(fixture: try #require(PreviewFixtures.all["join"]))
-        #expect(newcomer.screen == .join && !newcomer.everInClass)
+        #expect(newcomer.shown.screen == .join && !newcomer.everInClass)
         // A pick told to wait for the unlock may go once it lands: those words go then, and no
         // other failure's do (santa's round 2).
         var standing = SyncState()
@@ -228,10 +229,17 @@ struct AppTests {
         let tappedSince = try #require(PreviewFixtures.all["homeTapRefusedThenTapped"]?.sync)
         #expect(tappedSince.queued.count == 1 && tappedSince.queued.first?.stuck == true)
         #expect(tappedSince.refusedTapWords == nil && tappedSince.lastTap != nil)
+        // In no class, a tap refused for anything but an unknown block (#160's review): its way on
+        // the Try again beside it, as this Home has no Tap in.
+        let noClassStuck = Phone(fixture: try #require(PreviewFixtures.all["homeNoClassesTapStuck"]))
+        #expect(noClassStuck.shown == (.home, true) && noClassStuck.sync?.noClassesCard != nil)
+        #expect(
+            noClassStuck.sync?.refusedTapWords
+                == "Bali couldn't record a tap. Try again, or ask your teacher.")
         let over = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
         #expect(over.sync?.sessionOverWords(over.protection)?.hasSuffix("All your apps are back.") == true)
         over.closeSessionOver()
-        #expect(over.screen == .home)
+        #expect(over.shown.screen == .home)
         // Done as a read puts the phone in a class whose bell has not rung: not the one that
         // ended, so nothing is closed — its own Session over stays to come (C5b's review).
         let racing = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
@@ -246,18 +254,19 @@ struct AppTests {
         // says where the phone stands.
         let seen = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
         seen.seeHistory()
-        #expect(seen.screen == .history && seen.tabbed)
+        #expect(seen.shown == (.history, true))
         var read = try #require(seen.sync)
         read.standing = .out
         seen.synced(read)
-        #expect(seen.screen == .history && seen.tabbed)
+        #expect(seen.shown == (.history, true))
         // Join opened before the bell (over a class's Home this build knows no state of) is left
         // behind: History, never the Join the router would show in its place (santa's round 1).
         let opened = Phone(fixture: try #require(PreviewFixtures.all["sessionOver"]))
         opened.open(.join)
         opened.joining.type("KWX")
         opened.seeHistory()
-        #expect(opened.screen == .history && opened.opened.isEmpty && opened.joining == Joining())
+        #expect(opened.shown.screen == .history && opened.opened.isEmpty)
+        #expect(opened.joining == Joining())
         // Me (C6b): D1's name card, editing it and a refused save; Sign out held over an unsent
         // unlock — pressed, nothing tried — and one that failed.
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
@@ -268,7 +277,7 @@ struct AppTests {
         let held = Phone(fixture: try #require(PreviewFixtures.all["meSignOutHeld"]))
         #expect(held.sync.flatMap(SignOutWords.held) != nil)
         await held.signOut()
-        #expect(held.signOutFailed == nil && held.screen == .me)
+        #expect(held.signOutFailed == nil && held.shown.screen == .me)
         #expect(me.sync.flatMap(SignOutWords.held) == nil)
         let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
         #expect(notOut.signOutFailed == SignOutWords.failed)
@@ -279,7 +288,7 @@ struct AppTests {
         }
         // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
         let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
-        #expect(off.screen == .me && off.tabbed && off.protection?.permissionOff == true)
+        #expect(off.shown == (.me, true) && off.protection?.permissionOff == true)
         // Leave (C6c): Period 3's question; the leave under way; the server's no said under it;
         // and Leave held while the phone stands in Period 3's lesson, never out of it. A frozen
         // phone's leave says it has not started, the question kept to try again; a change of who
@@ -287,7 +296,7 @@ struct AppTests {
         let asked = Phone(fixture: try #require(PreviewFixtures.all["meLeaveAsk"]))
         let period3 = try #require(asked.sync?.me?.classes.first)
         #expect(asked.leaving.asking == period3 && period3.enrollmentId == "e3")
-        #expect(!asked.leaving.busy && asked.screen == .me && asked.tabbed)
+        #expect(!asked.leaving.busy && asked.shown == (.me, true))
         await asked.leave()
         #expect(asked.leaving.failure == Joining.notStarted && asked.leaving.asking == period3)
         asked.signed(in: false)
@@ -296,7 +305,7 @@ struct AppTests {
         let refusedLeave = try #require(PreviewFixtures.all["meLeaveError"]).leaving
         #expect(refusedLeave.failure == Leaving.inSession(period3) && !refusedLeave.busy)
         let inLesson = Phone(fixture: try #require(PreviewFixtures.all["meLeaveInSession"]))
-        #expect(inLesson.screen == .me && inLesson.tabbed)
+        #expect(inLesson.shown == (.me, true))
         let lesson = try #require(inLesson.sync)
         #expect(Leaving.held(period3, lesson, now: Date()) == Leaving.inSession(period3))
         #expect(Leaving.held(period3, try #require(me.sync), now: Date()) == nil)
@@ -310,20 +319,20 @@ struct AppTests {
             [
                 "home", "homeLoading", "homeError", "homeUnread", "homeRefused", "homeFromUnlocked",
                 "homeFromUnlockedRetap", "homeInSession", "homeTapRefused", "homeTapRefusedThenTapped",
-                "homeWaiting", "homeNoClasses",
+                "homeWaiting", "homeNoClasses", "homeNoClassesTapStuck",
             ],
             ["meEditing", "meNameError"]
         )
         for (name, state) in PreviewFixtures.all {
             let me = name.hasPrefix("me") && !editing.contains(name)
             let tabbed = homes.contains(name) || name.hasPrefix("history") || me
-            #expect(Phone(fixture: state).tabbed == tabbed, "\(name)")
+            #expect(Phone(fixture: state).shown.tabbed == tabbed, "\(name)")
         }
         let phone = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         phone.select(.me)
-        #expect(phone.screen == .me)
+        #expect(phone.shown.screen == .me)
         phone.select(.history)
-        #expect(phone.screen == .history && phone.history == History())
+        #expect(phone.shown.screen == .history && phone.history == History())
         await phone.readHistory()
         #expect(phone.history.failure == Joining.notStarted)
         // Chosen again while it shows: as it was — its screen does not appear anew, so a history
@@ -337,30 +346,30 @@ struct AppTests {
         var state = try #require(phone.sync)
         state.heardAt = Date()
         phone.synced(state)
-        #expect(phone.screen == .history)
+        #expect(phone.shown.screen == .history)
         state.standing = .waiting
         phone.synced(state)
-        #expect(phone.tab == .home && phone.screen == .waiting && !phone.tabbed)
+        #expect(phone.tab == .home && phone.shown == (.waiting, false))
         #expect(phone.history.failure == Joining.notStarted)
         state.standing = .out
         phone.synced(state)
-        #expect(phone.screen == .home && phone.tabbed)
+        #expect(phone.shown == (.home, true))
         let signedOut = Phone(fixture: try #require(PreviewFixtures.all["history"]))
         signedOut.signed(in: false)
-        #expect(signedOut.screen == .signIn && signedOut.history == History())
+        #expect(signedOut.shown.screen == .signIn && signedOut.history == History())
         signedOut.signed(in: true)
-        #expect(signedOut.screen == .home && signedOut.tab == .home)
+        #expect(signedOut.shown.screen == .home && signedOut.tab == .home)
         // Me's Join a class opens Join over it — no tab bar there — and Back returns to Me.
         let fromMe = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         fromMe.open(.join)
-        #expect(fromMe.screen == .join && fromMe.canGoBack && !fromMe.tabbed)
+        #expect(fromMe.shown == (.join, false) && fromMe.canGoBack)
         fromMe.back()
-        #expect(fromMe.screen == .me && fromMe.tabbed)
+        #expect(fromMe.shown == (.me, true))
         // Me's name edited: no tab bar, Save and Cancel the ways on; cancelled, the bar is back.
         let named = Phone(fixture: try #require(PreviewFixtures.all["meEditing"]))
-        #expect(named.screen == .me && !named.tabbed)
+        #expect(named.shown == (.me, false))
         named.naming = Naming()
-        #expect(named.screen == .me && named.tabbed)
+        #expect(named.shown == (.me, true))
         // Mid-edit, a change of standing sends the tab Home (santa's round 1): Home keeps its bar,
         // and Me, chosen again, shows the edit as it was, without one.
         let away = Phone(fixture: try #require(PreviewFixtures.all["meEditing"]))
@@ -369,9 +378,37 @@ struct AppTests {
         away.synced(moved)
         moved.standing = .out
         away.synced(moved)
-        #expect(away.screen == .home && away.tabbed && away.naming.editing)
+        #expect(away.shown == (.home, true) && away.naming.editing)
         away.select(.me)
-        #expect(away.screen == .me && !away.tabbed && away.naming.name == "Ana R.")
+        #expect(away.shown == (.me, false) && away.naming.name == "Ana R.")
+    }
+
+    @Test(
+        "Me lets go of a class's Leave at its lesson's bell by itself (#134's review): drawn alone, with no router to choose again, it is drawn as Me is past that bell once the bell rings by the phone's clock — the line saying the class is in session gone, its Leave no longer dimmed — where before it, it was not",
+        .timeLimit(.minutes(3)))
+    func leaveAtTheBell() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let state = try #require(PreviewFixtures.all["meLeaveInSession"]?.sync)
+        let period3 = try #require(state.me?.classes.first)
+        /// Me in a window of its own, standing in Period 3's lesson, its bell at `bell`.
+        func me(ringing bell: Date) -> UIWindow {
+            var standing = state
+            standing.standing = .inSession(
+                SessionView(id: "session", classId: period3.id, endsAt: bell), nil)
+            let phone = Phone(fixture: PreviewFixtures.State(sync: standing, tab: .me))
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.screen.bounds
+            window.rootViewController = UIHostingController(rootView: MeView(phone: phone))
+            window.isHidden = false
+            window.layoutIfNeeded()
+            return window
+        }
+        let bell = Date() + 2
+        let (ringing, rung) = (me(ringing: bell), me(ringing: Date() - 60))
+        defer { (ringing.isHidden, rung.isHidden) = (true, true) }
+        let past = drawn(rung)
+        #expect(drawn(ringing) != past)
+        try await until { Date() > bell && drawn(ringing) == past }
     }
 
     @Test(
@@ -453,7 +490,7 @@ struct AppTests {
             #expect(phone.offersSignOut == offers, "\(name)")
         }
         let joinHeld = Phone(fixture: try #require(PreviewFixtures.all["joinSignOutHeld"]))
-        #expect(joinHeld.screen == .join && joinHeld.sync.flatMap(SignOutWords.held) != nil)
+        #expect(joinHeld.shown.screen == .join && joinHeld.sync.flatMap(SignOutWords.held) != nil)
         await joinHeld.signOut()
         #expect(joinHeld.signOutFailed == nil)
         // Signed out from Join: the code typed goes with who typed it.
@@ -592,20 +629,25 @@ struct AppTests {
     }
 
     @Test(
-        "Sign out through the phone's own sign-in and outbox (C6b-1's review): an Emergency Unlock the outbox file holds unsent, said and nothing tried; a Keychain that cannot forget the tokens now, said; forgotten, nothing said and nobody signed in — each try's words the last one's no more"
-    )
+        "Sign out through the phone's own sign-in and outbox (C6b-1's review): an Emergency Unlock the outbox file holds unsent, said and nothing tried — said while the file holds it, a state whose queue shows none changing nothing, and gone once it has gone, whether or not a queue the phone was given ever showed it (#129's review: its reads may fail throughout); a Keychain that cannot forget the tokens now, said; forgotten, nothing said and nobody signed in — each try's words the last one's no more",
+        .timeLimit(.minutes(3)))
     func signOutWiring() async throws {
-        let (held, engine) = try standIn(StandIn())
+        let (held, engine) = try standIn(Reasons())
         try await engine.record(.unlock(session: "s", reason: nil))
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
-        // Said where the engine's queue shows no unlock but the file holds one: an unrelated
-        // publish changes nothing; once a hold the queue showed ends, it goes (santa, 1 and 2).
+        // A state whose queue shows no unlock — as a failed read of the queue leaves it — while
+        // the file still holds one: still said.
         held.synced(SyncState())
+        #expect(await engine.unlockUnsent() == true)
         #expect(held.signOutFailed == SignOutWords.unsent)
-        held.synced(await engine.state)
+        // The unlock goes, never shown in a queue the phone was given: the words go with it.
+        let running = Task { await engine.run() }
+        try await until { await engine.unlockUnsent() == false }
         held.synced(SyncState())
-        #expect(held.signOutFailed == nil)
+        try await until { held.signOutFailed == nil }
+        running.cancel()
+        await running.value
         let keychain = Keychain(account: "ana")
         let (phone, _) = try standIn(StandIn(), keychain: keychain)
         keychain.locked = true
@@ -862,6 +904,42 @@ struct AppTests {
     }
 
     @Test(
+        "A pick on its way when the card moves to another unlock never holds the new card's picks back (#152's review): it lets go of its own hold as it ends, with nothing else to reset it — the new card's picks are written into its unlock, or sent, at once — and of nothing more, so the new card's changes still go one at a time, its answer landing among them",
+        .timeLimit(.minutes(3)))
+    func picksPastTheirCard() async throws {
+        let (phone, engine, server, running) = try await unlockRecorded()
+        // Nurse on its way for the first unlock; the student locks their apps again and unlocks
+        // anew, the card the second unlock's — Bathroom written into it, and it recorded.
+        let first = Task { await phone.pick(.nurse) }
+        try await until { await server.changes.count == 1 }
+        #expect(await phone.backToFocus() == nil)
+        try await until { await engine.state.queued.isEmpty }
+        phone.synced(await engine.state)
+        #expect(await phone.emergencyUnlock() == nil)
+        phone.synced(await engine.state)
+        await phone.pick(.bathroom)
+        try await until { await engine.state.recordedUnlock?.reason == .bathroom }
+        // Other on its way for the second; the first's answer lands; Nurse, picked meanwhile, only
+        // moves the check.
+        let second = Task { await phone.pick(.other) }
+        try await until { await server.changes.count == 2 }
+        await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        await first.value
+        await phone.pick(.nurse)
+        #expect(phone.picking == .nurse)
+        #expect(await server.changes.count == 2)
+        await server.answer(200, #"{"outcome":"applied","reason":"other"}"#)
+        try await until { await server.changes.count == 3 }
+        await server.answer(200, #"{"outcome":"applied","reason":"nurse"}"#)
+        await second.value
+        #expect(await server.changes.map(\.reason) == ["nurse", "other", "nurse"])
+        #expect(phone.picking == nil && phone.pickFailed == nil)
+        #expect(await engine.state.recordedUnlock?.reason == .nurse)
+        running.cancel()
+        await running.value
+    }
+
+    @Test(
         "Picks made one after another while the unlock is still on the phone are each written into it at once (C5a's hold): no change of the reason is sent, and the unlock goes with the newest",
         .timeLimit(.minutes(3)))
     func picksOnThePhone() async throws {
@@ -894,25 +972,25 @@ struct AppTests {
         let home = Phone(fixture: try #require(PreviewFixtures.all["home"]))
         home.open(.join)
         home.joining.type("KWX")
-        #expect(home.screen == .join)
+        #expect(home.shown.screen == .join)
         home.back()
-        #expect(home.screen == .home && home.joining.code.isEmpty)
+        #expect(home.shown.screen == .home && home.joining.code.isEmpty)
         let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
         let state = try #require(waiting.sync)
         waiting.open(.home)
         waiting.synced(state)
-        #expect(waiting.screen == .home && waiting.tabbed && !waiting.canGoBack)
+        #expect(waiting.shown == (.home, true) && !waiting.canGoBack)
         waiting.open(.join)
-        #expect(waiting.screen == .join && waiting.canGoBack)
+        #expect(waiting.shown.screen == .join && waiting.canGoBack)
         waiting.back()
-        #expect(waiting.screen == .home && waiting.tabbed && !waiting.canGoBack)
+        #expect(waiting.shown == (.home, true) && !waiting.canGoBack)
         waiting.open(.join)
         waiting.joining.type("KWX")
         var out = state
         out.standing = .out
         waiting.synced(out)
         waiting.synced(state)
-        #expect(waiting.opened.isEmpty && waiting.screen == .waiting)
+        #expect(waiting.opened.isEmpty && waiting.shown.screen == .waiting)
         #expect(waiting.joining.code.isEmpty)
         // No classes: waiting, Home and Join over it stay — an armed tap needs no enrollment;
         // out, Join is the router's own, keeping what was typed there (santa's round 2).
@@ -924,14 +1002,15 @@ struct AppTests {
         waiting.open(.home)
         waiting.open(.join)
         waiting.synced(armed)
-        #expect(waiting.opened == [.home, .join] && waiting.screen == .join)
+        #expect(waiting.opened == [.home, .join] && waiting.shown.screen == .join)
         let reading = Phone(fixture: try #require(PreviewFixtures.all["homeLoading"]))
         reading.open(.join)
         reading.joining.type("KWX")
         var noClasses = try #require(reading.sync)
         noClasses.me = none
         reading.synced(noClasses)
-        #expect(reading.opened.isEmpty && reading.screen == .join && reading.joining.code == "KWX")
+        #expect(reading.opened.isEmpty && reading.shown.screen == .join)
+        #expect(reading.joining.code == "KWX")
         await home.tapIn()
         #expect(home.tapFailed == Joining.notStarted && !home.scanning)
     }
@@ -943,13 +1022,13 @@ struct AppTests {
         let waiting = Phone(fixture: try #require(PreviewFixtures.all["waiting"]))
         #expect(!waiting.canGoBack)
         waiting.open(.home)
-        #expect(waiting.screen == .home && !waiting.canGoBack)
+        #expect(waiting.shown.screen == .home && !waiting.canGoBack)
         #expect(!Phone(fixture: try #require(PreviewFixtures.all["home"])).canGoBack)
         #expect(Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"])).canGoBack)
         // Opened over Home, but the shields on: focus, which has no way back.
         let focused = Phone(fixture: try #require(PreviewFixtures.all["focus"]))
         focused.open(.join)
-        #expect(focused.screen == .focus && !focused.canGoBack)
+        #expect(focused.shown.screen == .focus && !focused.canGoBack)
     }
 
     @Test(
@@ -961,16 +1040,16 @@ struct AppTests {
             let phone = Phone(fixture: waiting)
             phone.open(.home)
             phone.select(tab)
-            #expect(phone.screen == tab && phone.tabbed, "\(tab)")
+            #expect(phone.shown == (tab, true), "\(tab)")
             var started = try #require(phone.sync)
             started.standing = .inSession(
                 SessionView(id: "s", classId: "p3", endsAt: Date() + 600), .focused)
             phone.synced(started)
-            #expect(phone.screen == .focus && !phone.tabbed, "\(tab)")
+            #expect(phone.shown == (.focus, false), "\(tab)")
             #expect(phone.opened.isEmpty && phone.tab == .home, "\(tab)")
         }
         let opened = Phone(fixture: waiting)
-        #expect(opened.screen == .waiting && !opened.tabbed && !opened.canGoBack)
+        #expect(opened.shown == (.waiting, false) && !opened.canGoBack)
     }
 
     @Test(
@@ -1017,14 +1096,14 @@ struct AppTests {
                     joinCode: "KWX49Q", eventId: EventID.mint(at: now), deviceTime: now))
         }
         let phone = Phone(fixture: try #require(PreviewFixtures.all["joinFromHome"]))
-        #expect(phone.screen == .join)
+        #expect(phone.shown.screen == .join)
         let none = #"{"error":{"code":"not_found","reason":"class_not_found","message":"none"}}"#
         phone.joined(await answer(404, none))
-        #expect(phone.screen == .join && phone.opened == [.join])
+        #expect(phone.shown.screen == .join && phone.opened == [.join])
         #expect(phone.joining.failure == Joining.words(.status(404), .classNotFound))
         let joined = #"{"outcome":"joined","enrollmentId":"e","class":{"id":"c","name":"Class c"}}"#
         phone.joined(await answer(200, joined))
-        #expect(phone.screen == .home && phone.opened.isEmpty && phone.joining == Joining())
+        #expect(phone.shown.screen == .home && phone.opened.isEmpty && phone.joining == Joining())
     }
 
     @Test(
@@ -1113,7 +1192,7 @@ struct AppTests {
         try await until { textFields(in: window).first?.isFirstResponder == true }
         let field = try #require(textFields(in: window).first)
         phone.back()
-        #expect(phone.screen == .home && !field.isFirstResponder)
+        #expect(phone.shown.screen == .home && !field.isFirstResponder)
         // Each render through the fade, which SwiftUI keeps Join for, its focus still asked for,
         // and past its end: no field has the keyboard back.
         var taken = false
@@ -1210,20 +1289,20 @@ struct AppTests {
             return protection
         }
         let phone = Phone(fixture: try #require(PreviewFixtures.all["screenTime"]))
-        #expect(!phone.everApproved && phone.screen == .screenTime)
+        #expect(!phone.everApproved && phone.shown.screen == .screenTime)
         phone.remember(read(.notDetermined))
         #expect(!phone.everApproved && !Phone().everApproved)
         phone.remember(read(.approved))
-        #expect(phone.everApproved && Phone().everApproved && phone.screen == .home)
+        #expect(phone.everApproved && Phone().everApproved && phone.shown.screen == .home)
         phone.remember(read(.notDetermined))
-        #expect(phone.everApproved && phone.screen == .home)
+        #expect(phone.everApproved && phone.shown.screen == .home)
         // Not determined for the grace: never granted, access off, or a grant that did not come
         // back with a restored backup, which restores these defaults.
         phone.remember(read(.notDetermined, off: true))
-        #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
+        #expect(!phone.everApproved && !Phone().everApproved && phone.shown.screen == .screenTime)
         phone.remember(read(.approved))
         phone.remember(read(.denied, off: true))
-        #expect(!phone.everApproved && !Phone().everApproved && phone.screen == .screenTime)
+        #expect(!phone.everApproved && !Phone().everApproved && phone.shown.screen == .screenTime)
     }
 
     @Test(
@@ -1258,9 +1337,9 @@ struct AppTests {
         phone.joining.type("KWX")
         state.me = try me("ana")
         phone.synced(state)
-        #expect(phone.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
+        #expect(phone.shown.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
         phone.back()
-        #expect(phone.screen == .home && phone.tabbed && !phone.canGoBack)
+        #expect(phone.shown == (.home, true) && !phone.canGoBack)
         #expect(phone.everInClass && phone.sync?.noClassesCard != nil)
         // Its own Join a class, then History chosen: a read saying none again, as each return to
         // the front makes, closes neither.
@@ -1268,18 +1347,18 @@ struct AppTests {
         phone.joining.type("KWX")
         state.heardAt = Date() + 1
         phone.synced(state)
-        #expect(phone.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
+        #expect(phone.shown.screen == .join && phone.canGoBack && phone.joining.code == "KWX")
         phone.back()
         phone.select(.history)
         state.heardAt = Date() + 2
         phone.synced(state)
-        #expect(phone.screen == .history && phone.tabbed)
+        #expect(phone.shown == (.history, true))
         // Ana signed out and back in, still in no class: still Home.
         phone.signed(in: true, as: "ana")
         phone.signed(in: false)
         phone.signed(in: true, as: "ana")
         phone.synced(state)
-        #expect(phone.screen == .home && phone.tabbed && phone.inClass == "ana")
+        #expect(phone.shown == (.home, true) && phone.inClass == "ana")
         // Bea signs in, in no class: Join, a late read of Ana's classes landing after her
         // sign-in included; listed in a class herself, Bea is the one kept.
         phone.signed(in: true, as: "bea")
@@ -1287,7 +1366,7 @@ struct AppTests {
         phone.synced(state)
         state.me = try me("bea")
         phone.synced(state)
-        #expect(phone.screen == .join && !phone.tabbed && phone.inClass == "ana")
+        #expect(phone.shown == (.join, false) && phone.inClass == "ana")
         state.me = try me("bea", period3)
         phone.synced(state)
         #expect(phone.inClass == "bea")
@@ -1297,9 +1376,9 @@ struct AppTests {
         leaving.synced(left)
         left.me = try me("ana")
         leaving.synced(left)
-        #expect(leaving.screen == .me && leaving.tabbed)
+        #expect(leaving.shown == (.me, true))
         leaving.select(.home)
-        #expect(leaving.screen == .home && leaving.sync?.noClassesCard != nil)
+        #expect(leaving.shown.screen == .home && leaving.sync?.noClassesCard != nil)
     }
 
     @Test(
@@ -1354,10 +1433,10 @@ struct AppTests {
         defer { defaults.set(before, forKey: Phone.introSeenKey) }
         defaults.removeObject(forKey: Phone.introSeenKey)
         let phone = Phone()
-        #expect(!phone.introSeen && phone.screen == .intro)
+        #expect(!phone.introSeen && phone.shown.screen == .intro)
         phone.sawIntro()
         #expect(phone.introSeen && Phone().introSeen)
-        #expect(phone.screen == .starting)
+        #expect(phone.shown.screen == .starting)
     }
 
     @Test(
@@ -1477,6 +1556,14 @@ private final class TestsBundle {}
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
     [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+}
+
+/// `window` as the screen would show it now: its pixels, drawn after any update due.
+@MainActor
+private func drawn(_ window: UIWindow) -> Data? {
+    UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+        _ = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+    }.pngData()
 }
 
 /// Every text field in `view`, itself among them, outermost first.

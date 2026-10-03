@@ -204,15 +204,15 @@ struct SignOutButton: View {
 }
 
 /// D1's Leave on a class of Me's (C6c): it asks its question under the class. Held, dimmed, while
-/// the phone stands in that class's lesson (`Leaving.held`, said under the class); none for a class
-/// named with no enrollment to leave by.
+/// the phone stands in that class's lesson (`held`, `Leaving.held` as `ClassesSection` judges it,
+/// said under the class); none for a class named with no enrollment to leave by.
 struct LeaveButton: View {
     let row: MeClass
     let phone: Phone
+    let held: String?
 
     var body: some View {
         if row.enrollmentId != nil {
-            let held = phone.sync.flatMap { Leaving.held(row, $0, now: Date()) }
             let waits = held != nil || phone.leaving.busy
             Button("Leave") { phone.leaving.ask(row) }
                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
@@ -223,16 +223,17 @@ struct LeaveButton: View {
     }
 }
 
-/// Under a class of Me's (C6c): why its Leave is held; or, once pressed, its question — the class
-/// named, what leaving costs, why the last try did not finish — with Leave class, the way to try
-/// again, and Cancel.
+/// Under a class of Me's (C6c): why its Leave is held (`held`, as `ClassesSection` judges it); or,
+/// once pressed, its question — the class named, what leaving costs, why the last try did not
+/// finish — with Leave class, the way to try again, and Cancel.
 struct LeaveQuestion: View {
     let row: MeClass
     let phone: Phone
+    let held: String?
 
     var body: some View {
         let leaving = phone.leaving
-        if let held = phone.sync.flatMap({ Leaving.held(row, $0, now: Date()) }) {
+        if let held {
             Text(held).textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.bottom, 12)

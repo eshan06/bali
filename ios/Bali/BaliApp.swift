@@ -108,6 +108,9 @@ final class Phone {
     /// finish (rule 5).
     var naming = Naming()
     private(set) var signOutFailed: String?
+    /// Counts Sign out's presses: an ask of the outbox file begun before one says nothing of its
+    /// words (`synced`).
+    private var signOutTries = 0
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
     var leaving = Leaving()
@@ -115,8 +118,10 @@ final class Phone {
     /// answered, and why the last did not go.
     private(set) var picking: UnlockReason?
     private(set) var pickFailed: String?
-    /// Whether a pick is on its way: one made meanwhile only moves the check (#140).
-    private var pickSending = false
+    /// The card a pick is on its way for: another made on it meanwhile only moves the check (#140),
+    /// and one on a later card goes. Its loop's own, let go as the loop ends, whichever way, so
+    /// nothing else resets it (#152's review).
+    private var pickSending: Int?
     /// Counts the unlocks Unlocked's card has been about: a pick on its way for one the card has
     /// left says and sends nothing more (#140, santa's round 1).
     private var cards = 0
@@ -165,7 +170,7 @@ final class Phone {
     /// at a bell either (C6a's review). The bar shows wherever the router honours a tab, but while
     /// Me shows its name being edited, whose ways on are Save and Cancel, and whose keyboard it
     /// would otherwise ride above (C6b). Anywhere else — Home, where a change of standing sends the
-    /// tab mid-edit — it shows. A view drawing both reads this once.
+    /// tab mid-edit — it shows. A view or a test reading both reads this once (#129's review).
     var shown: (screen: Screen, tabbed: Bool) {
         let shown = choose(opened)
         return (shown.screen, shown.tabbed && !(naming.editing && shown.screen == .me))
@@ -180,8 +185,7 @@ final class Phone {
             now: Date())
     }
 
-    var screen: Screen { shown.screen }
-    var tabbed: Bool { shown.tabbed }
+    private var screen: Screen { shown.screen }
 
     /// A tab chosen (C6a) — or `synced`'s Home. The history read is kept (#141): History shows it
     /// at once, and its screen reads the newest page again each time it shows (`refreshHistory`).
@@ -316,7 +320,7 @@ final class Phone {
     func signOut() async {
         // The last try's words go, whatever this one does: never two reasons at once (C6b-1's
         // review).
-        signOutFailed = nil
+        (signOutFailed, signOutTries) = (nil, signOutTries + 1)
         guard sync.flatMap(SignOutWords.held) == nil else { return }
         guard let signIn, let engine else { return signOutFailed = Joining.notStarted }
         switch await engine.unlockUnsent() {
@@ -408,7 +412,6 @@ final class Phone {
             keepInClass(me.user.id)
         }
         let keeps = state.keepsOpened(from: sync, at: Date(), everInClass: listed(state.me))
-        let wasHeld = sync.flatMap(SignOutWords.held) != nil
         // The unlock landed: a pick said to wait for it may go now (santa's round 1).
         if pickFailed == UnlockedWords.onItsWay, state.recordedUnlock != sync?.recordedUnlock {
             pickFailed = nil
@@ -416,14 +419,20 @@ final class Phone {
         // The card is about another unlock, or none: a pick waiting for the last one goes with it,
         // never to the next, and so does its check (#140, santa's round 1).
         if UnlockedWords(state)?.unlock != sync.flatMap({ UnlockedWords($0) })?.unlock {
-            (picking, pickSending, cards) = (nil, false, cards + 1)
+            (picking, cards) = (nil, cards + 1)
         }
         sync = state
-        // An unlock that held Sign out has gone: saying it has not would be stale — but only once
-        // a hold ends: "unsent" is said where the file holds one the engine's queue does not show,
-        // which the next publish would not change (Riders-2's santa, rounds 1 and 2).
-        if signOutFailed == SignOutWords.unsent, wasHeld, SignOutWords.held(state) == nil {
-            signOutFailed = nil
+        // "Unsent" is said where the file holds an unlock the engine's queue does not show
+        // (`signOut`): at each state whose queue shows none, the file is asked again, and the
+        // words go once it holds none — the unlock gone, whether or not a queue ever showed it,
+        // its reads failing throughout (#129's review) — never while it still does (Riders-2's
+        // santa), nor over a Sign out pressed since.
+        if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil, let engine {
+            let tries = signOutTries
+            Task {
+                guard await engine.unlockUnsent() == false, tries == signOutTries else { return }
+                signOutFailed = nil
+            }
         }
         guard !keeps else { return }
         pickFailed = nil
@@ -538,17 +547,22 @@ final class Phone {
     func pick(_ reason: UnlockReason) async {
         guard let engine else { return pickFailed = Joining.notStarted }
         (picking, pickFailed) = (reason, nil)
-        guard !pickSending else { return }
-        pickSending = true
+        guard pickSending != cards else { return }
         let card = cards
+        pickSending = card
         var sent: UnlockReason?
         while let next = picking, next != sent {
             sent = next
             let failed = await engine.explain(next)
-            guard card == cards else { return }
+            // The card has left the unlock it was made for: nothing more said or sent, and the
+            // hold let go — never one a pick on the card since holds.
+            guard card == cards else {
+                if pickSending == card { pickSending = nil }
+                return
+            }
             if picking == next { pickFailed = failed }
         }
-        (pickSending, picking) = (false, nil)
+        (pickSending, picking) = (nil, nil)
     }
 
     /// Back to focus from an Emergency Unlock (C5a) — or what the Unlocked screen says (rule 5).

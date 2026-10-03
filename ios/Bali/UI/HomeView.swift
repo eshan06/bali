@@ -196,15 +196,20 @@ struct HomeView: View {
 /// The student's classes as `GET /v1/me` names them, each with its teacher — or, until a read
 /// answers, why not — and Join a class, opened over the screen with a way back: Home's (C3) and
 /// Me's (C6b), under `title`. Me's, `leaves`, has D1's Leave on each class, its question under
-/// it, and D1's line under them (C6c).
+/// it, and D1's line under them (C6c) — a class's Leave held while the phone stands in its lesson,
+/// judged once for the class, so its button and its line agree, and again at the lesson's bell.
 struct ClassesSection: View {
     let phone: Phone
     let title: String
     var leaves = false
+    /// The bell of the lesson the phone stands in, rung: a Leave held for it is let go then, by
+    /// the phone's clock, as Home's card goes at its own (#134's review).
+    @State private var rung: Date?
 
     private var me: MeResponse? { phone.sync?.me }
 
     var body: some View {
+        let _ = rung
         VStack(alignment: .leading, spacing: 8) {
             Text(title).textStyle(.label).textCase(.uppercase)
                 .foregroundStyle(Theme.textTertiary)
@@ -214,6 +219,9 @@ struct ClassesSection: View {
                 Card(padding: 0) {
                     VStack(spacing: 0) {
                         ForEach(Array(me.classes.enumerated()), id: \.element.id) { index, row in
+                            let held =
+                                leaves
+                                ? phone.sync.flatMap { Leaving.held(row, $0, now: Date()) } : nil
                             if index > 0 { Rectangle().fill(Theme.border).frame(height: 1) }
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -226,13 +234,13 @@ struct ClassesSection: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityElement(children: .combine)
-                                if leaves { LeaveButton(row: row, phone: phone) }
+                                if leaves { LeaveButton(row: row, phone: phone, held: held) }
                             }
                             // Clear of the hairlines once the text size outgrows D1's 60.
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
                             .padding(.horizontal, 16)
-                            if leaves { LeaveQuestion(row: row, phone: phone) }
+                            if leaves { LeaveQuestion(row: row, phone: phone, held: held) }
                         }
                     }
                 }
@@ -255,6 +263,11 @@ struct ClassesSection: View {
                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                 .foregroundStyle(Theme.brand).frame(minHeight: 44)
             }
+        }
+        .task(id: leaves ? phone.bell : nil) {
+            guard leaves, let bell = phone.bell else { return }
+            await Screen.bell(bell, change: UIApplication.significantTimeChangeNotification)
+            if !Task.isCancelled { rung = bell }
         }
     }
 }
