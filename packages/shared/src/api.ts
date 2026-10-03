@@ -308,7 +308,8 @@ export interface UnlockReasonResponse {
 }
 
 // POST /v1/sessions/{id}/refocus — return to focus after an unlock (needs a live participation).
-// Refused (409) while protection is off: only a re-tap, which re-shields, leaves that state.
+// Refused (409) while protection is off: a re-tap, which re-shields, or Screen Time back on
+// (`…/protection-on`, #167) leaves that state.
 export interface RefocusRequest {
   eventId: string;
   deviceTime: string;
@@ -349,7 +350,8 @@ export interface RefocusResponse {
 // instead (owner decision 10): 'recorded', with no session and no state —
 // nothing to shield to. Every other report after the end is still a 409,
 // including the retry of one that landed while the session ran (it is on
-// record). Leaving the state takes a re-tap — refocus is refused from it.
+// record). Leaving the state takes a re-tap or Screen Time back on (#167) —
+// refocus is refused from it.
 export interface ProtectionOffRequest {
   /** Client idempotency key for the protection_off event (rule 4). */
   eventId: string;
@@ -380,6 +382,39 @@ export interface ProtectionOffResponse {
    * early end its endsAt is still ahead, and no answer may hand a phone a
    * window to shield to.
    */
+  session: SessionView | null;
+}
+
+// POST /v1/sessions/{id}/protection-on — Screen Time back on, in the class the
+// student tapped into (#167, the owner's decision 2026-10-02): out of
+// protection off to the state before it, with no re-tap — focused, or unlocked
+// where their latest turn there is an unlock — recorded as its own event.
+// Strict like refocus: a live participation in protection off, in a session
+// running by the server's clock, or a 409 (`protection_not_off`, nothing
+// recorded, where it is not in protection off). One the phone made before a
+// protection off of its own the server already has is late: recorded, never
+// applied, and answered as its retry is.
+export interface ProtectionOnRequest {
+  /** Client idempotency key for the protection_on event (rule 4). */
+  eventId: string;
+  /** Device clock, ISO 8601; clamped into the session window server-side. */
+  deviceTime: string;
+  /** The phone's own order (A12): what orders it against the student's protection off. */
+  order?: ActionOrder | null;
+}
+/** Every outcome Screen Time back on answers with (`ProtectionOnResponse.outcome`). */
+export const PROTECTION_ON_OUTCOMES = ['applied', 'replay'] as const;
+export type ProtectionOnOutcome = (typeof PROTECTION_ON_OUTCOMES)[number];
+export interface ProtectionOnResponse {
+  /** `replay` is also the answer to a late one, as a late refocus's is (A13). */
+  outcome: ProtectionOnOutcome;
+  /**
+   * The state it returned the student to when applied — `focused` or
+   * `unlocked`; the current stored state on a replay. Null on the replay of one
+   * whose participation has since ended while the session runs (A4).
+   */
+  state: ParticipationState | null;
+  /** The running session, for reconciliation; null on that replay (`stateChangeDisposition`: 'reread'). */
   session: SessionView | null;
 }
 
@@ -580,7 +615,9 @@ export interface SnapshotStudent {
    * a return, never counts — or null. `state` does not always show it:
    * the engine records an unlock without flipping the row when protection is
    * off (never softened into an unlock), when no participation is live, and
-   * after the end — the grid reads it here as it reads the unlock event.
+   * after the end — the grid reads it here as it reads the unlock event. One
+   * noted `protection_off` can sit on an `unlocked` row too: Screen Time back on
+   * (#167) returned the student to it, and there the row is the truth.
    */
   unlock: SnapshotUnlock | null;
   /**

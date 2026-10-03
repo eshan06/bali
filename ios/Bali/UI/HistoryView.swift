@@ -147,12 +147,14 @@ private struct ClassCard: View {
 
     /// A moment's state, whose ink its icon takes (DESIGN.md's states), and D1's icon for it: in
     /// focus, unlocked, Screen Time off, not in — a declined tap — and an end, of the class or of
-    /// being in it.
+    /// being in it. Screen Time back on (#167) has no artboard: Screen Time off's shield, whole, in
+    /// a neutral ink, since it returns the student to focus or to an unlock.
     private func look(_ type: HistoryEventType) -> (Chip.Kind, String) {
         switch type {
         case .tapIn, .refocus: (.focused, "checkmark.circle")
         case .unlock: (.unlocked, "lock.open")
         case .protectionOff: (.protectionOff, "shield.slash")
+        case .protectionOn: (.notIn, "shield")
         case .armedTapSkipped: (.notIn, "circle")
         case .sessionEnded, .sessionExpired, .leftForOtherSession, .enrollmentLeft,
             .enrollmentRemoved:

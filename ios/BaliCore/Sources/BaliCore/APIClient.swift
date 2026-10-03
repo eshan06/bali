@@ -208,6 +208,14 @@ public struct APIClient: Sendable {
         await send("POST", "/v1/sessions/\(escaped(id))/protection-off", request)
     }
 
+    /// `POST /v1/sessions/{id}/protection-on` — Screen Time back on (#167), for
+    /// `stateChangeDisposition`.
+    public func protectionOn(session id: String, _ request: ProtectionOnRequest) async
+        -> APIResponse<ProtectionOnResponse>
+    {
+        await send("POST", "/v1/sessions/\(escaped(id))/protection-on", request)
+    }
+
     /// `POST /v1/enrollments` — join a class by its code.
     public func join(_ request: EnrollmentJoinRequest) async -> APIResponse<EnrollmentJoinResponse>
     {

@@ -53,6 +53,7 @@ enum Contract {
         "UnlockReasonResponse": UnlockReasonResponse.self,
         "RefocusResponse": RefocusResponse.self,
         "ProtectionOffResponse": ProtectionOffResponse.self,
+        "ProtectionOnResponse": ProtectionOnResponse.self,
         "EnrollmentJoinResponse": EnrollmentJoinResponse.self,
         "EndEnrollmentResponse": EndEnrollmentResponse.self,
         "JoinCodePreviewResponse": JoinCodePreviewResponse.self,
@@ -70,6 +71,7 @@ enum Contract {
         "PATCH /v1/unlocks/{eventId}": UnlockReasonRequest.self,
         "POST /v1/sessions/{id}/refocus": RefocusRequest.self,
         "POST /v1/sessions/{id}/protection-off": ProtectionOffRequest.self,
+        "POST /v1/sessions/{id}/protection-on": ProtectionOnRequest.self,
         "POST /v1/enrollments": EnrollmentJoinRequest.self,
         "DELETE /v1/enrollments/{id}": EndEnrollmentRequest.self,
     ]
@@ -97,6 +99,11 @@ enum Contract {
         "POST /v1/sessions/{id}/protection-off": { status, body in
             stateChangeDisposition(
                 .status(status), try answer(ProtectionOffResponse.self, status, body)
+            ).rawValue
+        },
+        "POST /v1/sessions/{id}/protection-on": { status, body in
+            stateChangeDisposition(
+                .status(status), try answer(ProtectionOnResponse.self, status, body)
             ).rawValue
         },
     ]

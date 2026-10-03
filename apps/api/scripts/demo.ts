@@ -347,7 +347,8 @@ async function main(): Promise<void> {
       );
       console.log(`  live: protection_off for Ana arrived on the stream at seq ${liveOff.seq}.`);
 
-      // Refocus cannot leave it: her shields are gone, and only a re-tap re-shields.
+      // Refocus cannot leave it: her shields are gone. A re-tap re-shields, below; Screen Time
+      // turned back on leaves it too (#167), which the API's tests walk, not this demo.
       const refused = await call<ApiErrorBody>('POST', `/v1/sessions/${sid}/refocus`, {
         token: ana.token,
         body: { eventId: randomUUID(), deviceTime: iso() },

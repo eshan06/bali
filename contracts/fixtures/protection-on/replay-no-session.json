@@ -1,0 +1,23 @@
+{
+  "endpoint": "POST /v1/sessions/{id}/protection-on",
+  "scenario": "The retry of Screen Time back on, after the student was removed (A4): recorded, no session.",
+  "request": {
+    "path": "/v1/sessions/00000000-0000-7000-8000-000000000001/protection-on",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000002",
+      "deviceTime": "2000-01-01T00:01:00.000Z",
+      "order": {
+        "install": "00000000-0000-7000-8000-000000000003",
+        "seq": 1
+      }
+    }
+  },
+  "status": 200,
+  "type": "ProtectionOnResponse",
+  "body": {
+    "outcome": "replay",
+    "state": null,
+    "session": null
+  },
+  "disposition": "reread"
+}

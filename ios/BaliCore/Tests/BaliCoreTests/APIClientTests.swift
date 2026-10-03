@@ -132,6 +132,13 @@ struct APIClientFixtureTests {
                 response, fixture,
                 stateChangeDisposition(response.result, response.answer).rawValue)
         },
+        "POST /v1/sessions/{id}/protection-on": { client, fixture in
+            let request = try fixture.sent(ProtectionOnRequest.self)
+            let response = await client.protectionOn(session: fixture.parameter, request)
+            return try answered(
+                response, fixture,
+                stateChangeDisposition(response.result, response.answer).rawValue)
+        },
         "POST /v1/enrollments": { client, fixture in
             let request = try fixture.sent(EnrollmentJoinRequest.self)
             return try answered(await client.join(request), fixture)
@@ -257,6 +264,13 @@ struct APIClientTests {
         "protection off": { client in
             let r = await client.protectionOff(
                 session: "s1", ProtectionOffRequest(eventId: "e1", deviceTime: at))
+            return Sent(
+                result: r.result, noAnswer: r.noAnswer, error: r.error,
+                disposition: stateChangeDisposition(r.result, r.answer).rawValue)
+        },
+        "protection on": { client in
+            let r = await client.protectionOn(
+                session: "s1", ProtectionOnRequest(eventId: "e1", deviceTime: at))
             return Sent(
                 result: r.result, noAnswer: r.noAnswer, error: r.error,
                 disposition: stateChangeDisposition(r.result, r.answer).rawValue)

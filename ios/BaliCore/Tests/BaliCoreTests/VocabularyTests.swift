@@ -55,6 +55,7 @@ struct VocabularyTests {
         ("api.ts", "REFOCUS_OUTCOMES", values(RefocusResponse.Outcome.self)),
         ("api.ts", "UNLOCK_REASON_OUTCOMES", values(UnlockReasonResponse.Outcome.self)),
         ("api.ts", "PROTECTION_OFF_OUTCOMES", values(ProtectionOffResponse.Outcome.self)),
+        ("api.ts", "PROTECTION_ON_OUTCOMES", values(ProtectionOnResponse.Outcome.self)),
         ("api.ts", "ENROLLMENT_JOIN_OUTCOMES", values(EnrollmentJoinResponse.Outcome.self)),
         ("api.ts", "END_ENROLLMENT_OUTCOMES", values(EndEnrollmentResponse.Outcome.self)),
         ("api.ts", "END_ENROLLMENT_REASONS", values(EndEnrollmentResponse.Reason.self)),

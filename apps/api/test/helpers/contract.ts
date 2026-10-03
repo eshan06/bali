@@ -22,6 +22,8 @@ import {
   PROTECTION_OFF_OUTCOMES,
   PROTECTION_OFF_RECORDED_AS,
   type ProtectionOffResponse,
+  PROTECTION_ON_OUTCOMES,
+  type ProtectionOnResponse,
   REFOCUS_OUTCOMES,
   type RefocusResponse,
   type SessionView,
@@ -66,6 +68,7 @@ interface Contract {
   UnlockReasonResponse: UnlockReasonResponse;
   RefocusResponse: RefocusResponse;
   ProtectionOffResponse: ProtectionOffResponse;
+  ProtectionOnResponse: ProtectionOnResponse;
   EnrollmentJoinResponse: EnrollmentJoinResponse;
   EndEnrollmentResponse: EndEnrollmentResponse;
   JoinCodePreviewResponse: JoinCodePreviewResponse;
@@ -174,6 +177,11 @@ export const SCHEMAS = {
     state: state.nullable(),
     session: sessionView.nullable(),
   }),
+  ProtectionOnResponse: object<ProtectionOnResponse>()({
+    outcome: z.enum(PROTECTION_ON_OUTCOMES),
+    state: state.nullable(),
+    session: sessionView.nullable(),
+  }),
   EnrollmentJoinResponse: object<EnrollmentJoinResponse>()({
     outcome: z.enum(ENROLLMENT_JOIN_OUTCOMES),
     enrollmentId: z.uuid(),
@@ -237,6 +245,7 @@ export const ENDPOINTS: Record<
   'POST /v1/taps/{eventId}/unlock': { type: 'UnlockResponse', outbox: 'unlock' },
   'POST /v1/sessions/{id}/refocus': { type: 'RefocusResponse', outbox: 'change' },
   'POST /v1/sessions/{id}/protection-off': { type: 'ProtectionOffResponse', outbox: 'change' },
+  'POST /v1/sessions/{id}/protection-on': { type: 'ProtectionOnResponse', outbox: 'change' },
   'POST /v1/enrollments': { type: 'EnrollmentJoinResponse' },
   'DELETE /v1/enrollments/{id}': { type: 'EndEnrollmentResponse' },
   'GET /v1/join-codes/{code}': { type: 'JoinCodePreviewResponse' },

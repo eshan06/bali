@@ -26,14 +26,15 @@
         }
 
         /// Writes the marker — explicit content not denied: the least any store can say, so it
-        /// restricts nothing — and its flag, which is set only once the marker reads back, so a
-        /// marker iOS would not keep never reads as access taken back; and forgets the monitor's
-        /// note. After an authorization iOS confirmed, only.
+        /// restricts nothing — and its flag and the monitor's note by `written`'s rule: the flag
+        /// set, and the note forgotten, only once the marker reads back. After an authorization
+        /// iOS confirmed, only.
         public static func write() {
             let store = ManagedSettingsStore(named: .baliMarker)
             store.media.denyExplicitContent = false
-            shared?.set(store.media.denyExplicitContent != nil, forKey: "markerWritten")
-            lostAt = nil
+            let after = written(readBack: store.media.denyExplicitContent != nil, note: lostAt)
+            shared?.set(after.flag, forKey: "markerWritten")
+            lostAt = after.note
         }
 
         /// When the monitor, woken with the app closed, first found the marker gone since it was
@@ -43,16 +44,15 @@
             set { shared?.set(newValue, forKey: "markerLostAt") }
         }
 
-        /// The monitor's look at the marker at a wake: gone, with the shields' store empty too — as
-        /// iOS leaves both, so a store still holding shields is a misread, never a revocation —
-        /// it is noted at `date`, the first such wake's time kept. Whether it was gone.
+        /// The monitor's look at the marker at a wake, by `noting`'s rule — gone, with the shields'
+        /// store empty too, it is noted at `date`, the first such wake's time kept. Whether it was
+        /// gone.
         public static func noted(at date: Date) -> Bool {
             let shield = ManagedSettingsStore(named: .bali).shield
-            guard now == .missing, shield.applicationCategories == nil,
-                shield.webDomainCategories == nil
-            else { return false }
-            if lostAt == nil { lostAt = date }
-            return true
+            let shielded = shield.applicationCategories != nil || shield.webDomainCategories != nil
+            let look = noting(now, shielded: shielded, note: lostAt, at: date)
+            if look.note != lostAt { lostAt = look.note }
+            return look.lost
         }
 
         private static var shared: UserDefaults? { UserDefaults(suiteName: Outbox.appGroup) }

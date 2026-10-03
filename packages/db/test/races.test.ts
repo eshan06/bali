@@ -28,6 +28,7 @@ import {
   extendSession,
   markSilentParticipations,
   protectionOff,
+  protectionOn,
   refocus,
   renameStudent,
   startSession,
@@ -960,6 +961,80 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
         const over = one(await db.select().from(sessions).where(eq(sessions.id, session.id)));
         expect(over.endedAt).not.toBeNull();
         expect(await liveParticipations(session.id)).toHaveLength(0);
+      }
+    }
+  }, 120_000);
+
+  it('Screen Time back on racing an unlock, a late unlock, a re-tap or the end of the session ends the same, whichever lands first (#167)', async () => {
+    // Back on locks the session FOR UPDATE, as each rival does, so the pair
+    // serialises and either order must end the same way. An unlock: back on
+    // first returns to focus and the unlock flips it; the unlock first is
+    // recorded under protection off, and back on returns to it — unlocked
+    // either way, the unlock recorded once. A late unlock, made before the tap
+    // (A10): focused either way, noted late whichever lands first — never
+    // returned to (#167's review). A re-tap: focused either way, back on
+    // refused after it, protection being on again. The end — a teacher's, or
+    // the sweep at the bell — first, and back on is refused as after it; back
+    // on first, and the end closes the row. Never a 500, never two.
+    for (let round = 0; round < 12; round += 1) {
+      for (const rival of ['unlock', 'late', 'retap', 'end', 'sweep'] as const) {
+        const { classId, studentId } = await seed(`race-on-${rival}-${round}`);
+        const session = await openSession(classId, { due: rival === 'sweep' });
+        const change = () => ({
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+          now: session.startedAt, // heard while it ran (A17)
+        });
+        await tapIn(db, change());
+        await protectionOff(db, change());
+
+        // Odd rounds give the rival a head start, so both orders get exercised.
+        const back = () => protectionOn(db, change());
+        const [turned, other] = await Promise.allSettled([
+          round % 2 === 1 ? new Promise((resolve) => setTimeout(resolve, 10)).then(back) : back(),
+          rival === 'unlock'
+            ? unlock(db, change())
+            : rival === 'late'
+              ? unlock(db, { ...change(), deviceTime: session.startedAt })
+              : rival === 'retap'
+                ? tapIn(db, change())
+                : rival === 'end'
+                  ? endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' })
+                  : expireDueSessions(db, new Date()),
+        ]);
+
+        expect(other.status).toBe('fulfilled');
+        const turnedOn = await eventsOfType(session.id, 'protection_on');
+        if (turned.status === 'fulfilled') {
+          expect(turned.value.outcome).toBe('applied');
+          expect(turnedOn).toHaveLength(1);
+        } else {
+          // Refused only where its rival went first: a refusal records nothing.
+          expect(['retap', 'end', 'sweep']).toContain(rival);
+          expect(turned.reason).toMatchObject({
+            code: rival === 'retap' ? 'PROTECTION_NOT_OFF' : 'SESSION_NOT_RUNNING',
+          });
+          expect(turnedOn).toHaveLength(0);
+        }
+        if (rival === 'unlock' || rival === 'late' || rival === 'retap') {
+          const row = one(await liveParticipations(session.id));
+          expect(row.state).toBe(rival === 'unlock' ? 'unlocked' : 'focused');
+          if (rival !== 'retap') {
+            const [recorded, ...more] = await eventsOfType(session.id, 'unlock');
+            expect(more).toHaveLength(0);
+            // The late one is noted late whichever landed first; the other,
+            // protection off when it landed first, else nothing (it flipped).
+            const notes =
+              rival === 'late'
+                ? [{ recorded_as: 'superseded' }]
+                : [{ recorded_as: 'protection_off' }, null];
+            expect(notes).toContainEqual(recorded?.payload ?? null);
+          }
+        } else {
+          expect(await liveParticipations(session.id)).toHaveLength(0);
+        }
       }
     }
   }, 120_000);

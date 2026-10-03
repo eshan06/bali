@@ -65,8 +65,8 @@ public enum TapOutcome: String, CaseIterable, Sendable {
 }
 /// `UNLOCK_RECORDED_OUTCOMES`: every one means the unlock is recorded.
 public enum UnlockOutcome: String, CaseIterable, Sendable { case applied, recorded, replay }
-/// `STATE_CHANGE_OUTCOMES`: every outcome a refocus or a protection-off report answers with, as
-/// `stateChangeDisposition` reads both.
+/// `STATE_CHANGE_OUTCOMES`: every outcome a refocus, a protection-off report or Screen Time back on
+/// answers with, as `stateChangeDisposition` reads them all.
 public enum StateChangeOutcome: String, CaseIterable, Sendable { case applied, recorded, replay }
 /// `UNLOCK_RECORDED_AS`: why an unlock was recorded without flipping a participation.
 /// `superseded`: a late unlock — the student's own refocus or tap went ahead of it — whose answer
@@ -85,7 +85,8 @@ public enum ProtectionOffRecordedAs: String, CaseIterable, Sendable {
 }
 /// `RETURN_RECORDED_AS`: why a return to focus — a refocus, or a tap — was recorded without being
 /// applied. `superseded`: the phone made it before an unlock the server already had (A13), which
-/// stands; the answer is its retry's, the truth now. A history shows it as `recordedAs`.
+/// stands; the answer is its retry's, the truth now — so too Screen Time back on made before a
+/// protection off the server already had (#167). A history shows it as `recordedAs`.
 public enum ReturnRecordedAs: String, CaseIterable, Sendable { case superseded }
 /// `UNLOCK_REASONS`. Codable because the phone sends one; an answer carries it as `OrUnknown`.
 public enum UnlockReason: String, CaseIterable, Sendable, Codable { case bathroom, nurse, other }
@@ -95,6 +96,7 @@ public enum HistoryEventType: String, CaseIterable, Sendable {
     case leftForOtherSession = "left_for_other_session", enrollmentLeft = "enrollment_left"
     case enrollmentRemoved = "enrollment_removed", armedTapSkipped = "armed_tap_skipped"
     case sessionEnded = "session_ended", sessionExpired = "session_expired"
+    case protectionOn = "protection_on"
 }
 /// `ApiErrorCode`: the keys of `API_ERROR_STATUS`, each a status's class.
 public enum ApiErrorCode: String, CaseIterable, Sendable {
@@ -112,4 +114,5 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case displayNameInvalid = "display_name_invalid", displayNameTaken = "display_name_taken"
     case classInSession = "class_in_session"
     case unlockNotFound = "unlock_not_found", unlockSuperseded = "unlock_superseded"
+    case protectionNotOff = "protection_not_off"
 }

@@ -1196,6 +1196,9 @@ struct RegisterTests {
         // and the marker looked at, so a wake over access lost asks nothing (F1b).
         #expect(monitor.contains("asked: &Bell.monitorAsked"))
         #expect(monitor.contains("Marker.noted(at:") && monitor.contains("accessLost: accessLost)"))
+        // Whose bookkeeping, and the write's, go by the rules tested here (`MarkerBookTests`).
+        let marker = try sourceCode("BaliOutbox/Sources/BaliOutbox/PhoneBell.swift")
+        #expect(marker.contains("noting(now, shielded:") && marker.contains("written(readBack:"))
         for call in [
             "startMonitoring", "stopMonitoring", "schedule(for", "Bell.register", ".activities",
         ] {

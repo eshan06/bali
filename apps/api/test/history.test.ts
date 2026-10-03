@@ -344,6 +344,32 @@ describe('GET /v1/me/history', () => {
     ]);
   });
 
+  it('shows Screen Time back on, and a late one says so: the protection off after it stands (#167)', async () => {
+    const room = await seedClassroom(db, 'h-back-on');
+    const token = await ctx.tokenFor(room.student.cognitoId);
+    const lesson = await startAt(room.klass.id, '09:00', '09:50');
+    const install = randomUUID();
+    const nth = (seq: number) => ({ order: { install, seq } });
+    await ok(tap(token, room.block.tagId, '09:01'));
+    await ok(change(token, lesson.id, 'protection-off', '09:04', nth(2)));
+    await ok(change(token, lesson.id, 'protection-on', '09:05', nth(3)));
+    await ok(change(token, lesson.id, 'protection-off', '09:07', nth(4)));
+    // Back on again (#5), its request outliving the phone's wait; off again (#6) went ahead.
+    await ok(change(token, lesson.id, 'protection-off', '09:09', nth(6)));
+    const late = await ok(change(token, lesson.id, 'protection-on', '09:08', nth(5)));
+    expect(late).toMatchObject({ outcome: 'replay', state: 'protection_off' });
+
+    const c = room.klass.name;
+    expect((await historyOf(token)).events.map(line)).toEqual([
+      `protection_off 09:09 ${c}`,
+      `protection_on 09:08 ${c} superseded`,
+      `protection_off 09:07 ${c}`,
+      `protection_on 09:05 ${c}`,
+      `protection_off 09:04 ${c}`,
+      `tap_in 09:01 ${c}`,
+    ]);
+  });
+
   it('shows a late tap at its own time and says so: what went ahead of it stands (A13, A14)', async () => {
     const one = await seedClassroom(db, 'h-late-tap-one');
     const two = await seedClassroom(db, 'h-late-tap-two');

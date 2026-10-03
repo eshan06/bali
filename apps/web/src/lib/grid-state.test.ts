@@ -93,6 +93,27 @@ describe('grid-state', () => {
     expect(s.ana.state).toBe('focused');
   });
 
+  it('Screen Time back on returns the chip to the state before protection off, as the engine does (#167)', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }, { id: 'cal' }]));
+    // Focused before it: focused again, no unlock on the chip.
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(7, 'protection_on', 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'focused', note: null });
+    // An unlock before it, or one recorded while it was off: still unlocked, its reason with it.
+    s = applyEvent(s, evt(8, 'unlock', 'ben', T1, { reason: 'nurse' }));
+    s = applyEvent(s, evt(9, 'protection_off', 'ben'));
+    s = applyEvent(s, evt(10, 'protection_on', 'ben'));
+    expect(chip(s, 'ben')).toEqual({ display: 'unlocked', note: 'nurse' });
+    s = applyEvent(s, evt(11, 'protection_off', 'cal'));
+    s = applyEvent(s, evt(12, 'unlock', 'cal', T1, { recorded_as: 'protection_off' }));
+    s = applyEvent(s, evt(13, 'protection_on', 'cal'));
+    expect(chip(s, 'cal').display).toBe('unlocked');
+    // One late — a protection off the phone made after it went ahead — changes nothing.
+    s = applyEvent(s, evt(14, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(15, 'protection_on', 'ana', T1, { recorded_as: 'superseded' }));
+    expect(chip(s, 'ana').display).toBe('protection_off');
+  });
+
   it('ends every live participation on session_ended', () => {
     let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
     s = applyEvent(s, evt(9, 'session_ended', null));
@@ -436,6 +457,38 @@ describe('the unlock a chip carries (A9)', () => {
     const booted = fromSnapshot(boot);
     for (const id of ['ana', 'ben']) expect(chip(s, id)).toEqual(chip(booted, id));
     expect(chip(s, 'cal', new Date(T0))).toEqual(chip(booted, 'cal', new Date(T0)));
+  });
+
+  it('a row Screen Time back on returned to its unlock — one noted protection off — reads unlocked on a refresh too, live or at the bell (#167)', () => {
+    // The unlock moved nothing when it landed, and Screen Time back on returned the row to the
+    // unlocked it says: the stored row is the truth, so no refresh paints Protection off again.
+    const unlock = { eventId: 'ev-8', reason: 'nurse' as const, occurredAt: T1 };
+    const boot = snapshot(9, [
+      { id: 'ana', state: 'unlocked', unlock: { ...unlock, recordedAs: 'protection_off' } },
+      {
+        id: 'ben',
+        state: 'unlocked',
+        endedAt: T1,
+        unlock: { ...unlock, recordedAs: 'protection_off' },
+      },
+      { id: 'cal', state: 'protection_off', unlock: { ...unlock, recordedAs: 'protection_off' } },
+    ]);
+    let s = fromSnapshot(boot);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
+    expect(chip(s, 'ben')).toEqual({ display: 'left_unprotected', note: 'nurse' });
+    expect(chip(s, 'cal')).toEqual({ display: 'protection_off', note: 'unlocked · nurse' });
+    // The stream lands where the snapshot does.
+    let live = fromSnapshot(snapshot(5, [{ id: 'ana' }]));
+    for (const e of [
+      evt(6, 'protection_off', 'ana'),
+      evt(8, 'unlock', 'ana', T1, { recorded_as: 'protection_off', reason: 'nurse' }),
+      evt(9, 'protection_on', 'ana'),
+    ]) {
+      live = applyEvent(live, e);
+    }
+    expect(chip(live, 'ana')).toEqual(chip(s, 'ana'));
+    s = mergeSnapshot(live, boot);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
   });
 });
 

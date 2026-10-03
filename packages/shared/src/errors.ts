@@ -68,6 +68,10 @@ export const API_ERROR_REASONS = [
   // since, so their teacher no longer sees it — a 409. Nothing was recorded.
   'unlock_not_found',
   'unlock_superseded',
+  // POST /v1/sessions/{id}/protection-on (#167): the student's participation
+  // is not in protection off — a re-tap left it, or it never went — a 409;
+  // nothing was recorded.
+  'protection_not_off',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

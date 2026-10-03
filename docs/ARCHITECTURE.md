@@ -320,7 +320,8 @@ Student app:
 - `POST /v1/taps` — the tap; the response says which outcome happened: joined, armed,
   or switched sessions.
 - **The order the phone acted in** (A12): every record the phone's outbox sends — the
-  tap, both unlocks, the refocus, protection off — may carry `order`, `{ install, seq }`:
+  tap, both unlocks, the refocus, protection off and Screen Time back on — may carry `order`,
+  `{ install, seq }`:
   its outbox file's id, minted once when the file is made, and the record's place in that
   file, a counter no clock moves. It orders the student's own unlock against their return
   to focus, both ways (rule 1): an unlock their return went ahead of is late (A10, A12),
@@ -369,11 +370,23 @@ Student app:
   since, and so does the unlock's own replay. A reason outside the vocabulary is a `400`: this
   is no unlock record.
 - `POST /v1/sessions/{id}/protection-off` — the phone found its Screen Time permission revoked
-  (iOS app structure, rules); strict like refocus, and only a re-tap leaves the state. A
+  (iOS app structure, rules); strict like refocus, and only a re-tap or Screen Time back on
+  (below) leaves the state. A
   report that first reaches the server after the session ended, from a student who was in
   it at the end, is recorded like a late unlock instead of refused (ruled 2026-09-24): noted
   `after_session_end` in `payload.recorded_as`, the key and value an unlock uses, and
   answered `recorded` with no session, so no answer hands a phone a window to shield to.
+- `POST /v1/sessions/{id}/protection-on` — Screen Time back on in the class the student tapped
+  into (#167, the owner's decision 2026-10-02; iOS app structure, rules): out of protection off
+  to the state before it, as the student's latest turn there says (A9's rule, `latestTurn`) —
+  focused, or unlocked after an unlock — recorded as a `protection_on` event of its own, the
+  same body as refocus's and answered as one is. Strict like refocus: refused past the bell,
+  swept or not (A17), and for anyone not live in the session (`409 not_participating`); a
+  participation not in protection off — a re-tap left it, or it never went — is `409
+  protection_not_off`, nothing recorded. A replay after the student left the session names no
+  session (A4). One the phone made before a protection off of its own the server already has,
+  by its order (A12), is late — recorded, noted `superseded`, never applied — so the protection
+  off it made last stands.
 - `GET /v1/join-codes/{code}` — what a code opens, before joining it (the consent preview):
   the class, its teacher's display name, and whether the caller is in it already. A read
   that creates and writes nothing. It matches a code as the join does — one schema, to which
@@ -392,8 +405,9 @@ Student app:
   is answered `already_removed`, never refused.
 - `GET /v1/me/history` — the student's own timeline screens (A7): what was recorded about
   them that the consent screen says a teacher sees, in every class they have been in,
-  left ones too — tapped in, back to focus, unlocked (with its reason), protection off,
-  a switch to another class, leaving or being removed, the class ending while they were
+  left ones too — tapped in, back to focus, unlocked (with its reason), protection off and
+  Screen Time back on (#167), a switch to another class, leaving or being removed, the class
+  ending while they were
   in it, and a tap a Start declined (`armed_tap_skipped`: it already counted in another
   class, named — never a join). A late unlock or protection off carries its `recordedAs`
   note. Silence, joining and an unlock kept with no class are not shown
@@ -449,8 +463,10 @@ with no finer meaning than its status carries none.
   `after_session_end` / `unknown_session` / `not_enrolled`, and for one sent under its
   tap `tap_armed` / `unknown_tap`) when there is no live participation to flip,
   `protection_off` when there is one but its protection is off (never softened into an
-  unlock), and `superseded` when the student's own refocus or tap in that session came
-  after it — a late unlock, recorded and answered with the state it left alone, or with
+  unlock while it is off; Screen Time back on returns the student to it, #167), and
+  `superseded` when the student's own refocus or tap in that session came
+  after it — ahead of `protection_off`, so Screen Time back on never returns to it (#167) —
+  a late unlock, recorded and answered with the state it left alone, or with
   none once the student has left the session (ruled 2026-09-24, A10: "after" by the
   clamped times, a return's never later than the server recorded it, and a tie flips;
   A11: after the end too, never "left unlocked" over a phone shielded at it; A12: by the
@@ -468,8 +484,9 @@ with no finer meaning than its status carries none.
   a refused tap (a `4xx` but `401`, `408`, `429`) is kept, retried and shown
   (`tapDisposition`) — shown while it is the phone's newest tap: once the student taps again,
   that later tap is the one that counts, and the refused one is kept and retried unsaid
-  (decided 2026-10-01, #146). A refused refocus or protection-off report is dropped and the truth
-  re-read, never resent — final for its `event_id` (`stateChangeDisposition`). A read — a
+  (decided 2026-10-01, #146). A refused refocus, protection-off report or Screen Time back on is
+  dropped and the truth re-read, never resent — final for its `event_id`
+  (`stateChangeDisposition`). A read — a
   check-in, `GET /v1/me` — never overrides a newer state change of the phone's
   (`readMayReconcile`). The one exception is a record stuck after repeated failures
   (refused, or left unsettled by 8 answers): it stops holding reads back, so the phone
@@ -602,7 +619,14 @@ and data types, so the two apps can't drift out of type-agreement.
   reports it (`POST /v1/sessions/{id}/protection-off`), the server
   records it as its own event, and the grid shows "turned protection off" (a distinct state —
   never green, never an unlock: an unlock arriving then is recorded without softening it).
-  Returning to focus needs an explicit re-tap; refocus is refused out of it. A report that
+  Screen Time turned back on in the class the student tapped into puts them back where they
+  stood before it, with no re-tap (#167, the owner's decision 2026-10-02, replacing A2's re-tap):
+  focused, the shields back on, if they were focused; still unlocked if their latest turn there
+  is an Emergency Unlock, one recorded while it was off included, never a late one (A10)
+  (`POST /v1/sessions/{id}/protection-on`). Relocking only makes things stricter, the student
+  proved they were in the room with that class's tap, and the history keeps the protection off
+  beside the return, its own event. Out of a class, or past the bell, nothing changes; refocus
+  is still refused out of it, and a re-tap still leaves it. A report that
   only reaches the server after the bell is still recorded, with a note, so the history says
   why the phone went quiet. This permanently kills v2's worst bug, which was pretending to be
   shielded after exactly this. The phone notices by a marker, never by the permission's own

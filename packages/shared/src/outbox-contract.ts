@@ -1,9 +1,15 @@
-import type { ProtectionOffResponse, RefocusResponse, TapOutcome } from './api.js';
+import type {
+  ProtectionOffResponse,
+  ProtectionOnResponse,
+  RefocusResponse,
+  TapOutcome,
+} from './api.js';
 
 /*
  * The outbox contracts for a tap and for a state change (refocus, protection
- * off) — the siblings of the unlock's (`unlock-contract.ts`). The phone writes
- * each one to its outbox, acts on it at once, and sends it; after one send
+ * off, Screen Time back on) — the siblings of the unlock's
+ * (`unlock-contract.ts`). The phone writes each one to its outbox, acts on it
+ * at once, and sends it; after one send
  * attempt these typed tables say what the outbox does with the record and
  * what the phone does next, so the Phase 3 iOS client (BaliCore mirrors them,
  * B1; the outbox is built on them, B3) implements against an explicit rule
@@ -163,8 +169,10 @@ export type StateChangeDisposition =
   /** The token was rejected: refresh it, then retry (keep the record). */
   | 'reauth';
 
-/** Every outcome refocus or protection off answers with. */
-export type StateChangeOutcome = RefocusResponse['outcome'] | ProtectionOffResponse['outcome'];
+/** Every outcome refocus, protection off or Screen Time back on answers with. */
+export type StateChangeOutcome = (
+  RefocusResponse | ProtectionOffResponse | ProtectionOnResponse
+)['outcome'];
 
 /** Every outcome in `StateChangeOutcome`. */
 export const STATE_CHANGE_OUTCOMES = [
@@ -182,7 +190,8 @@ const STATE_CHANGE_RECORDED: Record<StateChangeOutcome, 'running' | 'over'> = {
 
 /**
  * The state-change outbox's decision from one send attempt, for
- * `POST /v1/sessions/{id}/refocus` and `…/protection-off` alike:
+ * `POST /v1/sessions/{id}/refocus`, `…/protection-off` and `…/protection-on`
+ * (#167) alike:
  *
  *   - a 2xx with a known outcome deletes the record — 'apply_session' when it
  *     names the running session, 'reread' when it names none (`recorded` and
@@ -196,9 +205,10 @@ const STATE_CHANGE_RECORDED: Record<StateChangeOutcome, 'running' | 'over'> = {
  *     in the session at its end, or the retry of one that landed while it
  *     ran), `409 not in this session` (nothing live to change, or a report
  *     retried after the student left the running session), the 409 for a
- *     refocus out of protection off (only a re-tap returns), `409` for an id
- *     held by another event, 404 for an unknown session, 400 for a malformed
- *     body.
+ *     refocus out of protection off (a re-tap or Screen Time back on
+ *     returns), the 409 for Screen Time back on with protection not off,
+ *     `409` for an id held by another event, 404 for an unknown session, 400
+ *     for a malformed body.
  *
  * Why a refusal is final: a refused change records nothing, so the server
  * treats its id as unused and a late resend would land as new — a refocus

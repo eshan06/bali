@@ -16,6 +16,7 @@ import type {
   ExtendSessionResponse,
   MeResponse,
   ProtectionOffResponse,
+  ProtectionOnResponse,
   RefocusResponse,
   SessionSnapshot,
   TapResponse,
@@ -1414,6 +1415,187 @@ describe('POST /v1/sessions/:id/protection-off', () => {
       state: 'protection_off',
     });
     expect(unlockDisposition(unlocked.statusCode, body)).toBe('recorded');
+  });
+});
+
+describe('POST /v1/sessions/:id/protection-on', () => {
+  // Screen Time back on in the class the student tapped into (#167, the owner's
+  // decision 2026-10-02): the state before protection off, with no re-tap.
+  async function off(tag: string, opts: { unlocked?: boolean } = {}) {
+    const seeded = await seedRunning(tag);
+    await tap(seeded.session.id, seeded.student.id);
+    const token = await ctx.tokenFor(seeded.student.cognitoId);
+    const send = (route: string, body: object = { eventId: randomUUID(), deviceTime: now() }) =>
+      post(token, `/v1/sessions/${seeded.session.id}/${route}`, body);
+    if (opts.unlocked) expect((await send('unlock')).statusCode).toBe(200);
+    expect((await send('protection-off')).statusCode).toBe(200);
+    return { ...seeded, token, send };
+  }
+  const recorded = (sessionId: string) =>
+    db
+      .select()
+      .from(events)
+      .where(and(eq(events.sessionId, sessionId), eq(events.type, 'protection_on')));
+  const stateOf = async (sessionId: string, studentId: string) =>
+    (
+      await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, sessionId), eq(participations.studentId, studentId)),
+        )
+    )[0]?.state;
+
+  it('returns a focused student to focus — no re-tap — and a retry replays it', async () => {
+    const { student, session, send } = await off('on-focused');
+    const body = { eventId: randomUUID(), deviceTime: now() };
+
+    const res = await send('protection-on', body);
+    expect(res.statusCode).toBe(200);
+    const view = { id: session.id, classId: session.classId, endsAt: session.endsAt.toISOString() };
+    expect(res.json<ProtectionOnResponse>()).toEqual({
+      outcome: 'applied',
+      state: 'focused',
+      session: view,
+    });
+    expect(stateChangeDisposition(res.statusCode, res.json())).toBe('apply_session');
+    expect(await stateOf(session.id, student.id)).toBe('focused');
+
+    const retry = await send('protection-on', body);
+    expect(retry.json<ProtectionOnResponse>()).toEqual({
+      outcome: 'replay',
+      state: 'focused',
+      session: view,
+    });
+    expect(await recorded(session.id)).toHaveLength(1);
+  });
+
+  it('leaves a student who had used Emergency Unlock unlocked', async () => {
+    const { student, session, send } = await off('on-unlocked', { unlocked: true });
+    const res = await send('protection-on');
+    expect(res.json<ProtectionOnResponse>()).toMatchObject({
+      outcome: 'applied',
+      state: 'unlocked',
+    });
+    expect(await stateOf(session.id, student.id)).toBe('unlocked');
+  });
+
+  it('is a 409 protection_not_off where protection is not off, and records nothing', async () => {
+    const { student, session, send } = await off('on-not-off');
+    await tap(session.id, student.id);
+    const res = await send('protection-on');
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: {
+        code: 'conflict',
+        reason: 'protection_not_off',
+        message: 'Screen Time permission is not off',
+      },
+    });
+    expect(stateChangeDisposition(res.statusCode, res.json())).toBe('drop');
+    expect(await recorded(session.id)).toHaveLength(0);
+  });
+
+  it('nobody else can turn a live student’s Screen Time back on: an outsider or the teacher gets 409', async () => {
+    const { teacher, student, session } = await off('on-authz');
+    for (const sub of ['outsider', teacher.cognitoId]) {
+      const res = await post(await ctx.tokenFor(sub), `/v1/sessions/${session.id}/protection-on`, {
+        eventId: randomUUID(),
+        deviceTime: now(),
+      });
+      expect(res.statusCode, sub).toBe(409);
+      expect(res.json<{ error: { reason: string } }>().error.reason).toBe('not_participating');
+    }
+    expect(await recorded(session.id)).toHaveLength(0);
+    expect(await stateOf(session.id, student.id)).toBe('protection_off');
+  });
+
+  it('after an early end, or past the bell the sweep has not reached, is a 409 session_not_running', async () => {
+    const early = await off('on-ended');
+    await post(await ctx.tokenFor(early.teacher.cognitoId), `/v1/sessions/${early.session.id}/end`);
+    const { student, klass } = await seedClassroom(db, 'on-past-bell');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() - 1_000),
+    });
+    const before = new Date(Date.now() - 30_000);
+    await tapIn(db, {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: randomUUID(),
+      deviceTime: before,
+      now: before,
+    });
+    const token = await ctx.tokenFor(student.cognitoId);
+    const body = () => ({ eventId: randomUUID(), deviceTime: before.toISOString() });
+    expect(
+      (await post(token, `/v1/sessions/${session.id}/protection-off`, body())).statusCode,
+    ).toBe(200);
+
+    for (const res of [
+      await early.send('protection-on'),
+      await post(token, `/v1/sessions/${session.id}/protection-on`, body()),
+    ]) {
+      expect(res.statusCode).toBe(409);
+      expect(res.json<{ error: { reason: string } }>().error.reason).toBe('session_not_running');
+    }
+    expect(await recorded(early.session.id)).toHaveLength(0);
+    expect(await recorded(session.id)).toHaveLength(0);
+  });
+
+  it('a retry after the student was removed names no session and no state (A4)', async () => {
+    const { klass, student, send } = await off('on-removed');
+    const body = { eventId: randomUUID(), deviceTime: now() };
+    expect((await send('protection-on', body)).statusCode).toBe(200);
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    await endEnrollment(db, {
+      enrollmentId: enrollment!.id,
+      reason: 'removed_from_class',
+      at: new Date(),
+    });
+    const retry = await send('protection-on', body);
+    expect(retry.json<ProtectionOnResponse>()).toEqual({
+      outcome: 'replay',
+      state: null,
+      session: null,
+    });
+    expect(stateChangeDisposition(retry.statusCode, retry.json())).toBe('reread');
+  });
+
+  it('is a 404 for an unknown session', async () => {
+    await seedClassroom(db, 'on-404');
+    const res = await post(
+      await ctx.tokenFor('lost-student'),
+      `/v1/sessions/${randomUUID()}/protection-on`,
+      { eventId: randomUUID(), deviceTime: now() },
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects a malformed body (400), and records nothing', async () => {
+    const { session, send } = await off('on-400');
+    for (const body of [
+      { eventId: 'not-a-uuid', deviceTime: now() },
+      { eventId: randomUUID() },
+      { eventId: randomUUID(), deviceTime: '2026-09-20T09:15:00' },
+    ]) {
+      expect((await send('protection-on', body)).statusCode).toBe(400);
+    }
+    expect(await recorded(session.id)).toHaveLength(0);
+  });
+
+  it('requires authentication', async () => {
+    const { session } = await off('on-auth');
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/v1/sessions/${session.id}/protection-on`,
+      payload: { eventId: randomUUID(), deviceTime: now() },
+    });
+    expect(res.statusCode).toBe(401);
   });
 });
 

@@ -117,8 +117,8 @@ public enum StateChangeDisposition: String, CaseIterable, Sendable {
     case reauth
 }
 
-/// An answer `stateChangeDisposition` reads — a refocus's or a protection-off report's, the
-/// TypeScript's `RefocusResponse | ProtectionOffResponse`.
+/// An answer `stateChangeDisposition` reads — a refocus's, a protection-off report's or Screen Time
+/// back on's, the TypeScript's `RefocusResponse | ProtectionOffResponse | ProtectionOnResponse`.
 public protocol StateChangeAnswer: Sendable {
     /// The outcome read as a `StateChangeOutcome`, the union of both endpoints' outcomes — from its
     /// raw value, so a refocus answered `recorded` reads as a report's would; nil for one this
@@ -135,8 +135,12 @@ extension ProtectionOffResponse: StateChangeAnswer {
     public var stateChangeOutcome: StateChangeOutcome? { .init(rawValue: outcome.rawValue) }
 }
 
-/// The state-change outbox's decision from one send attempt, for `POST /v1/sessions/{id}/refocus`
-/// and `…/protection-off` alike:
+extension ProtectionOnResponse: StateChangeAnswer {
+    public var stateChangeOutcome: StateChangeOutcome? { .init(rawValue: outcome.rawValue) }
+}
+
+/// The state-change outbox's decision from one send attempt, for `POST /v1/sessions/{id}/refocus`,
+/// `…/protection-off` and `…/protection-on` (#167) alike:
 ///
 /// - a 2xx with a known outcome deletes the record — `.applySession` when it names the running
 ///   session, `.reread` when it names none (`recorded` and its replay; a refocus replayed after

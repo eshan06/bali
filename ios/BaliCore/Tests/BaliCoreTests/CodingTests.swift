@@ -161,12 +161,14 @@ struct ForwardCompatibilityTests {
             UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse, order: order),
             RefocusRequest(eventId: "e1", deviceTime: at, order: order),
             ProtectionOffRequest(eventId: "e1", deviceTime: at, order: order),
+            ProtectionOnRequest(eventId: "e1", deviceTime: at, order: order),
         ]
         let bare: [any Encodable] = [
             TapRequest(tagId: "TAG-1", eventId: "e1", deviceTime: at),
             UnlockRequest(eventId: "e1", deviceTime: at, reason: .nurse),
             RefocusRequest(eventId: "e1", deviceTime: at),
             ProtectionOffRequest(eventId: "e1", deviceTime: at),
+            ProtectionOnRequest(eventId: "e1", deviceTime: at),
         ]
         let sortedKeys = BaliJSON.makeEncoder()
         sortedKeys.outputFormatting = .sortedKeys

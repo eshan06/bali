@@ -92,10 +92,14 @@ struct OutboxContractTests {
         case "tapDisposition":
             try check(file) { tapDisposition($0, try decode(TapResponse.self, $1)) }
         case "stateChangeDisposition":
-            // One table for both endpoints: every case holds for a refocus's answer and a report's.
+            // One table for all three: every case holds for a refocus's answer, a report's and
+            // Screen Time back on's.
             try check(file) { stateChangeDisposition($0, try decode(RefocusResponse.self, $1)) }
             try check(file) {
                 stateChangeDisposition($0, try decode(ProtectionOffResponse.self, $1))
+            }
+            try check(file) {
+                stateChangeDisposition($0, try decode(ProtectionOnResponse.self, $1))
             }
         case "readMayReconcile":
             for c in try OutboxCases.load(OutboxCases.Reconcile.self, file).cases {

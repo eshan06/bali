@@ -52,7 +52,14 @@ actor FakeScreenTime: ScreenTime {
     func permission() -> Permission { granted }
 
     func marker() -> Marker { marked ? hasMarker ? .present : .missing : .unwritten }
-    func writeMarker() { (hasMarker, marked, lostAt) = (true, true, nil) }
+    /// As the phone writes it (`Marker.write()`), by `Marker.written`'s rule: one that never sticks
+    /// (`markerSticks(false)`) reads back nothing.
+    func writeMarker() {
+        let after = Marker.written(readBack: sticks, note: lostAt)
+        (hasMarker, marked, lostAt) = (sticks, after.flag, after.note)
+    }
+    private var sticks = true
+    func markerSticks(_ sticks: Bool) { self.sticks = sticks }
     func markerLostAt() -> Date? { lostAt }
     /// The monitor, woken with the app closed, found the marker gone at `date`.
     func noteLoss(at date: Date) { lostAt = date }
@@ -822,6 +829,39 @@ struct ProtectionOffTests {
     }
 }
 
+@Suite("The marker's bookkeeping in the app group, as the phone and the monitor keep it (F1b; #169's review)")
+struct MarkerBookTests {
+    @Test(
+        "A write sets the flag only once the marker reads back — and forgets the monitor's note only then, so a loss the monitor found with Bali closed outlives a write that did not take"
+    )
+    func written() {
+        let note = at(-900)
+        let took = Marker.written(readBack: true, note: note)
+        #expect(took.flag && took.note == nil)
+        let missed = Marker.written(readBack: false, note: note)
+        #expect(!missed.flag && missed.note == note)
+        let none = Marker.written(readBack: false, note: nil)
+        #expect(!none.flag && none.note == nil)
+    }
+
+    @Test(
+        "The monitor's wake notes access lost only with the marker gone since it was written and the shields' store empty — a store still holding shields is a misread — the first such wake's time kept"
+    )
+    func noting() {
+        let (first, later) = (at(-900), at(-300))
+        let lost = Marker.noting(.missing, shielded: false, note: nil, at: first)
+        #expect(lost.lost && lost.note == first)
+        let again = Marker.noting(.missing, shielded: false, note: first, at: later)
+        #expect(again.lost && again.note == first)
+        for (marker, shielded) in [(Marker.missing, true), (.present, false), (.unwritten, false)] {
+            let kept = Marker.noting(marker, shielded: shielded, note: first, at: later)
+            #expect(!kept.lost && kept.note == first, "\(marker) \(shielded)")
+            let none = Marker.noting(marker, shielded: shielded, note: nil, at: later)
+            #expect(!none.lost && none.note == nil, "\(marker) \(shielded)")
+        }
+    }
+}
+
 @Suite(
     "#144 (F1b): access taken back while Bali runs is found by the marker, never by Family Controls' read, which a running app keeps approved",
     .timeLimit(.minutes(3)))
@@ -974,10 +1014,11 @@ struct RevokedWhileRunningTests {
     }
 
     @Test(
-        "No marker written yet — a phone of a build before F1b's, approved: a check asks iOS for the access silently, which iOS answers at once with no prompt where access is on, and writes the marker — nothing reported, never judged off; an ask that fails reports nothing either, and the next check asks again"
+        "No marker written yet — a phone of a build before F1b's, approved: a check asks iOS for the access silently, which iOS answers at once with no prompt where access is on, and writes the marker — nothing reported, never judged off; an ask that fails reports nothing either, and is not made again until the next launch (#169's review)"
     )
     func silentCheck() async throws {
-        let rig = try Rig()
+        let (outbox, url) = try makeOutbox()
+        let rig = try Rig(outbox: outbox)
         let screenTime = FakeScreenTime()
         let phone = Enforced(rig, screenTime)
         try await rig.tapIn()
@@ -988,14 +1029,44 @@ struct RevokedWhileRunningTests {
         try await eventually { await phone.enforcer.asking == nil }
         #expect(await !screenTime.marked)
         await screenTime.failAsk(false)
-        await phone.enforcer.check()
-        try await eventually { await screenTime.marked }
-        // Written, it is never asked again.
-        await phone.enforcer.check()
-        #expect(await screenTime.asks == 2)
+        for _ in 1...3 { await phone.enforcer.check() }
+        #expect(await screenTime.asks == 1)
+        #expect(await !screenTime.marked)
         #expect(try rig.outbox.records().isEmpty)
         let now = await phone.enforcer.protection
         #expect(now.permission == .approved && now.shielded && !now.permissionOff)
+        await phone.stop()
+        // The next launch asks once more, and writes the marker; written, it is never asked again.
+        let relaunched = Enforced(try Rig(outbox: try open(url)), screenTime)
+        await relaunched.until { $0.checked }
+        await relaunched.enforcer.check()
+        try await eventually { await screenTime.marked }
+        await relaunched.enforcer.check()
+        #expect(await screenTime.asks == 2)
+        await relaunched.stop()
+    }
+
+    @Test(
+        "A marker that never reads back — and access taken back, the read still approved in the running app — is asked for silently once a launch, never at every check, where iOS would prompt each time (#169's review)"
+    )
+    func silentCheckBounded() async throws {
+        let rig = try Rig()
+        let screenTime = FakeScreenTime()
+        await screenTime.markerSticks(false)
+        let phone = Enforced(rig, screenTime)
+        try await rig.tapIn()
+        try await rig.foreground()
+        await phone.until { $0.shielded }
+        try await eventually { await screenTime.asks == 1 }
+        try await eventually { await phone.enforcer.asking == nil }
+        #expect(await !screenTime.marked)
+        for check in 1...3 {
+            rig.clock.advance(by: 30)
+            try await rig.server.next(checkInRoute).reply(200, Answer.live())
+            try await rig.checkInDue(at(30 * Double(check + 1)))
+        }
+        await phone.enforcer.check()
+        #expect(await screenTime.asks == 1)
         await phone.stop()
     }
 
