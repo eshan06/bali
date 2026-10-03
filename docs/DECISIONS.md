@@ -26,7 +26,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   read from the top adds at the newer end, Show earlier at the older — so the id names neither; a
   class come back to after another the same day, read from the top, still renews that class's
   earlier cards, a rebuild at the top of the screen. **History's days are kept by the phone**,
-  drawn again only when the moments or the day change (a day's change renames Today). **The intro
+  drawn again only when the history or the day changes (a day's change renames Today): a visit
+  over a history unchanged since the last draws nothing, and each read draws anew, so a 12- or
+  24-hour clock or a locale changed meanwhile shows at the next read (santa's round 1: keyed on the
+  moments alone, it showed the old one until they changed). **History is read again on a return
+  from the background only**: the scene goes inactive for Control Center too, and a read from the
+  top there would take Show earlier's pages from a student reading them (santa's round 1). **The intro
   takes the page it opens on** (`IntroView(page:)`, a Debug launch's by default), so the scroll-edge
   test opens each page: paging the queuing scroll view by hand checked its slots, not its pages
   (#135's review). **Me's unsent ask**: each cancels the last, whose answer is older (#172's

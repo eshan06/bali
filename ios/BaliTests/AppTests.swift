@@ -485,13 +485,21 @@ struct AppTests {
     }
 
     @Test(
-        "History on screen as the app comes back to the front reads its newest page again, quietly, as each visit does (F4's review: it does not appear again) — never under another screen, nor again while the app stays in front"
+        "History on screen as the app comes back to the front from the background reads its newest page again, quietly, as each visit does (F4's review: it does not appear again) — never from only inactive, Control Center pulled down and up, whose read from the top would take Show earlier's pages from a student reading them (santa's round 1), nor under another screen"
     )
     func historyInFront() async {
         let shown = Phone(fixture: PreviewFixtures.State(tab: .history))
         #expect(shown.shown.screen == .history)
         shown.setForeground(true)
-        // A hop queued on the main actor after the read's: once it has run, so has the read.
+        shown.setForeground(false)
+        shown.setForeground(true)
+        // A hop queued on the main actor after any read's: once it has run, a read would show.
+        await Task {}.value
+        #expect(shown.history == History())
+        shown.setForeground(false)
+        shown.setForeground(false, behind: true)
+        shown.setForeground(false)
+        shown.setForeground(true)
         await Task {}.value
         #expect(shown.history.failure == Joining.notStarted)
         shown.forgetHistory()
@@ -499,13 +507,14 @@ struct AppTests {
         await Task {}.value
         #expect(shown.history == History())
         let away = Phone(fixture: PreviewFixtures.State(tab: .me))
+        away.setForeground(false, behind: true)
         away.setForeground(true)
         await Task {}.value
         #expect(away.history == History())
     }
 
     @Test(
-        "History's days are drawn once per change of the moments read — or of the day — never at each pass of its screen (F5's review): a read's flags flipping keeps them, and a page that changes the moments draws them anew"
+        "History's days as its screen draws them (`Phone.historyDays`, kept from one change of the history to the next: F5's review) are always the history's own: the same moments through a read that failed, and a page that changes them drawn anew — never a stale drawing"
     )
     func historyDays() async throws {
         let phone = Phone(fixture: try #require(PreviewFixtures.all["history"]))

@@ -633,8 +633,10 @@ struct ScreenTests {
         let history = try sourceCode("Bali/UI/HistoryView.swift")
         #expect(history.contains(".onAppear { Task { await phone.refreshHistory() } }"))
         #expect(!history.contains("forgetHistory") && !history.contains("onDisappear"))
-        // Its days drawn once per change of the moments, never at each pass (F5's review).
+        // Its days drawn once per change of the history (F5's review), and the card over the
+        // moments kept saying Reading… while a read from the top runs (F4's review).
         #expect(history.contains("let days = phone.historyDays") && !history.contains("days(now:"))
+        #expect(history.contains("reading: history.busy && history.fromTop"))
         let unlocked = try sourceCode("Bali/UI/UnlockedView.swift")
         #expect(
             unlocked.contains(

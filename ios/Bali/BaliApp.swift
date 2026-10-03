@@ -20,7 +20,7 @@ struct BaliApp: App {
         // again in front — where the engine checks in.
         .onChange(of: phase, initial: true) { _, phase in
             if phase == .background { Outbox.suspend() } else { Outbox.resume() }
-            phone.setForeground(phase == .active)
+            phone.setForeground(phase == .active, behind: phase == .background)
         }
     }
 
@@ -104,9 +104,12 @@ final class Phone {
     /// Signed in, the history not yet read for them: read once `GET /v1/me` names a student (#141)
     /// — never a teacher's account, which the API refuses (F4's review).
     private var historyDue = false
-    /// History's days as last drawn (`historyDays`), with the moments and the day they were drawn
+    /// History's days as last drawn (`historyDays`), with the history and the day they were drawn
     /// for.
-    @ObservationIgnored private var drawn: (events: [HistoryEvent], day: Date, days: [History.Day])?
+    @ObservationIgnored private var drawn: (history: History, day: Date, days: [History.Day])?
+    /// Whether the app has gone behind since it was last in front: coming back from there with
+    /// History shown reads it again (`setForeground`).
+    private var wentBehind = false
     /// The session whose Session over the student closed, as it was then (C5b): Home past its bell,
     /// until the bell moves — an extension rings one of its own (C5b's review).
     private(set) var sessionOverClosed: SessionView?
@@ -224,15 +227,16 @@ final class Phone {
         await historyRead(await engine.history(before: before), for: read)
     }
 
-    /// History's days and cards as its screen draws them (`History.days`): drawn again only when
-    /// the moments read or the day change, never at each pass of the screen — a read's flags
-    /// flipping, say (F5's review).
+    /// History's days and cards as its screen draws them (`History.days`): drawn once per change
+    /// of the history, or of the day (F5's review) — a visit's first pass over a history unchanged
+    /// since the last costs nothing — and anew with each read, so a clock or locale changed
+    /// meanwhile shows at the next.
     var historyDays: [History.Day] {
         let now = Date()
         let day = Calendar.current.startOfDay(for: now)
-        if let drawn, drawn.events == history.events, drawn.day == day { return drawn.days }
+        if let drawn, drawn.history == history, drawn.day == day { return drawn.days }
         let days = history.days(now: now)
-        drawn = (history.events, day, days)
+        drawn = (history, day, days)
         return days
     }
 
@@ -657,16 +661,21 @@ final class Phone {
         await engine.setForeground(foreground)
     }
 
-    /// The scene's phase: the engine checks in only in the foreground, and coming back runs rule
-    /// 3's check at once — Settings may have taken the permission — and reads History again where
-    /// it shows. Each hop reads the phase as it is then, so two in quick succession can never leave
-    /// the engine on the older one, nor run a check once the app has gone behind: its report
-    /// refused by the suspended file, it would show a failure that is none.
-    func setForeground(_ foreground: Bool) {
-        // Back in front with History shown, its newest page is read again, quietly, as each visit
-        // reads it: the screen does not appear again (F4's review).
-        if foreground, !self.foreground, shown.screen == .history {
-            Task { await refreshHistory() }
+    /// The scene's phase (`behind`: gone to the background): the engine checks in only in the
+    /// foreground, and coming back runs rule 3's check at once — Settings may have taken the
+    /// permission — and, from the background, reads History again where it shows. Each hop reads
+    /// the phase as it is then, so two in quick succession can never leave the engine on the older
+    /// one, nor run a check once the app has gone behind: its report refused by the suspended file,
+    /// it would show a failure that is none.
+    func setForeground(_ foreground: Bool, behind: Bool = false) {
+        // Back in front from the background with History shown, its newest page is read again,
+        // quietly, as each visit reads it: the screen does not appear again (F4's review). Never
+        // from only inactive — Control Center pulled down and up — whose read from the top would
+        // take Show earlier's pages from a student reading them (santa's round 1).
+        if behind { wentBehind = true }
+        if foreground, wentBehind {
+            wentBehind = false
+            if shown.screen == .history { Task { await refreshHistory() } }
         }
         self.foreground = foreground
         guard let onPhase else { return }
