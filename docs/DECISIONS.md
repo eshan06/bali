@@ -8,6 +8,50 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-02** — **F13a (#167): Screen Time back on in the class the student tapped into
+  returns them where they stood, with no re-tap — the server half.** **The owner's decision**
+  (2026-10-02, the phone re-test) replaces A2's "returning to focus needs a re-tap" for this one
+  case: relocking only makes things stricter, the student proved the room with that class's tap,
+  and the history keeps the protection off. **The endpoint:** `POST
+  /v1/sessions/{id}/protection-on`, additive, refocus's body and answer's shape, through the
+  engine (`protectionOn`, one more rule set on `changeState`): participations and events in one
+  transaction, idempotent on its event id, a `protection_on` event of its own. **Where it returns
+  them:** the state their latest turn in the session says (A9's `latestTurn`, the chip's own
+  rule) — unlocked after an unlock, focused after a tap or a refocus — never a stored copy of
+  "the state before", which would drift from the events (v2's disease) and would miss an unlock
+  that reached the server while protection was off: recorded then, never applied (A2 holds), it
+  stands once the permission is back, as the owner's "still unlocked if they had used Emergency
+  Unlock" asks. No payload: the grid mirrors the rule with its chip's own unlock, and its 15 s
+  refresh reads the row. **Strict:** refused past the bell, swept or not (A17's rule for a
+  return), for anyone not live in the session (`not_participating`), and where protection is not
+  off (`409 protection_not_off`, additive, nothing recorded: a re-tap still leaves it, as
+  before); a replay after the student left names no session (A4). **Late by the phone's order**
+  (A12): one made before a protection off of the student's own the server already has is
+  recorded, noted `superseded`, never applied — else a back-on stuck behind a later revocation
+  would paint green over a phone with no shields; an unlock made after it needs no rule, the
+  latest turn reads it. **Disclosed:** an unlock that lands under protection off is noted
+  `protection_off` ahead of `superseded` (A2's precedence, unchanged), so one the phone made
+  before a refocus, stuck until after the revocation, counts as the latest turn and the restore
+  is unlocked — never green over an unshielded phone, and reachable only with an unlock stuck
+  while the two records behind it land. **The claim is the phone's,** as a re-tap's is; the
+  owner's reasoning covers the block it no longer needs. **The grid:** a `protection_on` chip
+  reads Unlocked when it carries an unlock, else Focused; a late one is contact. **History:**
+  `protection_on` joins `HISTORY_EVENT_TYPES` — "Screen Time back on" on the phone, Screen Time
+  off's shield whole, in a neutral ink (it returns to focus or to an unlock). **The phone half**
+  is F13b, next: sent through the outbox after Turn on Screen Time is answered, the shields back
+  where the answer says. **Also here, F1b's three Claude Review WARNs (#169), red first:** the
+  monitor's note is forgotten only once the marker reads back (`Marker.written`), so a loss found
+  with Bali closed outlives a write that did not take; the silent ask is made once a launch at
+  most (`Enforcer.askedSilently`) — a phone whose marker never sticks and whose access was taken
+  back would see iOS's prompt at every check — and `Marker.noted`'s decision is a pure function
+  (`Marker.noting`), tested on Linux, its wiring pinned by `BellTests.monitorsCalls`. **Tests:**
+  PGlite (`transitions.test.ts`, "Screen Time back on"), the API (`session-lifecycle.test.ts`,
+  happy path, authz, validation, replay, 404, 401), a real-Postgres race against an unlock, a
+  re-tap, a teacher's end and the sweep at the bell, both orders seen for each; five engine
+  mutations each turn a test red; contract fixtures `protection-on/*` and a back-on in
+  `history/every-kind`, decoded by BaliCore; `MarkerBookTests`, `silentCheck`,
+  `silentCheckBounded`.
+
 - **2026-10-02** — **F1b (#144): a running Bali notices Screen Time access taken back by a
   marker, never by Family Controls' read — F1's DeviceActivity doubt and F2's not-begun guard
   retired.** **The evidence** (the owner's device experiment, iPhone 15 Pro, iOS 18.6.2, probe

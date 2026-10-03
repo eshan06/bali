@@ -392,12 +392,16 @@ function recordedAsOf(payload: Record<string, unknown>): UnlockRecordedAs | null
     : null;
 }
 
-/** What can carry a note: an unlock, a protection off, and a return to focus (A13). */
+/**
+ * What can carry a note: an unlock, a protection off, and a return — to focus
+ * (A13), or Screen Time back on (#167).
+ */
 const NOTED = [
   'unlock',
   'protection_off',
   'tap_in',
   'refocus',
+  'protection_on',
 ] as const satisfies readonly EventType[];
 
 /** What turns a chip: back to focus (a tap or a refocus), or away from it (an unlock). */

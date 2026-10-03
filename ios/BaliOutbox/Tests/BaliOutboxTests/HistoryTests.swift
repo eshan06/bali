@@ -149,9 +149,10 @@ struct HistoryTests {
         #expect(days.map(\.title) == ["Friday, December 31, 1999"])
         #expect(
             drawn(days).dropFirst() == [
-                "[Class fx-hist-p3 · Ms. Rivera]", "7:24 PM Tapped in",
-                "7:23 PM Unlocked · Bathroom", "7:22 PM Locked apps again", "7:21 PM Screen Time off",
-                "7:20 PM Tapped in", "7:19 PM Screen Time off (Arrived after class ended)",
+                "[Class fx-hist-p3 · Ms. Rivera]", "7:25 PM Tapped in",
+                "7:24 PM Unlocked · Bathroom", "7:23 PM Locked apps again", "7:22 PM Screen Time off",
+                "7:21 PM Screen Time back on", "7:20 PM Tapped in",
+                "7:19 PM Screen Time off (Arrived after class ended)",
                 "7:17 PM Class ended", "7:17 PM Unlocked (Arrived after class ended)",
                 "[Class fx-hist-p5 · Mr. Okafor]", "7:16 PM Tapped in",
                 "7:15 PM Locked apps again (Arrived late, so it changed nothing)", "7:14 PM Unlocked",

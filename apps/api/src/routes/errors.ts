@@ -47,6 +47,9 @@ const REFUSALS: Record<
   // or it is no longer the one the teacher sees. Nothing was recorded.
   UNLOCK_NOT_FOUND: ['not_found', 'unlock_not_found', 'no unlock of yours in a class has that id'],
   UNLOCK_SUPERSEDED: ['conflict', 'unlock_superseded', 'a later return or unlock ended it'],
+  // Screen Time back on (#167) with the participation not in protection off: a
+  // re-tap already left it, or it never went. Nothing was recorded.
+  PROTECTION_NOT_OFF: ['conflict', 'protection_not_off', 'Screen Time permission is not off'],
 };
 
 /**

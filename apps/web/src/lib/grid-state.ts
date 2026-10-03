@@ -82,12 +82,13 @@ function payloadOf(e: FeedEvent): Record<string, unknown> {
 
 /**
  * A late return (A13): a tap or a refocus the phone made before an unlock of
- * the student's own there that the engine already had. It left the row as that
- * unlock made it, and so does the chip — contact, and nothing more.
+ * the student's own there that the engine already had — or Screen Time back on
+ * made before a protection off it had (#167). It left the row as that unlock or
+ * protection off made it, and so does the chip — contact, and nothing more.
  */
 function isLateReturn(e: FeedEvent): boolean {
   return (
-    (e.type === 'tap_in' || e.type === 'refocus') &&
+    (e.type === 'tap_in' || e.type === 'refocus' || e.type === 'protection_on') &&
     payloadOf(e).recorded_as === ('superseded' satisfies ReturnRecordedAs)
   );
 }
@@ -206,6 +207,12 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
       if (payloadOf(e).recorded_as === ('after_session_end' satisfies ProtectionOffRecordedAs)) {
         s.endedAt ??= at;
       }
+      break;
+    case 'protection_on':
+      // Screen Time back on (#167): the state before protection off, as the
+      // engine reads it — the latest turn, which the chip's unlock mirrors.
+      s.state = s.unlock === null ? 'focused' : 'unlocked';
+      s.lastSeenAt = advance(s.lastSeenAt, at);
       break;
     case 'came_back':
       s.lastSeenAt = advance(s.lastSeenAt, at);

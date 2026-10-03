@@ -93,6 +93,27 @@ describe('grid-state', () => {
     expect(s.ana.state).toBe('focused');
   });
 
+  it('Screen Time back on returns the chip to the state before protection off, as the engine does (#167)', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }, { id: 'cal' }]));
+    // Focused before it: focused again, no unlock on the chip.
+    s = applyEvent(s, evt(6, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(7, 'protection_on', 'ana'));
+    expect(chip(s, 'ana')).toEqual({ display: 'focused', note: null });
+    // An unlock before it, or one recorded while it was off: still unlocked, its reason with it.
+    s = applyEvent(s, evt(8, 'unlock', 'ben', T1, { reason: 'nurse' }));
+    s = applyEvent(s, evt(9, 'protection_off', 'ben'));
+    s = applyEvent(s, evt(10, 'protection_on', 'ben'));
+    expect(chip(s, 'ben')).toEqual({ display: 'unlocked', note: 'nurse' });
+    s = applyEvent(s, evt(11, 'protection_off', 'cal'));
+    s = applyEvent(s, evt(12, 'unlock', 'cal', T1, { recorded_as: 'protection_off' }));
+    s = applyEvent(s, evt(13, 'protection_on', 'cal'));
+    expect(chip(s, 'cal').display).toBe('unlocked');
+    // One late — a protection off the phone made after it went ahead — changes nothing.
+    s = applyEvent(s, evt(14, 'protection_off', 'ana'));
+    s = applyEvent(s, evt(15, 'protection_on', 'ana', T1, { recorded_as: 'superseded' }));
+    expect(chip(s, 'ana').display).toBe('protection_off');
+  });
+
   it('ends every live participation on session_ended', () => {
     let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
     s = applyEvent(s, evt(9, 'session_ended', null));

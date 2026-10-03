@@ -7,6 +7,7 @@ import {
   findClassById,
   findOrCreateStudent,
   protectionOff,
+  protectionOn,
   refocus,
   startSession,
   unlock,
@@ -18,6 +19,7 @@ import type {
   EndSessionResponse,
   ExtendSessionResponse,
   ProtectionOffResponse,
+  ProtectionOnResponse,
   RefocusResponse,
   SessionView,
   StartSessionResponse,
@@ -79,7 +81,7 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
 /**
  * Session lifecycle. Starting and managing a session is teacher-only and
  * owner-only (via session -> class -> teacherId); the per-student actions
- * (check-in, unlock, refocus, protection-off) are for the enrolled phone and resolve the caller
+ * (check-in, unlock, refocus, protection-off and -on) are for the enrolled phone and resolve the caller
  * like a tap — an unlock sent under a tap too, which names its tap, not a session. All are thin
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
  * shape the response.
@@ -285,8 +287,9 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
 
   // POST /v1/sessions/:id/refocus — return to focus after an unlock (strict: a
   // live participation is required, so this can 409/404 unlike unlock; and it
-  // is refused out of protection off, which only a re-tap leaves). A replay
-  // after the participation ended while the session runs names no session.
+  // is refused out of protection off, which a re-tap or Screen Time back on
+  // leaves). A replay after the participation ended while the session runs
+  // names no session.
   app.post(
     '/v1/sessions/:id/refocus',
     { preHandler: app.authenticate },
@@ -297,6 +300,36 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         refocus(db, {
+          sessionId,
+          studentId: student.id,
+          eventId: body.eventId,
+          deviceTime: new Date(body.deviceTime),
+          order: body.order ?? null,
+          now: clock(),
+        }),
+      );
+      return {
+        outcome: result.outcome,
+        state: result.state,
+        session: result.session ? toSessionView(result.session) : null,
+      };
+    },
+  );
+
+  // POST /v1/sessions/:id/protection-on — Screen Time back on in the class the
+  // student tapped into (#167): out of protection off to the state before it,
+  // with no re-tap. Strict like refocus: a live participation in protection
+  // off, in a session running by the server's clock, or a 409/404.
+  app.post(
+    '/v1/sessions/:id/protection-on',
+    { preHandler: app.authenticate },
+    async (request): Promise<ProtectionOnResponse> => {
+      const identity = requireAuth(request);
+      const { id: sessionId } = parse(SessionParams, request.params);
+      const body = parse(StateChangeBody, request.body);
+      const student = await findOrCreateStudent(db, identity.sub);
+      const result = await mapTransitionError(() =>
+        protectionOn(db, {
           sessionId,
           studentId: student.id,
           eventId: body.eventId,

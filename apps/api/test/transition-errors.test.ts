@@ -97,6 +97,12 @@ const EXPECTED: Record<
     reason: 'unlock_superseded',
     message: 'a later return or unlock ended it',
   },
+  PROTECTION_NOT_OFF: {
+    code: 'conflict',
+    status: 409,
+    reason: 'protection_not_off',
+    message: 'Screen Time permission is not off',
+  },
 };
 
 /**

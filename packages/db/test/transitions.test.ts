@@ -22,6 +22,7 @@ import {
   extendSession,
   joinClassByCode,
   protectionOff,
+  protectionOn as protectionOnNow,
   refocus as refocusNow,
   renameStudent,
   startSession,
@@ -42,6 +43,8 @@ import type { Database } from '../src/types.js';
 const tapIn: typeof tapInNow = (db, input) => tapInNow(db, { now: input.deviceTime, ...input });
 const refocus: typeof refocusNow = (db, input) =>
   refocusNow(db, { now: input.deviceTime, ...input });
+const protectionOn: typeof protectionOnNow = (db, input) =>
+  protectionOnNow(db, { now: input.deviceTime, ...input });
 
 let db: Database;
 let close: () => Promise<void>;
@@ -1430,6 +1433,252 @@ describe('state changes', () => {
     expect(replay.outcome).toBe('replay');
     expect(replay.state).toBeNull();
     expect((await eventsFor(session.id)).filter((e) => e.type === 'unlock')).toHaveLength(1);
+  });
+});
+
+describe('Screen Time back on: the state before protection off, no re-tap (#167)', () => {
+  // The owner's decision (2026-10-02): turned back on in the class the student
+  // tapped into, Screen Time puts them back as they were — focused if they were
+  // focused, still unlocked after an Emergency Unlock — and the history keeps
+  // the protection off. Out of a class, or after the bell, nothing changes.
+  const at = (minute: number) => new Date(`2026-01-01T09:${String(minute).padStart(2, '0')}:00Z`);
+  const phone = newUuidV7();
+  function change(
+    session: { id: string },
+    student: { id: string },
+    minute: number,
+    seq: number | null = null,
+  ) {
+    return {
+      sessionId: session.id,
+      studentId: student.id,
+      eventId: newUuidV7(),
+      deviceTime: at(minute),
+      order: seq === null ? null : { install: phone, seq },
+    };
+  }
+  /** A 09:00–09:25 lesson, its student tapped in at 09:01. */
+  async function lesson(tag: string) {
+    const { klass, student } = await seedClass(tag);
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    await tapIn(db, change(session, student, 1, 1));
+    return { session, student };
+  }
+  async function rowOf(sessionId: string) {
+    return one(
+      await db.select().from(participations).where(eq(participations.sessionId, sessionId)),
+    );
+  }
+  const typesOf = async (sessionId: string) => (await eventsFor(sessionId)).map((e) => e.type);
+
+  it('focused before it: back to focus, recorded as its own event, the protection off kept', async () => {
+    const { session, student } = await lesson('on-focused');
+    await protectionOff(db, change(session, student, 5));
+    const before = await rowOf(session.id);
+    const back = change(session, student, 7);
+
+    expect(await protectionOn(db, back)).toMatchObject({
+      outcome: 'applied',
+      state: 'focused',
+      participationId: before.id,
+      session: { id: session.id },
+    });
+    expect((await rowOf(session.id)).state).toBe('focused');
+    expect(await typesOf(session.id)).toEqual([
+      'session_started',
+      'tap_in',
+      'protection_off',
+      'protection_on',
+    ]);
+    const recorded = one((await eventsFor(session.id)).filter((e) => e.type === 'protection_on'));
+    expect(recorded).toMatchObject({ eventId: back.eventId, payload: null, occurredAt: at(7) });
+  });
+
+  it('unlocked before it — or an unlock recorded while it was off: still unlocked, never relocked', async () => {
+    for (const when of ['before', 'during'] as const) {
+      const { session, student } = await lesson(`on-unlocked-${when}`);
+      if (when === 'before') await unlock(db, change(session, student, 4));
+      await protectionOff(db, change(session, student, 5));
+      if (when === 'during') {
+        expect((await unlock(db, change(session, student, 6))).recordedAs).toBe('protection_off');
+      }
+      expect(await protectionOn(db, change(session, student, 7)), when).toMatchObject({
+        outcome: 'applied',
+        state: 'unlocked',
+      });
+      expect((await rowOf(session.id)).state, when).toBe('unlocked');
+    }
+  });
+
+  it('back to focus after an unlock and a refocus, a re-tap or a late unlock: focused', async () => {
+    // The latest turn says the state before it (A9's rule): a refocus or a tap
+    // ends the unlock's; a late unlock turns nothing (A10).
+    for (const last of ['refocus', 'retap', 'late-unlock'] as const) {
+      const { session, student } = await lesson(`on-turn-${last}`);
+      if (last === 'late-unlock') {
+        await refocus(db, change(session, student, 6));
+        const late = await unlock(db, change(session, student, 4));
+        expect(late.recordedAs).toBe('superseded');
+      } else {
+        await unlock(db, change(session, student, 4));
+        if (last === 'refocus') await refocus(db, change(session, student, 5));
+        else await tapIn(db, change(session, student, 5));
+      }
+      await protectionOff(db, change(session, student, 8));
+      expect((await protectionOn(db, change(session, student, 9))).state, last).toBe('focused');
+    }
+  });
+
+  it('is refused where protection is not off, and records nothing: a re-tap already left it', async () => {
+    for (const how of ['never-off', 'retapped', 'unlocked'] as const) {
+      const { session, student } = await lesson(`on-not-off-${how}`);
+      if (how === 'retapped') {
+        await protectionOff(db, change(session, student, 5));
+        await tapIn(db, change(session, student, 6));
+      }
+      if (how === 'unlocked') await unlock(db, change(session, student, 6));
+      const before = await rowOf(session.id);
+
+      await expect(protectionOn(db, change(session, student, 7)), how).rejects.toMatchObject({
+        code: 'PROTECTION_NOT_OFF',
+      });
+      expect(await rowOf(session.id), how).toEqual(before);
+      expect(await typesOf(session.id), how).not.toContain('protection_on');
+    }
+  });
+
+  it('is idempotent: its retry replays the truth now, and once the student is out, names no session (A4)', async () => {
+    const { session, student } = await lesson('on-replay');
+    await protectionOff(db, change(session, student, 5));
+    const back = change(session, student, 7);
+    expect((await protectionOn(db, back)).outcome).toBe('applied');
+    await unlock(db, change(session, student, 8));
+
+    expect(await protectionOn(db, back)).toMatchObject({
+      outcome: 'replay',
+      state: 'unlocked',
+      session: { id: session.id },
+    });
+    const enrollment = one(
+      await db
+        .select()
+        .from(enrollments)
+        .where(
+          and(eq(enrollments.classId, session.classId), eq(enrollments.studentId, student.id)),
+        ),
+    );
+    await endEnrollment(db, {
+      enrollmentId: enrollment.id,
+      reason: 'removed_from_class',
+      at: at(9),
+    });
+    expect(await protectionOn(db, back)).toEqual({
+      outcome: 'replay',
+      state: null,
+      participationId: null,
+      session: null,
+    });
+    expect((await typesOf(session.id)).filter((t) => t === 'protection_on')).toHaveLength(1);
+  });
+
+  it('is refused past the bell, swept or not, and after an early end — its retry too — and nothing is recorded', async () => {
+    const { session, student } = await lesson('on-past-bell');
+    await protectionOff(db, change(session, student, 5));
+    const early = change(session, student, 6);
+    const pastBell = { ...change(session, student, 24), now: session.endsAt };
+    await expect(protectionOn(db, pastBell)).rejects.toMatchObject({
+      code: 'SESSION_NOT_RUNNING',
+    });
+    expect((await protectionOn(db, early)).outcome).toBe('applied');
+    await protectionOff(db, change(session, student, 7));
+    await endSession(db, { sessionId: session.id, at: at(10), reason: 'ended' });
+
+    for (const after of [change(session, student, 11), early]) {
+      await expect(protectionOn(db, after)).rejects.toMatchObject({
+        code: 'SESSION_NOT_RUNNING',
+      });
+    }
+    expect((await typesOf(session.id)).filter((t) => t === 'protection_on')).toHaveLength(1);
+  });
+
+  it('is refused with nothing live here: never tapped in, an outsider, the teacher', async () => {
+    const { school, teacher, student, klass } = await seedClass('on-nobody');
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const outsider = (await seedClass('on-nobody-outsider')).student;
+    const [absent] = await db
+      .insert(users)
+      .values({ cognitoId: 'student-on-nobody-absent', role: 'student', schoolId: school.id })
+      .returning();
+    await db.insert(enrollments).values({ classId: klass.id, studentId: absent!.id });
+    await tapIn(db, change(session, student, 1));
+    await protectionOff(db, change(session, student, 2));
+
+    for (const caller of [absent!, outsider, teacher]) {
+      await expect(protectionOn(db, change(session, caller, 3))).rejects.toMatchObject({
+        code: 'NOT_PARTICIPATING',
+      });
+    }
+    expect((await rowOf(session.id)).state).toBe('protection_off');
+    expect(await typesOf(session.id)).not.toContain('protection_on');
+    await expect(
+      protectionOn(db, { ...change(session, student, 3), sessionId: newUuidV7() }),
+    ).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+  });
+
+  it('an id another event holds is refused, never answered as a replay', async () => {
+    const { session, student } = await lesson('on-id-reuse');
+    const report = change(session, student, 5);
+    await protectionOff(db, report);
+    await expect(
+      protectionOn(db, { ...change(session, student, 6), eventId: report.eventId }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    expect((await rowOf(session.id)).state).toBe('protection_off');
+  });
+
+  it('one the phone made before a protection off of its own the server has is late: recorded, never applied', async () => {
+    // Off (#2), back on (#3) — that request outliving the phone's wait — and
+    // off again (#4), which went ahead of it: access is off, so it stays off.
+    const { session, student } = await lesson('on-late');
+    await protectionOff(db, change(session, student, 4, 2));
+    const slow = change(session, student, 5, 3);
+    await protectionOff(db, change(session, student, 6, 4));
+
+    expect(await protectionOn(db, slow)).toMatchObject({
+      outcome: 'replay',
+      state: 'protection_off',
+      session: { id: session.id },
+    });
+    expect((await rowOf(session.id)).state).toBe('protection_off');
+    const recorded = one(await db.select().from(events).where(eq(events.eventId, slow.eventId)));
+    expect(recorded).toMatchObject({
+      type: 'protection_on',
+      payload: { recorded_as: 'superseded' },
+      orderSeq: 3,
+    });
+    // Made after that protection off, by the phone's order, it applies.
+    expect((await protectionOn(db, change(session, student, 7, 5))).state).toBe('focused');
+    // With no order to compare, one applies as it arrives — as a refocus does (A13).
+    await protectionOff(db, change(session, student, 9, 7));
+    expect((await protectionOn(db, change(session, student, 8))).state).toBe('focused');
+  });
+
+  it('counts as contact: last seen moves, by the server’s clock', async () => {
+    const { session, student } = await lesson('on-contact');
+    await protectionOff(db, change(session, student, 5));
+    const stale = new Date('2026-01-01T09:06:00Z');
+    await db
+      .update(participations)
+      .set({ lastSeenAt: stale })
+      .where(eq(participations.sessionId, session.id));
+    await protectionOn(db, change(session, student, 7));
+    const seen = (await rowOf(session.id)).lastSeenAt!;
+    expect(Math.abs(Date.now() - seen.getTime())).toBeLessThan(60_000);
   });
 });
 

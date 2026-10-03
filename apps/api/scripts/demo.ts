@@ -347,7 +347,8 @@ async function main(): Promise<void> {
       );
       console.log(`  live: protection_off for Ana arrived on the stream at seq ${liveOff.seq}.`);
 
-      // Refocus cannot leave it: her shields are gone, and only a re-tap re-shields.
+      // Refocus cannot leave it: her shields are gone, and a re-tap re-shields (as Screen
+      // Time turned back on would, #167).
       const refused = await call<ApiErrorBody>('POST', `/v1/sessions/${sid}/refocus`, {
         token: ana.token,
         body: { eventId: randomUUID(), deviceTime: iso() },

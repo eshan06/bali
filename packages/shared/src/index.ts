@@ -157,6 +157,10 @@ export const EVENT_TYPES = [
   // session, its payload the reason and the unlock's event id. The unlock's
   // own event is never rewritten; its reason now is its latest change's.
   'unlock_reason_changed',
+  // Screen Time back on, in the class the student tapped into (#167, the
+  // owner's decision 2026-10-02): out of protection off to the state before
+  // it — focused, or unlocked where their latest turn there is an unlock.
+  'protection_on',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -178,6 +182,7 @@ export const HISTORY_EVENT_TYPES = [
   'armed_tap_skipped',
   'session_ended',
   'session_expired',
+  'protection_on',
 ] as const satisfies readonly EventType[];
 export type HistoryEventType = (typeof HISTORY_EVENT_TYPES)[number];
 
@@ -228,8 +233,9 @@ export type ProtectionOffRecordedAs = (typeof PROTECTION_OFF_RECORDED_AS)[number
  * and value a late unlock carries for the mirror case. `superseded`: the
  * student's own unlock in that session came after it by the phone's own order
  * (A12): the phone made the return, then the unlock, and the return reached the
- * server last — so the unlock stands (owner ruling, 2026-09-24; A13).
- * Additive-only like the other vocab.
+ * server last — so the unlock stands (owner ruling, 2026-09-24; A13). So too
+ * Screen Time back on that the phone's own later protection off went ahead of
+ * (#167): that protection off stands. Additive-only like the other vocab.
  */
 export const RETURN_RECORDED_AS = ['superseded'] as const;
 export type ReturnRecordedAs = (typeof RETURN_RECORDED_AS)[number];

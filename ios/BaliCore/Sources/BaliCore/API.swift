@@ -204,6 +204,27 @@ public struct ProtectionOffResponse: Codable, Sendable, Hashable {
     public let session: SessionView?
 }
 
+/// `POST /v1/sessions/{id}/protection-on` — Screen Time back on in the class the student tapped
+/// into (#167): the state before protection off, with no re-tap.
+public struct ProtectionOnRequest: Codable, Sendable, Hashable {
+    public let eventId: String
+    public let deviceTime: Date
+    public let order: ActionOrder?
+    public init(eventId: String, deviceTime: Date, order: ActionOrder? = nil) {
+        (self.eventId, self.deviceTime, self.order) = (eventId, deviceTime, order)
+    }
+}
+
+public struct ProtectionOnResponse: Codable, Sendable, Hashable {
+    /// `PROTECTION_ON_OUTCOMES`.
+    public enum Outcome: String, CaseIterable, Sendable { case applied, replay }
+    public let outcome: OrUnknown<Outcome>
+    /// Where it returned the student — focused, or unlocked after an unlock — or, on a replay, the
+    /// state now; nil once they are out of the session.
+    public let state: OrUnknown<ParticipationState>?
+    public let session: SessionView?
+}
+
 /// `POST /v1/enrollments` — join a class by its code.
 public struct EnrollmentJoinRequest: Codable, Sendable, Hashable {
     public let joinCode: String

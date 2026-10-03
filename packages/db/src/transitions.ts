@@ -74,7 +74,7 @@ import type { Database } from './types.js';
  * the two, of which only the look holds the session's window.
  *
  * A13 added one more to a tap carrying the phone's order: the look for an
- * unlock of the student's own after it (`unlockedSince`), inside the window —
+ * unlock of the student's own after it (`madeSince`), inside the window —
  * ~5.8 ms per tap against ~5.1 ms, measured over 30 ordered taps a round; the
  * read itself is ~0.04 ms through `events_user_occurred_idx`, the rest its
  * round trip.
@@ -100,6 +100,7 @@ export const TRANSITION_ERROR_CODES = [
   'CLASS_IN_SESSION',
   'UNLOCK_NOT_FOUND',
   'UNLOCK_SUPERSEDED',
+  'PROTECTION_NOT_OFF',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -1816,7 +1817,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       // one it made before a tap of theirs recorded in another session, which
       // would switch them back out of it (A14).
       const late =
-        (await unlockedSince(tx, session, input.studentId, order)) ||
+        (await madeSince(tx, session, input.studentId, order, 'unlock')) ||
         (await tappedSince(tx, input.studentId, order, session.id));
 
       const isNew = await insertEvent(tx, {
@@ -2041,32 +2042,46 @@ export interface StateChangeResult {
   session: SessionRow | null;
 }
 
+/** A stored state a change refuses to move a student out of — or, `onlyOutOf`, any but it. */
+interface StateRule {
+  state: ParticipationState;
+  code: TransitionErrorCode;
+  message: string;
+}
+
 /**
- * Shared body for the strict in-session state changes (refocus / protection
- * off): they need a live participation to move and refuse otherwise. Emergency
- * unlock does NOT use this — it must never refuse in a way that discards a
- * record (ISSUES.md #2), so it has its own body below.
+ * Shared body for the strict in-session state changes (refocus, protection
+ * off, Screen Time back on): they need a live participation to move and refuse
+ * otherwise. Emergency unlock does NOT use this — it must never refuse in a way
+ * that discards a record (ISSUES.md #2), so it has its own body below.
  */
 async function changeState<Ended = never>(
   db: Database,
   input: RefocusInput,
   eventType: EventType,
-  nextState: ParticipationState,
+  /** Where it moves the student: a state, or one read under the lock as it applies (#167). */
+  nextState:
+    | ParticipationState
+    | ((tx: Database, session: SessionRow, studentId: string) => Promise<ParticipationState>),
   rules: {
     /** A stored state this change may not move a student out of; it refuses with `code`. */
-    cannotLeave?: { state: ParticipationState; code: TransitionErrorCode; message: string };
+    cannotLeave?: StateRule;
+    /** The one stored state this change moves a student out of; any other refuses with `code`. */
+    onlyOutOf?: StateRule;
     /** Refuse a replay whose participation has ended, rather than answer it with no session. */
     replayNeedsLive?: boolean;
     /** Answer a change that reaches an ended session instead of refusing it; runs under the session lock. */
     afterEnd?: (tx: Database, session: SessionRow) => Promise<Ended>;
     /**
-     * A return to focus: refused past the bell, swept or not (A17), and late —
-     * recorded but never applied — when an unlock came after it (A13).
+     * A return — to focus, or Screen Time back on to the state before
+     * protection off: refused past the bell, swept or not (A17), and late —
+     * recorded but never applied — when the phone made one of these after it,
+     * by its own order (A13; #167).
      */
-    returning?: boolean;
+    returning?: EventType;
   } = {},
 ): Promise<StateChangeResult | Ended> {
-  const { cannotLeave, replayNeedsLive = false, afterEnd, returning = false } = rules;
+  const { cannotLeave, onlyOutOf, replayNeedsLive = false, afterEnd, returning } = rules;
   // Retry on deadlock: this locks the session first and the participation row
   // second, while the silence sweep, a tap switching the student out of this
   // session, and an armed tap converting at another Start take the row first —
@@ -2096,14 +2111,16 @@ async function changeState<Ended = never>(
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
       const order = knownOrder(input.order);
       const row = await loadParticipation(tx, session.id, input.studentId);
-      // A return the student's own later unlock went ahead of is noted as it
-      // is recorded — history is append-only — and judged only where it would
-      // otherwise apply, so every refusal below stands as it was (A13).
+      // A return the student's own later unlock — or, for Screen Time back on,
+      // later protection off — went ahead of is noted as it is recorded —
+      // history is append-only — and judged only where it would otherwise
+      // apply, so every refusal below stands as it was (A13; #167).
       const late =
-        returning &&
+        returning !== undefined &&
         row?.endedAt === null &&
         row.state !== cannotLeave?.state &&
-        (await unlockedSince(tx, session, input.studentId, order));
+        (onlyOutOf === undefined || row.state === onlyOutOf.state) &&
+        (await madeSince(tx, session, input.studentId, order, returning));
 
       const isNew = await insertEvent(tx, {
         eventId: input.eventId,
@@ -2148,6 +2165,9 @@ async function changeState<Ended = never>(
       if (cannotLeave !== undefined && row.state === cannotLeave.state) {
         throw new TransitionError(cannotLeave.code, cannotLeave.message);
       }
+      if (onlyOutOf !== undefined && row.state !== onlyOutOf.state) {
+        throw new TransitionError(onlyOutOf.code, onlyOutOf.message);
+      }
 
       await closeOpenSilence(
         tx,
@@ -2159,15 +2179,22 @@ async function changeState<Ended = never>(
         },
         occurredAt,
       );
-      // Late, it is contact and nothing more: the unlock after it stands, and
+      // Late, it is contact and nothing more: what went ahead of it stands, and
       // the answer is its retry's — the truth now, which the phone applies.
+      if (late) {
+        await tx
+          .update(participations)
+          .set({ lastSeenAt: heardNow() })
+          .where(eq(participations.id, row.id));
+        return { outcome: 'replay', state: row.state, participationId: row.id, session };
+      }
+      const state =
+        typeof nextState === 'string' ? nextState : await nextState(tx, session, input.studentId);
       await tx
         .update(participations)
-        .set(late ? { lastSeenAt: heardNow() } : { state: nextState, lastSeenAt: heardNow() })
+        .set({ state, lastSeenAt: heardNow() })
         .where(eq(participations.id, row.id));
-      return late
-        ? { outcome: 'replay', state: row.state, participationId: row.id, session }
-        : { outcome: 'applied', state: nextState, participationId: row.id, session };
+      return { outcome: 'applied', state, participationId: row.id, session };
     }),
   );
 }
@@ -2315,13 +2342,16 @@ const LATE_RETURN = { recorded_as: 'superseded' satisfies ReturnRecordedAs };
  * actions came last, a note only why an unlock flipped nothing. Only the order
  * says so, never the times: with none, or another install's, the return applies
  * as it arrives — a clock running fast at an unlock would clamp it to the bell,
- * and no return could ever come after it.
+ * and no return could ever come after it. `type` is what is looked for: an
+ * unlock, or for Screen Time back on a protection off — which then stands, the
+ * phone having found access taken back again after it (#167).
  */
-async function unlockedSince(
+async function madeSince(
   tx: Database,
   session: SessionRow,
   studentId: string,
   order: ActionOrder | null,
+  type: EventType,
 ): Promise<boolean> {
   if (order === null) return false;
   const later = await tx
@@ -2330,10 +2360,10 @@ async function unlockedSince(
     .where(
       and(
         eq(events.userId, studentId),
-        // Every unlock here is clamped into the window: `returnedSince`'s read.
+        // Every record here is clamped into the window: `returnedSince`'s read.
         between(events.occurredAt, session.startedAt, session.endsAt),
         eq(events.sessionId, session.id),
-        eq(events.type, 'unlock'),
+        eq(events.type, type),
         eq(events.orderInstall, order.install),
         gt(events.orderSeq, order.seq),
       ),
@@ -2894,11 +2924,12 @@ export async function changeUnlockReason(
  * Return to focus after an unlock. Never out of protection off: iOS dropped
  * every shield when the permission went, so claiming focus without re-shielding
  * would put a green chip over an unshielded phone. Only a re-tap — which
- * re-shields — leaves protection off (ARCHITECTURE, iOS rules). A replay after
- * the participation ended while the session runs names no session (A4). One
- * the phone made before an unlock the server already has is late: recorded,
- * noted `superseded`, never applied, and answered as its retry is (A13). Past
- * the bell, swept or not, it is refused as after the sweep (A17).
+ * re-shields — or Screen Time back on (`protectionOn`) leaves protection off
+ * (ARCHITECTURE, iOS rules). A replay after the participation ended while the
+ * session runs names no session (A4). One the phone made before an unlock the
+ * server already has is late: recorded, noted `superseded`, never applied, and
+ * answered as its retry is (A13). Past the bell, swept or not, it is refused as
+ * after the sweep (A17).
  */
 export function refocus(db: Database, input: RefocusInput): Promise<StateChangeResult> {
   return changeState(db, input, 'refocus', 'focused', {
@@ -2907,7 +2938,47 @@ export function refocus(db: Database, input: RefocusInput): Promise<StateChangeR
       code: 'PROTECTION_OFF',
       message: 'protection is off; only a re-tap returns to focus',
     },
-    returning: true,
+    returning: 'unlock',
+  });
+}
+
+/**
+ * Where Screen Time back on returns a student (#167): the state before
+ * protection off, as their latest turn in the session says — the chip's own
+ * rule (A9, `latestTurn`). Unlocked after an unlock, one recorded under
+ * protection off included (it changed nothing then, and stands once the
+ * permission is back); else focused, after a tap or a return to focus.
+ */
+async function stateBeforeOff(
+  tx: Database,
+  session: SessionRow,
+  studentId: string,
+): Promise<ParticipationState> {
+  const turn = firstOrUndefined(await latestTurn(tx, session.id, studentId));
+  return turn?.type === 'unlock' ? 'unlocked' : 'focused';
+}
+
+/**
+ * Screen Time back on, in the class the student tapped into (#167, the owner's
+ * decision 2026-10-02): out of protection off to the state before it — focused,
+ * so the phone shields again, or still unlocked after an Emergency Unlock — with
+ * no re-tap, recorded as its own `protection_on` event; the protection off stays
+ * in the history. Strict like refocus: a live participation in protection off
+ * (else `PROTECTION_NOT_OFF`, and nothing recorded), in a session running by the
+ * server's clock (refused past the bell, swept or not, A17). A replay after the
+ * participation ended while the session runs names no session (A4). One the
+ * phone made before a protection off of its own the server already has is late:
+ * recorded, noted `superseded`, never applied — access went again after it —
+ * and answered as its retry is.
+ */
+export function protectionOn(db: Database, input: RefocusInput): Promise<StateChangeResult> {
+  return changeState(db, input, 'protection_on', stateBeforeOff, {
+    onlyOutOf: {
+      state: 'protection_off',
+      code: 'PROTECTION_NOT_OFF',
+      message: 'protection is not off; nothing to turn back on',
+    },
+    returning: 'protection_off',
   });
 }
 

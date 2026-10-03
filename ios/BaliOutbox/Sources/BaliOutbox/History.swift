@@ -152,6 +152,7 @@ extension History.Moment {
                 ["Unlocked", event.reason?.known?.rawValue.capitalized].compactMap { $0 }
                     .joined(separator: " · ")
             case .protectionOff: "Screen Time off"
+            case .protectionOn: "Screen Time back on"
             case .leftForOtherSession: "Switched to another class"
             case .enrollmentLeft: "Left the class"
             case .enrollmentRemoved: "Removed from the class"

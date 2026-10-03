@@ -9,6 +9,7 @@ import {
   type HistoryPage,
   type MeResponse,
   PROTECTION_OFF_OUTCOMES,
+  PROTECTION_ON_OUTCOMES,
   REFOCUS_OUTCOMES,
   TAP_OUTCOMES,
   UNLOCK_REASON_OUTCOMES,
@@ -133,6 +134,15 @@ const SCENARIOS: Record<string, string> = {
   'protection-off/recorded':
     'A protection-off report first reaching the server after the session ended (A2c): no session.',
   'protection-off/recorded-replay': 'The retry of that late report: still no session.',
+  'protection-on/applied':
+    'Screen Time back on in the class the student tapped into (#167): back to focus, with no re-tap.',
+  'protection-on/replay': 'The retry of that, the student still in the session.',
+  'protection-on/409-protection-not-off':
+    'Screen Time back on with protection not off: refused, nothing recorded.',
+  'protection-on/applied-unlocked':
+    'Screen Time back on after an unlock recorded while it was off: still unlocked, never relocked.',
+  'protection-on/replay-no-session':
+    'The retry of Screen Time back on, after the student was removed (A4): recorded, no session.',
   'enrollments/joined': 'A student joins a class by its code.',
   'enrollments/already-enrolled': 'Joining a class the student is already in: a no-op.',
   'enrollments/404-class-not-found': 'A join code no class has.',
@@ -364,8 +374,24 @@ async function captureAll() {
   await capture('protection-off/replay', report, 200, { outcome: 'replay' });
   const off = { reason: 'protection_off' };
   await capture('refocus/409-protection-off', change(ana, s.id, 'refocus'), 409, off);
+  // Screen Time back on (#167), as the phone sends it, its order with it: back to
+  // focus, no re-tap; its retry; and another once it is on, refused.
+  const backOn = change(ana, s.id, 'protection-on', randomUUID(), {
+    order: { install: randomUUID(), seq: 1 },
+  });
+  const focused = { outcome: 'applied', state: 'focused' };
+  await capture('protection-on/applied', backOn, 200, focused);
+  await capture('protection-on/replay', backOn, 200, { outcome: 'replay' });
+  const notOff = { reason: 'protection_not_off' };
+  const onAgain = change(ana, s.id, 'protection-on');
+  await capture('protection-on/409-protection-not-off', onAgain, 409, notOff);
+  await setup(change(ana, s.id, 'protection-off'));
   const noted = { outcome: 'recorded', recordedAs: 'protection_off' };
   await capture('unlock/recorded-protection-off', change(ana, s.id, 'unlock'), 200, noted);
+  // On again, after that unlock: it stands — still unlocked.
+  const stillUnlocked = { outcome: 'applied', state: 'unlocked' };
+  const onUnlocked = change(ana, s.id, 'protection-on');
+  await capture('protection-on/applied-unlocked', onUnlocked, 200, stillUnlocked);
   const spent = { reason: 'event_id_conflict' };
   await capture('unlock/409-event-id-conflict', change(ana, s.id, 'unlock', landed), 409, spent);
   await capture('taps/409-event-id-conflict', tap(newcomer, c.block.tagId, landed), 409, spent);
@@ -379,6 +405,7 @@ async function captureAll() {
   await setup(del(await token(c.teacher.cognitoId), anasEnrollment));
   const gone = { outcome: 'replay', session: null };
   await capture('refocus/replay-no-session', refocus, 200, gone);
+  await capture('protection-on/replay-no-session', backOn, 200, gone);
   await capture('checkin/gone', checkin(ana, s.id), 200, { status: 'gone' });
   const out = { reason: 'not_participating' };
   await capture('refocus/409-not-participating', change(ana, s.id, 'refocus'), 409, out);
@@ -641,6 +668,7 @@ async function captureAll() {
   await setup(change(her, sA.id, 'unlock', randomUUID(), { reason: 'bathroom', ...at('09:10') }));
   await setup(change(her, sA.id, 'refocus', randomUUID(), at('09:14')));
   await setup(change(her, sA.id, 'protection-off', randomUUID(), at('09:20')));
+  await setup(change(her, sA.id, 'protection-on', randomUUID(), at('09:21')));
   await setup(tapAt(p3.block.tagId, '09:22'));
   await endAt(sA.id, '09:50', 'expired');
   await setup(change(her, sA.id, 'unlock', randomUUID(), at('09:55')));
@@ -779,6 +807,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     );
     expect(valuesOf('RefocusResponse', 'outcome')).toEqual(new Set(REFOCUS_OUTCOMES));
     expect(valuesOf('ProtectionOffResponse', 'outcome')).toEqual(new Set(PROTECTION_OFF_OUTCOMES));
+    expect(valuesOf('ProtectionOnResponse', 'outcome')).toEqual(new Set(PROTECTION_ON_OUTCOMES));
     expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(CHECK_IN_STATUSES));
     expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(UPDATE_ME_OUTCOMES));
     const reasonChanges = valuesOf('UnlockReasonResponse', 'outcome');
@@ -830,7 +859,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(next).toEqual(new Set([true, false]));
     // A replay, and a boot call, with a session and without: the session, not
     // the outcome, gives a phone its window (A3, A4).
-    for (const type of ['TapResponse', 'RefocusResponse', 'MeResponse']) {
+    for (const type of ['TapResponse', 'RefocusResponse', 'ProtectionOnResponse', 'MeResponse']) {
       const answers = all.filter(
         (f) => f.type === type && (type === 'MeResponse' || bodyOf(f).outcome === 'replay'),
       );
