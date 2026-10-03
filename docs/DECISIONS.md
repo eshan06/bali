@@ -51,7 +51,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   stays shown), the carried arming's comment, a test of a class over unswept with no tap waiting
   (Session over, `takenAndOver`), and this entry's test name. One left: a write of the end the file
   refuses is not tried again — only a suspension landing between the answer's settle and it can
-  refuse it, and a relaunch then ends the wait early or reads none, the safe side.
+  refuse it, and a relaunch then ends the wait early or reads none, the safe side. **Round 2:** the
+  fixes held, no blocker; both reviewers' two WARNs fixed — the race test asks for a 200 (a 500
+  passed it), and `endNotKept` pins a refused write of the end staying said (red with the write
+  back below the copy).
 
 - **2026-10-03** — **F11a-2: the merged PRs' review WARNs, part 2 — Me, Leave, Home and Unlocked.**
   **"Hasn't reached your teacher yet" is cleared by the file too, not the queue's edge alone**

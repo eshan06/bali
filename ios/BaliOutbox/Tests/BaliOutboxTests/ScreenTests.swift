@@ -1066,6 +1066,28 @@ struct DroppedWaitTests {
     }
 
     @Test(
+        "An end the file refuses to keep is said — storage failed (rule 5) — and kept in memory: armed again while waiting, where no write of the standing would say it (santa's round 2)"
+    )
+    func endNotKept() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.outbox.pool.write {
+            try $0.execute(
+                sql: """
+                    CREATE TRIGGER refuse BEFORE INSERT ON outboxState WHEN NEW.key = 'waitEnds'
+                    BEGIN SELECT RAISE(ABORT, 'refused'); END
+                    """)
+        }
+        rig.clock.advance(by: 86_400)
+        try await armed(rig)
+        let state = await rig.engine.state
+        #expect(state.link == .storageFailed)
+        #expect(state.waitEnds == SyncState.waitEnds(armedAt: at(86_400)))
+        #expect(try rig.outbox.waitEnds() == SyncState.waitEnds(armedAt: t0))
+        await rig.stop()
+    }
+
+    @Test(
         "The end is kept with the wait: Bali opened again past it, offline, is Home; a wait an earlier build kept, with no end, waits until a read ends it"
     )
     func relaunched() async throws {

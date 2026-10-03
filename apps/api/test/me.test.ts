@@ -603,7 +603,8 @@ describe('GET /v1/me', () => {
       expect(started.armedConverted).toBe(1);
       return live;
     });
-    const { body } = await me(token);
+    const { status, body } = await me(token);
+    expect(status).toBe(200);
     // Still waiting, read before the Start; or in its session, read after it.
     expect(body.session !== null || body.armed).toBe(true);
   });
