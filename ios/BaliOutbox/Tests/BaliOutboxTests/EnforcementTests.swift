@@ -1195,7 +1195,7 @@ struct BackOnTests {
     }
 
     @Test(
-        "Unlocked before Screen Time went off: still unlocked once it is back on — never relocked over the Emergency Unlock — at once and by the server's answer"
+        "Unlocked before Screen Time went off: still unlocked once it is back on — never relocked over the Emergency Unlock — at once and by the server's answer, its reason still changeable as before (A20; santa's round 1)"
     )
     func stillUnlocked() async throws {
         let (rig, phone) = try await off(unlocked: true)
@@ -1204,7 +1204,10 @@ struct BackOnTests {
         await rig.until { $0.standing == .inSession(session(), .unlocked) }
         try await rig.server.next(protectionOnRoute).reply(
             200, Answer.protectionOn(state: "unlocked"))
-        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        let state = await rig.until {
+            $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked)
+        }
+        #expect(UnlockedWords(state)?.picker == .open(nil))
         let now = await phone.until { !$0.permissionOff }
         #expect(!now.shielded && now.until == nil)
         #expect(await phone.screenTime.shields == shields)
@@ -1213,14 +1216,68 @@ struct BackOnTests {
     }
 
     @Test(
-        "Past the class's bell by the phone's clock, or out of a class, Screen Time back on changes nothing and sends nothing"
+        "Made once: a second Screen Time back on — a check that overlapped the first, both reading protection off before either recorded — finds the phone back where it stood and records nothing, never focus over the Emergency Unlock the first returned to (santa's round 1)"
     )
-    func overOrOut() async throws {
+    func once() async throws {
+        let (rig, phone) = try await off(unlocked: true)
+        #expect(try await rig.engine.record(.protectionOn(session: "s")) != nil)
+        #expect(try await rig.engine.record(.protectionOn(session: "s")) == nil)
+        let state = await rig.engine.state
+        #expect(state.standing == .inSession(session(), .unlocked))
+        #expect(state.queued.map(\.change) == [.protectionOn(session: "s")])
+        #expect(try rig.outbox.standing() == .inSession(session(), .unlocked))
+        await phone.stop()
+    }
+
+    @Test(
+        "Unlocked, and back on's answer late — protection off again by the server's truth: the next check's back on still returns to unlocked, where the phone stood before protection off, never focus over the Emergency Unlock (santa's round 1)"
+    )
+    func lateUnlocked() async throws {
+        let (rig, phone) = try await off(unlocked: true)
+        try await phone.enforcer.requestPermission()
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.replay(state: "protection_off"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        await phone.enforcer.check()
+        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.protectionOn(state: "unlocked"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    @Test(
+        "Where the phone stood before protection off not known — reported by the build before this one — back on passes the unlock guard: an Emergency Unlock still queued there keeps it unlocked (santa's round 1)"
+    )
+    func notKnown() async throws {
+        let (outbox, url) = try makeOutbox()
+        try record(outbox, .unlock(session: "s", reason: nil))
+        try record(outbox, .protectionOff(session: "s"))
+        try outbox.keep(.inSession(session(), .protectionOff))
+        let rig = try Rig(outbox: try open(url))
+        await rig.until { $0.standing == .inSession(session(), .protectionOff) }
+        try await rig.engine.record(.protectionOn(session: "s"))
+        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        await rig.stop()
+    }
+
+    @Test(
+        "Past the class's bell by the phone's clock, or out of a class, Screen Time back on changes nothing and sends nothing",
+        arguments: [true, false])
+    func overOrOut(over: Bool) async throws {
         let (rig, phone) = try await off()
-        rig.clock.advance(by: 3000)
+        if over {
+            rig.clock.advance(by: 3000)
+        } else {
+            // The server has the phone in no class.
+            try await rig.foreground(Answer.me(nil))
+            await rig.until { $0.standing == .out }
+        }
         try await phone.enforcer.requestPermission()
         #expect(try rig.outbox.records().isEmpty)
-        #expect(await rig.engine.state.standing == .inSession(session(), .protectionOff))
+        let standing: Standing = over ? .inSession(session(), .protectionOff) : .out
+        #expect(await rig.engine.state.standing == standing)
         await phone.stop()
     }
 

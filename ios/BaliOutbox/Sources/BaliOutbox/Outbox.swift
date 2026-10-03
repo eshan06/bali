@@ -443,7 +443,8 @@ public struct Outbox: Sendable {
     /// only make the truth older). Protection off is reported once per revocation — nil when
     /// already reported in this session — and again after a tap, which returns the row to
     /// focused, Screen Time back on (#167), or `protectionRestored`; with it, where the phone stood
-    /// there before it (`offFrom`), which Screen Time back on returns to. An unlock waiting for its
+    /// there before it (`offFrom`), which Screen Time back on returns to — kept until a tap or the
+    /// next report, so a back on made again returns there too. An unlock waiting for its
     /// reason is due `hold` later (C5a), and whatever the phone does next sends one at once: the
     /// student has moved on.
     @discardableResult
@@ -508,9 +509,9 @@ public struct Outbox: Sendable {
                     try Self.setState(db, Self.offFromKey, state.rawValue)
                 }
                 row = ("protection_off", nil, session, nil)
+            // `offFrom` kept: a back on answered late, or not at all, is made again from there.
             case .protectionOn(let session):
                 try Self.setState(db, Self.reportedKey, nil)
-                try Self.setState(db, Self.offFromKey, nil)
                 row = ("protection_on", nil, session, nil)
             }
             try db.execute(
@@ -566,7 +567,8 @@ public struct Outbox: Sendable {
     }
 
     /// Where the phone stood in that session before protection off — focused, or unlocked — which
-    /// Screen Time back on returns it to at once (#167); nil: not known.
+    /// Screen Time back on returns it to at once (#167), until a tap or the next report; nil: not
+    /// known.
     func offFrom() throws -> ParticipationState? {
         try pool.read { try Self.state($0, Self.offFromKey).flatMap(ParticipationState.init) }
     }

@@ -294,8 +294,9 @@ public actor Enforcer {
     /// decision 2026-10-02): with the marker there again — written only once iOS confirmed the
     /// access — and that class still running by the phone's own clock, the phone goes back where it
     /// stood before it, at once, and tells the server, which returns the row there too: no re-tap.
-    /// The change moves the standing out of protection off, so it is made once. Not saved — the
-    /// file refusing it — the next check makes it again, and meanwhile the screen offers the re-tap.
+    /// Made once: the engine records it only out of protection off, so a check overlapping this one
+    /// records none (`SyncEngine.record`). Not saved — the file refusing it — the next check makes
+    /// it again, and meanwhile the screen offers the re-tap.
     /// Out of a class, or past its bell, nothing changes.
     private func backOn() async {
         guard await screenTime.marker() == .present,

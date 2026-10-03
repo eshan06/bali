@@ -259,7 +259,7 @@ struct SchemaTests {
     }
 
     @Test(
-        "Protection off keeps where the phone stood before it in that session — focused, or unlocked — which Screen Time back on returns to, and both forget it, as a tap does; reported again from protection off, it keeps the first (#167)"
+        "Protection off keeps where the phone stood before it in that session — focused, or unlocked — which Screen Time back on returns to, and keeps for a back on made again (santa's round 1); the next report writes it anew, a tap forgets it; reported again from protection off, it keeps the first (#167)"
     )
     func offFrom() throws {
         let (outbox, _) = try makeOutbox()
@@ -270,7 +270,7 @@ struct SchemaTests {
             try record(outbox, .protectionOff(session: "s"))
             #expect(try outbox.offFrom() == kept && outbox.reportedOff() == "s")
             try record(outbox, .protectionOn(session: "s"))
-            #expect(try outbox.offFrom() == nil && outbox.reportedOff() == nil)
+            #expect(try outbox.offFrom() == kept && outbox.reportedOff() == nil)
         }
         // Standing in protection off already, or in another session, nothing new is known.
         try outbox.keep(.inSession(session(), .unlocked))
