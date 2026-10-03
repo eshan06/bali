@@ -65,6 +65,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   second ask under way, as iOS does, so losing the single flight fails the test, never hangs it);
   the monitor's note reported past the bell, and not one from after it; and a launch with the
   marker gone off at once. Each new rule, removed alone, turns a test red (nine mutations).
+  **Santa** (two Claude reviewers — Codex refuses every model on this Mac): no blockers. From its
+  WARNs: the monitor's empty-store condition, `notDeterminedPassing` kept unmarked so it tests the
+  grace again, and the README's minute's watch of the marker after Allow. Left open: Focus's Turn
+  on Screen Time opens Settings, which cannot bring a marker back (Focus shows over a missing one
+  only while its report cannot be queued); iOS 17's answer to the silent ask (seen on 18.6.2
+  only); and a phone whose marker never reads back keeps the pre-F1b blindness, with a silent ask
+  at each check.
 
 - **2026-10-02** — **F12 (CI): a PR merges only after its Claude Review has passed.** **Found**
   (#154; first seen by B4c's worker and kept only as a GOTCHAS note): the review job skipped drafts
