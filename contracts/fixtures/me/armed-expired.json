@@ -1,6 +1,6 @@
 {
   "endpoint": "GET /v1/me",
-  "scenario": "The boot call of a student in a class, with no session running and their tap waiting for Start.",
+  "scenario": "The same boot call once that tap’s school day has ended: it waits no more (#166).",
   "request": {
     "path": "/v1/me"
   },
@@ -24,6 +24,6 @@
       }
     ],
     "session": null,
-    "armed": true
+    "armed": false
   }
 }

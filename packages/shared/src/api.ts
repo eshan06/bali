@@ -97,6 +97,14 @@ export interface MeResponse {
   classes: MeClassWithTeacher[];
   /** The caller's live session, if any, with its derived display state. */
   session: (SessionView & { state: DisplayState }) | null;
+  /**
+   * Whether a tap of the caller's waits for a Start that would join them
+   * (decision 5; #166, additive): not taken by a Start, not past the end of
+   * its school day by the server's clock, and for a teacher of a class they
+   * are in — what a Start converts. False once none does, so a phone waiting
+   * for its teacher's Start stops waiting. False for a teacher.
+   */
+  armed: boolean;
 }
 
 // PATCH /v1/me — a student sets their own display name (A8). Unique within

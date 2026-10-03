@@ -13,6 +13,7 @@
       "displayName": null
     },
     "classes": [],
-    "session": null
+    "session": null,
+    "armed": false
   }
 }

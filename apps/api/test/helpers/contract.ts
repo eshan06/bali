@@ -144,6 +144,7 @@ export const SCHEMAS = {
       ...sessionView.shape,
       state: z.enum([...PARTICIPATION_STATES, 'ended', 'silent']),
     }).nullable(),
+    armed: z.boolean(),
   }),
   TapResponse: object<TapResponse>()({
     outcome: z.enum(TAP_OUTCOMES),

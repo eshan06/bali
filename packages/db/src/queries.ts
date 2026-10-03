@@ -12,7 +12,16 @@ import {
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { SQLWrapper } from 'drizzle-orm';
 
-import { blocks, classes, enrollments, events, participations, sessions, users } from './schema.js';
+import {
+  armedTaps,
+  blocks,
+  classes,
+  enrollments,
+  events,
+  participations,
+  sessions,
+  users,
+} from './schema.js';
 import type { Database } from './types.js';
 
 /*
@@ -258,6 +267,35 @@ export async function getTaughtClasses(db: Database, teacherId: string): Promise
     .select()
     .from(classes)
     .where(and(eq(classes.teacherId, teacherId), isNull(classes.removedAt)));
+}
+
+/**
+ * Whether a tap of the student's waits for a Start that would join them
+ * (decision 5): not consumed, not expired at `at` — the end of its school day —
+ * and for a teacher of a live class they are in, as the Start's own read of its
+ * waiting taps judges (`lockWaitingTaps`). `/v1/me` says it (#166), so a phone
+ * waiting for its teacher's Start stops waiting once none does.
+ */
+export async function hasArmedTap(db: Database, studentId: string, at: Date): Promise<boolean> {
+  const waiting = await db
+    .select({ id: armedTaps.id })
+    .from(armedTaps)
+    .innerJoin(classes, eq(classes.teacherId, armedTaps.teacherId))
+    .innerJoin(
+      enrollments,
+      and(eq(enrollments.classId, classes.id), eq(enrollments.studentId, armedTaps.studentId)),
+    )
+    .where(
+      and(
+        eq(armedTaps.studentId, studentId),
+        isNull(armedTaps.consumedAt),
+        gt(armedTaps.expiresAt, at),
+        isNull(classes.removedAt),
+        isNull(enrollments.removedAt),
+      ),
+    )
+    .limit(1);
+  return waiting.length > 0;
 }
 
 /** The student's current live participation and its session, if any. */

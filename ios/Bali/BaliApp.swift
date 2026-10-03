@@ -755,7 +755,9 @@ final class Phone {
             switch phone.sync?.standing {
             case .inSession(let session, let state)?:
                 "\(state?.rawValue ?? "unknown") until \(time(session.endsAt))"
-            case .waiting?: "waiting for the teacher's Start"
+            case .waiting?:
+                "waiting for the teacher's Start"
+                    + (phone.sync?.waitEnds.map { ", until \(day($0))" } ?? ", no end kept")
             case .unread?: "not read from the phone yet — Emergency Unlock still works"
             case .out?, nil: "in no session"
             }
@@ -776,6 +778,7 @@ final class Phone {
         }
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+        private func day(_ date: Date) -> String { date.formatted(date: .abbreviated, time: .shortened) }
 
         /// The asks of iOS for the access since this launch, newest first (F1b).
         private var asks: String {

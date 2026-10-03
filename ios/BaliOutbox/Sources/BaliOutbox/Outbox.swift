@@ -420,13 +420,15 @@ public struct Outbox: Sendable {
     }
 
     /// The session protection off was last reported for, and where the phone stood there before
-    /// it, the latest unlock's id, the file's install, the phone's standing, and the latest tap's id.
+    /// it, the latest unlock's id, the file's install, the phone's standing, the latest tap's id,
+    /// and where a wait for the Start ends.
     static let reportedKey = "protectionOffReported"
     static let offFromKey = "protectionOffFrom"
     static let lastUnlockKey = "lastUnlock"
     static let installKey = "install"
     static let standingKey = "standing"
     static let lastTapKey = "lastTap"
+    static let waitEndsKey = "waitEnds"
 
     /// An unlock not filed yet (B6b): made where the phone stood unread, under no session or tap.
     static let unfiled = "kind = 'unlock' AND sessionId IS NULL AND tapId IS NULL"
@@ -581,6 +583,17 @@ public struct Outbox: Sendable {
     /// The phone's newest tap's event id, queued or answered and gone — kept by each tap's own
     /// write — or nil before this file kept one: only it is said refused (#146).
     func lastTap() throws -> String? { try pool.read { try Self.state($0, Self.lastTapKey) } }
+
+    /// Where the wait for the teacher's Start ends (`SyncState.waitEnds`, #166), kept with each
+    /// arming; nil before this file kept one.
+    func waitEnds() throws -> Date? {
+        let kept = try pool.read { try Self.state($0, Self.waitEndsKey) }
+        return kept.flatMap(Double.init).map(Date.init(timeIntervalSince1970:))
+    }
+
+    func keepWaitEnds(_ ends: Date) throws {
+        try pool.write { try Self.setState($0, Self.waitEndsKey, "\(ends.timeIntervalSince1970)") }
+    }
 
     /// A later revocation is a new one, reported again: the Screen Time permission is back, or the
     /// phone's row is focused again (`SyncEngine.record`, A13).
