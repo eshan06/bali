@@ -687,6 +687,15 @@ public actor SyncEngine {
         await heard(sent.result, sent.noAnswer)
         let queued = queue()
         let applies = stored(outbox.awaiting) == 0
+        // An arming's wait ends where the server drops the tap, the end of its school day
+        // (decision 5) — by the phone's clock too, read or not (#166) — kept for a relaunch before
+        // the state is copied, so a write the file refuses stays shown (rule 5).
+        var waitEnds: Date?
+        if disposition == .tap(.waitForStart), applies {
+            let ends = SyncState.waitEnds(armedAt: clock.now())
+            waitEnds = ends
+            _ = stored { try outbox.keepWaitEnds(ends) }
+        }
         var next = state
         // Settled, and the queue read again, in one write: no screen sees the record neither on
         // its way nor answered (santa's round 1).
@@ -732,13 +741,7 @@ public actor SyncEngine {
             }
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:
-            // The server drops the tap at the end of its school day (decision 5): the wait ends
-            // there by the phone's clock too, read or not — kept for a relaunch (#166).
-            if applies {
-                let ends = SyncState.waitEnds(armedAt: clock.now())
-                next.waitEnds = ends
-                _ = stored { try outbox.keepWaitEnds(ends) }
-            }
+            if let waitEnds { next.waitEnds = waitEnds }
             switch next.standing {
             // Arming ends nothing: a session the phone is in stays (decision 4) while it runs by
             // the phone's own clock (data model, decision 6) — past its bell the phone is in none,
