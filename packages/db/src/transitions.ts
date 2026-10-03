@@ -2577,25 +2577,26 @@ async function unlockIn(
 
   const live = row !== undefined && row.endedAt === null ? row : undefined;
 
-  // Why nothing flips, when nothing does. A live student whose protection is
-  // off is not flipped: that state is never softened into an unlock
-  // (ARCHITECTURE, iOS rules: "never green, never an unlock") — iOS already
-  // dropped the shields, and the grid must keep saying the permission is off
-  // until a re-tap or Screen Time back on — which then returns the student to
-  // this unlock, their latest turn (#167). Nor is one who came back to focus
-  // after this unlock: it is late, and the return stands (owner ruling,
-  // 2026-09-24) — whether or not they are still here, so an unlock from before
-  // their own refocus, landing after the bell or a removal, never reads "left
-  // unlocked" over a phone that was shielded when it left (#76's review).
-  // Otherwise, with no live
-  // participation an ended session dominates (the whole session is over), else
-  // it's a student removed from the class mid-session — the ISSUES #2 case.
-  // Recorded all the same, never refused.
+  // Why nothing flips, when nothing does. One who came back to focus after
+  // this unlock is not flipped: it is late, and the return stands (owner
+  // ruling, 2026-09-24) — whether or not they are still here, so an unlock from
+  // before their own refocus, landing after the bell or a removal, never reads
+  // "left unlocked" over a phone that was shielded when it left (#76's review);
+  // and whether or not their protection is off, so Screen Time back on never
+  // returns them to it (#167's review). Nor is a live student whose protection
+  // is off: that state is never softened into an unlock (ARCHITECTURE, iOS
+  // rules: "never green, never an unlock") — iOS already dropped the shields,
+  // and the grid must keep saying the permission is off until a re-tap or
+  // Screen Time back on — which then returns the student to this unlock, their
+  // latest turn (#167). Otherwise, with no live participation an ended session
+  // dominates (the whole session is over), else it's a student removed from
+  // the class mid-session — the ISSUES #2 case. Recorded all the same, never
+  // refused.
   let note: UnlockRecordedAs | null = null;
-  if (live?.state === 'protection_off') note = 'protection_off';
-  else if (row && (await returnedSince(tx, session, input.studentId, { at: occurredAt, order }))) {
+  if (row && (await returnedSince(tx, session, input.studentId, { at: occurredAt, order }))) {
     note = 'superseded';
-  } else if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
+  } else if (live?.state === 'protection_off') note = 'protection_off';
+  else if (!live) note = session.endedAt ? 'after_session_end' : 'no_live_participation';
 
   const payload: Record<string, unknown> = { ...filing };
   if (note !== null) payload.recorded_as = note;

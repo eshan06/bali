@@ -465,7 +465,8 @@ with no finer meaning than its status carries none.
   `protection_off` when there is one but its protection is off (never softened into an
   unlock while it is off; Screen Time back on returns the student to it, #167), and
   `superseded` when the student's own refocus or tap in that session came
-  after it — a late unlock, recorded and answered with the state it left alone, or with
+  after it — ahead of `protection_off`, so Screen Time back on never returns to it (#167) —
+  a late unlock, recorded and answered with the state it left alone, or with
   none once the student has left the session (ruled 2026-09-24, A10: "after" by the
   clamped times, a return's never later than the server recorded it, and a tie flips;
   A11: after the end too, never "left unlocked" over a phone shielded at it; A12: by the
@@ -621,7 +622,7 @@ and data types, so the two apps can't drift out of type-agreement.
   Screen Time turned back on in the class the student tapped into puts them back where they
   stood before it, with no re-tap (#167, the owner's decision 2026-10-02, replacing A2's re-tap):
   focused, the shields back on, if they were focused; still unlocked if their latest turn there
-  is an Emergency Unlock, one recorded while it was off included
+  is an Emergency Unlock, one recorded while it was off included, never a late one (A10)
   (`POST /v1/sessions/{id}/protection-on`). Relocking only makes things stricter, the student
   proved they were in the room with that class's tap, and the history keeps the protection off
   beside the return, its own event. Out of a class, or past the bell, nothing changes; refocus

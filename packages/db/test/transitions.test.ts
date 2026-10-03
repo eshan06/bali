@@ -1532,6 +1532,30 @@ describe('Screen Time back on: the state before protection off, no re-tap (#167)
     }
   });
 
+  it('a late unlock landing while protection is off is noted late, never protection off: back on returns to the return after it', async () => {
+    // A10/A13: an unlock the student's own return went ahead of turns nothing,
+    // under protection off too — so Screen Time back on never returns to it.
+    // Late by the clamped times, and by the phone's order over a later time.
+    for (const by of ['time', 'order'] as const) {
+      const { session, student } = await lesson(`on-late-unlock-off-${by}`);
+      const made = by === 'time' ? change(session, student, 4) : change(session, student, 7, 2);
+      await refocus(
+        db,
+        by === 'time' ? change(session, student, 6) : change(session, student, 6, 3),
+      );
+      await protectionOff(db, change(session, student, 8));
+
+      expect(await unlock(db, made), by).toMatchObject({
+        outcome: 'recorded',
+        recordedAs: 'superseded',
+        state: 'protection_off',
+      });
+      expect((await rowOf(session.id)).state, by).toBe('protection_off');
+      expect((await protectionOn(db, change(session, student, 9))).state, by).toBe('focused');
+      expect((await rowOf(session.id)).state, by).toBe('focused');
+    }
+  });
+
   it('is refused where protection is not off, and records nothing: a re-tap already left it', async () => {
     for (const how of ['never-off', 'retapped', 'unlocked'] as const) {
       const { session, student } = await lesson(`on-not-off-${how}`);
@@ -1921,15 +1945,23 @@ describe('a late unlock: the student came back to focus after it (A10)', () => {
     });
   });
 
-  it('protection off comes first: the state an unlock never softens', async () => {
+  it('is late under protection off too — made before the return, with protection on — and never softens it (#167)', async () => {
+    // Noted late ahead of protection off, so Screen Time back on never returns
+    // to it; an unlock made since the return keeps `protection_off`.
     const { session, student } = await lesson('late-protoff');
     await tapIn(db, move(session, student, at(4)));
     await protectionOff(db, move(session, student, at(6)));
     expect(await unlock(db, move(session, student, at(2)))).toMatchObject({
       outcome: 'recorded',
+      recordedAs: 'superseded',
+      state: 'protection_off',
+    });
+    expect(await unlock(db, move(session, student, at(7)))).toMatchObject({
+      outcome: 'recorded',
       recordedAs: 'protection_off',
       state: 'protection_off',
     });
+    expect((await rowOf(session.id, student.id)).state).toBe('protection_off');
   });
 
   it('is contact: last contact moves on the server clock, and an open silence episode closes', async () => {
