@@ -195,6 +195,14 @@ struct AppTests {
         #expect(notUpdated.events == history.events && notUpdated.nextBefore == history.nextBefore)
         #expect(notUpdated.notUpdated?.hasPrefix("Bali couldn't update your history.") == true)
         #expect(notUpdated.failure == nil && !notUpdated.busy)
+        // Its Try again under way, the words kept beside Reading…; a sign-in Bali couldn't check,
+        // in one sentence (F4's review).
+        let tryingAgain = try #require(PreviewFixtures.all["historyRefreshReading"]?.history)
+        #expect(tryingAgain.notUpdated == notUpdated.notUpdated)
+        #expect(tryingAgain.busy && tryingAgain.fromTop && tryingAgain.events == history.events)
+        #expect(
+            PreviewFixtures.all["historyRefreshSignIn"]?.history.notUpdated
+                == "Bali couldn't check your sign-in to update your history. Try again.")
         let error = Phone(fixture: try #require(PreviewFixtures.all["historyError"]))
         await error.readHistory()
         #expect(error.history.failure == Joining.notStarted && !error.history.read)
@@ -281,10 +289,12 @@ struct AppTests {
         #expect(me.sync.flatMap(SignOutWords.held) == nil)
         let notOut = Phone(fixture: try #require(PreviewFixtures.all["meSignOutFailed"]))
         #expect(notOut.signOutFailed == SignOutWords.failed)
-        // Whose sign-in this is (#147): Ana's email on every Me, said by its Sign out.
+        // Whose sign-in this is (#147): Ana's email on every Me, said by its Sign out — each
+        // fixture whose screen is Me, whatever its name (#159's review).
         for (name, state) in PreviewFixtures.all {
-            let said = name.hasPrefix("me") ? "You're signed in as ana.rodriguez@bali.test." : nil
-            #expect(SignOutWords.signedIn(Phone(fixture: state).email) == said, "\(name)")
+            let phone = Phone(fixture: state)
+            let said = phone.shown.screen == .me ? "You're signed in as ana.rodriguez@bali.test." : nil
+            #expect(SignOutWords.signedIn(phone.email) == said, "\(name)")
         }
         // Me over a standing not read, Screen Time taken back: its row reads Off (Riders-2's santa).
         let off = Phone(fixture: try #require(PreviewFixtures.all["meScreenTimeOff"]))
@@ -403,12 +413,18 @@ struct AppTests {
             window.layoutIfNeeded()
             return window
         }
-        // Far enough ahead for a slow simulator to draw both first.
+        // Held, and past the bell, drawn first, with no bell to beat: the first window a test
+        // draws is the slow one. A held Leave is drawn otherwise than one past its bell.
+        let (rung, held) = (me(ringing: Date() - 60), me(ringing: Date() + 3600))
+        let (past, holding) = (drawn(rung), drawn(held))
+        #expect(holding != past)
+        // Then one whose bell is near: drawn as the held one is, until its bell rings — so it is
+        // only this window's own drawing, in one pass on the main actor, that must beat the bell
+        // (#172's review: both windows' first drawing had to).
         let bell = Date() + 15
-        let (ringing, rung) = (me(ringing: bell), me(ringing: Date() - 60))
-        defer { (ringing.isHidden, rung.isHidden) = (true, true) }
-        let past = drawn(rung)
-        #expect(drawn(ringing) != past)
+        let ringing = me(ringing: bell)
+        defer { (ringing.isHidden, rung.isHidden, held.isHidden) = (true, true, true) }
+        #expect(drawn(ringing) == holding)
         try await until { Date() > bell && drawn(ringing) == past }
     }
 
@@ -455,6 +471,63 @@ struct AppTests {
         await paged.historyRead(await client(400, cursor).history(before: "m0"), for: paged.reads)
         #expect(paged.history.events.count == shown && paged.history.fromTop)
         #expect(paged.history.notUpdated == "Bali couldn't update your history. \(Joining.notStarted)")
+        // A read from the top goes ahead of Show earlier's page on its way — on a phone not
+        // started too, which says so — so that page, landing after, is dropped, never taken for
+        // the newest in place of the moments read (F4's review).
+        var onItsWay = paging
+        onItsWay.busy = true
+        let ahead = Phone(fixture: PreviewFixtures.State(tab: .history, history: onItsWay))
+        let showEarlier = ahead.reads
+        await ahead.readHistory()
+        await ahead.historyRead(await client(200, older).history(before: "m1"), for: showEarlier)
+        #expect(ahead.history.events.count == shown && ahead.history.nextBefore != nil)
+        #expect(ahead.history.notUpdated == "Bali couldn't update your history. \(Joining.notStarted)")
+    }
+
+    @Test(
+        "History on screen as the app comes back to the front from the background reads its newest page again, quietly, as each visit does (F4's review: it does not appear again) — never from only inactive, Control Center pulled down and up, whose read from the top would take Show earlier's pages from a student reading them (santa's round 1), nor under another screen"
+    )
+    func historyInFront() async {
+        let shown = Phone(fixture: PreviewFixtures.State(tab: .history))
+        #expect(shown.shown.screen == .history)
+        shown.setForeground(true)
+        shown.setForeground(false)
+        shown.setForeground(true)
+        // A hop queued on the main actor after any read's: once it has run, a read would show.
+        await Task {}.value
+        #expect(shown.history == History())
+        shown.setForeground(false)
+        shown.setForeground(false, behind: true)
+        shown.setForeground(false)
+        shown.setForeground(true)
+        await Task {}.value
+        #expect(shown.history.failure == Joining.notStarted)
+        shown.forgetHistory()
+        shown.setForeground(true)
+        await Task {}.value
+        #expect(shown.history == History())
+        let away = Phone(fixture: PreviewFixtures.State(tab: .me))
+        away.setForeground(false, behind: true)
+        away.setForeground(true)
+        await Task {}.value
+        #expect(away.history == History())
+    }
+
+    @Test(
+        "History's days as its screen draws them (`Phone.historyDays`, kept from one change of the history to the next: F5's review) are always the history's own: the same moments through a read that failed, and a page that changes them drawn anew — never a stale drawing"
+    )
+    func historyDays() async throws {
+        let phone = Phone(fixture: try #require(PreviewFixtures.all["history"]))
+        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
+        await phone.readHistory()
+        #expect(phone.history.notUpdated != nil)
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [4, 2, 1])
+        let top = #"{"events":[{"eventId":"m0","type":"tap_in","occurredAt":"2026-09-01T13:00:00Z","class":{"id":"p3","name":"Period 3 — Algebra II"},"teacher":{"displayName":"Ms. Rivera"},"session":null,"reason":null,"recordedAs":null,"countedIn":null}],"nextBefore":null}"#
+        await phone.historyRead(await client(200, top).history(), for: phone.reads)
+        #expect(phone.history.events.map(\.eventId) == ["m0"])
+        #expect(phone.historyDays == phone.history.days(now: Date()))
+        #expect(phone.historyDays.flatMap(\.cards).map(\.moments.count) == [1])
     }
 
     @Test(
@@ -612,19 +685,39 @@ struct AppTests {
     }
 
     @Test(
-        "History follows who is signed in (#141): a sign-in reads the student's history at once, so even their first visit shows it; another student's sign-in forgets the last one's on the spot, before theirs is read, and a sign-out forgets it — no student is ever shown another's"
+        "History follows who is signed in (#141): a sign-in reads the student's history once `GET /v1/me` names them a student, so even their first visit shows it — never a teacher's account's, which the API refuses (F4's review); another student's sign-in forgets the last one's on the spot, before theirs is read, and a sign-out forgets it — no student is ever shown another's"
     )
     func historySignedIn() async throws {
         let server = StandIn(pages: [page(["a1"], next: nil), page(["b1"], next: nil)])
         let (phone, _) = try standIn(server)
+        /// The engine's state once `GET /v1/me` named `id`, a `role`, after `forgets` students'.
+        func named(_ id: String, _ role: String = "student", forgets: Int = 0) throws -> SyncState {
+            var state = SyncState()
+            state.me = try BaliJSON.makeDecoder().decode(
+                MeResponse.self,
+                from: Data(
+                    #"{"user":{"id":"\#(id)","role":"\#(role)","displayName":null},"classes":[],"session":null}"#
+                        .utf8))
+            state.forgets = forgets
+            return state
+        }
         phone.signed(in: true, as: "ana")
+        // A hop queued on the main actor after any read's: once it has run, a read would show.
+        await Task {}.value
+        #expect(phone.history == History())
+        phone.synced(try named("ana"))
         try await until { phone.history.read }
         #expect(phone.history.events.map(\.eventId) == ["a1"])
         phone.signed(in: true, as: "bea")
         #expect(phone.history == History())
+        phone.synced(try named("bea", forgets: 1))
         try await until { phone.history.read }
         #expect(phone.history.events.map(\.eventId) == ["b1"])
         phone.signed(in: false)
+        #expect(phone.history == History())
+        phone.signed(in: true, as: "tom")
+        phone.synced(try named("tom", "teacher", forgets: 2))
+        await Task {}.value
         #expect(phone.history == History())
         #expect(await server.befores == [nil, nil])
     }
@@ -638,8 +731,12 @@ struct AppTests {
         await held.signOut()
         #expect(held.signOutFailed == SignOutWords.unsent)
         // A state whose queue shows no unlock — as a failed read of the queue leaves it — while
-        // the file still holds one: still said, the file asked.
+        // the file still holds one: still said, the file asked; one ask at a time, each state's
+        // cancelling the last's, whose answer is older (#172's review).
         held.synced(SyncState())
+        let first = try #require(held.unsentCheck)
+        held.synced(SyncState())
+        #expect(first.isCancelled && held.unsentCheck?.isCancelled == false)
         await held.unsentCheck?.value
         #expect(held.signOutFailed == SignOutWords.unsent)
         // The queue shows it, then it goes: the hold's end clears the words at once.
@@ -1482,13 +1579,18 @@ struct AppTests {
     }
 
     @Test(
-        "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro's pages and Me's What your teacher sees among them"
+        "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro opened at each of its pages and Me's What your teacher sees among them"
     )
     func scrollEdges() throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        // The intro's paging lays out only the page shown, so it is opened at each of its pages
+        // (`IntroView.pages`; #135's review: paged by hand, the pager's slots were checked, not
+        // its pages, and a pager with no width would have stopped the suite).
+        let intro = IntroView.pages.map { ("intro, page \($0)", AnyView(IntroView(page: $0) {})) }
         let screens =
             PreviewFixtures.all.map { ($0.key, AnyView(RootView(phone: Phone(fixture: $0.value)))) }
-            + [("consentSheet", AnyView(ConsentSheet()))]
+            + [("consentSheet", AnyView(ConsentSheet()))] + intro
+        var introDrawn: Set<Data> = []
         for (name, screen) in screens {
             let window = UIWindow(windowScene: scene)
             window.frame = scene.screen.bounds
@@ -1500,18 +1602,17 @@ struct AppTests {
             // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
             #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
             expectEdges(of: scrolls, in: window, name)
-            // The intro's paging lays out only the page shown: each page, paged to, is checked.
+            // The page a pager shows is among those checked: its own scroll view.
             for pager in scrolls where pager.isPagingEnabled {
-                for page in 1..<Int((pager.contentSize.width / pager.bounds.width).rounded()) {
-                    pager.contentOffset.x = CGFloat(page) * pager.bounds.width
-                    window.layoutIfNeeded()
-                    let shown = pager.subviews.filter { $0.frame.minX == pager.contentOffset.x }
-                    let scrolls = shown.flatMap(scrollViews(in:))
-                    #expect(!scrolls.isEmpty, "\(name), page \(page)")
-                    expectEdges(of: scrolls, in: window, "\(name), page \(page)")
-                }
+                let page = scrolls.contains { $0 !== pager && $0.isDescendant(of: pager) }
+                #expect(page, "\(name): no page shown")
+            }
+            if intro.contains(where: { $0.0 == name }), let drawn = drawn(window) {
+                introDrawn.insert(drawn)
             }
         }
+        // Each opened at a page of its own.
+        #expect(introDrawn.count == IntroView.pages.count)
     }
 
     @Test(
@@ -1565,10 +1666,15 @@ struct AppTests {
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
 
-/// Every scroll view in `view`, itself among them, outermost first.
+/// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
+/// one it shows: the others it lays out lie off screen.
 @MainActor
 private func scrollViews(in view: UIView) -> [UIScrollView] {
-    [view as? UIScrollView].compactMap { $0 } + view.subviews.flatMap(scrollViews(in:))
+    let scroll = view as? UIScrollView
+    let shown = view.subviews.filter { subview in
+        scroll.map { !$0.isPagingEnabled || subview.frame.minX == $0.contentOffset.x } ?? true
+    }
+    return [scroll].compactMap { $0 } + shown.flatMap(scrollViews(in:))
 }
 
 /// `window` as the screen would show it now: its pixels, drawn after any update due.

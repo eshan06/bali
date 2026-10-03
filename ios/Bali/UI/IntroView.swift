@@ -9,8 +9,15 @@ struct IntroView: View {
     let done: () -> Void
     /// The pages' tags, first to last.
     static let pages = 0...2
+    @State private var page: Int
+
+    /// Opened on `page` — the first, or a Debug launch's — as a test opens each (#135's review).
+    init(page: Int = IntroView.opening, done: @escaping () -> Void) {
+        (_page, self.done) = (State(initialValue: page), done)
+    }
+
     #if DEBUG
-        @State private var page = IntroView.page(from: CommandLine.arguments)
+        static var opening: Int { page(from: CommandLine.arguments) }
 
         /// The page a Debug launch opens on — `-bali-intro-page 2` — for a screenshot of each: the
         /// page named, the nearest one that exists to a number past either end (#105's review), and
@@ -21,7 +28,7 @@ struct IntroView: View {
             return min(max(page, pages.lowerBound), pages.upperBound)
         }
     #else
-        @State private var page = IntroView.pages.lowerBound
+        static let opening = pages.lowerBound
     #endif
 
     var body: some View {

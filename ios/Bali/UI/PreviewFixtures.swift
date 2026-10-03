@@ -128,9 +128,16 @@
             "historyLoading": State(tab: .history, history: history(busy: true)),
             // Screen Time off in Period 3, an Emergency Unlock under it, then back on (#167).
             "historyScreenTime": State(tab: .history, history: anaHistory(screenTime: true)),
-            // Shown again, the moments kept, and the newest page's read again failed (#141).
+            // Shown again, the moments kept, and the newest page's read again failed (#141); its
+            // Try again under way, the words kept with Reading… (F4's review); and a sign-in Bali
+            // couldn't check, said in one sentence.
             "historyRefreshError": State(
                 tab: .history, history: anaHistory(failed: History.words(.networkError))),
+            "historyRefreshReading": State(
+                tab: .history,
+                history: anaHistory(failed: History.words(.networkError), reading: true)),
+            "historyRefreshSignIn": State(
+                tab: .history, history: anaHistory(failed: History.words(.status(401)))),
             // Me says whose sign-in this is, by Sign out (#147): Ana's email, on every Me.
             "me": State(sync: standing(.out, me: anaRodriguez), tab: .me, email: anaEmail),
             "meEditing": State(
@@ -271,9 +278,12 @@
 
         /// D1's History: Ana's moments today and yesterday at D1's times by this phone's clock,
         /// newest first as `GET /v1/me/history` answers — and an older page left: Show earlier —
-        /// kept, where reading them again from the top failed: `failed` (#141). `screenTime`: in
-        /// today's class, Screen Time off, an Emergency Unlock under it, then back on (#167).
-        private static func anaHistory(failed: String? = nil, screenTime: Bool = false) -> History {
+        /// kept, where reading them again from the top failed: `failed` (#141), and, `reading`,
+        /// read again from the top since. `screenTime`: in today's class, Screen Time off, an
+        /// Emergency Unlock under it, then back on (#167).
+        private static func anaHistory(
+            failed: String? = nil, reading: Bool = false, screenTime: Bool = false
+        ) -> History {
             /// `hour`:`minute`, `daysAgo` days back, as the API writes a time.
             func at(_ hour: Int, _ minute: Int, _ daysAgo: Int = 0) -> String {
                 let calendar = Calendar.current
@@ -316,6 +326,7 @@
                 from: Data(#"{"events":[\#(events.joined(separator: ","))],"nextBefore":"m0"}"#.utf8))
             (ana.events, ana.nextBefore) = (page?.events ?? [], page?.nextBefore)
             if let failed { ana.failed(failed) }
+            if reading { ana.reading(more: false) }
             return ana
         }
 
@@ -385,7 +396,9 @@
         /// `tappedSince`, a tap after it the server recorded (#146) — in an outbox of the fixture's
         /// own, each answer sent through the real client and settled as the engine does: only an
         /// outbox makes a stuck tap. On a task of its own, waited for, since a fixture is made at
-        /// once: nothing the send or the settle does waits on the main thread.
+        /// once: nothing the send or the settle does waits on the main thread. Waited for 30 s at
+        /// most, then stopped, saying so: a test pool with no thread to spare for that task fails
+        /// here, never hangs CI (#155's review).
         private static func refusedTap(
             _ state: SyncState, tappedSince: Bool = false, conflict: Bool = false
         ) -> SyncState {
@@ -426,7 +439,9 @@
                 made.state = state
                 done.signal()
             }
-            done.wait()
+            guard done.wait(timeout: .now() + 30) == .success else {
+                fatalError("A fixture's outbox did not answer within 30 s")
+            }
             return made.state ?? state
         }
 

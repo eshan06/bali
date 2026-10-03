@@ -8,6 +8,35 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-03** — **F11b: the merged PRs' review WARNs, part 3 — History, and the tests' hygiene.**
+  **The sign-in's history read waits for `GET /v1/me`** (#153's review): it went at the sign-in
+  itself, before the phone knew whose account it was, so a teacher signing in to the student app
+  always drew one `403`. Now it goes once `me` names a student — at once where the phone already
+  knows them (the same student signing back in) — and never for a teacher's account; History opened
+  there still reads, and says the account's own words. **The "couldn't update" card stays while
+  its Try again reads** (#153's review): the words went the moment a read from the top started,
+  with nothing in their place, so a press read as nothing; they now stay until that read answers,
+  the button saying Reading…, dimmed — the words still true until then (the moments may not be the
+  newest), and the quiet read each visit makes shows it too, only where a card already stands.
+  **A sign-in Bali couldn't check** is said in one sentence, "Bali couldn't check your sign-in to
+  update your history. Try again.", never "Bali couldn't" twice; the card's other words are
+  unchanged. **A card's id is its day, its class and how many of that class's cards come after it
+  that day** (#156's review): its oldest moment's id changed when Show earlier added an older
+  moment to it, rebuilding the card under the student's finger. Neither end of a run is stable — a
+  read from the top adds at the newer end, Show earlier at the older — so the id names neither; a
+  class come back to after another the same day, read from the top, still renews that class's
+  earlier cards, a rebuild at the top of the screen. **History's days are kept by the phone**,
+  drawn again only when the history or the day changes (a day's change renames Today): a visit
+  over a history unchanged since the last draws nothing, and each read draws anew, so a 12- or
+  24-hour clock or a locale changed meanwhile shows at the next read (santa's round 1: keyed on the
+  moments alone, it showed the old one until they changed). **History is read again on a return
+  from the background only**: the scene goes inactive for Control Center too, and a read from the
+  top there would take Show earlier's pages from a student reading them (santa's round 1). **The intro
+  takes the page it opens on** (`IntroView(page:)`, a Debug launch's by default), so the scroll-edge
+  test opens each page: paging the queuing scroll view by hand checked its slots, not its pages
+  (#135's review). **Me's unsent ask**: each cancels the last, whose answer is older (#172's
+  review), so `unsentCheck` is the code's own handle, no longer a test's alone.
+
 - **2026-10-03** — **F14 (#166): a wait the server has dropped is Home, never Waiting.** **The
   owner's goal (2026-10-02):** a tap at 7:10 PM on the owner's iPhone still said "Ready — waiting
   for your teacher" at 7:12 PM the next day, and the Start at 7:21 joined nothing — the server

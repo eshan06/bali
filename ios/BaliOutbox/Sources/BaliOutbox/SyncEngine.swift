@@ -685,6 +685,7 @@ public actor SyncEngine {
     private func answered(_ record: OutboxRecord, _ sent: Sent, _ disposition: Disposition?) async
     {
         await heard(sent.result, sent.noAnswer)
+        knowLastTap()
         let queued = queue()
         let applies = stored(outbox.awaiting) == 0
         // An arming's wait ends where the server drops the tap, the end of its school day
@@ -938,15 +939,24 @@ public actor SyncEngine {
         ring(.drain)
     }
 
-    private func refreshQueue() { state.queued = queue() }
+    /// The queue read again for the screens, the phone's newest tap with it while not known — each
+    /// written to the state in a step of its own, after its read, whatever order Swift evaluates
+    /// an assignment in (#155's review).
+    private func refreshQueue() {
+        knowLastTap()
+        let queued = queue()
+        state.queued = queued
+    }
+
+    /// The phone's newest tap, read from the file while not known — a read at launch that failed,
+    /// say (santa's round 1) — or a refused tap a later one went ahead of would be said again
+    /// (#146). Its own step, before the queue is read: never a read's hidden effect.
+    private func knowLastTap() {
+        if state.lastTap == nil, let lastTap = try? outbox.lastTap() { state.lastTap = lastTap }
+    }
 
     /// Everything queued, for the screens; a read that fails is shown (rule 5), the last one kept.
-    /// With it, the phone's newest tap while not known — a read at launch that failed, say (santa's
-    /// round 1) — or a refused tap a later one went ahead of would be said again (#146).
-    private func queue() -> [OutboxRecord] {
-        if state.lastTap == nil, let lastTap = try? outbox.lastTap() { state.lastTap = lastTap }
-        return stored(outbox.records) ?? state.queued
-    }
+    private func queue() -> [OutboxRecord] { stored(outbox.records) ?? state.queued }
 
     /// Writes the standing to the file — filing into it, in the same write, every unlock made where
     /// the phone stood unread, which then goes (B6b): whatever the file holds, never what a read of
@@ -960,7 +970,7 @@ public actor SyncEngine {
         if filed == nil {
             kept = nil
         } else if filed == true {
-            state.queued = queue()
+            refreshQueue()
             ring(.drain)
         }
     }

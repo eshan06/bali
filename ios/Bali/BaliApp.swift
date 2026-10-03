@@ -20,7 +20,7 @@ struct BaliApp: App {
         // again in front — where the engine checks in.
         .onChange(of: phase, initial: true) { _, phase in
             if phase == .background { Outbox.suspend() } else { Outbox.resume() }
-            phone.setForeground(phase == .active)
+            phone.setForeground(phase == .active, behind: phase == .background)
         }
     }
 
@@ -101,6 +101,15 @@ final class Phone {
     /// latest, or another student's, is dropped.
     private(set) var history = History()
     private(set) var reads = 0
+    /// Signed in, the history not yet read for them: read once `GET /v1/me` names a student (#141)
+    /// — never a teacher's account, which the API refuses (F4's review).
+    private var historyDue = false
+    /// History's days as last drawn (`historyDays`), with the history and the day they were drawn
+    /// for.
+    @ObservationIgnored private var drawn: (history: History, day: Date, days: [History.Day])?
+    /// Whether the app has gone behind since it was last in front: coming back from there with
+    /// History shown reads it again (`setForeground`).
+    private var wentBehind = false
     /// The session whose Session over the student closed, as it was then (C5b): Home past its bell,
     /// until the bell moves — an extension rings one of its own (C5b's review).
     private(set) var sessionOverClosed: SessionView?
@@ -109,7 +118,7 @@ final class Phone {
     var naming = Naming()
     private(set) var signOutFailed: String?
     /// The outbox file asked whether an unlock still waits, while Me says one has not gone
-    /// (`synced`): a test waits on it.
+    /// (`synced`): the latest ask, cancelled by the next, whose answer is newer (#172's review).
     @ObservationIgnored private(set) var unsentCheck: Task<Void, Never>?
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
@@ -209,11 +218,26 @@ final class Phone {
         guard !history.busy || !more && !history.fromTop, !more || history.nextBefore != nil
         else { return }
         let before = more ? history.nextBefore : nil
-        history.reading(more: more)
-        guard let engine else { return history.failed(Joining.notStarted) }
+        // Counted as it starts, engine or none: a read under way is no longer the latest (F4's
+        // review), so its answer is never taken for this one's.
         reads += 1
         let read = reads
+        history.reading(more: more)
+        guard let engine else { return history.failed(Joining.notStarted) }
         await historyRead(await engine.history(before: before), for: read)
+    }
+
+    /// History's days and cards as its screen draws them (`History.days`): drawn once per change
+    /// of the history, or of the day (F5's review) — a visit's first pass over a history unchanged
+    /// since the last costs nothing — and anew with each read, so a clock or locale changed
+    /// meanwhile shows at the next.
+    var historyDays: [History.Day] {
+        let now = Date()
+        let day = Calendar.current.startOfDay(for: now)
+        if let drawn, drawn.history == history, drawn.day == day { return drawn.days }
+        let days = history.days(now: now)
+        drawn = (history, day, days)
+        return days
     }
 
     /// The answer to read `read`: kept while no read has started since nor the history been
@@ -261,8 +285,9 @@ final class Phone {
     /// stream let go by between two sign-ins is no matter. With no account to tell by, on a sign-in
     /// after a sign-out. Another student's is never shown (C6a, C6b), at any moment: gone from what
     /// the phone shows at once, and from the engine's states until the engine has forgotten it too
-    /// (`synced`; #160's review). Signed in, the student's history is read at once, so even their
-    /// first visit to History shows it (#141).
+    /// (`synced`; #160's review). Signed in, the student's history is read once `GET /v1/me` names
+    /// them a student — at once where it already does — so even their first visit to History shows
+    /// it (#141); a teacher's account reads none, which the API would refuse (F4's review).
     func signed(in signedIn: Bool?, as account: String? = nil, email: String? = nil) {
         let another =
             account.map { self.account != nil && $0 != self.account }
@@ -284,7 +309,16 @@ final class Phone {
         }
         if let account { self.account = account }
         (self.signedIn, self.email) = (signedIn, email)
-        if changed, signedIn == true, !frozen { Task { await readHistory() } }
+        if changed { historyDue = signedIn == true && !frozen }
+        readDueHistory()
+    }
+
+    /// The history due at a sign-in, read once `me` names who is signed in: a student's, never a
+    /// teacher's account's (F4's review).
+    private func readDueHistory() {
+        guard historyDue, let role = sync?.me?.user.role else { return }
+        historyDue = false
+        if role.known == .student { Task { await readHistory() } }
     }
 
     /// Saves the name as typed (`PATCH /v1/me`), through the engine: set, editing ends and the name
@@ -423,20 +457,23 @@ final class Phone {
             (picking, cards) = (nil, cards + 1)
         }
         sync = state
+        readDueHistory()
         // "Unsent" is said where the file holds an unlock the engine's queue does not show
         // (`signOut`). A hold the queue showed ending is that unlock gone: the words go at once,
         // never a moment late under an enabled Sign out. Where none showed, its reads failing
         // throughout (#129's review), the file is asked again at each state whose queue shows no
-        // unlock, and they go once it holds none, never while it does (Riders-2's santa). Its
-        // answer lands after any press's whose read came first, the two executors keeping order,
-        // so it clears only these words, never ones a press set since.
+        // unlock, and they go once it holds none, never while it does (Riders-2's santa). One ask
+        // at a time: each cancels the last, whose answer is older (#172's review). Its answer
+        // lands after any press's whose read came first, the two executors keeping order, so it
+        // clears only these words, never ones a press set since.
         if signOutFailed == SignOutWords.unsent, SignOutWords.held(state) == nil {
             if wasHeld {
                 signOutFailed = nil
             } else if let engine {
+                unsentCheck?.cancel()
                 unsentCheck = Task {
-                    guard await engine.unlockUnsent() == false,
-                        signOutFailed == SignOutWords.unsent
+                    guard !Task.isCancelled, await engine.unlockUnsent() == false,
+                        !Task.isCancelled, signOutFailed == SignOutWords.unsent
                     else { return }
                     signOutFailed = nil
                 }
@@ -624,12 +661,22 @@ final class Phone {
         await engine.setForeground(foreground)
     }
 
-    /// The scene's phase: the engine checks in only in the foreground, and coming back runs rule
-    /// 3's check at once — Settings may have taken the permission. Each hop reads the phase as it
-    /// is then, so two in quick succession can never leave the engine on the older one, nor run a
-    /// check once the app has gone behind: its report refused by the suspended file, it would show
-    /// a failure that is none.
-    func setForeground(_ foreground: Bool) {
+    /// The scene's phase (`behind`: gone to the background): the engine checks in only in the
+    /// foreground, and coming back runs rule 3's check at once — Settings may have taken the
+    /// permission — and, from the background, reads History again where it shows. Each hop reads
+    /// the phase as it is then, so two in quick succession can never leave the engine on the older
+    /// one, nor run a check once the app has gone behind: its report refused by the suspended file,
+    /// it would show a failure that is none.
+    func setForeground(_ foreground: Bool, behind: Bool = false) {
+        // Back in front from the background with History shown, its newest page is read again,
+        // quietly, as each visit reads it: the screen does not appear again (F4's review). Never
+        // from only inactive — Control Center pulled down and up — whose read from the top would
+        // take Show earlier's pages from a student reading them (santa's round 1).
+        if behind { wentBehind = true }
+        if foreground, wentBehind {
+            wentBehind = false
+            if shown.screen == .history { Task { await refreshHistory() } }
+        }
         self.foreground = foreground
         guard let onPhase else { return }
         Task { await onPhase.engine(self.foreground) }

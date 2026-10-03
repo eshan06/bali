@@ -116,7 +116,7 @@ struct HistoryTests {
     }
 
     @Test(
-        "Each card is known by its own id, its first moment's, so the screen keeps it as it is (#139): no two cards share one, through every day; read again from the top, a newer moment of its class joins it under the same id, and one of another class makes a card of its own after it, every card before kept"
+        "Each card is known by its own id — its day, its class, and how many of that class's cards come after it that day — so the screen keeps it as it is (#139): no two cards share one, through every day; read again from the top, a newer moment of its class joins it under the same id, and one of another class makes a card of its own after it, every card before kept; and Show earlier's older moment of its class and day joins it under the same id too, so the card the student scrolled to stays (F5's review)"
     )
     func cardIds() throws {
         let moments = [
@@ -130,13 +130,17 @@ struct HistoryTests {
             try read(moments).days(now: t0, time: us()).flatMap(\.cards)
         }
         let shown = try cards(moments)
-        #expect(shown.map(\.id) == shown.map(\.moments[0].id) && Set(shown.map(\.id)).count == 3)
+        #expect(Set(shown.map(\.id)).count == 3)
         let refocus = moment("refocus", "2026-09-21T13:16:00Z")
         let joined = try cards([refocus] + moments)
         #expect(joined.map(\.id) == shown.map(\.id) && joined[0].moments.count == 3)
         let after = try cards([moment("tap_in", "2026-09-21T13:20:00Z", period: 5), refocus] + moments)
         #expect(after.count == 4 && after[1].name == "Period 5 — Chemistry")
-        #expect(after.map(\.id) == [shown[0].id, after[1].moments[0].id] + shown.dropFirst().map(\.id))
+        #expect(after.map(\.id) == [shown[0].id, after[1].id] + shown.dropFirst().map(\.id))
+        #expect(Set(after.map(\.id)).count == 4)
+        // Show earlier: yesterday's Period 3 an hour earlier, at the top of yesterday's first card.
+        let earlier = try cards(moments + [moment("tap_in", "2026-09-20T14:00:00Z")])
+        #expect(earlier.map(\.id) == shown.map(\.id) && earlier[1].moments.count == 2)
     }
 
     @Test(
@@ -216,7 +220,7 @@ struct HistoryTests {
     }
 
     @Test(
-        "Read again from the top over the moments read (#141): they stay meanwhile, and its page takes their place — the newest moments in, the older pages back under Show earlier — and a read that fails keeps them, said above them as not updated with why (rule 5), Show earlier's pages meanwhile, come or not, leaving that said, until a read from the top starts again or answers"
+        "Read again from the top over the moments read (#141): they stay meanwhile, and its page takes their place — the newest moments in, the older pages back under Show earlier — and a read that fails keeps them, said above them as not updated with why (rule 5), Show earlier's pages meanwhile, come or not, leaving that said, until a read from the top answers: while one is under way — its Try again — the words stay, Reading… beside them (F4's review); a sign-in Bali couldn't check said in one sentence, never \"Bali couldn't\" twice"
     )
     func readAgain() async throws {
         var history = History()
@@ -239,9 +243,19 @@ struct HistoryTests {
         history.reading(more: true)
         #expect(!history.answered(try await answer("empty.json")))
         #expect(history.notUpdated == notUpdated && history.failure == nil && history.nextBefore == nil)
-        // Try again from the top: the words go while it reads, and its page leaves none.
+        // Try again from the top: the words stay while it reads, its read from the top under way
+        // — the card's Try again reads Reading… — and a sign-in Bali couldn't check is said in one
+        // sentence.
         history.reading(more: false)
-        #expect(history.notUpdated == nil && history.events.count == 6)
+        #expect(history.notUpdated == notUpdated && history.busy && history.fromTop)
+        #expect(history.events.count == 6)
+        #expect(!history.answered(try await answer("401-unauthorized.json")))
+        #expect(
+            history.notUpdated
+                == "Bali couldn't check your sign-in to update your history. Try again.")
+        #expect(!history.busy && history.events.count == 6)
+        // Again: its page leaves none.
+        history.reading(more: false)
         #expect(!history.answered(try await answer("first-page.json")))
         #expect(history.events.count == 3 && history.failure == nil && history.notUpdated == nil)
         #expect(history.nextBefore == "00000000-0000-7000-8000-000000000006" && history.read)

@@ -6,8 +6,9 @@ import SwiftUI
 /// as `GET /v1/me/history` gives them — what their teachers see, nothing more — in D1's days and
 /// class cards, times in the phone's locale and time zone (`History.days`, tested on Linux). Kept
 /// while the app runs and shown at once, its newest page read again quietly each time it shows
-/// (#141); reading, nothing yet and a read that failed are each said, a failure with Try again
-/// (rule 5) — one over the moments kept said above them; an older page on Show earlier. Built as it
+/// (#141) — the app back in front too (`Phone.setForeground`); reading, nothing yet and a read that
+/// failed are each said, a failure with Try again (rule 5) — one over the moments kept said above
+/// them, its Try again reading Reading… while it reads; an older page on Show earlier. Built as it
 /// scrolls: only the days and cards on screen, each card by its own id (#139).
 struct HistoryView: View {
     let phone: Phone
@@ -32,7 +33,10 @@ struct HistoryView: View {
                         }
                     } else {
                         if let notUpdated = history.notUpdated {
-                            Retry(words: notUpdated, phone: phone) { await phone.readHistory() }
+                            Retry(
+                                words: notUpdated, phone: phone,
+                                reading: history.busy && history.fromTop
+                            ) { await phone.readHistory() }
                         }
                         moments(history)
                     }
@@ -51,10 +55,11 @@ struct HistoryView: View {
         }
     }
 
-    /// The days read — or, with none and nothing older, that there is nothing yet — and Show
-    /// earlier while an older page is left, its own failed page said there with Try again.
+    /// The days read — drawn once per change of the moments (`Phone.historyDays`) — or, with none
+    /// and nothing older, that there is nothing yet; and Show earlier while an older page is left,
+    /// its own failed page said there with Try again.
     @ViewBuilder private func moments(_ history: History) -> some View {
-        let days = history.days(now: Date())
+        let days = phone.historyDays
         if days.isEmpty, history.nextBefore == nil {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
