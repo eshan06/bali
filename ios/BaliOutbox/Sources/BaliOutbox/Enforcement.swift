@@ -50,6 +50,25 @@ public enum Marker: Sendable, Hashable {
     case present
     /// Written, and gone: the access was taken back.
     case missing
+
+    /// The monitor's look at the marker at a wake (`noted(at:)` on the phone): access lost — the
+    /// marker gone since it was written, the shields' store empty too, as iOS leaves both (a store
+    /// still holding shields is a misread, never a revocation) — is noted at `now`, the first such
+    /// wake's time kept. The note after it, and whether access was lost.
+    public static func noting(_ marker: Marker, shielded: Bool, note: Date?, at now: Date)
+        -> (lost: Bool, note: Date?)
+    {
+        guard marker == .missing, !shielded else { return (false, note) }
+        return (true, note ?? now)
+    }
+
+    /// The flag and the monitor's note after the marker is written (`write()` on the phone): the
+    /// flag set only once the marker reads back, so a marker iOS would not keep never reads as
+    /// access taken back — and the note forgotten only then, so a loss the monitor found with Bali
+    /// closed outlives a write that did not take (#169's review).
+    public static func written(readBack: Bool, note: Date?) -> (flag: Bool, note: Date?) {
+        (readBack, readBack ? nil : note)
+    }
 }
 
 /// What a screen may claim of the shields: what the last check found (rule 3), never the standing
@@ -165,6 +184,10 @@ public actor Enforcer {
     /// once throw `authorizationConflict`, so one made meanwhile — Turn on Screen Time pressed
     /// again, or over the silent check — has the answer of the one under way. Nil: none under way.
     private(set) var asking: [CheckedContinuation<Result<Void, any Error>, Never>]?
+    /// Whether this run has asked iOS silently for the access (F1b): once a launch at most, so a
+    /// phone whose marker never reads back is never asked at every check — where access was taken
+    /// back, iOS would prompt at each (#169's review).
+    private var askedSilently = false
 
     public init(engine: SyncEngine, screenTime: any ScreenTime, clock: any SyncClock = SystemClock()) {
         (self.engine, self.screenTime, self.clock) = (engine, screenTime, clock)
@@ -184,14 +207,16 @@ public actor Enforcer {
     /// clock says is not over — or was not when the monitor found the marker gone (F1b) — is
     /// reported: once there (the outbox's), and again whenever the phone stands focused there (the
     /// engine's `record`, A13). The marker judges first (`judged`): gone, or denied, off at once.
-    /// None written yet, an approved read is proven silently (`authorize`), and not determined is
-    /// off only once checks have read it so for `grace` of the phone's running:
+    /// None written yet, an approved read is proven silently (`authorize`) — once a launch at most
+    /// (`askedSilently`) — and not determined is off only once checks have read it so for `grace`
+    /// of the phone's running:
     /// Family Controls can read it so for a moment just after a launch, and a phone never granted
     /// the permission, or whose access is off, reads it so for good — so meanwhile the check is
     /// made again every `recheckAfter`, never waiting on the next wake (#145).
     public func check() async {
         let (read, marker) = (await screenTime.permission(), await screenTime.marker())
-        if marker == .unwritten, read == .approved, asking == nil {
+        if marker == .unwritten, read == .approved, asking == nil, !askedSilently {
+            askedSilently = true
             Task { try? await authorize() }
         }
         undetermined =
