@@ -56,7 +56,10 @@ const UPDATE = process.env.UPDATE_FIXTURES === '1';
 /** Every fixture, by the file it is written to, and the scenario that produces it. */
 const SCENARIOS: Record<string, string> = {
   'me/new-student': 'The boot call of a student signing in for the first time, in no class yet.',
-  'me/no-session': 'The boot call of a student in a class, with no session running.',
+  'me/no-session':
+    'The boot call of a student in a class, with no session running and their tap waiting for Start.',
+  'me/armed-expired':
+    'The same boot call once that tap’s school day has ended: it waits no more (#166).',
   'me/in-session': 'The boot call of a student live in a running session.',
   'taps/armed': 'A tap while none of the teacher’s sessions runs: saved, waiting for Start.',
   'taps/already-armed': 'Another tap of the same block while the first still waits.',
@@ -189,6 +192,8 @@ interface Call {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   path: string;
   body?: object;
+  /** When the server hears a call whose body names no time (a read): now, unless said. */
+  at?: string;
 }
 /**
  * The phone's clock, fixed: the server clamps it into the session's window
@@ -196,7 +201,7 @@ interface Call {
  * server stamps — stand-ins are numbered by value, so that would renumber one.
  */
 const deviceTime = '2026-01-01T09:00:00.000Z';
-const get = (as: string, path: string): Call => ({ as, method: 'GET', path });
+const get = (as: string, path: string, at?: string): Call => ({ as, method: 'GET', path, at });
 /** A leave or a removal, under a fresh id unless given one: the phone always sends one (A19). */
 const del = (as: string, path: string, eventId: string = randomUUID()): Call => ({
   as,
@@ -233,7 +238,7 @@ const fixtures = new Map<string, Fixture>();
 let heard = new Date();
 
 async function send(call: Call) {
-  const made = (call.body as { deviceTime?: string } | undefined)?.deviceTime;
+  const made = call.at ?? (call.body as { deviceTime?: string } | undefined)?.deviceTime;
   heard = made === undefined ? new Date() : new Date(made);
   const res = await ctx.app.inject({
     method: call.method,
@@ -316,7 +321,7 @@ const token = (sub: string, name?: string) =>
 async function captureAll() {
   // Someone signing in for the first time, in no class.
   const newcomer = await token('student-fx-newcomer');
-  await capture('me/new-student', get(newcomer, '/v1/me'), 200, { session: null });
+  await capture('me/new-student', get(newcomer, '/v1/me'), 200, { session: null, armed: false });
 
   // Taps before the teacher starts (decision 5).
   const arm = await seedClassroom(db, 'fx-arm');
@@ -327,7 +332,11 @@ async function captureAll() {
   await capture('taps/already-armed', tap(armer, arm.block.tagId), 200, again);
   await capture('taps/already-armed-retry', tap(armer, arm.block.tagId, waiting), 200, again);
   const named = await token(arm.student.cognitoId, 'Ana');
-  await capture('me/no-session', get(named, '/v1/me'), 200, { session: null });
+  // Read on the taps' own day, while they wait; read now, their school day is over (#166).
+  const stillArmed = { session: null, armed: true };
+  await capture('me/no-session', get(named, '/v1/me', deviceTime), 200, stillArmed);
+  const expired = { session: null, armed: false };
+  await capture('me/armed-expired', get(named, '/v1/me'), 200, expired);
 
   // A switch between two teachers' running sessions (decision 4).
   const from = await seedClassroom(db, 'fx-switch-from');
@@ -348,7 +357,7 @@ async function captureAll() {
   const landed = randomUUID();
   await setup(tap(ana, c.block.tagId, landed));
   await capture('taps/replay', tap(ana, c.block.tagId, landed), 200, { outcome: 'replay' });
-  await capture('me/in-session', get(ana, '/v1/me'), 200);
+  await capture('me/in-session', get(ana, '/v1/me'), 200, { armed: false });
   await capture('checkin/live', checkin(ana, s.id), 200, { status: 'live' });
   const unlocked = randomUUID();
   const bathroom = change(ana, s.id, 'unlock', unlocked, { reason: 'bathroom' });

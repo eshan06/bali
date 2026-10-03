@@ -1,9 +1,11 @@
 import {
+  armedTaps,
   type Database,
   endSession,
   enrollments,
   events,
   findUserByCognitoId,
+  getLiveParticipation,
   startSession,
   users,
 } from '@bali/db';
@@ -12,14 +14,22 @@ import type {
   MeResponse,
   RosterResponse,
   SessionSnapshot,
+  TapResponse,
   UpdateMeResponse,
 } from '@bali/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
+
+// `/v1/me`'s read of the live session, as it is, so a test can land a Start
+// just after it (#166's review).
+vi.mock('@bali/db', async (actual) => {
+  const db = await actual<typeof import('@bali/db')>();
+  return { ...db, getLiveParticipation: vi.fn(db.getLiveParticipation) };
+});
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -35,9 +45,23 @@ afterEach(async () => {
   await closeDb();
 });
 
-async function me(token: string): Promise<{ status: number; body: MeResponse }> {
-  const res = await authedInject(ctx.app, token, { method: 'GET', url: '/v1/me' });
+async function me(token: string, on = ctx): Promise<{ status: number; body: MeResponse }> {
+  const res = await authedInject(on.app, token, { method: 'GET', url: '/v1/me' });
   return { status: res.statusCode, body: res.json<MeResponse>() };
+}
+
+/** A tap of `tagId`, made and heard at `at`. */
+async function tap(token: string, tagId: string, on = ctx, at = new Date()): Promise<TapResponse> {
+  const payload = { tagId, eventId: randomUUID(), deviceTime: at.toISOString() };
+  const res = await authedInject(on.app, token, { method: 'POST', url: '/v1/taps', payload });
+  return res.json<TapResponse>();
+}
+
+/** The app on the server's clock `clock.now`, which the test moves. */
+async function onClock(clock: { now: Date }): Promise<AuthedApp> {
+  const timed = await makeAuthedApp(db, () => clock.now);
+  onTestFinished(() => timed.close());
+  return timed;
 }
 
 describe('GET /v1/me', () => {
@@ -536,6 +560,120 @@ describe('GET /v1/me', () => {
     );
   });
 
+  it('says a tap of the student’s waits for a Start until the end of its school day, by the server’s clock (#166)', async () => {
+    // The owner's phone (#166): a tap at 7:10 PM still said "waiting" at 7:12 PM
+    // the next day. The server had dropped it at the end of its school day —
+    // its own midnight — and nothing it answered said so.
+    const clock = { now: new Date(2026, 9, 1, 19, 10) };
+    const timed = await onClock(clock);
+    const { student, block } = await seedClassroom(db, 'me-armed');
+    const token = await timed.tokenFor(student.cognitoId);
+    expect((await me(token, timed)).body.armed).toBe(false);
+    expect((await tap(token, block.tagId, timed, clock.now)).outcome).toBe('armed');
+    const kept = await db.select().from(armedTaps);
+    expect((await me(token, timed)).body.armed).toBe(true);
+    // Its last millisecond, as the Start judges it (`expires_at > at`).
+    clock.now = new Date(2026, 9, 1, 23, 59, 59, 998);
+    expect((await me(token, timed)).body.armed).toBe(true);
+    clock.now = new Date(2026, 9, 1, 23, 59, 59, 999);
+    expect((await me(token, timed)).body.armed).toBe(false);
+    clock.now = new Date(2026, 9, 2, 19, 12);
+    const { status, body } = await me(token, timed);
+    expect(status).toBe(200);
+    expect(body.armed).toBe(false);
+    expect(body.session).toBeNull();
+    // A read: no tap consumed, refreshed or added.
+    expect(await db.select().from(armedTaps)).toEqual(kept);
+  });
+
+  it('a Start landing between its reads never answers no session and no tap waiting, which would send a phone the Start just joined to Home, unshielded (#166’s review)', async () => {
+    const { student, klass, block } = await seedClassroom(db, 'me-armed-race');
+    const token = await ctx.tokenFor(student.cognitoId);
+    expect((await tap(token, block.tagId)).outcome).toBe('armed');
+    const { getLiveParticipation: read } =
+      await vi.importActual<typeof import('@bali/db')>('@bali/db');
+    vi.mocked(getLiveParticipation).mockImplementationOnce(async (...args) => {
+      const live = await read(...args);
+      const at = Date.now();
+      const started = await startSession(db, {
+        classId: klass.id,
+        startedAt: new Date(at - 60_000),
+        endsAt: new Date(at + 25 * 60_000),
+      });
+      expect(started.armedConverted).toBe(1);
+      return live;
+    });
+    const { status, body } = await me(token);
+    expect(status).toBe(200);
+    // Still waiting, read before the Start; or in its session, read after it.
+    expect(body.session !== null || body.armed).toBe(true);
+  });
+
+  it('after the end of its school day, a Start joins no one: no session, no tap waiting, and the class in session — Home’s card, Tap in (#166)', async () => {
+    const clock = { now: new Date(2026, 9, 1, 19, 10) };
+    const timed = await onClock(clock);
+    const { student, klass, block } = await seedClassroom(db, 'me-armed-start');
+    const token = await timed.tokenFor(student.cognitoId);
+    expect((await tap(token, block.tagId, timed, clock.now)).outcome).toBe('armed');
+    clock.now = new Date(2026, 9, 2, 19, 21);
+    const started = await startSession(db, {
+      classId: klass.id,
+      startedAt: clock.now,
+      endsAt: new Date(clock.now.getTime() + 25 * 60_000),
+    });
+    expect(started.armedConverted).toBe(0);
+    const { body } = await me(token, timed);
+    expect(body.armed).toBe(false);
+    expect(body.session).toBeNull();
+    expect(body.classes.map((c) => c.liveSession)).toEqual([
+      { id: started.session.id, endsAt: started.session.endsAt.toISOString() },
+    ]);
+  });
+
+  it('says no tap waits once a Start has joined the student, nor once that class is over (#166)', async () => {
+    // C3a's accepted stale screen: joined while the phone could not hear, the
+    // class then over, its read named no session — and the phone kept waiting.
+    const { student, klass, block } = await seedClassroom(db, 'me-armed-joined');
+    const token = await ctx.tokenFor(student.cognitoId);
+    expect((await tap(token, block.tagId)).outcome).toBe('armed');
+    expect((await me(token)).body.armed).toBe(true);
+    const { session, armedConverted } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    expect(armedConverted).toBe(1);
+    let { body } = await me(token);
+    expect(body.session?.id).toBe(session.id);
+    expect(body.armed).toBe(false);
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    ({ body } = await me(token));
+    expect(body.session).toBeNull();
+    expect(body.armed).toBe(false);
+  });
+
+  it('counts only the caller’s own tap, for a teacher of a class they are in: what a Start converts (#166)', async () => {
+    const { student, klass, block } = await seedClassroom(db, 'me-armed-left');
+    // A class of another teacher's, which the student stays in.
+    const other = await seedClassroom(db, 'me-armed-other');
+    await db.insert(enrollments).values({ classId: other.klass.id, studentId: student.id });
+    const token = await ctx.tokenFor(student.cognitoId);
+    expect((await tap(token, block.tagId)).outcome).toBe('armed');
+    expect((await me(token)).body.armed).toBe(true);
+    // Another student's read: no tap of theirs waits.
+    expect((await me(await ctx.tokenFor(other.student.cognitoId))).body.armed).toBe(false);
+    // Out of that teacher's class, no Start of theirs would join the student.
+    await db
+      .update(enrollments)
+      .set({ removedAt: new Date() })
+      .where(and(eq(enrollments.classId, klass.id), eq(enrollments.studentId, student.id)));
+    expect((await me(token)).body.armed).toBe(false);
+    // Nor would one of a teacher whose class they never joined, though the tap arms.
+    const stranger = await seedClassroom(db, 'me-armed-stranger');
+    expect((await tap(token, stranger.block.tagId)).outcome).toBe('armed');
+    expect((await me(token)).body.armed).toBe(false);
+  });
+
   it('returns a teacher their taught classes (existing role preserved)', async () => {
     const { teacher, klass } = await seedClassroom(db, 'me-teacher');
     await startSession(db, {
@@ -548,10 +686,11 @@ describe('GET /v1/me', () => {
     expect(body.classes.map((c) => c.id)).toEqual([klass.id]);
     // A teacher's own classes name the caller — here, one with no name yet —
     // and no enrollment: they teach it, and have none to leave (A19); nor its
-    // session, which is for a student not in it (C3c).
+    // session, which is for a student not in it (C3c). And no tap waits (#166).
     expect(body.classes.map((c) => c.teacher)).toEqual([{ displayName: null }]);
     expect(body.classes.map((c) => c.enrollmentId)).toEqual([null]);
     expect(body.classes.map((c) => c.liveSession)).toEqual([null]);
+    expect(body.armed).toBe(false);
   });
 
   it('fills a teacher’s missing display name too, and keeps the role', async () => {

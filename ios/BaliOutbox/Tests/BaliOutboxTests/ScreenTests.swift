@@ -935,20 +935,20 @@ struct TapInTests {
     }
 }
 
+/// The screen for `state` at `now`, and whether its tab bar shows, with `opened` — the router's
+/// answer for a phone signed in, its permission approved and checked, Home's tab chosen.
+private func shown(_ state: SyncState, opened: [Screen], now: Date = t0) -> (Screen, Bool) {
+    var protection = Protection()
+    (protection.checked, protection.permission) = (true, .approved)
+    let shown = Screen.choose(
+        problem: nil, introSeen: true, signedIn: true, protection: protection,
+        everApproved: false, everInClass: false, sync: state, hasClasses: state.hasClasses,
+        sessionOverClosed: nil, opened: opened, tab: .home, now: now)
+    return (shown.screen, shown.tabbed)
+}
+
 @Suite("Waiting's Back to home, and the Start (#151)", .timeLimit(.minutes(3)))
 struct WaitingHomeTests {
-    /// The screen for `state` at `now`, and whether its tab bar shows, with `opened` — the router's
-    /// answer for a phone signed in, its permission approved and checked, Home's tab chosen.
-    private func shown(_ state: SyncState, opened: [Screen], now: Date = t0) -> (Screen, Bool) {
-        var protection = Protection()
-        (protection.checked, protection.permission) = (true, .approved)
-        let shown = Screen.choose(
-            problem: nil, introSeen: true, signedIn: true, protection: protection,
-            everApproved: false, everInClass: false, sync: state, hasClasses: state.hasClasses,
-            sessionOverClosed: nil, opened: opened, tab: .home, now: now)
-        return (shown.screen, shown.tabbed)
-    }
-
     @Test(
         "Bali opened again while waiting lands on Waiting, the tap's answer: where the phone stands is kept in the file, and nothing the student opened is (#151). The read every 30 s in the foreground (decision 6) runs whatever the screen — the Home opened over Waiting is no input of the engine's — and the Start it finds is Focus, that Home closed"
     )
@@ -972,6 +972,171 @@ struct WaitingHomeTests {
         #expect(!started.keepsOpened(from: waiting, at: now))
         #expect(shown(started, opened: [.home], now: now) == (.focus, false))
         await relaunched.stop()
+    }
+}
+
+@Suite("A wait the server has dropped is Home, never Waiting (#166)", .timeLimit(.minutes(3)))
+struct DroppedWaitTests {
+    /// A tap answered armed at the rig's clock: the phone waits for the Start.
+    private func armed(_ rig: Rig) async throws {
+        try await rig.engine.record(.tap(tagId: "tag"))
+        try await rig.server.next(tapRoute).reply(200, Answer.armed)
+        await rig.until { $0.standing == .waiting && $0.queued.isEmpty }
+    }
+
+    /// Class `c` with its session running until `at(4000)`, as `GET /v1/me` names it (C3c).
+    private let inSession =
+        #"{"id":"c","name":"Class c","teacher":{"displayName":null},"liveSession":{"id":"s","endsAt":"\#(iso(at(4000)))"}}"#
+
+    @Test(
+        "A read saying no tap of the student's waits — its school day over, or taken by a Start whose class is over too — ends the wait: Home, never Waiting, and no wait said on it"
+    )
+    func dropped() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(nil, classes: [Answer.inClass("c")], armed: false))
+        let state = await rig.engine.state
+        #expect(state.standing == .out)
+        #expect(shown(state, opened: []) == (.home, true))
+        #expect(shown(state, opened: [.home]) == (.home, true))
+        #expect(state.waitingCard == nil && state.inSessionCard(at: rig.clock.now()) == nil)
+        await rig.stop()
+    }
+
+    @Test(
+        "A Start after the tap's school day joins nothing: the read names no session and no tap waiting, and Home's card says the class is in session, with Tap in (C3c)"
+    )
+    func startAfterExpiry() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(nil, classes: [Answer.inClass("c")], armed: true))
+        #expect(await rig.engine.state.standing == .waiting)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute)
+            .reply(200, Answer.me(nil, classes: [inSession], armed: false))
+        let state = await rig.until { $0.standing != .waiting }
+        let now = rig.clock.now()
+        #expect(state.standing == .out)
+        #expect(shown(state, opened: [], now: now) == (.home, true))
+        let card = try #require(state.inSessionCard(at: now))
+        #expect(!card.unlocked && card.bell == at(4000))
+        #expect(card.words == "Class c is in session. Tap your teacher's block to join.")
+        await rig.stop()
+    }
+
+    @Test(
+        "A read naming a class over by the phone's clock, the sweep yet to run, and no tap waiting — a Start took the tap and the class has rung — is that class: Session over, never Waiting (santa's round 1)"
+    )
+    func takenAndOver() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.foreground(Answer.me(session(endsAt: -60), armed: false))
+        let state = await rig.engine.state
+        #expect(state.standing == .inSession(session(endsAt: -60), .focused))
+        #expect(shown(state, opened: []) == (.sessionOver, false))
+        await rig.stop()
+    }
+
+    @Test(
+        "Offline, the wait ends where the server drops the tap — the end of the day it was armed, by the phone's clock — at the next wake: Home. Each arming moves it"
+    )
+    func offlineAtTheEnd() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        // Armed again the next day: the end of that day.
+        rig.clock.advance(by: 86_400)
+        try await armed(rig)
+        let ends = try #require(await rig.engine.state.waitEnds)
+        #expect(ends == SyncState.waitEnds(armedAt: at(86_400)))
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(nil)
+        await rig.until { $0.meFailed != nil }
+        try await rig.sleeping([at(86_430)])
+        // A second before it: still waiting.
+        rig.clock.advance(by: ends.timeIntervalSince(rig.clock.now()) - 1)
+        try await rig.server.next(meRoute).reply(nil)
+        try await rig.sleeping([ends.addingTimeInterval(29)])
+        let waiting = await rig.engine.state
+        #expect(waiting.standing == .waiting)
+        #expect(shown(waiting, opened: [], now: rig.clock.now()) == (.waiting, false))
+        rig.clock.advance(by: 30)
+        let state = await rig.until { $0.standing == .out }
+        #expect(shown(state, opened: [], now: rig.clock.now()) == (.home, true))
+        await rig.stop()
+    }
+
+    @Test(
+        "An end the file refuses to keep is said — storage failed (rule 5) — and kept in memory: armed again while waiting, where no write of the standing would say it (santa's round 2)"
+    )
+    func endNotKept() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        try await rig.outbox.pool.write {
+            try $0.execute(
+                sql: """
+                    CREATE TRIGGER refuse BEFORE INSERT ON outboxState WHEN NEW.key = 'waitEnds'
+                    BEGIN SELECT RAISE(ABORT, 'refused'); END
+                    """)
+        }
+        rig.clock.advance(by: 86_400)
+        try await armed(rig)
+        let state = await rig.engine.state
+        #expect(state.link == .storageFailed)
+        #expect(state.waitEnds == SyncState.waitEnds(armedAt: at(86_400)))
+        #expect(try rig.outbox.waitEnds() == SyncState.waitEnds(armedAt: t0))
+        await rig.stop()
+    }
+
+    @Test(
+        "The end is kept with the wait: Bali opened again past it, offline, is Home; a wait an earlier build kept, with no end, waits until a read ends it"
+    )
+    func relaunched() async throws {
+        let rig = try Rig()
+        try await armed(rig)
+        await rig.stop()
+        let relaunched = try Rig(outbox: rig.outbox)
+        let ends = SyncState.waitEnds(armedAt: t0)
+        #expect(await relaunched.engine.state.waitEnds == ends)
+        relaunched.clock.advance(by: ends.timeIntervalSince(t0))
+        await relaunched.engine.setForeground(true)
+        try await relaunched.server.next(meRoute).reply(nil)
+        let state = await relaunched.until { $0.standing == .out }
+        #expect(shown(state, opened: [], now: relaunched.clock.now()) == (.home, true))
+        await relaunched.stop()
+
+        let earlier = try makeOutbox().outbox
+        try earlier.file(.waiting)
+        let kept = try Rig(outbox: earlier)
+        #expect(await kept.engine.state.waitEnds == nil)
+        kept.clock.advance(by: 7 * 86_400)
+        await kept.engine.setForeground(true)
+        try await kept.server.next(meRoute).reply(nil)
+        try await kept.sleeping([at(7 * 86_400 + 30)])
+        #expect(await kept.engine.state.standing == .waiting)
+        kept.clock.advance(by: 30)
+        try await kept.server.next(meRoute).reply(200, Answer.me(nil, armed: false))
+        await kept.until { $0.standing == .out }
+        await kept.stop()
+    }
+
+    @Test(
+        "The end is the midnight after the arming in the phone's own zone — the school's, in class — as the server's armed tap ends at its zone's (decision 5): a day an hour short too"
+    )
+    func waitEnds() throws {
+        var central = Calendar(identifier: .gregorian)
+        central.timeZone = try #require(TimeZone(identifier: "America/Chicago"))
+        func date(_ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) throws -> Date {
+            try #require(
+                central.date(
+                    from: DateComponents(
+                        year: 2026, month: month, day: day, hour: hour, minute: minute)))
+        }
+        // The owner's tap (#166): 7:10 PM on October 1.
+        let owners = SyncState.waitEnds(armedAt: try date(10, 1, 19, 10), calendar: central)
+        #expect(owners == (try date(10, 2)))
+        // March 8, 2026, the clocks go forward: a day of 23 hours.
+        let spring = SyncState.waitEnds(armedAt: try date(3, 8, 10), calendar: central)
+        #expect(spring == (try date(3, 9)))
     }
 }
 

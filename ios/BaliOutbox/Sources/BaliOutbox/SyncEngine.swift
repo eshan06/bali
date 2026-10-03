@@ -25,9 +25,12 @@ public struct SystemClock: SyncClock {
 public enum Standing: Sendable, Hashable {
     /// In no session: nothing to shield.
     case out
-    /// Armed, waiting for the teacher's Start (decision 5): nothing to shield yet. No read shows an
-    /// armed tap, so one naming no session leaves the phone waiting; in the foreground it reads the
-    /// truth every 30 s for the Start (decision 6, the owner's ruling, 2026-09-29; C3a).
+    /// Armed, waiting for the teacher's Start (decision 5): nothing to shield yet. In the foreground
+    /// it reads the truth every 30 s for the Start (decision 6, the owner's ruling, 2026-09-29;
+    /// C3a); a read naming no session leaves it waiting while it says a tap of the student's waits
+    /// (`MeResponse.armed`), and ends the wait once none does — its school day over, or taken by a
+    /// Start whose class is over too — as the end of that day by the phone's own clock does,
+    /// offline (`SyncState.waitEnds`): never Waiting where no Start would lock the phone (#166).
     case waiting
     /// In `session`: shielded only while `focused` (nil is a state this build does not know), and
     /// only until its `endsAt`, which the phone's own clock keeps (data model, decision 6).
@@ -159,6 +162,18 @@ public struct SyncState: Sendable, Hashable {
     /// (`SyncEngine.forgetMe`): a state counting fewer forgets than the app asked for was sent
     /// before the last one, so its `me` is the last student's (#160's review).
     public var forgets = 0
+    /// When the wait for the teacher's Start ends by the phone's own clock, offline too (#166): the
+    /// end of the day its tap was last answered armed (`waitEnds(armedAt:)`), kept in the outbox
+    /// file for a relaunch; nil when not known — a wait an earlier build kept, which only a read
+    /// ends.
+    public var waitEnds: Date?
+
+    /// Where a wait armed at `now` ends: the midnight after it in `calendar`'s zone — the phone's,
+    /// the school's in class — as the server drops an armed tap at the end of its school day, in
+    /// the school's zone (decision 5; Hosting, decision 5).
+    public static func waitEnds(armedAt now: Date, calendar: Calendar = .current) -> Date {
+        calendar.dateInterval(of: .day, for: now)?.end ?? now.addingTimeInterval(86_400)
+    }
 
     /// Whether the student is in any class, as `me` says: nil until a read answers (C3).
     public var hasClasses: Bool? { me.map { !$0.classes.isEmpty } }
@@ -260,7 +275,7 @@ public actor SyncEngine {
     private var kept: Standing?
     /// A tap answered armed while where the phone stood was unread, which cannot show it: carried
     /// until the standing is known — onto an out the file gives back, or a read of the truth that
-    /// names no session — since no read shows an armed tap.
+    /// names no session — unless that read says no tap of the student's waits (#166).
     private var armed = false
     private var watchers: [UUID: AsyncStream<SyncState>.Continuation] = [:]
     /// Rule 3's check of the shields, run at each wake in the foreground — before each check-in,
@@ -305,6 +320,7 @@ public actor SyncEngine {
         if queued == nil { state.link = .storageFailed }
         state.reportedOff = try? outbox.reportedOff()
         state.lastTap = try? outbox.lastTap()
+        state.waitEnds = try? outbox.waitEnds()
         do {
             state.standing = try outbox.standing()
             // An unlock not filed yet acts on it, and the first change files it (`keepStanding`) —
@@ -671,6 +687,15 @@ public actor SyncEngine {
         await heard(sent.result, sent.noAnswer)
         let queued = queue()
         let applies = stored(outbox.awaiting) == 0
+        // An arming's wait ends where the server drops the tap, the end of its school day
+        // (decision 5) — by the phone's clock too, read or not (#166) — kept for a relaunch before
+        // the state is copied, so a write the file refuses stays shown (rule 5).
+        var waitEnds: Date?
+        if disposition == .tap(.waitForStart), applies {
+            let ends = SyncState.waitEnds(armedAt: clock.now())
+            waitEnds = ends
+            _ = stored { try outbox.keepWaitEnds(ends) }
+        }
         var next = state
         // Settled, and the queue read again, in one write: no screen sees the record neither on
         // its way nor answered (santa's round 1).
@@ -716,6 +741,7 @@ public actor SyncEngine {
             }
             if applies { next.standing = .inSession(session, participation) }
         case .tap(.waitForStart)?:
+            if let waitEnds { next.waitEnds = waitEnds }
             switch next.standing {
             // Arming ends nothing: a session the phone is in stays (decision 4) while it runs by
             // the phone's own clock (data model, decision 6) — past its bell the phone is in none,
@@ -745,6 +771,12 @@ public actor SyncEngine {
         while !Task.isCancelled {
             rung.remove(.read)
             readStanding()
+            // Past the end of the day its tap was armed, the server has dropped it (decision 5),
+            // which a read says (`armed`); with none answered — offline — the wait ends there too,
+            // at a wake: never Waiting where no Start would lock the phone (#166).
+            if state.standing == .waiting, let ends = state.waitEnds, ends <= clock.now() {
+                state.standing = .out
+            }
             // Rule 3, at each wake in the foreground: before the check-in, or the read of the truth
             // in its place — offline, one that never completes. A protection off it reports is a
             // change, which the read's stamp then counts. Out of a session too (C1c): with the app
@@ -811,12 +843,13 @@ public actor SyncEngine {
         state.standing = armed && standing == .out ? .waiting : standing
     }
 
-    /// `GET /v1/me`'s answer, as a standing: its live session, or none — waiting, while armed. A
-    /// session over by the phone's own clock (data model, decision 6) is not the Start a waiting
-    /// phone waits for: the sweep that ends it on the server may run late, and it would end the
-    /// wait with no class to be in (C3).
+    /// `GET /v1/me`'s answer, as a standing: its live session, or none — waiting, while armed and
+    /// the read does not say no tap of the student's waits (#166). A session over by the phone's
+    /// own clock (data model, decision 6) is not the Start a waiting phone waits for: the sweep
+    /// that ends it on the server may run late, and it would end the wait with no class to be in
+    /// (C3).
     private func standing(_ me: MeResponse) -> Standing {
-        let waiting = state.standing == .waiting || armed
+        let waiting = (state.standing == .waiting || armed) && me.armed != false
         guard let session = me.session, !waiting || session.endsAt > clock.now() else {
             return waiting ? .waiting : .out
         }

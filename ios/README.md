@@ -152,6 +152,18 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     phone with no marker written yet waits on, for up to 10 seconds).
 14. With the app open, the bell (or Ctrl-C on `watch` and `npm run dev:teacher -- end`, found at
     the next check-in) takes the shields off: `Standing: in no session`.
+15. **A wait the server has dropped is Home, never Waiting (#166).** A phone still on Waiting from
+    an earlier build, opened online: the regular Home within moments — a read says no tap waits.
+    With no session running, **Tap**: Waiting, and
+    `Standing: waiting for the teacher's Start, until` the coming midnight. Turn on Airplane
+    Mode, run `npm run dev:teacher -- start 5` and then `-- end` (the Start takes the waiting tap,
+    and the class is then over), and turn Airplane Mode off: with Bali open, within 30 seconds,
+    the regular Home with no Waiting card and `Standing: in no session` — the build before kept
+    Waiting. **The owner's case:** **Tap** in the evening with nothing running, and leave the
+    phone. The next day, open Bali: Home, not Waiting. `-- start`: the phone does not lock, and
+    Home's card says "Device check is in session. Tap your teacher's block to join." — **Tap in**
+    locks it. **Offline:** the same evening tap, then Airplane Mode on before opening Bali the next
+    day: Home all the same, by the phone's own clock.
 
 Bali's own shield, "Focused with Bali", is round 3's (B5c, B5c-2), below.
 

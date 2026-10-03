@@ -71,9 +71,14 @@ public struct MeResponse: Codable, Sendable, Hashable {
     public let user: MeUser
     public let classes: [MeClass]
     public let session: Session?
+    /// Whether a tap of the student's waits for a Start that would join them (#166): false once
+    /// none does — its school day over, or a Start taken it — so a phone waiting for its teacher's
+    /// Start stops waiting. Nil from an older API, which says nothing of it, and in an answer the
+    /// phone rebuilds (a join, a rename, a leave): the read that brought it has been applied.
+    public let armed: Bool?
     /// An answer as the phone keeps it: a class it joined since the read, added (C3).
-    public init(user: MeUser, classes: [MeClass], session: Session?) {
-        (self.user, self.classes, self.session) = (user, classes, session)
+    public init(user: MeUser, classes: [MeClass], session: Session?, armed: Bool? = nil) {
+        (self.user, self.classes, self.session, self.armed) = (user, classes, session, armed)
     }
 }
 

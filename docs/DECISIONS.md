@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-03** — **F14 (#166): a wait the server has dropped is Home, never Waiting.** **The
+  owner's goal (2026-10-02):** a tap at 7:10 PM on the owner's iPhone still said "Ready — waiting
+  for your teacher" at 7:12 PM the next day, and the Start at 7:21 joined nothing — the server
+  drops an armed tap at the end of its school day (decision 5) and nothing told the phone (C3a's
+  known gap). If the server has dropped the tap, the phone shows the regular Home; "Waiting" is
+  never shown where no Start would lock the phone. **The server says it on the read the phone
+  already makes:** `GET /v1/me`, decision 6's 30 s read, gains `armed` (additive): whether a tap of
+  the caller's waits for a Start that would join them — not consumed, its `expires_at` after the
+  server's clock, for a teacher of a live class they are in. That is the Start's own read of its
+  waiting taps (`lockWaitingTaps`), so the read and the Start never disagree; it goes past the
+  issue in one case, on purpose: a block of a teacher whose class the student is not in arms
+  (arming needs no enrollment), but no Start joins it, so the phone drops to Home at the first
+  read. A boolean, since the phone needs no more; the phone reads it absent (an older API) as
+  unknown, never as none. **The phone:** a read saying `armed: false` ends the wait — Home, its
+  in-session card with Tap in where a class of theirs runs (C3c), plain Home otherwise — which also
+  ends C3a's accepted stale screen (a tap taken by a Start whose class ended while the phone could
+  not hear). A read only ends a wait, never starts one: the phone's waits are its taps' answers.
+  **The backstop, offline:** each arming answer sets where the wait ends, the midnight after it in
+  the phone's zone (`SyncState.waitEnds`) — the server's own rule, the end of the school day in the
+  school's zone (Hosting, decision 5), the phone being in the school — kept in the outbox file for
+  a relaunch (a key of its own, `waitEnds`: no migration), and the read loop ends the wait at its
+  first wake past it — every 30 s in the foreground, at once on coming back. A wait kept by an
+  earlier build has no end: only a read ends it. A phone clock set wrong moves the end, as it moves
+  the bell: early, Home shows while a tap still waits, and the read every 30 s in a class still
+  finds the Start's session (C3c) — the safe side. **Alternatives:** the tap's answer carrying the
+  server's `expiresAt` — exact, but a second field, and a wait kept by an earlier build would still
+  have none; the router judging the end at render — a timer of its own, where the engine's wake
+  suffices. **Not here:** a push for the Start (decision 6's known limit stands). No new words or
+  screens; the Debug readout's `Standing:` says the end. **Tests**, red first: `me.test.ts` (#166:
+  the end of its school day to the millisecond, a Start after it, joined then over, only the
+  Start's own taps), the fixtures `me/no-session` (`armed: true`) and `me/armed-expired`,
+  `DroppedWaitTests` (a read saying none, a Start after expiry, offline at the end and each arming
+  moving it, relaunched and an earlier build's wait, the end's rule over a day an hour short) and
+  `ReadTests.waitingStays`. **Santa, round 1** (Reviewer B the Claude fallback: Codex refuses every
+  model on this Mac): one blocker, from Reviewer A, which B raised as a WARN — `/v1/me` read the
+  live session before `armed`, as two statements, so a Start committing between them answered no
+  session and no tap waiting, true at no moment, and the phone the Start had just joined went to
+  Home unshielded until its next read. Fixed red first (a Start landed just after the session's
+  read, `me.test.ts`): `armed` is read first, so every interleaving answers the wait or the
+  session. WARNs fixed: the wait's end kept before the answer's state is copied (a refused write
+  stays shown), the carried arming's comment, a test of a class over unswept with no tap waiting
+  (Session over, `takenAndOver`), and this entry's test name. One left: a write of the end the file
+  refuses is not tried again — only a suspension landing between the answer's settle and it can
+  refuse it, and a relaunch then ends the wait early or reads none, the safe side. **Round 2:** the
+  fixes held, no blocker; both reviewers' two WARNs fixed — the race test asks for a 200 (a 500
+  passed it), and `endNotKept` pins a refused write of the end staying said (red with the write
+  back below the copy).
+
 - **2026-10-03** — **F11a-2: the merged PRs' review WARNs, part 2 — Me, Leave, Home and Unlocked.**
   **"Hasn't reached your teacher yet" is cleared by the file too, not the queue's edge alone**
   (#129's review): Me says it where the outbox file holds an unlock the engine's queue does not

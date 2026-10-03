@@ -252,13 +252,19 @@ struct ReadTests {
         await rig.stop()
     }
 
-    @Test("A read naming no session leaves an armed phone waiting: no read shows an armed tap")
+    @Test(
+        "A read naming no session leaves an armed phone waiting while it says a tap of theirs waits — or, an older API's, says nothing of one (#166)"
+    )
     func waitingStays() async throws {
         let rig = try Rig()
         try await rig.engine.record(.tap(tagId: "tag"))
         try await rig.server.next(tapRoute).reply(200, Answer.armed)
         await rig.until { $0.standing == .waiting }
         try await rig.foreground(Answer.me(nil))
+        #expect(await rig.engine.state.standing == .waiting)
+        rig.clock.advance(by: 30)
+        try await rig.server.next(meRoute).reply(200, Answer.me(nil, armed: true))
+        try await rig.sleeping([at(60)])
         #expect(await rig.engine.state.standing == .waiting)
         await rig.stop()
     }

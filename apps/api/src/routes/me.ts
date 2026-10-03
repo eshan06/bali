@@ -4,6 +4,7 @@ import {
   getEnrolledClasses,
   getLiveParticipation,
   getTaughtClasses,
+  hasArmedTap,
   renameStudent,
   sessionRunning,
 } from '@bali/db';
@@ -21,9 +22,10 @@ const UpdateBody = z.object({ displayName: z.string(), eventId: z.string().uuid(
 const NewName = z.object({ displayName: DisplayName });
 
 /**
- * GET /v1/me — the boot call: who am I, my classes, my live session. The
- * first-ever call quietly creates the caller's student row (a teacher's row is
- * provisioned elsewhere; an existing row keeps its real role).
+ * GET /v1/me — the boot call: who am I, my classes, my live session, and
+ * whether a tap of mine waits for a Start (#166). The first-ever call quietly
+ * creates the caller's student row (a teacher's row is provisioned elsewhere;
+ * an existing row keeps its real role).
  *
  * PATCH /v1/me — a student sets their own display name (A8), unique within
  * each class they are in (owner decision 8; `renameStudent`). Idempotent on
@@ -38,6 +40,12 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
       identity.sub,
       displayNameFromClaims(identity.claims),
     );
+
+    // A tap of theirs waiting for a Start, by the server's clock (#166): none,
+    // and a phone waiting for its teacher's Start stops waiting. Read before the
+    // session, so a Start landing between the two answers with its session —
+    // never with no session and no tap waiting (#166's review).
+    const armed = user.role === 'student' && (await hasArmedTap(db, user.id, clock()));
 
     // Each class names its teacher (C2a): a teacher's own, the caller — already
     // in hand; a student's, read with the class in one query, with the
@@ -88,6 +96,7 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
       user: { id: user.id, role: user.role, displayName: user.displayName },
       classes,
       session,
+      armed,
     };
   });
 

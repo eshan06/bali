@@ -152,7 +152,10 @@ it would switch them back out of where that later tap put them. It is consumed w
 joining and recorded in the session that declined it as its `tap_in`, noted `superseded`;
 a tap that would only arm once such a later tap is recorded never waits at all. It's saved
 as student + teacher, since one block serves all of a teacher's classes and the class is
-only knowable once a session starts. It expires at the end of the school day.
+only knowable once a session starts. It expires at the end of the school day, and the phone
+stops waiting with it (#166): `GET /v1/me` says whether a tap of the student's still waits for a
+Start that would join them, and offline the phone's own clock ends the wait at that day's end.
+"Waiting" is never shown where no Start would lock the phone.
 
 **6. Sessions end themselves.** The phone knows the session's end time, so it removes the
 shields at that moment using its own clock, even with no internet. On the server, a small
@@ -305,7 +308,11 @@ Student app:
   a teacher's own class; added 2026-09-30, A19, additive): what leaving it deletes. And its
   session running now by the server's clock, with its bell (`liveSession`, null when none runs
   and on a teacher's own class; added 2026-09-30, C3c, additive): Home says the class is in
-  session to a student not in it.
+  session to a student not in it. And whether a tap of the caller's waits for a Start that would
+  join them (`armed`; added 2026-10-03, #166, additive): not taken by a Start, not past the end
+  of its school day by the server's clock, for a teacher of a class they are in — the taps a
+  Start converts; false for a teacher. A phone waiting for its teacher's Start stops waiting once
+  it is false.
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
