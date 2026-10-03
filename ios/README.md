@@ -131,7 +131,8 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     **Then unlocked (#167):** **Emergency Unlock**, then turn Bali's access off in Settings and go
     back to Bali: the Screen Time off screen, its second step "Bali puts you back in class by
     itself"; **Turn on Screen Time** → **Allow**: still unlocked — the apps stay open, Unlocked's
-    screen with **Lock my apps again** — and `watch` shows **unlocked**, never focused.
+    screen with **Lock my apps again** and "Want to say why?" as before (a pick saves) — and
+    `watch` shows **unlocked**, never focused.
     **Then a launch with access off (#145):** focused again, swipe Bali away, turn its access off in
     Settings and open Bali: the Screen Time off screen at once — no "Checking Screen Time…" wait —
     and `watch` shows **protection off** within seconds. Turn access back on in Settings and press

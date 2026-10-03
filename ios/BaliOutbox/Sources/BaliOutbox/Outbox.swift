@@ -444,9 +444,9 @@ public struct Outbox: Sendable {
     /// already reported in this session — and again after a tap, which returns the row to
     /// focused, Screen Time back on (#167), or `protectionRestored`; with it, where the phone stood
     /// there before it (`offFrom`), which Screen Time back on returns to — kept until a tap or the
-    /// next report, so a back on made again returns there too. An unlock waiting for its
-    /// reason is due `hold` later (C5a), and whatever the phone does next sends one at once: the
-    /// student has moved on.
+    /// next report, so a back on made again returns there too, and unlocked by an Emergency Unlock
+    /// since. An unlock waiting for its reason is due `hold` later (C5a), and whatever the phone
+    /// does next sends one at once: the student has moved on.
     @discardableResult
     public func record(
         _ change: Change, now: Date, standing: Standing? = nil, holding hold: TimeInterval = 0
@@ -514,6 +514,11 @@ public struct Outbox: Sendable {
                 try Self.setState(db, Self.reportedKey, nil)
                 row = ("protection_on", nil, session, nil)
             }
+            // An Emergency Unlock is the latest turn the server records, under protection off too
+            // (A2): a back on made since returns to it (santa's round 2).
+            if change.isUnlock {
+                try Self.setState(db, Self.offFromKey, ParticipationState.unlocked.rawValue)
+            }
             try db.execute(
                 sql: """
                     INSERT INTO outbox (eventId, kind, tagId, sessionId, tapId, reason, follows,
@@ -567,8 +572,8 @@ public struct Outbox: Sendable {
     }
 
     /// Where the phone stood in that session before protection off — focused, or unlocked — which
-    /// Screen Time back on returns it to at once (#167), until a tap or the next report; nil: not
-    /// known.
+    /// Screen Time back on returns it to at once (#167), until a tap or the next report — unlocked
+    /// by an Emergency Unlock since; nil: not known.
     func offFrom() throws -> ParticipationState? {
         try pool.read { try Self.state($0, Self.offFromKey).flatMap(ParticipationState.init) }
     }

@@ -272,6 +272,10 @@ struct SchemaTests {
             try record(outbox, .protectionOn(session: "s"))
             #expect(try outbox.offFrom() == kept && outbox.reportedOff() == nil)
         }
+        // An Emergency Unlock since — the latest turn the server records, under protection off
+        // too — is where a back on made again returns (santa's round 2).
+        try record(outbox, .unlock(session: "s", reason: nil))
+        #expect(try outbox.offFrom() == .unlocked)
         // Standing in protection off already, or in another session, nothing new is known.
         try outbox.keep(.inSession(session(), .unlocked))
         try record(outbox, .protectionOff(session: "s"))

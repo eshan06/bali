@@ -8,47 +8,53 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-02** — **F13b (#167): the phone half of Screen Time back on — the Screen Time off
-  screen leaves with no re-tap.** **When:** the marker there again — written only once iOS has
-  confirmed the access (F1b), so never on Family Controls' read alone, which a running app keeps
-  approved after a revocation — while the phone stands protection off in a class still running by
-  its own clock: after Turn on Screen Time is answered, and at each check (a relaunch over a
-  protection off it kept, access turned back on before Bali closed). Out of a class, or past its
-  bell, nothing. **What:** a `protection_on` record through the outbox like every state change,
-  under the phone's order (A12), its answer read by `stateChangeDisposition` — and, at once, the
-  standing back where it stood before protection off, so the shields come back with no network
-  (local-first, decision 2). The outbox keeps that state with the report's own write
-  (`protectionOffFrom`, read from the standing it kept before it) until a tap or the next report,
-  so a back on made again — its answer late, or stuck and the truth read back to protection off —
-  returns there too; not known (a report of the build before), past the unlock guard: unlocked
-  while an Emergency Unlock is still queued there, else focused, the stricter. Made once: the
-  engine records it only out of protection off (`SyncEngine.record`, which never suspends), so
-  checks that overlap make one. The server's answer then reconciles — its latest turn decides
-  (F13a). A late answer (a protection off of the phone's after it on record) applies protection
-  off, and the next check sends a new one; refused — `protection_not_off`, the row not in
-  protection off on the server — it is dropped and the truth read again, as any state change. It
-  is no return of the student's (`isReturn`): an unlock the server has yet to record still guards
-  its session from its answer. Nor is it, or protection off, a turn of the student's (A9): the
-  unlock recorded keeps the Unlocked card's reason changeable once back on (A20,
-  `recordedUnlock`). **Outbox v6:** the table is made again, its kinds gaining
-  `protection_on` (v1's CHECK), its counter carried over (A12), cheap enough for the monitor's read
-  to run it after an update. **The words** (DESIGN.md's voice, no em-dash; D1's layout kept): the
-  card's second step reads "Bali puts you back in class by itself" — "Tap your teacher's block
-  again" only on the re-tap's way, where Screen Time reads on and no Screen Time back on could be
-  sent (a marker that does not read back) — and "Checking Screen Time…" says the teacher sees
-  Screen Time off "until it's back on". The steps are `ProtectionOffWords.steps`, tested
-  on Linux. **Tests**, red first where they could be: `BackOnTests` (focused again, still unlocked
-  — which caught the before-state read after the record's own standing — made once, unlocked
-  through a late answer, not known over a queued unlock, past the bell or out, a marker not back,
-  a relaunch, refused or late), `SchemaTests.fromV5`, `.offFrom`, `ScreenTests.backOn`,
-  `ProtectionOffScreenTests`, and the settle tests over `protection-on`'s fixtures and generated
-  cases. **Santa, round 1** (Reviewer B the Claude fallback: Codex refuses every model on this
-  Mac): one blocker from each, one root — back on forgot `protectionOffFrom` as it was made, so a
-  second back on in the same protection off (two checks overlapping, or a first answered late or
-  stuck) put an unlocked student in focus, shields over the Emergency Unlock. Fixed red first:
-  made once, and kept until a tap or the next report. All three WARNs fixed with it: the
-  not-known fallback past the unlock guard, the out-of-a-class case tested, and the Unlocked
-  card's reason kept through Screen Time off and back on.
+- **2026-10-02** — **F13b (#167): the phone half of Screen Time back on — the Screen Time off screen
+  leaves with no re-tap.** **When:** the marker there again — written only once iOS has confirmed
+  the access (F1b), so never on Family Controls' read alone, which a running app keeps approved
+  after a revocation — while the phone stands protection off in a class still running by its own
+  clock: after Turn on Screen Time is answered, and at each check (a relaunch over a protection off
+  it kept, access turned back on before Bali closed). Out of a class, or past its bell, nothing.
+  **What:** a `protection_on` record through the outbox like every state change, under the phone's
+  order (A12), its answer read by `stateChangeDisposition` — and, at once, the standing back where
+  it stood before protection off, so the shields come back with no network (local-first,
+  decision 2). The outbox keeps that state with the report's own write (`protectionOffFrom`, read
+  from the standing it kept before it) until a tap or the next report, so a back on made again — its
+  answer late, or stuck and the truth read back to protection off — returns there too, and to
+  unlocked after an Emergency Unlock since (the latest turn the server records, under protection off
+  too: A2); not known (a report of the build before), past the unlock guard: unlocked while an
+  Emergency Unlock is still queued there, else focused, the stricter. Made once: the engine records
+  it only out of protection off (`SyncEngine.record`, which never suspends), so checks that overlap
+  make one. The server's answer then reconciles — its latest turn decides (F13a). A late answer (a
+  protection off of the phone's after it on record) applies protection off, and the next check sends
+  a new one; refused — `protection_not_off`, the row not in protection off on the server — it is
+  dropped and the truth read again, as any state change. It is no return of the student's
+  (`isReturn`): an unlock the server has yet to record still guards its session from its answer. Nor
+  is it, or protection off, a turn of the student's (A9): the unlock recorded keeps the Unlocked
+  card's reason changeable once back on (A20, `recordedUnlock`). **Outbox v6:** the table is made
+  again, its kinds gaining `protection_on` (v1's CHECK), its counter carried over (A12), cheap
+  enough for the monitor's read to run it after an update. **The words** (DESIGN.md's voice, no
+  em-dash; D1's layout kept): the card's second step reads "Bali puts you back in class by itself" —
+  "Tap your teacher's block again" only on the re-tap's way, where Screen Time reads on and no
+  Screen Time back on could be sent (a marker that does not read back) — and "Checking Screen Time…"
+  says the teacher sees Screen Time off "until it's back on". The steps are
+  `ProtectionOffWords.steps`, tested on Linux. **Tests**, red first where they could be:
+  `BackOnTests` (focused again, still unlocked — which caught the before-state read after the
+  record's own standing — made once, unlocked through a late answer, an unlock since, not known over
+  a queued unlock, past the bell or out, a marker not back, a relaunch, refused or late),
+  `SchemaTests.fromV5`, `.offFrom`, `ScreenTests.backOn`, `ProtectionOffScreenTests`, and the settle
+  tests over `protection-on`'s fixtures and generated cases. **Santa, round 1** (Reviewer B the
+  Claude fallback: Codex refuses every model on this Mac): one blocker from each, one root — back on
+  forgot `protectionOffFrom` as it was made, so a second back on in the same protection off (two
+  checks overlapping, or a first answered late or stuck) put an unlocked student in focus, shields
+  over the Emergency Unlock. Fixed red first: made once, and kept until a tap or the next report.
+  All three WARNs fixed with it: the not-known fallback past the unlock guard, the out-of-a-class
+  case tested, and the Unlocked card's reason kept through Screen Time off and back on. **Round 2:**
+  every fix resolved, no blocker. Both reviewers raised the same WARN, fixed after the loop, red
+  first (the Claude Review sees it): an Emergency Unlock made after a back on the server had yet to
+  take left `protectionOffFrom` at focused, so a back on made again relocked over it; any unlock now
+  writes it unlocked. One WARN left: not known, the unlock guard's answer is not kept, so a back on
+  made again once that unlock has reached the server falls back to focused — only a protection off
+  reported by the build before this one can reach it.
 
 - **2026-10-02** — **F13a (#167): Screen Time back on in the class the student tapped into returns
   them where they stood, with no re-tap — the server half.** **The owner's decision** (2026-10-02,

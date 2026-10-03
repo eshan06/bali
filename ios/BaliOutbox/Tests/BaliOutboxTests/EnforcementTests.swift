@@ -1145,6 +1145,10 @@ extension Answer {
     static func protectionOn(_ view: SessionView = session(), state: String = "focused") -> String {
         #"{"outcome":"applied","state":"\#(state)","session":\#(json(view))}"#
     }
+    /// An Emergency Unlock under protection off: recorded, never softened (A2).
+    static func unlockUnderOff(_ view: SessionView = session()) -> String {
+        #"{"outcome":"recorded","recordedAs":"protection_off","state":"protection_off","session":\#(json(view)),"reason":null}"#
+    }
 }
 
 @Suite(
@@ -1237,6 +1241,27 @@ struct BackOnTests {
         try await phone.enforcer.requestPermission()
         try await rig.server.next(protectionOnRoute).reply(
             200, Answer.replay(state: "protection_off"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
+        await phone.enforcer.check()
+        #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
+        try await rig.server.next(protectionOnRoute).reply(
+            200, Answer.protectionOn(state: "unlocked"))
+        await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .unlocked) }
+        #expect(await !phone.screenTime.shielding)
+        await phone.stop()
+    }
+
+    @Test(
+        "An Emergency Unlock made after a back on the server has yet to take — the truth then protection off again: the next back on returns to unlocked, that unlock the latest turn the server recorded, never focus over it (santa's round 2)"
+    )
+    func unlockedSince() async throws {
+        let (rig, phone) = try await off()
+        try await phone.enforcer.requestPermission()
+        await rig.until { $0.standing == .inSession(session(), .focused) }
+        let first = try await rig.server.next(protectionOnRoute)
+        try await rig.engine.emergencyUnlock()
+        first.reply(200, Answer.replay(state: "protection_off"))
+        try await rig.server.next(unlockRoute).reply(200, Answer.unlockUnderOff())
         await rig.until { $0.queued.isEmpty && $0.standing == .inSession(session(), .protectionOff) }
         await phone.enforcer.check()
         #expect(await rig.engine.state.standing == .inSession(session(), .unlocked))
