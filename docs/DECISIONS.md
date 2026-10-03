@@ -8,8 +8,8 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-03** — **F11a-2: the merged PRs' review WARNs, part 2 — Me, Leave, Home and
-  Unlocked.** **"Hasn't reached your teacher yet" is cleared by the file, not the queue's edge**
+- **2026-10-03** — **F11a-2: the merged PRs' review WARNs, part 2 — Me, Leave, Home and Unlocked.**
+  **"Hasn't reached your teacher yet" is cleared by the file too, not the queue's edge alone**
   (#129's review): Me says it where the outbox file holds an unlock the engine's queue does not
   show, and Riders-2's santa (round 2) cleared it only once a hold the queue showed ended, so that
   no unrelated publish could clear it. Where the queue's reads failed throughout, no hold ever
@@ -19,21 +19,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   again (`unlockUnsent`, the read that set the words), and they go once it holds none, if they are
   still those words. Santa's rule holds: while the file holds the unlock, nothing clears it. No
   count of presses guards the ask (the first version had one; santa found it untested, and it is
-  not needed): the main actor and the engine each run their jobs in order, so the ask's answer lands after any press's whose read
-  came first, and a press reading after it sets its words after its clear. **A pick's hold is the loop's own** (#152's review): kept as the card it was made on, and
-  let go as the loop ends, whichever way, only if it is still that card's, so a card moving on
-  never latches it (the WARN's case: every later pick would move the check and send nothing) and
-  a loop ending for an old card never frees a newer one's (two changes at once). `synced` no
-  longer resets it. **Me wakes at its lesson's bell** (#134's review): the router already leaves
-  Me for Session over at that bell, so this changes nothing seen today; Me no longer leans on it.
-  `ClassesSection` judges each class's hold once, its Leave and its line from one answer. Its
-  test compares pixels, a Me drawn alone against one drawn past the bell: SwiftUI gives these
-  tests no accessibility tree to read words from. **A leave refused 403 for a reason this build
-  does not know** is the route's own no (`DELETE /v1/enrollments/{id}` gives a 403 only to an
-  account that may not end that enrollment), never the join's "only students can join a class".
-  **Home in no class names the Try again beside a refused tap's words**, having no Tap in (#160's
-  review); Waiting, which also has none of its own, keeps "Tap in again": its Back to home leads
-  to one. **The engine's leave**, like its join (F11a-1), touches no `me` forgotten meanwhile.
+  not needed): the main actor and the engine each run their jobs in order, so the ask's answer
+  lands after any press's whose read came first, and a press reading after it sets its words after
+  its clear. **A pick's hold is the loop's own** (#152's review): kept as the card it was made on,
+  and let go as the loop ends, whichever way, only if it is still that card's, so a card moving on
+  never latches it (the WARN's case: every later pick would move the check and send nothing) and a
+  loop ending for an old card never frees a newer one's (two changes at once). `synced` no longer
+  resets it. **Me wakes at its lesson's bell** (#134's review): the router already leaves Me for
+  Session over at that bell, so this changes nothing seen today; Me no longer leans on it.
+  `ClassesSection` judges each class's hold once, its Leave and its line from one answer. Its test
+  compares pixels, a Me drawn alone against one drawn past the bell: SwiftUI gives these tests no
+  accessibility tree to read words from. **A leave refused 403 for a reason this build does not
+  know** is the route's own no (`DELETE /v1/enrollments/{id}` gives a 403 only to an account that
+  may not end that enrollment), never the join's "only students can join a class". **Home in no
+  class names the Try again beside a refused tap's words**, having no Tap in (#160's review);
+  Waiting, which also has none of its own, keeps "Tap in again": its Back to home leads to one.
+  **The engine's leave**, like its join (F11a-1), touches no `me` forgotten meanwhile.
   **`emailAsked` replaced**: reading `Tokens.init`'s source broke on a reformat and missed an
   explicit `nil`; `TokenTests.emailEveryWay` runs every way the phone makes tokens and reads each
   back after a relaunch.
