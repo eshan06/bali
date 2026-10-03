@@ -120,15 +120,22 @@ npm run dev:teacher -- block   # the block DEVICE-CHECK-1, registered to the tea
     15, and with Bali behind for a minute, then opened — the same each time. Note in #144 how long
     after Bali came to the front **protection off** showed on `watch`.
     **Turn on Screen Time**: iOS's prompt appears; **Allow**: a new `Asked iOS:` line, `given in …`,
-    `Marker: present`, and the screen says Screen Time is back on — still no shields: only a re-tap
-    leaves protection off. Watch `Marker:` for a minute: it must stay `present` (iOS empties the
+    `Marker: present`, and, with no tap (#167), the Screen Time off screen gives way to Focus at
+    once: `Standing: focused`, `shields on`, `iOS:` holding `bali` to the bell again, and within
+    seconds `watch` shows the student **focused**; the readout's `Outbox:` lists
+    `Screen Time back on` until it is answered. Bali's History shows **Screen Time off**, then
+    **Screen Time back on**. Watch `Marker:` for a minute: it must stay `present` (iOS empties the
     stores as access comes back; a marker emptied after it was written would read as access taken
-    back again). **Tap** brings the shields and focus back, and `iOS:` holds `bali` to the bell
-    again. Next time, press **Turn on Screen Time** twice quickly: one prompt, one new `Asked iOS:`
-    line, and no error under the button.
+    back again). Next time, press **Turn on Screen Time** twice quickly: one prompt, one new
+    `Asked iOS:` line, no error under the button, and one `Screen Time back on`.
+    **Then unlocked (#167):** **Emergency Unlock**, then turn Bali's access off in Settings and go
+    back to Bali: the Screen Time off screen, its second step "Bali puts you back in class by
+    itself"; **Turn on Screen Time** → **Allow**: still unlocked — the apps stay open, Unlocked's
+    screen with **Lock my apps again** — and `watch` shows **unlocked**, never focused.
     **Then a launch with access off (#145):** focused again, swipe Bali away, turn its access off in
     Settings and open Bali: the Screen Time off screen at once — no "Checking Screen Time…" wait —
-    and `watch` shows **protection off** within seconds. Turn access back on and **Tap**.
+    and `watch` shows **protection off** within seconds. Turn access back on in Settings and press
+    **Turn on Screen Time** in Bali (iOS answers with no prompt): focused again, no tap (#167).
     **Then through the bell with Bali closed (the monitor's note):** `-- start 20`, **Tap**, swipe
     Bali away, and in the class's last 15 minutes (the bell's window running) turn its access off;
     open Bali only after the bell: `Marker:` ends `the monitor found it gone at` about when you
