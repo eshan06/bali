@@ -44,48 +44,53 @@ final class PhoneScreenTime: ScreenTime {
     /// iOS's own prompt; what it threw in the screen's words (C1b).
     func requestPermission() async throws {
         do {
-            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+            #if DEBUG
+                try await Self.timedAsk()
+            #else
+                try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+            #endif
         } catch {
             throw ScreenTimeAskError(familyControls: error)
         }
     }
 
-    func schedule(_ window: DateInterval?) throws {
-        do {
-            try Bell.register(window)
-        } catch {
-            #if DEBUG
-                Self.found("window refused: \(error)")
-            #endif
-            if case .unauthorized? = error as? DeviceActivityCenter.MonitoringError {
-                throw ScreenTimeUnauthorized()
-            }
-            throw error
-        }
-    }
-
-    func holds(_ window: DateInterval) -> Bool {
-        let held = Bell.holds(window, as: .bell, in: DeviceActivityCenter())
-        #if DEBUG
-            if !held { Self.found("bell window to \(Self.time(window.end)) gone from iOS") }
-        #endif
-        return held
-    }
+    func schedule(_ window: DateInterval?) throws { try Bell.register(window) }
 
     func monitorUnscheduled() -> Date? { Bell.monitorUnscheduled }
+
+    func marker() -> Marker { Marker.now }
+    func writeMarker() { Marker.write() }
+    func markerLostAt() -> Date? { Marker.lostAt }
 }
 
 #if DEBUG
-    /// #144's device check, for the Debug readout: what the enforcer's checks found of iOS's
-    /// DeviceActivity center, and the signals as iOS gives them now — which one flips when Screen
-    /// Time access is taken back with the app running.
+    /// #144's device check, for the Debug readout: the marker, the asks of iOS — the silent check's
+    /// among them — and the signals as iOS gives them now.
     extension PhoneScreenTime {
-        /// A bell window gone, a window refused: newest first, three kept.
-        static var findings: [String] = []
+        /// Each ask of iOS for the access, newest first, three kept: when, what iOS answered, and
+        /// how long it took. One no press made is the enforcer's silent check (F1b).
+        static var asks: [String] = []
 
-        static func found(_ finding: String) {
-            findings = Bell.logged(
-                "\(Date().formatted(date: .omitted, time: .standard)) · \(finding)", in: findings)
+        /// iOS asked, as `requestPermission` asks it, and its answer logged in `asks`.
+        static func timedAsk() async throws {
+            let (asked, at) = (ContinuousClock.now, time(Date()))
+            do {
+                try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+                asks = Bell.logged("\(at) · given in \(ContinuousClock.now - asked)", in: asks)
+            } catch {
+                asks = Bell.logged("\(at) · \(error) in \(ContinuousClock.now - asked)", in: asks)
+                throw error
+            }
+        }
+
+        /// The marker (F1b): there, gone, or none written yet — and the monitor's note.
+        static var markerNow: String {
+            let note = Marker.lostAt.map { "the monitor found it gone at \(time($0))" } ?? "no note"
+            return switch Marker.now {
+            case .unwritten: "none written yet · \(note)"
+            case .present: "present · \(note)"
+            case .missing: "MISSING — access taken back · \(note)"
+            }
         }
 
         /// Family Controls' read now — which a running app keeps after the access is taken back —
@@ -93,17 +98,10 @@ final class PhoneScreenTime: ScreenTime {
         static var signals: String {
             let center = DeviceActivityCenter()
             let held = Bell.Name.allCases.map { name in
-                "\(name) \(center.heldEnd(name).flatMap(Calendar.current.date(from:)).map(window) ?? "none")"
+                "\(name) \(center.heldEnd(name).flatMap(Calendar.current.date(from:)).map(time) ?? "none")"
             }
             return "Family Controls reads \(AuthorizationCenter.shared.authorizationStatus)"
                 + " · iOS holds " + held.joined(separator: ", ")
-        }
-
-        /// A window iOS holds, by its end — marked while it has not begun, every window being the
-        /// floor long: whether iOS reports one before it begins is what the enforcer's guard waits
-        /// on (`Enforcer.held`; F1's review).
-        static func window(_ end: Date) -> String {
-            time(end) + (end.addingTimeInterval(-Bell.floor) > Date() ? " (not begun)" : "")
         }
 
         static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .standard) }

@@ -63,9 +63,10 @@ final class Phone {
     /// Whether a pass has ever read the Screen Time permission approved (C1b), kept as `introSeen`
     /// is: Family Controls can read not determined for a moment after a launch (B5a-2), and with
     /// this set the router routes such a read as approved, so no Screen Time screen flashes on a
-    /// phone that gave it. The check judging the permission off clears it — denied, or not
-    /// determined for `Enforcer.grace`: a grant taken back, or one that did not come back with a
-    /// restored backup, which restores these defaults — so the grant screen returns.
+    /// phone that gave it. The check judging the permission off clears it — denied, the marker
+    /// gone (F1b), or not determined for `Enforcer.grace`: a grant taken back, or one that did not
+    /// come back with a restored backup, which restores these defaults — so the grant screen
+    /// returns.
     private(set) var everApproved = UserDefaults.standard.bool(forKey: Phone.everApprovedKey)
     static let everApprovedKey = "screenTimeApproved"
     /// The student `GET /v1/me` last listed in a class on this phone, by their id, kept as
@@ -643,12 +644,14 @@ final class Phone {
                 }
                 Text("Standing: \(standing)")
                 Text("Screen Time: \(shields)")
-                // #144: the signals the check judges the permission by, read live every 5 s, and
-                // what its checks found — which flips when access is taken back with Bali running;
-                // #145: how long Family Controls read not determined after this launch.
+                // #144 (F1b), read live every 5 s: the marker the check judges the access by, with
+                // the monitor's note, and the asks of iOS — the silent check's, the one no press
+                // made; Family Controls' read, which a running app keeps approved, and the windows
+                // iOS holds; #145: how long that read said not determined after this launch.
                 TimelineView(.periodic(from: .now, by: 5)) { _ in
+                    Text("Marker: \(PhoneScreenTime.markerNow)")
+                    Text("Asked iOS: \(asks)")
                     Text("iOS: \(PhoneScreenTime.signals)")
-                    Text("Found: \(found)")
                     Text("Launch: \(PhoneScreenTime.launch)")
                 }
                 Button("Allow Screen Time") {
@@ -752,10 +755,9 @@ final class Phone {
 
         private func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
 
-        /// What the checks found of iOS's DeviceActivity center, newest first (#144).
-        private var found: String {
-            PhoneScreenTime.findings.isEmpty
-                ? "nothing" : PhoneScreenTime.findings.joined(separator: "\n")
+        /// The asks of iOS for the access since this launch, newest first (F1b).
+        private var asks: String {
+            PhoneScreenTime.asks.isEmpty ? "none" : PhoneScreenTime.asks.joined(separator: "\n")
         }
 
         /// What the monitor did at its last wakes, newest first — which window woke it, too.
