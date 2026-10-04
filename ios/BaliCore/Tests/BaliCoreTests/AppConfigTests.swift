@@ -57,4 +57,29 @@ struct AppConfigTests {
         #expect(config.cognito.redirectURI == URL(string: "bali://auth/callback"))
         #expect(config.api.scheme == "https" && config.cognito.domain.scheme == "https")
     }
+
+    @Test(
+        "The icon project.yml names is an icon set in the app's asset catalog, and every image it lists is there"
+    )
+    func appIcon() throws {
+        // The TestFlight guard finds CFBundleIconName only when the build makes one, and the
+        // build makes one only from a set that exists: pinned here, at PR time, on Linux.
+        let ios = Contract.repoRoot.appending(path: "ios")
+        let project = try String(contentsOf: ios.appending(path: "project.yml"), encoding: .utf8)
+        let named = /\n\s+ASSETCATALOG_COMPILER_APPICON_NAME:\s*'?([^'\n]+?)'?[ \t]*(?=\n)/
+        let line = try #require(
+            project.firstMatch(of: named), "ASSETCATALOG_COMPILER_APPICON_NAME is not set")
+        #expect(project.matches(of: named).count == 1, "the icon is named more than once")
+        let iconSet = ios.appending(path: "Bali/Assets.xcassets/\(line.output.1).appiconset")
+        let contents = try #require(
+            try JSONSerialization.jsonObject(
+                with: Data(contentsOf: iconSet.appending(path: "Contents.json"))) as? [String: Any])
+        let images = try #require(contents["images"] as? [[String: Any]])
+        let files = images.compactMap { $0["filename"] as? String }
+        #expect(!files.isEmpty, "the icon set lists no image")
+        for file in files {
+            let image = iconSet.appending(path: file).path(percentEncoded: false)
+            #expect(FileManager.default.fileExists(atPath: image), "\(file)")
+        }
+    }
 }

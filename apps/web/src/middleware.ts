@@ -25,10 +25,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Pages only: built assets carry no script of their own, and a prefetch renders no HTML.
+  // Pages only: built assets and the icons in `public/` carry no script of their own, and a
+  // prefetch renders no HTML.
   matcher: [
     {
-      source: '/((?!_next/static|_next/image|favicon.ico).*)',
+      source: '/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|apple-icon.png).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },

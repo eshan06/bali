@@ -3,7 +3,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { createBlock } from '../src/management.js';
+import { createBlock, createClass } from '../src/management.js';
 import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
 import { hasSqlState } from '../src/sql-errors.js';
 import {
@@ -1808,6 +1808,91 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
       expect(await liveOf(studentId)).toHaveLength(0);
     }
   }, 60_000);
+});
+
+/**
+ * Run `deleteAccount` for `userId` in a transaction held open until the
+ * returned `release` is called, then committed: what a call racing a deletion
+ * meets mid-flight (C3).
+ */
+async function heldDeletion(userId: string) {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let ran!: () => void;
+  const deleted = new Promise<void>((resolve) => {
+    ran = resolve;
+  });
+  const committed = db.transaction(async (tx) => {
+    await deleteAccount(tx, { userId, eventId: newUuidV7(), at: new Date() });
+    ran();
+    await held;
+  });
+  await deleted;
+  return { release, committed };
+}
+
+describe.runIf(REAL_PG)('a deletion staged against an arm and a create (real Postgres, C3)', () => {
+  it('a tap reaching the arm path behind a deletion is refused, and arms nothing', async () => {
+    // The tap's route found the caller and no lesson (the deletion left its
+    // classes), so it arms. The deletion holds the student's row; the arm
+    // path reads it FOR SHARE, so it waits, then finds the row removed.
+    // Without that it never waits (the armed row's foreign key takes only
+    // KEY SHARE, which the deletion's NO KEY UPDATE allows) and arms for no one.
+    const { studentId, teacherId } = await seed('race-delete-arm');
+    const { release, committed } = await heldDeletion(studentId);
+    const arming = armTap(db, {
+      studentId,
+      teacherId,
+      eventId: newUuidV7(),
+      deviceTime: new Date(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    arming.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      release();
+      await committed;
+    }
+    await expect(arming).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(
+      await db.select().from(armedTaps).where(eq(armedTaps.studentId, studentId)),
+    ).toHaveLength(0);
+  });
+
+  it('a class or a block made behind a teacher’s deletion is refused, and none is owned by no one', async () => {
+    // The deletion found no class and no block, so it goes ahead. A create
+    // holds the teacher's row FOR SHARE, which waits for the deletion's NO KEY
+    // UPDATE and then reads the row removed.
+    const school = one(
+      await db.insert(schools).values({ name: 'race-delete-teacher' }).returning(),
+    );
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'race-delete-teacher', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    const { release, committed } = await heldDeletion(teacher.id);
+    const creating = createClass(db, { teacherId: teacher.id, schoolId: school.id, name: 'late' });
+    const registering = createBlock(db, { teacherId: teacher.id, tagId: 'race-delete-tag' });
+    creating.catch(() => undefined);
+    registering.catch(() => undefined);
+    try {
+      await waitForBlockedBackend(5_000, 2);
+    } finally {
+      release();
+      await committed;
+    }
+    await expect(creating).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    await expect(registering).rejects.toMatchObject({ code: 'ACCOUNT_DELETED' });
+    expect(await db.select().from(classes).where(eq(classes.teacherId, teacher.id))).toHaveLength(
+      0,
+    );
+    expect(await db.select().from(blocks).where(eq(blocks.teacherId, teacher.id))).toHaveLength(0);
+  });
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {

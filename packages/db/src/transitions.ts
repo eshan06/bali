@@ -120,7 +120,7 @@ export class TransitionError extends Error {
   }
 }
 
-/** A join or a rename of an account deleted while it was on its way (C3). */
+/** A join, rename or tap of an account deleted while it was on its way (C3). */
 const accountDeleted = () => new TransitionError('ACCOUNT_DELETED', 'this account was deleted');
 
 type SessionRow = typeof sessions.$inferSelect;
@@ -1104,6 +1104,22 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       }
       return answerOwnArmedTap(tx, exact, now);
     }
+
+    // Deleted after the route found the caller (C3): never armed for no one,
+    // as `tapIn` never joins one. FOR SHARE waits out a deletion holding the
+    // row (its NO KEY UPDATE, which the armed row's foreign key, KEY SHARE,
+    // never waits for) and keeps one from starting until this commits — the
+    // row, not the student's tap lock `tapIn` takes, since a Start holds
+    // armed rows before that lock and a stale-row refresh below would close
+    // the cycle. Its retry is a stranger's.
+    const caller = firstOrUndefined(
+      await tx
+        .select({ removedAt: users.removedAt })
+        .from(users)
+        .where(eq(users.id, input.studentId))
+        .for('share'),
+    );
+    if (caller?.removedAt) throw accountDeleted();
 
     // A tap the phone made before a tap of the student's already recorded in a
     // session (A14) never waits: a Start would convert it and switch them back
@@ -3668,18 +3684,23 @@ export async function deleteAccount(
       if (!me) throw new Error('deleteAccount: no such user');
       if (me.removedAt !== null) return { outcome: 'already_deleted' };
 
-      // An id another deletion holds is this deletion's retry reaching an account the
+      // An id a deletion holds can be this deletion's retry reaching an account the
       // same sign-in made since (a boot call between the two): the caller asked for
-      // no account, so this one goes too, under an id of its own. Any other event's
-      // id is a client bug, refused before anything changes.
+      // no account, so this one goes too, under an id of its own. The server cannot
+      // prove the sign-in is the same — the deletion took its subject away, on
+      // purpose — so it scopes the id to its caller as every replay check does, by
+      // the one shape that case has: this account was made after that deletion was
+      // recorded (both stamps the database's clock). An id held by any other event,
+      // or by a deletion this account predates, is not this caller's: refused
+      // before anything changes.
       const prior = firstOrUndefined(
         await tx
-          .select({ type: events.type })
+          .select({ type: events.type, recordedAt: events.recordedAt })
           .from(events)
           .where(eq(events.eventId, input.eventId))
           .limit(1),
       );
-      if (prior && prior.type !== 'account_deleted') {
+      if (prior && (prior.type !== 'account_deleted' || me.createdAt <= prior.recordedAt)) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       const eventId = prior ? newUuidV7() : input.eventId;

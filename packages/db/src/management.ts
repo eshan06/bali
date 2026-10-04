@@ -4,8 +4,9 @@ import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
-import { blocks, classes } from './schema.js';
+import { blocks, classes, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
+import { TransitionError } from './transitions.js';
 import type { Database } from './types.js';
 
 /*
@@ -69,6 +70,23 @@ function isJoinCodeCollision(err: unknown): boolean {
 }
 
 /**
+ * Hold the teacher's row while a class or block is made for them (C3). FOR
+ * SHARE waits out a deletion holding the row (`deleteAccount` takes it FOR NO
+ * KEY UPDATE, which a foreign key's KEY SHARE never waits for) and keeps one
+ * from starting, so the deletion either sees the new row and refuses
+ * `TEACHER_HAS_CLASSES`, or has removed the teacher and this refuses
+ * `ACCOUNT_DELETED`: never a class or block owned by no one.
+ */
+async function holdLiveTeacher(tx: Database, teacherId: string): Promise<void> {
+  const [row] = await tx
+    .select({ removedAt: users.removedAt })
+    .from(users)
+    .where(eq(users.id, teacherId))
+    .for('share');
+  if (row?.removedAt) throw new TransitionError('ACCOUNT_DELETED', 'this account was deleted');
+}
+
+/**
  * Create a class for a teacher with a unique, server-generated join code. The
  * insert uses ON CONFLICT DO NOTHING on the active join-code index: a code
  * collision returns no row and we try a fresh code — so two concurrent creates
@@ -83,20 +101,23 @@ export async function createClass(
   // real generator, so every production caller behaves identically.
   gen: () => string = generateJoinCode,
 ): Promise<ClassRow> {
-  for (let attempt = 0; attempt < JOIN_CODE_ATTEMPTS; attempt += 1) {
-    const [row] = await db
-      .insert(classes)
-      .values({
-        teacherId: input.teacherId,
-        schoolId: input.schoolId,
-        name: input.name,
-        joinCode: gen(),
-      })
-      .onConflictDoNothing({ target: classes.joinCode, where: activeClass })
-      .returning();
-    if (row) return row;
-  }
-  throw new Error('createClass: could not allocate a unique join code');
+  return db.transaction(async (tx) => {
+    await holdLiveTeacher(tx, input.teacherId);
+    for (let attempt = 0; attempt < JOIN_CODE_ATTEMPTS; attempt += 1) {
+      const [row] = await tx
+        .insert(classes)
+        .values({
+          teacherId: input.teacherId,
+          schoolId: input.schoolId,
+          name: input.name,
+          joinCode: gen(),
+        })
+        .onConflictDoNothing({ target: classes.joinCode, where: activeClass })
+        .returning();
+      if (row) return row;
+    }
+    throw new Error('createClass: could not allocate a unique join code');
+  });
 }
 
 /**
@@ -163,6 +184,16 @@ export type CreateBlockResult =
  * 2: a wrong answer may be corrected in place).
  */
 export async function createBlock(
+  db: Database,
+  input: { teacherId: string; tagId: string },
+): Promise<CreateBlockResult> {
+  return db.transaction(async (tx) => {
+    await holdLiveTeacher(tx, input.teacherId);
+    return registerBlock(tx, input);
+  });
+}
+
+async function registerBlock(
   db: Database,
   input: { teacherId: string; tagId: string },
 ): Promise<CreateBlockResult> {

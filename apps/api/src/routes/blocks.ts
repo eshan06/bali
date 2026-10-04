@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { mapTransitionError } from './errors.js';
 import { TAG_ID_MAX_LENGTH } from './schemas.js';
 
 const CreateBody = z.object({ tagId: z.string().trim().min(1).max(TAG_ID_MAX_LENGTH) });
@@ -32,7 +33,10 @@ export function registerBlocksRoutes(app: FastifyInstance, db: Database): void {
     async (request): Promise<BlockDetail> => {
       const teacher = await requireTeacher(db, request);
       const body = parseRequest(request, 'body', CreateBody);
-      const result = await createBlock(db, { teacherId: teacher.id, tagId: body.tagId });
+      // A teacher deleted while this was on its way (C3) is `409 account_deleted`.
+      const result = await mapTransitionError(() =>
+        createBlock(db, { teacherId: teacher.id, tagId: body.tagId }),
+      );
       if (result.outcome === 'tag_taken') {
         throw ApiError.conflict('that tag is already registered to an active block');
       }

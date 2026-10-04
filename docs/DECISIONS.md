@@ -8,6 +8,20 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **C3's follow-up (#217's review).** The arm path refuses a deleted account
+  like the join path: it reads the student's row FOR SHARE, which waits out the deletion's NO KEY
+  UPDATE, rather than taking the student's tap lock as `tapIn` does — a Start holds armed rows
+  before that lock, and the arm path's stale-row refresh would close a deadlock cycle. A class or
+  block create holds the teacher's row the same way, so a deletion either sees the new row
+  (`teacher_has_classes`) or the create sees the deletion (`account_deleted`). The deletion's
+  replay is scoped to its caller: the server can't prove a reborn account is the same sign-in
+  (the deletion took the subject away), so it accepts another account's deletion id only when the
+  caller's account was made after that deletion was recorded, and refuses it as
+  `event_id_conflict` otherwise. Runbook 2's "untick email write" is withdrawn (Cognito won't
+  remove write from a required attribute, and hosted Sign up needs it), and so is the S11 entry's
+  "the clients can't write `email` afterwards": the guard is that an account can only start from
+  a school address, and Cognito re-verifies a changed email.
+
 - **2026-10-04** — **C3: account deletion, through the engine (amends data-model decision 3,
   the owner's ruling of the same day).** `DELETE /v1/me` `{ eventId }` → the engine's
   `deleteAccount`, one transaction. **What goes:** each live class is left exactly as a leave
@@ -68,8 +82,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   named in the root layout's `metadata.icons`, not dropped in `app/` as `icon.*`: Next builds those
   as static (○) routes, which carry no CSP nonce and fail the every-route-dynamic check (proven by
   a build); a test keeps them out of `app/`. **Export compliance:** `ITSAppUsesNonExemptEncryption`
-  is `false` in the app's `Info.plist`, since Bali's only encryption is the system's HTTPS, which
-  is exempt.
+  is `false` in the app's `Info.plist`, since Bali's only cryptography is exempt: the system's
+  HTTPS, CryptoKit's SHA-256 for the sign-in's PKCE challenge (a hash, not encryption), and the
+  system Keychain holding its tokens.
 - **2026-10-04** — **P4: the help page is public, plain, and says only what is true today.**
   `/support` is read without signing in, so it calls no API and holds no state; it renders per
   request like every page (S4's CSP nonce), and the Sign out bar skips it as it skips `/login`, so
