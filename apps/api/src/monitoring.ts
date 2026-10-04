@@ -15,11 +15,19 @@ import type { Env } from './env.js';
 
 /** Drizzle's query errors end `\nparams: <values>` — the values are student data. */
 const PARAMS = /\bparams:[\s\S]*$/;
-/** Postgres echoes the offending row in errors (`Key (email)=(a@b.c)`, `Failing row contains (…)`). */
-const ROW_VALUES = /(Key \([^)]*\)=)\([\s\S]*?\)|(Failing row contains )\([\s\S]*?\)/g;
+/**
+ * Postgres echoes values in errors: the offending row (`Key (email)=(a@b.c)`,
+ * `Failing row contains (…)`), cut to the end of its line since a value can
+ * hold a `)`; and a rejected input (`invalid input syntax for type uuid: "…"`).
+ */
+const ROW_VALUES = /(Key \([^)]*\)=|Failing row contains ).*/g;
+const INPUT_VALUE = /(invalid input (?:syntax|value) for [^:\n]*: )".*/g;
 
 function scrubText(text: string): string {
-  return text.replace(PARAMS, 'params: [scrubbed]').replace(ROW_VALUES, '$1$2([scrubbed])');
+  return text
+    .replace(PARAMS, 'params: [scrubbed]')
+    .replace(ROW_VALUES, '$1([scrubbed])')
+    .replace(INPUT_VALUE, '$1[scrubbed]');
 }
 
 /**
@@ -105,13 +113,18 @@ export function initMonitoring(env: Env, options: MonitoringOptions = {}): boole
 }
 
 /**
- * Report a 500 — an unexpected error the handler turned into `internal`.
- * A no-op when monitoring is off. Only the route template is attached
- * (`/v1/join-codes/:code`), never the URL.
+ * Report a real failure: a 5xx from the error handler (the route template,
+ * `POST /v1/join-codes/:code`, never the URL), a failed sweep, a failed boot.
+ * A no-op when monitoring is off.
  */
-export function captureFailure(error: unknown, route: string): void {
+export function captureFailure(error: unknown, where: string): void {
   Sentry.withScope((scope) => {
-    scope.setTag('route', route);
+    scope.setTag('route', where);
     Sentry.captureException(error);
   });
+}
+
+/** Wait for queued events to send, before the process exits. A no-op when off. */
+export async function flushMonitoring(): Promise<void> {
+  await Sentry.flush(2000);
 }

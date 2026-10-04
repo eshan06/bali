@@ -13,7 +13,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   for Sentry's envelope protocol, and its own crash handlers; writing one is not minimal.
   **Off by default:** `initMonitoring` does nothing unless `SENTRY_DSN` is set, which tests and
   dev never do; an empty value reads as unset, never a boot failure. **Only real failures:** the
-  error handler's 500 branch calls `captureFailure`; the 4xx refusals above it never do. Sentry's
+  error handler's 500 branch and a 5xx `ApiError` (the 503 when Cognito's keys are out of reach)
+  call `captureFailure`; the 4xx refusals never do. A failed sweep and a failed start are
+  reported too (santa's review: the sweep is what ends sessions at the bell). Sentry's
   uncaught-exception handler reports a crash; its unhandled-rejection handler runs in `strict`
   mode, so the process still exits as Node's default would (its default `warn` mode would keep
   a broken process up). **No personal data leaves:** Sentry's default integrations are replaced
@@ -22,8 +24,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   with the raw URL, which carries a join code in `/v1/join-codes/:code`. `sendDefaultPii` is
   gone in v11; its replacement, `dataCollection`, is set to collect nothing, and local variables
   are off. `beforeSend` (`scrubEvent`) drops the request, the user, extras, breadcrumbs and the
-  transaction name, and cuts Drizzle's `params: …` and Postgres's echoed row values
-  (`Key (col)=(…)`) out of every message; the route template rides as a `route` tag instead.
+  transaction name, and cuts Drizzle's `params: …` and Postgres's echoed values
+  (`Key (col)=(…)`, `Failing row contains (…)`, `invalid input syntax for …: "…"`) out of every
+  message; the route template rides as a `route` tag instead.
   Proven by a test that sends a Drizzle-style failure with a name, an email, a Cognito id, an
   unlock reason, a code in the path and the query, a bearer token, the internal key and a
   cookie through a fake transport and finds none of them in the envelope, and finds no event
