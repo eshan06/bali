@@ -116,6 +116,8 @@ describe('log redaction', () => {
       'insert into "unlocks" ("name", "cognito_sub", "reason") values ($1, $2, $3)',
     );
     expect(errLine.err).not.toHaveProperty('params');
+    // The stack keeps its frames below the scrubbed message.
+    expect(errLine.err.stack).toMatch(/params: \[scrubbed\]\n\s+at /);
     expect(errLine.err.cause).not.toHaveProperty('parameters');
     expect(errLine.err.cause.code).toBe('22P02');
     expect(errLine.err.cause.detail).toBe('Failing row contains ([scrubbed])');
@@ -152,6 +154,27 @@ describe('log redaction', () => {
       } as unknown as Error),
     ).toEqual({
       note: 'params: [scrubbed]',
+    });
+  });
+
+  it('cuts the other ways Postgres echoes a value, and never logs raw bytes', () => {
+    const value = SECRETS.name;
+    expect(
+      serializeError({
+        range: `value "${value}" is out of range for type integer`,
+        date: `date/time field value out of range: "${value}"`,
+        json: `invalid input syntax for type json`,
+        detail: `Token "${value}" is invalid.`,
+        where: `JSON data, line 1: ${value}`,
+        bytes: Buffer.from(value),
+      } as unknown as Error),
+    ).toEqual({
+      range: 'value [scrubbed] is out of range for type integer',
+      date: 'date/time field value out of range: [scrubbed]',
+      json: 'invalid input syntax for type json',
+      detail: 'Token [scrubbed] is invalid.',
+      where: 'JSON data, line 1: [scrubbed]',
+      bytes: '[binary]',
     });
   });
 });

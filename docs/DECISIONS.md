@@ -14,7 +14,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   so a fix to one is a fix to both. **The logger:** an `err` serializer (pino's shape: `type`,
   `message`, `stack`, own fields, the cause) that drops `params` (Drizzle) and `parameters`
   (postgres.js in debug mode) at any depth and scrubs every string, so Postgres's echoed row
-  (`Key (…)=(…)`, `Failing row contains`) in `detail` or a stack goes too; and pino `redact` on
+  (`Key (…)=(…)`, `Failing row contains`) in `detail` or a stack goes too; the stack is scrubbed
+  around its message so its frames stay; raw bytes are never logged. The rule is a list of the
+  shapes Postgres echoes values in (santa's review added out-of-range values and bad JSON's
+  token and context line), so a new shape is one regex and one test. And pino `redact` on
   `authorization`, `x-internal-key` and `cookie` in any `headers` object, top-level or one level
   down — Fastify's request serializer logs no headers today, the censor is for the handler that
   someday does. Kept on purpose: the error class, the SQL text (`$1` placeholders only), Postgres's

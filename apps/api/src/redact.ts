@@ -14,14 +14,20 @@ const PARAMS = /\bparams:[\s\S]*$/;
  * hold a `)`; and a rejected input (`invalid input syntax for type uuid: "…"`).
  */
 const ROW_VALUES = /(Key \([^)]*\)=|Failing row contains ).*/g;
-const INPUT_VALUE = /(invalid input (?:syntax|value) for [^:\n]*: )".*/g;
+const INPUT_VALUE = /(invalid input (?:syntax|value) for [^:\n]*: |out of range: )".*/g;
+/** The same, said other ways: `value "…" is out of range`, bad JSON's `Token "…" is invalid`. */
+const QUOTED_VALUE = /(value |Token )"[^"\n]*"/g;
+/** Bad JSON's context line: `JSON data, line 1: …`. */
+const JSON_CONTEXT = /(JSON data, line \d+: ).*/g;
 
 /** A message, stack or Postgres detail with every value cut out. */
 export function scrubText(text: string): string {
   return text
     .replace(PARAMS, 'params: [scrubbed]')
     .replace(ROW_VALUES, '$1([scrubbed])')
-    .replace(INPUT_VALUE, '$1[scrubbed]');
+    .replace(INPUT_VALUE, '$1[scrubbed]')
+    .replace(QUOTED_VALUE, '$1[scrubbed]')
+    .replace(JSON_CONTEXT, '$1[scrubbed]');
 }
 
 /**
@@ -34,6 +40,8 @@ const VALUE_FIELDS = new Set(['params', 'parameters']);
 function scrubValue(value: unknown, seen: Set<object>): unknown {
   if (typeof value === 'string') return scrubText(value);
   if (typeof value !== 'object' || value === null) return value;
+  // Raw bytes cannot be scrubbed, so they never go.
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return '[binary]';
   if (seen.has(value)) return '[circular]';
   seen.add(value);
   if (Array.isArray(value)) return value.map((item) => scrubValue(item, seen));
@@ -45,12 +53,25 @@ function scrubValue(value: unknown, seen: Set<object>): unknown {
   return out;
 }
 
+/**
+ * The stack with its message scrubbed and its frames kept: `scrubText` on the
+ * whole stack would cut Drizzle's `params:` to the end, frames and all. A
+ * stack that does not hold the message as thrown is scrubbed whole.
+ */
+function scrubStack(err: Error): string {
+  const stack = err.stack ?? '';
+  const at = err.message === '' ? -1 : stack.indexOf(err.message);
+  if (at < 0) return scrubText(stack);
+  const frames = stack.slice(at + err.message.length);
+  return scrubText(stack.slice(0, at)) + scrubText(err.message) + scrubText(frames);
+}
+
 function serializeErrorInner(err: Error, seen: Set<object>): Record<string, unknown> {
   seen.add(err);
   const out: Record<string, unknown> = {
     type: err.constructor.name || err.name,
     message: scrubText(err.message),
-    stack: scrubText(err.stack ?? ''),
+    stack: scrubStack(err),
   };
   // Own fields: Drizzle's `query` (the SQL, `$1` placeholders only), a
   // Postgres error's `code`, `detail`, `constraint`, `table`, `column`…
