@@ -185,8 +185,8 @@ npm run load:sweep   # once load:serve has stopped: the sweep at that size, time
   school's address. The 600 students tap within the minute before the bell, the teachers start
   all 30 classes at it, and each phone reads the truth every 30 s for three minutes, while one
   account asks `GET /v1/me` 50 times a second. It passes when every school request is a 2xx (no
-  `429`, no `5xx`) with p95 under 500 ms, and the flooder is refused, each `429` with a
-  `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
+  `429`, no `5xx`) with p95 under 500 ms (a Start's under 1 s), and the flooder is refused, each
+  `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
   quiet, then 30 sessions ending at once. CI's "Load gate" runs both on every PR that touches
   `apps/api/`, `packages/db/`, `packages/shared/` or the root's `package.json`, lockfile or
   `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b).

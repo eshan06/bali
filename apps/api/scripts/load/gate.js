@@ -9,7 +9,7 @@ import http from 'k6/http';
  * address. The 600 tap within the minute before it, so each waits; each teacher's Start joins
  * their 30 at the bell, and every class starts, for `load:sweep` to end all 30. Each phone then
  * reads the truth every 30 s (decision 7): `GET /v1/me` while it waits, a check-in once joined.
- * Meanwhile one account asks `GET /v1/me` 50 times a second. Thresholds below; why: DECISIONS (L2b).
+ * Meanwhile one account asks `GET /v1/me` 50 times a second. Thresholds below; why: DECISIONS.
  */
 
 const SCHOOL_FILE = __ENV.LOAD_SCHOOL_FILE || './school.json';
@@ -23,6 +23,8 @@ const CADENCE = 30;
 const END = 180;
 const LESSON = { durationMinutes: 50 };
 const P95_MS = 500;
+/** A Start joins its 30 in one transaction, the bell's 30 Starts sharing 10 connections. */
+const START_P95_MS = 1000;
 
 const school = (key) => new SharedArray(key, () => [JSON.parse(open(SCHOOL_FILE))[key]].flat());
 const students = school('students');
@@ -70,7 +72,7 @@ export const options = {
     'http_reqs{kind:start}': [`count==${classes}`],
     // Each kind's p95 too, which the summary then shows.
     'http_req_duration{kind:tap}': [`p(95)<${P95_MS}`],
-    'http_req_duration{kind:start}': [`p(95)<${P95_MS}`],
+    'http_req_duration{kind:start}': [`p(95)<${START_P95_MS}`],
     'http_req_duration{kind:me}': [`p(95)<${P95_MS}`],
     'http_req_duration{kind:checkin}': [`p(95)<${P95_MS}`],
     // The flood: stopped by its own budget, every refusal a 429 with a Retry-After.

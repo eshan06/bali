@@ -20,15 +20,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   in. From 30 s to 90 s, one account of the school's, in no class, asks `GET /v1/me` 50 times a
   second. **Pass:** every school request a 2xx, so no `429` and no `5xx`; every check true (each
   tap waited, each Start joined everyone waiting, each phone was joined and found focused at
-  every check-in); the p95 of the school's requests, and of each kind's, under 500 ms; and the
-  flooder refused, each `429` with a positive `Retry-After`. **Why 500 ms:** the server's share
+  every check-in); the p95 of the school's requests, and of each phone request's kind, under
+  500 ms, and of the Starts under 1 s; and the flooder refused, each `429` with a positive
+  `Retry-After`. **Why 500 ms:** the server's share
   of the grid's "within a second or two" (Live updates), measured on the machine itself, so the
   network comes on top, with room for a shared runner where k6's 630 virtual users, the API and
   Postgres run at once. At the ~10 ms measured, it fails a fifty-fold slowdown at the bell (a
-  lock queue, a query per row), not noise. **Measured** (a 4-vCPU container, as CI's runner is,
-  Postgres 16): 3,366 school requests, none refused, p95 8.5 ms: a tap 11.8, `GET /v1/me` 6.1,
-  a check-in 4.7, a Start 126 (it converts its 30 in one transaction). The flooder's 3,001: 239
-  answered (its 120 at once, then 2 a second) and 2,762 refused, while the school met none.
+  lock queue, a query per row), not noise. **A Start's 1 s:** each converts its 30 in one
+  transaction, and the 30 Starts, within 2 s, queue for the API's 10 database connections; the
+  teacher's grid still fills within a second. **Measured** (a 4-vCPU container, as CI's runner
+  is, Postgres 16): 3,366 school requests, none refused, p95 8.5 ms: a tap 11.8, `GET /v1/me`
+  6.1, a check-in 4.7, a Start 126. The flooder's 3,001: 239 answered (its 120 at once, then 2 a
+  second) and 2,762 refused, while the school met none. CI's first run (#190): p95 9.5 ms, a
+  Start's 325 ms, the same 239 and 2,762, and the sweep 1,679 ms and 134 ms, no deadlock.
   **The sweep at that size** (`npm run load:sweep`): the API's own `sweep`, timed in process on
   the bell the gate left, once the API has stopped (over `/internal/sweep` it would race the
   API's own minute tick for the same rows), and run twice, each on a clock of its own (`sweep`

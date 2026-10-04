@@ -18,7 +18,7 @@ const school = JSON.parse(readFileSync(SCHOOL_FILE, 'utf8')) as SchoolFile;
 const url = databaseUrl(harnessServer(process.env), school.api.database);
 const classes = school.teachers.length + school.teachers.filter((t) => t.secondClassId).length;
 
-/** Deadlocks Postgres has found in the database, read afresh: a backend reports its own as it exits. */
+/** Postgres's deadlock count for the database, read afresh: a backend reports its own on exit. */
 async function deadlocks(): Promise<number> {
   const reader = createDb(url);
   try {
