@@ -1755,7 +1755,7 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
       const deletion = () =>
         deleteAccount(db, { userId: studentId, eventId: newUuidV7(), at: new Date() });
 
-      const [deleted, unlocked, renamed, joined, ended] = await Promise.allSettled([
+      const [deleted, unlocked, renamed, joined, ended, tapped] = await Promise.allSettled([
         round % 2 === 1
           ? new Promise((resolve) => setTimeout(resolve, 10)).then(deletion)
           : deletion(),
@@ -1768,6 +1768,14 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
           occurredAt: new Date(),
         }),
         endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+        // A second tap, its route past the class lookup: replayed, refused
+        // over, or refused deleted — never a lesson joined as no one.
+        tapIn(db, {
+          sessionId: session.id,
+          studentId,
+          eventId: newUuidV7(),
+          deviceTime: new Date(),
+        }),
       ]);
 
       if (deleted.status === 'rejected') throw deleted.reason;
@@ -1777,6 +1785,11 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
       for (const late of [renamed, joined]) {
         if (late.status === 'rejected')
           expect(late.reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+      }
+      if (tapped.status === 'rejected') {
+        expect(['ACCOUNT_DELETED', 'SESSION_NOT_RUNNING']).toContain(
+          (tapped.reason as { code?: string }).code,
+        );
       }
 
       expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });

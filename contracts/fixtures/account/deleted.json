@@ -1,0 +1,15 @@
+{
+  "endpoint": "DELETE /v1/me",
+  "scenario": "A student deletes their account (C3): every class left, their name and sign-in gone.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "DeleteMeResponse",
+  "body": {
+    "outcome": "deleted"
+  }
+}

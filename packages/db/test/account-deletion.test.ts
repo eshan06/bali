@@ -1,5 +1,5 @@
 import { sessionReport } from '@bali/shared';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
@@ -186,6 +186,27 @@ describe('deleteAccount (C3)', () => {
     expect(await eventsOf(ana.id)).toHaveLength(written);
   });
 
+  it('takes a retry reaching an account the same sign-in made since: that one goes too', async () => {
+    const { ana } = await seed('c3-reborn');
+    const eventId = newUuidV7();
+    await deleteAccount(db, { userId: ana.id, eventId, at: new Date() });
+    // A boot call between the deletion and its retry made the sign-in a new row.
+    const reborn = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'ana-c3-reborn', role: 'student', displayName: 'Ana' })
+        .returning(),
+    );
+
+    expect(await deleteAccount(db, { userId: reborn.id, eventId, at: new Date() })).toEqual({
+      outcome: 'deleted',
+    });
+    const row = one(await db.select().from(users).where(eq(users.id, reborn.id)));
+    expect(row).toMatchObject({ cognitoId: deletedCognitoId(reborn.id), displayName: null });
+    const deletion = one((await eventsOf(reborn.id)).filter((e) => e.type === 'account_deleted'));
+    expect(deletion.eventId).not.toBe(eventId);
+  });
+
   it('refuses an id another event holds, and changes nothing', async () => {
     const { ana, ben } = await seed('c3-conflict');
     const taken = newUuidV7();
@@ -225,7 +246,7 @@ describe('deleteAccount (C3)', () => {
     ).toEqual({ outcome: 'deleted' });
   });
 
-  it('refuses a join or a rename that reaches the deleted account, and keeps a late unlock', async () => {
+  it('refuses a join, a rename or a tap that reaches the deleted account, and keeps a late unlock', async () => {
     const { ana, ben, first } = await seed('c3-after');
     const session = await lesson(first.id, ana.id, ben.id);
     await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
@@ -242,6 +263,21 @@ describe('deleteAccount (C3)', () => {
     await expect(
       renameStudent(db, { studentId: ana.id, displayName: 'Ana', eventId: newUuidV7() }),
     ).rejects.toMatchObject(gone);
+    // A tap whose route found the class before the deletion joins no lesson as no one.
+    await expect(
+      tapIn(db, {
+        sessionId: session.id,
+        studentId: ana.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      }),
+    ).rejects.toMatchObject(gone);
+    expect(
+      await db
+        .select()
+        .from(participations)
+        .where(and(eq(participations.studentId, ana.id), isNull(participations.endedAt))),
+    ).toHaveLength(0);
 
     // An unlock still on its way is never lost (ISSUES #2): recorded, moving no one.
     const late = await unlock(db, {

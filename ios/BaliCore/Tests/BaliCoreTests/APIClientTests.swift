@@ -92,6 +92,10 @@ struct APIClientFixtureTests {
             let request = try fixture.sent(UpdateMeRequest.self)
             return try answered(await client.updateMe(request), fixture)
         },
+        "DELETE /v1/me": { client, fixture in
+            let request = try fixture.sent(DeleteMeRequest.self)
+            return try answered(await client.deleteMe(request), fixture)
+        },
         "POST /v1/taps": { client, fixture in
             let request = try fixture.sent(TapRequest.self)
             let response = await client.tap(request)

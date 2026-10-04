@@ -11,6 +11,7 @@ import {
 } from '@bali/db';
 import type {
   ApiErrorBody,
+  DeleteMeResponse,
   MeResponse,
   RosterResponse,
   SessionSnapshot,
@@ -1132,7 +1133,7 @@ describe('DELETE /v1/me (C3)', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json<DeleteMeResponse>()).toEqual({ outcome: 'deleted' });
-    expect(await getLiveParticipation(db, student.id)).toBeNull();
+    expect(await getLiveParticipation(db, student.id)).toBeUndefined();
     expect(await findUserByCognitoId(db, student.cognitoId)).toBeUndefined();
     const row = await rowOf(student.id);
     expect(row.displayName).toBeNull();
@@ -1173,17 +1174,40 @@ describe('DELETE /v1/me (C3)', () => {
     expect(deletions).toHaveLength(1);
   });
 
-  it('deletes only the caller’s own account: another’s eventId is 409, and nothing changes', async () => {
+  it('deletes the account a boot call made between the deletion and its retry', async () => {
+    const { student } = await seedClassroom(db, 'del-reborn');
+    const token = await ctx.tokenFor(student.cognitoId);
+    const eventId = randomUUID();
+    await deleteAs(token, eventId);
+    const { body } = await me(token);
+    expect(body.user.id).not.toBe(student.id);
+
+    const res = await deleteAs(token, eventId);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<DeleteMeResponse>()).toEqual({ outcome: 'deleted' });
+    expect(await findUserByCognitoId(db, student.cognitoId)).toBeUndefined();
+    expect((await rowOf(body.user.id)).removedAt).not.toBeNull();
+  });
+
+  it('deletes only the caller’s own account: another event’s eventId is 409, and nothing changes', async () => {
     const { student } = await seedClassroom(db, 'del-mine');
     const other = await seedClassroom(db, 'del-other');
     const theirs = randomUUID();
-    await deleteAs(await ctx.tokenFor(other.student.cognitoId), theirs);
+    const renamed = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/v1/me',
+      headers: { authorization: `Bearer ${await ctx.tokenFor(other.student.cognitoId)}` },
+      payload: { displayName: 'Bea', eventId: theirs },
+    });
+    expect(renamed.statusCode).toBe(200);
 
     const res = await deleteAs(await ctx.tokenFor(student.cognitoId), theirs);
 
     expect(res.statusCode).toBe(409);
     expect(res.json<ApiErrorBody>().error.reason).toBe('event_id_conflict');
     expect((await rowOf(student.id)).removedAt).toBeNull();
+    expect((await rowOf(other.student.id)).removedAt).toBeNull();
   });
 
   it('refuses a teacher who has a class, and changes nothing', async () => {
@@ -1205,7 +1229,10 @@ describe('DELETE /v1/me (C3)', () => {
   it('requires a token, and an access token', async () => {
     const { student } = await seedClassroom(db, 'del-auth');
     expect((await remove(null, { eventId: randomUUID() })).statusCode).toBe(401);
-    const idToken = await ctx.issuer.sign({ sub: student.cognitoId, audience: 'test-app-client-id' });
+    const idToken = await ctx.issuer.sign({
+      sub: student.cognitoId,
+      audience: 'test-app-client-id',
+    });
     expect((await deleteAs(idToken)).statusCode).toBe(401);
     expect((await rowOf(student.id)).removedAt).toBeNull();
   });

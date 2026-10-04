@@ -47,6 +47,7 @@ enum Contract {
     static let responseTypes: [String: any (Codable & Sendable).Type] = [
         "MeResponse": MeResponse.self,
         "UpdateMeResponse": UpdateMeResponse.self,
+        "DeleteMeResponse": DeleteMeResponse.self,
         "TapResponse": TapResponse.self,
         "CheckInResponse": CheckInResponse.self,
         "UnlockResponse": UnlockResponse.self,
@@ -64,6 +65,7 @@ enum Contract {
     /// Each endpoint a fixture's request sends a body to, as the BaliCore type the phone sends.
     static let requestTypes: [String: any (Codable & Sendable).Type] = [
         "PATCH /v1/me": UpdateMeRequest.self,
+        "DELETE /v1/me": DeleteMeRequest.self,
         "POST /v1/taps": TapRequest.self,
         "POST /v1/sessions/{id}/checkin": CheckInRequest.self,
         "POST /v1/sessions/{id}/unlock": UnlockRequest.self,

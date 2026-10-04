@@ -1827,6 +1827,16 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       if (!sessionRunning(session, now)) {
         throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
       }
+      // Deleted after the route found its class (C3): the deletion holds this
+      // student's tap lock, so a tap behind it sees the row removed and never
+      // joins a lesson as no one. Its retry is a stranger's, with no class.
+      const caller = firstOrUndefined(
+        await tx
+          .select({ removedAt: users.removedAt })
+          .from(users)
+          .where(eq(users.id, input.studentId)),
+      );
+      if (caller?.removedAt) throw accountDeleted();
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
       const order = knownOrder(input.order);
@@ -3646,15 +3656,33 @@ export async function deleteAccount(
 ): Promise<DeleteAccountResult> {
   return withDeadlockRetry(() =>
     db.transaction(async (tx): Promise<DeleteAccountResult> => {
-      // The row first, as a rename and a join take it, so either one waits for
-      // this and then finds it deleted. NO KEY UPDATE, so the foreign-key
-      // checks a tap or an unlock of theirs takes go on until the row's own
-      // UPDATE below.
+      // The student's taps first, as a tap takes them before its session, so a
+      // tap behind this finds the row removed and joins nothing. Then the row,
+      // as a rename and a join take it, so either one waits for this and then
+      // finds it deleted. NO KEY UPDATE, so the foreign-key checks an unlock of
+      // theirs takes go on until the row's own UPDATE below.
+      await lockStudentTaps(tx, input.userId);
       const me = firstOrUndefined(
         await tx.select().from(users).where(eq(users.id, input.userId)).for('no key update'),
       );
       if (!me) throw new Error('deleteAccount: no such user');
       if (me.removedAt !== null) return { outcome: 'already_deleted' };
+
+      // An id another deletion holds is this deletion's retry reaching an account the
+      // same sign-in made since (a boot call between the two): the caller asked for
+      // no account, so this one goes too, under an id of its own. Any other event's
+      // id is a client bug, refused before anything changes.
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (prior && prior.type !== 'account_deleted') {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const eventId = prior ? newUuidV7() : input.eventId;
 
       if (me.role === 'teacher') {
         const owned = (table: typeof classes | typeof blocks) =>
@@ -3695,13 +3723,13 @@ export async function deleteAccount(
         .where(and(eq(events.userId, me.id), eq(events.type, 'display_name_changed')));
 
       const isNew = await insertEvent(tx, {
-        eventId: input.eventId,
+        eventId,
         type: 'account_deleted',
         userId: me.id,
         occurredAt: input.at,
       });
-      // The account was live, so nothing has recorded its deletion: an id on
-      // record names another event.
+      // Taken since the check above, by a write racing this one: refused, and the
+      // retry is judged afresh.
       if (!isNew) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }

@@ -86,6 +86,7 @@ const MATRIX = {
   //                                                            student  teacher
   'GET /v1/me':                             [401, 401, 200,     200,     200,     200],
   'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403],
+  'DELETE /v1/me':                          [401, 401, 200,     200,     409,     409],
   'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
   'POST /v1/taps':                          [401, 401, 200,     200,     200,     200],
   'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200],
@@ -151,6 +152,8 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'POST /internal/sessions/expire': () => ({ url: '/internal/sessions/expire' }),
   'GET /v1/me': () => ({ url: '/v1/me' }),
   'PATCH /v1/me': () => ({ url: '/v1/me', body: { displayName: 'Ada', eventId: randomUUID() } }),
+  // Each caller deletes only their own account; a teacher with a class is refused (C3).
+  'DELETE /v1/me': () => ({ url: '/v1/me', body: { eventId: randomUUID() } }),
   // The first page, as the app asks for it: another student is answered their
   // own history, so the stranger check reads it. (Another's cursor is a 400:
   // history.test.ts.)

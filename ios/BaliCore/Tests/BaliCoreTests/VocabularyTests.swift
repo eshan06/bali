@@ -51,6 +51,7 @@ struct VocabularyTests {
         // Each response's own: a value one gains fails here even with no fixture carrying it —
         // `removed_from_class` is a teacher's answer, never in a student fixture.
         ("api.ts", "UPDATE_ME_OUTCOMES", values(UpdateMeResponse.Outcome.self)),
+        ("api.ts", "DELETE_ME_OUTCOMES", values(DeleteMeResponse.Outcome.self)),
         ("api.ts", "CHECK_IN_STATUSES", values(CheckInResponse.Status.self)),
         ("api.ts", "REFOCUS_OUTCOMES", values(RefocusResponse.Outcome.self)),
         ("api.ts", "UNLOCK_REASON_OUTCOMES", values(UnlockReasonResponse.Outcome.self)),

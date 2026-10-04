@@ -1,0 +1,15 @@
+{
+  "endpoint": "DELETE /v1/me",
+  "scenario": "The retry of that deletion: this sign-in has no account now.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "DeleteMeResponse",
+  "body": {
+    "outcome": "already_deleted"
+  }
+}

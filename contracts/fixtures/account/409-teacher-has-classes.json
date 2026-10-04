@@ -1,0 +1,19 @@
+{
+  "endpoint": "DELETE /v1/me",
+  "scenario": "A teacher with a class deleting their account: theirs goes through the school.",
+  "request": {
+    "path": "/v1/me",
+    "body": {
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 409,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "conflict",
+      "reason": "teacher_has_classes",
+      "message": "a teacher with a class or a block: ask the school to delete the account"
+    }
+  }
+}

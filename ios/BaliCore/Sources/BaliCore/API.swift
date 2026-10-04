@@ -98,6 +98,21 @@ public struct UpdateMeResponse: Codable, Sendable, Hashable {
     public let user: MeUser
 }
 
+/// `DELETE /v1/me` — the caller deletes their own account (C3). A teacher with a class or a block
+/// is refused `409 teacher_has_classes`.
+public struct DeleteMeRequest: Codable, Sendable, Hashable {
+    public let eventId: String
+    public init(eventId: String) { self.eventId = eventId }
+}
+
+public struct DeleteMeResponse: Codable, Sendable, Hashable {
+    /// `DELETE_ME_OUTCOMES`: either way, this sign-in has no account now.
+    public enum Outcome: String, CaseIterable, Sendable {
+        case deleted, alreadyDeleted = "already_deleted"
+    }
+    public let outcome: OrUnknown<Outcome>
+}
+
 /// `POST /v1/taps`.
 public struct TapRequest: Codable, Sendable, Hashable {
     public let tagId: String
