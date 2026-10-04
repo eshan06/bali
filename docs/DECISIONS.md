@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P2: Sentry in the portal, on P1's rules.** **New dependency:
+  `@sentry/browser`** (v11, `apps/web` only), not `@sentry/nextjs`: the portal is a client-side
+  SPA against the API, so there is no server or edge runtime to instrument, and the Next SDK's
+  build plugin, source-map upload and tunnel route are more than this step needs. Only the
+  integrations named in `initMonitoring` are bundled; the build carries no replay code.
+  **Started by** `src/instrumentation-client.ts`, Next's hook that runs in the browser before
+  the app. **Off by default:** a no-op unless `NEXT_PUBLIC_SENTRY_DSN` is set at build time;
+  blank reads as unset. **Only real failures:** the global handlers (an uncaught error or
+  rejection; Next's app router, with no explicit error boundary, hands React's uncaught render
+  errors to `reportError`, which they catch), and the API client's 5xx and network failures,
+  reported where they happen as an `ApiFailure` carrying the method and the path's template
+  only (`POST /v1/sessions/:id/end: 503`), fingerprinted per route and status. A 4xx is never
+  reported, and `beforeSend` drops an `ApiError`/`NetworkError` that reaches the global
+  handlers unhandled (a 5xx one was already sent). The SSE stream's drops are not reported: it
+  reconnects on its own, and a drop is routine (a deploy, a sleeping laptop). **No personal
+  data leaves:** `defaultIntegrations: false` and an allow-list (event filters, function
+  names, browser API errors, global handlers, linked errors, dedupe), so no breadcrumbs (which
+  hold clicked text, console lines and fetched URLs), no HttpContext (the page URL, which
+  carries a class id), no sessions, no replay, no tracing; `dataCollection` collects nothing;
+  `beforeSend` (`scrubEvent`) drops the request, the user, extras, breadcrumbs and the
+  transaction, and cuts every URL in a message or a stack frame's filename to its origin and
+  template and every UUID to `:id`. Tokens live in sessionStorage, which nothing here reads;
+  request bodies are never attached. Proven by a test that drives a global error, a rejection
+  and the API client (500, 503, the 4xx refusals, a dropped connection) through a fake
+  transport with a class and session id, a student name, an unlock reason, an invite code, a
+  token and a form value planted in the URL, scope, breadcrumbs, a request and the server's
+  error message, and finds none of them, and exactly five events (none for a 4xx). **Context:** environment
+  `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (unset, `NODE_ENV`); release Vercel's
+  `NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA`. Stack traces stay minified: uploading source maps is
+  a later choice, not needed to see that something broke.
 - **2026-10-04** — **P1: Sentry in the API, off without a DSN, scrubbed before it leaves.**
   **New dependency: `@sentry/node`** (v11, `apps/api` only): error monitoring needs a client
   for Sentry's envelope protocol, and its own crash handlers; writing one is not minimal.
