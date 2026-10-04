@@ -99,8 +99,8 @@ export default function SupportPage() {
           <Question title="Tap in">
             <p>
               When class starts, hold your iPhone to your teacher&apos;s Bali block. Your apps go
-              quiet until the bell. Tap before your teacher starts class and Bali waits, then locks
-              your apps when class begins, so you never tap twice.
+              quiet until the bell. Tap before your teacher starts class and Bali waits. Your phone
+              locks when class starts, as long as Bali is open. No need to tap again.
             </p>
           </Question>
           <Question title="Emergency Unlock">
@@ -126,7 +126,7 @@ export default function SupportPage() {
           <Question title="Turning it off">
             <p>
               You approve Screen Time for Bali on your own iPhone, and you can turn it off in
-              Settings any time. Your teacher sees Screen Time off when you do.
+              Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
           <Question title="What your teacher sees">
@@ -168,15 +168,16 @@ export default function SupportPage() {
           <Question title="Run a class">
             <p>
               Create a class and give your students its join code. When class starts, open the class
-              and press Start. A live grid shows who&apos;s focused, who unlocked, and who turned
-              Screen Time off.
+              and start a session. A live grid shows who&apos;s focused, who unlocked, and whose
+              protection is off (they turned Screen Time off on their phone).
             </p>
           </Question>
           <Question title="Reports">
             <p>
-              When a session ends, its recap shows who joined, the class&apos;s focus minutes, and
-              every unlock with its reason. Reports, on the class page, lists your past sessions;
-              open one to see its recap. Reports show the class as a whole and never rank students.
+              When a session ends, its recap shows who joined, the class&apos;s focus and silent
+              minutes, every unlock with its reason, and every time protection went off. Reports, on
+              the class page, lists your past sessions; open one to see its recap. Reports show the
+              class as a whole and never rank students.
             </p>
           </Question>
         </Section>

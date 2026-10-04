@@ -16,7 +16,7 @@ const swift = readFileSync(
 function swiftList(name: string): string[] {
   const body = new RegExp(`static let ${name} = \\[([\\s\\S]*?)\\]`).exec(swift)?.[1];
   if (!body) throw new Error(`ConsentCard.${name} not found in JoinView.swift`);
-  return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(' — ', ': '));
+  return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replaceAll(' — ', ': '));
 }
 
 function pageList(name: string): string[] {
@@ -33,6 +33,16 @@ describe('the help page says what the app says', () => {
 
   it('what a teacher never sees, word for word', () => {
     expect(pageList('TEACHER_NEVER_SEES')).toEqual(swiftList('neverSees'));
+  });
+
+  it('a tap before class keeps the Waiting screen’s condition', () => {
+    const waiting = readFileSync(
+      fileURLToPath(new URL('../../../../../ios/Bali/UI/WaitingView.swift', import.meta.url)),
+      'utf8',
+    );
+    const promise = 'Your phone locks when class starts, as long as Bali is open.';
+    expect(waiting).toContain(promise);
+    expect(page.replace(/\s+/g, ' ')).toContain(promise);
   });
 
   it('the support address is a mailto link', () => {
