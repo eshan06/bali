@@ -5,6 +5,9 @@ import { PortalBar } from '@/components/portal-bar';
 
 import './globals.css';
 
+// Rendered per request, so each page carries its CSP nonce (src/middleware.ts).
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Bali — teacher portal',
   description: 'Live classroom focus grid.',

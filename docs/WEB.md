@@ -185,6 +185,24 @@ apps and server-to-server call it. Set `CORS_ORIGINS` on the dev API to the port
 origin. The allowed request header is the `Authorization` bearer; there are no
 cookies, so the API runs CORS without credentials mode.
 
+## Security headers and the CSP
+
+Every page carries a Content-Security-Policy with a fresh nonce
+(`apps/web/src/middleware.ts`, built by `contentSecurityPolicy` in
+`apps/web/src/lib/csp.ts`); HSTS, `nosniff`, the referrer policy and the
+Permissions-Policy come from `next.config.mjs`'s `headers()`. The page may
+connect only to its own origin, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_DOMAIN`
+and the ingest host of `NEXT_PUBLIC_SENTRY_DSN`, read at build time.
+
+- **Any new origin the portal loads or calls** (an API, a font, an image host,
+  an analytics or monitoring service) **must be added to the CSP** in
+  `csp.ts`, with its test, or the browser refuses it.
+- **No inline script, `eval` or `<style>` element of our own:** scripts run only
+  with the nonce Next stamps on them; styles come from the stylesheet.
+- **The CSP is the access token's defence** (it sits in sessionStorage): a
+  refresh token, when one comes, never goes in web storage
+  (`docs/DECISIONS.md`, S4).
+
 ## Known gap — token renewal
 
 The portal stores only the Cognito **access token** (sessionStorage, per tab).
