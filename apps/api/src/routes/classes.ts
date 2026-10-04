@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireTeacher } from '../auth/teacher.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
 const CreateBody = z.object({ name: z.string().trim().min(1).max(120) });
@@ -58,10 +58,10 @@ function toClassDetail(
 export function registerClassesRoutes(app: FastifyInstance, db: Database): void {
   app.post(
     '/v1/classes',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { body: CreateBody } } },
     async (request): Promise<ClassDetail> => {
       const teacher = await requireTeacher(db, request);
-      const body = parse(CreateBody, request.body);
+      const body = parseRequest(request, 'body', CreateBody);
       if (!teacher.schoolId) {
         // A class needs a school; a teacher without one isn't fully provisioned.
         throw ApiError.conflict('teacher is not assigned to a school');
@@ -77,10 +77,10 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
 
   app.get(
     '/v1/classes/:id',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
     async (request): Promise<ClassDetail> => {
       const teacher = await requireTeacher(db, request);
-      const { id } = parse(Params, request.params);
+      const { id } = parseRequest(request, 'params', Params);
       const klass = await findClassById(db, id);
       if (!klass) throw ApiError.notFound('class not found');
       if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
@@ -90,11 +90,11 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
 
   app.patch(
     '/v1/classes/:id',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params, body: UpdateBody } } },
     async (request): Promise<ClassDetail> => {
       const teacher = await requireTeacher(db, request);
-      const { id } = parse(Params, request.params);
-      const body = parse(UpdateBody, request.body);
+      const { id } = parseRequest(request, 'params', Params);
+      const body = parseRequest(request, 'body', UpdateBody);
       const klass = await findClassById(db, id);
       if (!klass) throw ApiError.notFound('class not found');
       if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
@@ -113,10 +113,10 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
 
   app.get(
     '/v1/classes/:id/roster',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
     async (request): Promise<RosterResponse> => {
       const teacher = await requireTeacher(db, request);
-      const { id: classId } = parse(Params, request.params);
+      const { id: classId } = parseRequest(request, 'params', Params);
       const klass = await findClassById(db, classId);
       if (!klass) throw ApiError.notFound('class not found');
       if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');

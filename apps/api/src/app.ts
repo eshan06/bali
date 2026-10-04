@@ -1,7 +1,7 @@
 import cors from '@fastify/cors';
 import type { Database } from '@bali/db';
 import { API_VERSION, type HealthzResponse } from '@bali/shared';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
 
 import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
@@ -39,6 +39,11 @@ export interface AppDeps {
    * set it to that day.
    */
   clock?: () => Date;
+  /**
+   * Shown each route as it is registered: how the API snapshot
+   * (`contracts/openapi.json`, O1) reads the route table. Unset everywhere else.
+   */
+  onRoute?: onRouteHookHandler;
 }
 
 /**
@@ -62,6 +67,8 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
           : {}),
     },
   });
+  // Before any route: Fastify shows a route to its onRoute hooks as it registers it.
+  if (deps.onRoute) app.addHook('onRoute', deps.onRoute);
 
   registerErrors(app);
 

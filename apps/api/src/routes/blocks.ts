@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireTeacher } from '../auth/teacher.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 
 const CreateBody = z.object({ tagId: z.string().trim().min(1).max(200) });
 
@@ -19,10 +19,10 @@ const CreateBody = z.object({ tagId: z.string().trim().min(1).max(200) });
 export function registerBlocksRoutes(app: FastifyInstance, db: Database): void {
   app.post(
     '/v1/blocks',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { body: CreateBody } } },
     async (request): Promise<BlockDetail> => {
       const teacher = await requireTeacher(db, request);
-      const body = parse(CreateBody, request.body);
+      const body = parseRequest(request, 'body', CreateBody);
       const result = await createBlock(db, { teacherId: teacher.id, tagId: body.tagId });
       if (result.outcome === 'tag_taken') {
         throw ApiError.conflict('that tag is already registered to an active block');

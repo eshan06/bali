@@ -12,7 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 import { DeviceTime, Order } from './schemas.js';
 
@@ -43,9 +43,10 @@ function endOfDay(now: Date): Date {
  * only while it is live there, and names none once it is not (A4).
  */
 export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
-  app.post('/v1/taps', { preHandler: app.authenticate }, async (request): Promise<TapResponse> => {
+  const options = { preHandler: app.authenticate, config: { parses: { body: TapBody } } };
+  app.post('/v1/taps', options, async (request): Promise<TapResponse> => {
     const identity = requireAuth(request);
-    const body = parse(TapBody, request.body);
+    const body = parseRequest(request, 'body', TapBody);
     const deviceTime = new Date(body.deviceTime);
 
     const student = await findOrCreateStudent(db, identity.sub);

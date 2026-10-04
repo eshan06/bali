@@ -38,11 +38,13 @@ jobs:
       - run: npm run format:check
       - run: npm test
       # The contract fixtures are the API's real answers to a phone, which
-      # BaliCore decodes, and contracts/outbox/ the outbox tables' answers on
-      # every input BaliCore's port must match. `npm test` already fails when
-      # one drifts; this runs the generators themselves and fails on any diff
-      # — new, changed or deleted — so the committed tree is exactly what
-      # `npm run fixtures` writes.
+      # BaliCore decodes, contracts/outbox/ the outbox tables' answers on
+      # every input BaliCore's port must match, and contracts/openapi.json
+      # every route and the request schema it parses. `npm test` already fails
+      # when one drifts; this runs the generators themselves and fails on any
+      # diff — new, changed or deleted — so the committed tree is exactly what
+      # `npm run fixtures` writes. A removal from /v1 fails before anything is
+      # written (additive-only).
       - run: npm run fixtures && git add --intent-to-add contracts && git diff --exit-code -- contracts
       # A schema.ts change must ship with its generated migration: regenerate
       # and fail if anything under migrations/ differs from what's committed.

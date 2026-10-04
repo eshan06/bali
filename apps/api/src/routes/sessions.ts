@@ -32,7 +32,7 @@ import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
 import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 import { DeviceTime, Order } from './schemas.js';
 
@@ -90,11 +90,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // POST /v1/classes/:id/sessions — start (or return the already-running) session.
   app.post(
     '/v1/classes/:id/sessions',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: ClassParams, body: DurationBody } },
+    },
     async (request): Promise<StartSessionResponse> => {
       const teacher = await requireTeacher(db, request);
-      const { id: classId } = parse(ClassParams, request.params);
-      const { durationMinutes } = parse(DurationBody, request.body);
+      const { id: classId } = parseRequest(request, 'params', ClassParams);
+      const { durationMinutes } = parseRequest(request, 'body', DurationBody);
 
       const klass = await findClassById(db, classId);
       if (!klass) throw ApiError.notFound('class not found');
@@ -120,9 +123,9 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // POST /v1/sessions/:id/end — the owning teacher ends a running session.
   app.post(
     '/v1/sessions/:id/end',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: SessionParams } } },
     async (request): Promise<EndSessionResponse> => {
-      const { id } = parse(SessionParams, request.params);
+      const { id } = parseRequest(request, 'params', SessionParams);
       const { session } = await requireSessionOwner(db, request, id);
       const result = await mapTransitionError(() =>
         endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
@@ -137,11 +140,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // POST /v1/sessions/:id/extend — the owning teacher adds time.
   app.post(
     '/v1/sessions/:id/extend',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: ExtendBody } },
+    },
     async (request): Promise<ExtendSessionResponse> => {
-      const { id } = parse(SessionParams, request.params);
+      const { id } = parseRequest(request, 'params', SessionParams);
       const { session } = await requireSessionOwner(db, request, id);
-      const { durationMinutes, eventId } = parse(ExtendBody, request.body);
+      const { durationMinutes, eventId } = parseRequest(request, 'body', ExtendBody);
       // The duration goes to the engine, not a computed end time: the
       // arithmetic belongs inside its locked read, or two simultaneous
       // presses compute the same target and the second is refused.
@@ -155,11 +161,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // POST /v1/sessions/:id/checkin — the ~30s heartbeat; the engine answers live/gone.
   app.post(
     '/v1/sessions/:id/checkin',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: CheckInBody } },
+    },
     async (request): Promise<CheckInResponse> => {
       const identity = requireAuth(request);
-      const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(CheckInBody, request.body);
+      const { id: sessionId } = parseRequest(request, 'params', SessionParams);
+      const body = parseRequest(request, 'body', CheckInBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         checkIn(db, { sessionId, studentId: student.id, deviceTime: new Date(body.deviceTime) }),
@@ -179,11 +188,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // removed student or an unknown session id, so no response can mean "discard".
   app.post(
     '/v1/sessions/:id/unlock',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: UnlockBody } },
+    },
     async (request): Promise<UnlockResponse> => {
       const identity = requireAuth(request);
-      const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(UnlockBody, request.body);
+      const { id: sessionId } = parseRequest(request, 'params', SessionParams);
+      const body = parseRequest(request, 'body', UnlockBody);
       const student = await findOrCreateStudent(db, identity.sub);
       // Wrapped even though unlock is built never to refuse: it can still raise
       // EVENT_ID_CONFLICT when the client reuses an id that already belongs to
@@ -210,11 +222,11 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // caller's own taps only. Never refused either, and mapped the same way.
   app.post(
     '/v1/taps/:eventId/unlock',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: TapParams, body: UnlockBody } } },
     async (request): Promise<UnlockResponse> => {
       const identity = requireAuth(request);
-      const { eventId: tapEventId } = parse(TapParams, request.params);
-      const body = parse(UnlockBody, request.body);
+      const { eventId: tapEventId } = parseRequest(request, 'params', TapParams);
+      const body = parseRequest(request, 'body', UnlockBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         unlockUnderTap(db, {
@@ -234,11 +246,11 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // (A20), the unlock named by its own event id; idempotent on the body's.
   app.patch(
     '/v1/unlocks/:eventId',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: TapParams, body: ReasonBody } } },
     async (request): Promise<UnlockReasonResponse> => {
       const identity = requireAuth(request);
-      const { eventId: unlockEventId } = parse(TapParams, request.params);
-      const body = parse(ReasonBody, request.body);
+      const { eventId: unlockEventId } = parseRequest(request, 'params', TapParams);
+      const body = parseRequest(request, 'body', ReasonBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const { outcome, reason } = await mapTransitionError(() =>
         changeUnlockReason(db, {
@@ -261,11 +273,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // answered with no session (owner decision 10).
   app.post(
     '/v1/sessions/:id/protection-off',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: StateChangeBody } },
+    },
     async (request): Promise<ProtectionOffResponse> => {
       const identity = requireAuth(request);
-      const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(StateChangeBody, request.body);
+      const { id: sessionId } = parseRequest(request, 'params', SessionParams);
+      const body = parseRequest(request, 'body', StateChangeBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         protectionOff(db, {
@@ -292,11 +307,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // names no session.
   app.post(
     '/v1/sessions/:id/refocus',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: StateChangeBody } },
+    },
     async (request): Promise<RefocusResponse> => {
       const identity = requireAuth(request);
-      const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(StateChangeBody, request.body);
+      const { id: sessionId } = parseRequest(request, 'params', SessionParams);
+      const body = parseRequest(request, 'body', StateChangeBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         refocus(db, {
@@ -322,11 +340,14 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
   // off, in a session running by the server's clock, or a 409/404.
   app.post(
     '/v1/sessions/:id/protection-on',
-    { preHandler: app.authenticate },
+    {
+      preHandler: app.authenticate,
+      config: { parses: { params: SessionParams, body: StateChangeBody } },
+    },
     async (request): Promise<ProtectionOnResponse> => {
       const identity = requireAuth(request);
-      const { id: sessionId } = parse(SessionParams, request.params);
-      const body = parse(StateChangeBody, request.body);
+      const { id: sessionId } = parseRequest(request, 'params', SessionParams);
+      const body = parseRequest(request, 'body', StateChangeBody);
       const student = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         protectionOn(db, {

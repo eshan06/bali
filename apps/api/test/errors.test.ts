@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { z } from 'zod';
 
 import { buildApp } from '../src/app.js';
-import { ApiError, parse } from '../src/errors.js';
+import { ApiError, parse, parseRequest } from '../src/errors.js';
 import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 
@@ -80,6 +80,35 @@ describe('the one error shape', () => {
     const res = await app.inject({ method: 'POST', url: '/thing2', payload: { minutes: 25 } });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ minutes: 25 });
+  });
+
+  it('parses a request part with the schema its route declares, and refuses as parse does', async () => {
+    const Body = z.object({ minutes: z.number().int().positive() });
+    app.post('/declared', { config: { parses: { body: Body } } }, (request) => ({
+      minutes: parseRequest(request, 'body', Body).minutes,
+    }));
+    const ok = await app.inject({ method: 'POST', url: '/declared', payload: { minutes: 25 } });
+    expect(ok.json()).toEqual({ minutes: 25 });
+    const bad = await app.inject({ method: 'POST', url: '/declared', payload: { minutes: -3 } });
+    expect(bad.statusCode).toBe(400);
+    const details = bodyOf(bad).error.details as { path: string }[];
+    expect(details.map((d) => d.path)).toEqual(['minutes']);
+  });
+
+  it('refuses, as a bug, a parse its route does not declare: the API snapshot would miss it', async () => {
+    const Body = z.object({ minutes: z.number() });
+    const Other = z.object({ minutes: z.number() });
+    app.post('/undeclared', (request) => parseRequest(request, 'body', Body));
+    app.post('/another', { config: { parses: { body: Other } } }, (request) =>
+      parseRequest(request, 'body', Body),
+    );
+    app.post('/elsewhere', { config: { parses: { query: Body } } }, (request) =>
+      parseRequest(request, 'body', Body),
+    );
+    for (const url of ['/undeclared', '/another', '/elsewhere']) {
+      const res = await app.inject({ method: 'POST', url, payload: { minutes: 1 } });
+      expect(res.statusCode, url).toBe(500);
+    }
   });
 
   it('an unknown route is a 404 in the shape', async () => {

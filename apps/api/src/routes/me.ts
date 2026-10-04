@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { displayNameFromClaims } from '../auth/verify.js';
 import { DisplayName } from '../display-name.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parse, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 
 const UpdateBody = z.object({ displayName: z.string(), eventId: z.string().uuid() });
@@ -102,12 +102,12 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
 
   app.patch(
     '/v1/me',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { body: UpdateBody } } },
     async (request): Promise<UpdateMeResponse> => {
       const identity = requireAuth(request);
       // A malformed body is a client bug; a name that breaks a rule is the
       // student's to change — a reason each.
-      const body = parse(UpdateBody, request.body, 'invalid_request');
+      const body = parseRequest(request, 'body', UpdateBody, 'invalid_request');
       const { displayName } = parse(NewName, body, 'display_name_invalid');
 
       const caller = await findOrCreateStudent(db, identity.sub);

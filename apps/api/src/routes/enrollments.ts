@@ -17,7 +17,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError, refusal } from './errors.js';
 import { DeviceTime, JoinCode } from './schemas.js';
 
@@ -28,8 +28,8 @@ const JoinBody = z.object({
 });
 const Params = z.object({ id: z.string().uuid() });
 // Optional (A19): the endpoint shipped with no body, so a caller sending none
-// still ends the enrollment, under an id the engine mints.
-const EndBody = z.object({ eventId: z.string().uuid().optional() });
+// (or `null`) still ends the enrollment, under an id the engine mints.
+const EndBody = z.object({ eventId: z.string().uuid().optional() }).nullish();
 const CodeParams = z.object({ code: JoinCode });
 
 // A teacher owns classes; they don't join one as a student (which would only
@@ -63,10 +63,10 @@ export function registerEnrollmentsRoutes(
 ): void {
   app.get(
     '/v1/join-codes/:code',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: CodeParams } } },
     async (request): Promise<JoinCodePreviewResponse> => {
       const identity = requireAuth(request);
-      const { code } = parse(CodeParams, request.params);
+      const { code } = parseRequest(request, 'params', CodeParams);
 
       // Looked up, never created: someone signing in for the first time has
       // no row yet, and is answered as the student a join would make them.
@@ -84,10 +84,10 @@ export function registerEnrollmentsRoutes(
 
   app.post(
     '/v1/enrollments',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { body: JoinBody } } },
     async (request): Promise<EnrollmentJoinResponse> => {
       const identity = requireAuth(request);
-      const body = parse(JoinBody, request.body);
+      const body = parseRequest(request, 'body', JoinBody);
 
       const student = await findOrCreateStudent(db, identity.sub);
       // Enrollments are the student-to-class relation.
@@ -110,11 +110,11 @@ export function registerEnrollmentsRoutes(
 
   app.delete(
     '/v1/enrollments/:id',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params, body: EndBody } } },
     async (request): Promise<EndEnrollmentResponse> => {
       const identity = requireAuth(request);
-      const { id: enrollmentId } = parse(Params, request.params);
-      const { eventId } = parse(EndBody, request.body ?? {});
+      const { id: enrollmentId } = parseRequest(request, 'params', Params);
+      const { eventId } = parseRequest(request, 'body', EndBody) ?? {};
 
       const user = await findUserByCognitoId(db, identity.sub);
       if (!user) throw ApiError.forbidden('unknown user', 'unknown_user');
