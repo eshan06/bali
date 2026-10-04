@@ -96,7 +96,8 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
 /**
  * A fresh, migrated database `name` on the server at `baseUrl`, one of that name dropped first —
  * for the load harness (`apps/api/scripts/load`), whose database outlives the process that makes
- * it: the API serves it from its own. Returns its URL.
+ * it: the API serves it from its own. Returns its URL. It drops what it is given, on whatever
+ * server: a caller checks the server is a local one first (the harness's `harnessServer`).
  */
 export async function recreateDatabase(baseUrl: string, name: string): Promise<string> {
   await dropDatabase(baseUrl, name);

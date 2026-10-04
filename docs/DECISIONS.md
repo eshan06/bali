@@ -134,8 +134,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Controls apps to parental controls or individuals managing their own focus, says the framework
   "may not be used … in organizational settings", and bars sharing device or usage data
   "received through the Family Controls Framework or otherwise" beyond the individual and their
-  device (ISSUES #3); 33 states restrict phones at school (ISSUES #4); App Store guideline
-  5.1.1(v) requires in-app account deletion, against data-model decision 3 (ISSUES #5); there is no privacy manifest though the app uses `UserDefaults`; FERPA's
+  device (ISSUES #3); 33 states restrict phones at school (ISSUES #4);
+  App Store guideline 5.1.1(v) requires in-app account deletion, against data-model decision 3
+  (ISSUES #5); there is no privacy manifest though the app uses `UserDefaults`; FERPA's
   school-official terms and the state's student-privacy law (or the SDPC NDPA) call for a signed
   agreement; the 13+ promise is not enforced. **Decided:** Phase 6 (PLAN's "Phase 6 steps"),
   after Phase 4 and gating Phase 5's student-facing steps. S1, the authorization matrix, runs

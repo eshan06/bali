@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { newUuidV7 } from '@bali/db';
 import { dropDatabase } from '@bali/db/testing';
-import type { SessionSnapshot, StartSessionResponse, TapResponse } from '@bali/shared';
+import type { MeResponse, SessionSnapshot, StartSessionResponse, TapResponse } from '@bali/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createCall } from '../scripts/demo/http.js';
@@ -46,6 +46,26 @@ function listeningAt(child: ChildProcess, timeoutMs = 30_000): Promise<string> {
     });
   });
 }
+
+describe('harnessServer', () => {
+  it('takes a Postgres server on this machine', () => {
+    for (const host of ['localhost', '127.0.0.1', '[::1]']) {
+      const url = `postgres://postgres:postgres@${host}:5432/postgres`;
+      expect(harnessServer({ TEST_DATABASE_URL: url })).toBe(url);
+    }
+  });
+
+  it('refuses one anywhere else, a list of hosts, no host (the driver would read PGHOST) and none', () => {
+    for (const url of [
+      'postgres://app:secret@containers-us-west-1.railway.app:5432/railway',
+      'postgres://postgres@localhost,db.example.com:5432/postgres',
+      'postgres:///postgres',
+    ]) {
+      expect(() => harnessServer({ TEST_DATABASE_URL: url })).toThrow(/on this machine/);
+    }
+    expect(() => harnessServer({})).toThrow(/TEST_DATABASE_URL/);
+  });
+});
 
 describe.runIf(REAL_PG)('the load harness', () => {
   const database = `bali_load_${randomUUID().replace(/-/g, '')}`;
@@ -123,5 +143,16 @@ describe.runIf(REAL_PG)('the load harness', () => {
       token: teacher.token,
     });
     expect(grid.students.filter((s) => s.state === 'focused')).toHaveLength(waiting.length + 1);
+
+    // The second classes: the next teacher teaches two, and this room takes the second of them
+    // at another bell, so its students are in two classes, one of them in session now.
+    const next = await call<MeResponse>('GET', '/v1/me', { token: school.teachers[1]!.token });
+    expect(next.classes).toHaveLength(2);
+    const me = await call<MeResponse>('GET', '/v1/me', { token: late!.token });
+    expect(me.session?.id).toBe(started.session.id);
+    const live = new Map(me.classes.map((c) => [c.id, c.liveSession?.id ?? null]));
+    expect(live.size).toBe(2);
+    expect(live.get(teacher.classId)).toBe(started.session.id);
+    expect([...live.values()].filter((id) => id === null)).toHaveLength(1);
   });
 });
