@@ -37,3 +37,24 @@ describe('AUTH_AUDIENCE: the app clients whose tokens are accepted', () => {
     }
   });
 });
+
+describe('INTERNAL_API_KEY: long enough not to be guessed (Phase 6 S3)', () => {
+  async function bootWithKey(key: string) {
+    vi.resetModules();
+    for (const [name, value] of Object.entries({ ...testEnvVars, INTERNAL_API_KEY: key })) {
+      vi.stubEnv(name, value);
+    }
+    return (await import('../src/env.js')).env;
+  }
+
+  it('a key under 32 characters fails the boot', async () => {
+    for (const key of ['x'.repeat(31), 'test-internal-key-0123456789', '']) {
+      await expect(bootWithKey(key), key).rejects.toThrow(/INTERNAL_API_KEY/);
+    }
+  });
+
+  it('32 characters boots, and so does what `openssl rand -hex 32` gives', async () => {
+    expect((await bootWithKey('k'.repeat(32))).INTERNAL_API_KEY).toHaveLength(32);
+    expect((await bootWithKey('ab'.repeat(32))).INTERNAL_API_KEY).toHaveLength(64);
+  });
+});

@@ -36,7 +36,7 @@ with notes. The ones a deploy must set:
 | --- | --- |
 | `DATABASE_URL` | Managed Postgres connection string. |
 | `AUTH_ISSUER` / `AUTH_JWKS_URI` / `AUTH_AUDIENCE` | The Cognito pool's issuer, its JWKS endpoint, and the app client ids whose tokens the API accepts, comma-separated: the web portal's and the phone's (below), both in the pool `AUTH_ISSUER` names. One id alone accepts just that client. |
-| `INTERNAL_API_KEY` | Long random secret (`openssl rand -hex 32`) for the backup sweep cron. |
+| `INTERNAL_API_KEY` | Long random secret (`openssl rand -hex 32`) for the backup sweep cron; under 32 characters, the API refuses to boot. |
 | `TZ` | The school's zone (e.g. `America/Chicago`). Bell times and armed-tap end-of-day expiry use server-local time; Railway defaults to UTC. |
 | `LOG_LEVEL` | `info` in production. |
 | `SENTRY_DSN` | Optional. The Sentry project's DSN; unset, error monitoring is off. When set, a 500 or a crash is reported with the route, never the request, the user or query values (`apps/api/src/monitoring.ts`). |

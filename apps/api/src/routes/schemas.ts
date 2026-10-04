@@ -58,3 +58,10 @@ export const Order = z.custom<ActionOrder>(isActionOrder).nullish().catch(null);
  * bad input before any lookup (API decision 4, sane sizes).
  */
 export const JoinCode = z.string().min(1).trim().max(JOIN_CODE_LENGTH).toUpperCase();
+
+/**
+ * The longest block tag ID the API reads: registering a block (`/v1/blocks`) and
+ * tapping one (`/v1/taps`) share it, so a tag that registers can always be
+ * tapped, and a tap can never carry an unbounded string (Phase 6 S3).
+ */
+export const TAG_ID_MAX_LENGTH = 200;

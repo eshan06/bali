@@ -5,8 +5,9 @@ import { z } from 'zod';
 
 import { requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { TAG_ID_MAX_LENGTH } from './schemas.js';
 
-const CreateBody = z.object({ tagId: z.string().trim().min(1).max(200) });
+const CreateBody = z.object({ tagId: z.string().trim().min(1).max(TAG_ID_MAX_LENGTH) });
 
 type BlockRow = Awaited<ReturnType<typeof listBlocks>>[number];
 

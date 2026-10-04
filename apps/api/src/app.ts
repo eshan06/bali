@@ -7,6 +7,7 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors, routerRefusal } from './errors.js';
+import { registerSecurityHeaders } from './headers.js';
 import { createLimiter, type LimitOptions } from './limits.js';
 import { LOG_REDACT, serializeError } from './redact.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
@@ -92,6 +93,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   if (deps.onRoute) app.addHook('onRoute', deps.onRoute);
 
   registerErrors(app);
+  registerSecurityHeaders(app);
 
   // CORS only when origins are configured (the browser portal). Native apps and
   // server-to-server send no Origin and are unaffected; the header list is the

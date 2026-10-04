@@ -120,7 +120,7 @@ async function waitWithNotice(ms: number, label: string): Promise<void> {
 
 // ---------------------------------------------------------------- local mode
 
-const LOCAL_INTERNAL_KEY = 'sim-internal-key-0123456789';
+const LOCAL_INTERNAL_KEY = 'sim-internal-key-0123456789abcdef';
 const LOCAL_ISSUER = 'https://sim-issuer.bali.local/pool';
 const LOCAL_AUDIENCE = 'sim-app-client';
 

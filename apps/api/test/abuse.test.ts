@@ -439,8 +439,14 @@ describe('a malformed or forged token', () => {
     expect(res.body.error).toMatchObject({ code: 'unauthorized' });
   });
 
-  // S3 (#209, parked) adds the `token_use` check: on main an ID token is still taken.
-  it.todo('an ID token rather than an access token → 401 (lands with S3, #209)');
+  // S3: only an access token is taken; an ID token for this very app is still a 401.
+  it('an ID token rather than an access token → 401 in the one shape', async () => {
+    const app = appWith({ unsigned: ROOMY });
+    const token = await issuer.sign({ sub: 'abuse-forger', audience: TEST_AUDIENCE });
+    const res = await send(app, { url: '/v1/me', token });
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatchObject({ code: 'unauthorized' });
+  });
 });
 
 describe('an oversized or malformed body', () => {
