@@ -5705,6 +5705,27 @@ describe('enrollment lifecycle', () => {
     ).rejects.toMatchObject({ code: 'CLASS_NOT_FOUND' });
   });
 
+  it('refuses an account that is no student, judged in its own transaction, and writes nothing (T1c)', async () => {
+    const { klass, school } = await seedClass('join-turned');
+    const turned = await freshStudent('turned', school.id);
+    // Its invite redeemed after the route found it a student (T1b): the join
+    // judges the row as it stands, not as the route read it.
+    await db.update(users).set({ role: 'teacher' }).where(eq(users.id, turned.id));
+    const input = {
+      studentId: turned.id,
+      joinCode: klass.joinCode,
+      eventId: newUuidV7(),
+      occurredAt: new Date('2026-01-01T08:00:00Z'),
+    };
+    expect(await joinClassByCode(db, input)).toEqual({ outcome: 'not_a_student' });
+    // The account before the code, as the route always judged it.
+    expect(await joinClassByCode(db, { ...input, joinCode: 'NOPE-NONEXISTENT' })).toEqual({
+      outcome: 'not_a_student',
+    });
+    expect(await activeEnrollment(klass.id, turned.id)).toHaveLength(0);
+    expect(await db.select().from(events).where(eq(events.userId, turned.id))).toHaveLength(0);
+  });
+
   it('re-joining after removal adds a fresh enrollment and keeps the removed one as history', async () => {
     const { klass, student } = await seedClass('rejoin');
     const enr = one(await activeEnrollment(klass.id, student.id));

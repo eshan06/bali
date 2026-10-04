@@ -3169,12 +3169,15 @@ export interface JoinClassInput {
   eventId: string;
   occurredAt: Date;
 }
-export interface JoinClassResult {
-  /** 'joined' created a new enrollment; 'already_enrolled' the student was already in (no-op). */
-  outcome: 'joined' | 'already_enrolled';
-  enrollmentId: string;
-  class: ClassRow;
-}
+export type JoinClassResult =
+  | {
+      /** 'joined' created a new enrollment; 'already_enrolled' the student was already in (no-op). */
+      outcome: 'joined' | 'already_enrolled';
+      enrollmentId: string;
+      class: ClassRow;
+    }
+  /** The account is no student — a teacher, its invite perhaps redeemed a moment ago. Nothing written. */
+  | { outcome: 'not_a_student' };
 
 /**
  * Join a class by its code (auth decision 3). Locks the class row so concurrent
@@ -3183,12 +3186,32 @@ export interface JoinClassResult {
  * a no-op ('already_enrolled'), not an error. A prior removed enrollment is left
  * as history (decision 3): a re-join adds a fresh active row, so "who was in this
  * class in March" stays answerable rather than being rewritten.
+ *
+ * Only a student joins, judged in this transaction (T1c), before the code. The
+ * caller's row is read FOR SHARE, and an invite's redeem holds it FOR UPDATE
+ * (`redeemTeacherInvite`), so the two run one at a time: the join first, and
+ * the redeem finds a student in a class; the redeem first, and the join reads
+ * the teacher it made and writes nothing. The row before the class, as a
+ * rename takes them, and the redeem locks no class, so none of the three holds
+ * what another waits on. Shared, not exclusive: the foreign-key checks the
+ * student's taps, unlocks and a Start's conversion take go on around it, as
+ * they do around a rename's.
  */
 export async function joinClassByCode(
   db: Database,
   input: JoinClassInput,
 ): Promise<JoinClassResult> {
-  return db.transaction(async (tx) => {
+  return db.transaction(async (tx): Promise<JoinClassResult> => {
+    const caller = firstOrUndefined(
+      await tx
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, input.studentId))
+        .for('share'),
+    );
+    if (!caller) throw new Error('joinClassByCode: no such user');
+    if (caller.role !== 'student') return { outcome: 'not_a_student' };
+
     const cls = firstOrUndefined(
       await tx
         .select()
@@ -3440,8 +3463,9 @@ function nameKey(name: string): string {
  */
 export async function renameStudent(db: Database, input: RenameInput): Promise<RenameResult> {
   // Retry on deadlock, as every other engine mutation does. No cycle is known:
-  // this locks the caller's row and then their classes in id order, and a join
-  // or a Start takes its class lock first, holding nothing yet. So this is
+  // this locks the caller's row and then their classes in id order, a join
+  // takes its caller's row before its class too (T1c), and a Start takes its
+  // class lock first, holding nothing yet. So this is
   // defence in depth — were one ever found, a rename that lost it would reach
   // the phone as a 500 rather than land. A re-run is safe: the aborted attempt
   // committed nothing, and the replay check comes first.
