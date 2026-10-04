@@ -8,6 +8,7 @@ import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors } from './errors.js';
 import { createLimiter, type LimitOptions } from './limits.js';
+import { LOG_REDACT, serializeError } from './redact.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
@@ -63,6 +64,10 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
+      // No secret header and no query value in a log line (Phase 6, S2): a
+      // database error loses its parameters and Postgres's echoed values.
+      redact: LOG_REDACT,
+      serializers: { err: serializeError },
       // pino refuses both at once ("only one of option.transport or
       // option.stream can be specified"), so an injected stream wins outright
       // rather than being spread on top of a transport and throwing an opaque

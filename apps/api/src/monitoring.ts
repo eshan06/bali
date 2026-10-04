@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import type { ErrorEvent, NodeOptions } from '@sentry/node';
 
 import type { Env } from './env.js';
+import { scrubText } from './redact.js';
 
 /*
  * Error monitoring (Phase 5, P1). Off unless SENTRY_DSN is set — tests and dev
@@ -10,25 +11,9 @@ import type { Env } from './env.js';
  * rejection), never an expected 4xx refusal, and nothing about a student goes
  * with them: the scrubber below keeps the error's type, its stack, the route
  * template and the release, and drops everything else that could carry
- * personal data.
+ * personal data. Messages are scrubbed by the same rule as the logs
+ * (`redact.ts`, Phase 6 S2).
  */
-
-/** Drizzle's query errors end `\nparams: <values>` — the values are student data. */
-const PARAMS = /\bparams:[\s\S]*$/;
-/**
- * Postgres echoes values in errors: the offending row (`Key (email)=(a@b.c)`,
- * `Failing row contains (…)`), cut to the end of its line since a value can
- * hold a `)`; and a rejected input (`invalid input syntax for type uuid: "…"`).
- */
-const ROW_VALUES = /(Key \([^)]*\)=|Failing row contains ).*/g;
-const INPUT_VALUE = /(invalid input (?:syntax|value) for [^:\n]*: )".*/g;
-
-function scrubText(text: string): string {
-  return text
-    .replace(PARAMS, 'params: [scrubbed]')
-    .replace(ROW_VALUES, '$1([scrubbed])')
-    .replace(INPUT_VALUE, '$1[scrubbed]');
-}
 
 /**
  * The beforeSend scrubber. Exported for its test; anything Sentry or an

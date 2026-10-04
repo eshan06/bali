@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S2: log redaction, on Sentry's rule.** The security investigation found a
+  Drizzle error carries its SQL parameters into the logs. **One rule:** P1's scrubber moved to
+  `apps/api/src/redact.ts` (`scrubText`), and both Sentry's `beforeSend` and the logger use it,
+  so a fix to one is a fix to both. **The logger:** an `err` serializer (pino's shape: `type`,
+  `message`, `stack`, own fields, the cause) that drops `params` (Drizzle) and `parameters`
+  (postgres.js in debug mode) at any depth and scrubs every string, so Postgres's echoed row
+  (`Key (…)=(…)`, `Failing row contains`) in `detail` or a stack goes too; the stack is scrubbed
+  around its message so its frames stay; raw bytes are never logged. The rule is a list of the
+  shapes Postgres echoes values in (santa's review added out-of-range values and bad JSON's
+  token and context line), so a new shape is one regex and one test. And pino `redact` on
+  `authorization`, `x-internal-key` and `cookie` in any `headers` object, top-level or one level
+  down — Fastify's request serializer logs no headers today, the censor is for the handler that
+  someday does. Kept on purpose: the error class, the SQL text (`$1` placeholders only), Postgres's
+  error code, constraint and column names, and the request's method and URL. **Not taken:** the
+  URL in the request log still carries a join code on `/v1/join-codes/:code` — a short-lived
+  class code, not personal data, and the line that ties a failure to its request; Sentry drops it
+  because it leaves the system, the logs stay on Railway.
 - **2026-10-04** — **P6: the owner's runbooks in their own file, `docs/RUNBOOKS.md`.** DEPLOY.md
   explains how the API runs; the runbooks are click-by-click and production-only, so they got
   their own file, linked from DEPLOY.md and PLAN.md. **The restore drill restores into a copy,
