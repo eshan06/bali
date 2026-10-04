@@ -99,8 +99,9 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   demo site, and user-facing strings wherever they live (DESIGN.md lists
   where). Read `docs/DESIGN.md` first, then design and build with the
   `design-taste-frontend` skill, and write every new or changed user-facing
-  string with the `no-ai-slop` skill; `/santa-loop` runs `web-design-guidelines`
-  on the portal's UI and `no-ai-slop` on changed strings (WARNs only). The design skills never apply to the API,
+  string with the `no-ai-slop` skill; `/santa-loop` runs
+  `web-design-guidelines` on the portal's UI and `no-ai-slop` on changed
+  strings (WARNs only). The design skills never apply to the API,
   `packages/`, or `apps/web/src/lib` and the iOS engine beyond their
   user-facing strings. Restyling an approved screen is a planned design step
   with the owner's sign-off, never a side effect of a skill's advice.
