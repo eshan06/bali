@@ -18,6 +18,13 @@ also works on Render or plain Docker.
   sessions and opens silence episodes for phones gone quiet (hosting decision 3).
   A scheduled `POST /internal/sweep` with the `x-internal-key` header (step 4
   below) is its backup. Idempotent, so any overlap is harmless.
+- **Rate limits** (ISSUES #1, `apps/api/src/limits.ts`): kept in each process's
+  memory, so N instances are N times each budget, and a restart empties them —
+  the way to clear a school's address locked out of joining by a guesser. The
+  caller's address is the `X-Real-IP` Railway's edge sets, overwriting any a
+  client sends, so the API must be reached only through that edge. On another
+  host (Render, plain Docker), a proxy in front must set `X-Real-IP` the same
+  way, or a client picks its own address's budget.
 
 ## Environment variables
 

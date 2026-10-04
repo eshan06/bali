@@ -116,8 +116,8 @@ export interface Limiter {
    */
   guess(request: FastifyRequest): void;
   /**
-   * Its answer, `status`: a code no class has — a 404, the only one either route answers —
-   * keeps the miss it held; any other answer gives it back.
+   * Its answer, `status`: a 404 — today only `class_not_found`, and any 404 on a lookup tells a
+   * guesser the code opens nothing — keeps the miss it held; any other answer gives it back.
    */
   settle(request: FastifyRequest, status: number): void;
 }

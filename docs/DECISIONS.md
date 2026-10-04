@@ -22,7 +22,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   flooding account gets 120, then 2 a second. **Each address where no one is signed in** (no
   token, or one the pool refused), **1,200 at once and 600 a minute:** every phone of a
   600-student school failing at once, twice. Honest ones are rare — the phone renews its token
-  on its own clock, the portal signs out at a 401 — and a key set out of reach (`503`) is ours
+  60 s before it expires and never sends one it knows has expired, the portal signs out at a
+  401 — so over this budget a refused token's 429, the outbox's "retry" where a 401 would be
+  "reauth", only delays a renewal, never drops a record. A key set out of reach (`503`) is ours
   and costs the caller nothing. **The join-code preview and the join, together: each account 20
   tries, then 2 a minute** (a student joins ~6 classes, a preview and a join each, with typos;
   over it, they wait at most 30 s), **and each address 100 misses (`404 class_not_found`), then 6
@@ -36,10 +38,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   would hand any guesser a switch that turns joining off for every school. Known edges: a
   guesser with many addresses multiplies it — Phase 6's Cognito item (self sign-up off or gated)
   is the fix at the root — and a student at school with a few accounts could spend the school's
-  misses: joining on its Wi-Fi then waits for the refill, on cellular it doesn't. **Over a
-  budget:** `429` in the one error shape (`ApiError.rateLimited`), no `reason`, with
-  `Retry-After` in whole seconds — at most 30 at these sizes, so the phone's "Wait a minute,
-  then try again" is honest. A refusal spends nothing, so a client is back as its budget
+  misses: joining on its Wi-Fi then waits for the refill, one miss every ten seconds, on
+  cellular it doesn't; restarting the API empties every bucket at once. **Over a budget:** `429` in the one
+  error shape (`ApiError.rateLimited`), no `reason`, with `Retry-After` in whole seconds — at
+  most 30 at these sizes, so the phone's "Wait a minute, then try again" is honest — and exposed
+  through CORS, so the portal's fetch can read it too. A refusal spends nothing, so a client is back as its budget
   refills: a throttle, never a ban, and no response is delayed — holding a flood's connections
   open is the cost a flood wants. That is how ARCHITECTURE's "slowing requests down before ever
   blocking them" is met; sign-in itself is Cognito's, never this API's. **Spends nothing:**

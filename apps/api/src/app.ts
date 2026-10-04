@@ -91,7 +91,8 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       .map((o) => o.trim())
       .filter(Boolean) ?? [];
   if (corsOrigins.length > 0) {
-    void app.register(cors, { origin: corsOrigins });
+    // A 429's Retry-After, readable by the portal's fetch, not only sent.
+    void app.register(cors, { origin: corsOrigins, exposedHeaders: ['retry-after'] });
   }
 
   // Every /v1 route's budget is spent in `authenticate`; /healthz and the

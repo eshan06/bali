@@ -89,6 +89,27 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
     await app.close();
   });
 
+  it('lets the portal read a 429’s Retry-After: exposed to its fetch, not only sent (L1)', async () => {
+    const app = buildApp(
+      { ...testEnv, CORS_ORIGINS: 'http://localhost:3000' },
+      {
+        db,
+        verifyToken: issuer.verifier,
+        limits: { unsigned: { burst: 1, perMinute: 1 }, now: () => 0 },
+      },
+    );
+    const send = () =>
+      app.inject({ method: 'GET', url: '/v1/me', headers: { origin: 'http://localhost:3000' } });
+
+    expect((await send()).statusCode).toBe(401);
+    const over = await send();
+    expect(over.statusCode).toBe(429);
+    expect(over.headers['retry-after']).toBe('60');
+    expect(over.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(over.headers['access-control-expose-headers']).toBe('retry-after');
+    await app.close();
+  });
+
   it('parses the origin list — trims entries, drops blanks, treats whitespace as unset', async () => {
     // Trailing comma, interior spaces, and an empty entry must not produce a
     // surprising allowlist (e.g. an empty-string origin that matches everything).
