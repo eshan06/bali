@@ -26,7 +26,7 @@ export const NOT_A_BLOCK_ID =
 
 /** `POST /v1/blocks`'s one 409 (P3): a live block of another teacher's holds the tag. */
 export const BLOCK_TAKEN =
-  'That block is registered to another teacher. Check the ID against your block. If it matches, ask whoever sent your invite code to move it to you.';
+  'That block is registered to another teacher. If the ID matches the one on your block, ask whoever sent your invite code to move it to you.';
 
 /** No answer from the API (P3): the connection, never the person. */
 export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try again.";

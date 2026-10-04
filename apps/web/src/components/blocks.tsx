@@ -3,8 +3,8 @@
 import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { blockIdOf, type RegisterAnswer, registerBlock } from '@/lib/blocks';
-import { errText, NOT_A_BLOCK_ID } from '@/lib/errors';
+import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
+import { NOT_A_BLOCK_ID } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
 
 /** What the section last said under the field. */
@@ -26,6 +26,7 @@ export function Blocks() {
   // A send under way: a second Enter before the page redraws sends nothing.
   const sending = useRef(false);
   const [blocks, setBlocks] = useState<BlockDetail[] | null>(null);
+  // Set when the list didn't load: what to add to the line that says so, or '' for nothing.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,7 +37,7 @@ export function Blocks() {
     setLoadError(null);
     api.get<BlockListResponse>('/v1/blocks').then(
       (res) => setBlocks(res.blocks),
-      (e: unknown) => setLoadError(errText(e)),
+      (e: unknown) => setLoadError(loadProblem(e) ?? ''),
     );
   }, [api]);
 
@@ -82,11 +83,11 @@ export function Blocks() {
         {blocks && blocks.length > 1 ? 'Your blocks' : 'Your block'}
       </h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        Students tap it with their phone to join your session.
+        Students tap your block with their phone to join your session.
       </p>
 
       {blocks === null ? (
-        loadError ? (
+        loadError !== null ? (
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <p role="alert" className="text-sm">
               Couldn't load your blocks.{' '}
@@ -101,7 +102,7 @@ export function Blocks() {
             </button>
           </div>
         ) : (
-          <p role="status" className="mt-4 text-sm text-slate-500">
+          <p role="status" className="mt-4 text-sm text-slate-500 dark:text-slate-400">
             Loading…
           </p>
         )
@@ -166,6 +167,7 @@ export function Blocks() {
             <button
               type="submit"
               aria-disabled={busy}
+              aria-busy={busy}
               className="mt-6 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 aria-disabled:opacity-60 motion-reduce:transition-none"
             >
               {busy ? 'Registering…' : said?.kind === 'failed' ? 'Try again' : 'Register block'}

@@ -1,8 +1,8 @@
 import type { BlockDetail } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
-import { createApiClient } from './api-client';
-import { blockIdOf, registerBlock } from './blocks';
+import { ApiError, createApiClient, NetworkError } from './api-client';
+import { blockIdOf, loadProblem, registerBlock } from './blocks';
 import {
   BLOCK_TAKEN,
   CANT_REACH,
@@ -123,5 +123,16 @@ describe('registerBlock', () => {
         message: CANT_REGISTER,
       });
     }
+  });
+});
+
+describe('loadProblem', () => {
+  it('says the connection and the wait in their words, and no log line', () => {
+    expect(loadProblem(new NetworkError())).toBe(CANT_REACH);
+    expect(loadProblem(new ApiError(429, 'rate_limited', 'too many requests'))).toBe(
+      TOO_MANY_TRIES,
+    );
+    expect(loadProblem(new ApiError(500, 'internal', 'internal error'))).toBeNull();
+    expect(loadProblem(new ApiError(403, 'forbidden', 'teacher access required'))).toBeNull();
   });
 });

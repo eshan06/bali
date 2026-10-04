@@ -46,3 +46,13 @@ export async function registerBlock(
     return { kind: 'failed', message: errText(e) };
   }
 }
+
+/**
+ * What to add to "Couldn't load your blocks." for `e`, the list's failure: the connection, or the
+ * budget's wait, in their words; nothing for anything else, whose message is written for a log.
+ */
+export function loadProblem(e: unknown): string | null {
+  if (e instanceof NetworkError) return CANT_REACH;
+  if (e instanceof ApiError && e.status === 429) return errText(e);
+  return null;
+}
