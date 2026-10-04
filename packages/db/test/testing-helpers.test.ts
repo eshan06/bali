@@ -131,7 +131,8 @@ describe('the helpers that drop databases', () => {
           else process.env.NODE_ENV = env;
           await expect(run()).rejects.toThrow(`${name} is a test-only helper`);
         } finally {
-          process.env.NODE_ENV = saved;
+          if (saved === undefined) delete process.env.NODE_ENV;
+          else process.env.NODE_ENV = saved;
         }
       });
     }

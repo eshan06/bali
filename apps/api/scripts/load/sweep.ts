@@ -54,7 +54,7 @@ async function sweepTheBell() {
     if (bell!.focused !== school.students.length || bell!.running !== classes) {
       throw new Error(
         `expected the gate's bell, ${school.students.length} phones focused in ${classes} ` +
-          `sessions, and found ${bell!.focused} in ${bell!.running}: run the gate first`,
+          `sessions, and found ${bell!.focused} in ${bell!.running}: seed, then run the gate once`,
       );
     }
     const silence = await timed(bell!.lastHeard + SILENCE_THRESHOLD_MS + 1);
@@ -76,6 +76,8 @@ console.log(
     `${end.expired} of ${classes} sessions ended at once, ${endedParticipations} participations ` +
     `with them, in ${end.ms} ms; deadlocks: ${atGate} during the gate, ${inSweep} in the sweep`,
 );
+// The retry handles a deadlock, so it fails nothing; but L3 is revisited at the first one.
+if (atGate + inSweep > 0) console.log('::warning::deadlocks met the gate: revisit L3 (PLAN.md)');
 const failures = [
   silence.wentSilent !== focused && 'not every quiet phone was marked silent',
   silence.expired !== 0 && 'a session ended before every phone was quiet',

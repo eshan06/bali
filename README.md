@@ -188,8 +188,8 @@ npm run load:sweep   # once load:serve has stopped: the sweep at that size, time
   `429`, no `5xx`) with p95 under 500 ms, and the flooder is refused, each `429` with a
   `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
   quiet, then 30 sessions ending at once. CI's "Load gate" runs both on every PR that touches
-  `apps/api/`, `packages/db/` or `packages/shared/`, or by hand. Numbers and why:
-  `docs/DECISIONS.md` (L2b).
+  `apps/api/`, `packages/db/`, `packages/shared/` or the root's `package.json`, lockfile or
+  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b).
 - **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
   machine (`localhost`, `127.0.0.1`, `[::1]`), and one no one vouched for: `localhost` could be a
   tunnel to another machine, and nothing can tell, so `LOAD_LOCAL_POSTGRES=1` says it is not

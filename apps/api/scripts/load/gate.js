@@ -115,7 +115,8 @@ export function phone() {
     if (session === null) {
       const me = request('me', 'GET', '/v1/me', s.token);
       check(me, { 'the truth is read': (r) => r.status === 200 });
-      session = me.status === 200 ? (me.json('session.id') ?? null) : null;
+      const ownClass = me.status === 200 && me.json('session.classId') === s.classId;
+      session = ownClass ? me.json('session.id') : null;
     } else {
       const checkin = { deviceTime: deviceTime() };
       check(request('checkin', 'POST', `/v1/sessions/${session}/checkin`, s.token, checkin), {
@@ -124,7 +125,7 @@ export function phone() {
       });
     }
   }
-  check(session, { 'the Start joined them': (id) => id !== null });
+  check(session, { 'the Start joined them to their class': (id) => id !== null });
 }
 
 /** A teacher at the bell: Start, which joins everyone waiting, then their second class. */

@@ -44,7 +44,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   deadlock, not four; and a sweep longer than its minute skips the next tick, never stacks
   (`startSweeping`). At ~2 ms a row, the serial loop fills its minute at ~30,000 phones going
   quiet at once on one API: L3 comes back at that size, or when the gate's deadlock count leaves
-  0. **L2a's harness, tightened (its review's WARNs):** `localhost` doesn't prove the server is
+  0 (the sweep step then warns in CI; a deadlock the retry handled fails nothing). **L2a's harness, tightened (its review's WARNs):** `localhost` doesn't prove the server is
   this machine's, and the server can't prove it either. A server reached on its own loopback, as
   at an SSH tunnel's far end, says `inet_server_addr()` is `127.0.0.1`, while a Postgres container
   published on this machine's port, CI's service, says its bridge address (`172.17.0.2`; both
@@ -53,7 +53,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `dropDatabase` and `recreateDatabase` refuse outside `NODE_ENV` test or development, as the
   backdating helpers do, and so does `makeTestDb` on a real Postgres, which would otherwise make a
   database its close can't drop; `load:seed` runs as development. **CI:** the gate's job is
-  decided by the PR's changed paths, as the iOS build's is, so a PR with none reports success and
+  decided by the PR's changed paths, as the iOS build's is (the API, the engine, the shared
+  contract, and the root manifests and `.nvmrc` it runs on), so a PR with none reports success and
   the check can be made required (the owner's ruleset toggle); k6 comes from
   `grafana/setup-k6-action`, pinned to its commit, at the version measured here.
 

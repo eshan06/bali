@@ -37,7 +37,7 @@ jobs:
           run=true
           if [ "$EVENT" = pull_request ]; then
             changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
-            printf '%s\n' "$changed" | grep -qE '^(apps/api/|packages/(db|shared)/|\.github/workflows/load-gate\.yml$)' || run=false
+            printf '%s\n' "$changed" | grep -qE '^(apps/api/|packages/(db|shared)/|package(-lock)?\.json$|\.nvmrc$|\.github/workflows/load-gate\.yml$)' || run=false
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
