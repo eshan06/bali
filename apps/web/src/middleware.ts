@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { config as webConfig } from '@/lib/config';
-import { contentSecurityPolicy } from '@/lib/csp';
+import { config as webConfig } from './lib/config';
+import { contentSecurityPolicy } from './lib/csp';
 
 /*
  * Every page gets a CSP with a fresh nonce (Phase 6, S4). Next reads the nonce from the request's

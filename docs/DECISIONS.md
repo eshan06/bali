@@ -28,8 +28,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   still meets `img-src`. The built-in 404's own `<style>` (its dark mode) is refused; the page
   still lays out by its attributes. **Dev only:** `next dev` gets `'unsafe-eval'` and inline
   styles for fast refresh. **Origins** come from the build's `NEXT_PUBLIC_*`, each cut to its
-  origin (a Sentry DSN's key and project go); blank means none; a malformed one throws, so a bad
-  build fails on its first page, not silently. **Not taken:** `upgrade-insecure-requests` (it
+  origin (a Sentry DSN's key and project go); blank means none; a malformed one fails the build
+  (`next.config.mjs`), so no deploy serves a 500 for it. **Not taken:** `upgrade-insecure-requests` (it
   breaks the local API on http); `X-Frame-Options` (`frame-ancestors` covers it); HSTS
   `preload` (a commitment for the final domain, the owner's). **Headers on every response,**
   assets too, from `next.config.mjs`: HSTS two years with subdomains (browsers ignore it over

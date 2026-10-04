@@ -1,3 +1,4 @@
+/* global process, URL */
 /**
  * Sent with every response, assets included (Phase 6, S4). The CSP is per request, with its
  * nonce, so it is set in src/middleware.ts instead. HSTS is ignored over plain http, so it is
@@ -13,6 +14,17 @@ export const securityHeaders = [
     value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   },
 ];
+
+// The CSP's origins (src/lib/csp.ts): a malformed one fails the build here, not every page.
+for (const name of [
+  'NEXT_PUBLIC_API_URL',
+  'NEXT_PUBLIC_COGNITO_DOMAIN',
+  'NEXT_PUBLIC_SENTRY_DSN',
+]) {
+  const value = process.env[name]?.trim();
+  if (value && !URL.canParse(value))
+    throw new Error(`${name} is not a URL: the CSP needs its origin`);
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
