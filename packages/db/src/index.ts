@@ -15,5 +15,6 @@ export * from './school-command.js';
 export * from './schema.js';
 export * as schema from './schema.js';
 export * from './schools.js';
+export * from './student-record.js';
 export * from './transitions.js';
 export type { Database } from './types.js';

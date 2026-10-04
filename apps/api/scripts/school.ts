@@ -4,7 +4,8 @@ import { detailOf } from './demo/cognito.js';
 
 /*
  * The owner's school commands (`npm run school -- <command>`): add a school,
- * record its data agreement, mint a teacher invite. They run against
+ * record its data agreement, mint a teacher invite, list them, export one
+ * student's record (JSON on standard output, nothing else). They run against
  * DATABASE_URL, as `npm run migrate` does; the commands are @bali/db's
  * (school-command.ts). An invite's code is printed to this terminal, once, and
  * nowhere else.

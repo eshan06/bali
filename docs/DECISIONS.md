@@ -22,6 +22,39 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "the clients can't write `email` afterwards": the guard is that an account can only start from
   a school address, and Cognito re-verifies a changed email.
 
+- **2026-10-04** — **C5: one student's whole record, exported by the owner's command, not an
+  endpoint.** **Where:** `npm run school -- export-student <id>`, beside T1a's commands
+  (`exportStudentRecord`, `packages/db/src/student-record.ts`). A parent's FERPA request goes
+  to the school, which asks the vendor, a few times a year at most; the owner answers it. An
+  HTTP route would be a new surface (authz for an owner role that doesn't exist, the matrix,
+  rate limits, the OpenAPI snapshot) for no client; the command runs where `npm run school`
+  already runs, `railway ssh` on prod. **What:** every row keyed to the person, whole, every
+  column (a column added later is exported with no change here): the `users` row, and their
+  enrollments, participations, events, armed taps and redeemed invites; plus what those rows
+  point at, named — each class's name and its teacher's display name, each session's window,
+  the school. Never another student's row: a class's roster, a session's other events and a
+  teacher's received armed taps are out. An invite's code hash is left out: it opens nothing
+  and says nothing about the person. **Found by** the account's id or its Cognito subject (the
+  owner finds the `sub` by email in the pool; `users` stores no email). A deleted account
+  (C3) has no subject and is found by its id only, its record as the deletion left it.
+  **Complete by construction:** `STUDENT_RECORD_COVERAGE` places every foreign key to `users`,
+  exported or argued not theirs (a teacher's classes, blocks, and the taps students made on
+  their block), and a test reads the Drizzle schema and fails when a new key is neither.
+  **Read-only:** one `REPEATABLE READ`, `READ ONLY` transaction, so the document is one
+  moment's truth and the database itself refuses a write. **Output:** one JSON document
+  (`bali.student-record/1`) and nothing else on standard output, so it redirects to a file;
+  the runbook (`docs/RUNBOOKS.md`, runbook 1, step 10) checks it with `jq` and has the owner
+  deliver it to the school through the agreement's channel, then delete the copy. **The hold
+  (ISSUES #5, "none happens while a parent's inspection request is open"):** a step in that
+  runbook, not code: the owner runs every disposal (C6a, C6b), so the owner holds them; a
+  student's own deletion can't wait on a request the student may not know of, and keeps the
+  records under the id anyway. A hold flag in the database is for when C6a/C6b are built, if
+  they need one. **Rode along:** `deleteAccount` consumes the student's armed taps still
+  waiting (one armed just before the deletion), so no Start weighs them; their `order_install`
+  stays, as the events' does (C3 kept the history). A Start holds its armed rows before the
+  student's tap lock and the deletion the other way round, so the two can deadlock: both run
+  under `withDeadlockRetry`, and a real-Postgres race test runs them together.
+
 - **2026-10-04** — **C3: account deletion, through the engine (amends data-model decision 3,
   the owner's ruling of the same day).** `DELETE /v1/me` `{ eventId }` → the engine's
   `deleteAccount`, one transaction. **What goes:** each live class is left exactly as a leave
