@@ -91,7 +91,7 @@ export const options = {
     'http_req_duration{kind:checkin}': [`p(95)<${P95_MS}`],
     // The flood: stopped by its own budget, every refusal a 429 with a Retry-After. No more
     // answered than the budget allows, so a raised budget fails; and every request sent, so a
-    // slow API can't thin the flood into passing.
+    // slow API can't thin the flood into passing (no scenario may drop one).
     'http_reqs{who:flooder,status:429}': ['count>0'],
     'http_reqs{who:flooder,status:200}': [`count<=${FLOOD_ANSWERED_MAX}`],
     dropped_iterations: ['count==0'],

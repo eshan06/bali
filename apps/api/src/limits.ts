@@ -41,6 +41,7 @@ export interface Budgets {
 }
 
 export const BUDGETS: Budgets = {
+  // The load gate caps its flooder at this budget (scripts/load/gate.js): change both together.
   account: { burst: 120, perMinute: 120 },
   unsigned: { burst: 1_200, perMinute: 600 },
   joinTries: { burst: 20, perMinute: 2 },
