@@ -3,6 +3,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
+import { getSessionEvents } from '../src/queries.js';
 import {
   armedTaps,
   classes,
@@ -123,10 +124,13 @@ function phone() {
   return (seq: number): ActionOrder => ({ install, seq });
 }
 
-/** The report of a session: its row and every event the engine stored in it, and `kept`. */
+/**
+ * The report of a session: its row and every event the engine stored in it, read as R2's route
+ * reads them (`getSessionEvents`), and `kept`.
+ */
 async function reportOf(sessionId: string, kept: ReportEvent[] = []) {
   const session = one(await db.select().from(sessions).where(eq(sessions.id, sessionId)));
-  const stored = await db.select().from(events).where(eq(events.sessionId, sessionId));
+  const stored = await getSessionEvents(db, sessionId);
   return sessionReport(session, [...stored, ...kept], LATER);
 }
 
