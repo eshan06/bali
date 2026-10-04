@@ -38,6 +38,33 @@ export const SESSION_REPORTS_PAGE_LIMIT = 20;
 export const JOIN_CODE_LENGTH = 6;
 
 /**
+ * The symbols every code is drawn from, a join code's and a teacher invite's:
+ * no 0/O and no 1/I/L to mistake, upper case only (`generateJoinCode` says why).
+ */
+export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/**
+ * A teacher invite's code (T1a): 25 symbols of the alphabet (`@bali/db` says
+ * why 25), shown in groups of five. Here, so the portal checks a code as the
+ * redeem does before it spends a try on one (T2).
+ */
+export const INVITE_CODE_LENGTH = 25;
+export const INVITE_CODE_PATTERN = new RegExp(`^[${JOIN_CODE_ALPHABET}]{${INVITE_CODE_LENGTH}}$`);
+
+/**
+ * A code as typed or pasted, put back as it was minted (T1b): upper case, with
+ * every space and any dash set aside (a document may turn hyphens into en dashes).
+ */
+export function inviteCodeSymbols(typed: string): string {
+  return typed.replace(/[\s\p{Pd}]/gu, '').toUpperCase();
+}
+
+/** A code as it is shown: in groups of five, the dashes only separating them. */
+export function formatInviteCode(code: string): string {
+  return code.replace(/(.{5})(?=.)/g, '$1-');
+}
+
+/**
  * The longest display name, in code points (a grid cell, not an essay): what a
  * student may set (`PATCH /v1/me`, A8), and where a name read off a sign-in
  * token is cut. A phone's name field holds to it.

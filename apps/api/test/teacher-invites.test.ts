@@ -191,6 +191,23 @@ describe('POST /v1/teacher-invites/redeem', () => {
     expect(await accountOf(sub)).toMatchObject({ role: 'student', schoolId: null });
   });
 
+  it('fills in a missing display name as the boot call would, even refused, and nothing else (T1b’s review)', async () => {
+    const sub = fresh('nameless');
+    // Its row, made by a sign-in that carried no name.
+    const headers = { authorization: `Bearer ${await ctx.tokenFor(sub)}` };
+    const me = await ctx.app.inject({ method: 'GET', url: '/v1/me', headers });
+    expect(me.json<MeResponse>().user.displayName).toBeNull();
+
+    const refused = await redeem(sub, { code: NO_INVITE, eventId: randomUUID() }, { name: 'Bea' });
+
+    expect(refused.status).toBe(404);
+    expect(await accountOf(sub)).toMatchObject({
+      role: 'student',
+      schoolId: null,
+      displayName: 'Bea',
+    });
+  });
+
   it('refuses a student in a live class, telling them to use a separate account: 409 student_in_class, nothing changed', async () => {
     const { student } = await seedClassroom(db, fresh('enrolled'));
     const { invite: minted, code } = await invite();

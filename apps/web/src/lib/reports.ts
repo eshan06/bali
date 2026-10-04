@@ -52,7 +52,9 @@ export async function readSessions(
   const klass = `/v1/classes/${encodeURIComponent(classId)}`;
   const reports = `${klass}/reports/sessions`;
   try {
-    if (at === 'earlier' && list.nextBefore !== null) {
+    if (at === 'earlier') {
+      // At the end there is nothing earlier: the list as it is, never the newest page in its place.
+      if (list.nextBefore === null) return { ...list, reading: null };
       const page = await api.get<SessionReportsPage>(
         `${reports}?before=${encodeURIComponent(list.nextBefore)}`,
       );
@@ -66,7 +68,8 @@ export async function readSessions(
   } catch (e) {
     if (at === 'earlier' && e instanceof ApiError && e.reason === 'unknown_cursor') {
       const fresh = await readSessions(api, classId, list, 'newest');
-      return { ...fresh, restarted: fresh.failure === null };
+      // Failed too, it keeps no cursor: Show earlier never offers the one the server refused.
+      return fresh.failure ? { ...fresh, nextBefore: null } : { ...fresh, restarted: true };
     }
     return { ...list, reading: null, failure: { at, message: errText(e) } };
   }

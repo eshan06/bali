@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 
-import { JOIN_CODE_LENGTH } from '@bali/shared';
+import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
@@ -30,7 +30,7 @@ type BlockRow = typeof blocks.$inferSelect;
  * it is upper-case — and this generator is the only thing that stores one.
  * Pinned by a test rather than a CHECK constraint.
  */
-export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export { JOIN_CODE_ALPHABET };
 /**
  * Every code's length — and so the longest one a route accepts. Its source is
  * `@bali/shared`, where the phone and the portal read the same limit.

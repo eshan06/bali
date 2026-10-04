@@ -1,8 +1,8 @@
 import { createHash, randomInt } from 'node:crypto';
 
+import { INVITE_CODE_LENGTH, JOIN_CODE_ALPHABET } from '@bali/shared';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 
-import { JOIN_CODE_ALPHABET } from './management.js';
 import { classes, enrollments, schools, teacherInvites, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
@@ -23,9 +23,15 @@ type UserRow = typeof users.$inferSelect;
  * (no 0/O, no 1/I/L), so 25 × log2(31) ≈ 124 bits of chance. That is past the
  * 112 bits at which NIST SP 800-63B (§5.1.2.2) stores a look-up secret under a
  * plain approved hash, with no salt and no slow hash: no search of a stolen
- * table's hashes finds a code, let alone within the 14 days one lives.
+ * table's hashes finds a code, let alone within the 14 days one lives. Kept in
+ * `@bali/shared` with a code's other rules, so the portal checks one as the redeem does.
  */
-export const INVITE_CODE_LENGTH = 25;
+export {
+  formatInviteCode,
+  INVITE_CODE_LENGTH,
+  INVITE_CODE_PATTERN,
+  inviteCodeSymbols,
+} from '@bali/shared';
 /** An invite is good for 14 days from its minting (the owner's ruling, 2026-10-04). */
 export const INVITE_LIFETIME_DAYS = 14;
 /** Bounded, as a join code's are, so a broken database can never spin here forever. */
@@ -38,25 +44,6 @@ export function generateInviteCode(): string {
     code += JOIN_CODE_ALPHABET[randomInt(JOIN_CODE_ALPHABET.length)];
   }
   return code;
-}
-
-/** A code as it is shown: in groups of five, the dashes only separating them. */
-export function formatInviteCode(code: string): string {
-  return code.replace(/(.{5})(?=.)/g, '$1-');
-}
-
-/** A code's symbols as `generateInviteCode` draws them: `INVITE_CODE_LENGTH` of the alphabet. */
-export const INVITE_CODE_PATTERN = new RegExp(`^[${JOIN_CODE_ALPHABET}]{${INVITE_CODE_LENGTH}}$`);
-
-/**
- * A code as a teacher types or pastes it, put back in the form it was minted in
- * (T1b): upper-case, with every space and dash set aside, so `abcde fghjk-…`
- * is `ABCDEFGHJK…` — what `hashInviteCode` takes, once it matches
- * `INVITE_CODE_PATTERN`. Any dash: a code pasted from a document may come with
- * its hyphens made en dashes.
- */
-export function inviteCodeSymbols(typed: string): string {
-  return typed.replace(/[\s\p{Pd}]/gu, '').toUpperCase();
 }
 
 /**
