@@ -1,4 +1,8 @@
-/* global process, URL */
+import type { NextConfig } from 'next';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants';
+
+import { checkBuildEnv } from './src/lib/csp';
+
 /**
  * Sent with every response, assets included (Phase 6, S4). The CSP is per request, with its
  * nonce, so it is set in src/middleware.ts instead. HSTS is ignored over plain http, so it is
@@ -15,24 +19,8 @@ export const securityHeaders = [
   },
 ];
 
-// The CSP's origins (src/lib/csp.ts): one that is no http(s) URL fails the build here, not every
-// page. Unset means the default (the API) or none (Cognito, Sentry); a blank API is an error.
-for (const name of [
-  'NEXT_PUBLIC_API_URL',
-  'NEXT_PUBLIC_COGNITO_DOMAIN',
-  'NEXT_PUBLIC_SENTRY_DSN',
-]) {
-  const value = process.env[name]?.trim();
-  if (value === undefined || (value === '' && name !== 'NEXT_PUBLIC_API_URL')) continue;
-  const url = URL.canParse(value) ? new URL(value) : null;
-  if (url?.protocol !== 'http:' && url?.protocol !== 'https:') {
-    throw new Error(`${name} is not an http(s) URL: the CSP needs its origin`);
-  }
-}
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  headers: async () => [{ source: '/:path*', headers: securityHeaders }],
+export const nextConfig: NextConfig = {
+  headers: () => Promise.resolve([{ source: '/:path*', headers: securityHeaders }]),
   // @bali/shared ships as TypeScript/ESM; let Next transpile it in-app rather
   // than requiring a prebuilt dist.
   transpilePackages: ['@bali/shared'],
@@ -41,7 +29,7 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   // @bali/shared uses NodeNext `.js` import specifiers that actually resolve to
   // `.ts` sources; webpack doesn't do that mapping on its own, so teach it.
-  webpack: (config) => {
+  webpack: (config: { resolve: { extensionAlias?: Record<string, string[]> } }) => {
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js', '.jsx'],
       ...config.resolve.extensionAlias,
@@ -50,4 +38,9 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// A production build checks the CSP's origins first: a bad one fails the build, not every page.
+// Only the build: `next start` reads this file too, with the build's values already baked in.
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_PRODUCTION_BUILD) checkBuildEnv(process.env);
+  return nextConfig;
+}

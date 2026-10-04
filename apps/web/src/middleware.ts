@@ -7,7 +7,7 @@ import { contentSecurityPolicy } from './lib/csp';
  * Every page gets a CSP with a fresh nonce (Phase 6, S4). Next reads the nonce from the request's
  * own Content-Security-Policy header and stamps it on each script it renders, which is why the
  * pages render per request (the root layout's `dynamic`): a page built ahead would carry no nonce.
- * The headers that never change ride on every response from next.config.mjs's `headers()`.
+ * The headers that never change ride on every response from next.config.ts's `headers()`.
  */
 export function middleware(request: NextRequest) {
   const csp = contentSecurityPolicy({

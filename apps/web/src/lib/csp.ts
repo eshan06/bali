@@ -32,6 +32,30 @@ function originOf(url: string | undefined): string | null {
   return parsed.origin;
 }
 
+/**
+ * A production build's check of the origins the CSP is built from (next.config.ts), so a bad one
+ * fails the build rather than every page: the API's URL must be set (unset, the portal would
+ * call its localhost default) and be an http(s) URL; Cognito's and Sentry's, when set, too.
+ */
+export function checkBuildEnv(env: Record<string, string | undefined>): void {
+  const urls = {
+    NEXT_PUBLIC_API_URL: env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_COGNITO_DOMAIN: env.NEXT_PUBLIC_COGNITO_DOMAIN,
+    NEXT_PUBLIC_SENTRY_DSN: env.NEXT_PUBLIC_SENTRY_DSN,
+  };
+  for (const [name, value] of Object.entries(urls)) {
+    let origin: string | null;
+    try {
+      origin = originOf(value);
+    } catch {
+      throw new Error(`${name} is not an http(s) URL: the CSP needs its origin`);
+    }
+    if (origin === null && name === 'NEXT_PUBLIC_API_URL') {
+      throw new Error('set NEXT_PUBLIC_API_URL for a production build: the API the portal calls');
+    }
+  }
+}
+
 export function contentSecurityPolicy(options: CspOptions): string {
   const nonce = `'nonce-${options.nonce}'`;
   const api = originOf(options.apiUrl);

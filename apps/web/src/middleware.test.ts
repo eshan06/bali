@@ -16,6 +16,16 @@ describe('middleware', () => {
     expect(forwardedCsp(response)).toBe(csp);
   });
 
+  it("never lets a request's own CSP header choose the nonce Next stamps", () => {
+    const request = new NextRequest('http://localhost:3000/', {
+      headers: { 'Content-Security-Policy': "script-src 'nonce-attacker'" },
+    });
+    const response = middleware(request);
+    const csp = response.headers.get('Content-Security-Policy');
+    expect(csp).not.toContain('attacker');
+    expect(forwardedCsp(response)).toBe(csp);
+  });
+
   it('mints a fresh nonce per request', () => {
     const nonce = () =>
       /'nonce-([^']+)'/.exec(

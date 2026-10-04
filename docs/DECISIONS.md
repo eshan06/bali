@@ -29,13 +29,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   still lays out by its attributes. **Dev only:** `next dev` gets `'unsafe-eval'` and inline
   styles for fast refresh. **Origins** come from the build's `NEXT_PUBLIC_*`, each cut to its
   origin (a Sentry DSN's key and project go); blank means none (the API's is required); one that is not an http(s) URL
-  fails the build (`next.config.mjs`), so no deploy serves a 500 or a `null` origin for it.
+  fails the build (`next.config.ts`), so no deploy serves a 500 or a `null` origin for it.
   **Every page renders per request,** guarded by a test of the app's route config and a CI
   check of the build's route table: a static page has no nonce, so it would be blank. **No
   report endpoint:** a browser check before the Vercel flip (PLAN, S4) stands in for one. **Not taken:** `upgrade-insecure-requests` (it
   breaks the local API on http); `X-Frame-Options` (`frame-ancestors` covers it); HSTS
   `preload` (a commitment for the final domain, the owner's). **Headers on every response,**
-  assets too, from `next.config.mjs`: HSTS two years with subdomains (browsers ignore it over
+  assets too, from `next.config.ts`: HSTS two years with subdomains (browsers ignore it over
   http, so localhost is fine), `nosniff`, `strict-origin-when-cross-origin`, and a
   Permissions-Policy turning off camera, microphone, geolocation, payment and USB.
 - **2026-10-04** — **C1: privacy manifests, declared per binary, held to the code by a

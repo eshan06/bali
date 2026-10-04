@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import nextConfig, { securityHeaders } from '../../next.config.mjs';
+import { PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from 'next/constants';
 
-import { contentSecurityPolicy, type CspOptions } from './csp';
+import config, { nextConfig, securityHeaders } from '../../next.config';
+
+import { checkBuildEnv, contentSecurityPolicy, type CspOptions } from './csp';
 
 const BASE: CspOptions = {
   apiUrl: 'https://api.bali.example/',
@@ -91,9 +93,56 @@ describe('contentSecurityPolicy', () => {
   });
 });
 
+describe('checkBuildEnv: a production build refuses an origin the CSP cannot hold', () => {
+  const GOOD = {
+    NEXT_PUBLIC_API_URL: 'https://api.bali.example',
+    NEXT_PUBLIC_COGNITO_DOMAIN: 'https://bali-dev.auth.us-east-1.amazoncognito.com',
+    NEXT_PUBLIC_SENTRY_DSN: 'https://publickey@o123.ingest.us.sentry.io/456',
+  };
+
+  it('passes configured http(s) URLs, and Cognito or Sentry left unset or blank', () => {
+    expect(() => checkBuildEnv(GOOD)).not.toThrow();
+    expect(() => checkBuildEnv({ NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001' })).not.toThrow();
+    expect(() =>
+      checkBuildEnv({ ...GOOD, NEXT_PUBLIC_COGNITO_DOMAIN: '', NEXT_PUBLIC_SENTRY_DSN: ' ' }),
+    ).not.toThrow();
+  });
+
+  it('requires the API URL: unset, the portal would call its localhost default', () => {
+    expect(() => checkBuildEnv({ ...GOOD, NEXT_PUBLIC_API_URL: undefined })).toThrow(
+      /set NEXT_PUBLIC_API_URL/,
+    );
+    expect(() => checkBuildEnv({ ...GOOD, NEXT_PUBLIC_API_URL: ' ' })).toThrow(
+      /set NEXT_PUBLIC_API_URL/,
+    );
+  });
+
+  it('names each variable that is no http(s) URL', () => {
+    for (const name of Object.keys(GOOD)) {
+      for (const bad of ['not a url', 'mailto:x@y', 'javascript:alert(1)']) {
+        expect(() => checkBuildEnv({ ...GOOD, [name]: bad })).toThrow(
+          `${name} is not an http(s) URL`,
+        );
+      }
+    }
+  });
+
+  it('runs on a production build only, never on next start', () => {
+    const before = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = 'mailto:x@y';
+    try {
+      expect(() => config(PHASE_PRODUCTION_BUILD)).toThrow(/NEXT_PUBLIC_API_URL/);
+      expect(config(PHASE_PRODUCTION_SERVER)).toBe(nextConfig);
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+      else process.env.NEXT_PUBLIC_API_URL = before;
+    }
+  });
+});
+
 describe('next.config headers()', () => {
   it('sends the fixed security headers with every response', async () => {
-    const rules = await nextConfig.headers?.();
+    const rules = await config(PHASE_PRODUCTION_SERVER).headers?.();
     expect(rules).toEqual([{ source: '/:path*', headers: securityHeaders }]);
     const byKey = Object.fromEntries(securityHeaders.map((h) => [h.key, h.value]));
     expect(byKey).toMatchObject({
