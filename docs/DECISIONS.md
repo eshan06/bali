@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S7: abuse tests, in process — what they proved, and the one bug.** An
+  in-process pen test of the API (`apps/api/test/abuse.test.ts`), with real tokens from the test
+  issuer. **Proven:** a join-code guesser meets its account's 20 tries, then, over fresh accounts,
+  its address's 100 misses (the right code and the join refused too), at production's `BUDGETS`;
+  a `429` for an account's tries gives back the miss its address held (L1's review). Another
+  student's `event_id` on a tap, an unlock, a refocus or an invite redeem is `409
+  event_id_conflict`, with no event, participation, redeemed invite or teacher written; the
+  unlock's `409` reads `retry_and_surface`, never a discard. Every forged or malformed token tried
+  — `alg: none` (also with the pool's key id, and in capitals), HS256 and HS512 keyed with the
+  public key's PEM or JWK, an unknown, missing or numeric key id, another key under the pool's
+  id, an embedded `jwk`, an unknown `crit`, expired, not yet valid, a wrong issuer, client or
+  audience, an empty subject, a payload swapped after signing, and malformed shapes — is `401`,
+  never `500` or `503`: the verifier pins RS256, and jose's rejections all sit on its 401 list.
+  A body over Fastify's 1 MiB is `413`; a capped field `400`; deep, broken or non-JSON bodies a
+  `4xx`; all in the one shape. Every UUID path parameter (a guard fails a new parameter name the
+  test doesn't cover) is `400`. **The bug, fixed here:** Fastify's router refuses a path
+  parameter past 100 characters (`414`) or with a bad percent-encoding (`400`) before any route
+  runs, so before the error handler: the answer left in Fastify's own shape (`FST_ERR_…` codes,
+  the path echoed back). `Fastify({ frameworkErrors: routerRefusal })` answers both in the one
+  shape with a fixed message, and an async-constraint failure (no route has one) as a `500`
+  reported like any other. The failing test came first, in its own commit. **Not here:** an ID
+  token is still accepted on main — S3 (#209, parked) adds the `token_use` check, so its test is
+  an `it.todo`; a tap's `tagId` has no cap until S3 (a 900 KB one reads as no block, `404`); an
+  unknown key id against the real Cognito JWKS makes jose refetch the set, at most once per its
+  30 s cooldown, which no in-process test reaches. **Known risk, recorded rather than fixed:** an
+  account's request budget is the only bound on its orphan unlocks (`unknown_session`, no
+  session, rows kept forever by rule 6): 120 at once, then 2 a second, so one account can add up
+  to ~172,800 rows a day, and accounts are free while self sign-up is on. The root fix is
+  Phase 6's Cognito item (self sign-up off or gated); a tighter per-account budget on orphan
+  unlocks — a `429`, which the unlock contract retries, never a discard — is the fallback if
+  that is late.
+
 - **2026-10-04** — **S5: CI hardening.** **Pins:** every third-party and GitHub action in the
   workflows CI runs is pinned to a commit, with its tag in a trailing comment (a bump is its own PR,
   both changed together), so a moved tag can't move the code that runs; `claude-review.yml` and
