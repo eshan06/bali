@@ -8,6 +8,61 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **L2b: the one-address load gate passes, so ISSUES #1 is done — a school at the
+  bell from one address meets no `429` and no `5xx` at p95 8.5 ms, while one flooding account is
+  refused; and the sweep at that size takes about a second, so L3 is not needed.** **The gate**
+  (`apps/api/scripts/load/gate.js`, k6 2.3; CI's "Load gate"): L2a's school, every request
+  carrying one `X-Real-IP`, as Railway's edge reports a school's address. The 600 students tap
+  once each within the minute before the bell, so every tap waits; the 20 teachers press Start
+  at the bell, within 2 s, each joining their 30, and the school's 10 second classes start too,
+  empty, so the sweep has all 30 sessions to end. Each phone then reads the truth every 30 s, as
+  it does (decision 7): `GET /v1/me` while it waits, a check-in once joined, until three minutes
+  in. From 30 s to 90 s, one account of the school's, in no class, asks `GET /v1/me` 50 times a
+  second. **Pass:** every school request a 2xx, so no `429` and no `5xx`; every check true (each
+  tap waited, each Start joined everyone waiting, each phone was joined and found focused at
+  every check-in); the p95 of the school's requests, and of each kind's, under 500 ms; and the
+  flooder refused, each `429` with a positive `Retry-After`. **Why 500 ms:** the server's share
+  of the grid's "within a second or two" (Live updates), measured on the machine itself, so the
+  network comes on top, with room for a shared runner where k6's 630 virtual users, the API and
+  Postgres run at once. At the ~10 ms measured, it fails a fifty-fold slowdown at the bell (a
+  lock queue, a query per row), not noise. **Measured** (a 4-vCPU container, as CI's runner is,
+  Postgres 16): 3,366 school requests, none refused, p95 8.5 ms: a tap 11.8, `GET /v1/me` 6.1,
+  a check-in 4.7, a Start 126 (it converts its 30 in one transaction). The flooder's 3,001: 239
+  answered (its 120 at once, then 2 a second) and 2,762 refused, while the school met none.
+  **The sweep at that size** (`npm run load:sweep`): the API's own `sweep`, timed in process on
+  the bell the gate left, once the API has stopped (over `/internal/sweep` it would race the
+  API's own minute tick for the same rows), and run twice, each on a clock of its own (`sweep`
+  takes one now; the tick and the route pass none). Past the silence threshold it marked 600 of
+  600 phones silent in 1,188 ms, ~2 ms each; past every bell it ended the 30 sessions and their
+  600 participations at once in 91 ms. Postgres counted no deadlock in the database through the
+  gate (its taps, Starts and check-ins, and the API's own sweeps) or the timed sweep, so the
+  per-row retry never ran. **L3 is not needed at this size.** #56's worst case, each of 630 rows
+  deadlocking four times, each found after Postgres's 1 s `deadlock_timeout` plus up to 140 ms of
+  backoff, is ~4 s a row and ~45 minutes a sweep, and it can't happen here: a silence candidate
+  is a phone quiet for 90 s, so its row's only rival is that phone acting at that instant, and
+  once the rival commits, the retry's guarded UPDATE finds the row changed and passes it. One
+  deadlock, not four; and a sweep longer than its minute skips the next tick, never stacks
+  (`startSweeping`). At ~2 ms a row, the serial loop fills its minute at ~30,000 phones going
+  quiet at once on one API: L3 comes back at that size, or when the gate's deadlock count leaves
+  0. **L2a's harness, tightened (its review's WARNs):** `localhost` doesn't prove the server is
+  this machine's, and the server can't prove it either. A server reached on its own loopback, as
+  at an SSH tunnel's far end, says `inet_server_addr()` is `127.0.0.1`, while a Postgres container
+  published on this machine's port, CI's service, says its bridge address (`172.17.0.2`; both
+  checked with Docker here). So both commands also need `LOAD_LOCAL_POSTGRES=1`, the person
+  vouching; CI sets it beside its service container, and a remote URL is refused even so.
+  `dropDatabase` and `recreateDatabase` refuse outside `NODE_ENV` test or development, as the
+  backdating helpers do, and so does `makeTestDb` on a real Postgres, which would otherwise make a
+  database its close can't drop; `load:seed` runs as development. **CI:** the gate's job is
+  decided by the PR's changed paths, as the iOS build's is, so a PR with none reports success and
+  the check can be made required (the owner's ruleset toggle); k6 comes from
+  `grafana/setup-k6-action`, pinned to its commit, at the version measured here.
+
+- **2026-10-04** — **L1's `X-Real-IP` verified on dev (by the conductor): Railway's edge replaces
+  one a client sends.** 1,700 unauthenticated requests in 22 s, each carrying `X-Real-IP:
+  203.0.113.7`, were all answered `401` and none `429`; a budget keyed on that header would have
+  refused about 280 (1,200 at once, then 10 a second). Dev runs one replica of `bali` (Railway's
+  `numReplicas`, its default), so per-replica budgets don't explain it.
+
 - **2026-10-04** — **L2a: the load harness trusts its issuer through env alone, and writes only
   a database of its own on this machine.** `npm run load:serve` sets `AUTH_JWKS_URI` to a
   `data:` URL holding the seed's public key (the verifier reads its key set through jose with

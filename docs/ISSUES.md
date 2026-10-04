@@ -29,7 +29,8 @@ one minute. A naive rule blocks the entire school at the exact moment everyone n
 **Done when:** a simulated school — hundreds of accounts behind one address — can all tap
 in the same minute with zero blocks, while a single flooding account still gets stopped.
 
-**Status (Phase 4, L1 — 2026-10-04): the limits are built; L2b's load gate proves them.**
+**Status: done (Phase 4, L1 and L2b — 2026-10-04): the limits are built, and the simulated school
+proved them.**
 - Every signed-in request spends its own account's budget, counted only once the sign-in is
   verified (Cognito's `sub`), never its address's: 120 at once, then 120 a minute — 2.4 times
   the busiest honest client, a teacher with five portal tabs open.
@@ -39,9 +40,15 @@ in the same minute with zero blocks, while a single flooding account still gets 
   wrong codes, then 6 a minute, whichever accounts guess — so free accounts don't add guesses.
 - Over a budget, the answer is "too many requests" (`429`) with how many seconds to wait. Phones
   retry on their own; nothing waiting on a phone, an Emergency Unlock included, is ever dropped.
-- The address is the one Railway's edge reports (`X-Real-IP`), which a phone can't fake.
-- Numbers and why: `docs/DECISIONS.md`, 2026-10-04 (L1). Still to prove: the simulated school
-  (Phase 4, L2b).
+- The address is the one Railway's edge reports (`X-Real-IP`), which a phone can't fake: on dev,
+  the edge replaced every one a client sent (checked 2026-10-04).
+- **Proven (L2b):** 600 accounts behind one address tapped in within the same minute, their
+  teachers' Starts joined them, and each phone then checked in every 30 s, as phones do: 3,366
+  requests in three minutes, not one refused, 95% of them answered within 8.5 ms (the gate
+  allows 500 ms). At the same address and time, one account asking 50 times a second was
+  stopped 2,762 times, each refusal saying when to come back. CI's load gate runs it again on
+  every change to the API.
+- Numbers and why: `docs/DECISIONS.md`, 2026-10-04 (L1, L2b).
 
 ## 2. An emergency unlock record must never be lost
 

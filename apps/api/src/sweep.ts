@@ -9,10 +9,13 @@ export const SWEEP_INTERVAL_MS = 60_000;
  * session past its end time (decision 6), then opens a silence episode for
  * every focused phone gone quiet (decision 7). Both duties are idempotent, so
  * any number may run at once — each API process's own, every minute, and the
- * Railway cron's backup call to `/internal/sweep` (hosting decision 3).
+ * Railway cron's backup call to `/internal/sweep` (hosting decision 3). By the
+ * server's clock; the load gate's timed sweep alone passes its own `now`.
  */
-export async function sweep(db: Database): Promise<{ expired: number; wentSilent: number }> {
-  const now = new Date();
+export async function sweep(
+  db: Database,
+  now = new Date(),
+): Promise<{ expired: number; wentSilent: number }> {
   // Expire first: a session ending here also ends its live participations, so
   // the silence pass never opens an episode on a phone that just left.
   const expired = await expireDueSessions(db, now);

@@ -97,6 +97,12 @@ touching infra, CI, git plumbing, or the dev environment.
   `.claude/hooks/session-start.sh`'s header comment (the source of truth for
   this trap — this entry exists only because the field is configured outside
   the repo, on claude.ai).
+- **A cloud session's outbound address rotates.** Its requests leave from many addresses (seen:
+  160.79.106.x, 9+ addresses in 18 requests), so one session can't exhaust a per-address budget
+  on dev (L1's). Test per-address limits in process (`apps/api/test/rate-limits.test.ts`) or in
+  CI, never against dev from a session.
+- **Workers (sub-agents) have no Agent tool.** So `/santa-loop`'s reviewers run as headless
+  `claude -p` processes, one per reviewer. Never create remote sessions for them.
 - **Sessions on dev really expire.** The API sweeps every minute by itself
   (session expiry + silence detection), and a Railway cron POSTs
   `/internal/sweep` as its backup. Timing-sensitive steps against dev must
