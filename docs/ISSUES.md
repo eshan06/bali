@@ -91,7 +91,6 @@ unlock is durable but, lacking a session/class, shows only in the student's own
 history rather than a teacher report — an ops surface for these orphan records is
 an API-layer follow-up, bounded meanwhile by the per-account rate limits of #1.
 
-
 ## 3. Apple's terms for Screen Time apps may not fit a classroom
 
 **The problem.** Since 2026-03-30, Apple's developer agreement limits apps that use the
