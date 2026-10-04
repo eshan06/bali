@@ -227,8 +227,12 @@ from `last_seen_at` (rule 2), never from the column.
 
 ### Decided later, on purpose
 
-- A school's written request to dispose of its data, and the retention schedule (ISSUES
-  #5, Phase 6 C6a and C6b). A student's own deletion is decided (decision 3's amendment).
+- The retention schedule (ISSUES #5, Phase 6 C6b). A student's own deletion is decided
+  (decision 3's amendment), and so is a school's written request to dispose of its data
+  (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves
+  one, its classes, blocks, open invites and pre-bell taps removed, the school marked
+  removed, and a `school_disposed` event of counts naming no one; its lessons and their
+  history stay, naming no one.
 
 ## Auth
 

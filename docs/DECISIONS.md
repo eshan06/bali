@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **C6a: a school's data disposed of on its written request — de-identified,
+  as C3 leaves an account, not destroyed.** `npm run school -- dispose <school-id>` (a preview)
+  and `… --confirm "<name>"` → the engine's `disposeSchool`, one transaction. **What
+  "dispose" means:** every person of the school — its teachers (`users.school_id`), and anyone
+  enrolled in, present in or recorded in one of its classes (a student has no school of their
+  own) — is de-identified exactly as C3 leaves a deleted account: no name, `cognito_id`
+  `deleted:<id>`, removed, a rename's names emptied (migration 0015's rewrite, so no new
+  migration and no new hole in the append-only history). Its enrollments end; its classes are
+  removed and their names emptied (a class name can name a teacher); its teachers' blocks are
+  removed, freeing the tags; its open invites and every pre-bell tap of its people or on its
+  teachers are deleted (transient rows, with the phone's install number); the school row is
+  marked removed, keeping its name (an institution, not a person). **What stays, and why:**
+  the lessons, their participations and events (times, states, unlock reasons, the phone's
+  install number on an event), under rows that name no one: the owner's rulings keep
+  aggregates (C6b) and C3 keeps the same rows for a deleted account. Destroying them would
+  need a DELETE through the events trigger. Whether a school's agreement accepts
+  de-identification for disposal is the lawyer's to confirm with the agreement (an open owner
+  item); a school whose agreement demands destruction is raised before running it (runbook 1,
+  step 11), not served by this command. The redeemed invites
+  stay too: 0013/0014 make them immutable, and they name only a de-identified row. **Logged
+  without personal data:** a `school_disposed` event (no session, class or user), its payload
+  the school's id and seven counts; the command prints the same line. **Safety:** a preview
+  without `--confirm` runs the whole disposal and rolls it back, so its counts are exact; the
+  confirmation is the school's name, exactly. **Refused, writing nothing:** while a lesson of
+  the school runs (one past its bell, unswept, is ended as the sweep ends it, A18's way); and
+  while a person of it has records at another school (`shared_accounts`, by id): that account
+  is the other school's too, and moving one school's rows to a stand-in would mean rewriting
+  `events.user_id`. Not built until a second school shares a student. **The inspection
+  hold** stays a runbook step (C5): the preview reminds the owner. **Idempotent** on the
+  school row: a second run is `already_disposed`. **Locks:** the school, then its people's
+  rows, then its classes, then its lessons — a join, rename and deletion take a person before
+  a class, so none waits in a cycle with it; a Start behind it finds its class removed
+  (`startSession` now refuses a removed class, `CLASS_NOT_FOUND`); an arm or rename finds the
+  account deleted; an unlock is recorded whichever lands first (the old account's in its
+  lesson, or a reborn account's as `not_enrolled`). The Cognito sign-ins and backups are the
+  owner's (runbook 1, step 11). **Rode along (#219's review):** C5's export carries the
+  lessons' own events (start, extend, end, expiry: no one's id) as `sessionEvents`, so it says
+  when the student's lesson ended; `deleteAccount` records no event for the pre-bell tap it
+  consumes, on purpose: a Start's decline says why a student is not in the session that
+  declined them, and a deletion has no session; its `account_deleted` is the why.
+
 - **2026-10-04** — **C3's follow-up (#217's review).** The arm path refuses a deleted account
   like the join path: it reads the student's row FOR SHARE, which waits out the deletion's NO KEY
   UPDATE, rather than taking the student's tap lock as `tapIn` does — a Start holds armed rows
