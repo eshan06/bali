@@ -210,7 +210,18 @@ export function LiveGrid({
             const note = unlockNote(s, display);
             return (
               <li key={s.studentId} className={`rounded-lg border px-3 py-2 text-sm ${chip.cls}`}>
-                <div className="font-medium">{s.displayName ?? s.studentId.slice(0, 8)}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium">{s.displayName ?? s.studentId.slice(0, 8)}</span>
+                  {/* S9: a badge beside the state, in the chip's own ink, never a colour of its own. */}
+                  {s.clockOff ? (
+                    <span
+                      title="This phone's clock is set ahead. Bali records the time by its own clock."
+                      className="shrink-0 rounded-md border border-current px-1.5 text-xs leading-5"
+                    >
+                      Clock off
+                    </span>
+                  ) : null}
+                </div>
                 <div className="text-xs opacity-80">
                   {note === null ? chip.label : `${chip.label} · ${note}`}
                 </div>

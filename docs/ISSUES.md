@@ -160,14 +160,25 @@ consultations.
 **The problem.** By March 2026, 33 states restricted students' phones at school. Texas
 (HB 1481) has districts forbid personal devices for the whole school day; Oklahoma and
 Arkansas ban them bell to bell; Kansas requires them stored away; Illinois starts in
-2027–28. Tapping in is using the phone, and the pilot school's state is not known yet
-(the deploy's time zone is America/Chicago).
+2027–28. Tapping in is using the phone.
 
-**The plan.** The owner confirms the school's state and phone policy, and whether the
-phones are the students' own; the school's lawyer clears Bali against the state's law
-before the pilot.
+**Where the pilots are (owner, 2026-10-04).** The first pilot is preliminary and
+unofficial: one professor's class at Vanderbilt University in Nashville (US Central, so
+the deploy's `TZ` stays America/Chicago), with adult students on their own phones. There
+is no school or district phone policy and no data agreement yet, and the states' K-12
+phone laws don't apply to a university class of adults. The likely later K-12 pilot is in
+Los Angeles or New Jersey; phones are still assumed to be the students' own.
 
-**Done when:** the school confirms in writing that its policy allows Bali.
+**The plan.** Before the K-12 pilot, the owner confirms its state and the school's phone
+policy, and the school's lawyer clears Bali against that state's law. For the lawyer then:
+- **California:** SOPIPA (student online privacy), AB 1584's terms for a district's
+  contract with a vendor holding pupil records, and the Phone-Free Schools Act (each
+  district limits phones on campus by July 2026).
+- **New Jersey:** its student-privacy rules (the state's student records regulations and
+  any data agreement the district requires), and its 2025 law requiring districts to
+  adopt a policy restricting phones during the school day.
+
+**Done when:** the K-12 school confirms in writing that its policy allows Bali.
 
 ## 5. Deleting data, and "an unlock record is never lost"
 
@@ -183,8 +194,10 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
 - Records leave only through three doors: the student deleting their account, the
   school's written request, and a published retention schedule. Each deletion is logged
   without personal data, and none happens while a parent's inspection request is open.
-- The owner decides the retention period and whether a deleted account's records are
-  de-identified or held for the school; ARCHITECTURE is amended; Phase 6 C3–C6 build it.
+- The owner ruled (2026-10-04, `docs/DECISIONS.md`): named records are kept through the
+  school year, then de-identified, and aggregates stay (C6b); a student's in-app account
+  deletion de-identifies their events and deletes the account, name and sign-in (C3).
+  ARCHITECTURE's data-model decision 3 is amended with C3; Phase 6 C3–C6 build it.
 
 **Done when:** the owner's policy is written, and C3–C6 have landed.
 

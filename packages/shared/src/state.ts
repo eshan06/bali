@@ -61,3 +61,36 @@ export function clampToWindow(deviceTime: Date, startedAt: Date, endsAt: Date): 
   if (t > endsAt.getTime()) return new Date(endsAt);
   return new Date(t);
 }
+
+/**
+ * S9: clock skew surfaced, never acted on. How far ahead of the server's
+ * receive time a phone's claimed time may read before its event is noted.
+ * Two minutes: an iPhone on network time is within a second of it, and a
+ * request's trip and retries take seconds, so past this the clock itself is
+ * set wrong. Ahead is the direction that ends shields early (iOS schedules
+ * follow the wall clock). Only ahead is judged: a claim behind the server is
+ * what every offline catch-up looks like, so it proves nothing.
+ */
+export const CLOCK_AHEAD_THRESHOLD_MS = 2 * 60_000;
+
+/**
+ * The note's key in an event's payload: the whole seconds the phone's clock
+ * read ahead of the server when the event arrived. Additive and advisory: the
+ * clamp and every ordering rule ignore it.
+ */
+export const CLOCK_AHEAD_NOTE = 'clock_ahead_s';
+
+/** Seconds a claimed time runs ahead of when the server heard it, past the threshold; else null. */
+export function clockAheadSeconds(deviceTime: Date, heardAt: Date): number | null {
+  const ahead = deviceTime.getTime() - heardAt.getTime();
+  return ahead > CLOCK_AHEAD_THRESHOLD_MS ? Math.round(ahead / 1000) : null;
+}
+
+/** Whether a stored event payload carries the clock note (S9). */
+export function hasClockNote(payload: unknown): boolean {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    typeof (payload as Record<string, unknown>)[CLOCK_AHEAD_NOTE] === 'number'
+  );
+}

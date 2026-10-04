@@ -8,6 +8,41 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S9: clock skew surfaced — a note on the record and a badge on the grid,
+  never a rule.** The engine's one event writer (`insertEvent`) compares a phone's claimed time,
+  unclamped, with when the server heard it (`heardNow`, the clock that stamps `last_seen_at`); a
+  claim more than `CLOCK_AHEAD_THRESHOLD_MS` (2 minutes, `@bali/shared`) ahead adds
+  `clock_ahead_s` — whole seconds — to that event's payload, beside any `recorded_as` or reason.
+  It does so for a tap, a refocus, Screen Time on and off, and an unlock (an orphan, and one filed
+  later under its tap, too); a replay writes nothing. **Only ahead, on purpose:** a claim behind
+  the server is what every offline catch-up looks like — an unlock queued for ten minutes reads
+  ten minutes behind — so it proves nothing, and a badge built on it would accuse the honest
+  phone. Ahead has no innocent reading, and it is the direction that matters: iOS schedules
+  follow the wall clock, so a clock set forward is what ends shields early. **Why 2 minutes:** an
+  iPhone on network time is within a second, and a request's trip and the outbox's retries take
+  seconds, so past that the clock itself is set wrong, while a jump that ends a lesson early is
+  tens of minutes. **Advisory only:** the clamp (rule 1), `occurred_at`, the phone's order
+  (A10–A14) and every chip's state are exactly as before; reports ignore the key. The grid's
+  snapshot carries `clockOff` per student (any noted record of theirs in the session; additive,
+  so an older server's omission reads false), the stream sets it from the payload, and the chip
+  shows a "Clock off" badge beside its name in the chip's own ink, never a colour of its own. Not
+  covered: a pre-bell tap converted at Start (heard by `armTap`, written later), and check-ins,
+  which write no history (decision 7).
+- **2026-10-04** — **The owner's rulings, second set: retention, deletion, 13+, and the pilot.**
+  **(a) Retention (C6b):** named records are kept through the school year, then de-identified;
+  aggregates stay. **(b) Account deletion (C3):** a student's in-app deletion de-identifies their
+  events and deletes the account, its name and its sign-in. This amends data-model decision 3
+  ("nothing is truly deleted"), approved by the owner; ARCHITECTURE's own amendment lands with
+  C3. **(c) 13+ (C7):** the school's agreement, plus a neutral in-app age screen that stores
+  nothing on "no". It matters for the later K-12 pilot; the first pilot's users are adults.
+  **(d) The pilot (amended by the owner the same day):** the first, preliminary pilot is
+  unofficial: one professor at Vanderbilt University (Nashville, US Central, so production's `TZ`
+  stays America/Chicago), with adult students on their own phones. There is no school or
+  district policy, so no data agreement yet, and state K-12 phone bans don't apply to it. Los
+  Angeles or New Jersey is the likely later K-12 pilot, whose `TZ` would then be
+  America/Los_Angeles or America/New_York; the `TZ` docs are unchanged until then. ISSUES #4
+  names California's and New Jersey's laws for the lawyer at that point. The support email for
+  P4's FAQ page is eshan.shah@vanderbilt.edu.
 - **2026-10-04** — **S7: abuse tests, in process — what they proved, and the one bug.** An
   in-process pen test of the API (`apps/api/test/abuse.test.ts`), with real tokens from the test
   issuer. **Proven:** a join-code guesser meets its account's 20 tries, then, over fresh accounts,
