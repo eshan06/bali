@@ -177,6 +177,10 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.
+- **The app icon and the portal's icon** are the mark on its stone-50 tile (the
+  owner's pick, 2026-10-04): track r 240 and arc stroked 100 on a 1024 square, the
+  mark's geometry ×10. One source, `apps/web/public/icon.svg`, opaque and unrounded
+  (iOS rounds it); the app's `AppIcon` and the portal's PNGs are renders of it.
 - **Every error path** says what happened and offers a way to retry, right
   where it happened (CLAUDE.md: no silent failures).
 

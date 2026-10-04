@@ -11,6 +11,15 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Bali — teacher portal',
   description: 'Live classroom focus grid.',
+  // From public/, not app/icon.*: Next builds those as static routes, which the CSP's
+  // every-route-dynamic check refuses (.github/scripts/web-routes-dynamic.sh).
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: { url: '/apple-icon.png', sizes: '180x180' },
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

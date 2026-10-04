@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **The app icon is the mark (concept A), picked by the owner.** Three
+  concepts were drawn: A, the mark on its stone-50 tile; B, the same tile as a block on an
+  evergreen field; C, a lowercase "b" in stone-50 on green-700. The owner picked A: it is the
+  brand's existing symbol at Theme.swift's exact geometry, not recoloured and never closed, so
+  the home screen, the app and the shield show one mark. Its source is
+  `apps/web/public/icon.svg` (1024, opaque, unrounded: iOS applies its own mask). **iOS:** one
+  1024 universal `AppIcon` in `ios/Bali/Assets.xcassets`, Xcode making every size; `project.yml`
+  names it, so the build writes `CFBundleIconName` for the TestFlight guard. **Portal:** the
+  favicon (SVG, a 512 PNG fallback) and the 180 Apple touch icon sit in `apps/web/public` and are
+  named in the root layout's `metadata.icons`, not dropped in `app/` as `icon.*`: Next builds those
+  as static (○) routes, which carry no CSP nonce and fail the every-route-dynamic check (proven by
+  a build); a test keeps them out of `app/`. **Export compliance:** `ITSAppUsesNonExemptEncryption`
+  is `false` in the app's `Info.plist`, since Bali's only encryption is the system's HTTPS, which
+  is exempt.
+
 - **2026-10-04** — **P4: the help page is public, plain, and says only what is true today.**
   `/support` is read without signing in, so it calls no API and holds no state; it renders per
   request like every page (S4's CSP nonce), and the Sign out bar skips it as it skips `/login`, so
