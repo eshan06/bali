@@ -27,9 +27,13 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
   const caret = useRef<number | null>(null);
   // The last attempt whose answer never came: sent again, unchanged, by Try again.
   const unanswered = useRef<Attempt | null>(null);
+  // A send under way: a second Enter before the page redraws sends nothing.
+  const sending = useRef(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<Exclude<RedeemAnswer, { kind: 'teacher' }> | null>(null);
+  const codeRefused = said?.kind === 'refused' && CODE_REFUSALS.has(said.reason);
+  const teaches = said?.kind === 'refused' && said.reason === 'already_teacher';
 
   // The caret back after the symbols it followed, once the grouped code is in the field.
   useLayoutEffect(() => {
@@ -42,14 +46,21 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
     const { value, selectionStart } = e.target;
     const forward = /Forward$/.test((e.nativeEvent as InputEvent).inputType ?? '');
     const next = typedCode(code, value, selectionStart ?? value.length, forward);
-    caret.current = next.caret;
-    setCode(next.value);
     setSaid(null);
+    if (next.value !== code) {
+      caret.current = next.caret;
+      setCode(next.value);
+    } else {
+      // A space or dash typed changes nothing, so no render puts the caret back: React's own
+      // restore of the field moves it to the end, and this puts it back after that.
+      queueMicrotask(() => e.target.setSelectionRange(next.caret, next.caret));
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (sending.current) return;
+    if (teaches) return onTeacher();
     const problem = codeProblem(code);
     if (problem) {
       setSaid({ kind: 'refused', message: problem, reason: 'invite_code_invalid' });
@@ -57,18 +68,18 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
       return;
     }
     const attempt = attemptFor(unanswered.current, code);
+    sending.current = true;
     setBusy(true);
     setSaid(null);
     const answer = await redeemInvite(api, attempt);
     unanswered.current = answer.kind === 'failed' ? attempt : null;
     if (answer.kind === 'teacher') return onTeacher();
+    sending.current = false;
     setBusy(false);
     setSaid(answer);
     if (answer.kind === 'refused' && CODE_REFUSALS.has(answer.reason)) field.current?.focus();
   }
 
-  const codeRefused = said?.kind === 'refused' && CODE_REFUSALS.has(said.reason);
-  const teaches = said?.kind === 'refused' && said.reason === 'already_teacher';
   return (
     <>
       <h1 className="text-2xl font-semibold">Enter your invite code</h1>
