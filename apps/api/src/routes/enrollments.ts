@@ -13,12 +13,12 @@ import type {
   EnrollmentJoinResponse,
   JoinCodePreviewResponse,
 } from '@bali/shared';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parseRequest } from '../errors.js';
-import type { Limiter } from '../limits.js';
+import { guessing, type Limiter } from '../limits.js';
 import { mapTransitionError, refusal } from './errors.js';
 import { DeviceTime, JoinCode } from './schemas.js';
 
@@ -67,20 +67,11 @@ export function registerEnrollmentsRoutes(
   clock: () => Date,
   limits: Limiter,
 ): void {
-  const guessing = {
-    preHandler: async (request: FastifyRequest) => {
-      await app.authenticate(request);
-      limits.guess(request);
-    },
-    onResponse: (request: FastifyRequest, reply: FastifyReply, done: () => void) => {
-      limits.settle(request, reply.statusCode);
-      done();
-    },
-  };
+  const guessingJoinCodes = guessing(app, limits, 'join');
 
   app.get(
     '/v1/join-codes/:code',
-    { ...guessing, config: { parses: { params: CodeParams } } },
+    { ...guessingJoinCodes, config: { parses: { params: CodeParams } } },
     async (request): Promise<JoinCodePreviewResponse> => {
       const identity = requireAuth(request);
       const { code } = parseRequest(request, 'params', CodeParams);
@@ -101,7 +92,7 @@ export function registerEnrollmentsRoutes(
 
   app.post(
     '/v1/enrollments',
-    { ...guessing, config: { parses: { body: JoinBody } } },
+    { ...guessingJoinCodes, config: { parses: { body: JoinBody } } },
     async (request): Promise<EnrollmentJoinResponse> => {
       const identity = requireAuth(request);
       const body = parseRequest(request, 'body', JoinBody);

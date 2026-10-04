@@ -1,4 +1,12 @@
-import { type Database, startSession, tapIn } from '@bali/db';
+import {
+  createSchool,
+  type Database,
+  formatInviteCode,
+  mintTeacherInvite,
+  recordAgreement,
+  startSession,
+  tapIn,
+} from '@bali/db';
 import { type UnlockResponse, unlockDisposition } from '@bali/shared';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { randomUUID } from 'node:crypto';
@@ -16,8 +24,8 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
 /*
  * The rate limits over HTTP (Phase 4 · L1, ISSUES #1): a budget per verified
  * account, never per address; one per address only where no one is signed in;
- * join codes' tries per account and a backstop on misses per address; a 429 in
- * the one error shape with Retry-After; the address as Railway's edge reports
+ * join codes' and teacher invites' tries per account and a backstop on misses
+ * per address; a 429 in the one error shape with Retry-After; the address as Railway's edge reports
  * it. Each test builds its app with small budgets and a clock it drives, so a
  * refill is a step of `ms`, not a wait. The production sizes against the real
  * cadence: limits.test.ts.
@@ -29,6 +37,8 @@ const SCHOOL = '203.0.113.10';
 const HOME = '198.51.100.20';
 /** No class can have it: `O` is not in the join-code alphabet. */
 const NO_CLASS = 'NOCODE';
+/** No invite has it, though it is shaped as one. */
+const NO_INVITE = 'ABCDE-FGHJK-MNPQR-STUVW-XYZ23';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -263,6 +273,76 @@ describe('guessing join codes', () => {
   });
 });
 
+describe('guessing teacher invite codes (T1b)', () => {
+  /** A live code, as the owner's command prints it. */
+  async function liveCode(name: string): Promise<string> {
+    const school = await createSchool(db, { name });
+    await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-30' });
+    const minted = await mintTeacherInvite(db, { schoolId: school.id });
+    if (minted.outcome !== 'minted') throw new Error(`no invite: ${minted.outcome}`);
+    return formatInviteCode(minted.code);
+  }
+
+  /** A redeem of `code` by `sub` from `address`. */
+  const redeemer =
+    (app: FastifyInstance) =>
+    async (sub: string, code: string, address = SCHOOL, eventId = randomUUID()) =>
+      send(
+        app,
+        address,
+        { method: 'POST', url: '/v1/teacher-invites/redeem', headers: await signedIn(sub) },
+        { code, eventId },
+      );
+
+  it('holds each account to its tries, whatever the answers', async () => {
+    const app = appWith({ inviteTries: { burst: 2, perMinute: 1 } });
+    const redeem = redeemer(app);
+
+    expect((await redeem('limits-inv-a', NO_INVITE)).status).toBe(404);
+    expect((await redeem('limits-inv-a', 'not a code')).status).toBe(400);
+    const code = await liveCode('Tries High');
+    expect(await redeem('limits-inv-a', code)).toEqual({
+      status: 429,
+      retryAfter: '60',
+      body: { error: { code: 'rate_limited', message: 'too many invite-code tries' } },
+    });
+    // Another account has its own; a minute gives this one a try back.
+    expect((await redeem('limits-inv-b', NO_INVITE)).status).toBe(404);
+    ms += 60_000;
+    expect(await redeem('limits-inv-a', code)).toMatchObject({
+      status: 200,
+      body: { outcome: 'redeemed', user: { role: 'teacher' } },
+    });
+  });
+
+  it('stops an address once its misses are spent, whichever accounts made them — the backstop', async () => {
+    const app = appWith({ inviteMisses: { burst: 2, perMinute: 2 } });
+    const redeem = redeemer(app);
+    const code = await liveCode('Backstop High');
+
+    expect((await redeem('limits-inv-g1', NO_INVITE)).status).toBe(404);
+    // Any answer but a 404 gives its miss back: here, a code that can't be one.
+    expect((await redeem('limits-inv-g2', 'not a code')).status).toBe(400);
+    expect((await redeem('limits-inv-g1', NO_INVITE)).body).toMatchObject({
+      error: { reason: 'invite_not_found' },
+    });
+
+    // A fresh account, a live code: refused before any lookup, for its address's misses.
+    expect(await redeem('limits-inv-g3', code)).toEqual({
+      status: 429,
+      retryAfter: '30',
+      body: { error: { code: 'rate_limited', message: 'too many unknown invite codes from here' } },
+    });
+    // Another address isn't held, and a redeem spends none of its misses.
+    expect((await redeem('limits-inv-g3', code, HOME)).status).toBe(200);
+    expect((await redeem('limits-inv-g4', NO_INVITE, HOME)).status).toBe(404);
+
+    // Nor are join codes: their backstop is their own.
+    const lookUp = { url: `/v1/join-codes/${NO_CLASS}`, headers: await signedIn('limits-inv-g5') };
+    expect((await send(app, SCHOOL, lookUp)).status).toBe(404);
+  });
+});
+
 describe('the caller’s address behind Railway’s edge', () => {
   it('is the X-Real-IP the edge sets: one bucket for each client behind the same proxy', async () => {
     const app = appWith({ unsigned: { burst: 1, perMinute: 1 } });
@@ -350,6 +430,16 @@ describe('the other suites’ app (makeAuthedApp)', () => {
     for (let i = 0; i <= past; i += 1) {
       const url = `/v1/join-codes/${NO_CLASS}`;
       expect((await authedInject(ctx.app, token, { method: 'GET', url })).statusCode).toBe(404);
+    }
+    // And past an invite's 5 tries and the address's 20 misses (T1b).
+    const redeemer = await ctx.tokenFor('limits-roomy-invites');
+    for (let i = 0; i <= Math.max(BUDGETS.inviteTries.burst, BUDGETS.inviteMisses.burst); i += 1) {
+      const res = await authedInject(ctx.app, redeemer, {
+        method: 'POST',
+        url: '/v1/teacher-invites/redeem',
+        payload: { code: NO_INVITE, eventId: randomUUID() },
+      });
+      expect(res.statusCode).toBe(404);
     }
   });
 });

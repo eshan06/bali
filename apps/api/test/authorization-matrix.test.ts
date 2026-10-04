@@ -2,7 +2,10 @@ import {
   type Database,
   endSession,
   enrollments,
+  formatInviteCode,
+  mintTeacherInvite,
   protectionOff,
+  recordAgreement,
   startSession,
   tapIn,
   unlock,
@@ -90,6 +93,7 @@ const MATRIX = {
   'GET /v1/join-codes/:code':               [401, 401, 200,     200,     403,     403],
   'POST /v1/enrollments':                   [401, 401, 200,     200,     403,     403],
   'DELETE /v1/enrollments/:id':             [401, 401, 200,     403,     403,     200],
+  'POST /v1/teacher-invites/redeem':        [401, 401, 409,     409,     409,     409],
   'POST /v1/classes':                       [401, 401, 403,     403,     200,     200],
   'GET /v1/classes/:id':                    [401, 401, 403,     403,     403,     200],
   'PATCH /v1/classes/:id':                  [401, 401, 403,     403,     403,     200],
@@ -165,6 +169,17 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     // Never while the class is in session (A19): over, the student may leave.
     await endSession(db, { sessionId: w.sessionId, at: new Date(), reason: 'ended' });
     return { url: `/v1/enrollments/${w.enrollmentId}`, body: { eventId: randomUUID() } };
+  },
+  // A live code for the owner's school: no caller here may redeem it — the two
+  // students are in a live class (the owner's ruling, T1b), the two teachers
+  // teachers already — so none is made a teacher by the call.
+  'POST /v1/teacher-invites/redeem': async (w) => {
+    const schoolId = w.owner.schoolId!;
+    await recordAgreement(db, { schoolId, signedOn: '2026-09-30' });
+    const minted = await mintTeacherInvite(db, { schoolId });
+    if (minted.outcome !== 'minted') throw new Error(`no invite: ${minted.outcome}`);
+    const code = formatInviteCode(minted.code);
+    return { url: '/v1/teacher-invites/redeem', body: { code, eventId: randomUUID() } };
   },
   'POST /v1/classes': () => ({ url: '/v1/classes', body: { name: 'Period 2' } }),
   'GET /v1/classes/:id': (w) => ({ url: `/v1/classes/${w.klass.id}` }),

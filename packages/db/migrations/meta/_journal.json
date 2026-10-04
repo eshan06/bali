@@ -99,6 +99,13 @@
       "when": 1791107723219,
       "tag": "0013_teacher_invites_single_use",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791110123981,
+      "tag": "0014_teacher_invites_keep_redeemed",
+      "breakpoints": true
     }
   ]
 }

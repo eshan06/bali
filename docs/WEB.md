@@ -77,10 +77,11 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 
 Every first sign-in provisions the caller as a **student** (see
 `findOrCreateStudent` in `packages/db/src/queries.ts`). A teacher is made with an
-**invite code** the owner mints for their school. Phase 4 builds it in three steps:
-T1a stores the codes and gives the owner the command that mints them; redeeming one,
-which makes the account a teacher at the code's school in one step, comes with T1b;
-the portal's form for it with T2.
+**invite code** the owner mints for their school: the owner mints it and hands it on,
+and the teacher signs in once and redeems it, which makes the account a teacher at
+the code's school in one step. Phase 4 builds it in three steps: T1a, the codes and
+the owner's command; T1b, the redeem (`POST /v1/teacher-invites/redeem`); T2, the
+portal's form for it.
 
 **The owner's commands** run against `DATABASE_URL`, as `npm run migrate` does, from
 a checkout after `npm ci`:
@@ -103,9 +104,29 @@ npm run school -- invite <school-id>                 # one teacher's code, shown
   run the command inside the API's service with `railway ssh`, where `DATABASE_URL` is
   already set and the image carries the command.
 
-**Until T1b lands**, the role and the school are still set by hand. After the would-be
-teacher has signed in **once** (so their row exists), against `DATABASE_URL`, with the
-id `add` printed:
+**Redeeming it.** Until T2 puts a form on the portal, the teacher redeems it through
+the API, with the access token of the account they will teach from (a portal sign-in
+keeps it in the tab's session storage):
+
+```bash
+# From a checkout after npm ci: the eventId is a UUIDv7, as every write's is.
+EVENT_ID=$(node --input-type=module -e "import {v7} from 'uuid'; console.log(v7())")
+curl -X POST "$API/v1/teacher-invites/redeem" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d "{\"code\": \"<the code>\", \"eventId\": \"$EVENT_ID\"}"
+```
+
+- **The code is matched as printed,** its case, spaces and dashes set aside. The answer
+  is the account as `/v1/me` gives it, now `teacher`; sent again with the same
+  `eventId`, it answers `replay` with the account now, nothing redeemed twice.
+- **Refused, with nothing changed:** a code no invite has (`404 invite_not_found`), one
+  used (`409 invite_used`) or expired (`409 invite_expired`) — mint another; an account
+  already a teacher (`409 already_teacher`); and an account that is a student in a live
+  class (`409 student_in_class`): it teaches from a separate account (the owner's
+  ruling, 2026-10-04).
+
+**The dev fallback**, on dev only and never for a school's teacher: the role and the
+school set by hand, with no invite on record. After the would-be teacher has signed in
+**once** (so their row exists), against `DATABASE_URL`, with the id `add` printed:
 
 ```sql
 UPDATE users SET role = 'teacher', school_id = '<school id>' WHERE cognito_id = '<their Cognito sub>';

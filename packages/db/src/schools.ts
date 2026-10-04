@@ -1,20 +1,22 @@
 import { createHash, randomInt } from 'node:crypto';
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 
 import { JOIN_CODE_ALPHABET } from './management.js';
-import { schools, teacherInvites } from './schema.js';
+import { classes, enrollments, schools, teacherInvites, users } from './schema.js';
+import { isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
  * Schools and teacher invites: the owner's writes, made by the owner's command
- * (`npm run school`, ./school-command.ts), never by a route. Like management.ts
- * they sit beside the transition engine: they never touch `participations` or
- * `events`.
+ * (`npm run school`, ./school-command.ts), and the redeem of an invite, the one
+ * a route makes (T1b). Like management.ts they sit beside the transition
+ * engine: they never touch `participations` or `events`.
  */
 
 type SchoolRow = typeof schools.$inferSelect;
 type InviteRow = typeof teacherInvites.$inferSelect;
+type UserRow = typeof users.$inferSelect;
 
 /**
  * An invite code's length: 25 symbols of the join code's unambiguous alphabet
@@ -41,6 +43,20 @@ export function generateInviteCode(): string {
 /** A code as it is shown: in groups of five, the dashes only separating them. */
 export function formatInviteCode(code: string): string {
   return code.replace(/(.{5})(?=.)/g, '$1-');
+}
+
+/** A code's symbols as `generateInviteCode` draws them: `INVITE_CODE_LENGTH` of the alphabet. */
+export const INVITE_CODE_PATTERN = new RegExp(`^[${JOIN_CODE_ALPHABET}]{${INVITE_CODE_LENGTH}}$`);
+
+/**
+ * A code as a teacher types or pastes it, put back in the form it was minted in
+ * (T1b): upper-case, with every space and dash set aside, so `abcde fghjk-…`
+ * is `ABCDEFGHJK…` — what `hashInviteCode` takes, once it matches
+ * `INVITE_CODE_PATTERN`. Any dash: a code pasted from a document may come with
+ * its hyphens made en dashes.
+ */
+export function inviteCodeSymbols(typed: string): string {
+  return typed.replace(/[\s\p{Pd}]/gu, '').toUpperCase();
 }
 
 /**
@@ -136,4 +152,115 @@ export async function mintTeacherInvite(
     }
     throw new Error('mintTeacherInvite: could not draw a code no other invite holds');
   });
+}
+
+export type RedeemInviteResult =
+  | { outcome: 'redeemed' | 'replay'; user: UserRow }
+  | {
+      outcome:
+        | 'event_id_conflict'
+        | 'already_teacher'
+        | 'student_in_class'
+        | 'invite_not_found'
+        | 'invite_used'
+        | 'invite_expired';
+    };
+
+/**
+ * Redeem a teacher invite (T1b): the account `userId` becomes a teacher at the
+ * invite's school, and the invite is marked redeemed by it under `eventId`, in
+ * one transaction. `code` is the code's symbols (`inviteCodeSymbols`), looked
+ * up by its hash.
+ *
+ * Idempotent on `eventId`: a replay by the same account redeems nothing again
+ * and answers `replay` with the account now; one another account's redeem
+ * holds is `event_id_conflict`. The account is judged before any code is
+ * looked up — a teacher already, or a student in a live class (the owner's
+ * ruling, 2026-10-04) — so an account that can redeem nothing learns nothing
+ * of codes. Then the invite: none with the code, used, or past its expiry by
+ * the database's clock, the one that set it. Every refusal changes nothing.
+ *
+ * Single use under contention: the caller's row is held to the end, so one
+ * account's redeems run one at a time and it never takes two invites; and the
+ * invite is taken by one UPDATE guarded by `redeemed_at IS NULL`, so of two
+ * accounts taking it at once the second finds it gone (`invite_used`), never a
+ * second redeem. Nothing goes to `participations` or `events`: the invite row
+ * is the record.
+ */
+export async function redeemTeacherInvite(
+  db: Database,
+  input: { userId: string; code: string; eventId: string },
+): Promise<RedeemInviteResult> {
+  try {
+    return await db.transaction(async (tx): Promise<RedeemInviteResult> => {
+      const [user] = await tx.select().from(users).where(eq(users.id, input.userId)).for('update');
+      if (!user) throw new Error('redeemTeacherInvite: no account has that id');
+
+      const [own] = await tx
+        .select({ redeemedBy: teacherInvites.redeemedBy })
+        .from(teacherInvites)
+        .where(eq(teacherInvites.redeemEventId, input.eventId));
+      if (own) {
+        return own.redeemedBy === user.id
+          ? { outcome: 'replay', user }
+          : { outcome: 'event_id_conflict' };
+      }
+
+      if (user.role === 'teacher') return { outcome: 'already_teacher' };
+      const [enrolled] = await tx
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .innerJoin(classes, eq(classes.id, enrollments.classId))
+        .where(
+          and(
+            eq(enrollments.studentId, user.id),
+            isNull(enrollments.removedAt),
+            isNull(classes.removedAt),
+          ),
+        )
+        .limit(1);
+      if (enrolled) return { outcome: 'student_in_class' };
+
+      const [invite] = await tx
+        .select({
+          id: teacherInvites.id,
+          schoolId: teacherInvites.schoolId,
+          redeemedAt: teacherInvites.redeemedAt,
+          expired: sql<boolean>`${teacherInvites.expiresAt} <= now()`,
+        })
+        .from(teacherInvites)
+        .where(eq(teacherInvites.codeHash, hashInviteCode(input.code)));
+      if (!invite) return { outcome: 'invite_not_found' };
+      if (invite.redeemedAt !== null) return { outcome: 'invite_used' };
+      if (invite.expired) return { outcome: 'invite_expired' };
+
+      // `now()` is the transaction's start, so the guard's expiry agrees with
+      // the read's; a row the guard skips — taken since — is never updated.
+      const [taken] = await tx
+        .update(teacherInvites)
+        .set({ redeemedAt: sql`now()`, redeemedBy: user.id, redeemEventId: input.eventId })
+        .where(
+          and(
+            eq(teacherInvites.id, invite.id),
+            isNull(teacherInvites.redeemedAt),
+            gt(teacherInvites.expiresAt, sql`now()`),
+          ),
+        )
+        .returning({ id: teacherInvites.id });
+      if (!taken) return { outcome: 'invite_used' };
+
+      const [teacher] = await tx
+        .update(users)
+        .set({ role: 'teacher', schoolId: invite.schoolId })
+        .where(eq(users.id, user.id))
+        .returning();
+      if (!teacher) throw new Error('redeemTeacherInvite: the account went missing');
+      return { outcome: 'redeemed', user: teacher };
+    });
+  } catch (err) {
+    // Another account's redeem took this eventId while this one waited on it:
+    // a client bug, as the read above would have said had it come second.
+    if (isUniqueViolation(err)) return { outcome: 'event_id_conflict' };
+    throw err;
+  }
 }

@@ -887,11 +887,20 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       expect(named, type).toEqual(new Set([true, false]));
     }
     // Every refusal a phone can meet, by status and by reason: all but a
-    // teacher's extend.
+    // teacher's extend, and a teacher invite's, which the portal redeems (T1b).
     const errors = all.filter((f) => f.type === 'ApiErrorBody');
     expect(new Set(errors.map((f) => f.status))).toEqual(new Set([400, 401, 403, 404, 409]));
     const reasons = errors.map((f) => (f.body as ApiErrorBody).error.reason).filter(Boolean);
-    const phones = API_ERROR_REASONS.filter((reason) => reason !== 'invalid_extension');
+    const portal = new Set<string>([
+      'invalid_extension',
+      'invite_code_invalid',
+      'invite_not_found',
+      'invite_used',
+      'invite_expired',
+      'already_teacher',
+      'student_in_class',
+    ]);
+    const phones = API_ERROR_REASONS.filter((reason) => !portal.has(reason));
     expect(new Set(reasons)).toEqual(new Set(phones));
   });
 

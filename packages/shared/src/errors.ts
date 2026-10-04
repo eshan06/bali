@@ -75,6 +75,17 @@ export const API_ERROR_REASONS = [
   // is not in protection off — a re-tap left it, or it never went — a 409;
   // nothing was recorded.
   'protection_not_off',
+  // POST /v1/teacher-invites/redeem (T1b), nothing changed by any of them: the
+  // code can't be one (a 400); no invite has it (a 404); it was used, or its
+  // 14 days are over (a 409); or the account can't become a teacher — it is
+  // one, or a student in a live class (a 409; the owner's ruling, 2026-10-04:
+  // a separate account for teaching).
+  'invite_code_invalid',
+  'invite_not_found',
+  'invite_used',
+  'invite_expired',
+  'already_teacher',
+  'student_in_class',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

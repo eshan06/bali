@@ -18,6 +18,8 @@ const ROOMY_LIMITS: LimitOptions = {
   unsigned: ROOMY,
   joinTries: ROOMY,
   joinMisses: ROOMY,
+  inviteTries: ROOMY,
+  inviteMisses: ROOMY,
 };
 
 export interface AuthedApp {

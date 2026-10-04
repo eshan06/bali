@@ -46,8 +46,8 @@ export class ApiError extends Error {
   static notFound(message = 'not found', reason?: ApiErrorReason): ApiError {
     return new ApiError('not_found', message, undefined, reason);
   }
-  static conflict(message: string): ApiError {
-    return new ApiError('conflict', message);
+  static conflict(message: string, reason?: ApiErrorReason): ApiError {
+    return new ApiError('conflict', message, undefined, reason);
   }
   static rateLimited(message = 'over budget', retryAfter?: number): ApiError {
     return Object.assign(new ApiError('rate_limited', message), { retryAfter });

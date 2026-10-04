@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **T1b: an account becomes a teacher by redeeming an invite code, `POST
+  /v1/teacher-invites/redeem` with `{ code, eventId }`; each refusal a `409` with its own reason
+  but an unknown code's `404`, and none a `410`.** **The path:** the resource T1a made and the act
+  on it, the code in the body because it is a bearer secret: in the path or the query it would sit
+  in every request log line (Fastify logs each URL) and every proxy's. **The code** is matched as
+  the command printed it: case, whitespace and any dash set aside (`inviteCodeSymbols`; a paste
+  from a document can turn hyphens into en dashes), then 25 symbols of the alphabet or `400
+  invite_code_invalid`, at most 64 characters as typed. That 400 has its own reason, apart from a
+  malformed body's `400 invalid_request`, as a rename's name is apart from its body (A8): the first
+  is the teacher's to fix, the second a client bug. **The refusals,** each new in
+  `API_ERROR_REASONS`, each changing nothing: no invite has the code, `404 invite_not_found`, as
+  `class_not_found` is a join code's, and the miss the backstop counts; used, `409 invite_used`,
+  also the loser of a race; expired, `409 invite_expired`; an account already a teacher, `409
+  already_teacher`; a student in a live class (an enrollment not removed, in a class not
+  archived), `409 student_in_class`, the owner's ruling (b) — a student who left their classes, or
+  whose classes were archived, may redeem. **Not `410` for expired:** API decision 4's statuses are
+  `API_ERROR_STATUS`'s, mirrored by BaliCore and read by the portal, and none is `410`; a new
+  status class for one refusal would be one more for every client to learn, while "it exists, but
+  its state refuses this" is a `409` with a reason everywhere else (`session_not_running`,
+  `class_in_session`, `unlock_superseded`). They are a route's refusals, not the engine's; BaliCore
+  mirrors them as it mirrors every reason, and no phone fixture carries them: the portal redeems
+  (T2). **The order:** the account first, then the code — an account that can redeem nothing is
+  told so whatever it sends, and never learns whether a code exists; then unknown, used, expired.
+  **Idempotent on `eventId`,** T1a's unique `redeem_event_id`, read first: the same account's is a
+  `replay`, answered with the account now (whatever code it carries, as a rename's replay answers
+  the name now); another account's is the engine's `409 event_id_conflict`. Two accounts sending
+  one eventId at once both read it free; the unique index lets one write, and the other's 23505 is
+  answered `event_id_conflict`. **Under contention:** the caller's `users` row is held (FOR UPDATE)
+  to the end, so one account's redeems run one at a time — it never takes two invites, and a retry
+  racing its first send finds it; the invite is taken by T1a's UPDATE guarded by `redeemed_at IS
+  NULL` and the expiry, so of two accounts racing for one code exactly one wins. Expiry is judged by
+  the database's `now()`, the clock that set it, and the transaction's one `now()` keeps the read
+  and the guard agreeing. Three real-Postgres races stage each case, every one failing with its
+  lock or guard removed. **An account with no row yet** gets one as the boot call makes it (a
+  student, named from its token), then is judged, so a teacher whose first call is the redeem keeps
+  their name. **No event:** the redeem writes `users` and `teacher_invites` only; the invite row is
+  the record. So **0014** makes 0013's trigger `BEFORE UPDATE OR DELETE` (T1a's review WARN): a
+  redeemed invite is never deleted, an unredeemed one may go; 0013 itself is not edited. TRUNCATE,
+  which no row trigger sees, is unguarded, as on every table but `events`: no code path runs it.
+  **Rate limits, L1's pattern** (`apps/api/src/limits.ts`): each account 5 tries, then 1 a minute;
+  each address 20 misses, then 2 a minute, a miss held through its lookup and given back on any
+  answer but the 404; buckets of their own, so a join code's guesses and an invite's never spend
+  each other's. A teacher redeems once: an expired code, then the fresh one mistyped, typed right,
+  and resent when its answer is lost, are 4 tries; a school's 60 teachers redeeming at a training
+  behind one address, one in ten mistyping a symbol, spend 6 misses. A guesser at one address gets
+  about 2,900 misses a day against 31²⁵ ≈ 2 × 10³⁷ codes: defence in depth on a 124-bit code. **A
+  known edge:** the join checks
+  the caller's role before its transaction, so a join landing as the same account's redeem commits
+  can enroll the new teacher — the account joining on a phone in the instant it redeems on the
+  portal; the class's teacher can remove the enrollment. Closing it means the engine's join
+  re-reading the role under a lock, a step of its own. **Not in T1b:** the portal's form (T2),
+  revoking a code, and T1a's two smaller review WARNs, `npm run school -- list` and a warning on a
+  duplicate school name, left out to keep the step under its size.
+
 - **2026-10-04** — **T1a: teacher invite codes, kept as a SHA-256 hash and minted only for a
   school whose data agreement is on record, by the owner's `npm run school`.** **The code:** 25
   symbols of the join code's unambiguous alphabet (`JOIN_CODE_ALPHABET`: 31 symbols, no `0`/`O`,

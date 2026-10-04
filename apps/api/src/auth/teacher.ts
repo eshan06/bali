@@ -14,9 +14,9 @@ import { requireAuth } from './plugin.js';
 /**
  * Resolve the authenticated caller and require they are a provisioned teacher.
  * Unlike the student boot path this never creates a row: an unknown caller or a
- * student gets 403, and a teacher is provisioned out of band (role flip). The
- * returned row's `id` is the owner the class/block/session routes authorize
- * against.
+ * student gets 403, and an account becomes a teacher by redeeming an invite
+ * (`POST /v1/teacher-invites/redeem`, T1b). The returned row's `id` is the
+ * owner the class/block/session routes authorize against.
  */
 export async function requireTeacher(db: Database, request: FastifyRequest): Promise<UserRow> {
   const identity = requireAuth(request);

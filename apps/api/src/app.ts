@@ -18,6 +18,7 @@ import { registerMeRoute } from './routes/me.js';
 import { registerReportsRoutes } from './routes/reports.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
+import { registerTeacherInvitesRoute } from './routes/teacher-invites.js';
 import type { StreamHubOptions } from './sse/hub.js';
 
 export interface AppDeps {
@@ -108,6 +109,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerTapsRoute(app, deps.db, clock);
   registerSessionsRoute(app, deps.db, clock);
   registerEnrollmentsRoutes(app, deps.db, clock, limits);
+  registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);
   registerReportsRoutes(app, deps.db, clock);
   registerBlocksRoutes(app, deps.db);

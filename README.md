@@ -116,16 +116,16 @@ missing rather than failing obscurely):
    leaves the account in `NEW_PASSWORD_REQUIRED` and no token is issued).
 2. `ALLOW_USER_PASSWORD_AUTH` enabled on the app client — the flow the demo signs in
    with.
-3. The teacher's **role flip and a school**. Every first sign-in provisions a
-   _student_ with no school (`GET /v1/me`), and nothing assigns one yet — but
-   `classes.school_id` is `NOT NULL`, so the role by itself is not enough.
-   Redeeming a teacher invite will set both in one step: that comes with T1b. The
-   owner's command already adds a school and mints its invites (`npm run school`,
-   [docs/WEB.md](docs/WEB.md), "Making a teacher"); until T1b lands, the role and
-   the school are set by hand.
+3. The teacher's **role and school**. Every first sign-in provisions a _student_
+   with no school (`GET /v1/me`) — and `classes.school_id` is `NOT NULL`, so the
+   role by itself is not enough. Redeeming a teacher invite sets both in one step:
+   the owner mints a code for a school (`npm run school`), and the teacher signs in
+   once and redeems it — through the API now (`POST /v1/teacher-invites/redeem`), on
+   the portal once T2 lands ([docs/WEB.md](docs/WEB.md), "Making a teacher").
 
-   With the command: `npm run school -- add "Demo School"` prints the school's id,
-   then `UPDATE users SET role = 'teacher', school_id = '<school id>' WHERE id = '<their id>';`.
+   On dev, the role and the school can still be set by hand, the fallback:
+   `npm run school -- add "Demo School"` prints the school's id, then
+   `UPDATE users SET role = 'teacher', school_id = '<school id>' WHERE id = '<their id>';`.
    Or run the demo and paste the two statements it prints — it mints
    the id for you. `schools.id` has **no database default** (ids are minted in
    TypeScript, data-model decision 2), so the insert has to supply one; to write
@@ -215,7 +215,7 @@ npm run dev -w @bali/web    # http://localhost:3000
 It needs a Cognito **web** app client and a few `NEXT_PUBLIC_*` variables; the full
 setup — app-client provisioning, callback URLs, and making a teacher (every first
 sign-in provisions a student: the owner's `npm run school` mints a school's teacher
-invites, and until T1b redeems them the role and school are set by hand) — is in
+invites, and redeeming one makes the account a teacher there) — is in
 [docs/WEB.md](docs/WEB.md). The API serves the
 portal cross-origin only when `CORS_ORIGINS` is set; unset means no CORS, today's
 behavior for the native apps.

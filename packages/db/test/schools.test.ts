@@ -13,7 +13,9 @@ import {
   generateInviteCode,
   hashInviteCode,
   INVITE_CODE_LENGTH,
+  INVITE_CODE_PATTERN,
   INVITE_LIFETIME_DAYS,
+  inviteCodeSymbols,
   mintTeacherInvite,
   recordAgreement,
 } from '../src/schools.js';
@@ -116,6 +118,35 @@ describe('invite codes', () => {
     expect(formatInviteCode(code)).toBe('ABCDE-FGHJK-MNPQR-STUVW-XYZ23');
     expect(hashInviteCode(code)).toBe(createHash('sha256').update(code).digest('hex'));
     expect(hashInviteCode(code)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('are read back as typed — case, spaces and any dash set aside — into the symbols minted (T1b)', () => {
+    const code = generateInviteCode();
+    const shown = formatInviteCode(code);
+    for (const typed of [
+      shown,
+      shown.toLowerCase(),
+      shown.replaceAll('-', ' '),
+      shown.replaceAll('-', ' - '),
+      shown.replaceAll('-', '–'),
+      shown.replaceAll('-', '‑'),
+      `\t${code}\n`,
+    ]) {
+      expect(inviteCodeSymbols(typed), typed).toBe(code);
+    }
+    expect(code).toMatch(INVITE_CODE_PATTERN);
+    const short = code.slice(1);
+    for (const wrong of [
+      short,
+      `${code}A`,
+      `${short}0`,
+      `${short}o`,
+      `${short}1`,
+      `${short}i`,
+      `${short}l`,
+    ]) {
+      expect(inviteCodeSymbols(wrong), wrong).not.toMatch(INVITE_CODE_PATTERN);
+    }
   });
 });
 
@@ -307,6 +338,19 @@ describe('the teacher_invites table', () => {
     );
     const [kept] = await db.select().from(teacherInvites).where(eq(teacherInvites.id, a.id));
     expect(kept?.redeemedBy).toBe(account.id);
+  });
+
+  it('keeps a redeemed invite on the record: it is never deleted, while an unredeemed one can go (0014)', async () => {
+    const { a, b, redeem } = await twoInvites('Record High');
+    await db.update(teacherInvites).set(redeem()).where(eq(teacherInvites.id, a.id));
+    const rows = (id: string) => db.select().from(teacherInvites).where(eq(teacherInvites.id, id));
+
+    expect(await refusal(db.delete(teacherInvites).where(eq(teacherInvites.id, a.id)))).toMatch(
+      /single use: invite .* is already redeemed/,
+    );
+    expect(await rows(a.id)).toHaveLength(1);
+    await db.delete(teacherInvites).where(eq(teacherInvites.id, b.id));
+    expect(await rows(b.id)).toHaveLength(0);
   });
 });
 
