@@ -16,6 +16,9 @@ import { ZodError, type ZodType } from 'zod';
 
 /** An error that carries an API error code; the handler renders it to the wire shape. */
 export class ApiError extends Error {
+  /** A 429's wait in whole seconds, sent as `Retry-After` (ISSUES #1). */
+  retryAfter?: number;
+
   constructor(
     readonly code: ApiErrorCode,
     message: string,
@@ -46,8 +49,8 @@ export class ApiError extends Error {
   static conflict(message: string): ApiError {
     return new ApiError('conflict', message);
   }
-  static rateLimited(message = 'over budget'): ApiError {
-    return new ApiError('rate_limited', message);
+  static rateLimited(message = 'over budget', retryAfter?: number): ApiError {
+    return Object.assign(new ApiError('rate_limited', message), { retryAfter });
   }
   static unavailable(message = 'temporarily unavailable'): ApiError {
     return new ApiError('unavailable', message);
@@ -138,6 +141,7 @@ export function registerErrors(app: FastifyInstance): void {
 
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof ApiError) {
+      if (error.retryAfter !== undefined) reply.header('retry-after', String(error.retryAfter));
       reply.status(error.status).send(body(error.code, error.message, error.details, error.reason));
       return;
     }

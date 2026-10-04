@@ -7,6 +7,7 @@ import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
 import { registerErrors } from './errors.js';
+import { createLimiter, type LimitOptions } from './limits.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.js';
@@ -44,6 +45,12 @@ export interface AppDeps {
    * (`contracts/openapi.json`, O1) reads the route table. Unset everywhere else.
    */
   onRoute?: onRouteHookHandler;
+  /**
+   * The rate limits (ISSUES #1): a budget to change from `BUDGETS`, and the
+   * clock they refill by. Unset, `BUDGETS` on the process's monotonic clock;
+   * tests shrink a budget and drive the clock.
+   */
+  limits?: LimitOptions;
 }
 
 /**
@@ -66,6 +73,10 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
           ? { transport: { target: 'pino-pretty' } }
           : {}),
     },
+    // No forwarded header moves `request.ip`: Railway documents no hop count
+    // for X-Forwarded-For, so the rate limits read its X-Real-IP instead
+    // (`clientAddress`, limits.ts).
+    trustProxy: false,
   });
   // Before any route: Fastify shows a route to its onRoute hooks as it registers it.
   if (deps.onRoute) app.addHook('onRoute', deps.onRoute);
@@ -83,7 +94,10 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
     void app.register(cors, { origin: corsOrigins });
   }
 
-  registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env));
+  // Every /v1 route's budget is spent in `authenticate`; /healthz and the
+  // internal routes, which never call it, spend none.
+  const limits = createLimiter(deps.limits);
+  registerAuth(app, deps.verifyToken ?? createCognitoVerifier(env), limits);
 
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
   const clock = deps.clock ?? (() => new Date());
@@ -91,7 +105,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
   registerSessionsRoute(app, deps.db, clock);
-  registerEnrollmentsRoutes(app, deps.db, clock);
+  registerEnrollmentsRoutes(app, deps.db, clock, limits);
   registerClassesRoutes(app, deps.db);
   registerBlocksRoutes(app, deps.db);
   registerFeedRoutes(app, deps.db, deps.stream);
