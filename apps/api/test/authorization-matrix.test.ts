@@ -40,8 +40,9 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * key; /healthz, anyone.
  *
  * Each row runs in a world of its own (`world`), so no row's write reaches
- * another's. And a 2xx to a stranger names nothing of this world's — its
- * session, its student, their enrollment, tap and unlock, or the owner — so
+ * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
+ * — its session, its student, their enrollment, tap and unlock, the owner and
+ * their block, and the class unless the request carries its join code — so
  * the routes no one is refused (an unlock, a check-in, a tap) are pinned too.
  */
 
@@ -165,7 +166,9 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
     url: `/v1/classes/${w.klass.id}/sessions`,
     body: { durationMinutes: 25 },
   }),
-  // The owner's own tag: theirs again, the retry of a lost answer; another teacher's 409.
+  // The owner's own tag: theirs again, the retry of a lost answer. Another
+  // teacher's claim on it is the API's 409 for a tag another teacher's live
+  // block holds — how a block is never taken over, so it is this row's refusal.
   'POST /v1/blocks': (w) => ({ url: '/v1/blocks', body: { tagId: w.block.tagId } }),
   'GET /v1/sessions/:id': (w) => ({ url: `/v1/sessions/${w.sessionId}` }),
   'GET /v1/sessions/:id/events': (w) => ({ url: `/v1/sessions/${w.sessionId}/events` }),
@@ -221,6 +224,24 @@ function unlisted(
   return routes
     .filter((route) => matrix[keyOf(route)]?.length !== callersOf(route.url).length)
     .map((route) => `${String(route.method)} ${route.url}`);
+}
+
+/**
+ * What a 2xx to a stranger never names: the world's own ids — and its class,
+ * unless the request carries the class's join code, which opens it (the
+ * preview and the join answer with the class).
+ */
+function hidden(w: World, sent: Sent): string[] {
+  const ids = [
+    w.sessionId,
+    w.student.id,
+    w.enrollmentId,
+    w.tapId,
+    w.unlockId,
+    w.owner.id,
+    w.block.id,
+  ];
+  return JSON.stringify(sent).includes(w.klass.joinCode) ? ids : [...ids, w.klass.id];
 }
 
 /** The headers `caller` sends in world `w`. */
@@ -339,8 +360,9 @@ describe.each(routes.filter((route) => unlisted([route]).length === 0))('$method
     });
     expect(res.statusCode).toBe(status);
     if (STRANGERS.has(caller) && status < 300 && !sent.stream) {
-      const ids = [w.sessionId, w.student.id, w.enrollmentId, w.tapId, w.unlockId, w.owner.id];
-      for (const id of ids) expect(res.body, `${caller} is shown ${id}`).not.toContain(id);
+      for (const id of hidden(w, sent)) {
+        expect(res.body, `${caller} is shown ${id}`).not.toContain(id);
+      }
     }
   });
 });
