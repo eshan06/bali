@@ -29,7 +29,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   states:** loading; a failure said where it happened (the newest page: in the list's place; Show
   earlier's: in its own place) with Try again; no reports yet; and a stale cursor: `400
   unknown_cursor` (the portal's `ApiError` now carries the error's `reason`) reads the newest page
-  again and says "Bali lost your place in the list, so it starts again from the newest session.".
+  again and says "Bali lost your place in the list, so it starts again from the newest session."
+  in a status region kept mounted, so a screen reader hears it.
   Only Show earlier's cursor restarts the list: the newest page refused so is said as any failure,
   never read again and again. The newest page reads the class too, for its name in the back link,
   and either read failing fails it. **The look:** a table (a header row, each session a row
@@ -47,7 +48,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Start would hold one of the account's five live streams, and a tab per class left open could
   take them all and refuse the stream of the class being taught. A report that reaches the server
   after the end shows in the reports, and in the card at its next showing, as R4 has it. A fresh
-  visit shows the card alone: there is no grid on the page to keep. UI only. **The `429` (R4's review WARN):** every route the
+  visit shows the card alone: there is no grid on the page to keep. A grid whose snapshot read
+  fails, live or ended, now says why with Try again (it said why with no way to retry). UI only. **The `429` (R4's review WARN):** every route the
   portal calls spends the account's budget, whose `Retry-After` is a second at L1's sizes, so
   "Wait a minute" told a teacher to wait sixty times too long: it says "Too many tries for now.
   Wait a moment, then try again." The phone keeps "a minute", which its join budget's 30 s earns.

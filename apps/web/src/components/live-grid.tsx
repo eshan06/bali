@@ -69,6 +69,7 @@ export function LiveGrid({
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0); // a boot that failed, tried again (rule 5)
   // Any sign of life from the server: an event, a heartbeat comment, or a
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
@@ -84,6 +85,7 @@ export function LiveGrid({
 
   // Boot from the snapshot, then stream.
   useEffect(() => {
+    setError(null);
     let sse: SseClient | null = null;
     let cancelled = false;
     void (async () => {
@@ -126,7 +128,7 @@ export function LiveGrid({
       cancelled = true;
       sse?.close();
     };
-  }, [api, sessionId, onUnauthorized]);
+  }, [api, sessionId, onUnauthorized, attempt]);
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
@@ -167,7 +169,16 @@ export function LiveGrid({
     return () => clearInterval(t);
   }, [api, sessionId, over]);
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-red-600">
+        {error}{' '}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="underline">
+          Try again
+        </button>
+      </p>
+    );
+  }
   if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
 
   const stale = staleness({

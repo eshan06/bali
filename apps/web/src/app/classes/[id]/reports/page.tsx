@@ -66,16 +66,14 @@ export default function ReportsPage() {
       </Link>
       <h1 className="mt-4 text-2xl font-semibold">Reports</h1>
 
-      {list.reading === 'newest' ? (
-        <p role="status" className="mt-6 text-sm text-slate-500 dark:text-slate-400">
-          Loading sessions…
-        </p>
-      ) : null}
-      {list.restarted ? (
-        <p role="status" className="mt-6 text-sm">
-          Bali lost your place in the list, so it starts again from the newest session.
-        </p>
-      ) : null}
+      {/* Mounted throughout, so a screen reader hears what it comes to say. */}
+      <p role="status" className="mt-6 text-sm text-slate-500 empty:mt-0 dark:text-slate-400">
+        {list.reading === 'newest'
+          ? 'Loading sessions…'
+          : list.restarted
+            ? 'Bali lost your place in the list, so it starts again from the newest session.'
+            : null}
+      </p>
       {retry('newest', "Couldn't load the sessions.")}
 
       {list.loaded && list.sessions.length === 0 && list.nextBefore === null ? (
