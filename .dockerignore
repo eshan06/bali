@@ -15,3 +15,6 @@ docs
 # Test-only helpers must not reach the production image (they write
 # participations outside the transition engine).
 packages/db/src/testing.ts
+
+# The Cognito Lambda is pasted into AWS by hand, never run by the API.
+infra

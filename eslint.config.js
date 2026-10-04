@@ -20,5 +20,12 @@ export default tseslint.config(
     files: ['**/*.js', '**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
+  {
+    // Plain Node.js scripts outside the TypeScript workspaces (the Cognito Lambda).
+    files: ['infra/**/*.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', structuredClone: 'readonly' },
+    },
+  },
   prettier,
 );

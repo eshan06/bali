@@ -84,7 +84,7 @@ project for the API (its DSN).
    AUTH_AUDIENCE=<prod web client id>,<prod phone client id>
    INTERNAL_API_KEY=<64 hex characters, generated below>
    TZ=<the school's zone, e.g. America/Chicago>
-   CORS_ORIGINS=<the portal's origin, e.g. https://portal.example.com>
+   CORS_ORIGINS=<the portal's origin: https://<project>.vercel.app for now (runbook 2)>
    LOG_LEVEL=info
    SENTRY_DSN=<the API's Sentry project DSN>
    SENTRY_ENVIRONMENT=production
@@ -146,9 +146,11 @@ project for the API (its DSN).
 What it makes: a new user pool for production only, hardened per Phase 6's list, with
 two app clients (the portal's and the phone's) and nothing else.
 
-**Decide first** (Phase 6's owner decisions; the steps below need the answers):
-how accounts are made (self sign-up open, gated to the school's email domain, or made by
-the school), and whether teachers must use MFA.
+**Decided** (the owner, 2026-10-04, for the Vanderbilt pilot on production): self
+sign-up **gated** to `@vanderbilt.edu` (step 4), MFA **Optional** with TOTP (step 6),
+and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
+`bali-portal.vercel.app`), until a custom domain is chosen. Wherever these runbooks say
+`<portal domain>`, that is `<project>.vercel.app` for now.
 
 1. **MFA on the AWS root user.** Sign in as root → account menu (top right) →
    **Security credentials** → **Multi-factor authentication (MFA)** → **Assign MFA
@@ -170,27 +172,45 @@ the school), and whether teachers must use MFA.
    issuer is `https://cognito-idp.<region>.amazonaws.com/<pool id>`;
    `curl -sS <issuer>/.well-known/jwks.json` returns a `keys` list. These are
    `AUTH_ISSUER` and `AUTH_JWKS_URI` (runbook 1).
-4. **Self sign-up.** Pool → **Sign-up** → **Self-service sign-up**:
-   - **Off**, if the school makes accounts: users are then created under **Users →
-     Create user**, and the hosted page shows no "Sign up" link.
-   - **Gated**, if students sign themselves up: Cognito has no domain allow-list
-     setting; gating needs a **Pre sign-up Lambda trigger** that refuses emails
-     outside the school's domain. No such Lambda exists in this repo yet; ask for it
-     as a step before turning sign-up on.
-   - **Open** is what dev runs, and the security investigation's reason for the
-     join-code backstops (L1). Don't leave prod open without a decision.
-   **Check:** open the hosted sign-in page (step 9): a "Sign up" link shows only if
-   sign-up is on.
+4. **Self sign-up, gated to the school's domain.** Cognito has no domain allow-list
+   setting, so a **Pre sign-up Lambda** refuses every other email:
+   [`infra/cognito/pre-signup.mjs`](../infra/cognito/pre-signup.mjs). Attach it
+   **before** turning sign-up on (open sign-up is what dev runs; never on prod).
+   1. **Lambda** (same region as the pool) → **Create function** → **Author from
+      scratch**: name `bali-pre-signup`, runtime **Node.js 22.x**, architecture
+      arm64, default execution role → **Create function**.
+   2. **Code** tab: open `index.mjs`, replace its contents with the whole of
+      `infra/cognito/pre-signup.mjs` from `main` → **Deploy**. The handler stays
+      `index.handler`.
+   3. **Configuration → Environment variables → Edit → Add:**
+      `ALLOWED_EMAIL_DOMAINS` = `vanderbilt.edu` → Save. Comma-separated for more
+      than one; exact match only (`mc.vanderbilt.edu` must be listed itself). Unset
+      or empty refuses every sign-up.
+   4. Cognito → the pool → **Extensions** → **Add Lambda trigger** *(wording
+      unsure)*: **Sign-up** → **Pre sign-up trigger** → `bali-pre-signup` → Add.
+      The console adds the permission for Cognito to call it.
+   5. Pool → **Sign-up**: **Self-service sign-up** on, and Cognito sends the email a
+      verification code (**Cognito-assisted verification**, email), so nobody signs
+      up with a school address they can't read.
+   6. The check runs only at sign-up, so nobody may change their email afterwards:
+      on both app clients (step 8) → **Attribute read and write permissions**
+      *(wording unsure)*, untick **email** under write.
+   Accounts you make yourself under **Users → Create user** skip the check (e.g.
+   App Review's demo account). A first sign-in through Apple or Google is checked
+   like a sign-up, so a hidden Apple email is refused.
+   **Check:** on the hosted page (step 9) → **Sign up**: a `@gmail.com` address is
+   refused with "Use your @vanderbilt.edu email address to sign up."; a
+   `@vanderbilt.edu` one is sent a code.
 5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
    → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.
    **Check:** the page shows the new minimum.
-6. **MFA for teachers, if chosen.** Pool → **Authentication** → **Sign-in** →
-   **Multi-factor authentication**. Cognito sets MFA for the whole pool, not per
-   group: **Required** makes students use it too; **Optional** lets each user turn
-   it on, and nothing forces a teacher to. Use **Authenticator apps** (TOTP), not
-   SMS. Whether the hosted sign-in page itself walks an optional user through
-   setting up TOTP is unsure; try it with a test account before telling teachers it
-   works.
+6. **MFA: Optional, TOTP** (ruled 2026-10-04). Pool → **Authentication** →
+   **Sign-in** → **Multi-factor authentication** → **Optional**, **Authenticator
+   apps** only, no SMS. Cognito sets MFA for the whole pool, not per group, so
+   **Required** would make students use it too; Optional lets each user turn it on,
+   and nothing forces a teacher to. Whether the hosted sign-in page itself walks an
+   optional user through setting up TOTP is unsure; try it with a test account
+   before telling teachers it works.
 7. **Threat protection.** Pool → **Threat protection** *(formerly "advanced
    security")*. It needs the pool's **Plus** feature plan, which is billed per
    monthly active user; check the price first. Set it to **Full function**
@@ -317,8 +337,10 @@ your Vercel projects; step 1 tells you which case you're in.
      then **Redeploy**.
    - **Deploy.** **Check:** the deployment's build log finishes, and its
      `*.vercel.app` URL shows the portal's sign-in page.
-4. **The domain.** New project → **Settings → Domains** → add `<portal domain>` and
-   create the DNS record Vercel shows at your DNS provider.
+4. **The domain.** For now (ruled 2026-10-04) it is the project's free address,
+   `https://<project>.vercel.app` (e.g. `bali-portal.vercel.app`): no DNS. A custom
+   domain later: **Settings → Domains** → add it and create the DNS record Vercel
+   shows, then repeat this step's three URLs with it.
    **Check:** `https://<portal domain>` loads with a valid certificate. Then make
    these three agree, byte for byte: Vercel's `NEXT_PUBLIC_REDIRECT_URI`, the
    `bali-web` client's callback and sign-out URLs (runbook 2, step 8), and Railway's

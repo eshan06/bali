@@ -30,7 +30,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm test -ws --if-present"
+    "test": "npm test -ws --if-present && npm run test:infra",
+    "test:infra": "node --test 'infra/**/*.test.mjs'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
