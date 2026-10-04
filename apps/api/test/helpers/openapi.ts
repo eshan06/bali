@@ -1,4 +1,3 @@
-import type { Database } from '@bali/db';
 import { API_VERSION } from '@bali/shared';
 import type { RouteOptions } from 'fastify';
 import { readFile } from 'node:fs/promises';
@@ -7,6 +6,7 @@ import { z, type ZodType } from 'zod';
 
 import { buildApp } from '../../src/app.js';
 import { ENDPOINTS, SCHEMAS } from './contract.js';
+import { makeTestDb } from './db.js';
 import { testEnv } from './env.js';
 
 /*
@@ -27,16 +27,21 @@ type Json = Record<string, unknown>;
 /** Every route the app registers, as Fastify shows it to an onRoute hook. */
 export async function routeTable(): Promise<RouteOptions[]> {
   const routes: RouteOptions[] = [];
-  // Registering a route reads no database, and no request is sent.
+  // The app as every test builds it, its own database included; no request is sent.
+  const { db, close } = await makeTestDb();
   const app = buildApp(testEnv, {
-    db: {} as Database,
+    db,
     verifyToken: () => Promise.reject(new Error('no request is sent')),
     onRoute: (route) => {
       routes.push(route);
     },
   });
-  await app.ready();
-  await app.close();
+  try {
+    await app.ready();
+  } finally {
+    await app.close();
+    await close();
+  }
   return routes;
 }
 
