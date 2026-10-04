@@ -81,7 +81,8 @@ never stored here, no screen can ever show it.
 ### The tables
 
 - `users` — one row per teacher or student, with a `role` column saying which.
-- `schools` — one row per school, so users and classes can be grouped under one.
+- `schools` — one row per school, so users and classes can be grouped under one, with the
+  day its data agreement was signed (none on record: no teacher invite is minted for it).
 - `blocks` — one row per physical Bali block: the ID its NFC tag broadcasts, and which
   teacher owns it.
 - `classes` — one row per class. Each class belongs to a teacher and a school.
@@ -100,6 +101,9 @@ never stored here, no screen can ever show it.
   participation unless its tap had already landed, or a later tap of the student's went
   ahead of it (A14); it expires at the end of the school day. Transient — not the
   permanent history that lives in `events`.
+- `teacher_invites` — one row per invite code the owner mints for a school (Phase 4, T1a):
+  the code's hash, never the code, its expiry 14 days on, and the one account that redeemed
+  it, once (T1b).
 
 ### The decisions (2026-09-15)
 

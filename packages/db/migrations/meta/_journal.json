@@ -85,6 +85,20 @@
       "when": 1791097456257,
       "tag": "0011_class_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791106856962,
+      "tag": "0012_teacher_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791107723219,
+      "tag": "0013_teacher_invites_single_use",
+      "breakpoints": true
     }
   ]
 }

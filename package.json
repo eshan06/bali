@@ -18,6 +18,7 @@
     "dev:api": "npm run dev -w @bali/api",
     "start": "npm start -w @bali/api",
     "migrate": "npm run migrate -w @bali/api",
+    "school": "npm run school -w @bali/api --",
     "demo": "npm run demo -w @bali/api",
     "dev:teacher": "npm run dev:teacher -w @bali/api --",
     "load:seed": "npm run load:seed -w @bali/api",

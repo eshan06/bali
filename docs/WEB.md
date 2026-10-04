@@ -76,18 +76,45 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 ## Making a teacher
 
 Every first sign-in provisions the caller as a **student** (see
-`findOrCreateStudent` in `packages/db/src/queries.ts`); teacher rows are flipped out
-of band. After a would-be teacher has signed in **once** (so their row exists), flip
-their role against `DATABASE_URL`:
+`findOrCreateStudent` in `packages/db/src/queries.ts`). A teacher is made with an
+**invite code** the owner mints for their school. Phase 4 builds it in three steps:
+T1a stores the codes and gives the owner the command that mints them; redeeming one,
+which makes the account a teacher at the code's school in one step, comes with T1b;
+the portal's form for it with T2.
+
+**The owner's commands** run against `DATABASE_URL`, as `npm run migrate` does, from
+a checkout after `npm ci`:
+
+```bash
+npm run school -- add "Lincoln High"                 # prints the school's id
+npm run school -- agreement <school-id> 2026-10-01   # its data agreement, signed that day
+npm run school -- invite <school-id>                 # one teacher's code, shown this once
+```
+
+- **The data agreement comes first.** No invite is minted for a school without one on
+  record: FERPA's school-official terms and the state's student-privacy law call for it
+  (`docs/ISSUES.md`, Phase 6). The day is the one the agreement was signed, never after
+  today; recording it again replaces it and says what it said.
+- **A code is for one teacher, once, for 14 days.** 25 letters and digits in five
+  groups of five, with no `0`/`O` or `1`/`I`/`L` to mistake. Only its hash is stored,
+  so the command's output is the one place a code is ever shown: lost, mint another.
+- **Where they run:** with `DATABASE_URL` set to that environment's database. From
+  your own machine that is the Railway Postgres service's `DATABASE_PUBLIC_URL`; or
+  run the command inside the API's service with `railway ssh`, where `DATABASE_URL` is
+  already set and the image carries the command.
+
+**Until T1b lands**, the role and the school are still set by hand. After the would-be
+teacher has signed in **once** (so their row exists), against `DATABASE_URL`, with the
+id `add` printed:
 
 ```sql
-UPDATE users SET role = 'teacher' WHERE cognito_id = '<their Cognito sub>';
+UPDATE users SET role = 'teacher', school_id = '<school id>' WHERE cognito_id = '<their Cognito sub>';
 ```
 
 The `cognito_id` is the user's `sub` claim (visible in the Cognito console under
 **Users**, or in the JWT). The teacher-only endpoints (`requireTeacher` in
-`apps/api/src/auth/teacher.ts`) return 403 until this is set, so the class-management
-screens stay empty until the flip.
+`apps/api/src/auth/teacher.ts`) return 403 until the role is set, and a class can't be
+made until the school is (`409`, "teacher is not assigned to a school").
 
 ## The API side: CORS
 

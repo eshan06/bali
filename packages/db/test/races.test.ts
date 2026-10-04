@@ -15,8 +15,15 @@ import {
   participations,
   schools,
   sessions,
+  teacherInvites,
   users,
 } from '../src/schema.js';
+import {
+  createSchool,
+  type MintInviteResult,
+  mintTeacherInvite,
+  recordAgreement,
+} from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
   armTap,
@@ -3427,3 +3434,52 @@ describe.runIf(REAL_PG)('display names under contention (real Postgres)', () => 
     }
   });
 });
+
+describe.runIf(REAL_PG)(
+  'school agreements and invites under contention (real Postgres, T1a)',
+  () => {
+    beforeAll(async () => {
+      await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+    });
+
+    it('two agreements recorded at once each say the day their own write replaced', async () => {
+      // The row is locked from its read to its write. Without the lock both runs
+      // read the same day and both say they replaced it, though one replaced the
+      // other's.
+      for (let round = 0; round < 15; round += 1) {
+        const school = await createSchool(db, { name: `Race agreement ${round}` });
+        const [a, b] = await Promise.all([
+          recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' }),
+          recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-02' }),
+        ]);
+        if (!a || !b) throw new Error('both runs found the school');
+        const [first, second] = a.before === null ? [a, b] : [b, a];
+        expect(first.before).toBeNull();
+        expect(second.before).toBe(first.school.agreementSignedAt);
+        const [row] = await db.select().from(schools).where(eq(schools.id, school.id));
+        expect(row?.agreementSignedAt).toBe(second.school.agreementSignedAt);
+      }
+    });
+
+    it('a mint reads its school’s agreement after a change holding the row, never before', async () => {
+      // Nothing takes an agreement back yet; a step that does will hold the
+      // school's row while it writes, as this transaction does. The mint holds
+      // the row from its read to its write (FOR SHARE), so it waits, then reads
+      // the agreement gone. Without that, it reads the old row unblocked and mints.
+      const school = await createSchool(db, { name: 'Race revoke' });
+      await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' });
+      let minting: Promise<MintInviteResult> | undefined;
+      await db.transaction(async (tx) => {
+        await tx.update(schools).set({ agreementSignedAt: null }).where(eq(schools.id, school.id));
+        minting = mintTeacherInvite(db, { schoolId: school.id });
+        await waitForBlockedBackend();
+      });
+      expect((await minting)?.outcome).toBe('no_agreement');
+      const invites = await db
+        .select()
+        .from(teacherInvites)
+        .where(eq(teacherInvites.schoolId, school.id));
+      expect(invites).toHaveLength(0);
+    }, 20_000);
+  },
+);

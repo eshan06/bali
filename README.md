@@ -117,10 +117,16 @@ missing rather than failing obscurely):
 2. `ALLOW_USER_PASSWORD_AUTH` enabled on the app client — the flow the demo signs in
    with.
 3. The teacher's **role flip and a school**. Every first sign-in provisions a
-   _student_ with no school (`GET /v1/me`), and nothing ever assigns one — but
-   `classes.school_id` is `NOT NULL`, so the role by itself is not enough:
+   _student_ with no school (`GET /v1/me`), and nothing assigns one yet — but
+   `classes.school_id` is `NOT NULL`, so the role by itself is not enough.
+   Redeeming a teacher invite will set both in one step: that comes with T1b. The
+   owner's command already adds a school and mints its invites (`npm run school`,
+   [docs/WEB.md](docs/WEB.md), "Making a teacher"); until T1b lands, the role and
+   the school are set by hand.
 
-   Easiest path: run the demo and paste the two statements it prints — it mints
+   With the command: `npm run school -- add "Demo School"` prints the school's id,
+   then `UPDATE users SET role = 'teacher', school_id = '<school id>' WHERE id = '<their id>';`.
+   Or run the demo and paste the two statements it prints — it mints
    the id for you. `schools.id` has **no database default** (ids are minted in
    TypeScript, data-model decision 2), so the insert has to supply one; to write
    them by hand, mint a UUIDv7 with
@@ -207,9 +213,10 @@ npm run dev -w @bali/web    # http://localhost:3000
 ```
 
 It needs a Cognito **web** app client and a few `NEXT_PUBLIC_*` variables; the full
-setup — app-client provisioning, callback URLs, and the teacher role flip
-(`UPDATE users SET role = 'teacher' WHERE cognito_id = '<sub>'`, since every first
-sign-in provisions a student) — is in [docs/WEB.md](docs/WEB.md). The API serves the
+setup — app-client provisioning, callback URLs, and making a teacher (every first
+sign-in provisions a student: the owner's `npm run school` mints a school's teacher
+invites, and until T1b redeems them the role and school are set by hand) — is in
+[docs/WEB.md](docs/WEB.md). The API serves the
 portal cross-origin only when `CORS_ORIGINS` is set; unset means no CORS, today's
 behavior for the native apps.
 
