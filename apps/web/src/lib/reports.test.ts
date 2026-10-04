@@ -166,11 +166,22 @@ describe('readSessions', () => {
       [NEWEST]: [new NetworkError()],
     });
     const again = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier');
+    // No cursor kept, so Show earlier never offers the one the server refused (R5's review).
     expect(again).toMatchObject({
       sessions: [MON, SUN],
+      nextBefore: null,
+      reading: null,
       failure: { at: 'newest', message: new NetworkError().message },
       restarted: false,
     });
+  });
+
+  it('reads nothing for Show earlier at the end, the list as it was (R5’s review)', async () => {
+    const list = await loaded(page(null, MON, SUN));
+    const api = fakeApi({});
+    const same = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier');
+    expect(same).toEqual({ ...list, reading: null });
+    expect(api.asked).toEqual([]);
   });
 
   it('reads the newest page once for a cursor refused there, never again and again', async () => {

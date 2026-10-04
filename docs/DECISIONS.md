@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **T2: the portal's invite-code screen. A non-teacher's home is the code's
+  field; the code is checked by the redeem's own rule before a try is spent; an attempt is resent
+  under its own `eventId` only while its answer never came; and every refusal is said in its words,
+  keyed on `reason`.** **Where:** the home page, in place of the classes view, for an account
+  `GET /v1/me` says isn't a teacher, the page's one boot read deciding; sign-in lands there. A class
+  page reached directly still says a student's `403` as before. **The field:** one text input, in
+  mono as the join code is shown, since a code is read symbol by symbol, and 16 px so a tablet's
+  Safari doesn't zoom into it. What is typed or pasted is kept as the redeem reads it
+  (`inviteCodeSymbols`: case, spaces and any dash set aside) and shown in fives as the command
+  printed it (`formatInviteCode`), the caret kept after the same symbols. The dashes are the
+  field's, so Backspace or Delete taking only a dash takes the symbol past it too, or the key would
+  seem to do nothing. Nothing is cut: a 26th symbol, or an O, stays in view for the check to name.
+  Not five boxes: one field pastes whole and reads as one value to a screen reader. **The check
+  before sending is the redeem's own rule,** `INVITE_CODE_PATTERN`, so the code's rules moved into
+  `@bali/shared` (`JOIN_CODE_ALPHABET`, `INVITE_CODE_LENGTH`, `INVITE_CODE_PATTERN`,
+  `inviteCodeSymbols`, `formatInviteCode`), `@bali/db` re-exporting them unchanged: the portal and
+  the route read one rule, as `tidyDisplayName` is one for the phone and the engine. Every send
+  spends one of the account's 5 tries, then 1 a minute (T1b), so a code that can't be one never
+  goes; it is said in the words `invite_code_invalid` maps to. **The `eventId`:** the portal mints
+  it (`newEventId`, a UUIDv7 from Web Crypto: the step adds no dependency, and the `uuid` package is
+  `@bali/db`'s). An attempt is the code's symbols and its `eventId`. An answer that never came (no
+  connection, a 5xx, a `429`) keeps it: the button becomes Try again and resends the same code under
+  the same `eventId`, so a redeem that landed is answered `replay`. A refusal changed nothing, so the
+  next send, or a new code, gets a fresh one: resent, a refused id would repeat an
+  `event_id_conflict` forever. **The words,** in `errText` (`apps/web/src/lib/errors.ts`), each with
+  the way on: a code that can't be one (what one is: 25 letters and digits, no 0, O, 1, I or L);
+  unknown (check each letter and digit); used, and expired (codes last 14 days), each "ask the
+  person who sent it for a new one"; a teacher already, where the button becomes Go to your classes,
+  which reads `/v1/me` again; a student in a class: the owner's ruling (b), a separate account for
+  teaching, with the code still good there, since a refusal spends none. A reason with no words
+  (a newer server's) keeps the API's message; a `429` keeps R5's "Wait a moment", as the step said,
+  though the invite budget refills a try a minute once 5 are spent; no connection is the portal's
+  existing "can't reach the server — retry", its em dash left for the owner's cleanup (DESIGN.md).
+  **No Sign out here** for a student account to switch: S4 (Phase 6) brings the real one, which ends
+  the Cognito session; today's `signOut()` forgets only the tab's token, and Sign in would land the
+  same account again. **Success:** the page reads `GET /v1/me` again, the truth for its classes (the
+  redeem's answer carries none), and shows the classes view with no reload, its heading focused so a
+  screen reader says where the person is. A failed boot read now says so with Try again (it said
+  why with no way to retry). **The look,** the portal's current Tailwind until the tokens come: an
+  error in the primary ink with no red (red is protection off's and destructive actions'), the
+  field's border darker when the code is at fault and focus put back on it; the primary button the
+  brand green (`emerald-700`, white text past 4.5:1), dimmed while busy; one button throughout, so
+  focus never drops as its label changes; its 150 ms colour change off under reduced motion;
+  sentence case. **Ride-alongs.** R5's review WARNs: `readSessions('earlier')` with no cursor, at
+  the end, reads nothing and returns the list as it was, where it read the newest page into its
+  place; and a stale-cursor restart that fails keeps no cursor, so Show earlier no longer offers the
+  one the server refused (the failure is said at the top, with Try again). A test of each fails on
+  the old code. The class page's `{ id, over }` grid state is still untested: the portal has no
+  component harness, and a reducer pulled out of the page would put this step over its size; left
+  for the next step that touches the page. T1b's review WARN 2: ARCHITECTURE.md's "a refusal
+  redeems nothing and changes no account" was too strong, since `findOrCreateStudent` runs before
+  the account is judged and fills a missing display name as `/v1/me` would; the sentence now says
+  so, and a test pins it.
+
 - **2026-10-04** — **T1b: an account becomes a teacher by redeeming an invite code, `POST
   /v1/teacher-invites/redeem` with `{ code, eventId }`; each refusal a `409` with its own reason
   but an unknown code's `404`, and none a `410`.** **The path:** the resource T1a made and the act
