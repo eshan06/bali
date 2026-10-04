@@ -36,7 +36,11 @@ targets:
       - path: Bali
         # D1's tokens, which Theme.swift's colours are: the app needs none of it, so it ships in
         # the tests' bundle alone (BaliTests, below).
-        excludes: [UI/bali-tokens.json]
+        excludes: [UI/bali-tokens.json, PrivacyInfo.xcprivacy]
+      # Each bundle's privacy manifest (Phase 6, C1), a resource: App Store Connect reads it at
+      # every upload. A Linux check holds it to the code (.github/scripts/privacy-manifests.py).
+      - path: Bali/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.Bali
@@ -91,7 +95,11 @@ targets:
   BaliMonitor:
     type: app-extension
     platform: iOS
-    sources: [BaliMonitor]
+    sources:
+      - path: BaliMonitor
+        excludes: [PrivacyInfo.xcprivacy]
+      - path: BaliMonitor/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.Bali.BaliMonitor
@@ -107,7 +115,11 @@ targets:
   BaliShield:
     type: app-extension
     platform: iOS
-    sources: [BaliShield]
+    sources:
+      - path: BaliShield
+        excludes: [PrivacyInfo.xcprivacy]
+      - path: BaliShield/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.Bali.BaliShield

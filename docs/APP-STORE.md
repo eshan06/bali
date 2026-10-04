@@ -201,6 +201,8 @@ data; ⚖️ confirm a server-side error report triggered by an app request is n
 **Checks before pasting:**
 - The in-app "What your teacher sees" list, this table and the privacy policy (C2) must
   agree (#130). They do as of this draft.
+- The app's privacy manifest (`ios/Bali/PrivacyInfo.xcprivacy`, C1) lists the same data
+  types; CI fails when this table's types and the manifest's differ.
 - If accounts stop being self-created (Phase 6's open decision on how accounts are made),
   the email row still stands: the school or Cognito still holds it on Bali's behalf.
 - Data kept after an account is deleted follows the owner's retention policy (ISSUES #5,

@@ -40,6 +40,11 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+      # Phase 6, C1: each iOS bundle's privacy manifest is there, parses, and
+      # declares every required-reason API its Swift calls (the script says
+      # what else). Every upload is checked against them, TestFlight included.
+      - run: python3 .github/scripts/privacy-manifests.test.py
+      - run: python3 .github/scripts/privacy-manifests.py
       # The contract fixtures are the API's real answers to a phone, which
       # BaliCore decodes, contracts/outbox/ the outbox tables' answers on
       # every input BaliCore's port must match, and contracts/openapi.json

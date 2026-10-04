@@ -97,6 +97,18 @@ jobs:
         run: xcodebuild build -quiet -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO
         working-directory: ios
 
+      # Phase 6, C1: the manifests ci.yml checks reached the bundles — the app's and each
+      # extension's, where App Store Connect reads them.
+      - name: Each bundle carries its privacy manifest
+        working-directory: ios
+        run: |
+          dir=$(xcodebuild -showBuildSettings -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" 2>/dev/null \
+            | awk '$1 == "TARGET_BUILD_DIR" { print $3; exit }')
+          app="$dir/Bali.app"
+          for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
+            plutil -lint "$bundle/PrivacyInfo.xcprivacy" || { echo "::error::no privacy manifest in $bundle"; exit 1; }
+          done
+
       # The app target's own tests (BaliTests), hosted in the app.
       - name: The app's tests on the simulator, signing off
         run: xcodebuild test -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" CODE_SIGNING_ALLOWED=NO
