@@ -69,6 +69,11 @@ In the AWS console → Cognito → the dev user pool → **App integration → A
    `AUTH_AUDIENCE` lists it with the phone's, comma-separated (`docs/DEPLOY.md`):
    a token from a client it does not list is refused.
 
+**Dev's client** (created 2026-10-04): `bali-web-dev`, id
+`2f0vj9o545imu4qth5phanki1v`, a public SPA client with PKCE and no secret, in the same
+pool as the phone's `bali-ios-dev-public` (`7u6trs6gv805oi35ima29em6oe`, `docs/DEPLOY.md`).
+Dev's `AUTH_AUDIENCE` is the phone's id plus this one, comma-separated.
+
 The portal builds the hosted-UI authorize URL itself (`src/lib/auth.ts`) with a
 freshly generated PKCE `code_verifier`/`code_challenge` (S256) and a `state` nonce,
 exchanges the code for tokens at `/oauth2/token` on the callback, and sends the
@@ -82,7 +87,7 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 
 **Sign out (S4a).** Every signed-in page, the invite-code screen's included, has a
 bar with Sign out (`PortalBar`, `src/components/portal-bar.tsx`, in the root layout;
-hidden on `/login` and `/auth/*`). It forgets the token, then sends the browser to
+hidden on `/login`, `/auth/*` and the public help page `/support`). It forgets the token, then sends the browser to
 `<NEXT_PUBLIC_COGNITO_DOMAIN>/logout?client_id=…&logout_uri=<origin>/login`, which ends
 the Cognito session and returns to `/login`, saying "You're signed out." So the next
 Sign in on a shared classroom computer asks who it is, instead of opening the last

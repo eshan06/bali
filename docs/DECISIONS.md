@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P4: the help page is public, plain, and says only what is true today.**
+  `/support` is read without signing in, so it calls no API and holds no state; it renders per
+  request like every page (S4's CSP nonce), and the Sign out bar skips it as it skips `/login`, so
+  a signed-out student never sees a Sign out. Its teacher-sees lists are the app's `ConsentCard`
+  lists word for word (a colon for the app's dash), and a test reads `JoinView.swift` so the two
+  can't drift (#130: the store, the labels and the app say the same thing). It speaks to the first
+  pilot as it is (adults at Vanderbilt, one professor): a teacher asks us for an invite code by
+  email, since the owner mints them. Left out on purpose until they are true: account deletion
+  (C3, C4), the 13+ line (C7), retention (C6b) and any legal promise; the privacy policy is
+  "coming soon" until C2 brings the lawyer's words, never placeholder text. Support goes to
+  eshan.shah@vanderbilt.edu (owner).
 - **2026-10-04** — **S3: API tightening, from the security investigation.** **Access tokens
   only:** `createVerifier` requires `token_use: 'access'` and checks the app client by
   `client_id` alone; an id token, even this app's, is `401`. Every client already sent access

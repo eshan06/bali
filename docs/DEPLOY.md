@@ -88,6 +88,7 @@ checked with a public authorize request (`bali://auth/callback`, scope
 
 - **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
 - **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check)
+- **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`). Dev's `AUTH_AUDIENCE` is the phone's id plus this one: `7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v`
 - **Dev's API:** `https://bali-production-09a2.up.railway.app` — dev's, despite
   the name: Railway named the service before the environment was renamed dev.
   No production API exists yet (Phase 5).
