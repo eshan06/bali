@@ -116,8 +116,6 @@ npm run school -- agreement <school-id> 2026-10-01   # its data agreement, signe
 npm run school -- invite <school-id>                 # one teacher's code, shown this once
 npm run school -- list                               # every school, its agreement, open invites
 npm run --silent school -- export-student <id> > record.json   # one student's whole record (C5)
-npm run school -- dispose <school-id>                # what disposing of its data would take (C6a)
-npm run school -- dispose <school-id> --confirm "<name>"   # dispose of it, on its written request
 ```
 
 - **The data agreement comes first.** No invite is minted for a school without one on
@@ -144,24 +142,6 @@ npm run school -- dispose <school-id> --confirm "<name>"   # dispose of it, on i
   (`packages/db/src/student-record.ts`) says where each foreign key to `users` stands, and a
   test fails when a new one is neither exported nor argued out. Running it on prod and
   delivering it: `docs/RUNBOOKS.md`, runbook 1, step 10.
-- **A school's data, disposed of on its written request (C6a).** `dispose <school-id>`
-  alone is a preview: the whole disposal runs and rolls back, so it prints exact counts and
-  writes nothing. With `--confirm` and the school's name exactly as `list` prints it, it
-  disposes, in one transaction (`disposeSchool`, `packages/db/src/transitions.ts`): every
-  person of the school (its teachers, and anyone enrolled in, present in or recorded in one
-  of its classes) is de-identified as an account deletion leaves one (C3: no name, no
-  Cognito subject, removed; a rename's names emptied); its enrollments end; its classes are
-  removed and lose their names; its teachers' blocks are removed (a tag can be registered
-  again); its open invites and the pre-bell taps of its people and on its blocks are
-  deleted; the school is marked removed. What stays names no one: its lessons, their
-  participations and events, so counts still add up. It is logged as one `school_disposed`
-  event, its payload the school's id and those counts, and the command prints one line of
-  the same: no name. Refused, writing nothing: a lesson of the school running (one past its
-  bell is ended as the sweep would end it), or a person of it with records at another school
-  too (listed by id; splitting an account between schools is not built). A second run says
-  it was disposed of already. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
-  key to `users` or `schools`, and a test fails on one it doesn't name. The Cognito sign-ins
-  and the backups are the owner's to clear: `docs/RUNBOOKS.md`, runbook 1, step 11.
 
 **Redeeming it, on the portal (T2).** The teacher signs in to the portal with the
 account they will teach from. An account that isn't a teacher yet, as `GET /v1/me` says,

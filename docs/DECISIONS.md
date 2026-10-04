@@ -9,8 +9,9 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-04** — **C6a: a school's data disposed of on its written request — de-identified,
-  as C3 leaves an account, not destroyed.** `npm run school -- dispose <school-id>` (a preview)
-  and `… --confirm "<name>"` → the engine's `disposeSchool`, one transaction. **What
+  as C3 leaves an account, not destroyed.** The engine's `disposeSchool`, one transaction; the
+  owner's command (`npm run school -- dispose`, a preview, then `--confirm "<name>"`) and its
+  runbook land as C6a's second PR. **What
   "dispose" means:** every person of the school — its teachers (`users.school_id`), and anyone
   enrolled in, present in or recorded in one of its classes (a student has no school of their
   own) — is de-identified exactly as C3 leaves a deleted account: no name, `cognito_id`
@@ -25,25 +26,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   aggregates (C6b) and C3 keeps the same rows for a deleted account. Destroying them would
   need a DELETE through the events trigger. Whether a school's agreement accepts
   de-identification for disposal is the lawyer's to confirm with the agreement (an open owner
-  item); a school whose agreement demands destruction is raised before running it (runbook 1,
-  step 11), not served by this command. The redeemed invites
+  item); a school whose agreement demands destruction is raised before running it, not served
+  by this disposal. The redeemed invites
   stay too: 0013/0014 make them immutable, and they name only a de-identified row. **Logged
   without personal data:** a `school_disposed` event (no session, class or user), its payload
-  the school's id and seven counts; the command prints the same line. **Safety:** a preview
-  without `--confirm` runs the whole disposal and rolls it back, so its counts are exact; the
-  confirmation is the school's name, exactly. **Refused, writing nothing:** while a lesson of
+  the school's id and seven counts. **Safety:** without `confirmName` it is a preview that runs
+  the whole disposal and rolls it back, so its counts are exact; the confirmation is the
+  school's name, exactly. **Refused, writing nothing:** while a lesson of
   the school runs (one past its bell, unswept, is ended as the sweep ends it, A18's way); and
   while a person of it has records at another school (`shared_accounts`, by id): that account
   is the other school's too, and moving one school's rows to a stand-in would mean rewriting
   `events.user_id`. Not built until a second school shares a student. **The inspection
-  hold** stays a runbook step (C5): the preview reminds the owner. **Idempotent** on the
+  hold** stays a runbook step (C5). **Idempotent** on the
   school row: a second run is `already_disposed`. **Locks:** the school, then its people's
   rows, then its classes, then its lessons — a join, rename and deletion take a person before
   a class, so none waits in a cycle with it; a Start behind it finds its class removed
   (`startSession` now refuses a removed class, `CLASS_NOT_FOUND`); an arm or rename finds the
   account deleted; an unlock is recorded whichever lands first (the old account's in its
   lesson, or a reborn account's as `not_enrolled`). The Cognito sign-ins and backups are the
-  owner's (runbook 1, step 11). **Rode along (#219's review):** C5's export carries the
+  owner's, in the command's runbook. **Rode along (#219's review):** C5's export carries the
   lessons' own events (start, extend, end, expiry: no one's id) as `sessionEvents`, so it says
   when the student's lesson ended; `deleteAccount` records no event for the pre-bell tap it
   consumes, on purpose: a Start's decline says why a student is not in the session that
