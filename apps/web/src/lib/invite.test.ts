@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, createApiClient, NetworkError } from './api-client';
-import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES } from './errors';
+import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
 import { attemptFor, CODE_REFUSALS, codeProblem, redeemInvite, typedCode } from './invite';
 
 // A code as the owner's command prints it (T1a), and its symbols as minted.
@@ -120,7 +120,7 @@ describe('redeemInvite', () => {
   const attempt = { code: CODE, eventId: '0192a3b4-c5d6-7e7f-8a9b-0c1d2e3f4a5b' };
 
   /** The API client over a fetch that answers `status` with `body`, every request recorded. */
-  function api(status: number, body: unknown) {
+  function api(status: number, body: unknown, headers: Record<string, string> = {}) {
     const sent: { url: string; init: RequestInit | undefined }[] = [];
     const client = createApiClient({
       baseUrl: 'http://api',
@@ -130,7 +130,7 @@ describe('redeemInvite', () => {
         return Promise.resolve(
           new Response(JSON.stringify(body), {
             status,
-            headers: { 'content-type': 'application/json' },
+            headers: { 'content-type': 'application/json', ...headers },
           }),
         );
       },
@@ -195,6 +195,16 @@ describe('redeemInvite', () => {
     expect(await redeemInvite(busy.client, attempt)).toEqual({
       kind: 'failed',
       message: TOO_MANY_TRIES,
+    });
+    // The invite budget's tries come back one a minute, and its Retry-After says so (S4a).
+    const spent = api(
+      429,
+      { error: { code: 'rate_limited', message: 'too many invite-code tries' } },
+      { 'retry-after': '60' },
+    );
+    expect(await redeemInvite(spent.client, attempt)).toEqual({
+      kind: 'failed',
+      message: TOO_MANY_TRIES_MINUTE,
     });
     const broken = api(500, { error: { code: 'internal', message: 'internal error' } });
     expect(await redeemInvite(broken.client, attempt)).toEqual({

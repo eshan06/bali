@@ -16,6 +16,8 @@ export class ApiError extends Error {
     message: string,
     /** Which refusal it was, where the status doesn't say (`API_ERROR_REASONS`): key on this. */
     readonly reason?: string,
+    /** A 429's `Retry-After`, in whole seconds, when the server sent one. */
+    readonly retryAfter?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -55,6 +57,11 @@ export interface ApiClient {
   del<T>(path: string): Promise<T>;
 }
 
+/** `Retry-After` as the API sends it, whole seconds; anything else (a date, none) is unknown. */
+function retryAfterSeconds(header: string | null): number | undefined {
+  return header !== null && /^\d+$/.test(header.trim()) ? Number(header) : undefined;
+}
+
 export function createApiClient(opts: ApiClientOptions): ApiClient {
   const doFetch = opts.fetchImpl ?? fetch;
 
@@ -91,6 +98,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         parsed?.error?.code ?? 'error',
         parsed?.error?.message ?? `request failed (${res.status})`,
         parsed?.error?.reason,
+        retryAfterSeconds(res.headers.get('retry-after')),
       );
     }
     if (res.status === 204) return undefined as T;

@@ -165,7 +165,9 @@ describe('readSessions', () => {
       [CLASS]: [KLASS],
       [NEWEST]: [new NetworkError()],
     });
-    const again = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier');
+    // Even a list still marked restarted (startRead clears it) comes back unmarked (S4a).
+    const marked = { ...startRead(list, 'earlier'), restarted: true };
+    const again = await readSessions(api, 'c1', marked, 'earlier');
     // No cursor kept, so Show earlier never offers the one the server refused (R5's review).
     expect(again).toMatchObject({
       sessions: [MON, SUN],

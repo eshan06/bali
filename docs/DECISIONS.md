@@ -8,6 +8,30 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S4a: a real Sign out on the portal, pulled forward from Phase 6's S4
+  into Phase 4.** The security investigation (below, 2026-10-04) found no sign-out control:
+  `signOut()` ran only on a 401, and the Cognito hosted-UI session was never ended, so on a
+  shared classroom computer the next Sign in opened the last teacher's account; and T2's
+  screen tells a student account to use a separate one for teaching, with no way to switch.
+  **The control:** one bar, `PortalBar`, rendered by the root layout on every page but
+  `/login` and `/auth/*`, so every signed-in page and the invite-code screen get it without
+  re-wrapping each page. **What it does** (`endSession`, `apps/web/src/lib/auth.ts`): forgets
+  the token first, then sends the browser to the hosted UI's `/logout` with `client_id` and
+  `logout_uri` = the callback URL's origin + `/login`, the sign-out URL `docs/WEB.md` already
+  asked to register, so no new variable. **Honest when it can't:** with no hosted UI configured,
+  or a redirect that throws, the token is still gone and `/login` says the sign-in page may
+  still remember the account and to close the browser. What happened is kept in sessionStorage
+  until the next Sign in, read, never taken (React's dev mode drew `/login` twice and lost a
+  read-once note in the screenshots). **Not detectable, so documented:** a `logout_uri` the
+  client doesn't list makes Cognito show its own error page; `/logout` doesn't revoke tokens
+  already issued, so another tab's token lives out its hour. **The 401 stays local:** an expired
+  token is no reason to end the hosted UI's session. **Dev's client:** this session's AWS user
+  can't list or describe the pool's app clients (AccessDenied), so whether dev's web client
+  lists `http://localhost:3000/login` is unconfirmed: an owner check in the console.
+  **Ride-alongs** (T2's review WARNs): a 429's words follow its `Retry-After` (the client now
+  reads it onto `ApiError.retryAfter`): up to 5 s is "a moment" (the account budget's second),
+  longer is "a minute" (the invite budget's tries come back one a minute); `event_id_conflict`
+  gets words; the reports fallback sets `restarted: false` itself.
 - **2026-10-04** — **T1c: the join judges the caller's role inside its own transaction, under
   the caller's `users` row, closing T1b's known edge.** T1b's join read the role before its
   transaction, so a join landing as the same account's redeem committed could enroll the new

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, createApiClient, NetworkError } from './api-client';
-import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES } from './errors';
+import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
 
 describe('errText', () => {
   it('says what to do over the budget, never the API’s own 429 message', () => {
@@ -10,22 +10,42 @@ describe('errText', () => {
     expect(TOO_MANY_TRIES).toBe('Too many tries for now. Wait a moment, then try again.');
   });
 
-  it('maps the 429 the API client throws from the real error shape', async () => {
-    const api = createApiClient({
-      baseUrl: 'http://api',
-      getToken: () => 'tok',
-      fetchImpl: () =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              error: { code: 'rate_limited', message: 'too many requests from this account' },
-            }),
-            { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '20' } },
+  it('maps the 429 the API client throws from the real error shape, its wait from Retry-After', async () => {
+    const thrown = async (retryAfter: string | null) => {
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (retryAfter !== null) headers['retry-after'] = retryAfter;
+      const api = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: () =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: { code: 'rate_limited', message: 'too many requests from this account' },
+              }),
+              { status: 429, headers },
+            ),
           ),
-        ),
-    });
-    const failure: unknown = await api.get('/v1/me').catch((e: unknown) => e);
-    expect(errText(failure)).toBe(TOO_MANY_TRIES);
+      });
+      return api.get('/v1/me').catch((e: unknown) => e);
+    };
+    // The account's budget: a second, or no header at all, is "a moment" (S4a).
+    expect(errText(await thrown('1'))).toBe(TOO_MANY_TRIES);
+    expect(errText(await thrown('5'))).toBe(TOO_MANY_TRIES);
+    expect(errText(await thrown(null))).toBe(TOO_MANY_TRIES);
+    // An HTTP date isn't what the API sends: the wait is unknown, so "a moment".
+    expect(errText(await thrown('Wed, 21 Oct 2026 07:28:00 GMT'))).toBe(TOO_MANY_TRIES);
+    // The invite budget's: up to a minute, so "a minute".
+    expect(errText(await thrown('6'))).toBe(TOO_MANY_TRIES_MINUTE);
+    expect(errText(await thrown('60'))).toBe(TOO_MANY_TRIES_MINUTE);
+    expect((await thrown('60')) as ApiError).toMatchObject({ status: 429, retryAfter: 60 });
+    expect(TOO_MANY_TRIES_MINUTE).toBe('Too many tries for now. Wait a minute, then try again.');
+  });
+
+  it('says an event_id_conflict in words, keyed on its reason (S4a)', () => {
+    expect(
+      errText(new ApiError(409, 'conflict', 'event_id already used', 'event_id_conflict')),
+    ).toBe("That didn't go through, so nothing changed. Try again.");
   });
 
   it('keeps every other error’s own words', () => {
