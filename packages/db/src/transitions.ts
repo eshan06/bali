@@ -11,6 +11,8 @@ import type {
 } from '@bali/shared';
 import {
   clampToWindow,
+  CLOCK_AHEAD_NOTE,
+  clockAheadSeconds,
   isActionOrder,
   isUnlockReason,
   MAX_SESSION_MINUTES,
@@ -189,8 +191,19 @@ async function insertEvent(
     payload?: unknown;
     /** The phone's own order for it (A12); only one `knownOrder` can compare is kept. */
     order?: unknown;
+    /**
+     * The phone's claimed time, unclamped (S9): one far ahead of when the server
+     * heard it adds `clock_ahead_s` to the payload. Advisory only: the clamped
+     * `occurredAt` and every order stay as they are.
+     */
+    deviceTime?: Date;
   },
 ): Promise<boolean> {
+  const ahead = e.deviceTime ? clockAheadSeconds(e.deviceTime, heardNow()) : null;
+  const payload =
+    ahead === null
+      ? (e.payload ?? null)
+      : { ...(e.payload as Record<string, unknown> | null), [CLOCK_AHEAD_NOTE]: ahead };
   const inserted = await tx
     .insert(events)
     .values({
@@ -200,7 +213,7 @@ async function insertEvent(
       classId: e.classId ?? null,
       userId: e.userId ?? null,
       occurredAt: e.occurredAt,
-      payload: e.payload ?? null,
+      payload,
       ...orderColumns(e.order),
     })
     .onConflictDoNothing({ target: events.eventId })
@@ -1829,6 +1842,7 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         occurredAt,
         payload: late ? LATE_RETURN : null,
         order,
+        deviceTime: input.deviceTime,
       });
       if (!isNew) {
         // On record for exactly this session and student — insertEvent
@@ -2131,6 +2145,7 @@ async function changeState<Ended = never>(
         occurredAt,
         payload: late ? LATE_RETURN : null,
         order,
+        deviceTime: input.deviceTime,
       });
 
       if (!isNew) {
@@ -2457,6 +2472,7 @@ async function recordOrphanUnlock(
     },
     // Kept with it, so a tap that files it later orders it as the phone did (A12).
     order: knownOrder(input.order),
+    deviceTime: input.deviceTime,
   });
   return {
     outcome: isNew ? 'recorded' : 'replay',
@@ -2611,6 +2627,7 @@ async function unlockIn(
     occurredAt,
     payload: Object.keys(payload).length > 0 ? payload : null,
     order,
+    deviceTime: input.deviceTime,
   });
 
   if (!isNew) {
@@ -3042,6 +3059,7 @@ async function recordProtectionOffAfterEnd(
     occurredAt: clampToWindow(input.deviceTime, session.startedAt, session.endsAt),
     payload: { recorded_as: note },
     order: knownOrder(input.order),
+    deviceTime: input.deviceTime,
   });
   if (!isNew && (await storedPayload(tx, input.eventId))?.recorded_as !== note) {
     throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');

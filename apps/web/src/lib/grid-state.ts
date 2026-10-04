@@ -8,7 +8,12 @@ import type {
   UnlockReason,
   UnlockRecordedAs,
 } from '@bali/shared';
-import { deriveDisplayState, isUnlockReason, PARTICIPATION_STATES } from '@bali/shared';
+import {
+  deriveDisplayState,
+  hasClockNote,
+  isUnlockReason,
+  PARTICIPATION_STATES,
+} from '@bali/shared';
 
 /**
  * The live grid's pure state machine, kept out of the component so it can be
@@ -40,6 +45,12 @@ export interface Student {
    * relabels. Its event id is what a change of its reason names (A20).
    */
   unlock: { eventId: string; reason: UnlockReason | null } | null;
+  /**
+   * A record of theirs here came from a phone clock set ahead of the server's
+   * (S9): the chip carries a "Clock off" badge beside its state, never instead
+   * of it. Advisory only; it changes no state.
+   */
+  clockOff: boolean;
 }
 
 export type Students = Record<string, Student>;
@@ -104,6 +115,7 @@ export function fromSnapshot(snap: SessionSnapshot): Students {
       lastSeenAt: s.lastSeenAt ? new Date(s.lastSeenAt) : null,
       endedAt: s.endedAt ? new Date(s.endedAt) : null,
       unlock: null,
+      clockOff: s.clockOff === true,
     };
     // What the stored row does not show, read as the stream reads it (A9). A
     // late report leaves the ended row alone (A2c), so without these the 15 s
@@ -154,6 +166,7 @@ function unknownStudent(studentId: string): Student {
     lastSeenAt: null,
     endedAt: null,
     unlock: null,
+    clockOff: false,
   };
 }
 
@@ -180,6 +193,8 @@ export function applyEvent(prev: Students, e: FeedEvent): Students {
   // being dropped. The record is durable; the grid must not stay silent about
   // it, and the next snapshot carries them.
   const s: Student = { ...(prev[id] ?? unknownStudent(id)) };
+  // Any of their records can carry the clock note, a late one too (S9).
+  if (hasClockNote(e.payload)) s.clockOff = true;
   if (isLateReturn(e)) {
     s.lastSeenAt = advance(s.lastSeenAt, at);
     return { ...prev, [id]: s };

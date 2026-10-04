@@ -31,6 +31,7 @@ function snapshot(
     endedAt?: string;
     unlock?: SnapshotUnlock;
     protectionOffAfterEnd?: boolean;
+    clockOff?: boolean;
   }[],
 ): SessionSnapshot {
   return {
@@ -47,6 +48,7 @@ function snapshot(
       endedAt: s.endedAt ?? null,
       unlock: s.unlock ?? null,
       protectionOffAfterEnd: s.protectionOffAfterEnd ?? false,
+      ...(s.clockOff === undefined ? {} : { clockOff: s.clockOff }),
     })),
   };
 }
@@ -934,5 +936,48 @@ describe('staleness', () => {
       reason: 'reconnecting',
       secondsAgo: 0,
     });
+  });
+});
+
+describe('the clock-off badge (S9)', () => {
+  it('reads it from the snapshot; an older server that omits it reads none', () => {
+    const s = fromSnapshot(snapshot(5, [{ id: 'ana', clockOff: true }, { id: 'ben' }]));
+    expect(s.ana.clockOff).toBe(true);
+    expect(s.ben.clockOff).toBe(false);
+  });
+
+  it('a streamed record carrying the note sets it, beside the state it never changes', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+    s = applyEvent(s, evt(6, 'unlock', 'ana', T1, { reason: 'nurse', clock_ahead_s: 600 }));
+    expect(s.ana.clockOff).toBe(true);
+    expect(chip(s, 'ana')).toEqual({ display: 'unlocked', note: 'nurse' });
+    expect(s.ben.clockOff).toBe(false);
+    // It stays once seen: a later record without the note does not clear it.
+    s = applyEvent(s, evt(7, 'refocus', 'ana'));
+    expect(s.ana.clockOff).toBe(true);
+    expect(chip(s, 'ana').display).toBe('focused');
+  });
+
+  it('a late return with the note still sets it (contact, and the clock)', () => {
+    let s = fromSnapshot(snapshot(5, [{ id: 'ana', state: 'unlocked' }]));
+    s = applyEvent(
+      s,
+      evt(6, 'refocus', 'ana', T1, { recorded_as: 'superseded', clock_ahead_s: 900 }),
+    );
+    expect(s.ana.clockOff).toBe(true);
+    expect(s.ana.state).toBe('unlocked');
+  });
+
+  it('a mid-session joiner the snapshot lacks gets it from their tap', () => {
+    const s = applyEvent({}, evt(6, 'tap_in', 'cy', T1, { clock_ahead_s: 200 }));
+    expect(s.cy.clockOff).toBe(true);
+  });
+
+  it('a note that is not a number sets nothing', () => {
+    const s = applyEvent(
+      fromSnapshot(snapshot(5, [{ id: 'ana' }])),
+      evt(6, 'tap_in', 'ana', T1, { clock_ahead_s: 'lots' }),
+    );
+    expect(s.ana.clockOff).toBe(false);
   });
 });
