@@ -1,16 +1,16 @@
 import { createHash, randomInt } from 'node:crypto';
 
 import { INVITE_CODE_LENGTH, JOIN_CODE_ALPHABET } from '@bali/shared';
-import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
 
 import { classes, enrollments, schools, teacherInvites, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
- * Schools and teacher invites: the owner's writes, made by the owner's command
- * (`npm run school`, ./school-command.ts), and the redeem of an invite, the one
- * a route makes (T1b). Like management.ts they sit beside the transition
+ * Schools and teacher invites: the owner's writes and reads, made by the owner's
+ * command (`npm run school`, ./school-command.ts), and the redeem of an invite,
+ * the one a route makes (T1b). Like management.ts they sit beside the transition
  * engine: they never touch `participations` or `events`.
  */
 
@@ -63,6 +63,46 @@ export async function createSchool(db: Database, input: { name: string }): Promi
 }
 
 const liveSchool = (schoolId: string) => and(eq(schools.id, schoolId), isNull(schools.removedAt));
+
+/** The schools on record under `name`, its case set aside: what a second `add` of one says. */
+export async function schoolsNamed(db: Database, name: string): Promise<SchoolRow[]> {
+  return db
+    .select()
+    .from(schools)
+    .where(and(isNull(schools.removedAt), sql`lower(${schools.name}) = lower(${name})`))
+    .orderBy(asc(schools.createdAt));
+}
+
+export interface SchoolListing {
+  id: string;
+  name: string;
+  agreementSignedAt: string | null;
+  /** Its invites still open: neither redeemed nor past their expiry by the database's clock. */
+  openInvites: number;
+}
+
+/** Every school on record, by name: never a code, nor a code's hash. */
+export async function listSchools(db: Database): Promise<SchoolListing[]> {
+  return db
+    .select({
+      id: schools.id,
+      name: schools.name,
+      agreementSignedAt: schools.agreementSignedAt,
+      openInvites: sql<number>`count(${teacherInvites.id})::int`,
+    })
+    .from(schools)
+    .leftJoin(
+      teacherInvites,
+      and(
+        eq(teacherInvites.schoolId, schools.id),
+        isNull(teacherInvites.redeemedAt),
+        gt(teacherInvites.expiresAt, sql`now()`),
+      ),
+    )
+    .where(isNull(schools.removedAt))
+    .groupBy(schools.id)
+    .orderBy(asc(schools.name), asc(schools.createdAt));
+}
 
 /**
  * Record the school's data agreement as signed on `signedOn`, a day written
