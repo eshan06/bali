@@ -93,7 +93,10 @@ function checkSchoolId(schoolId: string): void {
   if (!isUuid(schoolId)) throw new Error(`"${schoolId}" is not a school id: add prints one`);
 }
 
-/** A real day of the calendar, written YYYY-MM-DD, and not after today on this machine. */
+/**
+ * A real day of the calendar, written YYYY-MM-DD, and not after today in this
+ * machine's zone (`TZ`: the school's on the API's service, DEPLOY.md).
+ */
 function checkDay(day: string, now: Date): void {
   const at = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00Z`) : null;
   // A day past its month's end parses as one of the next month's, so it reads back changed.
@@ -103,7 +106,9 @@ function checkDay(day: string, now: Date): void {
   const two = (n: number) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
   if (day > today) {
-    throw new Error(`an agreement can't be signed after today: ${day} is after ${today}`);
+    throw new Error(
+      `an agreement can't be signed after today: ${day} is after ${today}, today on this machine`,
+    );
   }
 }
 

@@ -64,22 +64,29 @@ const liveSchool = (schoolId: string) => and(eq(schools.id, schoolId), isNull(sc
 /**
  * Record the school's data agreement as signed on `signedOn`, a day written
  * YYYY-MM-DD (the command checks it). Recording it again replaces the day — the
- * owner correcting a mistyped one — and `before` is the day it replaced.
- * Undefined when no live school has the id.
+ * owner correcting a mistyped one — and `before` is the day it replaced: the
+ * row is locked from its read to its write, so two runs at once each name the
+ * day their own write replaced. Undefined when no live school has the id.
  */
 export async function recordAgreement(
   db: Database,
   input: { schoolId: string; signedOn: string },
 ): Promise<{ school: SchoolRow; before: string | null } | undefined> {
-  const [current] = await db.select().from(schools).where(liveSchool(input.schoolId));
-  if (!current) return undefined;
-  const [school] = await db
-    .update(schools)
-    .set({ agreementSignedAt: input.signedOn })
-    .where(liveSchool(input.schoolId))
-    .returning();
-  if (!school) return undefined;
-  return { school, before: current.agreementSignedAt };
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(schools)
+      .where(liveSchool(input.schoolId))
+      .for('update');
+    if (!current) return undefined;
+    const [school] = await tx
+      .update(schools)
+      .set({ agreementSignedAt: input.signedOn })
+      .where(eq(schools.id, current.id))
+      .returning();
+    if (!school) return undefined;
+    return { school, before: current.agreementSignedAt };
+  });
 }
 
 export type MintInviteResult =
@@ -96,8 +103,9 @@ export type MintInviteResult =
  * unique hash makes a code another invite holds a fresh draw, never a second
  * invite with it — a draw that at 124 bits never comes, bounded all the same.
  *
- * The agreement is read before the invite is written, and nothing comes between
- * the two: nothing takes an agreement back off the record.
+ * The school's row is held (FOR SHARE) from the read of its agreement to the
+ * invite's write, so nothing that takes an agreement back off the record or
+ * removes the school can come between the two; nothing does yet.
  */
 export async function mintTeacherInvite(
   db: Database,
@@ -106,24 +114,26 @@ export async function mintTeacherInvite(
   // real generator, so every production caller behaves identically.
   gen: () => string = generateInviteCode,
 ): Promise<MintInviteResult> {
-  const [school] = await db.select().from(schools).where(liveSchool(input.schoolId));
-  if (!school) return { outcome: 'unknown_school' };
-  if (school.agreementSignedAt === null) return { outcome: 'no_agreement', school };
-  for (let attempt = 0; attempt < INVITE_MINT_ATTEMPTS; attempt += 1) {
-    const code = gen();
-    const [invite] = await db
-      .insert(teacherInvites)
-      .values({
-        schoolId: school.id,
-        codeHash: hashInviteCode(code),
-        // The database's clock, which `created_at` reads in the same statement,
-        // so the two are exactly the lifetime apart. In hours, because a day of
-        // the database's zone can be 23 or 25 of them.
-        expiresAt: sql`now() + make_interval(hours => ${INVITE_LIFETIME_DAYS * 24}::int)`,
-      })
-      .onConflictDoNothing({ target: teacherInvites.codeHash })
-      .returning();
-    if (invite) return { outcome: 'minted', code, invite, school };
-  }
-  throw new Error('mintTeacherInvite: could not draw a code no other invite holds');
+  return db.transaction(async (tx): Promise<MintInviteResult> => {
+    const [school] = await tx.select().from(schools).where(liveSchool(input.schoolId)).for('share');
+    if (!school) return { outcome: 'unknown_school' };
+    if (school.agreementSignedAt === null) return { outcome: 'no_agreement', school };
+    for (let attempt = 0; attempt < INVITE_MINT_ATTEMPTS; attempt += 1) {
+      const code = gen();
+      const [invite] = await tx
+        .insert(teacherInvites)
+        .values({
+          schoolId: school.id,
+          codeHash: hashInviteCode(code),
+          // The database's clock, whose now() also fills `created_at`, so the
+          // two are exactly the lifetime apart. In hours, because a day of the
+          // database's zone can be 23 or 25 of them.
+          expiresAt: sql`now() + make_interval(hours => ${INVITE_LIFETIME_DAYS * 24}::int)`,
+        })
+        .onConflictDoNothing({ target: teacherInvites.codeHash })
+        .returning();
+      if (invite) return { outcome: 'minted', code, invite, school };
+    }
+    throw new Error('mintTeacherInvite: could not draw a code no other invite holds');
+  });
 }

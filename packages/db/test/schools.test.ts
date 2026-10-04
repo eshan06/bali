@@ -351,7 +351,7 @@ describe('npm run school: its arguments', () => {
       expect(refused('agreement', id, day)).toBe(`"${day}" is not a day written YYYY-MM-DD`);
     }
     expect(refused('agreement', id, '2026-10-05')).toBe(
-      "an agreement can't be signed after today: 2026-10-05 is after 2026-10-04",
+      "an agreement can't be signed after today: 2026-10-05 is after 2026-10-04, today on this machine",
     );
     expect(refused('agreement', id, '2026-10-01', 'signed')).toBe('unexpected "signed"');
     expect(parse('agreement', id, '2026-10-04')).toBeTypeOf('function');
