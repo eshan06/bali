@@ -17,9 +17,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the branch committed. The base is `HEAD^1` (the checkout is two deep): on a PR, HEAD is the PR
   merged into its base, so its first parent is the base this very tree was built on — not `main`'s
   tip fetched later, which may have gained a route since, a false failure no re-run clears — and on
-  a push to `main`, `main` before the push. A PR whose HEAD is no merge fails the step, since its
-  `HEAD^1` would be the branch's own past. And a missing snapshot fails the test, where it read as
-  an empty one. **Why not only failing on a missing file:** it stops a deletion, not an edit — an
+  a push to `main`, `main` before the push (squash merges: one commit a push). Any HEAD but a
+  push's that is no merge fails the step, since its `HEAD^1` would be the branch's own past — a
+  new trigger decides its baseline first — and so does a base with no snapshot. And a missing
+  snapshot fails the test, where it read as an empty one. **Why not only failing on a missing file:** it stops a deletion, not an edit — an
   emptied, regenerated or hand-edited copy is still the branch's own baseline. **Why not a second
   test reading the base:** one check and one message, with nothing new to keep in step; only the
   baseline's source changes. O1's "not caught, left to review: a hand edit of the snapshot" is

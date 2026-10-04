@@ -178,7 +178,10 @@ const PARTS = new Set(['params', 'query', 'body']);
  * `req?.query`, `request['params']`, `const { body } = request`, a handler's
  * `({ query }) =>` — as `file:line reads part`. Syntax alone, so whatever
  * the object is called: the app has no other params, query or body to read,
- * and `parseRequest` reads its part by a variable, never by name.
+ * and `parseRequest` reads its part by a variable, never by name. Some other
+ * object's `.query` would fail it loudly, never pass; a read that hides its
+ * name (`Reflect.get`, a key held in a variable) is a dodge for review, not a
+ * mistake this catches.
  */
 function bareReads(file: string, source: string): string[] {
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -191,7 +194,8 @@ function bareReads(file: string, source: string): string[] {
     if (ts.isElementAccessExpression(node)) part = quoted(node.argumentExpression);
     if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
       const key = node.propertyName ?? node.name;
-      part = ts.isIdentifier(key) ? key.text : quoted(key);
+      if (ts.isIdentifier(key)) part = key.text;
+      else part = quoted(ts.isComputedPropertyName(key) ? key.expression : key);
     }
     if (part !== undefined && PARTS.has(part)) {
       const { line } = tree.getLineAndCharacterOfPosition(node.getStart(tree));
@@ -224,6 +228,7 @@ describe('a route parses only through parseRequest, so none stays out of the sna
       app.get('/v1/c/:id', async (request) => parse(Params, request['params']));
       app.post('/v1/d', async ({ body }) => parse(Body, body));
       app.get('/v1/e', async (request) => { const { query: q } = request; return parse(Query, q); });
+      app.post('/v1/f', async (request) => { const { ['body']: b } = request; return parse(Body, b); });
     `;
     expect(bareReads('route.ts', route)).toEqual([
       'route.ts:2 reads body',
@@ -231,6 +236,7 @@ describe('a route parses only through parseRequest, so none stays out of the sna
       'route.ts:4 reads params',
       'route.ts:5 reads body',
       'route.ts:6 reads query',
+      'route.ts:7 reads body',
     ]);
     // A part named only as config.parses' key, or held in a variable as parseRequest's own read.
     const declared = `
