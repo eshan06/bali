@@ -1,9 +1,11 @@
 import {
+  checkIn,
   classes,
   type Database,
   endEnrollment,
   endSession,
   enrollments,
+  markSilentParticipations,
   protectionOff,
   refocus,
   renameStudent,
@@ -12,7 +14,14 @@ import {
   unlock,
   users,
 } from '@bali/db';
-import type { ActionOrder, ApiErrorBody, SessionReportResponse } from '@bali/shared';
+import { backdateLastSeen } from '@bali/db/testing';
+import {
+  type ActionOrder,
+  type ApiErrorBody,
+  SESSION_REPORTS_PAGE_LIMIT,
+  type SessionReportResponse,
+  type SessionReportsPage,
+} from '@bali/shared';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -25,6 +34,9 @@ import { joinCodeFor, makeTestDb, seedClassroom } from './helpers/db.js';
  * counts is R1's, pinned rule by rule (packages/shared/src/report.test.ts,
  * packages/db/test/report.test.ts); here, what the route adds: the names, the
  * rounding, a session not over yet, and who may read it.
+ *
+ * R3 — GET /v1/classes/:id/reports/sessions: the class's sessions, newest
+ * first, a page at a time, each with its totals — R2's, figure for figure.
  */
 
 let db: Database;
@@ -72,7 +84,27 @@ async function classmate(c: Classroom, tag: string) {
 
 /** A 09:00–09:25 lesson for the class. */
 async function lesson(classId: string) {
-  return (await startSession(db, { classId, startedAt: at(0), endsAt: at(25) })).session;
+  return lessonFrom(classId, 0);
+}
+
+/** A 25-minute lesson for the class, `from` minutes past 09:00. */
+async function lessonFrom(classId: string, from: number) {
+  return (await startSession(db, { classId, startedAt: at(from), endsAt: at(from + 25) })).session;
+}
+
+/** The teacher's own second class: none of its sessions are the first's. */
+async function secondClass(c: Classroom, tag: string) {
+  return one(
+    await db
+      .insert(classes)
+      .values({
+        teacherId: c.teacher.id,
+        schoolId: c.school.id,
+        name: 'Second',
+        joinCode: joinCodeFor(tag),
+      })
+      .returning(),
+  );
 }
 
 /** The student's move in the session, made at `when` and heard then (A17). */
@@ -84,6 +116,13 @@ async function reportAs(cognitoId: string, classId: string, sessionId: string) {
   return authedInject(ctx.app, await ctx.tokenFor(cognitoId), {
     method: 'GET',
     url: `/v1/classes/${classId}/reports/sessions/${sessionId}`,
+  });
+}
+
+async function listAs(cognitoId: string, classId: string, query = '') {
+  return authedInject(ctx.app, await ctx.tokenFor(cognitoId), {
+    method: 'GET',
+    url: `/v1/classes/${classId}/reports/sessions${query}`,
   });
 }
 
@@ -260,17 +299,7 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
     const c = await seedClassroom(db, 'scope');
     const other = await seedClassroom(db, 'scope-other');
     // The teacher's own second class, and another teacher's: neither session is this class's.
-    const second = one(
-      await db
-        .insert(classes)
-        .values({
-          teacherId: c.teacher.id,
-          schoolId: c.school.id,
-          name: 'Second',
-          joinCode: joinCodeFor('scope-second'),
-        })
-        .returning(),
-    );
+    const second = await secondClass(c, 'scope-second');
     const mine = await lesson(second.id);
     const theirs = await lesson(other.klass.id);
     await tapIn(db, move(theirs.id, other.student.id, at(1)));
@@ -285,6 +314,268 @@ describe('GET /v1/classes/:id/reports/sessions/:sessionId', () => {
       expect(res.body).not.toContain(other.student.id);
     }
     const unknown = await reportAs(c.teacher.cognitoId, randomUUID(), mine.id);
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json<ApiErrorBody>().error).toMatchObject({
+      code: 'not_found',
+      reason: 'class_not_found',
+    });
+  });
+});
+
+describe('GET /v1/classes/:id/reports/sessions', () => {
+  it('lists the class’s sessions newest first, each with its totals — the one running too', async () => {
+    const c = await seedClassroom(db, 'list');
+    const ana = c.student;
+    const ben = await classmate(c, 'list-ben');
+    // 09:00–09:25, swept at the bell: Ana 4 + 17 around a bathroom unlock, Ben 23.
+    const first = await lessonFrom(c.klass.id, 0);
+    await tapIn(db, move(first.id, ana.id, at(1)));
+    await unlock(db, { ...move(first.id, ana.id, at(5)), reason: 'bathroom' });
+    await refocus(db, move(first.id, ana.id, at(8)));
+    await tapIn(db, move(first.id, ben.id, at(2)));
+    await endSession(db, { sessionId: first.id, at: at(25), reason: 'expired' });
+    // 10:00–10:25, ended by the teacher at 10:20: Ben 9, until his Screen Time went off.
+    const second = await lessonFrom(c.klass.id, 60);
+    await tapIn(db, move(second.id, ben.id, at(61)));
+    await protectionOff(db, move(second.id, ben.id, at(70)));
+    await endSession(db, { sessionId: second.id, at: at(80), reason: 'ended' });
+    // 11:00–11:25, running at 11:10: Ana 9 so far.
+    const third = await lessonFrom(c.klass.id, 120);
+    await tapIn(db, move(third.id, ana.id, at(121)));
+    // Not this class's: the teacher's own other class, and another teacher's.
+    await lessonFrom((await secondClass(c, 'list-second')).id, 120);
+    await lessonFrom((await seedClassroom(db, 'list-other')).klass.id, 120);
+    now = at(130);
+
+    const res = await listAs(c.teacher.cognitoId, c.klass.id);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<SessionReportsPage>()).toEqual({
+      sessions: [
+        {
+          id: third.id,
+          startedAt: at(120).toISOString(),
+          endsAt: at(145).toISOString(),
+          endedAt: null,
+          ended: false,
+          joinedCount: 1,
+          focusMinutes: 9,
+          averageFocusMinutes: 9,
+          silentMinutes: 0,
+          unlockCount: 0,
+          protectionOffCount: 0,
+        },
+        {
+          id: second.id,
+          startedAt: at(60).toISOString(),
+          endsAt: at(85).toISOString(),
+          endedAt: at(80).toISOString(),
+          ended: true,
+          joinedCount: 1,
+          focusMinutes: 9,
+          averageFocusMinutes: 9,
+          silentMinutes: 0,
+          unlockCount: 0,
+          protectionOffCount: 1,
+        },
+        {
+          id: first.id,
+          startedAt: at(0).toISOString(),
+          endsAt: at(25).toISOString(),
+          endedAt: at(25).toISOString(),
+          ended: true,
+          joinedCount: 2,
+          focusMinutes: 44,
+          averageFocusMinutes: 22,
+          silentMinutes: 0,
+          unlockCount: 1,
+          protectionOffCount: 0,
+        },
+      ],
+      nextBefore: null,
+    });
+  });
+
+  it('answers a class with no sessions yet with an empty page', async () => {
+    const c = await seedClassroom(db, 'list-none');
+    const res = await listAs(c.teacher.cognitoId, c.klass.id);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<SessionReportsPage>()).toEqual({ sessions: [], nextBefore: null });
+  });
+
+  it('agrees with each session’s own report, figure for figure (R2)', async () => {
+    const c = await seedClassroom(db, 'agree');
+    const ana = c.student;
+    const ben = await classmate(c, 'agree-ben');
+    // Ana and Ben each 12.3 minutes: 25 in all, an average of 12 (R2's rounding).
+    const rounding = await lessonFrom(c.klass.id, 0);
+    await tapIn(db, move(rounding.id, ana.id, at(12, 42)));
+    await tapIn(db, move(rounding.id, ben.id, at(12, 42)));
+    await endSession(db, { sessionId: rounding.id, at: at(25), reason: 'expired' });
+    // Ana silent 10:05 to 10:08:30; Ben's unlock late behind his re-tap, then Screen Time off.
+    const eventful = await lessonFrom(c.klass.id, 60);
+    const install = randomUUID();
+    await tapIn(db, move(eventful.id, ana.id, at(61)));
+    await tapIn(db, move(eventful.id, ben.id, at(62), { install, seq: 1 }));
+    await backdateLastSeen(db, { sessionId: eventful.id, studentId: ana.id }, at(61));
+    expect(await markSilentParticipations(db, at(65))).toBe(1);
+    const stuck = move(eventful.id, ben.id, at(66), { install, seq: 2 });
+    await tapIn(db, move(eventful.id, ben.id, at(67), { install, seq: 3 }));
+    expect((await unlock(db, stuck)).recordedAs).toBe('superseded');
+    await checkIn(db, { sessionId: eventful.id, studentId: ana.id, deviceTime: at(68, 30) });
+    await protectionOff(db, move(eventful.id, ben.id, at(77, 20)));
+    await endSession(db, { sessionId: eventful.id, at: at(85), reason: 'expired' });
+    // No one joined.
+    const empty = await lessonFrom(c.klass.id, 120);
+    await endSession(db, { sessionId: empty.id, at: at(145), reason: 'expired' });
+    // Past its bell, not swept yet: counted to the bell, not marked over.
+    const unswept = await lessonFrom(c.klass.id, 180);
+    await tapIn(db, move(unswept.id, ana.id, at(190, 50)));
+    now = at(230);
+
+    const page = (await listAs(c.teacher.cognitoId, c.klass.id)).json<SessionReportsPage>();
+    for (const row of page.sessions) {
+      const res = await reportAs(c.teacher.cognitoId, c.klass.id, row.id);
+      const report = res.json<SessionReportResponse>();
+      expect(row, row.id).toMatchObject({
+        ended: report.ended,
+        joinedCount: report.joined.length,
+        focusMinutes: report.focusMinutes,
+        averageFocusMinutes: report.averageFocusMinutes,
+        silentMinutes: report.silentMinutes,
+        unlockCount: report.unlocks.length,
+        protectionOffCount: report.protectionOffs.length,
+      });
+    }
+    // What they agree on: Ana 4 + 16.5 and 3.5 silent, Ben 15⅓ — 35⅚ in all, a half up to 4 silent.
+    const totals = (row: SessionReportsPage['sessions'][number]) => [
+      row.id,
+      row.ended,
+      row.joinedCount,
+      row.focusMinutes,
+      row.averageFocusMinutes,
+      row.silentMinutes,
+      row.unlockCount,
+      row.protectionOffCount,
+    ];
+    expect(page.sessions.map(totals)).toEqual([
+      [unswept.id, false, 1, 14, 14, 0, 0, 0],
+      [empty.id, true, 0, 0, null, 0, 0, 0],
+      [eventful.id, true, 2, 36, 18, 4, 1, 1],
+      [rounding.id, true, 2, 25, 12, 0, 0, 0],
+    ]);
+  });
+
+  it('pages by a cursor that names a session: none skipped or repeated, a tie at one start included', async () => {
+    const c = await seedClassroom(db, 'paging');
+    const lessons = [];
+    for (const from of [0, 30, 60, 90]) {
+      const session = await lessonFrom(c.klass.id, from);
+      // The fourth ends as it begins, and the fifth starts that same instant.
+      const end = from === 90 ? at(90) : at(from + 25);
+      await endSession(db, { sessionId: session.id, at: end, reason: 'ended' });
+      lessons.push(session);
+    }
+    lessons.push(await lessonFrom(c.klass.id, 90));
+    const newestFirst = lessons.map((s) => s.id).reverse();
+    expect(newestFirst[0]! > newestFirst[1]!).toBe(true); // the tie, broken by id
+
+    const pageOf = async (query: string) =>
+      (await listAs(c.teacher.cognitoId, c.klass.id, query)).json<SessionReportsPage>();
+    for (const limit of [1, 2, 3]) {
+      const seen: string[] = [];
+      let page = await pageOf(`?limit=${limit}`);
+      for (;;) {
+        expect(page.sessions.length).toBeLessThanOrEqual(limit);
+        seen.push(...page.sessions.map((s) => s.id));
+        if (page.nextBefore === null) break;
+        expect(page.nextBefore).toBe(seen[seen.length - 1]);
+        page = await pageOf(`?limit=${limit}&before=${page.nextBefore}`);
+      }
+      expect(seen, `limit ${limit}`).toEqual(newestFirst);
+    }
+
+    // A session started between two reads never shifts the next page.
+    const firstPage = await pageOf('?limit=2');
+    now = at(200);
+    await endSession(db, { sessionId: lessons[4]!.id, at: at(115), reason: 'expired' });
+    await lessonFrom(c.klass.id, 150);
+    const next = await pageOf(`?limit=2&before=${firstPage.nextBefore}`);
+    expect(next.sessions.map((s) => s.id)).toEqual(newestFirst.slice(2, 4));
+  });
+
+  it(`holds a page to ${SESSION_REPORTS_PAGE_LIMIT} sessions`, async () => {
+    const c = await seedClassroom(db, 'page-size');
+    const ids: string[] = [];
+    for (let i = 0; i <= SESSION_REPORTS_PAGE_LIMIT; i += 1) {
+      const session = await lessonFrom(c.klass.id, i * 30);
+      await endSession(db, { sessionId: session.id, at: at(i * 30 + 25), reason: 'expired' });
+      ids.unshift(session.id);
+    }
+    now = at(SESSION_REPORTS_PAGE_LIMIT * 30 + 60);
+
+    const first = (await listAs(c.teacher.cognitoId, c.klass.id)).json<SessionReportsPage>();
+    expect(first.sessions.map((s) => s.id)).toEqual(ids.slice(0, SESSION_REPORTS_PAGE_LIMIT));
+    expect(first.nextBefore).toBe(ids[SESSION_REPORTS_PAGE_LIMIT - 1]);
+    const rest = (
+      await listAs(c.teacher.cognitoId, c.klass.id, `?before=${first.nextBefore}`)
+    ).json<SessionReportsPage>();
+    expect(rest).toMatchObject({ nextBefore: null });
+    expect(rest.sessions.map((s) => s.id)).toEqual(ids.slice(SESSION_REPORTS_PAGE_LIMIT));
+  });
+
+  it('refuses a cursor the class doesn’t hold (400 unknown_cursor) and a malformed request (400 invalid_request)', async () => {
+    const c = await seedClassroom(db, 'cursor');
+    await lessonFrom(c.klass.id, 0);
+    // The teacher's own other class's session, another teacher's, and none at all.
+    const mine = await lessonFrom((await secondClass(c, 'cursor-second')).id, 0);
+    const theirs = await lessonFrom((await seedClassroom(db, 'cursor-other')).klass.id, 0);
+    for (const before of [mine.id, theirs.id, randomUUID()]) {
+      const res = await listAs(c.teacher.cognitoId, c.klass.id, `?before=${before}`);
+      expect(res.statusCode).toBe(400);
+      expect(res.json<ApiErrorBody>().error).toMatchObject({
+        code: 'bad_input',
+        reason: 'unknown_cursor',
+      });
+    }
+
+    const tooMany = `?limit=${SESSION_REPORTS_PAGE_LIMIT + 1}`;
+    for (const query of ['?before=not-a-uuid', '?limit=0', tooMany, '?limit=2.5', '?limit=all']) {
+      const res = await listAs(c.teacher.cognitoId, c.klass.id, query);
+      expect(res.statusCode, query).toBe(400);
+      expect(res.json<ApiErrorBody>().error, query).toMatchObject({
+        code: 'bad_input',
+        reason: 'invalid_request',
+      });
+    }
+    const malformed = await listAs(c.teacher.cognitoId, 'not-a-uuid');
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json<ApiErrorBody>().error).toMatchObject({
+      code: 'bad_input',
+      reason: 'invalid_request',
+    });
+  });
+
+  it('is the class’s own teacher’s: another teacher and any student 403, no sign-in 401, an unknown class 404', async () => {
+    const c = await seedClassroom(db, 'list-authz');
+    const other = await seedClassroom(db, 'list-authz-other');
+    const session = await lessonFrom(c.klass.id, 0);
+    await tapIn(db, move(session.id, c.student.id, at(1)));
+
+    for (const caller of [other.teacher, c.student, other.student]) {
+      // A cursor of the class's own changes nothing: who may read it comes first.
+      for (const query of ['', `?before=${session.id}`]) {
+        const res = await listAs(caller.cognitoId, c.klass.id, query);
+        expect(res.statusCode).toBe(403);
+        expect(res.json<ApiErrorBody>().error.code).toBe('forbidden');
+        expect(res.body).not.toContain(session.id);
+      }
+    }
+    const anonymous = await ctx.app.inject({
+      method: 'GET',
+      url: `/v1/classes/${c.klass.id}/reports/sessions`,
+    });
+    expect(anonymous.statusCode).toBe(401);
+    const unknown = await listAs(c.teacher.cognitoId, randomUUID());
     expect(unknown.statusCode).toBe(404);
     expect(unknown.json<ApiErrorBody>().error).toMatchObject({
       code: 'not_found',

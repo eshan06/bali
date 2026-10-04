@@ -428,7 +428,10 @@ Student app:
 
 Teacher app and web portal:
 - `GET /v1/me` — same boot call, role-aware.
-- `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes.
+- `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes. A class named by its id is
+  the caller's own: an unknown one is `404 class_not_found` on every route under
+  `/v1/classes/{id}` (added 2026-10-04, R3, additive: one condition, one shape), another
+  teacher's `403`.
 - `GET /v1/classes/{id}/roster` — the roster; `DELETE /v1/enrollments/{id}` — remove a
   student (the one-transaction removal).
 - `POST /v1/classes/{id}/sessions` — start a session; if one is already open for this
@@ -446,6 +449,17 @@ Teacher app and web portal:
   session not yet marked over is answered too, counted to now or to its bell, with `ended: false`.
   Another teacher and a student are `403`; a session not in the class is the unknown session's
   `404 session_not_found`, an unknown class `404 class_not_found`.
+- `GET /v1/classes/{id}/reports/sessions` — the class's sessions (R3), for the class's own
+  teacher: newest first by when each started, the running one too, each with its window
+  (`startedAt`, `endsAt`, `endedAt`), R2's `ended`, and its totals — how many joined, the class's
+  focus minutes (total, and the average per student who joined), silent minutes, and how many
+  unlocks and protection offs. Counted on each read from the session's own events, by the same
+  `sessionReport` and rounded as R2 rounds, so a row never disagrees with its session's report.
+  Paged as the history is: at most 20 a page, and `nextBefore`, the last session's id, to pass as
+  `before` — a cursor that names a row, so a session started between pages never shifts one; a
+  `before` the class does not hold is `400 unknown_cursor`, a malformed request `400
+  invalid_request`. Another teacher and a student are `403`, an unknown class `404
+  class_not_found`.
 - `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
   block holds is a `409`; re-registering one's own tag returns that block (the retry of a
   lost response).

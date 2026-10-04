@@ -27,6 +27,27 @@ export async function requireTeacher(db: Database, request: FastifyRequest): Pro
   return user;
 }
 
+type ClassRow = NonNullable<Awaited<ReturnType<typeof findClassById>>>;
+
+/** No class has that id: the one 404 of every route under /v1/classes/{id} (#192's review). */
+export const classNotFound = () => ApiError.notFound('class not found', 'class_not_found');
+
+/**
+ * The class `classId` names, required to be `teacher`'s — the shared guard for the class routes,
+ * so an unknown class reaches a client in one shape on every one of them: `404 class_not_found`.
+ * Another teacher's class is `403`.
+ */
+export async function requireOwnClass(
+  db: Database,
+  teacher: UserRow,
+  classId: string,
+): Promise<ClassRow> {
+  const klass = await findClassById(db, classId);
+  if (!klass) throw classNotFound();
+  if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
+  return klass;
+}
+
 type SessionRow = NonNullable<Awaited<ReturnType<typeof findSessionById>>>;
 
 /**

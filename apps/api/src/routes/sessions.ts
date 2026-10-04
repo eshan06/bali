@@ -4,7 +4,6 @@ import {
   type Database,
   endSession,
   extendSession,
-  findClassById,
   findOrCreateStudent,
   protectionOff,
   protectionOn,
@@ -31,8 +30,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { requireSessionOwner, requireTeacher } from '../auth/teacher.js';
-import { ApiError, parseRequest } from '../errors.js';
+import { requireOwnClass, requireSessionOwner, requireTeacher } from '../auth/teacher.js';
+import { parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
 import { DeviceTime, Order } from './schemas.js';
 
@@ -99,9 +98,7 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
       const { id: classId } = parseRequest(request, 'params', ClassParams);
       const { durationMinutes } = parseRequest(request, 'body', DurationBody);
 
-      const klass = await findClassById(db, classId);
-      if (!klass) throw ApiError.notFound('class not found');
-      if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
+      await requireOwnClass(db, teacher, classId);
 
       const startedAt = clock();
       const endsAt = new Date(startedAt.getTime() + durationMinutes * 60_000);

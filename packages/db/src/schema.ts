@@ -143,6 +143,10 @@ export const sessions = pgTable(
     uniqueIndex('sessions_one_running_per_class')
       .on(t.classId)
       .where(sql`${t.endedAt} IS NULL`),
+    // GET /v1/classes/{id}/reports/sessions (R3) — a class's sessions, newest
+    // first, a page at a time (`classSessions`), so a page costs its own size
+    // however many sessions the class has run.
+    index('sessions_class_started_idx').on(t.classId, t.startedAt, t.id),
   ],
 );
 

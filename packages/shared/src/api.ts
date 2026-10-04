@@ -730,3 +730,34 @@ export interface SessionReportResponse {
   /** Oldest first. */
   protectionOffs: SessionReportProtectionOff[];
 }
+
+// GET /v1/classes/{id}/reports/sessions?before=&limit= — the class's sessions (R3), for its own
+// teacher, a page at a time, each with its totals: what its report says, counted by the same
+// `sessionReport` and rounded the same way, so a row never disagrees with its session's report.
+// Aggregates only, never rankings.
+export interface SessionReportSummary {
+  /** The session: its report is GET /v1/classes/{id}/reports/sessions/{sessionId}. */
+  id: string;
+  startedAt: string;
+  /** Its bell: the scheduled end, which an extend moves on. */
+  endsAt: string;
+  /** When it was marked over; null until then. */
+  endedAt: string | null;
+  /** As the report says it: false while it runs, and past its bell until the sweep marks it. */
+  ended: boolean;
+  /** How many joined: the report's `joined`, counted. */
+  joinedCount: number;
+  /** The report's, whole minutes each rounded from its exact figure. */
+  focusMinutes: number;
+  averageFocusMinutes: number | null;
+  silentMinutes: number;
+  /** How many unlocks and protection offs the report lists, whatever each changed. */
+  unlockCount: number;
+  protectionOffCount: number;
+}
+export interface SessionReportsPage {
+  /** Newest first, by when each started. */
+  sessions: SessionReportSummary[];
+  /** Pass as `before` for the next, older page; null at the end. A `400` for it: reload from the top. */
+  nextBefore: string | null;
+}
