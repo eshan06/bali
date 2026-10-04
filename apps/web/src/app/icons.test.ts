@@ -15,7 +15,7 @@ const PUBLIC = fileURLToPath(new URL('../../public/', import.meta.url));
 describe('the portal icon', () => {
   it('every icon the root layout names is a file in public/', () => {
     const layout = readFileSync(join(APP, 'layout.tsx'), 'utf8');
-    const urls = [...layout.matchAll(/url: '\/([^']+)'/g)].map((match) => match[1]);
+    const urls = [...layout.matchAll(/url: ['"]\/([^'"]+)['"]/g)].map((match) => match[1]);
     expect(urls).toEqual(['icon.svg', 'icon.png', 'apple-icon.png']);
     for (const url of urls) expect(existsSync(join(PUBLIC, url)), url).toBe(true);
   });
