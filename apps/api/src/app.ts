@@ -6,7 +6,7 @@ import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify'
 import { registerAuth } from './auth/plugin.js';
 import { createCognitoVerifier, type TokenVerifier } from './auth/verify.js';
 import type { Env } from './env.js';
-import { registerErrors } from './errors.js';
+import { registerErrors, routerRefusal } from './errors.js';
 import { createLimiter, type LimitOptions } from './limits.js';
 import { LOG_REDACT, serializeError } from './redact.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
@@ -84,6 +84,9 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
     // for X-Forwarded-For, so the rate limits read its X-Real-IP instead
     // (`clientAddress`, limits.ts).
     trustProxy: false,
+    // A path its router refuses (too long a parameter, a bad encoding) answers
+    // in the one error shape too, not Fastify's (Phase 6, S7).
+    frameworkErrors: routerRefusal,
   });
   // Before any route: Fastify shows a route to its onRoute hooks as it registers it.
   if (deps.onRoute) app.addHook('onRoute', deps.onRoute);

@@ -1,11 +1,15 @@
 import type { Database } from '@bali/db';
 import type { ApiErrorBody } from '@bali/shared';
-import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
+import Fastify, {
+  type FastifyInstance,
+  type FastifyServerOptions,
+  type LightMyRequestResponse,
+} from 'fastify';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { buildApp } from '../src/app.js';
-import { ApiError, parse, parseRequest } from '../src/errors.js';
+import { ApiError, parse, parseRequest, routerRefusal } from '../src/errors.js';
 import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 
@@ -137,5 +141,36 @@ describe('the one error shape', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(bodyOf(res).error.code).toBe('bad_input');
+  });
+});
+
+describe('a refusal from the router, before any route runs (S7)', () => {
+  it('an async route constraint that fails is a 500 in the one shape, never Fastify’s', async () => {
+    // No route of the API has one; this pins the branch that would answer it.
+    const bare = Fastify({
+      logger: false,
+      frameworkErrors: routerRefusal,
+      constraints: {
+        tenant: {
+          name: 'tenant',
+          storage: () => {
+            const routes = new Map<string, unknown>();
+            return {
+              get: (key: string) => routes.get(key) ?? null,
+              set: (key: string, value: unknown) => void routes.set(key, value),
+            };
+          },
+          deriveConstraint: (_req: unknown, _ctx: unknown, done: (err: Error | null) => void) =>
+            done(new Error('constraint down')),
+          mustMatchWhenDerived: true,
+          validate: () => true,
+        },
+      } as unknown as FastifyServerOptions['constraints'],
+    });
+    bare.get('/x', { constraints: { tenant: 'a' } }, () => ({}));
+    const res = await bare.inject({ method: 'GET', url: '/x' });
+    expect(res.statusCode).toBe(500);
+    expect(bodyOf(res)).toEqual({ error: { code: 'internal', message: 'internal error' } });
+    await bare.close();
   });
 });

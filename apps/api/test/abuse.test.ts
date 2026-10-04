@@ -373,13 +373,13 @@ describe('a malformed or forged token', () => {
       .sign(new TextEncoder().encode(secret));
   };
 
-  const CASES: [name: string, token: () => Promise<string>][] = [
-    ['alg: none, no signature', async () => `${b64({ alg: 'none' })}.${b64(claims())}.`],
+  const CASES: [name: string, token: () => string | Promise<string>][] = [
+    ['alg: none, no signature', () => `${b64({ alg: 'none' })}.${b64(claims())}.`],
     [
       'alg: none, with the pool’s key id',
-      async () => `${b64({ alg: 'none', kid: issuer.publicJwk.kid })}.${b64(claims())}.`,
+      () => `${b64({ alg: 'none', kid: issuer.publicJwk.kid })}.${b64(claims())}.`,
     ],
-    ['alg: NONE, in capitals', async () => `${b64({ alg: 'NONE' })}.${b64(claims())}.`],
+    ['alg: NONE, in capitals', () => `${b64({ alg: 'NONE' })}.${b64(claims())}.`],
     ['HS256 signed with the public key’s PEM', () => publicKeyAsSecret('HS256', 'pem')],
     ['HS256 signed with the public JWK', () => publicKeyAsSecret('HS256', 'jwk')],
     ['HS512 signed with the public key’s PEM', () => publicKeyAsSecret('HS512', 'pem')],
@@ -394,7 +394,7 @@ describe('a malformed or forged token', () => {
     [
       'an unknown critical header',
       // Hand-made: jose won't sign a header it can't honour.
-      async () =>
+      () =>
         `${b64({ alg: 'RS256', kid: issuer.publicJwk.kid, crit: ['x-bali'], 'x-bali': 1 })}.${b64(claims())}.c2ln`,
     ],
     ['expired', () => issuer.sign({ sub: 'abuse-forger', expiresInSeconds: -60 })],
@@ -416,16 +416,16 @@ describe('a malformed or forged token', () => {
         return `${head}.${b64({ ...claims(), sub: 'someone-else' })}.${sig}`;
       },
     ],
-    ['two parts', async () => `${b64({ alg: 'RS256' })}.${b64(claims())}`],
+    ['two parts', () => `${b64({ alg: 'RS256' })}.${b64(claims())}`],
     ['four parts', async () => `${await issuer.sign({ sub: 'abuse-forger' })}.extra`],
-    ['a header that is no JSON', async () => `bm90LWpzb24.${b64(claims())}.c2ln`],
-    ['a header that is JSON but no object', async () => `${b64([1])}.${b64(claims())}.c2ln`],
+    ['a header that is no JSON', () => `bm90LWpzb24.${b64(claims())}.c2ln`],
+    ['a header that is JSON but no object', () => `${b64([1])}.${b64(claims())}.c2ln`],
     [
       'a payload that is no JSON',
-      async () => `${b64({ alg: 'RS256', kid: 'test-key-1' })}.bm90LWpzb24.c2ln`,
+      () => `${b64({ alg: 'RS256', kid: 'test-key-1' })}.bm90LWpzb24.c2ln`,
     ],
-    ['not a JWT at all', async () => 'hello'],
-    ['a 16 KB token', async () => `${'a'.repeat(16_384)}.${'b'.repeat(16)}.${'c'.repeat(16)}`],
+    ['not a JWT at all', () => 'hello'],
+    ['a 16 KB token', () => `${'a'.repeat(16_384)}.${'b'.repeat(16)}.${'c'.repeat(16)}`],
   ];
 
   it.each(CASES)('%s → 401 in the one shape', async (_, token) => {
@@ -444,7 +444,9 @@ describe('an oversized or malformed body', () => {
   const refused = (res: { status: number; body: { error?: Record<string, unknown> } }) => {
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.status).toBeLessThan(500);
-    expect(res.body.error).toMatchObject({ code: expect.any(String), message: expect.any(String) });
+    expect(Object.keys(res.body)).toEqual(['error']);
+    expect(typeof res.body.error?.code).toBe('string');
+    expect(typeof res.body.error?.message).toBe('string');
   };
 
   it('over Fastify’s 1 MiB limit: 413 in the one shape, signed in or not', async () => {
@@ -455,9 +457,9 @@ describe('an oversized or malformed body', () => {
     for (const sub of [student.cognitoId, undefined]) {
       const res = await send(app, { method: 'POST', url: '/v1/taps', sub, payload: huge, headers });
       expect(res.status).toBe(413);
-      expect(res.body).toEqual({
-        error: { code: 'bad_input', message: expect.stringMatching(/too large/i) },
-      });
+      expect(Object.keys(res.body.error ?? {})).toEqual(['code', 'message']);
+      expect(res.body.error?.code).toBe('bad_input');
+      expect(String(res.body.error?.message)).toMatch(/too large/i);
     }
   });
 
@@ -597,9 +599,10 @@ describe('a path parameter that is no UUID', () => {
           payload: {},
         });
         expect(res.status, bad).toBe(status);
-        expect(res.body, bad).toEqual({
-          error: { code: 'bad_input', message: expect.not.stringContaining(bad) },
-        });
+        expect(Object.keys(res.body), bad).toEqual(['error']);
+        expect(Object.keys(res.body.error ?? {}), bad).toEqual(['code', 'message']);
+        expect(res.body.error?.code, bad).toBe('bad_input');
+        expect(String(res.body.error?.message), bad).not.toContain(bad);
       }
     },
   );
