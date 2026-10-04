@@ -32,3 +32,4 @@ ios/Bali.xcodeproj/
 
 # graphify knowledge graph — regenerable (`graphify update .`), stays local
 graphify-out/
+__pycache__/

@@ -100,10 +100,13 @@ jobs:
       # Phase 6, C1: the manifests ci.yml checks reached the bundles — the app's and each
       # extension's, where App Store Connect reads them.
       - name: Each bundle carries its privacy manifest
+        working-directory: ios
         run: |
-          app=$(find ~/Library/Developer/Xcode/DerivedData -type d -path '*/Build/Products/Debug-iphonesimulator/Bali.app' | head -1)
+          dir=$(xcodebuild -showBuildSettings -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" 2>/dev/null \
+            | awk '$1 == "TARGET_BUILD_DIR" { print $3; exit }')
+          app="$dir/Bali.app"
           for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
-            plutil -lint "$bundle/PrivacyInfo.xcprivacy" || { echo "::error::no privacy manifest in ${bundle:-Bali.app}"; exit 1; }
+            plutil -lint "$bundle/PrivacyInfo.xcprivacy" || { echo "::error::no privacy manifest in $bundle"; exit 1; }
           done
 
       # The app target's own tests (BaliTests), hosted in the app.

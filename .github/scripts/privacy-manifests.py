@@ -10,6 +10,8 @@ included. Run from the repository root, on Linux (no Xcode), this fails when:
   - Swift the target compiles in (its folder and the local packages it links, which end up in
     its binary) calls a required-reason API its manifest does not declare;
   - the app's collected data types differ from docs/APP-STORE.md's privacy table.
+The API scan is best effort: regexes for the spellings in USES, not a parse of the Swift, so
+a new required-reason call spelled another way (sysctl's kern.boottime, say) adds a pattern.
 GRDB ships its own manifest in its package, so third-party code is not scanned here.
 """
 import os
