@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/shared';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
 import { blocks, classes } from './schema.js';
@@ -188,4 +188,16 @@ export async function createBlock(
     return { outcome: 'already_registered', block: existing };
   }
   return { outcome: 'tag_taken' };
+}
+
+/**
+ * A teacher's live blocks, oldest first: theirs alone, and none soft-removed,
+ * since a removed block no longer holds its tag. A read; it writes nothing.
+ */
+export async function listBlocks(db: Database, teacherId: string): Promise<BlockRow[]> {
+  return db
+    .select()
+    .from(blocks)
+    .where(and(eq(blocks.teacherId, teacherId), isNull(blocks.removedAt)))
+    .orderBy(asc(blocks.createdAt), asc(blocks.id));
 }

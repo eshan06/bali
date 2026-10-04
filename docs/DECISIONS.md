@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P3: a teacher registers their block on the portal by its ID.** **Where:**
+  a "Your block" section under the classes on the home page, not a page of its own: a teacher
+  does it once, and the classes page is where they land. **The read:** none existed, so
+  `GET /v1/blocks` (additive), the caller's own live blocks, oldest first, `{ blocks }` so the
+  answer can grow; a student is `403`, as for every teacher route. **The ID's check:** ten
+  ASCII letters and digits, any case and spacing, sent upper-case: exactly what BaliCore's
+  `BlockTag.code` reads off a tag, so a registered block is one a phone can tap. Checked in the
+  portal only: the API still takes any tag of 1 to 200 characters (`/v1` is additive-only, and
+  dev's `DEVICE-CHECK-1` tags stay valid). **No `eventId`:** `POST /v1/blocks` takes none, and
+  needs none: a resend of one's own tag returns the same block (2026-09-22), so Try again resends
+  as it was. **Keyed on status, not `reason`:** the route has one `409` (another teacher's live
+  block) and one `400` (a tag it can't take), so the portal reads those statuses there rather
+  than adding a reason to the shared vocabulary. **Another teacher's block:** no self-serve way
+  to move a block exists yet, so the way on is to check the ID, then ask whoever sent the
+  invite code (the owner) to move it.
 - **2026-10-04** — **P2: Sentry in the portal, on P1's rules.** **New dependency:
   `@sentry/browser`** (v11, `apps/web` only), not `@sentry/nextjs`: the portal is a client-side
   SPA against the API, so there is no server or edge runtime to instrument, and the Next SDK's

@@ -566,6 +566,10 @@ export interface BlockDetail {
   tagId: string;
   createdAt: string;
 }
+// GET /v1/blocks — the caller's own live blocks, oldest first (Phase 5 · P3).
+export interface BlockListResponse {
+  blocks: BlockDetail[];
+}
 
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
 // A student never leaves while the class has a session running by the server's

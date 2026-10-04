@@ -43,6 +43,16 @@
       }
     },
     "/v1/blocks": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "$ref": "#/components/responses/error"
+          }
+        }
+      },
       "post": {
         "requestBody": {
           "required": true,

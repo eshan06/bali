@@ -20,6 +20,20 @@ const A_MOMENT = 5;
 export const NOT_AN_INVITE_CODE =
   'An invite code is 25 letters and digits, with no 0, O, 1, I or L. Check it against the one you were sent.';
 
+/** A block's ID (P3): said before it is sent, and if the register refuses it. */
+export const NOT_A_BLOCK_ID =
+  'A block ID is 10 letters and digits. Check it against the one written on your block.';
+
+/** `POST /v1/blocks`'s one 409 (P3): a live block of another teacher's holds the tag. */
+export const BLOCK_TAKEN =
+  'That block is registered to another teacher. If the ID matches the one on your block, ask whoever sent your invite code to move it to you.';
+
+/** No answer from the API (P3): the connection, never the person. */
+export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try again.";
+
+/** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
+export const CANT_REGISTER = "Bali couldn't register the block just now. Try again.";
+
 /**
  * The refusals a person can act on, in their words (T2): keyed on the error's `reason`, never its
  * message, which is written for a log. Each says what happened and what to do next.

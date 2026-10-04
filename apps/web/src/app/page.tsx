@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Blocks } from '@/components/blocks';
 import { InviteCode } from '@/components/invite-code';
 import { getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
@@ -134,6 +135,8 @@ export default function HomePage() {
           ))}
         </ul>
       )}
+
+      <Blocks />
     </main>
   );
 }
