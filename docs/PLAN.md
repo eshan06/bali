@@ -28,14 +28,14 @@ _Last updated: 2026-10-04 — **L2b has landed — the one-address load gate (IS
   school met no `429` and no `5xx`, p95 8.5 ms (the bound is 500 ms); the
   flooder met 2,762 `429`s, each with `Retry-After`. `npm run load:sweep` then
   times the API's own sweep on that bell: 600 phones marked silent in 1.2 s,
-  30 sessions ended at once in 91 ms, no deadlock all run — so L3 is not
-  needed at this size. CI's "Load gate" runs both on every PR touching
+  30 sessions ended at once in 91 ms, and no deadlock in the whole run, so L3
+  is not needed at this size. CI's "Load gate" runs both on every PR touching
   `apps/api/`, `packages/db/`, `packages/shared/` or the root manifests, or by
-  hand; making it a
-  required check is the owner's ruleset toggle. **To know:** the harness's two
-  commands now also need `LOAD_LOCAL_POSTGRES=1` (`localhost` can be a tunnel,
-  and nothing can tell), and `@bali/db/testing`'s helpers that drop databases
-  refuse outside `NODE_ENV` test or development. Numbers and why:
+  hand; making it a required check is the owner's ruleset toggle. **To know:**
+  the harness's two commands now also need `LOAD_LOCAL_POSTGRES=1`
+  (`localhost` can be a tunnel, and nothing can tell), and
+  `@bali/db/testing`'s helpers that drop databases refuse outside `NODE_ENV`
+  test or development. Numbers and why:
   `docs/DECISIONS.md` (L2b). **L2a has landed — the load harness** (for L2b's
   one-address gate): `npm run load:seed` seeds a school at the bell — 20
   teachers with a block each, 30 classes, 600 students enrolled where they tap —
