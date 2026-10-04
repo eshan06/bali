@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S4: the portal's CSP, with a nonce, and its security headers.** **Why the
+  CSP matters most:** the access token lives in sessionStorage (WEB.md), where any script on the
+  page can read it; httpOnly cookies would need a server the SPA doesn't have. So the CSP is the
+  token's defence: an injected script can't run (no inline, no eval, no other origin), and if one
+  did, `connect-src` lets nothing leave but for the API, Cognito and Sentry. **A future refresh
+  token must stay out of web storage** (sessionStorage or localStorage): a long-lived token there
+  turns one XSS into a standing account takeover; it belongs in an httpOnly cookie on a
+  same-site token endpoint, or not in the browser at all. **Nonce, not `'unsafe-inline'`:** Next's
+  app router writes inline scripts (its RSC payload), so a script policy without one means a
+  nonce or `'unsafe-inline'`; hashes don't fit (the payload differs per page and build). A nonce
+  is per request, so it is set in `src/middleware.ts` rather than `headers()`, and the pages
+  render per request (`dynamic = 'force-dynamic'` in the root layout): a page built ahead carries
+  no nonce. Every page is a client page reading the API from the browser, so nothing cached is
+  lost. `'strict-dynamic'` lets the chunks Next's nonced scripts load run. **Styles:** the
+  portal's own come from Tailwind's stylesheet (`'self'`), and a `<style>` element needs the
+  nonce; only style *attributes* are inline-allowed (`style-src-attr`), because Next's built-in
+  404 and error pages style by attribute, and an attribute selects nothing and any URL in it
+  still meets `img-src`. The built-in 404's own `<style>` (its dark mode) is refused; the page
+  still lays out by its attributes. **Dev only:** `next dev` gets `'unsafe-eval'` and inline
+  styles for fast refresh. **Origins** come from the build's `NEXT_PUBLIC_*`, each cut to its
+  origin (a Sentry DSN's key and project go); blank means none (the API's is required); one that is not an http(s) URL
+  fails the build (`next.config.ts`), so no deploy serves a 500 or a `null` origin for it.
+  **Every page renders per request,** guarded by a test of the app's route config and a CI
+  check of the build's route table: a static page has no nonce, so it would be blank. **No
+  report endpoint:** a browser check before the Vercel flip (PLAN, S4) stands in for one. **Not taken:** `upgrade-insecure-requests` (it
+  breaks the local API on http); `X-Frame-Options` (`frame-ancestors` covers it); HSTS
+  `preload` (a commitment for the final domain, the owner's). **Headers on every response,**
+  assets too, from `next.config.ts`: HSTS two years with subdomains (browsers ignore it over
+  http, so localhost is fine), `nosniff`, `strict-origin-when-cross-origin`, and a
+  Permissions-Policy turning off camera, microphone, geolocation, payment and USB.
 - **2026-10-04** — **C1: privacy manifests, declared per binary, held to the code by a
   Linux script.** **What each declares:** the required-reason APIs whose code is in that bundle's
   binary: its own Swift plus the local packages it links. BaliOutbox, linked by all three, reads
