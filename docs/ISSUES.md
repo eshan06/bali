@@ -91,6 +91,65 @@ unlock is durable but, lacking a session/class, shows only in the student's own
 history rather than a teacher report — an ops surface for these orphan records is
 an API-layer follow-up, bounded meanwhile by the per-account rate limits of #1.
 
+
+## 3. Apple's terms for Screen Time apps may not fit a classroom
+
+**The problem.** Since 2026-03-30, Apple's developer agreement limits apps that use the
+Family Controls framework, the one Bali's shields run on (§3.3.3(P); the text of
+2026-08-18). The app's primary purpose must be parental controls through Family Sharing,
+or "offering individuals the ability to manage their devices to enable focus and
+productivity". The framework "may not be used for other purposes, such as ad blocking, in
+organizational settings, or for managing the device of another adult individual", and
+device or usage data received through it may not be shared "beyond … the individual and
+their device". Bali's sessions are started by a teacher at school, and the teacher's grid
+shows each student's state, "Screen Time off" included. A reviewer could read that as
+both. Apple granted the distribution entitlement on 2026-09-24, after the clause existed:
+a good sign, not a ruling. External TestFlight builds are reviewed too, so this can stop
+the pilot, not only the App Store.
+
+**The plan.**
+- The owner asks App Review before the first external build (an App Review consultation),
+  describing Bali as it is: the student installs it, grants Screen Time access to
+  themselves, taps in, and holds the exit; the teacher sees what the app records.
+- A fallback design, settled with the owner before the answer comes: the grid shows only
+  what Bali itself records, never data received through Family Controls.
+- Phase 6 gates on it.
+
+**Done when:** Apple's answer is on record, and the design matches it.
+
+## 4. Phone bans at school
+
+**The problem.** By March 2026, 33 states restricted students' phones at school. Texas
+(HB 1481) has districts forbid personal devices for the whole school day; Oklahoma and
+Arkansas ban them bell to bell; Kansas requires them stored away; Illinois starts in
+2027–28. Tapping in is using the phone, and the pilot school's state is not known yet
+(the deploy's time zone is America/Chicago).
+
+**The plan.** The owner confirms the school's state and phone policy, and whether the
+phones are the students' own; the school's lawyer clears Bali against the state's law
+before the pilot.
+
+**Done when:** the school confirms in writing that its policy allows Bali.
+
+## 5. Deleting data, and "an unlock record is never lost"
+
+**The problem.** The App Store requires that an account made in the app can be deleted in
+the app (guideline 5.1.1(v)); a school's data agreement requires its data disposed of on
+request; FERPA lets parents inspect a student's record; COPPA, once under-13 comes,
+requires a written retention policy. Bali's architecture says nothing is ever truly
+deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lost.
+
+**The plan.**
+- "Never lost" keeps its meaning on the way from the phone to the server, which is what
+  the unlock contract promises: no response ever means "discard".
+- Records leave only through three doors: the student deleting their account, the
+  school's written request, and a published retention schedule. Each deletion is logged
+  without personal data, and none happens while a parent's inspection request is open.
+- The owner decides the retention period and whether a deleted account's records are
+  de-identified or held for the school; ARCHITECTURE is amended; Phase 6 C3–C6 build it.
+
+**Done when:** the owner's policy is written, and C3–C6 have landed.
+
 ---
 
 ## Considered and set aside (so we don't re-argue them)

@@ -8,6 +8,36 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **Phase 6, security and compliance, added on the owner's ask after two
+  investigations.** The owner asked whether a full security and compliance audit is necessary or
+  beneficial. Two read-only investigations ran: one of the code and its infrastructure, one of
+  the law and Apple's terms, with current sources. **Verdict: necessary, as a short gate before
+  real students, not an open-ended audit.** **Security:** no IDOR, no injection, no committed
+  secret, and `npm audit --omit=dev` is clean; the JWT checks, every route's ownership check, the
+  stream's header-only token, the internal key's timing-safe compare and the app's Keychain use
+  are solid. The gaps sit where no review looks, in existing code and configuration: a Drizzle
+  error carries its SQL parameters (names, unlock reasons) into the logs, with no redaction; the
+  portal has no sign-out and never ends the Cognito session, so a shared classroom computer
+  opens the last teacher's account; no security headers or CSP on the portal; ID tokens accepted
+  beside access tokens; the API's database role could drop the append-only trigger; a PR runs its
+  own copy of `claude-review.yml` (PLAN's carried edge) while `main` auto-merges and auto-deploys;
+  Cognito's prod settings are undocumented. **Compliance:** Apple's developer agreement §3.3.3(P)
+  (added 2026-03-30; the text of 2026-08-18, read on Apple's site on 2026-10-04) limits Family
+  Controls apps to parental controls or individuals managing their own focus, says the framework
+  "may not be used … in organizational settings", and bars sharing device or usage data beyond
+  the individual and their device (ISSUES #3); 33 states restrict phones at school (ISSUES #4);
+  App Store guideline 5.1.1(v) requires in-app account deletion, against data-model decision 3
+  (ISSUES #5); there is no privacy manifest though the app uses `UserDefaults`; FERPA's
+  school-official terms and the state's student-privacy law (or the SDPC NDPA) call for a signed
+  agreement; the 13+ promise is not enforced. **Decided:** Phase 6 (PLAN's "Phase 6 steps"),
+  after Phase 4 and gating Phase 5's student-facing steps. S1, the authorization matrix, runs
+  inside Phase 4, so the new report and invite routes are covered from their first PR. L1 and
+  T1a take the investigations' requirements: a backstop on join-code misses, since accounts are
+  free while self sign-up is on; invite codes single-use, expiring, stored hashed and minted only
+  for a school with a signed agreement. O1b closes O1's two review gaps. **Not taken:** a paid
+  penetration test or SOC 2 for a one-school 13+ pilot (revisit before scaling); under-13
+  support. None of this is legal advice: the lawyer and the school confirm every legal call.
+
 - **2026-10-04** — **O1: the OpenAPI snapshot check, built from the route table and zod 4's
   `z.toJSONSchema`, with no new dependency.** The step deferred on 2026-09-19 as needing
   `@fastify/swagger` needs none of it: swagger reads Fastify's `schema` slot, which Fastify also
