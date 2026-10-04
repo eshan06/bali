@@ -50,7 +50,12 @@ In the AWS console → Cognito → the dev user pool → **App integration → A
 2. **Hosted UI / OAuth.**
    - **Allowed callback URLs:** `http://localhost:3000/auth/callback` (add the
      deployed portal origin later, when there is one).
-   - **Allowed sign-out URLs:** `http://localhost:3000/login`.
+   - **Allowed sign-out URLs:** `http://localhost:3000/login` (and the deployed
+     portal's `/login` later). Sign out (S4a, below) sends the browser to the
+     hosted UI's `/logout` with this URL as `logout_uri`: the callback URL's origin
+     plus `/login`, so it needs no variable of its own. **An existing client made
+     without it needs it added** (App client → Login pages → Edit → Allowed sign-out
+     URLs); until then Cognito shows an error page at Sign out and its session stays.
    - **Identity providers:** Cognito user pool (plus any federated IdPs the pool
      already uses).
    - **OAuth grant types:** **Authorization code grant** only. Leave *Implicit* off.
@@ -72,6 +77,18 @@ query string, and the SSE stream is read with `fetch` + `ReadableStream` (not
 > Both `NEXT_PUBLIC_REDIRECT_URI` and the app client's **Allowed callback URL** must
 > be byte-for-byte identical, or Cognito rejects the exchange. That mismatch is the
 > most common first-run failure.
+
+**Sign out (S4a).** Every signed-in page, the invite-code screen's included, has a
+bar with Sign out (`PortalBar`, `src/components/portal-bar.tsx`, in the root layout;
+hidden on `/login` and `/auth/*`). It forgets the token, then sends the browser to
+`<NEXT_PUBLIC_COGNITO_DOMAIN>/logout?client_id=…&logout_uri=<origin>/login`, which ends
+the Cognito session and returns to `/login`, saying "You're signed out." So the next
+Sign in on a shared classroom computer asks who it is, instead of opening the last
+teacher's account. When there is no hosted UI to send it to (no domain or client id
+configured), the token is still gone and `/login` says the sign-in page may still
+remember the account, and to close the browser. Limits, as Cognito has them: the
+access token itself stays valid until it expires (an hour), in any other tab that
+still holds it; `/logout` ends the hosted UI's session, not tokens already issued.
 
 ## Making a teacher
 
