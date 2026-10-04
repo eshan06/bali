@@ -18,10 +18,21 @@ const school = JSON.parse(readFileSync(SCHOOL_FILE, 'utf8')) as SchoolFile;
 const url = databaseUrl(harnessServer(process.env), school.api.database);
 const classes = school.teachers.length + school.teachers.filter((t) => t.secondClassId).length;
 
-/** Postgres's deadlock count for the database, read afresh: a backend reports its own on exit. */
+/**
+ * Postgres's deadlock count for the database, once no other client is connected to it: a backend
+ * flushes its pending counts as it exits, before it leaves pg_stat_activity, so none is missed.
+ */
 async function deadlocks(): Promise<number> {
   const reader = createDb(url);
   try {
+    for (let waited = 0; ; waited += 100) {
+      const [others] = await reader.$client<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity where datname = current_database()
+          and backend_type = 'client backend' and pid <> pg_backend_pid()`;
+      if (others!.n === 0) break;
+      if (waited >= 10_000) throw new Error('other clients stayed connected to the database');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     const [row] = await reader.$client<{ n: number }[]>`
       select deadlocks::int as n from pg_stat_database where datname = current_database()`;
     return row!.n;

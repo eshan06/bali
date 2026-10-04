@@ -114,9 +114,6 @@ jobs:
           # loses TEST_DATABASE_URL, fail the job instead of silently skipping
           # the race tests.
           REQUIRE_REAL_PG: '1'
-          # The load harness's opt-in (its smoke test runs here): this server is
-          # the runner's own service container.
-          LOAD_LOCAL_POSTGRES: '1'
 
   # BaliCore, the iOS apps' Swift package, decodes every contract fixture and
   # mirrors @bali/shared's vocabularies, so a change to an answer, a fixture or

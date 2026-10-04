@@ -24,6 +24,11 @@ import { harnessServer, type SchoolFile, seedSchool } from '../scripts/load/scho
 
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
 const apiDir = fileURLToPath(new URL('..', import.meta.url));
+/**
+ * The suite vouches for its own server (`harnessServer`'s opt-in): every real-Postgres suite
+ * already makes and drops databases on TEST_DATABASE_URL, so this one adds nothing to that.
+ */
+const env = { ...process.env, LOAD_LOCAL_POSTGRES: '1' };
 
 /** The API's base URL, once its log says it listens; a process gone first fails with its output. */
 function listeningAt(child: ChildProcess, timeoutMs = 30_000): Promise<string> {
@@ -91,7 +96,7 @@ describe.runIf(REAL_PG)('the load harness', () => {
   let base: string;
 
   beforeAll(async () => {
-    server = harnessServer(process.env);
+    server = harnessServer(env);
     dir = mkdtempSync(join(tmpdir(), 'bali-load-'));
     school = await seedSchool(server, database);
     const file = join(dir, 'school.json');
@@ -99,7 +104,7 @@ describe.runIf(REAL_PG)('the load harness', () => {
     api = spawn(process.execPath, ['--import', 'tsx', 'scripts/load/serve.ts'], {
       cwd: apiDir,
       env: {
-        ...process.env,
+        ...env,
         LOAD_SCHOOL_FILE: file,
         HOST: '127.0.0.1',
         PORT: '0',

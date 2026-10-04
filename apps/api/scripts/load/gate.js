@@ -16,7 +16,12 @@ const SCHOOL_FILE = __ENV.LOAD_SCHOOL_FILE || './school.json';
 const API = __ENV.API_URL || 'http://127.0.0.1:3001';
 /** The school's one address, as Railway's edge reports it (`X-Real-IP`, L1). */
 const SCHOOL_ADDRESS = '203.0.113.7';
-/** In seconds from the doors opening: the taps before 55, the Starts at 60, the reads to 180. */
+/**
+ * In seconds from the doors opening: the taps before 55, the Starts at 60, the reads to 180. Two
+ * margins are spent on purpose: 5 s so every tap lands before its Start (else it joins, and the
+ * check fails), and ~60 s after a phone's last read for the API to stop before its own minute
+ * sweep marks that phone silent (else `load:sweep` refuses the bell). CI stops it at once.
+ */
 const TAPS_BEFORE = 55;
 const BELL = 60;
 const CADENCE = 30;

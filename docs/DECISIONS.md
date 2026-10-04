@@ -19,47 +19,50 @@ a real decision? Add a dated entry at the top: what was decided and why.
   it does (decision 7): `GET /v1/me` while it waits, a check-in once joined, until three minutes
   in. From 30 s to 90 s, one account of the school's, in no class, asks `GET /v1/me` 50 times a
   second. **Pass:** every school request a 2xx, so no `429` and no `5xx`; every check true (each
-  tap waited, each Start joined everyone waiting, each phone was joined and found focused at
-  every check-in); the p95 of the school's requests, and of each phone request's kind, under
-  500 ms, and of the Starts under 1 s; and the flooder refused, each `429` with a positive
-  `Retry-After`. **Why 500 ms:** the server's share
-  of the grid's "within a second or two" (Live updates), measured on the machine itself, so the
-  network comes on top, with room for a shared runner where k6's 630 virtual users, the API and
-  Postgres run at once. At the ~10 ms measured, it fails a fifty-fold slowdown at the bell (a
-  lock queue, a query per row), not noise. **A Start's 1 s:** each converts its 30 in one
-  transaction, and the 30 Starts, within 2 s, queue for the API's 10 database connections; the
-  teacher's grid still fills within a second. **Measured** (a 4-vCPU container, as CI's runner
-  is, Postgres 16): 3,366 school requests, none refused, p95 8.5 ms: a tap 11.8, `GET /v1/me`
-  6.1, a check-in 4.7, a Start 126. The flooder's 3,001: 239 answered (its 120 at once, then 2 a
-  second) and 2,762 refused, while the school met none. CI's first run (#190): p95 9.5 ms, a
-  Start's 325 ms, the same 239 and 2,762, and the sweep 1,679 ms and 134 ms, no deadlock.
-  **The sweep at that size** (`npm run load:sweep`): the API's own `sweep`, timed in process on
-  the bell the gate left, once the API has stopped (over `/internal/sweep` it would race the
-  API's own minute tick for the same rows), and run twice, each on a clock of its own (`sweep`
-  takes one now; the tick and the route pass none). Past the silence threshold it marked 600 of
-  600 phones silent in 1,188 ms, ~2 ms each; past every bell it ended the 30 sessions and their
-  600 participations at once in 91 ms. Postgres counted no deadlock in the database through the
-  gate (its taps, Starts and check-ins, and the API's own sweeps) or the timed sweep, so the
-  per-row retry never ran. **L3 is not needed at this size.** #56's worst case, each of 630 rows
-  deadlocking four times, each found after Postgres's 1 s `deadlock_timeout` plus up to 140 ms of
-  backoff, is ~4 s a row and ~45 minutes a sweep, and it can't happen here: a silence candidate
-  is a phone quiet for 90 s, so its row's only rival is that phone acting at that instant, and
-  once the rival commits, the retry's guarded UPDATE finds the row changed and passes it. One
-  deadlock, not four; and a sweep longer than its minute skips the next tick, never stacks
-  (`startSweeping`). At ~2 ms a row, the serial loop fills its minute at ~30,000 phones going
-  quiet at once on one API: L3 comes back at that size, or when the gate's deadlock count leaves
-  0 (the sweep step then warns in CI; a deadlock the retry handled fails nothing). **L2a's harness, tightened (its review's WARNs):** `localhost` doesn't prove the server is
-  this machine's, and the server can't prove it either. A server reached on its own loopback, as
-  at an SSH tunnel's far end, says `inet_server_addr()` is `127.0.0.1`, while a Postgres container
-  published on this machine's port, CI's service, says its bridge address (`172.17.0.2`; both
-  checked with Docker here). So both commands also need `LOAD_LOCAL_POSTGRES=1`, the person
-  vouching; CI sets it beside its service container, and a remote URL is refused even so.
-  `dropDatabase` and `recreateDatabase` refuse outside `NODE_ENV` test or development, as the
-  backdating helpers do, and so does `makeTestDb` on a real Postgres, which would otherwise make a
-  database its close can't drop; `load:seed` runs as development. **CI:** the gate's job is
-  decided by the PR's changed paths, as the iOS build's is (the API, the engine, the shared
-  contract, and the root manifests and `.nvmrc` it runs on), so a PR with none reports success and
-  the check can be made required (the owner's ruleset toggle); k6 comes from
+  tap waited, each Start joined everyone waiting, each phone was joined to its own class and
+  found focused at every check-in); the p95 of the school's requests, and of each phone request's
+  kind, under 500 ms, and of the Starts under 1 s; and the flooder refused, each `429` with a
+  positive `Retry-After`. **Why 500 ms:** the server's share of the grid's "within a second or
+  two" (Live updates), measured on the machine itself, so the network comes on top, with room for
+  a shared runner where k6's 630 virtual users, the API and Postgres run at once. At the ~10 ms
+  measured, it fails a fifty-fold slowdown at the bell (a lock queue, a query per row), not
+  noise. **A Start's 1 s:** each converts its 30 in one transaction, and the 30 Starts, within
+  2 s, queue for the API's 10 database connections (CI measured 325 ms); the teacher's grid still
+  fills within a second. **Measured** (a 4-vCPU container, as CI's runner is, Postgres 16):
+  3,366 school requests, none refused, p95 8.5 ms: a tap 11.8, `GET /v1/me` 6.1, a check-in 4.7,
+  a Start 126. The flooder's 3,001: 239 answered (its 120 at once, then 2 a second) and 2,762
+  refused, while the school met none. CI's first run (#190): p95 9.5 ms, a Start's 325 ms, the
+  same 239 and 2,762, and the sweep 1,679 ms and 134 ms, no deadlock. **The sweep at that size**
+  (`npm run load:sweep`): the API's own `sweep`, timed in process on the bell the gate left, once
+  the API has stopped (over `/internal/sweep` it would race the API's own minute tick for the
+  same rows), and run twice, each on a clock of its own (`sweep` takes one now; the tick and the
+  route pass none). Past the silence threshold it marked 600 of 600 phones silent in 1,188 ms,
+  ~2 ms each; past every bell it ended the 30 sessions and their 600 participations at once in
+  91 ms. Postgres counted no deadlock in the database through the gate (its taps, Starts and
+  check-ins, and the API's own sweeps) or the timed sweep, so the per-row retry never ran; the
+  count is read once no other client is connected, as a backend flushes its counts as it exits.
+  **L3 is not needed at this size.** #56's worst case, each of 630 rows deadlocking four times,
+  each found after Postgres's 1 s `deadlock_timeout` plus up to 140 ms of backoff, is ~4 s a row
+  and ~45 minutes a sweep, and it can't happen here: a silence candidate is a phone quiet for
+  90 s, so its row's only rival is that phone acting at that instant, and once the rival commits,
+  the retry's guarded UPDATE finds the row changed and passes it. One deadlock, not four; and a
+  sweep longer than its minute skips the next tick, never stacks (`startSweeping`). At ~2 ms a
+  row, the serial loop fills its minute at ~30,000 phones going quiet at once on one API: L3
+  comes back at that size, or when the gate's deadlock count leaves 0 (the sweep step then warns
+  in CI; a deadlock the retry handled fails nothing). **L2a's harness, tightened (its review's
+  WARNs):** `localhost` doesn't prove the server is this machine's, and the server can't prove
+  it either. A server reached on its own loopback, as at an SSH tunnel's far end, says
+  `inet_server_addr()` is `127.0.0.1`, while a Postgres container published on this machine's
+  port, CI's service, says its bridge address (`172.17.0.2`; both checked with Docker here). So
+  both commands also need `LOAD_LOCAL_POSTGRES=1`, the person vouching, and a remote URL is
+  refused even so. The gate's CI job sets it beside its service container; the real-Postgres
+  lane's smoke test vouches for its own server, where every real-Postgres suite already makes and
+  drops databases. `dropDatabase` and `recreateDatabase` refuse outside `NODE_ENV` test or
+  development, as the backdating helpers do, and so does `makeTestDb` on a real Postgres, which
+  would otherwise make a database its close can't drop; `load:seed` runs as development. **CI:**
+  the gate's job is decided by the PR's changed paths, as the iOS build's is (the API, the
+  engine, the shared contract, and the root manifests and `.nvmrc` it runs on), so a PR with none
+  reports success and the check can be made required (the owner's ruleset toggle); k6 comes from
   `grafana/setup-k6-action`, pinned to its commit, at the version measured here.
 
 - **2026-10-04** — **L1's `X-Real-IP` verified on dev (by the conductor): Railway's edge replaces
