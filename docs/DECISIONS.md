@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **The pilot runs on production; sign-up gated to the school's domain (S11).**
+  The owner's rulings for the Vanderbilt pilot: it runs on **production**, not dev. Prod's
+  self sign-up is **gated** to `@vanderbilt.edu`, MFA is **Optional** with TOTP, never SMS
+  (Cognito sets MFA per pool, so Required would bind students too), and the portal lives on
+  its free Vercel address, `<project>.vercel.app`, until a custom domain is chosen (the
+  callback and sign-out URLs and `CORS_ORIGINS` follow it). **The gate** is a Pre sign-up
+  Lambda, `infra/cognito/pre-signup.mjs`, since Cognito has no domain allow-list: plain ESM, no
+  dependencies, so the owner pastes it into the console and the paste is the deploy (no
+  infrastructure-as-code for one function). **Choices:** the domain after the last `@` must
+  equal a listed one exactly, in any case; a subdomain (`mc.vanderbilt.edu`) is refused
+  unless listed itself, so a lookalike can never slip through a suffix match. An unset or
+  empty `ALLOWED_EMAIL_DOMAINS` refuses everyone and logs why (fail closed: a forgotten
+  variable must not open sign-up). `PreSignUp_ExternalProvider` (a first Apple or Google
+  sign-in) is checked like a sign-up, or it would be an open door; a hidden Apple relay
+  address is therefore refused. `PreSignUp_AdminCreateUser` passes: only someone with AWS
+  access makes those, e.g. App Review's demo account. Cognito's email verification proves the
+  address is the user's, and the clients can't write `email` afterwards. This is the root fix S7 named for orphan-unlock rows from free
+  accounts. Its tests run on node's own runner from the root `npm test`, outside the
+  workspaces, so neither the lockfile nor the API's image changes.
 - **2026-10-04** — **The app icon is the mark (concept A), picked by the owner.** Three
   concepts were drawn: A, the mark on its stone-50 tile; B, the same tile as a block on an
   evergreen field; C, a lowercase "b" in stone-50 on green-700. The owner picked A: it is the
@@ -22,7 +41,6 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a build); a test keeps them out of `app/`. **Export compliance:** `ITSAppUsesNonExemptEncryption`
   is `false` in the app's `Info.plist`, since Bali's only encryption is the system's HTTPS, which
   is exempt.
-
 - **2026-10-04** — **P4: the help page is public, plain, and says only what is true today.**
   `/support` is read without signing in, so it calls no API and holds no state; it renders per
   request like every page (S4's CSP nonce), and the Sign out bar skips it as it skips `/login`, so
