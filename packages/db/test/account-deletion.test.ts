@@ -201,11 +201,21 @@ describe('deleteAccount (C3)', () => {
     const { ana } = await seed('c3-reborn');
     const eventId = newUuidV7();
     await deleteAccount(db, { userId: ana.id, eventId, at: new Date() });
-    // A boot call between the deletion and its retry made the sign-in a new row.
+    // A boot call between the deletion and its retry made the sign-in a new row —
+    // made after the deletion was recorded, stated outright: PGlite's clock is
+    // coarse enough for the two stamps to tie, which the check reads as before.
+    const recorded = one(
+      await db.select().from(events).where(eq(events.eventId, eventId)),
+    ).recordedAt;
     const reborn = one(
       await db
         .insert(users)
-        .values({ cognitoId: 'ana-c3-reborn', role: 'student', displayName: 'Ana' })
+        .values({
+          cognitoId: 'ana-c3-reborn',
+          role: 'student',
+          displayName: 'Ana',
+          createdAt: new Date(recorded.getTime() + 1000),
+        })
         .returning(),
     );
 
@@ -244,6 +254,37 @@ describe('deleteAccount (C3)', () => {
       displayName: 'Ana',
       removedAt: null,
     });
+  });
+
+  it('consumes a tap of theirs still waiting for a Start, and leaves a classmate’s waiting', async () => {
+    const { teacher, ana, ben, first } = await seed('c3-armed');
+    for (const studentId of [ana.id, ben.id]) {
+      await armTap(db, {
+        studentId,
+        teacherId: teacher.id,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: fromNow(60 * MIN),
+      });
+    }
+    const at = new Date();
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at });
+
+    const waiting = (studentId: string) =>
+      db.select().from(armedTaps).where(eq(armedTaps.studentId, studentId));
+    expect(one(await waiting(ana.id)).consumedAt).toEqual(at);
+    expect(one(await waiting(ben.id)).consumedAt).toBeNull();
+    // The Start takes Ben's and weighs nothing of hers.
+    const { session } = await startSession(db, {
+      classId: first.id,
+      startedAt: new Date(),
+      endsAt: fromNow(30 * MIN),
+    });
+    const joined = await db
+      .select({ studentId: participations.studentId })
+      .from(participations)
+      .where(eq(participations.sessionId, session.id));
+    expect(joined).toEqual([{ studentId: ben.id }]);
   });
 
   it('refuses a teacher with a class or a block, and deletes one with neither', async () => {

@@ -1808,6 +1808,40 @@ describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)',
       expect(await liveOf(studentId)).toHaveLength(0);
     }
   }, 60_000);
+
+  it('a deletion racing a Start that would take the student’s waiting tap leaves it consumed and them in no lesson', async () => {
+    // The Start locks its armed rows, then the student's tap lock; the deletion
+    // takes that lock, then the armed rows. A deadlock between them is refused
+    // by the database and retried; whichever order wins, the tap is consumed
+    // and the student ends in no lesson: converted and then left, or never taken.
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId, teacherId } = await seed(`race-delete-armed-${round}`);
+      await armTap(db, {
+        studentId,
+        teacherId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+      const deletion = () =>
+        deleteAccount(db, { userId: studentId, eventId: newUuidV7(), at: new Date() });
+      const [deleted, started] = await Promise.allSettled([
+        round % 2 === 1
+          ? new Promise((resolve) => setTimeout(resolve, 5)).then(deletion)
+          : deletion(),
+        openSession(classId),
+      ]);
+      if (deleted.status === 'rejected') throw deleted.reason;
+      if (started.status === 'rejected') throw started.reason;
+      expect(deleted.value.outcome).toBe('deleted');
+
+      const armed = one(
+        await db.select().from(armedTaps).where(eq(armedTaps.studentId, studentId)),
+      );
+      expect(armed.consumedAt).not.toBeNull();
+      expect(await liveOf(studentId)).toHaveLength(0);
+    }
+  }, 60_000);
 });
 
 /**

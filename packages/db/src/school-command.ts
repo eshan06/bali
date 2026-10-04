@@ -9,12 +9,13 @@ import {
   recordAgreement,
   schoolsNamed,
 } from './schools.js';
+import { exportStudentRecord } from './student-record.js';
 import type { Database } from './types.js';
 
 /*
  * The owner's school commands, `npm run school -- <command>`
  * (apps/api/scripts/school.ts): add a school, record its data agreement, mint a
- * teacher invite, list the schools, against DATABASE_URL as `npm run migrate`
+ * teacher invite, list the schools, export one student's record, against DATABASE_URL as `npm run migrate`
  * is. Every argument is checked before anything connects, and each refusal says
  * what was wrong and how to say it.
  */
@@ -27,6 +28,9 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
                                 good for ${INVITE_LIFETIME_DAYS} days, and shown this once only
   list                          every school: its id, its agreement's day, and how many of its
                                 invites are open (not redeemed, not expired); never a code
+  export-student <id>           one student's whole record, as JSON on standard output, for a
+                                parent's inspection request; <id> is their account's id or
+                                their Cognito subject (sub). It reads, and writes nothing
 
 It runs against DATABASE_URL, as npm run migrate does.`;
 
@@ -87,6 +91,16 @@ export function parseSchoolCommand(
     case 'list':
       nothingMore(args);
       return list;
+    case 'export-student': {
+      const [who, ...extra] = args;
+      if (!who?.trim()) {
+        throw new Error(
+          `export-student needs the account's id or Cognito subject: export-student <id>`,
+        );
+      }
+      nothingMore(extra);
+      return (io) => exportStudent(io, who.trim());
+    }
     default:
       throw new Error(`unknown command "${command}"`);
   }
@@ -181,4 +195,11 @@ async function list({ db, print }: SchoolCommandIO): Promise<void> {
       row(school.id, school.agreementSignedAt ?? 'none', String(school.openInvites), school.name),
     );
   }
+}
+
+/** The record as one JSON document, and nothing else on standard output, so it redirects whole. */
+async function exportStudent({ db, print }: SchoolCommandIO, who: string): Promise<void> {
+  const record = await exportStudentRecord(db, who);
+  if (!record) throw new Error(`no account on record has the id or Cognito subject ${who}`);
+  print(JSON.stringify(record, null, 2));
 }

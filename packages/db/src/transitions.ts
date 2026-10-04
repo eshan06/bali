@@ -3732,6 +3732,14 @@ export async function deleteAccount(
           refuseInSession: false,
         });
       }
+      // A tap of theirs still waiting for a Start — one armed just before this —
+      // goes with them: consumed, so no Start ever weighs it. A Start holds its
+      // armed rows before the student's tap lock this holds, so the two can
+      // deadlock; the database refuses one and the retry runs it after.
+      await tx
+        .update(armedTaps)
+        .set({ consumedAt: input.at })
+        .where(and(eq(armedTaps.studentId, me.id), isNull(armedTaps.consumedAt)));
 
       await tx
         .update(users)
