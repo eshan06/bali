@@ -1,5 +1,6 @@
 'use client';
 
+import type { SessionReportSummary as Summary } from '@bali/shared';
 import { useEffect, useId, useState } from 'react';
 
 import {
@@ -16,8 +17,9 @@ import { useApi } from '@/lib/use-api';
  * The recap card (R4): the class's last session, once the server has marked it over, as R2
  * reports it. The class page shows it while no session runs, so a Start takes it away, and it
  * reads the report each time it is shown. Class aggregates only: never one student's minutes.
+ * Given a `session` (R5's opened row), it reads that one's report, its heading for screen readers.
  */
-export function RecapCard({ classId }: { classId: string }) {
+export function RecapCard({ classId, session }: { classId: string; session?: Summary }) {
   const api = useApi();
   const headingId = useId();
   const [state, setState] = useState<RecapState>({ kind: 'finding' });
@@ -25,13 +27,13 @@ export function RecapCard({ classId }: { classId: string }) {
 
   useEffect(() => {
     let live = true;
-    void loadRecap(api, classId, (next) => {
+    void loadRecap(api, classId, session, (next) => {
       if (live) setState(next);
     });
     return () => {
       live = false;
     };
-  }, [api, classId, attempt]);
+  }, [api, classId, session, attempt]);
 
   // Nothing until there is a session to recap: a class that never ran one shows no card.
   if (state.kind === 'finding' || state.kind === 'none') return null;
@@ -41,31 +43,36 @@ export function RecapCard({ classId }: { classId: string }) {
     setAttempt((n) => n + 1);
   }
 
-  const session = state.kind === 'error' ? null : state.session;
+  const which = session ? 'this session' : 'the last session';
+  const shown = state.kind === 'error' ? null : state.session;
   return (
     <section
       aria-labelledby={headingId}
       aria-busy={state.kind === 'loading'}
       className="rounded-lg border border-slate-200 p-4 dark:border-slate-800"
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div
+        className={
+          session ? 'sr-only' : 'flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1'
+        }
+      >
         <h2 id={headingId} className="text-lg font-medium">
-          Last session
+          {session ? sessionTimes(session) : 'Last session'}
         </h2>
-        {session ? (
+        {shown && !session ? (
           <p className="text-sm text-slate-500 tabular-nums dark:text-slate-400">
-            {sessionTimes(session)}
+            {sessionTimes(shown)}
           </p>
         ) : null}
       </div>
       {state.kind === 'loading' ? (
         <p role="status" className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Loading the last session…
+          Loading {which}…
         </p>
       ) : state.kind === 'error' ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <p role="alert" className="text-sm">
-            Couldn't load the last session.{' '}
+            Couldn't load {which}.{' '}
             <span className="text-slate-600 dark:text-slate-300">{state.message}</span>
           </p>
           <button

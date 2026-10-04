@@ -130,6 +130,26 @@ describe('grid-state', () => {
     }
   });
 
+  it('draws an ended session from its snapshot, who was still unlocked at the end said (R5)', () => {
+    const s = fromSnapshot({
+      ...snapshot(9, [
+        { id: 'ana', endedAt: T1 },
+        { id: 'ben', state: 'unlocked', endedAt: T1 },
+        { id: 'cal', state: 'protection_off', endedAt: T1 },
+        { id: 'dee', state: null },
+      ]),
+      ended: true,
+    });
+    // An ended grid's clock stops (`LiveGrid`): none of its chips depends on the time.
+    const later = new Date('2026-01-02T08:00:00.000Z');
+    expect(['ana', 'ben', 'cal', 'dee'].map((id) => gridDisplay(s[id], later))).toEqual([
+      'ended',
+      'left_unprotected',
+      'left_protection_off',
+      'absent',
+    ]);
+  });
+
   it('marks a removed student as ended', () => {
     let s = fromSnapshot(snapshot(5, [{ id: 'cal' }]));
     s = applyEvent(s, evt(6, 'enrollment_removed', 'cal'));

@@ -35,17 +35,18 @@ export type RecapState =
   | { kind: 'error'; message: string };
 
 /**
- * Find the class's last session (R3, one row) and read its report (R2), telling `show` each step
- * after the first. Every failure ends in `error` with its cause, for the card's Try again.
+ * The class's last session (R3, one row), or `known` (R5's opened row): read its report (R2),
+ * telling `show` each step after the first. Every failure ends in `error`, for Try again.
  */
 export async function loadRecap(
   api: Pick<ApiClient, 'get'>,
   classId: string,
+  known: SessionReportSummary | undefined,
   show: (state: RecapState) => void,
 ): Promise<void> {
   const reports = `/v1/classes/${encodeURIComponent(classId)}/reports/sessions`;
   try {
-    const session = latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
+    const session = known ?? latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
     if (session === null) {
       show({ kind: 'none' });
       return;
@@ -66,7 +67,7 @@ export interface RecapFormat {
   timeZone?: string;
 }
 
-/** When the session ran, its start to its end: "Sat, Oct 4, 9:05 AM to 9:30 AM". */
+/** When the session ran, its start to its end: "Sun, Oct 4, 9:05 AM to 9:30 AM". */
 export function sessionTimes(
   session: SessionReportSummary,
   { locale, timeZone }: RecapFormat = {},
@@ -103,9 +104,25 @@ export interface RecapMoment {
   reason?: string;
 }
 
+/** The class's figures in words, as the card and the reports list (R5) both say them. */
+export function classFigures(
+  joined: number,
+  minutes: Pick<SessionReportSummary, 'focusMinutes' | 'averageFocusMinutes' | 'silentMinutes'>,
+  locale?: string,
+) {
+  const min = new Intl.NumberFormat(locale, { style: 'unit', unit: 'minute' }); // "83 min"
+  return {
+    joined: new Intl.NumberFormat(locale).format(joined),
+    focus: min.format(minutes.focusMinutes),
+    // Null only when nobody joined (R2), when there are no figures at all.
+    average: min.format(minutes.averageFocusMinutes ?? 0),
+    silent: min.format(minutes.silentMinutes),
+  };
+}
+
 export interface RecapView {
   /** The class's figures; null when nobody joined, which the card says instead of zeros. */
-  stats: { joined: string; focus: string; average: string; silent: string } | null;
+  stats: ReturnType<typeof classFigures> | null;
   /** Who joined, in the order they first did (R2's). */
   joined: { key: string; name: string }[];
   /** Oldest first, every one R2 lists, whatever it changed. */
@@ -119,28 +136,13 @@ export function recapView(
   { locale, timeZone }: RecapFormat = {},
 ): RecapView {
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
-  const count = new Intl.NumberFormat(locale);
-  const minutes = new Intl.NumberFormat(locale, {
-    style: 'unit',
-    unit: 'minute',
-    unitDisplay: 'short',
-  });
   const moment = (e: { eventId: string; student: ReportStudent; occurredAt: string }) => ({
     key: e.eventId,
     name: nameOf(e.student),
     time: clock.format(new Date(e.occurredAt)),
   });
   return {
-    stats:
-      report.joined.length === 0
-        ? null
-        : {
-            joined: count.format(report.joined.length),
-            focus: minutes.format(report.focusMinutes),
-            // Null only when nobody joined (R2), when there are no stats at all.
-            average: minutes.format(report.averageFocusMinutes ?? 0),
-            silent: minutes.format(report.silentMinutes),
-          },
+    stats: report.joined.length === 0 ? null : classFigures(report.joined.length, report, locale),
     joined: report.joined.map((s) => ({ key: s.id, name: nameOf(s) })),
     unlocks: report.unlocks.map((u) => ({
       ...moment(u),

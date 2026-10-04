@@ -8,6 +8,64 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **R5: the portal's reports page — a class's sessions newest first, a page at a
+  time, each row opening its recap; and, at the bell, the ended grid stays under the recap card
+  until the next Start.** **Where:** `/classes/{id}/reports`, reached by "Reports →" at the top of
+  the class page. **The list:** R3's rows, newest first, 20 a page, with Show earlier after them
+  (the history's paging, as the phone's History does it: `before` the oldest read, each session
+  once). Only sessions the server has marked over are listed: one running, or past its bell
+  before the sweep marks it, would be counted to now (R2's `ended: false`), and the card never
+  recaps a session the server still counts as running (R4's rule, never the tab's clock); its
+  grid is on the class page, and it is listed once over. So the empty state says "No reports yet.
+  When a session ends, its report shows here.", true with a first session running. **A row:** when
+  it ran (the card's `sessionTimes`), how many joined, the class's focus minutes and the average
+  per student who joined, silent minutes, and how many unlocks and protection offs; a session
+  nobody joined says so in place of zeros, as the card does. Worded by one function for both
+  (`classFigures`), so a row and its recap never say a number two ways. Class aggregates only.
+  **Opening one:** the row's first cell is a disclosure button (`aria-expanded`), one row open at
+  a time; R4's `RecapCard`, given the row's session, reads its report alone (R2) each time it
+  opens, its heading for screen readers only, since the row above says when it ran; R2's notes
+  (`recordedAs`) stay unshown there, as on the class page. **The
+  states:** loading; a failure said where it happened (the newest page: in the list's place; Show
+  earlier's: in its own place) with Try again; no reports yet; and a stale cursor: `400
+  unknown_cursor` (the portal's `ApiError` now carries the error's `reason`) reads the newest page
+  again and says "Bali lost your place in the list, so it starts again from the newest session."
+  in a status region kept mounted, so a screen reader hears it.
+  Only Show earlier's cursor restarts the list: the newest page refused so is said as any failure,
+  never read again and again. The newest page reads the class too, for its name in the back link,
+  and either read failing fails it. **The look:** a table (a header row, each session a row
+  header), the portal's Tailwind, no colour for any state, numerals `tabular-nums`, a text glyph
+  (▸ ▾) for the disclosure, no motion but the buttons' 150 ms hover, off under reduced motion;
+  narrower than its columns (about 700 px), the table scrolls sideways (desktop-first, works on a
+  tablet). **The ended grid (R4's review WARN, the owner's default):** R4's card replaced the grid
+  at the bell, so who was still unlocked at the end, the grid's "Left · unlocked", went with it.
+  The class page now keeps the grid under the card, headed "How it ended", until the next Start:
+  when the page marks the session over (the End's answer, or the grid's end event or snapshot),
+  the live grid goes and a grid of the ended session takes its place under the card, drawn once
+  from that session's own snapshot, so its picture is the server's at the end, never chips the
+  stream had not yet ended. A grid booting on a session already over draws it and stops: no
+  stream, no 15 s refresh, no clock, no staleness banner. An ended grid streaming until the next
+  Start would hold one of the account's five live streams, and a tab per class left open could
+  take them all and refuse the stream of the class being taught. A report that reaches the server
+  after the end shows in the reports, and in the card at its next showing, as R4 has it. A fresh
+  visit shows the card alone: there is no grid on the page to keep. A grid whose snapshot read
+  fails, live or ended, now says why with Try again (it said why with no way to retry). UI only. **The `429` (R4's review WARN):** every route the
+  portal calls spends the account's budget, whose `Retry-After` is a second at L1's sizes, so
+  "Wait a minute" told a teacher to wait sixty times too long: it says "Too many tries for now.
+  Wait a moment, then try again." The phone keeps "a minute", which its join budget's 30 s earns.
+  **Where it lives:** `apps/web/src/lib/reports.ts` (the reads, the paging, the stale cursor, a
+  row's words; tested), `classFigures` and `loadRecap`'s opened session in `recap.ts`, and
+  `LiveGrid`'s `over`.
+
+- **2026-10-04** — **The owner's rulings: T1a's invite codes, and the reports' silence rule.**
+  **(a)** A teacher invite code is single-use and expires 14 days after it is minted; the owner
+  mints each one with a command (T1a). **(b)** An account that is already a student in a live
+  class can't redeem one: the redemption is refused, and the account is told to use a separate
+  account for teaching (T1b, T2). **(c)** The reports' silence rule stands as R1 built it: silent
+  time isn't focus and is reported apart, as silent minutes; and the 1.5 to 2.5 minutes before a
+  phone is declared silent (the 90 s threshold, plus up to the sweep's minute) still count as
+  focus. These answer the two open owner items, removed from `docs/PLAN.md`.
+
 - **2026-10-04** — **R4: the recap card — the class page shows its last session's report (R2) once
   the server has marked it over, until a new session starts; and the portal says a `429` in the
   phone's words.** **When it shows (the conductor's call):** the class's newest session, once the

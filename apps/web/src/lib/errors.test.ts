@@ -7,7 +7,7 @@ describe('errText', () => {
   it('says what to do over the budget, never the API’s own 429 message', () => {
     const e = new ApiError(429, 'rate_limited', 'too many requests from this account');
     expect(errText(e)).toBe(TOO_MANY_TRIES);
-    expect(TOO_MANY_TRIES).toBe('Too many tries for now. Wait a minute, then try again.');
+    expect(TOO_MANY_TRIES).toBe('Too many tries for now. Wait a moment, then try again.');
   });
 
   it('maps the 429 the API client throws from the real error shape', async () => {

@@ -92,7 +92,7 @@ function fakeApi(answers: Record<string, unknown>) {
 
 async function states(api: ReturnType<typeof fakeApi>, classId = 'c1'): Promise<RecapState[]> {
   const shown: RecapState[] = [];
-  await loadRecap(api, classId, (s) => shown.push(s));
+  await loadRecap(api, classId, undefined, (s) => shown.push(s));
   return shown;
 }
 
@@ -138,6 +138,22 @@ describe('loadRecap', () => {
       { kind: 'loading', session: SESSION },
       { kind: 'error', message: TOO_MANY_TRIES },
     ]);
+  });
+
+  it('reads a session the reports page opened, its report alone (R5)', async () => {
+    const api = fakeApi({ [ONE]: REPORT });
+    const shown: RecapState[] = [];
+    await loadRecap(api, 'c1', SESSION, (s) => shown.push(s));
+    expect(shown).toEqual([
+      { kind: 'loading', session: SESSION },
+      { kind: 'ready', session: SESSION, report: REPORT },
+    ]);
+    expect(api.asked).toEqual([ONE]);
+
+    const failing = fakeApi({ [ONE]: new NetworkError() });
+    const failed: RecapState[] = [];
+    await loadRecap(failing, 'c1', SESSION, (s) => failed.push(s));
+    expect(failed.at(-1)).toEqual({ kind: 'error', message: new NetworkError().message });
   });
 
   it('puts the class id in the path as one segment', async () => {

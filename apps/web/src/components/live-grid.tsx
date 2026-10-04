@@ -64,9 +64,12 @@ export function LiveGrid({
     onEndedRef.current = onEnded;
   }, [onEnded]);
   const [students, setStudents] = useState<Students | null>(null);
+  // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
+  const [over, setOver] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0); // a boot that failed, tried again (rule 5)
   // Any sign of life from the server: an event, a heartbeat comment, or a
   // snapshot refresh that came back. A heartbeat is freshness and not just
   // liveness — a quiet class emits no events, so nothing arriving is normal
@@ -82,6 +85,7 @@ export function LiveGrid({
 
   // Boot from the snapshot, then stream.
   useEffect(() => {
+    setError(null);
     let sse: SseClient | null = null;
     let cancelled = false;
     void (async () => {
@@ -89,7 +93,11 @@ export function LiveGrid({
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
-        if (snap.ended) onEndedRef.current?.(sessionId);
+        if (snap.ended) {
+          setOver(true);
+          onEndedRef.current?.(sessionId);
+          return;
+        }
         appliedSeq.current = snap.latestSeq;
         lastStreamActivity.current = Date.now();
         lastGridActivity.current = Date.now();
@@ -120,13 +128,14 @@ export function LiveGrid({
       cancelled = true;
       sse?.close();
     };
-  }, [api, sessionId, onUnauthorized]);
+  }, [api, sessionId, onUnauthorized, attempt]);
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
+    if (over) return;
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [over]);
 
   // Slow snapshot refresh keeps derived silence honest for quietly-present
   // students: heartbeats update last_seen_at server-side but emit no event
@@ -135,6 +144,7 @@ export function LiveGrid({
   // read before an unlock but resolving after it would put the chip back to
   // green for an unshielded phone.
   useEffect(() => {
+    if (over) return;
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
         (snap) => {
@@ -157,9 +167,18 @@ export function LiveGrid({
       );
     }, 15_000);
     return () => clearInterval(t);
-  }, [api, sessionId]);
+  }, [api, sessionId, over]);
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-red-600">
+        {error}{' '}
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="underline">
+          Try again
+        </button>
+      </p>
+    );
+  }
   if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
 
   const stale = staleness({
@@ -173,7 +192,7 @@ export function LiveGrid({
 
   return (
     <div className="space-y-3">
-      {stale ? (
+      {stale && !over ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {stale.reason === 'reconnecting' ? 'Reconnecting' : 'Live feed has gone quiet'} — last
           updated {stale.secondsAgo}s ago

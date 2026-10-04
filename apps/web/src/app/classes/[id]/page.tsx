@@ -19,7 +19,8 @@ export default function ClassDetailPage() {
 
   const [klass, setKlass] = useState<ClassDetail | null>(null);
   const [roster, setRoster] = useState<RosterResponse | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  // The session the grid shows: running, or over, kept under the recap card until the next Start.
+  const [grid, setGrid] = useState<{ id: string; over: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,11 +29,11 @@ export default function ClassDetailPage() {
     api.get<ClassDetail>(`/v1/classes/${classId}`).then(
       (c) => {
         setKlass(c);
-        // Recover the live grid across a reload. `sessionId` is otherwise seeded
+        // Recover the live grid across a reload. `grid` is otherwise seeded
         // only by the Start response, so refreshing mid-lesson dropped the grid
         // and offered to start a session that was already running — which reads
         // as the session having ended.
-        setSessionId((cur) => cur ?? c.liveSessionId);
+        setGrid((cur) => cur ?? (c.liveSessionId ? { id: c.liveSessionId, over: false } : null));
       },
       (e: unknown) => setError(errText(e)),
     );
@@ -50,9 +51,9 @@ export default function ClassDetailPage() {
   }, [load, router]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another
-  // tab or a phone), and the recap card takes its place. Only that session's end clears it.
+  // tab or a phone), and the recap card goes above it. Only that session's end changes anything.
   const onEnded = useCallback((ended: string) => {
-    setSessionId((cur) => (cur === ended ? null : cur));
+    setGrid((cur) => (cur?.id === ended ? { id: ended, over: true } : cur));
   }, []);
 
   function startSession() {
@@ -60,7 +61,7 @@ export default function ClassDetailPage() {
     api.post<StartSessionResponse>(`/v1/classes/${classId}/sessions`, { durationMinutes: 25 }).then(
       (res) => {
         setBusy(false);
-        setSessionId(res.session.id);
+        setGrid({ id: res.session.id, over: false });
       },
       (e: unknown) => {
         setBusy(false);
@@ -70,12 +71,13 @@ export default function ClassDetailPage() {
   }
 
   function endSession() {
-    if (!sessionId) return;
+    if (!grid) return;
+    const ending = grid.id;
     setBusy(true);
-    api.post(`/v1/sessions/${sessionId}/end`).then(
+    api.post(`/v1/sessions/${ending}/end`).then(
       () => {
         setBusy(false);
-        setSessionId(null);
+        onEnded(ending);
       },
       (e: unknown) => {
         setBusy(false);
@@ -86,9 +88,17 @@ export default function ClassDetailPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/" className="text-sm text-slate-500 hover:underline">
-        ← All classes
-      </Link>
+      <nav className="flex justify-between gap-4 text-sm">
+        <Link href="/" className="text-slate-500 hover:underline">
+          ← All classes
+        </Link>
+        <Link
+          href={`/classes/${classId}/reports`}
+          className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+        >
+          Reports →
+        </Link>
+      </nav>
 
       <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold">{klass?.name ?? '…'}</h1>
@@ -102,7 +112,7 @@ export default function ClassDetailPage() {
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
       <div className="mt-6">
-        {sessionId === null ? (
+        {grid === null || grid.over ? (
           <div className="space-y-6">
             <button
               type="button"
@@ -115,6 +125,13 @@ export default function ClassDetailPage() {
             {/* The last session's recap (R4) until a new one starts; only once the class is read,
                 so a session already running never shows it. */}
             {klass ? <RecapCard classId={classId} /> : null}
+            {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
+            {grid ? (
+              <section className="space-y-4">
+                <h2 className="text-lg font-medium">How it ended</h2>
+                <LiveGrid sessionId={grid.id} />
+              </section>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-4">
@@ -129,7 +146,7 @@ export default function ClassDetailPage() {
                 End session
               </button>
             </div>
-            <LiveGrid sessionId={sessionId} onEnded={onEnded} />
+            <LiveGrid sessionId={grid.id} onEnded={onEnded} />
           </div>
         )}
       </div>
