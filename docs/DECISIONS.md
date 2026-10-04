@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P5: TestFlight from CI, by hand.** **Trigger:** `workflow_dispatch`
+  only, with a choice of environment; dev is the only option, and builds with `project.yml`'s
+  values, which are dev's. Prod adds an option and its overrides in the Archive step, so its
+  values stay out of the project until prod exists. **No key, no failure:** a Linux job reads
+  whether the three secrets are set, so a keyless run spends no macOS minutes and passes with a
+  warning naming what is missing. **Upload by Xcode itself:** `-exportArchive` with
+  `destination: upload` and the same key, not `altool` (deprecated for uploads) or fastlane (a
+  Ruby toolchain for one call): no new dependency. **Signing:** automatic, through the key
+  (`-allowProvisioningUpdates`), as `project.yml` already signs; no certificate or profile in
+  secrets. The owner's key is App Manager as asked; if Xcode refuses it a certificate, an Admin
+  key is the fallback (`docs/DEPLOY.md`). **Build number:** `github.run_number`, so a re-run of
+  an uploaded run is refused and a new dispatch is the way. **Release guard (a slice of S10):**
+  cheap checks before signing and before upload — no `DEBUG` in Release's compilation
+  conditions, no Debug-only text in the app or the monitor binary, the sign-in settings present
+  and HTTPS, the run's build number, and an app icon, which the app lacks today, so the first
+  run fails there with that said rather than at Apple's validation. S10's own rule (Release
+  never ships dev's API) waits for prod: today dev is the only build there is.
 - **2026-10-04** — **P3: a teacher registers their block on the portal by its ID.** **Where:**
   a "Your block" section under the classes on the home page, not a page of its own: a teacher
   does it once, and the classes page is where they land. **The read:** none existed, so

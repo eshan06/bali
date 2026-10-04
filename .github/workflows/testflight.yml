@@ -1,0 +1,191 @@
+# TestFlight (Phase 5, P5): the student app archived as Release, signed through the
+# owner's App Store Connect API key, and uploaded to TestFlight. Run by hand only (Actions →
+# TestFlight → Run workflow). Without the key's three secrets it says so and passes, building
+# nothing. Setup, and what a run needs on Apple's side: docs/DEPLOY.md, "TestFlight".
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Whose API and sign-in the build talks to
+        type: choice
+        # Only dev exists. When prod does, add it here and its values in "Archive" below.
+        options: [dev]
+        default: dev
+
+permissions:
+  contents: read
+
+# One upload at a time, and never one cut off halfway.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  # On Linux, so a run with no key spends no macOS minutes.
+  secrets:
+    name: App Store Connect key present?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          missing=""
+          [ -n "$KEY_ID" ] || missing="$missing APP_STORE_CONNECT_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing APP_STORE_CONNECT_ISSUER_ID"
+          [ -n "$KEY_P8" ] || missing="$missing APP_STORE_CONNECT_KEY_P8"
+          if [ -n "$missing" ]; then
+            msg="Skipped: no TestFlight build. Missing secret(s):$missing. docs/DEPLOY.md, \"TestFlight\", says how to add them."
+            echo "::warning::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  upload:
+    name: Archive and upload to TestFlight
+    needs: secrets
+    if: needs.secrets.outputs.ready == 'true'
+    # As ios.yml (decision 9): once the repo is private, `[self-hosted, macOS]`.
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Where the archive and the key go; and, as ios.yml, Xcode 26.6 on GitHub's image.
+      - name: Select Xcode
+        run: |
+          echo "ARCHIVE=$RUNNER_TEMP/Bali.xcarchive" >> "$GITHUB_ENV"
+          echo "KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          if [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+      - run: xcodebuild -version
+
+      # As ios.yml: pinned and checksummed.
+      - name: Install XcodeGen
+        env:
+          VERSION: 2.46.0
+          SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/$VERSION/xcodegen.zip"
+          echo "$SHA256  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q -o "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+        working-directory: ios
+
+      # Release guard, before anything is signed (#130, "Nothing from Debug in Release"; a slice of
+      # Phase 6's S10): no target compiles its `#if DEBUG` code — the readout, the device-check
+      # switches, the preview fixtures.
+      - name: 'Release guard: no DEBUG flag'
+        working-directory: ios
+        run: |
+          settings=$(xcodebuild -showBuildSettings -project Bali.xcodeproj -scheme Bali -configuration Release)
+          flags=$(echo "$settings" | grep -E '^ *(SWIFT_ACTIVE_COMPILATION_CONDITIONS|GCC_PREPROCESSOR_DEFINITIONS) = ' || true)
+          echo "$flags"
+          if echo "$flags" | grep -qw DEBUG; then
+            echo "::error::A Release target compiles with DEBUG set: its readout and device checks would ship."
+            exit 1
+          fi
+
+      # The key only for as long as the run needs it; the last step removes it.
+      - name: Write the API key
+        env:
+          KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: (umask 077; printf '%s\n' "$KEY_P8" > "$KEY_PATH")
+
+      # Signed through the key: Xcode makes or fetches the certificate and profiles itself. The
+      # build number is the run's, the same in the app and both extensions.
+      - name: Archive
+        working-directory: ios
+        run: |
+          case "$ENVIRONMENT" in
+            dev) overrides=() ;; # project.yml's values are dev's.
+            # prod) overrides=(BALI_API_URL=… BALI_COGNITO_DOMAIN=… BALI_COGNITO_CLIENT_ID=…) ;;
+            *) echo "::error::No values for the environment \"$ENVIRONMENT\"."; exit 1 ;;
+          esac
+          xcodebuild archive -quiet -project Bali.xcodeproj -scheme Bali -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" "${overrides[@]}"
+
+      # Release guard on what was built: the sign-in's settings are there, over HTTPS; the build
+      # number is the run's; an icon exists (App Store Connect refuses a build without one); and
+      # no binary holds text that only `#if DEBUG` code has — the readout's title and the
+      # monitor's lost-bell check. Renaming those texts means updating them here.
+      - name: 'Release guard: the archived app'
+        run: |
+          app="$ARCHIVE/Products/Applications/Bali.app"
+          plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$app/Info.plist" 2>/dev/null; }
+          fail=0
+          for key in BaliAPIURL BaliCognitoDomain BaliCognitoClientID BaliCognitoRedirectURI; do
+            value=$(plist "$key")
+            echo "$key = $value"
+            [ -n "$value" ] || { echo "::error::$key is empty: the app could not sign in."; fail=1; }
+          done
+          for key in BaliAPIURL BaliCognitoDomain; do
+            case "$(plist "$key")" in
+              https://*) ;;
+              *) echo "::error::$key is not an https:// URL."; fail=1 ;;
+            esac
+          done
+          [ "$(plist CFBundleVersion)" = "$GITHUB_RUN_NUMBER" ] \
+            || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }
+          [ -n "$(plist CFBundleIconName)" ] \
+            || { echo "::error::The app has no icon (CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
+          for marker in "Bali:Debug readout" "PlugIns/BaliMonitor.appex/BaliMonitor:lost on purpose (device check)"; do
+            binary="$app/${marker%%:*}"
+            if [ ! -f "$binary" ]; then
+              echo "::error::No $binary in the archive to check."
+              fail=1
+            elif LC_ALL=C grep -qaF "${marker#*:}" "$binary"; then
+              echo "::error::$(basename "$binary") holds Debug-only code (\"${marker#*:}\")."
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+      # Signed for App Store Connect and uploaded in one step: `destination: upload` sends the build
+      # with the same key, so no other uploader is needed.
+      - name: Export and upload to TestFlight
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>H535678UF8</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+          echo "Uploaded build $GITHUB_RUN_NUMBER ($ENVIRONMENT). It shows in App Store Connect → TestFlight once Apple has processed it." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
