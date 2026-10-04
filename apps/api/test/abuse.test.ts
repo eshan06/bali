@@ -231,15 +231,19 @@ describe('a flood of orphan unlocks', () => {
 
     // Then its refill, and no more: two a second.
     ms += 10_000;
-    for (let i = 0; i < 25; i += 1) {
-      await send(app, {
+    const refill = (10 * BUDGETS.account.perMinute) / 60;
+    const after: number[] = [];
+    for (let i = 0; i < refill + 5; i += 1) {
+      const res = await send(app, {
         method: 'POST',
         url: `/v1/sessions/${randomUUID()}/unlock`,
         sub,
         payload: stamped(),
       });
+      after.push(res.status);
     }
-    expect(await orphans()).toBe(BUDGETS.account.burst + (10 * BUDGETS.account.perMinute) / 60);
+    expect(after).toEqual([...Array<number>(refill).fill(200), ...Array<number>(5).fill(429)]);
+    expect(await orphans()).toBe(BUDGETS.account.burst + refill);
   });
 });
 
