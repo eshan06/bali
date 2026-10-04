@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
@@ -42,6 +43,12 @@ export default function LoginPage() {
         Sign in
       </button>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <Link
+        href="/support"
+        className="text-sm text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:text-slate-300 dark:hover:text-slate-100"
+      >
+        Help and questions
+      </Link>
     </main>
   );
 }
