@@ -1,5 +1,8 @@
 import type { RouteOptions } from 'fastify';
-import { writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -21,6 +24,13 @@ import {
  * too and fails on any diff, as it does for the contract fixtures. Either way,
  * a removal from /v1 fails first and nothing is written (additive-only): an
  * addition passes once the regenerated snapshot is committed.
+ *
+ * A branch can't move its own baseline (O1b): CI puts the base branch's copy
+ * in place before it regenerates (ci.yml), so a removal is judged against
+ * what the base promised however the branch's copy was deleted, regenerated
+ * or edited — and here a missing snapshot fails rather than starting over.
+ * Nor can a route parse outside the snapshot: only `parseRequest` reads a
+ * request's params, query or body, against the schemas its route declares.
  */
 
 const UPDATE = process.env.UPDATE_FIXTURES === '1';
@@ -56,8 +66,7 @@ function shape(route: RouteOptions, part: 'params' | 'query' | 'body') {
 describe('the API snapshot (contracts/openapi.json)', () => {
   it('is the surface the app has today, and keeps every /v1 promise', async () => {
     const committed = await readSnapshot();
-    const before = committed === null ? {} : (JSON.parse(committed) as Record<string, unknown>);
-    const breaks = broken(before, today);
+    const breaks = broken(JSON.parse(committed) as Record<string, unknown>, today);
     // First, so a regenerate never writes a removal over the snapshot.
     expect(breaks, additiveOnly(breaks)).toEqual([]);
     if (UPDATE) {
@@ -151,5 +160,90 @@ describe('the API snapshot (contracts/openapi.json)', () => {
   it('holds only /v1 to additive-only: the probe and the sweep are not the apps’', () => {
     const without = routes.filter((r) => !r.url.startsWith('/healthz'));
     expect(broken(today, openApiDocument(without))).toEqual([]);
+  });
+
+  it('fails when the snapshot is missing: regenerated from nothing, it would hide a removal', async () => {
+    // Nothing promises nothing: against it, a removed route passes.
+    expect(broken({}, openApiDocument(edit('POST', '/v1/taps', () => null)))).toEqual([]);
+    const gone = fileURLToPath(new URL('./no-such-openapi.json', import.meta.url));
+    await expect(readSnapshot(gone)).rejects.toThrow(/is missing.*never regenerated from nothing/);
+  });
+});
+
+/** The request parts the snapshot holds: what a route declares in `config.parses`. */
+const PARTS = new Set(['params', 'query', 'body']);
+
+/**
+ * Every place `source` reads a request part by name — `request.body`,
+ * `req?.query`, `request['params']`, `const { body } = request`, a handler's
+ * `({ query }) =>` — as `file:line reads part`. Syntax alone, so whatever
+ * the object is called: the app has no other params, query or body to read,
+ * and `parseRequest` reads its part by a variable, never by name. Some other
+ * object's `.query` would fail it loudly, never pass; a read that hides its
+ * name (`Reflect.get`, a key held in a variable) is a dodge for review, not a
+ * mistake this catches.
+ */
+function bareReads(file: string, source: string): string[] {
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const found: string[] = [];
+  // A key as written: a name, or a quoted one — never a variable holding one.
+  const quoted = (key: ts.Node) => (ts.isStringLiteralLike(key) ? key.text : undefined);
+  const visit = (node: ts.Node): void => {
+    let part: string | undefined;
+    if (ts.isPropertyAccessExpression(node)) part = node.name.text;
+    if (ts.isElementAccessExpression(node)) part = quoted(node.argumentExpression);
+    if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+      const key = node.propertyName ?? node.name;
+      if (ts.isIdentifier(key)) part = key.text;
+      else part = quoted(ts.isComputedPropertyName(key) ? key.expression : key);
+    }
+    if (part !== undefined && PARTS.has(part)) {
+      const { line } = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+      found.push(`${file}:${line + 1} reads ${part}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return found;
+}
+
+describe('a route parses only through parseRequest, so none stays out of the snapshot', () => {
+  it('holds in every file of the app', async () => {
+    const src = fileURLToPath(new URL('../src/', import.meta.url));
+    const files = (await readdir(src, { recursive: true })).filter((f) => f.endsWith('.ts'));
+    expect(files).toContain(join('routes', 'taps.ts'));
+    const reads = await Promise.all(
+      files.map(async (f) => bareReads(join('src', f), await readFile(join(src, f), 'utf8'))),
+    );
+    expect(
+      reads.flat(),
+      'parse a request part with parseRequest, its schema declared in config.parses',
+    ).toEqual([]);
+  });
+
+  it('fails a bare read of a part, in each form a handler can write one', () => {
+    const route = `
+      app.post('/v1/a', async (request) => parse(Body, request.body));
+      app.get('/v1/b', async (req) => parse(Query, req?.query));
+      app.get('/v1/c/:id', async (request) => parse(Params, request['params']));
+      app.post('/v1/d', async ({ body }) => parse(Body, body));
+      app.get('/v1/e', async (request) => { const { query: q } = request; return parse(Query, q); });
+      app.post('/v1/f', async (request) => { const { ['body']: b } = request; return parse(Body, b); });
+    `;
+    expect(bareReads('route.ts', route)).toEqual([
+      'route.ts:2 reads body',
+      'route.ts:3 reads query',
+      'route.ts:4 reads params',
+      'route.ts:5 reads body',
+      'route.ts:6 reads query',
+      'route.ts:7 reads body',
+    ]);
+    // A part named only as config.parses' key, or held in a variable as parseRequest's own read.
+    const declared = `
+      app.post('/v1/a', { config: { parses: { body: Body } } }, async (request) =>
+        parseRequest(request, 'body', Body));
+      const parseRequest = (request, part, schema) => parse(schema, request[part]);
+    `;
+    expect(bareReads('route.ts', declared)).toEqual([]);
   });
 });
