@@ -8,6 +8,54 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **R1: focus time is one pure function of a session's stored events
+  (`sessionReport`, `@bali/shared`), read in the engine's order; silent time is not focus, and is
+  counted apart.** **What it is:** the session's window (start, bell, end), its events as the
+  `events` table stores them, and the server's `now` give who joined, the class's focus minutes
+  (total, and the average per student who joined), the minutes it went silent, and every unlock
+  and protection-off report with its note. No I/O; R2 and R3 serve it, R4 and R5 draw it.
+  **The order is `seq`, the engine's own:** it applied each record as it arrived — one student's
+  in one session one at a time, under the session's lock or their row's — and noted
+  (`payload.recorded_as`) each one it did not apply. So a noted record moves no one, and the rest
+  move a student as the engine did: a tap or a refocus to focus, an unlock to unlocked,
+  protection off to it, Screen Time back on to the state before it (unlocked where the latest
+  turn, never a late one, is an unlock: #167's `latestTurn`), and a switch, a removal or a leave
+  out of the session. That is A12's order wherever the phone sent one, since the engine noted the
+  late record of each pair, so the function never reads `order_install` / `order_seq` itself:
+  nothing the engine left un-noted can disagree with them, and re-judging them would second-guess
+  the engine. Pinned on the engine: a clock turned back between a refocus and the real unlock
+  after it counts 4 minutes; by the times, 19. **The times only measure:** each is the stored
+  claim (rule 1), held to the window the session really ran, from its start to the earliest of
+  `ended_at`, the bell and `now` (a session the sweep has not ended counts to its bell; one
+  running, to now), and, along a student's own order, never earlier than the record before it. A
+  claim timed before what went ahead of it counts from that moment, so a clock turned back adds no
+  time and never counts any before the student's own tap. **Silence:** the docs don't say how a
+  report counts it, so this is the default until the owner rules. A focused phone's time from
+  `went_silent` until contact (`came_back`, which the engine records for any contact) or the end
+  of its stint is not focus, since rule 3 and the grid's "never green" say silence is unverified.
+  It is reported apart (`silentMinutes`), so the report says how much went unverified instead of
+  hiding it. **Protection off** ends focus as an unlock does, and each report is listed with its
+  note (`after_session_end` where it reached the server after the end), for R2 to show as it
+  chooses. **The average** divides the class's focus by the students who joined (an applied
+  `tap_in`, never `armed_tap_skipped`, never a tap noted `superseded`), and is null, not 0, when
+  no one did. **The unlock list** holds every unlock in the class, applied or noted, oldest first,
+  each with its reason now (its latest `unlock_reason_changed`, A20, as the grid and the history
+  show it) and its note. One kept with no class (`unknown_session`, `not_enrolled`, `tap_armed`,
+  `unknown_tap`) is in none, so the one its tap files later, naming it (`unattached_event_id`),
+  is the one that counts. **Minutes are exact**, fractions kept; the reader rounds. **Aggregates
+  only:** each student's minutes stay inside the function. **Not covered, disclosed:** (1) the
+  claims are what rule 1 lets them be, so a clock running fast or slow inside the window moves
+  that student's minutes (S9 surfaces skew); (2) the time from a phone's last contact to the
+  sweep's `went_silent`, the 90 s threshold and up to a sweep's minute, counts as focus, and a
+  sweep that never ran records no silence; (3) B6b's one press filed twice (the follow-up where
+  the phone stood, and the filing where a refused scan later landed) is two records, as that
+  ruling allows, so a session holding both lists both. **Tests:** one per rule on events built by
+  hand (`packages/shared/src/report.test.ts`), and the same rules driven through the real engine,
+  the events it stored fed in (`packages/db/test/report.test.ts`). Each test fails when the rule
+  it pins is broken: ordered by the times, a noted unlock or return applied, `ended_at` or the
+  bell ignored, a skip joined, a kept unlock counted, silence counted as focus, a late turn, the
+  reason change dropped.
+
 - **2026-10-04** — **L2b: the one-address load gate passes, so ISSUES #1 is done — a school at the
   bell from one address meets no `429` and no `5xx` at p95 8.5 ms, while one flooding account is
   refused; and the sweep at that size takes about a second, so L3 is not needed.** **The gate**
