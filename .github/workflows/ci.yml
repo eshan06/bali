@@ -80,7 +80,15 @@ jobs:
       # tsc alone doesn't exercise the Next build (the webpack extensionAlias
       # that resolves @bali/shared's .js specifiers, Tailwind's PostCSS step),
       # so a portal that type-checks but cannot build would merge green.
-      - run: npm run build -w @bali/web
+      # A static (○) route is built ahead, so it carries no CSP nonce and its
+      # scripts are refused: a blank page (Phase 6, S4; src/app/rendering.test.ts).
+      - name: Build the portal, every route rendered per request
+        run: |
+          npm run build -w @bali/web | tee "$RUNNER_TEMP/web-build.log"
+          if grep -F ' ○ /' "$RUNNER_TEMP/web-build.log"; then
+            echo "::error::static routes above carry no CSP nonce; keep the root layout's dynamic = 'force-dynamic'"
+            exit 1
+          fi
 
   # The same Vitest suite, but against a real multi-connection Postgres. This is
   # the only lane where the engine's FOR UPDATE serialization actually contends,

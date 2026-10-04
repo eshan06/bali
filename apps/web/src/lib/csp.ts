@@ -19,15 +19,23 @@ export interface CspOptions {
   dev: boolean;
 }
 
-/** The origin a configured URL names (a DSN's key and path go); null when it is blank. */
+/**
+ * The http(s) origin a configured URL names (a DSN's key and path go); null when it is unset or
+ * blank. Anything else throws: an origin of `null` would silently block every call.
+ */
 function originOf(url: string | undefined): string | null {
   if (url === undefined || url.trim() === '') return null;
-  return new URL(url).origin;
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`not an http(s) URL: ${parsed.protocol}`);
+  }
+  return parsed.origin;
 }
 
 export function contentSecurityPolicy(options: CspOptions): string {
   const nonce = `'nonce-${options.nonce}'`;
   const api = originOf(options.apiUrl);
+  if (api === null) throw new Error('the API URL is blank: the portal could call nothing');
   const cognito = originOf(options.cognitoDomain);
   const sentry = originOf(options.sentryDsn);
   const list = (...sources: (string | null | false)[]) =>

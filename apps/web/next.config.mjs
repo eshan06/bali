@@ -15,15 +15,19 @@ export const securityHeaders = [
   },
 ];
 
-// The CSP's origins (src/lib/csp.ts): a malformed one fails the build here, not every page.
+// The CSP's origins (src/lib/csp.ts): one that is no http(s) URL fails the build here, not every
+// page. Unset means the default (the API) or none (Cognito, Sentry); a blank API is an error.
 for (const name of [
   'NEXT_PUBLIC_API_URL',
   'NEXT_PUBLIC_COGNITO_DOMAIN',
   'NEXT_PUBLIC_SENTRY_DSN',
 ]) {
   const value = process.env[name]?.trim();
-  if (value && !URL.canParse(value))
-    throw new Error(`${name} is not a URL: the CSP needs its origin`);
+  if (value === undefined || (value === '' && name !== 'NEXT_PUBLIC_API_URL')) continue;
+  const url = URL.canParse(value) ? new URL(value) : null;
+  if (url?.protocol !== 'http:' && url?.protocol !== 'https:') {
+    throw new Error(`${name} is not an http(s) URL: the CSP needs its origin`);
+  }
 }
 
 /** @type {import('next').NextConfig} */

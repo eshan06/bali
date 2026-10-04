@@ -83,6 +83,11 @@ describe('contentSecurityPolicy', () => {
 
   it('fails loudly on a configured URL that is not one', () => {
     expect(() => contentSecurityPolicy({ ...BASE, apiUrl: 'not a url' })).toThrow();
+    // Parses, but its origin is the string 'null': every call would be refused.
+    expect(() => contentSecurityPolicy({ ...BASE, apiUrl: 'mailto:x@y' })).toThrow(/http\(s\)/);
+    expect(() => contentSecurityPolicy({ ...BASE, sentryDsn: 'javascript:alert(1)' })).toThrow();
+    // A blank API would drop it from connect-src.
+    expect(() => contentSecurityPolicy({ ...BASE, apiUrl: ' ' })).toThrow(/blank/);
   });
 });
 
