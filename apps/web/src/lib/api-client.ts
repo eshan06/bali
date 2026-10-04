@@ -1,5 +1,7 @@
 import type { ApiErrorBody } from '@bali/shared';
 
+import { captureApiFailure } from './monitoring';
+
 /**
  * The API client, built around the one auth-honesty rule the portal must never
  * break: **only a definitive 401 signs a user out.** A `fetch` that throws is a
@@ -81,6 +83,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     } catch {
       // fetch rejects only on a network-level failure, never on an HTTP error
       // status — so this is "can't reach the server", not "not allowed".
+      captureApiFailure(method, path, 'network');
       throw new NetworkError();
     }
 
@@ -89,6 +92,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       throw new UnauthorizedError();
     }
     if (!res.ok) {
+      // A 5xx is the server failing; a 4xx is a refusal the screen explains.
+      if (res.status >= 500) captureApiFailure(method, path, res.status);
       const parsed = (await res.json().catch(() => null)) as ApiErrorBody | null;
       // Guard `parsed.error` too, not just `parsed`: a non-2xx body that is valid
       // JSON without our `{ error: { code, message } }` shape (an ALB/API-Gateway
