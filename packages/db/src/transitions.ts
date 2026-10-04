@@ -19,7 +19,20 @@ import {
   SILENCE_THRESHOLD_MS,
   tidyDisplayName,
 } from '@bali/shared';
-import { and, asc, between, eq, gt, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  between,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import { newUuidV7 } from './ids.js';
 import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
@@ -30,7 +43,9 @@ import {
   enrollments,
   events,
   participations,
+  schools,
   sessions,
+  teacherInvites,
   users,
 } from './schema.js';
 import { isDeadlock, isUniqueViolation } from './sql-errors.js';
@@ -686,11 +701,15 @@ export async function startSession(
       // other writers' events free (A18): a Start then waits on the session's
       // row, and the sweep or a tap holding that row inserts an event whose
       // class key-share a FOR UPDATE here would refuse — a deadlock, measured.
-      await tx
-        .select({ id: classes.id })
-        .from(classes)
-        .where(eq(classes.id, input.classId))
-        .for('no key update');
+      const cls = firstOrUndefined(
+        await tx
+          .select({ removedAt: classes.removedAt })
+          .from(classes)
+          .where(eq(classes.id, input.classId))
+          .for('no key update'),
+      );
+      // Disposed of with its school (C6a) while this Start waited on it: no lesson in it.
+      if (cls?.removedAt) throw new TransitionError('CLASS_NOT_FOUND', 'no such class');
 
       // The taps this Start converts, and their students' locks, first (A14's
       // order; `lockWaitingTaps`) — then the class's session not yet marked
@@ -3735,7 +3754,10 @@ export async function deleteAccount(
       // A tap of theirs still waiting for a Start — one armed just before this —
       // goes with them: consumed, so no Start ever weighs it. A Start holds its
       // armed rows before the student's tap lock this holds, so the two can
-      // deadlock; the database refuses one and the retry runs it after.
+      // deadlock; the database refuses one and the retry runs it after. No
+      // event of its own, unlike a Start's decline (decision 5, A14): that one
+      // says why a student is not in the session that declined them; here there
+      // is no session, and the `account_deleted` below is the why.
       await tx
         .update(armedTaps)
         .set({ consumedAt: input.at })
@@ -3765,4 +3787,322 @@ export async function deleteAccount(
       return { outcome: 'deleted' };
     }),
   );
+}
+
+/**
+ * Where each foreign key to `users` or `schools` stands in a school's disposal
+ * (C6a): what `disposeSchool` does with its rows. A test holds this to the
+ * schema, so a new table or column keyed to a person or a school fails CI until
+ * the disposal handles it.
+ */
+export const SCHOOL_DISPOSAL_COVERAGE = {
+  'users.school_id': 'its teachers: each account de-identified, as a deletion leaves one (C3)',
+  'classes.school_id': 'its classes: removed, their names emptied',
+  'classes.teacher_id': 'its teachers: de-identified with their classes',
+  'blocks.teacher_id': "its teachers' blocks: removed, so a tag can be registered again",
+  'enrollments.student_id': 'each in its classes ended, the student de-identified',
+  'participations.student_id':
+    'kept (none live: no lesson of it runs), under a person de-identified',
+  'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
+  'armed_taps.student_id': 'deleted: the taps of its people',
+  'armed_taps.teacher_id': "deleted: the taps on its teachers' blocks",
+  'teacher_invites.school_id': 'an open invite deleted; a redeemed one kept, naming no one',
+  'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
+} as const;
+
+export interface DisposeSchoolInput {
+  schoolId: string;
+  /** The server's clock: when it happened. */
+  at: Date;
+  /** The school's name, typed by the owner to confirm. Absent, nothing is written: a preview. */
+  confirmName?: string;
+  /** The idempotency key for the school_disposed event (rule 4); one is minted when absent. */
+  eventId?: string;
+}
+
+/**
+ * What a disposal took, as its `school_disposed` event records it: counts,
+ * never a name. Teachers and students: the accounts it de-identified. Classes
+ * and sessions: the school's, kept nameless. Blocks, open invites and armed
+ * taps: those it removed or deleted.
+ */
+export interface DisposalCounts {
+  teachers: number;
+  students: number;
+  classes: number;
+  sessions: number;
+  blocks: number;
+  openInvites: number;
+  armedTaps: number;
+}
+
+type NamedSchool = { id: string; name: string };
+export type DisposeSchoolResult =
+  | { outcome: 'disposed' | 'preview'; school: NamedSchool; counts: DisposalCounts }
+  | { outcome: 'already_disposed'; school: NamedSchool; disposedAt: Date }
+  | { outcome: 'name_mismatch'; school: NamedSchool }
+  | { outcome: 'in_session'; school: NamedSchool; sessions: number }
+  | { outcome: 'shared_accounts'; school: NamedSchool; userIds: string[] }
+  | { outcome: 'unknown_school' };
+
+/** A preview's answer, carried out of the transaction it rolls back. */
+class DisposalPreview extends Error {
+  constructor(readonly result: DisposeSchoolResult) {
+    super('preview');
+  }
+}
+
+/**
+ * A school's data disposed of on its written request (C6a, ISSUES #5; its data
+ * agreement). One transaction: every person of the school — its teachers, and
+ * anyone enrolled in, present in or recorded in one of its classes — is
+ * de-identified as an account deletion leaves one (C3: no name, no Cognito
+ * subject, removed; a rename's names emptied); its enrollments end; its classes
+ * are removed and lose their names; its teachers' blocks are removed; the taps
+ * waiting on them and its people's are deleted, as are its open invites; the
+ * school is marked removed; and `school_disposed` records it with the school's
+ * id and counts. What stays names no one: the lessons, their participations and
+ * events, under rows that name no one, so counts still add up.
+ *
+ * Refused, writing nothing: while a lesson of the school runs (`in_session`; one
+ * past its bell, not yet swept, is ended as the sweep would); and while a person
+ * of it also has records at another school (`shared_accounts`, by id): their
+ * account is that school's too, and splitting it is not built. Without
+ * `confirmName` it is a preview: the whole disposal runs and rolls back, so the
+ * counts are exact. Idempotent: a school disposed of already is answered so.
+ */
+export async function disposeSchool(
+  db: Database,
+  input: DisposeSchoolInput,
+): Promise<DisposeSchoolResult> {
+  try {
+    return await withDeadlockRetry(() => db.transaction((tx) => disposeOnce(tx, input)));
+  } catch (err) {
+    if (err instanceof DisposalPreview) return err.result;
+    throw err;
+  }
+}
+
+async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<DisposeSchoolResult> {
+  // The school first, so two disposals and an invite's minting serialise on it.
+  const row = firstOrUndefined(
+    await tx.select().from(schools).where(eq(schools.id, input.schoolId)).for('update'),
+  );
+  if (!row) return { outcome: 'unknown_school' };
+  const school = { id: row.id, name: row.name };
+  if (row.removedAt !== null) {
+    return { outcome: 'already_disposed', school, disposedAt: row.removedAt };
+  }
+  if (input.confirmName !== undefined && input.confirmName.trim() !== row.name.trim()) {
+    return { outcome: 'name_mismatch', school };
+  }
+
+  // Its people before its classes, as a join, a rename and a deletion take a
+  // person's row before a class: a join behind this then finds the class gone,
+  // or the account deleted. One who joined between the read and the classes'
+  // lock is read again after it.
+  const people = await lockPeople(tx, await peopleOf(tx, school.id));
+  const schoolClasses = await tx
+    .select({ id: classes.id })
+    .from(classes)
+    .where(eq(classes.schoolId, school.id))
+    .orderBy(asc(classes.id))
+    .for('no key update');
+  const known = new Set(people.map((p) => p.id));
+  people.push(
+    ...(await lockPeople(
+      tx,
+      (await peopleOf(tx, school.id)).filter((id) => !known.has(id)),
+    )),
+  );
+  const classIds = schoolClasses.map((c) => c.id);
+
+  const lessons = classIds.length
+    ? await tx
+        .select()
+        .from(sessions)
+        .where(inArray(sessions.classId, classIds))
+        .orderBy(asc(sessions.id))
+    : [];
+  const openIds = lessons.filter((s) => s.endedAt === null).map((s) => s.id);
+  const held = openIds.length
+    ? await tx
+        .select()
+        .from(sessions)
+        .where(and(inArray(sessions.id, openIds), isNull(sessions.endedAt)))
+        .orderBy(asc(sessions.id))
+        .for('update')
+    : [];
+  const running = held.filter((s) => sessionRunning(s, input.at)).length;
+  if (running > 0) return { outcome: 'in_session', school, sessions: running };
+  const live = people.filter((p) => p.removedAt === null);
+  const liveIds = live.map((p) => p.id);
+  const shared = await tiedElsewhere(tx, school.id, liveIds);
+  if (shared.length > 0) return { outcome: 'shared_accounts', school, userIds: shared };
+
+  // Nothing is written above this line, so each refusal leaves all as it was.
+  // Past its bell, not yet swept: ended as the sweep ends it, so no one is left in it.
+  for (const session of held) {
+    await endHeldSession(tx, session, { at: input.at, reason: 'expired' });
+  }
+
+  const peopleIds = people.map((p) => p.id);
+  if (classIds.length) {
+    await tx
+      .update(enrollments)
+      .set({ removedAt: input.at })
+      .where(and(inArray(enrollments.classId, classIds), isNull(enrollments.removedAt)));
+    await tx.update(classes).set({ name: '' }).where(inArray(classes.id, classIds));
+    await tx
+      .update(classes)
+      .set({ removedAt: input.at })
+      .where(and(inArray(classes.id, classIds), isNull(classes.removedAt)));
+  }
+  const armed = peopleIds.length
+    ? await tx
+        .delete(armedTaps)
+        .where(or(inArray(armedTaps.studentId, peopleIds), inArray(armedTaps.teacherId, peopleIds)))
+        .returning({ id: armedTaps.id })
+    : [];
+  const removedBlocks = peopleIds.length
+    ? await tx
+        .update(blocks)
+        .set({ removedAt: input.at })
+        .where(and(inArray(blocks.teacherId, peopleIds), isNull(blocks.removedAt)))
+        .returning({ id: blocks.id })
+    : [];
+  const invites = await tx
+    .delete(teacherInvites)
+    .where(and(eq(teacherInvites.schoolId, school.id), isNull(teacherInvites.redeemedAt)))
+    .returning({ id: teacherInvites.id });
+  if (liveIds.length) {
+    await tx
+      .update(users)
+      .set({ cognitoId: sql`'deleted:' || ${users.id}`, displayName: null, removedAt: input.at })
+      .where(inArray(users.id, liveIds));
+    // After the rows are marked removed: the trigger allows this rewrite only then.
+    await tx
+      .update(events)
+      .set({ payload: null })
+      .where(
+        and(
+          inArray(events.userId, liveIds),
+          eq(events.type, 'display_name_changed'),
+          isNotNull(events.payload),
+        ),
+      );
+  }
+  await tx.update(schools).set({ removedAt: input.at }).where(eq(schools.id, school.id));
+
+  const counts: DisposalCounts = {
+    teachers: live.filter((p) => p.role === 'teacher').length,
+    students: live.filter((p) => p.role === 'student').length,
+    classes: classIds.length,
+    sessions: lessons.length,
+    blocks: removedBlocks.length,
+    openInvites: invites.length,
+    armedTaps: armed.length,
+  };
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId ?? newUuidV7(),
+    type: 'school_disposed',
+    occurredAt: input.at,
+    payload: {
+      school_id: school.id,
+      teachers: counts.teachers,
+      students: counts.students,
+      classes: counts.classes,
+      sessions: counts.sessions,
+      blocks: counts.blocks,
+      open_invites: counts.openInvites,
+      armed_taps: counts.armedTaps,
+    },
+  });
+  if (!isNew) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+  }
+  if (input.confirmName === undefined) {
+    throw new DisposalPreview({ outcome: 'preview', school, counts });
+  }
+  return { outcome: 'disposed', school, counts };
+}
+
+/** Ids, once each, sorted: one order to lock them in. */
+function idsOf(rows: { id: string | null }[]): string[] {
+  return [...new Set(rows.map((r) => r.id).filter((id): id is string => id !== null))].sort();
+}
+
+/**
+ * The people of a school: its teachers, and everyone enrolled in, present in or
+ * recorded in one of its classes.
+ */
+async function peopleOf(tx: Database, schoolId: string): Promise<string[]> {
+  const ofSchool = tx
+    .select({ id: classes.id })
+    .from(classes)
+    .where(eq(classes.schoolId, schoolId));
+  const lessons = tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(inArray(sessions.classId, ofSchool));
+  return idsOf([
+    ...(await tx.select({ id: users.id }).from(users).where(eq(users.schoolId, schoolId))),
+    ...(await tx
+      .selectDistinct({ id: classes.teacherId })
+      .from(classes)
+      .where(eq(classes.schoolId, schoolId))),
+    ...(await tx
+      .selectDistinct({ id: enrollments.studentId })
+      .from(enrollments)
+      .where(inArray(enrollments.classId, ofSchool))),
+    ...(await tx
+      .selectDistinct({ id: participations.studentId })
+      .from(participations)
+      .where(inArray(participations.sessionId, lessons))),
+    ...(await tx
+      .selectDistinct({ id: events.userId })
+      .from(events)
+      .where(or(inArray(events.classId, ofSchool), inArray(events.sessionId, lessons)))),
+  ]);
+}
+
+/** The accounts `ids`, each locked as a rename locks its own, in id order. */
+async function lockPeople(tx: Database, ids: string[]) {
+  if (ids.length === 0) return [];
+  return tx
+    .select({ id: users.id, role: users.role, removedAt: users.removedAt })
+    .from(users)
+    .where(inArray(users.id, ids))
+    .orderBy(asc(users.id))
+    .for('no key update');
+}
+
+/**
+ * Those of `ids` with records at another school: a teacher there, or enrolled
+ * in, teaching or recorded in one of its classes.
+ */
+async function tiedElsewhere(tx: Database, schoolId: string, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const elsewhere = tx
+    .select({ id: classes.id })
+    .from(classes)
+    .where(ne(classes.schoolId, schoolId));
+  return idsOf([
+    ...(await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, ids), isNotNull(users.schoolId), ne(users.schoolId, schoolId)))),
+    ...(await tx
+      .selectDistinct({ id: classes.teacherId })
+      .from(classes)
+      .where(and(inArray(classes.teacherId, ids), ne(classes.schoolId, schoolId)))),
+    ...(await tx
+      .selectDistinct({ id: enrollments.studentId })
+      .from(enrollments)
+      .where(and(inArray(enrollments.studentId, ids), inArray(enrollments.classId, elsewhere)))),
+    ...(await tx
+      .selectDistinct({ id: events.userId })
+      .from(events)
+      .where(and(inArray(events.userId, ids), inArray(events.classId, elsewhere)))),
+  ]);
 }
