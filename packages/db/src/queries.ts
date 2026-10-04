@@ -535,7 +535,7 @@ export async function getSessionRoster(
   classId: string,
 ): Promise<SnapshotRosterRow[]> {
   const turn = latestTurn(db, sessionId, users.id).as('turn');
-  const clockOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and ${events.payload} -> ${CLOCK_AHEAD_NOTE}::text is not null)`;
+  const clockOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and jsonb_typeof(${events.payload} -> ${CLOCK_AHEAD_NOTE}::text) = 'number')`;
   const lateOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and ${events.type} = 'protection_off' and ${events.payload}->>'recorded_as' = 'after_session_end')`;
 
   const rows = await db

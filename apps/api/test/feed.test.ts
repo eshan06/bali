@@ -209,6 +209,20 @@ describe('GET /v1/sessions/:id — what the row does not show (A9)', () => {
     });
   });
 
+  it('marks the student whose phone clock ran ahead (S9), and only them', async () => {
+    const { teacher, student, session, school, klass } = await seedRunning('a9-clock');
+    const ben = await classmate('a9-clock-ben', school.id, klass.id);
+    await tapIn(db, {
+      ...change(session.id, student.id),
+      deviceTime: new Date(Date.now() + 600_000),
+    });
+    await tapIn(db, change(session.id, ben.id));
+
+    const snap = await snapshotOf(teacher.cognitoId, session.id);
+    expect(row(snap, student.id)).toMatchObject({ state: 'focused', clockOff: true });
+    expect(row(snap, ben.id)).toMatchObject({ state: 'focused', clockOff: false });
+  });
+
   it('carries an unlock recorded against protection off, and the state stays protection off', async () => {
     const { teacher, student, session } = await seedRunning('a9-off');
     await tapIn(db, change(session.id, student.id));
