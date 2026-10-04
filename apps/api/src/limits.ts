@@ -1,4 +1,4 @@
-import type { FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { isIP } from 'node:net';
 import { performance } from 'node:perf_hooks';
 
@@ -10,10 +10,10 @@ import { ApiError } from './errors.js';
  * address, so a signed-in request is budgeted by its verified account, never its address
  * (`authenticate` spends it once the token checks out), and only a request no one is signed in on
  * — no token, or one the pool refused — by address, with a budget for a whole school. Guessing a
- * join code gets a tighter budget per account and, as accounts are free while self sign-up is on,
- * a backstop on misses per address. Over a budget is a 429 in the one error shape, `Retry-After`
- * saying when one more passes: a throttle that refills, never a block. The sizes and why:
- * docs/DECISIONS.md, 2026-10-04 (L1).
+ * code — a join code, or a teacher invite's (T1b) — gets a tighter budget per account and, as
+ * accounts are free while self sign-up is on, a backstop on misses per address. Over a budget is a
+ * 429 in the one error shape, `Retry-After` saying when one more passes: a throttle that refills,
+ * never a block. The sizes and why: docs/DECISIONS.md, 2026-10-04 (L1, T1b).
  *
  * Each budget is a token bucket per key, in this process's memory — no Redis, no new
  * infrastructure: N instances of the API are N times each budget.
@@ -34,6 +34,10 @@ export interface Budgets {
   joinTries: Budget;
   /** Each address's misses there (`404 class_not_found`), whatever the account. */
   joinMisses: Budget;
+  /** Each account's tries at redeeming a teacher invite (T1b). */
+  inviteTries: Budget;
+  /** Each address's misses there (`404 invite_not_found`), whatever the account. */
+  inviteMisses: Budget;
 }
 
 export const BUDGETS: Budgets = {
@@ -41,7 +45,12 @@ export const BUDGETS: Budgets = {
   unsigned: { burst: 1_200, perMinute: 600 },
   joinTries: { burst: 20, perMinute: 2 },
   joinMisses: { burst: 100, perMinute: 6 },
+  inviteTries: { burst: 5, perMinute: 1 },
+  inviteMisses: { burst: 20, perMinute: 2 },
 };
+
+/** What a guess is at: a join code (the preview and the join), or a teacher invite (its redeem). */
+export type Guess = 'join' | 'invite';
 
 /** Budgets to change from `BUDGETS`, and the clock they refill by (ms): tests drive both. */
 export interface LimitOptions extends Partial<Budgets> {
@@ -110,14 +119,15 @@ export interface Limiter {
   /** A request no one is signed in on: one of its address's budget. */
   unsigned(request: FastifyRequest): void;
   /**
-   * A signed-in request to look a join code up, before the lookup, which is what answers a guess:
-   * one of its address's misses held, so lookups in flight never outrun the backstop, then one
-   * of the account's tries.
+   * A signed-in request to look a code up (`at` says which kind), before the lookup, which is
+   * what answers a guess: one of its address's misses held, so lookups in flight never outrun
+   * the backstop, then one of the account's tries.
    */
-  guess(request: FastifyRequest): void;
+  guess(request: FastifyRequest, at: Guess): void;
   /**
-   * Its answer, `status`: a 404 — today only `class_not_found`, and any 404 on a lookup tells a
-   * guesser the code opens nothing — keeps the miss it held; any other answer gives it back.
+   * Its answer, `status`: a 404 — `class_not_found` or `invite_not_found`, and any 404 on a
+   * lookup tells a guesser the code opens nothing — keeps the miss it held; any other answer
+   * gives it back.
    */
   settle(request: FastifyRequest, status: number): void;
 }
@@ -129,22 +139,54 @@ export function createLimiter({
   const of = (name: keyof Budgets) => bucket(budgets[name] ?? BUDGETS[name], now);
   const account = of('account');
   const unsigned = of('unsigned');
-  const joinTries = of('joinTries');
-  const joinMisses = of('joinMisses');
-  // The guesses holding one of their address's misses until their answer settles it; one whose
-  // answer never goes out (its client gone) keeps it, the safe side.
-  const holding = new WeakSet<FastifyRequest>();
+  const guesses: Record<Guess, { tries: Bucket; misses: Bucket; tried: string; missed: string }> = {
+    join: {
+      tries: of('joinTries'),
+      misses: of('joinMisses'),
+      tried: 'too many join-code tries',
+      missed: 'too many unknown join codes from here',
+    },
+    invite: {
+      tries: of('inviteTries'),
+      misses: of('inviteMisses'),
+      tried: 'too many invite-code tries',
+      missed: 'too many unknown invite codes from here',
+    },
+  };
+  // The guesses holding one of their address's misses, and whose, until their answer settles it;
+  // one whose answer never goes out (its client gone) keeps it, the safe side.
+  const holding = new WeakMap<FastifyRequest, Bucket>();
   return {
     signedIn: (sub) => refuse(account.take(sub), 'too many requests from this account'),
     unsigned: (request) =>
       refuse(unsigned.take(clientAddress(request)), 'too many requests with no sign-in'),
-    guess: (request) => {
-      refuse(joinMisses.take(clientAddress(request)), 'too many unknown join codes from here');
-      holding.add(request);
-      refuse(joinTries.take(requireAuth(request).sub), 'too many join-code tries');
+    guess: (request, at) => {
+      const { tries, misses, tried, missed } = guesses[at];
+      refuse(misses.take(clientAddress(request)), missed);
+      holding.set(request, misses);
+      refuse(tries.take(requireAuth(request).sub), tried);
     },
     settle: (request, status) => {
-      if (holding.delete(request) && status !== 404) joinMisses.refund(clientAddress(request));
+      const misses = holding.get(request);
+      holding.delete(request);
+      if (misses && status !== 404) misses.refund(clientAddress(request));
+    },
+  };
+}
+
+/**
+ * A route's hooks for a guess at a code (`at`): `authenticate`, then the guess, before the
+ * handler; its answer settles the miss the guess held.
+ */
+export function guessing(app: FastifyInstance, limits: Limiter, at: Guess) {
+  return {
+    preHandler: async (request: FastifyRequest) => {
+      await app.authenticate(request);
+      limits.guess(request, at);
+    },
+    onResponse: (request: FastifyRequest, reply: FastifyReply, done: () => void) => {
+      limits.settle(request, reply.statusCode);
+      done();
     },
   };
 }

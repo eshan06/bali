@@ -2,7 +2,13 @@ import type { FastifyRequest } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError } from '../src/errors.js';
-import { BUDGETS, createLimiter, type Limiter, type LimitOptions } from '../src/limits.js';
+import {
+  BUDGETS,
+  createLimiter,
+  type Guess,
+  type Limiter,
+  type LimitOptions,
+} from '../src/limits.js';
 
 /*
  * The production budgets (`BUDGETS`) against the clients' real cadence, the
@@ -25,9 +31,14 @@ const request = (sub: string, address = SCHOOL) =>
   }) as unknown as FastifyRequest;
 
 /** A lookup by `student` answered `status` — or 429, as the app answers a guess over budget. */
-function lookUp(limiter: Limiter, student: FastifyRequest, status: number): void {
+function lookUp(
+  limiter: Limiter,
+  student: FastifyRequest,
+  status: number,
+  at: Guess = 'join',
+): void {
   try {
-    limiter.guess(student);
+    limiter.guess(student, at);
   } catch (err) {
     limiter.settle(student, 429);
     throw err;
@@ -104,6 +115,26 @@ describe('BUDGETS never refuses an honest client', () => {
     for (let i = 0; i < 600; i += 1) count((l) => l.unsigned(request(`student-${i}`)));
     expect(refused()).toBe(0);
   });
+
+  it('a teacher redeeming their invite: a mistyped symbol, a code mistyped in length, an expired code, its answer lost and resent', () => {
+    const { count, refused } = driven();
+    const teacher = request('new-teacher');
+    for (const status of [404, 400, 409, 200, 200]) {
+      count((l) => lookUp(l, teacher, status, 'invite'));
+    }
+    expect(refused()).toBe(0);
+  });
+
+  it('a school’s 60 teachers redeeming at a training, from one address in ten minutes, every tenth mistyping a symbol first', () => {
+    const { clock, count, refused } = driven();
+    for (let i = 0; i < 60; i += 1) {
+      clock.ms = i * 10_000;
+      const teacher = request(`teacher-${i}`);
+      if (i % 10 === 0) count((l) => lookUp(l, teacher, 404, 'invite'));
+      count((l) => lookUp(l, teacher, 200, 'invite'));
+    }
+    expect(refused()).toBe(0);
+  });
 });
 
 describe('BUDGETS holds a flood or a guesser to its budget', () => {
@@ -132,6 +163,22 @@ describe('BUDGETS holds a flood or a guesser to its budget', () => {
     const { burst, perMinute } = BUDGETS.joinMisses;
     expect(looked).toBeLessThanOrEqual(burst + perMinute * 60);
   });
+
+  it('an invite guesser the same way: an hour of guessing is the invite misses’ budget, and one account’s is its tries', () => {
+    const { clock, count } = driven();
+    let looked = 0;
+    let mine = 0;
+    for (clock.ms = 0; clock.ms < HOUR; clock.ms += 100) {
+      const guess = request(`invite-guesser-${clock.ms}`, '192.0.2.67');
+      if (count((l) => lookUp(l, guess, 404, 'invite'))) looked += 1;
+      const own = request('invite-guesser', `198.51.100.${clock.ms % 200}`);
+      if (count((l) => lookUp(l, own, 404, 'invite'))) mine += 1;
+    }
+    const misses = BUDGETS.inviteMisses;
+    expect(looked).toBeLessThanOrEqual(misses.burst + misses.perMinute * 60);
+    const tries = BUDGETS.inviteTries;
+    expect(mine).toBeLessThanOrEqual(tries.burst + tries.perMinute * 60);
+  });
 });
 
 describe('the buckets', () => {
@@ -139,17 +186,33 @@ describe('the buckets', () => {
     const { limiter } = driven({ joinMisses: { burst: 2, perMinute: 6 } });
     const [a, b, c] = [request('racer-a'), request('racer-b'), request('racer-c')];
     // Two lookups in flight hold both misses: a third waits, whatever they answer.
-    limiter.guess(a);
-    limiter.guess(b);
-    expect(() => limiter.guess(c)).toThrow(expect.objectContaining({ retryAfter: 10 }));
+    limiter.guess(a, 'join');
+    limiter.guess(b, 'join');
+    expect(() => limiter.guess(c, 'join')).toThrow(expect.objectContaining({ retryAfter: 10 }));
     limiter.settle(c, 429);
     // a's code opened a class: its miss back, for c. b and c miss: both kept.
     limiter.settle(a, 200);
-    limiter.guess(c);
+    limiter.guess(c, 'join');
     limiter.settle(b, 404);
     limiter.settle(c, 404);
-    expect(() => limiter.guess(request('racer-d'))).toThrow(
+    expect(() => limiter.guess(request('racer-d'), 'join')).toThrow(
       expect.objectContaining({ retryAfter: 10 }),
+    );
+  });
+
+  it('keep an invite’s guesses and a join code’s apart: neither kind spends the other’s', () => {
+    const { limiter } = driven({
+      joinMisses: { burst: 1, perMinute: 1 },
+      inviteMisses: { burst: 1, perMinute: 1 },
+    });
+    lookUp(limiter, request('kinds-a'), 404, 'invite');
+    expect(() => lookUp(limiter, request('kinds-b'), 404, 'invite')).toThrow(
+      expect.objectContaining({ message: 'too many unknown invite codes from here' }),
+    );
+    // The join code's backstop is whole; spent, it holds joins only.
+    lookUp(limiter, request('kinds-c'), 404, 'join');
+    expect(() => lookUp(limiter, request('kinds-d'), 200, 'join')).toThrow(
+      expect.objectContaining({ message: 'too many unknown join codes from here' }),
     );
   });
 
@@ -193,12 +256,12 @@ describe('the buckets', () => {
     // Both misses are the address's still. Two in flight hold both, and one
     // settled twice gives back only the one it held.
     const [b, c] = [request('settled-b'), request('settled-c')];
-    limiter.guess(b);
-    limiter.guess(c);
+    limiter.guess(b, 'join');
+    limiter.guess(c, 'join');
     limiter.settle(b, 200);
     limiter.settle(b, 200);
     limiter.settle(c, 404);
     lookUp(limiter, request('settled-d'), 404);
-    expect(() => limiter.guess(request('settled-e'))).toThrow(ApiError);
+    expect(() => limiter.guess(request('settled-e'), 'join')).toThrow(ApiError);
   });
 });

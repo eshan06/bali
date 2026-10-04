@@ -103,7 +103,7 @@ never stored here, no screen can ever show it.
   permanent history that lives in `events`.
 - `teacher_invites` — one row per invite code the owner mints for a school (Phase 4, T1a):
   the code's hash, never the code, its expiry 14 days on, and the one account that redeemed
-  it, once (T1b).
+  it, once (T1b) — after which the row is never changed or deleted.
 
 ### The decisions (2026-09-15)
 
@@ -432,6 +432,19 @@ Student app:
 
 Teacher app and web portal:
 - `GET /v1/me` — same boot call, role-aware.
+- `POST /v1/teacher-invites/redeem` — how an account becomes a teacher (T1b): `{ code, eventId }`,
+  the code the owner minted for a school (data model, `teacher_invites`), matched as the command
+  printed it with its case, spaces and dashes set aside, and looked up by its hash; in the body,
+  never the URL, so no request log holds it. In one transaction the account becomes a teacher at
+  the code's school and the invite is marked redeemed by it, by one UPDATE guarded by `redeemed_at
+  IS NULL`, so of two accounts racing for a code one wins; answered with the user as `/v1/me`
+  gives it, and a replay with the user now. The account is judged first: a teacher already is `409
+  already_teacher`, a student in a live class `409 student_in_class` (the owner's ruling: a
+  separate account for teaching). Then the code: none with it `404 invite_not_found`, used `409
+  invite_used`, expired `409 invite_expired`; one that can't be a code `400 invite_code_invalid`.
+  A refusal redeems nothing and changes no account: a first-time caller keeps only the student row
+  the boot call would have made. Tries are budgeted per account and misses per address, as the
+  join's are. No event: the invite row is the record, kept by the database from change or deletion.
 - `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes. A class named by its id is
   the caller's own: an unknown one is `404 class_not_found` on every route under
   `/v1/classes/{id}` (added 2026-10-04, R3, additive: one condition, one shape), another

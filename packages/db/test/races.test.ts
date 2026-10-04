@@ -23,6 +23,8 @@ import {
   type MintInviteResult,
   mintTeacherInvite,
   recordAgreement,
+  type RedeemInviteResult,
+  redeemTeacherInvite,
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
@@ -3483,3 +3485,141 @@ describe.runIf(REAL_PG)(
     }, 20_000);
   },
 );
+
+describe.runIf(REAL_PG)('teacher invites redeemed under contention (real Postgres, T1b)', () => {
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  /** A code minted for a school with its agreement on record: its symbols, and its invite's id. */
+  async function code(tag: string) {
+    const school = await createSchool(db, { name: `Race invite ${tag}` });
+    await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' });
+    const minted = await mintTeacherInvite(db, { schoolId: school.id });
+    if (minted.outcome !== 'minted') throw new Error(`no invite: ${minted.outcome}`);
+    return { code: minted.code, inviteId: minted.invite.id, schoolId: school.id };
+  }
+
+  const student = async (tag: string) =>
+    one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `race-invite-${tag}-${newUuidV7()}`, role: 'student' })
+        .returning(),
+    );
+
+  /**
+   * `redeems`, started while a transaction holds `lock`'s rows, each parked behind it — so every
+   * one has read what it reads first before any can write — then let go together.
+   */
+  async function parkedBehind(
+    lock: (tx: Database) => Promise<unknown>,
+    redeems: (() => Promise<RedeemInviteResult>)[],
+  ): Promise<RedeemInviteResult[]> {
+    let started: Promise<RedeemInviteResult>[] = [];
+    await db.transaction(async (tx) => {
+      await lock(tx);
+      started = redeems.map((redeem) => redeem());
+      await waitForBlockedBackend(5_000, redeems.length);
+    });
+    return Promise.all(started);
+  }
+
+  it('two accounts redeeming one code at once: exactly one becomes a teacher', async () => {
+    for (let round = 0; round < 5; round += 1) {
+      const { code: symbols, inviteId, schoolId } = await code(`one-${round}`);
+      const [a, b] = [await student(`a-${round}`), await student(`b-${round}`)];
+      const redeem = (userId: string) => () =>
+        redeemTeacherInvite(db, { userId, code: symbols, eventId: newUuidV7() });
+
+      // Both read the invite free, then meet at the guarded UPDATE: the second finds it taken.
+      const results = await parkedBehind(
+        (tx) =>
+          tx.select().from(teacherInvites).where(eq(teacherInvites.id, inviteId)).for('update'),
+        [redeem(a.id), redeem(b.id)],
+      );
+
+      expect(results.map((r) => r.outcome).sort(), `round ${round}`).toEqual([
+        'invite_used',
+        'redeemed',
+      ]);
+      const winner = results[0]?.outcome === 'redeemed' ? a : b;
+      const loser = winner === a ? b : a;
+      const [invite] = await db
+        .select()
+        .from(teacherInvites)
+        .where(eq(teacherInvites.id, inviteId));
+      expect(invite?.redeemedBy).toBe(winner.id);
+      const accounts = await db
+        .select()
+        .from(users)
+        .where(inArray(users.id, [a.id, b.id]));
+      const byId = new Map(accounts.map((u) => [u.id, u]));
+      expect(byId.get(winner.id)).toMatchObject({ role: 'teacher', schoolId });
+      expect(byId.get(loser.id)).toMatchObject({ role: 'student', schoolId: null });
+    }
+  }, 30_000);
+
+  it('one account redeeming two codes at once takes one: its row is held, so the second finds a teacher', async () => {
+    for (let round = 0; round < 5; round += 1) {
+      const [first, second] = [await code(`two-a-${round}`), await code(`two-b-${round}`)];
+      const account = await student(`two-${round}`);
+      const redeem = (symbols: string) => () =>
+        redeemTeacherInvite(db, { userId: account.id, code: symbols, eventId: newUuidV7() });
+
+      const results = await parkedBehind(
+        (tx) => tx.select().from(users).where(eq(users.id, account.id)).for('update'),
+        [redeem(first.code), redeem(second.code)],
+      );
+
+      expect(results.map((r) => r.outcome).sort(), `round ${round}`).toEqual([
+        'already_teacher',
+        'redeemed',
+      ]);
+      const taken = await db
+        .select()
+        .from(teacherInvites)
+        .where(
+          and(
+            inArray(teacherInvites.id, [first.inviteId, second.inviteId]),
+            isNotNull(teacherInvites.redeemedAt),
+          ),
+        );
+      expect(taken).toHaveLength(1);
+      const [row] = await db.select().from(users).where(eq(users.id, account.id));
+      expect(row?.schoolId).toBe(taken[0]?.schoolId);
+    }
+  }, 30_000);
+
+  it('two accounts sending one eventId at once: one redeems, the other is told it is taken', async () => {
+    for (let round = 0; round < 5; round += 1) {
+      const [first, second] = [await code(`id-a-${round}`), await code(`id-b-${round}`)];
+      const [a, b] = [await student(`id-a-${round}`), await student(`id-b-${round}`)];
+      const eventId = newUuidV7();
+
+      // Each reads the eventId free, then meets the other at its unique index.
+      const results = await parkedBehind(
+        (tx) =>
+          tx
+            .select()
+            .from(teacherInvites)
+            .where(inArray(teacherInvites.id, [first.inviteId, second.inviteId]))
+            .for('update'),
+        [
+          () => redeemTeacherInvite(db, { userId: a.id, code: first.code, eventId }),
+          () => redeemTeacherInvite(db, { userId: b.id, code: second.code, eventId }),
+        ],
+      );
+
+      expect(results.map((r) => r.outcome).sort(), `round ${round}`).toEqual([
+        'event_id_conflict',
+        'redeemed',
+      ]);
+      const taken = await db
+        .select()
+        .from(teacherInvites)
+        .where(eq(teacherInvites.redeemEventId, eventId));
+      expect(taken).toHaveLength(1);
+    }
+  }, 30_000);
+});

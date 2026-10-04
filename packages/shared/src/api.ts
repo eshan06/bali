@@ -131,6 +131,23 @@ export interface UpdateMeResponse {
   user: MeUser;
 }
 
+// POST /v1/teacher-invites/redeem — a signed-in account redeems the invite code
+// the owner minted for a school (T1b), and is a teacher there from then on.
+export interface RedeemTeacherInviteRequest {
+  /** The code as the owner's command printed it; its case, spaces and dashes are set aside. */
+  code: string;
+  /** Client idempotency key for the redeem (rule 4). */
+  eventId: string;
+}
+export interface RedeemTeacherInviteResponse {
+  /**
+   * 'redeemed' made the account a teacher at the code's school; 'replay' this
+   * eventId already did — nothing is redeemed again, and `user` is the truth now.
+   */
+  outcome: 'redeemed' | 'replay';
+  user: MeUser;
+}
+
 // POST /v1/taps — the tap.
 export interface TapRequest {
   /** The NFC tag id the block broadcasts. */

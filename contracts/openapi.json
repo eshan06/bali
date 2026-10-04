@@ -2250,6 +2250,42 @@
         }
       }
     },
+    "/v1/teacher-invites/redeem": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "eventId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "code",
+                  "eventId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "default": {
+            "$ref": "#/components/responses/error"
+          }
+        }
+      }
+    },
     "/v1/unlocks/{eventId}": {
       "patch": {
         "parameters": [
@@ -2378,7 +2414,13 @@
                         "class_in_session",
                         "unlock_not_found",
                         "unlock_superseded",
-                        "protection_not_off"
+                        "protection_not_off",
+                        "invite_code_invalid",
+                        "invite_not_found",
+                        "invite_used",
+                        "invite_expired",
+                        "already_teacher",
+                        "student_in_class"
                       ]
                     },
                     "message": {

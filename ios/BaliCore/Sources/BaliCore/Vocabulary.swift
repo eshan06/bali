@@ -115,4 +115,7 @@ public enum ApiErrorReason: String, CaseIterable, Sendable, Encodable {
     case classInSession = "class_in_session"
     case unlockNotFound = "unlock_not_found", unlockSuperseded = "unlock_superseded"
     case protectionNotOff = "protection_not_off"
+    case inviteCodeInvalid = "invite_code_invalid", inviteNotFound = "invite_not_found"
+    case inviteUsed = "invite_used", inviteExpired = "invite_expired"
+    case alreadyTeacher = "already_teacher", studentInClass = "student_in_class"
 }
