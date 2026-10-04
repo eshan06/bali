@@ -31,9 +31,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   newer build's `recorded_as`, met mid-deploy, moves no one, since a note always means the engine
   did not apply the record, and `moved` already reads any note so; it is listed with `recordedAs:
   null`, as a client reads any vocabulary value it doesn't know as none (API decision 4; the grid's
-  snapshot does the same). The record is still listed: an unlock is never discarded. So the list
-  and the minutes tell one story, the docs no longer read null as "it took effect", and a test pins
-  both halves. A note added later must keep that meaning. **Errors:** a student and another teacher
+  snapshot does the same). The record is still listed: an unlock is never discarded. The types'
+  docs no longer read null as "it took effect", only as "no note this build knows", so the list
+  and the minutes no longer contradict them; a test pins both halves. A note added later must keep
+  that meaning. **Errors:** a student and another teacher
   `403`, as the roster's; a malformed id `400` in the one shape; an unknown class `404
   class_not_found`; an unknown session, or one in another class (the teacher's own other class
   included), `404 session_not_found`. A report is read under its own class, and an id of another
