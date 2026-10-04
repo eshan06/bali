@@ -1,0 +1,463 @@
+# Owner runbooks — production
+
+Five runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
+Vercel and GitHub. Phase 5's P6. Do them in this order the first time — each one
+uses values the one before it produced:
+
+1. [Cognito for production](#2-cognito-for-production) (the API needs its pool's values),
+2. [Production on Railway](#1-production-on-railway),
+3. [The Vercel flip](#3-the-vercel-flip),
+4. [The backup-restore drill](#4-the-backup-restore-drill), once prod holds data,
+5. [GitHub hardening](#5-github-hardening), any time.
+
+How to read them:
+
+- Each step says where to click, then **Check:** how to know it worked.
+- `<like this>` is a value you fill in. **No real secret goes in this file, or in any
+  commit, chat or issue.** Secrets live in Railway's variables, Vercel's environment
+  variables and GitHub's secrets, and nowhere else.
+- Consoles rename their menus often. Where these steps say *(wording unsure)*, the
+  setting exists but its label may read differently today; look for the nearest match.
+- Production never shares anything with dev (hosting decision 2): its own pool, its own
+  database, its own keys. Never paste a dev value into prod or a prod value into dev.
+
+Write down as you go, in a password manager, never in the repo: the pool id, the
+hosted-UI domain, both app client ids, the API's URL, the portal's URL.
+
+---
+
+## 1. Production on Railway
+
+What it makes: a `production` environment in the existing Railway project, with the API
+service and its own Postgres, reachable only on Railway's private network.
+
+**Before you start:** the Cognito pool from runbook 2 exists, and you have a Sentry
+project for the API (its DSN).
+
+1. **2FA on the Railway account.** Railway → your avatar → **Account Settings** →
+   **Security** *(wording unsure)* → turn on two-factor authentication with an
+   authenticator app; save the recovery codes in your password manager.
+   **Check:** sign out and back in; it asks for the code.
+2. **The environment.** Open the Bali project → the environment menu at the top (it
+   reads `dev` today) → **New Environment** → name it `production`. Choose an empty
+   environment, not a copy of dev, so no dev variable comes along *(if Railway only
+   offers "duplicate", duplicate and then replace every variable in step 5)*.
+   **Check:** the menu lists `dev` and `production`; switching between them shows
+   different services.
+3. **The database.** In `production`: **+ Create** → **Database** → **PostgreSQL**. Put
+   it in the same region as the API (hosting decision 4): its **Settings** →
+   **Region** *(wording unsure)* must match the API service's.
+   - **No public TCP proxy.** Postgres service → **Settings** → **Networking** →
+     **Public Networking**: if a TCP proxy is listed (Railway adds one by default),
+     delete it. The API reaches the database over the private network only.
+   - **Check:** the Postgres service's **Variables** show `DATABASE_URL` with a host
+     ending `.railway.internal`; `DATABASE_PUBLIC_URL` is gone or empty, and
+     **Networking** lists no public domain or proxy.
+4. **Backups.** Postgres service → **Backups** tab → turn on a **daily** schedule (and
+   weekly, if offered). Backups need a paid Railway plan.
+   - **Point-in-time recovery:** hosting decision 4 asks for it. Railway's backups, as
+     far as this doc's author knows, are scheduled volume snapshots, not
+     point-in-time recovery. If you find no PITR setting, write that down and raise
+     it: it is an architecture decision (a managed Postgres elsewhere, or accepting
+     daily snapshots for the pilot), not something to settle in the console alone.
+   - **Check:** the next day, the Backups tab lists one backup with a time.
+5. **The API service.** In `production`: **+ Create** → **GitHub Repo** →
+   `eshan06/bali`. Railway reads `railway.json`: Dockerfile build, `npm run migrate &&
+   npm start`, health check `/healthz`.
+   - **Settings → Source** *(wording unsure)*: branch `main`. If Railway offers
+     **Wait for CI**, turn it on, so a red `main` never deploys to prod.
+   - **Settings → Networking → Generate Domain** for the public HTTPS URL (or add
+     your own domain there and follow its DNS instructions). This is `<prod API URL>`.
+   - **Settings → Replicas:** leave at 1. The rate limits live in each process's
+     memory (`docs/DEPLOY.md`), so 2 replicas double every budget.
+6. **The variables.** API service → **Variables** → **Raw Editor**, then paste and fill
+   in. Every one is checked at boot (`apps/api/src/env.ts`); one missing or malformed
+   fails the deploy with a message naming it.
+
+   ```
+   DATABASE_URL=${{Postgres.DATABASE_URL}}
+   AUTH_ISSUER=https://cognito-idp.<region>.amazonaws.com/<prod pool id>
+   AUTH_JWKS_URI=https://cognito-idp.<region>.amazonaws.com/<prod pool id>/.well-known/jwks.json
+   AUTH_AUDIENCE=<prod web client id>,<prod phone client id>
+   INTERNAL_API_KEY=<64 hex characters, generated below>
+   TZ=<the school's zone, e.g. America/Chicago>
+   CORS_ORIGINS=<the portal's origin, e.g. https://portal.example.com>
+   LOG_LEVEL=info
+   SENTRY_DSN=<the API's Sentry project DSN>
+   SENTRY_ENVIRONMENT=production
+   RAILWAY_DEPLOYMENT_DRAINING_SECONDS=15
+   ```
+
+   - `DATABASE_URL`: the reference `${{Postgres.DATABASE_URL}}` as written, if the
+     database service is named `Postgres`; Railway fills in the private URL. Never
+     paste the URL itself.
+   - `AUTH_*`: from runbook 2. `AUTH_AUDIENCE` is both client ids, comma, no spaces.
+   - `INTERNAL_API_KEY`: generate it on your own computer with
+     `openssl rand -hex 32` and paste the output. Never reuse dev's. Boot refuses
+     under 16 characters; 64 is the target.
+   - `TZ`: an IANA zone name for the school (`America/Chicago`,
+     `America/New_York`, …). Unset, Railway runs UTC and every bell time is wrong.
+   - `CORS_ORIGINS`: exactly the portal's origin — `https://`, the host, no path, no
+     trailing slash, no `*`. Not dev's portal, not `localhost`. Until the portal has
+     its domain (runbook 3), leave it unset: the API then sends no CORS headers and
+     the portal can't call it, which is the safe failure.
+   - `SENTRY_*`: from the API's Sentry project → **Settings → Client Keys (DSN)**.
+     Unset, error monitoring is off (nothing breaks).
+   - `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`: above the 8 s graceful shutdown.
+   - `PORT`, `HOST` and `NODE_ENV`: leave unset; Railway provides `PORT`, and
+     `NODE_ENV` defaults to `production`.
+
+   **Check:** **Deploy** (or wait for the auto-deploy). The deploy log shows the
+   migrations applied, then the server listening and `sweeping every minute`.
+7. **The backup sweep cron.** The API sweeps every minute itself; this cron is its
+   backup (hosting decision 3). Easiest: open **dev**'s cron service, note its
+   image, start command and schedule, and make the same in `production`:
+   **+ Create** → **Empty Service** (or **Docker Image**) → name it `sweep-cron`.
+   - **Settings → Cron Schedule:** `*/5 * * * *`.
+   - **Variables:** `INTERNAL_API_KEY=${{<api service name>.INTERNAL_API_KEY}}`
+     (a reference, so the key lives in one place).
+   - **Start command:** one request that exits when done, for example with the image
+     `curlimages/curl`:
+     `curl -fsS -X POST -H "x-internal-key: $INTERNAL_API_KEY" <prod API URL>/internal/sweep`
+     *(if Railway doesn't expand `$INTERNAL_API_KEY` in a start command, wrap it:
+     `sh -c '…'`)*.
+   - **Check:** after the next run, the cron's log shows
+     `{"expired":N,"wentSilent":M}`. A `401` means the key differs from the API's.
+8. **Verify the whole thing.**
+   - `curl -sS <prod API URL>/healthz` → `{"status":"ok","version":…}`.
+   - `curl -sS -o /dev/null -w '%{http_code}\n' <prod API URL>/v1/me` → `401` (no
+     token: refused, as it should be).
+   - Once the portal is up (runbook 3), sign in there: the home page loads, which is
+     a signed `GET /v1/me` with a prod token.
+   - The API's log has no `error` line since boot.
+9. **Owner commands on prod** (`npm run school`, `docs/WEB.md`). With no public proxy,
+   your computer can't reach prod's database. Run them inside the API service:
+   `railway link` (choose the project and `production`), then
+   `railway ssh --service <api service name>`, and in that shell
+   `npm run school -- list`. Never turn the TCP proxy back on for this.
+
+---
+
+## 2. Cognito for production
+
+What it makes: a new user pool for production only, hardened per Phase 6's list, with
+two app clients (the portal's and the phone's) and nothing else.
+
+**Decide first** (Phase 6's owner decisions; the steps below need the answers):
+how accounts are made (self sign-up open, gated to the school's email domain, or made by
+the school), and whether teachers must use MFA.
+
+1. **MFA on the AWS root user.** Sign in as root → account menu (top right) →
+   **Security credentials** → **Multi-factor authentication (MFA)** → **Assign MFA
+   device** → authenticator app or a security key. Then do the console work below as
+   an IAM user or IAM Identity Center user, not as root.
+   **Check:** the root's Security credentials page lists the device; the next root
+   sign-in asks for it.
+2. **CloudTrail.** AWS console → **CloudTrail** → **Trails** → **Create trail**: a name
+   like `bali-account-trail`, a new S3 bucket, **log file validation** on, all
+   regions, **management events** read and write. (Event history already keeps 90
+   days without a trail; the trail keeps them as long as the bucket does.)
+   **Check:** **Trails** lists it as Logging: on; within ~15 minutes, files appear in
+   the bucket.
+3. **The pool.** **Cognito** → **User pools** → **Create user pool**, in the same
+   region as dev's (`us-east-1`) unless there is a reason not to. Sign-in with
+   **email**. Name it `bali-production`. Turn on **deletion protection**
+   (pool **Settings**, *wording unsure*).
+   **Check:** the pool's overview shows its **User pool ID** (`<region>_…`). Its
+   issuer is `https://cognito-idp.<region>.amazonaws.com/<pool id>`;
+   `curl -sS <issuer>/.well-known/jwks.json` returns a `keys` list. These are
+   `AUTH_ISSUER` and `AUTH_JWKS_URI` (runbook 1).
+4. **Self sign-up.** Pool → **Sign-up** → **Self-service sign-up**:
+   - **Off**, if the school makes accounts: users are then created under **Users →
+     Create user**, and the hosted page shows no "Sign up" link.
+   - **Gated**, if students sign themselves up: Cognito has no domain allow-list
+     setting; gating needs a **Pre sign-up Lambda trigger** that refuses emails
+     outside the school's domain. No such Lambda exists in this repo yet; ask for it
+     as a step before turning sign-up on.
+   - **Open** is what dev runs, and the security investigation's reason for the
+     join-code backstops (L1). Don't leave prod open without a decision.
+   **Check:** open the hosted sign-in page (step 9): a "Sign up" link shows only if
+   sign-up is on.
+5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
+   → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.
+   **Check:** the page shows the new minimum.
+6. **MFA for teachers, if chosen.** Pool → **Authentication** → **Sign-in** →
+   **Multi-factor authentication**. Cognito sets MFA for the whole pool, not per
+   group: **Required** makes students use it too; **Optional** lets each user turn
+   it on, and nothing forces a teacher to. Use **Authenticator apps** (TOTP), not
+   SMS. Whether the hosted sign-in page itself walks an optional user through
+   setting up TOTP is unsure; try it with a test account before telling teachers it
+   works.
+7. **Threat protection.** Pool → **Threat protection** *(formerly "advanced
+   security")*. It needs the pool's **Plus** feature plan, which is billed per
+   monthly active user; check the price first. Set it to **Full function**
+   (enforcement), with compromised-credentials and adaptive authentication on.
+   **Check:** the page shows Full function; **Users** → a user → shows a risk level
+   after their next sign-in.
+8. **The two app clients.** Pool → **App clients** → **Create app client**:
+   - **The portal's:** type **Single-page application** (public, **no client
+     secret**). Name `bali-web`.
+     **Login pages** → **Allowed callback URLs:** `https://<portal domain>/auth/callback`
+     only. **Allowed sign-out URLs:** `https://<portal domain>/login` only. No
+     `localhost`, no preview URLs, no dev URLs.
+   - **The phone's:** type **Mobile app** (public, no secret). Name `bali-ios`.
+     Callback `bali://auth/callback` only; follow `docs/DEPLOY.md`, "The phone's
+     sign-in", steps 2–3 (scopes with **Profile** ticked by hand, and the 365-day
+     refresh token).
+   - On **both**: **OAuth grant types:** **Authorization code grant** only (that is
+     PKCE; Implicit off). **Scopes:** `openid`, `email`, `profile`. **Identity
+     providers:** Cognito user pool (and Apple, if step 11 applies).
+   - On **both**, **App client information → Edit:**
+     - **Authentication flows:** turn **off** `ALLOW_USER_PASSWORD_AUTH` and
+       `ALLOW_ADMIN_USER_PASSWORD_AUTH` (those send a password straight to the API).
+       Keep `ALLOW_REFRESH_TOKEN_AUTH`. `ALLOW_USER_SRP_AUTH`: try it off; if the
+       hosted page then fails to sign anyone in, turn it back on (SRP never sends
+       the password).
+     - **Prevent user existence errors:** **Enabled**, so a sign-in never says
+       whether an email has an account.
+   **Check**, with the AWS CLI signed in to the account:
+   ```bash
+   aws cognito-idp describe-user-pool-client --user-pool-id <pool id> --client-id <client id> \
+     --query 'UserPoolClient.[ExplicitAuthFlows,PreventUserExistenceErrors,AllowedOAuthFlows,CallbackURLs,LogoutURLs]'
+   aws cognito-idp initiate-auth --client-id <client id> --auth-flow USER_PASSWORD_AUTH \
+     --auth-parameters USERNAME=nobody@example.com,PASSWORD=x
+   ```
+   The first shows no `*_PASSWORD_AUTH`, `ENABLED`, `["code"]`, and only the URLs
+   above. The second must fail with *"USER_PASSWORD_AUTH flow not enabled for this
+   client"*. Then the phone client's public-client check in `docs/DEPLOY.md`
+   (`invalid_grant`, never `invalid_client`).
+9. **The hosted-UI domain.** Pool → **Branding** → **Domain** → **Create Cognito
+   domain**, prefix e.g. `bali`, **Hosted UI (classic)** (as dev). This is
+   `https://<prefix>.auth.<region>.amazoncognito.com`: the portal's
+   `NEXT_PUBLIC_COGNITO_DOMAIN` and the phone's `BALI_COGNITO_DOMAIN`.
+   **Check:** open
+   `<domain>/oauth2/authorize?response_type=code&client_id=<web client id>&redirect_uri=https%3A%2F%2F<portal domain>%2Fauth%2Fcallback&scope=openid+email+profile&code_challenge=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&code_challenge_method=S256`
+   in a browser: the sign-in page loads. A `redirect_mismatch` error means the
+   callback URL isn't registered byte for byte.
+10. **Delete unused clients.** Pool → **App clients**: delete every client that is
+    not `bali-web` or `bali-ios`.
+    **Check:** `aws cognito-idp list-user-pool-clients --user-pool-id <pool id>`
+    lists exactly two, and both ids are in prod's `AUTH_AUDIENCE`.
+11. **Sign in with Apple — only if Google sign-in is offered.** App Store guideline 4.8:
+    an app that offers a third-party sign-in such as Google must offer Sign in with
+    Apple too. Email-and-password through Cognito alone doesn't need it. If Google is
+    on the pool:
+    1. Apple Developer → **Certificates, Identifiers & Profiles** → **Identifiers** →
+       the app ID `com.bali.Bali` → tick **Sign in with Apple** → Save.
+    2. **Identifiers** → **+** → **Services IDs** → an identifier such as
+       `com.bali.signin` → Continue → Register. Open it → tick **Sign in with
+       Apple** → **Configure**: primary app ID `com.bali.Bali`; **Domains:**
+       `<prefix>.auth.<region>.amazoncognito.com`; **Return URLs:**
+       `https://<prefix>.auth.<region>.amazoncognito.com/oauth2/idpresponse` → Save.
+    3. **Keys** → **+** → name it, tick **Sign in with Apple** → **Configure** →
+       primary app ID `com.bali.Bali` → Register → **Download** the `.p8` (Apple
+       offers it once; keep it in your password manager) and note the **Key ID**.
+       Your **Team ID** is at the top right of the developer site.
+    4. Cognito → the pool → **Social and external providers** → **Add identity
+       provider** → **Sign in with Apple**: the Services ID, Team ID, Key ID, and the
+       `.p8`'s contents; scopes `email` and `name`. Map Apple's `email` to `email`
+       and `name` to `name`.
+    5. Both app clients → **Login pages** → **Identity providers:** add Sign in with
+       Apple.
+    **Check:** the hosted sign-in page shows "Continue with Apple", and a test Apple
+    ID signs in and lands back on the portal.
+12. **Hand the values on:** `AUTH_ISSUER`, `AUTH_JWKS_URI` and `AUTH_AUDIENCE` to
+    Railway (runbook 1); the domain and web client id to Vercel (runbook 3); the
+    domain and phone client id to whoever adds prod's values to the iOS build
+    (`docs/DEPLOY.md`, "Where the values go"; Phase 6's S10).
+
+---
+
+## 3. The Vercel flip
+
+What it makes: a new Vercel project that builds the portal (`apps/web`) from `main`.
+
+**Pick the moment.** The v2 demo site is deployed by the **existing** Vercel project,
+from its production branch `v2-archive` (ARCHITECTURE, Status). The flip must not
+replace it by accident. Do this on a day you can watch both sites, after runbooks 1–2.
+
+**What the repo says about `vercel.json`:** the file at the repo root only turns off
+deploys of `main`. Vercel reads `vercel.json` from a project's **Root Directory**, so
+it governs a project whose root is the repo root (the existing one, if that is its
+setting), and not the new project rooted at `apps/web`. The doc's author can't see
+your Vercel projects; step 1 tells you which case you're in.
+
+1. **Look at the existing project, change nothing.** Vercel → the existing project →
+   **Settings → General:** note its **Root Directory**. **Settings → Git:** note its
+   **Production Branch** (expected `v2-archive`).
+2. **Protect the demo before anything changes.** Still in the existing project →
+   **Settings → Git → Ignored Build Step** → **Custom**:
+   `[ "$VERCEL_GIT_COMMIT_REF" != "v2-archive" ]` (exit 0 means skip, so it builds
+   only `v2-archive`). Never set its production branch to `main` unless you mean to
+   retire the demo site: the next push to `main` would replace it with the portal.
+   **Check:** **Deployments** still shows the demo's production deployment as
+   current; its URL still shows the demo.
+3. **The new project.** Vercel → **Add New… → Project** → import `eshan06/bali`:
+   - **Root Directory:** `apps/web`. Leave **Include files outside the root
+     directory** on *(wording unsure)*: the portal imports `packages/shared`.
+   - **Framework:** Next.js (detected). **Build command:** default (`next build`).
+     **Install command:** default; Vercel installs the npm workspace from the
+     repo's lockfile. Name it `bali-portal`.
+   - **Environment Variables**, scope **Production** only, before the first deploy:
+
+     | Variable | Value |
+     | --- | --- |
+     | `NEXT_PUBLIC_API_URL` | `<prod API URL>` (runbook 1), no trailing slash |
+     | `NEXT_PUBLIC_COGNITO_DOMAIN` | `https://<prefix>.auth.<region>.amazoncognito.com` |
+     | `NEXT_PUBLIC_COGNITO_CLIENT_ID` | prod's `bali-web` client id |
+     | `NEXT_PUBLIC_REDIRECT_URI` | `https://<portal domain>/auth/callback` |
+     | `NEXT_PUBLIC_COGNITO_SCOPES` | `openid email profile` |
+     | `NEXT_PUBLIC_SENTRY_DSN` | the portal's Sentry project DSN (optional) |
+     | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production` |
+
+     None is secret (`docs/WEB.md`), but each is baked in at build time: change one,
+     then **Redeploy**.
+   - **Deploy.** **Check:** the deployment's build log finishes, and its
+     `*.vercel.app` URL shows the portal's sign-in page.
+4. **The domain.** New project → **Settings → Domains** → add `<portal domain>` and
+   create the DNS record Vercel shows at your DNS provider.
+   **Check:** `https://<portal domain>` loads with a valid certificate. Then make
+   these three agree, byte for byte: Vercel's `NEXT_PUBLIC_REDIRECT_URI`, the
+   `bali-web` client's callback and sign-out URLs (runbook 2, step 8), and Railway's
+   `CORS_ORIGINS` (runbook 1). Redeploy the portal after any change.
+5. **Previews: protected, and never pointed at prod.**
+   - **Settings → Deployment Protection → Vercel Authentication:** on, for
+     **Standard Protection** (all deployments but the production domain).
+     **Check:** a preview URL opened in a private window asks for a Vercel login.
+   - **Settings → Environment Variables:** the **Preview** and **Development**
+     scopes get dev's values (dev API, dev pool's domain and `bali-web-dev` client),
+     or none at all. Never prod's: a preview is unreviewed code. **Check:** every
+     `NEXT_PUBLIC_*` with a prod value is ticked **Production** only.
+   - A preview can sign in only at a URL registered on dev's web client (Cognito
+     takes no wildcards) and listed in dev's `CORS_ORIGINS`. Previews that can't sign
+     in are fine; to sign in on one, register one fixed branch alias, never every URL.
+6. **Remove `vercel.json`'s deploy block.** Ask a session for a PR that deletes
+   `vercel.json` (the block is the whole file) — after step 2, so the existing
+   project still builds only `v2-archive`.
+   **Check:** after it merges, the new project deploys `main` to production; the
+   existing project shows the build skipped by its Ignored Build Step; the demo site
+   is unchanged.
+7. **End to end.** On `https://<portal domain>`: sign in (prod pool), the classes page
+   loads, Sign out returns to `/login` saying you're signed out. In the browser's
+   developer tools, the API calls go to `<prod API URL>` and none fails with a CORS
+   error.
+
+---
+
+## 4. The backup-restore drill
+
+What it proves: prod's data can be brought back, how long it takes, and that it comes
+back whole. Run it after prod holds real sessions, then once a term.
+
+Railway's restore button, as far as this doc's author knows, restores a backup **over
+the same volume**. Never do that on prod for a drill. So the drill has two halves:
+prod's data restored into a scratch database inside prod's private network, and
+Railway's own restore practised on dev, whose data is disposable. *(If the Backups tab
+offers restoring into a new volume or service, use that on prod's latest backup instead
+of the dump in A, and skip B.)*
+
+Run it outside school hours, so prod isn't changing while you count.
+
+**A. Prod's data into a scratch database (about 30 minutes).**
+
+1. Postgres service (production) → **Backups:** note the latest backup's time.
+   **Check:** it is from the last 24 hours. If not, stop: backups aren't running
+   (runbook 1, step 4).
+2. In `production`: **+ Create** → **Database** → **PostgreSQL**, named
+   `restore-drill`. Delete its TCP proxy as in runbook 1, step 3. Add a variable to
+   it: `PROD_DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+3. Shell into it: `railway link` (the project, `production`), then
+   `railway ssh --service restore-drill`. Start a timer, or use `time` below.
+4. Dump prod and restore it into the scratch database:
+   ```bash
+   time sh -c 'pg_dump "$PROD_DATABASE_URL" -Fc -f /tmp/prod.dump \
+     && pg_restore --no-owner --no-privileges -d "$DATABASE_URL" /tmp/prod.dump'
+   ```
+   **Check:** no `error:` lines. If `pg_dump` refuses over a server version
+   mismatch, the two Postgres services run different versions: give
+   `restore-drill` the same version as prod's (its image tag) and start again.
+5. **Row counts,** every table, prod against the copy:
+   ```bash
+   for t in schools users blocks classes enrollments sessions participations events armed_taps teacher_invites; do
+     echo "$t $(psql "$PROD_DATABASE_URL" -Atc "select count(*) from $t") $(psql "$DATABASE_URL" -Atc "select count(*) from $t")"
+   done
+   ```
+   **Check:** the two numbers match on every line.
+6. **A known session's events,** in order. Pick a recent ended session:
+   `psql "$PROD_DATABASE_URL" -Atc "select id from sessions where ended_at is not null order by started_at desc limit 1"`,
+   then on both databases:
+   ```bash
+   Q="select count(*), md5(string_agg(event_id::text || type || occurred_at::text, ',' order by seq)) from events where session_id = '<session id>'"
+   psql "$PROD_DATABASE_URL" -Atc "$Q"; psql "$DATABASE_URL" -Atc "$Q"
+   ```
+   **Check:** both lines are identical. Then open that session's recap on the
+   portal and see it matches what you remember of the class.
+7. **Destroy the copy.** It holds student data. `restore-drill` → **Settings** →
+   **Delete service**, and delete its volume if Railway keeps it.
+   **Check:** the `production` environment lists only the API, Postgres and the cron.
+
+**B. Railway's own restore, on dev (about 15 minutes).**
+
+8. Dev's Postgres → **Backups** → the latest → **Restore**. Railway stages the
+   change; apply it *(wording unsure)*. Time it from the click until dev's API
+   answers `/healthz` again.
+9. **Check:** dev's portal signs in and lists its classes. Anything written to dev
+   after that backup is gone; that is expected.
+
+**Record it** — a line in `docs/PLAN.md` (ask a session for a PR, or add it to the
+PR the session opens next) under Phase 5's P6, like:
+`Restore drill 2026-MM-DD: prod backup of <time> restored into scratch in <A minutes>, counts and session <id>'s events match; dev's in-place restore took <B minutes>.`
+A failed check goes there too, with what failed.
+
+---
+
+## 5. GitHub hardening
+
+All on `github.com/eshan06/bali` → **Settings**, as the owner.
+
+1. **2FA on the GitHub account.** Avatar → **Settings → Password and
+   authentication → Two-factor authentication**. **Check:** the page says enabled.
+2. **The owner on `.github/**`, `Dockerfile` and `railway.json`.** Two parts:
+   - **CODEOWNERS.** Ask a session for a PR adding `.github/CODEOWNERS`:
+     ```
+     /.github/      @eshan06
+     /Dockerfile    @eshan06
+     /railway.json  @eshan06
+     ```
+   - **The ruleset.** **Settings → Rules → Rulesets → `protect-main`** → **Require a
+     pull request before merging** → tick **Require review from Code Owners** → Save.
+     *(Whether this needs "Required approvals" at 1 or works at 0 is unsure;
+     try 0 first, then check below.)*
+   - Know this before turning it on: GitHub never lets a PR's author approve it, and
+     sessions open PRs under your account. So a session's PR touching those files
+     won't auto-merge; you merge it yourself with the merge box's bypass, after
+     reading it. That is the point: a PR can't change its own checks or deploy
+     without you.
+   **Check:** a PR that touches `.github/` shows "Review required — code owner" and
+   doesn't merge on green; a PR touching only `docs/` merges as before.
+3. **Secret scanning with push protection.** **Settings → Code security**
+   *(formerly "Code security and analysis")* → **Secret Protection** (or **Secret
+   scanning**) → **Enable**, then **Push protection** → **Enable**. On a public repo
+   it's free; on a private one it needs GitHub's paid Secret Protection.
+   **Check:** **Security → Secret scanning** opens with no alerts; pushing a commit
+   with a test token pattern (on a throwaway branch) is blocked.
+4. **Private vulnerability reporting.** Same page → **Private vulnerability
+   reporting → Enable** (offered on public repos). **Check:** **Security →
+   Advisories** shows a "Report a vulnerability" button to outsiders.
+5. **CodeQL, default setup.** Same page → **Code scanning → CodeQL analysis → Set up →
+   Default**. Languages: JavaScript/TypeScript and GitHub Actions. Swift builds on
+   macOS runners and bills those minutes; leave it out unless you want it.
+   **Check:** **Actions** shows a CodeQL run finishing; **Security → Code scanning**
+   lists results (or none).
+6. **Approval for outside contributors' workflows.** **Settings → Actions → General
+   → Fork pull request workflows from outside collaborators** → **Require approval
+   for all outside collaborators**. *(On a private repo this section reads
+   differently: keep "Run workflows from fork pull requests" off.)* **Check:** the
+   setting shows after Save.
+7. **The load gate as a required check.** **Settings → Rules → Rulesets →
+   `protect-main` → Require status checks to pass → Add checks** →
+   `One-address load gate (k6)` → Save. Its workflow runs on every PR and skips the
+   job when no API, database, shared code or manifest changed, and a skipped job
+   counts as passed, so docs PRs never wait on it.
+   **Check:** the next docs-only PR shows the check as skipped and still merges;
+   the next API PR shows it running and required.
