@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **R4: the recap card — the class page shows its last session's report (R2) once
+  the server has marked it over, until a new session starts; and the portal says a `429` in the
+  phone's words.** **When it shows (the conductor's call):** the class's newest session, once the
+  server has marked it over — when the End is answered; when the grid hears the end, its stream's
+  `session_ended` or `session_expired`, or a snapshot saying `ended` (the boot's, or the 15 s
+  refresh's, so a stream that missed the end still ends); and on a fresh visit, R3's newest row
+  (`limit=1`) when it is `ended`. It goes when a session starts: the Start's answer, or one already
+  running when the page loads. Never by the tab's own clock: past the bell, the grid stays until
+  the sweep marks the session, within the minute, so the card never shows a session the server
+  still counts as running (R2 would answer it with `ended: false`). The grid names the session
+  that ended and the page clears only that one, so a late end from a grid it has left changes
+  nothing. Nothing shows while the card looks for a session: a class never run shows no card,
+  never one that flashes and goes. **Read once each time it shows:** reports are counted on read
+  (R3), so an unlock or protection off that first reaches the server after the card was shown
+  appears at its next showing (a reload, or R5's page); it doesn't poll. **What it shows:** the day
+  and the times it ran (R3's row), who joined (display names in R2's order, an account with none by
+  the start of its id, as the grid names it), the class's focus minutes and the average per
+  student who joined, silent minutes with one line saying what silent is and that it doesn't count
+  as focus, every unlock R2 lists (who, when, and the reason as the phone shows it to pick, or "No
+  reason given") and every protection off (who, when). Class aggregates only: no student's
+  minutes, no ranking. R2's notes (`recordedAs`) are not shown: each listed unlock is one the
+  student made, whatever it changed; R5's page can show them. **The states:** loading; an error
+  saying what failed (`errText`'s words) with Try again; nobody joined, said in place of zero
+  figures; no unlocks, said; protection off listed only when there is one. **The word:**
+  "Protection off", the grid's for the state (DESIGN.md: the portal's grid says "Protection off",
+  the app "Screen Time off"), so one page never names a state two ways; the owner may rule
+  otherwise. **The look:** the portal's current Tailwind, a bordered card, no colour for any state
+  (red is reserved, and the words say it), and no motion but Try again's 150 ms hover, off under
+  reduced motion. **The `429` (L1's review WARN, closed):** `errText` says "Too many tries for now.
+  Wait a minute, then try again.", the phone's words for the same answer, where the portal showed
+  the API's own message; `Retry-After` is at most 30 s at L1's sizes. **Where it lives:**
+  `apps/web/src/lib/recap.ts` (which session, the two reads, the words and numbers; tested),
+  `RecapCard` beside the grid, and `endsSession` in `grid-state.ts`.
+
 - **2026-10-04** — **R3: the class's reports list, `GET /v1/classes/{id}/reports/sessions`, for the
   class's own teacher: every session newest first, 20 a page, each row R2's figures counted on
   read; and an unknown class is `404 class_not_found` on every class route.** **A row:** the

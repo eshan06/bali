@@ -9,6 +9,7 @@ import { getAccessToken } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
 import { LiveGrid } from '@/components/live-grid';
+import { RecapCard } from '@/components/recap-card';
 
 export default function ClassDetailPage() {
   const api = useApi();
@@ -47,6 +48,12 @@ export default function ClassDetailPage() {
     }
     load();
   }, [load, router]);
+
+  // The grid says when the server marks its session over (the bell's sweep, an End from another
+  // tab or a phone), and the recap card takes its place. Only that session's end clears it.
+  const onEnded = useCallback((ended: string) => {
+    setSessionId((cur) => (cur === ended ? null : cur));
+  }, []);
 
   function startSession() {
     setBusy(true);
@@ -96,14 +103,19 @@ export default function ClassDetailPage() {
 
       <div className="mt-6">
         {sessionId === null ? (
-          <button
-            type="button"
-            onClick={startSession}
-            disabled={busy}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Start 25-min session
-          </button>
+          <div className="space-y-6">
+            <button
+              type="button"
+              onClick={startSession}
+              disabled={busy}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Start 25-min session
+            </button>
+            {/* The last session's recap (R4) until a new one starts; only once the class is read,
+                so a session already running never shows it. */}
+            {klass ? <RecapCard classId={classId} /> : null}
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -117,7 +129,7 @@ export default function ClassDetailPage() {
                 End session
               </button>
             </div>
-            <LiveGrid sessionId={sessionId} />
+            <LiveGrid sessionId={sessionId} onEnded={onEnded} />
           </div>
         )}
       </div>
