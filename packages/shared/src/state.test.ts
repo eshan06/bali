@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   clampToWindow,
+  CLOCK_AHEAD_THRESHOLD_MS,
+  clockAheadSeconds,
   deriveDisplayState,
+  hasClockNote,
   SILENCE_THRESHOLD_MS,
   type ParticipationSnapshot,
 } from './state.js';
@@ -74,5 +77,28 @@ describe('clampToWindow', () => {
     expect(clampToWindow(new Date('2026-01-01T10:00:00Z'), start, end).toISOString()).toBe(
       end.toISOString(),
     );
+  });
+});
+
+describe('clockAheadSeconds (S9)', () => {
+  const heard = new Date('2026-01-01T09:00:00Z');
+  const at = (ms: number) => new Date(heard.getTime() + ms);
+
+  it('notes a claim ahead of the server past the threshold, in whole seconds', () => {
+    expect(clockAheadSeconds(at(CLOCK_AHEAD_THRESHOLD_MS + 1_000), heard)).toBe(121);
+    expect(clockAheadSeconds(at(60 * 60_000), heard)).toBe(3600);
+  });
+
+  it('says nothing at or under the threshold, nor for a claim behind (offline catch-up)', () => {
+    expect(clockAheadSeconds(at(CLOCK_AHEAD_THRESHOLD_MS), heard)).toBeNull();
+    expect(clockAheadSeconds(at(5_000), heard)).toBeNull();
+    expect(clockAheadSeconds(at(-60 * 60_000), heard)).toBeNull();
+  });
+
+  it('reads the note back only as a number', () => {
+    expect(hasClockNote({ clock_ahead_s: 300 })).toBe(true);
+    expect(hasClockNote({ clock_ahead_s: '300' })).toBe(false);
+    expect(hasClockNote(null)).toBe(false);
+    expect(hasClockNote({ recorded_as: 'superseded' })).toBe(false);
   });
 });

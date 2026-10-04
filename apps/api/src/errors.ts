@@ -131,6 +131,32 @@ export function parseRequest<T>(
   return parse(schema, request[part], reason);
 }
 
+/**
+ * What Fastify's router refuses before any route runs, so before the error
+ * handler: a path parameter past its length cap (414) or not validly
+ * percent-encoded (400). Left alone, each leaves in Fastify's own shape, the
+ * path echoed in it (Phase 6, S7). Given to `Fastify({ frameworkErrors })`.
+ */
+export function routerRefusal(
+  error: { code?: string; statusCode?: number },
+  request: FastifyRequest,
+  reply: FastifyReply,
+): void {
+  const status = typeof error.statusCode === 'number' ? error.statusCode : 400;
+  // An async route constraint's failure (none is registered): a bug, as in the handler.
+  if (status >= 500) {
+    request.log.error({ err: error }, 'router error');
+    captureFailure(error, `${request.method} (router)`);
+    reply.status(500).send(body('internal', 'internal error'));
+    return;
+  }
+  const message =
+    error.code === 'FST_ERR_MAX_PARAM_LENGTH'
+      ? 'a path parameter is too long'
+      : 'the path is not a valid URL';
+  reply.status(status).send(body('bad_input', message));
+}
+
 /** The route template a request matched (`POST /v1/join-codes/:code`), never its URL. */
 function routeOf(request: FastifyRequest): string {
   return `${request.method} ${request.routeOptions.url ?? '(no route)'}`;

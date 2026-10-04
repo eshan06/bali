@@ -22,10 +22,11 @@ jobs:
   changes:
     name: iOS changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       ios: ${{ steps.diff.outputs.ios }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - id: diff
@@ -52,7 +53,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Xcode 26.6 (swift-tools-version 6.0 needs 16 or later), pinned where
       # GitHub keeps several side by side; a Mac of one's own builds with the

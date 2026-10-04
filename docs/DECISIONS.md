@@ -12,7 +12,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   only:** `createVerifier` requires `token_use: 'access'` and checks the app client by
   `client_id` alone; an id token, even this app's, is `401`. Every client already sent access
   tokens (the portal stores `access_token`, the phone sends `accessToken`, the demo signs in for
-  `AccessToken`), and an id token says who signed in, for the client; it grants nothing.
+  `AccessToken`), and an id token says who signed in, for the client; it grants nothing. S7's
+  `it.todo` for it is now a passing test in `abuse.test.ts`.
   **Headers:** an `onSend` hook (`apps/api/src/headers.ts`) puts HSTS (a year, with subdomains)
   and `nosniff` on every answer, errors and `404`s included, and `Cache-Control: no-store` on
   `/v1`'s; `/healthz` and `/internal` keep the default. The live stream hijacks its response, so
@@ -26,6 +27,123 @@ a real decision? Add a dated entry at the top: what was decided and why.
   that key starts again with its whole burst. Forgetting early is the permissive side, and only
   a flood of 100,000 distinct keys inside one refill window ever does it.
 
+- **2026-10-04** — **S9: clock skew surfaced — a note on the record and a badge on the grid,
+  never a rule.** The engine's one event writer (`insertEvent`) compares a phone's claimed time,
+  unclamped, with when the server heard it (`heardNow`, the clock that stamps `last_seen_at`); a
+  claim more than `CLOCK_AHEAD_THRESHOLD_MS` (2 minutes, `@bali/shared`) ahead adds
+  `clock_ahead_s` — whole seconds — to that event's payload, beside any `recorded_as` or reason.
+  It does so for a tap, a refocus, Screen Time on and off, and an unlock (an orphan, and one filed
+  later under its tap, too); a replay writes nothing. **Only ahead, on purpose:** a claim behind
+  the server is what every offline catch-up looks like — an unlock queued for ten minutes reads
+  ten minutes behind — so it proves nothing, and a badge built on it would accuse the honest
+  phone. Ahead has no innocent reading, and it is the direction that matters: iOS schedules
+  follow the wall clock, so a clock set forward is what ends shields early. **Why 2 minutes:** an
+  iPhone on network time is within a second, and a request's trip and the outbox's retries take
+  seconds, so past that the clock itself is set wrong, while a jump that ends a lesson early is
+  tens of minutes. **Advisory only:** the clamp (rule 1), `occurred_at`, the phone's order
+  (A10–A14) and every chip's state are exactly as before; reports ignore the key. The grid's
+  snapshot carries `clockOff` per student (any noted record of theirs in the session; additive,
+  so an older server's omission reads false), the stream sets it from the payload, and the chip
+  shows a "Clock off" badge beside its name in the chip's own ink, never a colour of its own. Not
+  covered: a pre-bell tap converted at Start (heard by `armTap`, written later), and check-ins,
+  which write no history (decision 7).
+- **2026-10-04** — **The owner's rulings, second set: retention, deletion, 13+, and the pilot.**
+  **(a) Retention (C6b):** named records are kept through the school year, then de-identified;
+  aggregates stay. **(b) Account deletion (C3):** a student's in-app deletion de-identifies their
+  events and deletes the account, its name and its sign-in. This amends data-model decision 3
+  ("nothing is truly deleted"), approved by the owner; ARCHITECTURE's own amendment lands with
+  C3. **(c) 13+ (C7):** the school's agreement, plus a neutral in-app age screen that stores
+  nothing on "no". It matters for the later K-12 pilot; the first pilot's users are adults.
+  **(d) The pilot (amended by the owner the same day):** the first, preliminary pilot is
+  unofficial: one professor at Vanderbilt University (Nashville, US Central, so production's `TZ`
+  stays America/Chicago), with adult students on their own phones. There is no school or
+  district policy, so no data agreement yet, and state K-12 phone bans don't apply to it. Los
+  Angeles or New Jersey is the likely later K-12 pilot, whose `TZ` would then be
+  America/Los_Angeles or America/New_York; the `TZ` docs are unchanged until then. ISSUES #4
+  names California's and New Jersey's laws for the lawyer at that point. The support email for
+  P4's FAQ page is eshan.shah@vanderbilt.edu.
+- **2026-10-04** — **S7: abuse tests, in process — what they proved, and the one bug.** An
+  in-process pen test of the API (`apps/api/test/abuse.test.ts`), with real tokens from the test
+  issuer. **Proven:** a join-code guesser meets its account's 20 tries, then, over fresh accounts,
+  its address's 100 misses (the right code and the join refused too), at production's `BUDGETS`;
+  a `429` for an account's tries gives back the miss its address held (L1's review). Another
+  student's `event_id` on a tap, an unlock, a refocus or an invite redeem is `409
+  event_id_conflict`, with no event, participation, redeemed invite or teacher written; the
+  unlock's `409` reads `retry_and_surface`, never a discard. Every forged or malformed token tried
+  — `alg: none` (also with the pool's key id, and in capitals), HS256 and HS512 keyed with the
+  public key's PEM or JWK, an unknown, missing or numeric key id, another key under the pool's
+  id, an embedded `jwk`, an unknown `crit`, expired, not yet valid, a wrong issuer, client or
+  audience, an empty subject, a payload swapped after signing, and malformed shapes — is `401`,
+  never `500` or `503`: the verifier pins RS256, and jose's rejections all sit on its 401 list.
+  A body over Fastify's 1 MiB is `413`; a capped field `400`; deep, broken or non-JSON bodies a
+  `4xx`; all in the one shape. Every UUID path parameter (a guard fails a new parameter name the
+  test doesn't cover) is `400`. **The bug, fixed here:** Fastify's router refuses a path
+  parameter past 100 characters (`414`) or with a bad percent-encoding (`400`) before any route
+  runs, so before the error handler: the answer left in Fastify's own shape (`FST_ERR_…` codes,
+  the path echoed back). `Fastify({ frameworkErrors: routerRefusal })` answers both in the one
+  shape with a fixed message, and an async-constraint failure (no route has one) as a `500`
+  reported like any other. The failing test came first, in its own commit. **Not here:** an ID
+  token is still accepted on main — S3 (#209, parked) adds the `token_use` check, so its test is
+  an `it.todo`; a tap's `tagId` has no cap until S3 (a 900 KB one reads as no block, `404`); an
+  unknown key id against the real Cognito JWKS makes jose refetch the set, at most once per its
+  30 s cooldown, which no in-process test reaches. **Known risk, recorded rather than fixed:** an
+  account's request budget is the only bound on its orphan unlocks (`unknown_session`, no
+  session, rows kept forever by rule 6): 120 at once, then 2 a second, so one account can add up
+  to ~172,800 rows a day, and accounts are free while self sign-up is on. The root fix is
+  Phase 6's Cognito item (self sign-up off or gated); a tighter per-account budget on orphan
+  unlocks — a `429`, which the unlock contract retries, never a discard — is the fallback if
+  that is late.
+
+- **2026-10-04** — **S5: CI hardening.** **Pins:** every third-party and GitHub action in the
+  workflows CI runs is pinned to a commit, with its tag in a trailing comment (a bump is its own PR,
+  both changed together), so a moved tag can't move the code that runs; `claude-review.yml` and
+  `claude.yml` are S6's, untouched here (their tamper protection, GOTCHAS). Every job has a
+  `timeout-minutes`, so a hung step costs minutes, not six hours. **Audit:** `npm audit
+  --omit=dev --audit-level=high` — what ships, high and critical only; a dev tool's advisory
+  never reaches a phone or the API, and blocking on it would turn CI red over nothing a user
+  meets. `npm audit signatures` checks every installed package against the registry's
+  signatures. **Load gate:** the flooder's `200`s are capped at what its budget allows over the
+  flood's minute (120 at once, then 2 a second: 240, plus 5 for requests in flight; a run
+  measured 239), so a raised budget fails (240 at once measured 359); and `dropped_iterations`
+  must be zero, with `maxVUs` 50 (a second's latency each) so a slow API fails the gate rather
+  than quietly sending fewer requests. **The CSP nonce, served:** CI's check job starts the
+  built portal with `next start` and checks that every `<script>` on `/login` carries the
+  nonce its response's `script-src` names — the rendering-per-request test and the route
+  table check prove the precondition, this the outcome. The route table check fails when
+  the table has no `+ First Load JS` end, rather than reading every later line as routes.
+  **Privacy manifests:** a `//` inside a string literal no longer hides the rest of the line
+  from the scan; an extension declaring any collected data type fails (none calls the API);
+  TestFlight's Release guard lints each archived bundle's manifest, the build Apple reads.
+- **2026-10-04** — **S4: the portal's CSP, with a nonce, and its security headers.** **Why the
+  CSP matters most:** the access token lives in sessionStorage (WEB.md), where any script on the
+  page can read it; httpOnly cookies would need a server the SPA doesn't have. So the CSP is the
+  token's defence: an injected script can't run (no inline, no eval, no other origin), and if one
+  did, `connect-src` lets nothing leave but for the API, Cognito and Sentry. **A future refresh
+  token must stay out of web storage** (sessionStorage or localStorage): a long-lived token there
+  turns one XSS into a standing account takeover; it belongs in an httpOnly cookie on a
+  same-site token endpoint, or not in the browser at all. **Nonce, not `'unsafe-inline'`:** Next's
+  app router writes inline scripts (its RSC payload), so a script policy without one means a
+  nonce or `'unsafe-inline'`; hashes don't fit (the payload differs per page and build). A nonce
+  is per request, so it is set in `src/middleware.ts` rather than `headers()`, and the pages
+  render per request (`dynamic = 'force-dynamic'` in the root layout): a page built ahead carries
+  no nonce. Every page is a client page reading the API from the browser, so nothing cached is
+  lost. `'strict-dynamic'` lets the chunks Next's nonced scripts load run. **Styles:** the
+  portal's own come from Tailwind's stylesheet (`'self'`), and a `<style>` element needs the
+  nonce; only style *attributes* are inline-allowed (`style-src-attr`), because Next's built-in
+  404 and error pages style by attribute, and an attribute selects nothing and any URL in it
+  still meets `img-src`. The built-in 404's own `<style>` (its dark mode) is refused; the page
+  still lays out by its attributes. **Dev only:** `next dev` gets `'unsafe-eval'` and inline
+  styles for fast refresh. **Origins** come from the build's `NEXT_PUBLIC_*`, each cut to its
+  origin (a Sentry DSN's key and project go); blank means none (the API's is required); one that is not an http(s) URL
+  fails the build (`next.config.ts`), so no deploy serves a 500 or a `null` origin for it.
+  **Every page renders per request,** guarded by a test of the app's route config and a CI
+  check of the build's route table: a static page has no nonce, so it would be blank. **No
+  report endpoint:** a browser check before the Vercel flip (PLAN, S4) stands in for one. **Not taken:** `upgrade-insecure-requests` (it
+  breaks the local API on http); `X-Frame-Options` (`frame-ancestors` covers it); HSTS
+  `preload` (a commitment for the final domain, the owner's). **Headers on every response,**
+  assets too, from `next.config.ts`: HSTS two years with subdomains (browsers ignore it over
+  http, so localhost is fine), `nosniff`, `strict-origin-when-cross-origin`, and a
+  Permissions-Policy turning off camera, microphone, geolocation, payment and USB.
 - **2026-10-04** — **C1: privacy manifests, declared per binary, held to the code by a
   Linux script.** **What each declares:** the required-reason APIs whose code is in that bundle's
   binary: its own Swift plus the local packages it links. BaliOutbox, linked by all three, reads

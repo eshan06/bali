@@ -1,4 +1,5 @@
 import {
+  CLOCK_AHEAD_NOTE,
   type EventType,
   HISTORY_EVENT_TYPES,
   type HistoryEventType,
@@ -418,6 +419,8 @@ export interface SnapshotRosterRow {
   } | null;
   /** A protection-off report reached this session after it ended (A2c). */
   protectionOffAfterEnd: boolean;
+  /** One of their records here came from a phone clock set ahead of the server's (S9). */
+  clockOff: boolean;
 }
 
 /**
@@ -532,6 +535,7 @@ export async function getSessionRoster(
   classId: string,
 ): Promise<SnapshotRosterRow[]> {
   const turn = latestTurn(db, sessionId, users.id).as('turn');
+  const clockOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and jsonb_typeof(${events.payload} -> ${CLOCK_AHEAD_NOTE}::text) = 'number')`;
   const lateOff = sql<boolean>`exists (select 1 from ${events} where ${events.sessionId} = ${sessionId} and ${events.userId} = ${users.id} and ${events.type} = 'protection_off' and ${events.payload}->>'recorded_as' = 'after_session_end')`;
 
   const rows = await db
@@ -549,6 +553,7 @@ export async function getSessionRoster(
       turnPayload: turn.payload,
       turnAt: turn.occurredAt,
       protectionOffAfterEnd: lateOff,
+      clockOff,
     })
     .from(enrollments)
     .innerJoin(users, eq(enrollments.studentId, users.id))
@@ -594,6 +599,7 @@ export async function getSessionRoster(
               }
             : null,
         protectionOffAfterEnd: r.protectionOffAfterEnd,
+        clockOff: r.clockOff,
       };
     });
 }

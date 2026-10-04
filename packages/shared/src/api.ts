@@ -655,6 +655,13 @@ export interface SnapshotStudent {
    * row stays as the end left it.
    */
   protectionOffAfterEnd: boolean;
+  /**
+   * True when one of the student's records in this session came from a phone
+   * whose clock read more than `CLOCK_AHEAD_THRESHOLD_MS` ahead of the server
+   * (S9, its payload's `clock_ahead_s`). Advisory: the times stay clamped and
+   * every order stands. Additive: an older server omits it.
+   */
+  clockOff?: boolean;
 }
 export interface SessionSnapshot {
   session: SessionView & { startedAt: string };
