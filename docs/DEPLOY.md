@@ -141,6 +141,52 @@ console → Cognito → that user pool:
   (dev's first client did, found at the device check; the authorize request
   above passes either way, so it proves nothing about the secret).
 
+## TestFlight — owner action (needs App Store Connect and GitHub settings)
+
+The **TestFlight** workflow (`.github/workflows/testflight.yml`, Phase 5's P5) archives
+the student app as Release, signs it through an App Store Connect API key, and uploads
+it. It runs only by hand: Actions → TestFlight → Run workflow, choosing whose API and
+sign-in the build talks to (dev, the only one until prod exists; then it gets prod's
+values in its "Archive" step). Without the key's secrets it builds nothing, says which
+are missing, and passes. Once, before the first run:
+
+1. **The app record.** App Store Connect → Apps → + → New App: iOS, the name, a
+   language, bundle ID `com.bali.Bali` (registered on team `H535678UF8` by the first
+   device build), any SKU. A build uploads only into an app that exists.
+2. **The API key.** App Store Connect → Users and Access → Integrations → App Store
+   Connect API → Team Keys → + (the Account Holder requests access the first time).
+   Name it `Bali CI`, access **App Manager**, Generate. Download the `.p8` — Apple
+   offers it once — and note its **Key ID** and the **Issuer ID** above the table.
+3. **The secrets.** GitHub → the repo → Settings → Secrets and variables → Actions →
+   New repository secret, three times:
+   - `APP_STORE_CONNECT_KEY_ID` — the Key ID;
+   - `APP_STORE_CONNECT_ISSUER_ID` — the Issuer ID;
+   - `APP_STORE_CONNECT_KEY_P8` — the whole `.p8` file, its `BEGIN` and `END` lines
+     included.
+
+What a run checks and needs:
+
+- **The release guard** (#130, "Nothing from Debug in Release"; part of Phase 6's S10)
+  fails the run before anything is uploaded if a Release target compiles with
+  `DEBUG`, if the app or the monitor holds text only `#if DEBUG` code has (the
+  readout's title, the lost-bell device check), if a sign-in setting is empty or the
+  API isn't `https://`, or if the app has **no icon**. It has none yet: App Store
+  Connect refuses such a build, so the first run stops there until an `AppIcon` asset
+  catalog is added to the `Bali` target (#130, "Build and store setup").
+- **Signing:** `-allowProvisioningUpdates` with the key, so Xcode makes or fetches
+  the certificate and the App Store profiles for the app and both extensions itself.
+  If it says the key may not create a certificate or use cloud-managed distribution
+  certificates, the key's role is too narrow for that: generate one with **Admin**
+  access and replace the three secrets. A GitHub runner keeps no keychain, so a run
+  may leave a new Apple Development certificate on the team each time: revoke old
+  ones in the developer account if they pile up toward Apple's limit. Each extension's Family Controls
+  (Distribution) entitlement must be approved on its own bundle ID too.
+- **The build number** is the run's number; the version stays `MARKETING_VERSION`.
+  Apple refuses a number already uploaded, so re-running a run that got as far as the
+  upload fails: dispatch a new run.
+- App Store Connect asks the export-compliance question on each build until the app
+  declares it in `Info.plist`.
+
 ## Local run
 
 ```bash
