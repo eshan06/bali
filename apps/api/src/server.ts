@@ -2,8 +2,12 @@ import { createDb } from '@bali/db';
 
 import { buildApp } from './app.js';
 import { env } from './env.js';
+import { initMonitoring } from './monitoring.js';
 import { makeShutdown } from './shutdown.js';
 import { startSweeping, sweep } from './sweep.js';
+
+// First, so a failure during boot is reported too. A no-op without SENTRY_DSN.
+initMonitoring(env);
 
 // postgres.js connects lazily, so this makes no network call at boot.
 const db = createDb(env.DATABASE_URL);

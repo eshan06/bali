@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P1: Sentry in the API, off without a DSN, scrubbed before it leaves.**
+  **New dependency: `@sentry/node`** (v11, `apps/api` only): error monitoring needs a client
+  for Sentry's envelope protocol, and its own crash handlers; writing one is not minimal.
+  **Off by default:** `initMonitoring` does nothing unless `SENTRY_DSN` is set, which tests and
+  dev never do; an empty value reads as unset, never a boot failure. **Only real failures:** the
+  error handler's 500 branch calls `captureFailure`; the 4xx refusals above it never do. Sentry's
+  uncaught-exception handler reports a crash; its unhandled-rejection handler runs in `strict`
+  mode, so the process still exits as Node's default would (its default `warn` mode would keep
+  a broken process up). **No personal data leaves:** Sentry's default integrations are replaced
+  by an allow-list (error shape, linked causes, dedupe, stack context, the crash handlers):
+  without it, v11's HTTP and Fastify instrumentation reported a handler's error on its own,
+  with the raw URL, which carries a join code in `/v1/join-codes/:code`. `sendDefaultPii` is
+  gone in v11; its replacement, `dataCollection`, is set to collect nothing, and local variables
+  are off. `beforeSend` (`scrubEvent`) drops the request, the user, extras, breadcrumbs and the
+  transaction name, and cuts Drizzle's `params: …` and Postgres's echoed row values
+  (`Key (col)=(…)`) out of every message; the route template rides as a `route` tag instead.
+  Proven by a test that sends a Drizzle-style failure with a name, an email, a Cognito id, an
+  unlock reason, a code in the path and the query, a bearer token, the internal key and a
+  cookie through a fake transport and finds none of them in the envelope, and finds no event
+  for a 403. **Context:** environment `SENTRY_ENVIRONMENT` (unset, `NODE_ENV`, which is
+  `production` on dev's Railway too, hence the variable); release Railway's
+  `RAILWAY_GIT_COMMIT_SHA`. **Tracing off:** no sample rate, no spans.
 - **2026-10-04** — **S4a: a real Sign out on the portal, pulled forward from Phase 6's S4
   into Phase 4.** The security investigation (below, 2026-10-04) found no sign-out control:
   `signOut()` ran only on a 401, and the Cognito hosted-UI session was never ended, so on a

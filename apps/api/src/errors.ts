@@ -7,6 +7,8 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError, type ZodType } from 'zod';
 
+import { captureFailure } from './monitoring.js';
+
 /*
  * Step 6 — the error shape and the validation layer. Everything the API rejects
  * leaves through here in one JSON shape (API-surface decision 4), and no request
@@ -162,7 +164,10 @@ export function registerErrors(app: FastifyInstance): void {
     }
     // Anything else is a bug: log it with the request, return an opaque 500 —
     // never leak internals to the client (rule 5 is honest failure, not detail).
+    // It is also the one place a failure reaches error monitoring: the 4xx
+    // refusals above are the API working, never reported.
     request.log.error({ err: error }, 'unhandled error');
+    captureFailure(error, `${request.method} ${request.routeOptions.url ?? '(no route)'}`);
     reply.status(500).send(body('internal', 'internal error'));
   });
 }
