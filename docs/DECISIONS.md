@@ -30,8 +30,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `409 event_id_conflict`. **Teachers:** one with a live class or block is `409
   teacher_has_classes` — their students' class would be left to no one; the school handles it
   (C6a). One with neither is deleted like a student. **In flight:** the deletion takes the
-  student's tap lock, then their row, so a tap behind it, a join and a rename each find the row
-  removed and are `409 account_deleted`; an unlock is recorded as one with no class (ISSUES
+  student's tap lock, then their row, so a tap behind it, a join, a rename and an invite redeem
+  each find the row removed and are `409 account_deleted`; an unlock is recorded as one with no class (ISSUES
   #2); the boot call's name fill skips a removed row. **Cognito:** no server credential — the
   phone calls Cognito's own `DeleteUser` with its access token after the API answers (C4).
   Not done here: armed taps stay to expire (a Start converts only enrolled students).

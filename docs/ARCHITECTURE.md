@@ -330,8 +330,8 @@ Student app:
   `{ eventId }`, through the engine (data-model decision 3's amendment), answered `deleted`;
   a retry, or any call from a sign-in with no account here, is `already_deleted`, and makes
   none — a retry reaching an account a boot call made since deletes that one too. A teacher
-  with a live class or block is `409 teacher_has_classes`. A join, rename or tap still on its
-  way under the deleted account is `409 account_deleted`; an unlock is recorded, never
+  with a live class or block is `409 teacher_has_classes`. A join, rename, tap or invite redeem
+  still on its way under the deleted account is `409 account_deleted`; an unlock is recorded, never
   refused. The Cognito sign-in is the phone's to delete with its own access token once this
   answers (C4): the API holds no AWS credential.
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,

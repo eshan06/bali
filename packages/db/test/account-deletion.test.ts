@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
+import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { getSessionEvents, getSessionRoster } from '../src/queries.js';
 import { classes, enrollments, events, participations, schools, users } from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
@@ -278,6 +279,15 @@ describe('deleteAccount (C3)', () => {
         .from(participations)
         .where(and(eq(participations.studentId, ana.id), isNull(participations.endedAt))),
     ).toHaveLength(0);
+
+    // A redeem that waited on the row spends no code on it.
+    const school = one(await db.insert(schools).values({ name: 'c3-after-school' }).returning());
+    await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' });
+    const minted = await mintTeacherInvite(db, { schoolId: school.id });
+    if (minted.outcome !== 'minted') throw new Error(minted.outcome);
+    const redeem = { userId: ana.id, code: minted.code, eventId: newUuidV7() };
+    expect(await redeemTeacherInvite(db, redeem)).toEqual({ outcome: 'account_deleted' });
+    expect(one(await db.select().from(users).where(eq(users.id, ana.id))).role).toBe('student');
 
     // An unlock still on its way is never lost (ISSUES #2): recorded, moving no one.
     const late = await unlock(db, {
