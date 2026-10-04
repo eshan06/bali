@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { ApiError } from '../errors.js';
+import type { Limiter } from '../limits.js';
 import type { AuthedIdentity, TokenVerifier } from './verify.js';
 
 /** An async Fastify preHandler; Fastify awaits the returned promise. */
@@ -27,18 +28,30 @@ function bearerToken(header: string | undefined): string | null {
 /**
  * Wire authentication onto the app: a `request.auth` slot and an `authenticate`
  * preHandler that rejects anything without a valid token before the handler
- * runs. Decorated synchronously so routes can reference `app.authenticate` the
- * moment `buildApp` returns.
+ * runs, and spends the request's rate limit (ISSUES #1) once it knows who is
+ * asking. Decorated synchronously so routes can reference `app.authenticate`
+ * the moment `buildApp` returns.
  */
-export function registerAuth(app: FastifyInstance, verify: TokenVerifier): void {
+export function registerAuth(app: FastifyInstance, verify: TokenVerifier, limits: Limiter): void {
   app.decorateRequest('auth', null);
 
   const authenticate: AsyncPreHandler = async (request) => {
-    const token = bearerToken(request.headers.authorization);
-    if (token === null) {
-      throw ApiError.unauthorized('missing bearer token');
+    let identity: AuthedIdentity;
+    try {
+      const token = bearerToken(request.headers.authorization);
+      if (token === null) {
+        throw ApiError.unauthorized('missing bearer token');
+      }
+      identity = await verify(token);
+    } catch (err) {
+      // No one is signed in: their address's budget, the 401 within it. A key
+      // set out of reach (503) is ours, not the caller's, and costs nothing.
+      if (err instanceof ApiError && err.code === 'unauthorized') limits.unsigned(request);
+      throw err;
     }
-    request.auth = await verify(token);
+    // Signed in: the verified account's own budget, never its address's.
+    limits.signedIn(identity.sub);
+    request.auth = identity;
   };
 
   app.decorate('authenticate', authenticate);

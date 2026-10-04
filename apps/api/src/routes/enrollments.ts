@@ -13,11 +13,12 @@ import type {
   EnrollmentJoinResponse,
   JoinCodePreviewResponse,
 } from '@bali/shared';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parseRequest } from '../errors.js';
+import type { Limiter } from '../limits.js';
 import { mapTransitionError, refusal } from './errors.js';
 import { DeviceTime, JoinCode } from './schemas.js';
 
@@ -55,15 +56,31 @@ const teacherCannotJoin = () => ApiError.forbidden('teachers cannot join a class
  * a mid-session removal reaches the grid and the phone honestly. A student never
  * leaves while the class has a session running: 409 `class_in_session` (A19).
  * The body's optional `eventId` is what the event is recorded under.
+ *
+ * The preview and the join look a code up, so each is a guess at one (ISSUES
+ * #1): an account's tries, and a backstop on its address's misses, since
+ * accounts are free while self sign-up is on (`Limiter.guess`).
  */
 export function registerEnrollmentsRoutes(
   app: FastifyInstance,
   db: Database,
   clock: () => Date,
+  limits: Limiter,
 ): void {
+  const guessing = {
+    preHandler: async (request: FastifyRequest) => {
+      await app.authenticate(request);
+      limits.guess(request);
+    },
+    onResponse: (request: FastifyRequest, reply: FastifyReply, done: () => void) => {
+      limits.settle(request, reply.statusCode);
+      done();
+    },
+  };
+
   app.get(
     '/v1/join-codes/:code',
-    { preHandler: app.authenticate, config: { parses: { params: CodeParams } } },
+    { ...guessing, config: { parses: { params: CodeParams } } },
     async (request): Promise<JoinCodePreviewResponse> => {
       const identity = requireAuth(request);
       const { code } = parseRequest(request, 'params', CodeParams);
@@ -84,7 +101,7 @@ export function registerEnrollmentsRoutes(
 
   app.post(
     '/v1/enrollments',
-    { preHandler: app.authenticate, config: { parses: { body: JoinBody } } },
+    { ...guessing, config: { parses: { body: JoinBody } } },
     async (request): Promise<EnrollmentJoinResponse> => {
       const identity = requireAuth(request);
       const body = parseRequest(request, 'body', JoinBody);

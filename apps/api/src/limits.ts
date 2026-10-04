@@ -1,0 +1,150 @@
+import type { FastifyRequest } from 'fastify';
+import { isIP } from 'node:net';
+import { performance } from 'node:perf_hooks';
+
+import { requireAuth } from './auth/plugin.js';
+import { ApiError } from './errors.js';
+
+/*
+ * The rate limits (ISSUES #1; API decision 4's 429). A school's 600 phones share one internet
+ * address, so a signed-in request is budgeted by its verified account, never its address
+ * (`authenticate` spends it once the token checks out), and only a request no one is signed in on
+ * — no token, or one the pool refused — by address, with a budget for a whole school. Guessing a
+ * join code gets a tighter budget per account and, as accounts are free while self sign-up is on,
+ * a backstop on misses per address. Over a budget is a 429 in the one error shape, `Retry-After`
+ * saying when one more passes: a throttle that refills, never a block. The sizes and why:
+ * docs/DECISIONS.md, 2026-10-04 (L1).
+ *
+ * Each budget is a token bucket per key, in this process's memory — no Redis, no new
+ * infrastructure: N instances of the API are N times each budget.
+ */
+
+/** Up to `burst` requests at once, refilled at `perMinute` a minute. */
+export interface Budget {
+  burst: number;
+  perMinute: number;
+}
+
+export interface Budgets {
+  /** Each signed-in account, on every `/v1` route: keyed by the verified Cognito `sub`. */
+  account: Budget;
+  /** Each address, for a request no one is signed in on: no token, or one the pool refused. */
+  unsigned: Budget;
+  /** Each account's tries on the join-code preview and the join. */
+  joinTries: Budget;
+  /** Each address's misses there (`404 class_not_found`), whatever the account. */
+  joinMisses: Budget;
+}
+
+export const BUDGETS: Budgets = {
+  account: { burst: 120, perMinute: 120 },
+  unsigned: { burst: 1_200, perMinute: 600 },
+  joinTries: { burst: 20, perMinute: 2 },
+  joinMisses: { burst: 100, perMinute: 6 },
+};
+
+/** Budgets to change from `BUDGETS`, and the clock they refill by (ms): tests drive both. */
+export interface LimitOptions extends Partial<Budgets> {
+  now?: () => number;
+}
+
+/**
+ * The caller's address: `X-Real-IP`, which Railway's edge sets on every request to the client's
+ * own address, overwriting any a client sends (docs.railway.com, Public Networking, Specs &
+ * Limits). Never `X-Forwarded-For`: Railway documents no hop count for it, its staff say the
+ * count varies, and Fastify 5.12 ignores a numeric `trustProxy` — so that stays off, and no entry
+ * a client adds there picks a bucket. With none (local runs, tests), the socket's peer.
+ */
+export function clientAddress(request: FastifyRequest): string {
+  const real = request.headers['x-real-ip'];
+  return typeof real === 'string' && isIP(real) !== 0 ? real : request.ip;
+}
+
+interface Bucket {
+  /** Spend one when `key` can: 0, or the seconds to wait, with nothing spent. */
+  take(key: string): number;
+  /** Give `key` back one it spent. */
+  refund(key: string): void;
+}
+
+function bucket({ burst, perMinute }: Budget, now: () => number): Bucket {
+  const perMs = perMinute / 60_000;
+  // What each key holds and since when; a key with its whole burst has no entry.
+  const held = new Map<string, { tokens: number; at: number }>();
+  let sweptAt = now();
+  const tokens = (key: string, at: number): number => {
+    const entry = held.get(key);
+    return entry ? Math.min(burst, entry.tokens + Math.max(0, at - entry.at) * perMs) : burst;
+  };
+  const keep = (key: string, left: number, at: number): void => {
+    if (left >= burst) held.delete(key);
+    else held.set(key, { tokens: left, at });
+  };
+  const take = (key: string): number => {
+    const at = now();
+    // Once a full refill's time, forget the keys refilled since: memory follows who is active.
+    if (at - sweptAt >= burst / perMs) {
+      sweptAt = at;
+      for (const k of held.keys()) if (tokens(k, at) >= burst) held.delete(k);
+    }
+    const left = tokens(key, at);
+    if (left < 1) return Math.ceil((1 - left) / perMs / 1000);
+    keep(key, left - 1, at);
+    return 0;
+  };
+  const refund = (key: string): void => {
+    const at = now();
+    keep(key, tokens(key, at) + 1, at);
+  };
+  return { take, refund };
+}
+
+/** Over budget: a 429 in the one error shape, with when to try again. */
+function refuse(seconds: number, message: string): void {
+  if (seconds > 0) throw ApiError.rateLimited(message, seconds);
+}
+
+export interface Limiter {
+  /** A signed-in request: one of the account's budget. */
+  signedIn(sub: string): void;
+  /** A request no one is signed in on: one of its address's budget. */
+  unsigned(request: FastifyRequest): void;
+  /**
+   * A signed-in request to look a join code up, before the lookup, which is what answers a guess:
+   * one of its address's misses held, so lookups in flight never outrun the backstop, then one
+   * of the account's tries.
+   */
+  guess(request: FastifyRequest): void;
+  /**
+   * Its answer, `status`: a 404 — today only `class_not_found`, and any 404 on a lookup tells a
+   * guesser the code opens nothing — keeps the miss it held; any other answer gives it back.
+   */
+  settle(request: FastifyRequest, status: number): void;
+}
+
+export function createLimiter({
+  now = () => performance.now(),
+  ...budgets
+}: LimitOptions = {}): Limiter {
+  const of = (name: keyof Budgets) => bucket(budgets[name] ?? BUDGETS[name], now);
+  const account = of('account');
+  const unsigned = of('unsigned');
+  const joinTries = of('joinTries');
+  const joinMisses = of('joinMisses');
+  // The guesses holding one of their address's misses until their answer settles it; one whose
+  // answer never goes out (its client gone) keeps it, the safe side.
+  const holding = new WeakSet<FastifyRequest>();
+  return {
+    signedIn: (sub) => refuse(account.take(sub), 'too many requests from this account'),
+    unsigned: (request) =>
+      refuse(unsigned.take(clientAddress(request)), 'too many requests with no sign-in'),
+    guess: (request) => {
+      refuse(joinMisses.take(clientAddress(request)), 'too many unknown join codes from here');
+      holding.add(request);
+      refuse(joinTries.take(requireAuth(request).sub), 'too many join-code tries');
+    },
+    settle: (request, status) => {
+      if (holding.delete(request) && status !== 404) joinMisses.refund(clientAddress(request));
+    },
+  };
+}

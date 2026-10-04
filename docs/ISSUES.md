@@ -29,6 +29,20 @@ one minute. A naive rule blocks the entire school at the exact moment everyone n
 **Done when:** a simulated school — hundreds of accounts behind one address — can all tap
 in the same minute with zero blocks, while a single flooding account still gets stopped.
 
+**Status (Phase 4, L1 — 2026-10-04): the limits are built; L2b's load gate proves them.**
+- Every signed-in request spends its own account's budget, counted only once the sign-in is
+  verified (Cognito's `sub`), never its address's: 120 at once, then 120 a minute — 2.4 times
+  the busiest honest client, a teacher with five portal tabs open.
+- A request with no sign-in, or one Cognito refused, spends its address's budget: 1,200 at
+  once, then 600 a minute — a whole school's phones, twice over.
+- Guessing a class code: each account gets 20 tries, then 2 a minute; each address gets 100
+  wrong codes, then 6 a minute, whichever accounts guess — so free accounts don't add guesses.
+- Over a budget, the answer is "too many requests" (`429`) with how many seconds to wait. Phones
+  retry on their own; nothing waiting on a phone, an Emergency Unlock included, is ever dropped.
+- The address is the one Railway's edge reports (`X-Real-IP`), which a phone can't fake.
+- Numbers and why: `docs/DECISIONS.md`, 2026-10-04 (L1). Still to prove: the simulated school
+  (Phase 4, L2b).
+
 ## 2. An emergency unlock record must never be lost
 
 **The problem.** Emergency Unlock means shields drop immediately, no permission needed.

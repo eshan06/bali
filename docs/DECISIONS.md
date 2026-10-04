@@ -8,6 +8,71 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **L1: the rate limits (ISSUES #1), sized from the clients' real cadence, and
+  the caller's address read from Railway's `X-Real-IP`, not a `trustProxy` hop count.**
+  **Budgets** (`BUDGETS`, `apps/api/src/limits.ts`; each a token bucket: a burst, refilled a
+  minute at a time): **every signed-in account, 120 at once and 120 a minute,** keyed by the
+  Cognito `sub` once `authenticate` has verified the token — never by address or an unverified
+  claim. The real cadence: a phone checks in every 30 s, or reads `GET /v1/me` every 30 s while
+  waiting or out of a session (2 a minute); a phone back online drains its outbox at once — 40
+  records and a read after each, plus History's pages, is ~85; the portal reads a session's
+  snapshot every 15 s per tab and its stream comes back at worst every ~10 s, so five tabs (the
+  stream cap) are ~50 a minute, and their loads ~25 at once; `dev:teacher watch` reads every 2 s.
+  So the rate is 2.4 times the worst honest one and the burst outlasts the biggest honest burst; a
+  flooding account gets 120, then 2 a second. **Each address where no one is signed in** (no
+  token, or one the pool refused), **1,200 at once and 600 a minute:** every phone of a
+  600-student school failing at once, twice. Honest ones are rare — the phone renews its token
+  60 s before it expires and never sends one it knows has expired, the portal signs out at a
+  401 — so over this budget a refused token's 429, the outbox's "retry" where a 401 would be
+  "reauth", only delays a renewal, never drops a record. A key set out of reach (`503`) is ours
+  and costs the caller nothing. **The join-code preview and the join, together: each account 20
+  tries, then 2 a minute** (a student joins ~6 classes, a preview and a join each, with typos;
+  over it, they wait at most 30 s), **and each address 100 misses (`404 class_not_found`), then 6
+  a minute** — a period's joins at the start of a year, 20 classes of 30 behind one address with
+  one in ten mistyping, is ~60. The miss is held before the lookup and given back on any answer
+  but a 404, so lookups in flight never outrun the backstop, however many race. Why a backstop:
+  accounts are free while self sign-up is on (the 2026-10-04 investigation). There are 31⁶ ≈ 887.5
+  million codes; at one school's ~150 classes a guess hits once in ~5.9 million, so one address
+  (≈8,640 misses a day) finds a class about once in two years — with no backstop, each free
+  account would add ≈2,880 guesses a day. **Per address, not global:** a global ceiling
+  would hand any guesser a switch that turns joining off for every school. Known edges: a
+  guesser with many addresses multiplies it — Phase 6's Cognito item (self sign-up off or gated)
+  is the fix at the root — and a student at school with a few accounts could spend the school's
+  misses: joining on its Wi-Fi then waits for the refill, one miss every ten seconds, on
+  cellular it doesn't; restarting the API empties every bucket at once. **Over a budget:** `429` in the one
+  error shape (`ApiError.rateLimited`), no `reason`, with `Retry-After` in whole seconds — at
+  most 30 at these sizes, so the phone's "Wait a minute, then try again" is honest — and exposed
+  through CORS, so the portal's fetch can read it too. A refusal spends nothing, so a client is back as its budget
+  refills: a throttle, never a ban, and no response is delayed — holding a flood's connections
+  open is the cost a flood wants. That is how ARCHITECTURE's "slowing requests down before ever
+  blocking them" is met; sign-in itself is Cognito's, never this API's. **Spends nothing:**
+  `/healthz`; `/internal/*`, whose key is its guard (S3 lengthens it); an unknown route's 404 and
+  CORS's preflight, which verify nothing and read nothing. The stream's per-teacher cap stays
+  its own 429, with no `Retry-After`: a cap, not a budget. **The address:** Railway's docs
+  (Public Networking, Specs & Limits) name one header for the client, `X-Real-IP`, set by its
+  edge on every request; its staff confirm the edge overwrites any a client sends and that an app
+  behind it can't be reached directly (Station, 2026-05-06), and that `X-Forwarded-For`'s hop
+  count varies (2026-09-09). No hop count is documented, and Fastify 5.12 ignores a numeric
+  `trustProxy` anyway (it fails closed: `request.ip` stays the socket's peer), while an
+  address-checking one needs a proxy range Railway doesn't publish. So `trustProxy` stays off,
+  stated in `buildApp`, and the limits key on `X-Real-IP` (a value that is no address: the
+  socket's peer); no `X-Forwarded-For` entry a client adds picks a bucket. Probed on dev: the edge
+  answers (`server: railway-hikari`, `x-railway-edge: iad1`), and its domain has an A record only,
+  so addresses are IPv4; if IPv6 ever arrives, key it by its /64. A move off Railway (Render, the
+  named fallback) revisits this header first. **Store:** each process's memory — no Redis, no new
+  infrastructure — so N instances are N times each budget, and a deploy empties them; the
+  buckets refill on the process's monotonic clock, never the server's clock that judges sessions.
+  **No new dependency:** hand-rolled. `@fastify/rate-limit` counts at a hook that runs before a
+  route's own preHandler, so it can't key on the verified account without moving authentication,
+  and it can neither count only misses nor hold one for a lookup in flight. **The phone, checked:**
+  BaliCore and BaliOutbox say a 429 honestly with a way to retry — `GET /v1/me` on Home and
+  Waiting, History, the preview and the join, a rename and a leave, all "Too many tries for now.
+  Wait a minute, then try again." — and the outbox keeps a record answered 429 and retries it,
+  never counting it toward the stuck bound (an unlock's 429 is `retry`, the unlock contract). A
+  check-in answered 429 is retried at the next 30 s wake and not said on the phone, which claims
+  only its own shields; the grid shows that phone silent after 90 s. No phone change: at these
+  sizes an honest phone never meets one. L2b's load gate proves the sizes against the real app.
+
 - **2026-10-04** — **O1b: CI judges a removal from `/v1` against the base branch's copy of the
   snapshot.** O1's check compared the app with the `contracts/openapi.json` committed on the same
   branch, so the branch owned its own baseline: delete the file and regenerate it, or edit it by
