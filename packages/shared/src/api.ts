@@ -131,6 +131,26 @@ export interface UpdateMeResponse {
   user: MeUser;
 }
 
+// DELETE /v1/me — the caller deletes their own account (C3, App Store
+// 5.1.1(v)): every class left, their events kept for the class's counts but
+// named to no one, their name and sign-in gone. A teacher with a class is
+// refused, `409 teacher_has_classes`: theirs goes through the school.
+export interface DeleteMeRequest {
+  /** Client idempotency key for the account_deleted event (rule 4). */
+  eventId: string;
+}
+/** Every outcome `DELETE /v1/me` answers with (`DeleteMeResponse.outcome`). */
+export const DELETE_ME_OUTCOMES = ['deleted', 'already_deleted'] as const;
+export type DeleteMeOutcome = (typeof DELETE_ME_OUTCOMES)[number];
+export interface DeleteMeResponse {
+  /**
+   * 'deleted' this call deleted the account; 'already_deleted' this sign-in has
+   * no account here — the retry of a deletion that landed, or none was ever
+   * made. Either way there is no account: the phone stops asking.
+   */
+  outcome: DeleteMeOutcome;
+}
+
 // POST /v1/teacher-invites/redeem — a signed-in account redeems the invite code
 // the owner minted for a school (T1b), and is a teacher there from then on.
 export interface RedeemTeacherInviteRequest {

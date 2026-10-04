@@ -73,7 +73,8 @@ async function fillMissingDisplayName(
     await db
       .update(users)
       .set({ displayName })
-      .where(and(eq(users.id, row.id), isNull(users.displayName)))
+      // Never a deleted account's (C3): a sign-in read before its deletion names it no more.
+      .where(and(eq(users.id, row.id), isNull(users.displayName), isNull(users.removedAt)))
       .returning(),
   );
   if (updated) return updated;

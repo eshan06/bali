@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **C3: account deletion, through the engine (amends data-model decision 3,
+  the owner's ruling of the same day).** `DELETE /v1/me` `{ eventId }` → the engine's
+  `deleteAccount`, one transaction. **What goes:** each live class is left exactly as a leave
+  leaves it (`endLiveEnrollment`, factored out of `endEnrollment`: its own `enrollment_left`, a
+  live participation ended on the session's feed), in session too, since a deletion never
+  waits for a lesson; the row's name and Cognito subject (`cognito_id` becomes
+  `deleted:<id>`, which no subject can be, so the sign-in matches no row); and the names in
+  each `display_name_changed` payload. **What stays, and why a tombstone, not a DELETE:** the
+  `users` row, marked removed, so every event, participation and unlock of theirs still
+  counts in its class's reports (R1/R2 add up the same, tested) under a row that names no one;
+  nulling `events.user_id` would have rewritten the whole history and broken the per-student
+  counts. Unlock reasons stay: a reason names no one. **The one rewrite of `events`:**
+  migration 0015 (custom, via drizzle-kit) lets the append-only trigger pass exactly an UPDATE
+  that empties a deleted account's rename payload and changes nothing else; every other
+  UPDATE, DELETE and TRUNCATE is refused as before. **Recorded without personal data:** an
+  `account_deleted` event, no payload, no class. **Idempotent:** a sign-in with no row is
+  answered `already_deleted` and no row is made (looked up, never created); a retry reaching a
+  row a boot call made since (the id already names an `account_deleted`) deletes that row too,
+  under a fresh id, since the caller asked for no account; an id naming any other event is
+  `409 event_id_conflict`. **Teachers:** one with a live class or block is `409
+  teacher_has_classes` — their students' class would be left to no one; the school handles it
+  (C6a). One with neither is deleted like a student. **In flight:** the deletion takes the
+  student's tap lock, then their row, so a tap behind it, a join, a rename and an invite redeem
+  each find the row removed and are `409 account_deleted`; an unlock is recorded as one with no class (ISSUES
+  #2); the boot call's name fill skips a removed row. **Cognito:** no server credential — the
+  phone calls Cognito's own `DeleteUser` with its access token after the API answers (C4).
+  Not done here: armed taps stay to expire (a Start converts only enrolled students).
+
 - **2026-10-04** — **The pilot runs on production; sign-up gated to the school's domain (S11).**
   The owner's rulings for the Vanderbilt pilot: it runs on **production**, not dev. Prod's
   self sign-up is **gated** to `@vanderbilt.edu`, MFA is **Optional** with TOTP, never SMS
@@ -27,6 +55,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   address is the user's, and the clients can't write `email` afterwards. This is the root fix S7 named for orphan-unlock rows from free
   accounts. Its tests run on node's own runner from the root `npm test`, outside the
   workspaces, so neither the lockfile nor the API's image changes.
+
 - **2026-10-04** — **The app icon is the mark (concept A), picked by the owner.** Three
   concepts were drawn: A, the mark on its stone-50 tile; B, the same tile as a block on an
   evergreen field; C, a lowercase "b" in stone-50 on green-700. The owner picked A: it is the
@@ -52,6 +81,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (C3, C4), the 13+ line (C7), retention (C6b) and any legal promise; the privacy policy is
   "coming soon" until C2 brings the lawyer's words, never placeholder text. Support goes to
   eshan.shah@vanderbilt.edu (owner).
+
 - **2026-10-04** — **S3: API tightening, from the security investigation.** **Access tokens
   only:** `createVerifier` requires `token_use: 'access'` and checks the app client by
   `client_id` alone; an id token, even this app's, is `401`. Every client already sent access

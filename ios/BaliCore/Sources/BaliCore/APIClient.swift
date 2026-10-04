@@ -157,6 +157,11 @@ public struct APIClient: Sendable {
         await send("PATCH", "/v1/me", request)
     }
 
+    /// `DELETE /v1/me` — the caller deletes their own account (C3).
+    public func deleteMe(_ request: DeleteMeRequest) async -> APIResponse<DeleteMeResponse> {
+        await send("DELETE", "/v1/me", request)
+    }
+
     /// `POST /v1/taps` — for `tapDisposition`.
     public func tap(_ request: TapRequest) async -> APIResponse<TapResponse> {
         await send("POST", "/v1/taps", request)

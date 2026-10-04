@@ -1,6 +1,8 @@
 import {
   type Database,
+  deleteAccount,
   findOrCreateStudent,
+  findUserByCognitoId,
   getEnrolledClasses,
   getLiveParticipation,
   getTaughtClasses,
@@ -8,7 +10,12 @@ import {
   renameStudent,
   sessionRunning,
 } from '@bali/db';
-import { deriveDisplayState, type MeResponse, type UpdateMeResponse } from '@bali/shared';
+import {
+  type DeleteMeResponse,
+  deriveDisplayState,
+  type MeResponse,
+  type UpdateMeResponse,
+} from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -20,6 +27,7 @@ import { mapTransitionError } from './errors.js';
 
 const UpdateBody = z.object({ displayName: z.string(), eventId: z.string().uuid() });
 const NewName = z.object({ displayName: DisplayName });
+const DeleteBody = z.object({ eventId: z.string().uuid() });
 
 /**
  * GET /v1/me — the boot call: who am I, my classes, my live session, and
@@ -31,6 +39,11 @@ const NewName = z.object({ displayName: DisplayName });
  * each class they are in (owner decision 8; `renameStudent`). Idempotent on
  * `eventId`: a replay applies nothing and answers the name now. A teacher's
  * name is not set here (403): the ruling is about students in a class.
+ *
+ * DELETE /v1/me — the caller deletes their own account (C3): the engine's
+ * `deleteAccount`, idempotent on `eventId`. A teacher with a class or a block
+ * is refused `409 teacher_has_classes`. The Cognito sign-in is the phone's to
+ * delete once this answers (C4): this API holds no credential for it.
  */
 export function registerMeRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
   app.get('/v1/me', { preHandler: app.authenticate }, async (request): Promise<MeResponse> => {
@@ -118,6 +131,21 @@ export function registerMeRoute(app: FastifyInstance, db: Database, clock: () =>
         renameStudent(db, { studentId: caller.id, displayName, eventId: body.eventId }),
       );
       return { outcome, user: { id: user.id, role: user.role, displayName: user.displayName } };
+    },
+  );
+
+  app.delete(
+    '/v1/me',
+    { preHandler: app.authenticate, config: { parses: { body: DeleteBody } } },
+    async (request): Promise<DeleteMeResponse> => {
+      const identity = requireAuth(request);
+      const { eventId } = parseRequest(request, 'body', DeleteBody);
+      // Looked up, never created: a deleted account's sign-in matches no row
+      // (`deleteAccount` takes its subject away), so its retry is told the
+      // truth, that there is no account, and never makes a new one.
+      const user = await findUserByCognitoId(db, identity.sub);
+      if (!user) return { outcome: 'already_deleted' };
+      return mapTransitionError(() => deleteAccount(db, { userId: user.id, eventId, at: clock() }));
     },
   );
 }

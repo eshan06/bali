@@ -103,6 +103,18 @@ const EXPECTED: Record<
     reason: 'protection_not_off',
     message: 'Screen Time permission is not off',
   },
+  TEACHER_HAS_CLASSES: {
+    code: 'conflict',
+    status: 409,
+    reason: 'teacher_has_classes',
+    message: 'a teacher with a class or a block: ask the school to delete the account',
+  },
+  ACCOUNT_DELETED: {
+    code: 'conflict',
+    status: 409,
+    reason: 'account_deleted',
+    message: 'this account was deleted',
+  },
 };
 
 /**

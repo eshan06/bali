@@ -280,6 +280,14 @@ describe('a bucket at its key cap', () => {
     expect(b.size()).toBe(100);
   });
 
+  it('holds one key at most when given a cap under one', () => {
+    for (const cap of [0, -5]) {
+      const b = bucket(budget, () => 0, cap);
+      for (let i = 0; i < 100; i += 1) b.take(`flood-${i}`);
+      expect(b.size()).toBe(1);
+    }
+  });
+
   it('forgets the key idle longest, and keeps one in use — even one being refused', () => {
     const b = bucket(budget, () => 0, 2);
     b.take('hammered');

@@ -25,6 +25,7 @@ import { newUuidV7 } from './ids.js';
 import { changedReasons, latestTurn, liveClassWithCode, type UserRow } from './queries.js';
 import {
   armedTaps,
+  blocks,
   classes,
   enrollments,
   events,
@@ -103,6 +104,8 @@ export const TRANSITION_ERROR_CODES = [
   'UNLOCK_NOT_FOUND',
   'UNLOCK_SUPERSEDED',
   'PROTECTION_NOT_OFF',
+  'TEACHER_HAS_CLASSES',
+  'ACCOUNT_DELETED',
 ] as const;
 export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
@@ -116,6 +119,9 @@ export class TransitionError extends Error {
     this.name = 'TransitionError';
   }
 }
+
+/** A join or a rename of an account deleted while it was on its way (C3). */
+const accountDeleted = () => new TransitionError('ACCOUNT_DELETED', 'this account was deleted');
 
 type SessionRow = typeof sessions.$inferSelect;
 type ParticipationRow = typeof participations.$inferSelect;
@@ -1821,6 +1827,16 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
       if (!sessionRunning(session, now)) {
         throw new TransitionError('SESSION_NOT_RUNNING', 'session has ended');
       }
+      // Deleted after the route found its class (C3): the deletion holds this
+      // student's tap lock, so a tap behind it sees the row removed and never
+      // joins a lesson as no one. Its retry is a stranger's, with no class.
+      const caller = firstOrUndefined(
+        await tx
+          .select({ removedAt: users.removedAt })
+          .from(users)
+          .where(eq(users.id, input.studentId)),
+      );
+      if (caller?.removedAt) throw accountDeleted();
 
       const occurredAt = clampToWindow(input.deviceTime, session.startedAt, session.endsAt);
       const order = knownOrder(input.order);
@@ -3222,12 +3238,14 @@ export async function joinClassByCode(
   return db.transaction(async (tx): Promise<JoinClassResult> => {
     const caller = firstOrUndefined(
       await tx
-        .select({ role: users.role })
+        .select({ role: users.role, removedAt: users.removedAt })
         .from(users)
         .where(eq(users.id, input.studentId))
         .for('share'),
     );
     if (!caller) throw new Error('joinClassByCode: no such user');
+    // Deleted while this join was on its way (C3): never a class again.
+    if (caller.removedAt !== null) throw accountDeleted();
     if (caller.role !== 'student') return { outcome: 'not_a_student' };
 
     const cls = firstOrUndefined(
@@ -3323,9 +3341,6 @@ export async function endEnrollment(
   db: Database,
   input: EndEnrollmentInput,
 ): Promise<EndEnrollmentResult> {
-  const eventType: EventType =
-    input.reason === 'left_class' ? 'enrollment_left' : 'enrollment_removed';
-  const participationReason: ParticipationEndedReason = input.reason;
   // Retry on deadlock: a concurrent cross-session tapIn (the student switching
   // classes at the instant of removal) ends this same participation while holding
   // a different session's lock, so the two can deadlock on the participations row.
@@ -3349,88 +3364,109 @@ export async function endEnrollment(
           studentId: enrollment.studentId,
         };
       }
-
-      // The class, shared. A Start takes it exclusively, so the two serialise: a
-      // leave sees a session a Start committed first, and a Start sees the
-      // enrollment a leave removed first — never a leave that misses a session
-      // starting under it, whose Start then joins the student from their waiting
-      // tap into a class they have left (A19).
-      await tx
-        .select({ id: classes.id })
-        .from(classes)
-        .where(eq(classes.id, enrollment.classId))
-        .for('share');
-
-      // This class's running session, locked so a concurrent tap/end into THIS
-      // class serializes (a removal can't leave a live participation stranded in
-      // an ended session, and endSession can't re-end this participation under a
-      // wrong reason), and a leave judges it with no extend landing in between.
-      const session = firstOrUndefined(
-        await tx
-          .select()
-          .from(sessions)
-          .where(and(eq(sessions.classId, enrollment.classId), isNull(sessions.endedAt)))
-          .limit(1)
-          .for('update'),
-      );
-      if (input.reason === 'left_class' && session && sessionRunning(session, input.at)) {
-        throw new TransitionError('CLASS_IN_SESSION', 'the class is in session');
-      }
-
-      await tx
-        .update(enrollments)
-        .set({ removedAt: input.at })
-        .where(eq(enrollments.id, enrollment.id));
-
-      // Null when there was no live participation to end (no running session, or
-      // the student not in it): the event is then enrollment-level, with no
-      // session.
-      let ended: { sessionId: string; occurredAt: Date } | null = null;
-      if (session) {
-        // End the student's live participation with ONE guarded set-based UPDATE,
-        // matching endSession — no read-then-update-by-id (that pattern, held
-        // under two locks, made a cross-session tapIn deadlock near-certain). The
-        // isNull guard means a participation ended by a racing switch-tap is left
-        // as-is rather than overwritten.
-        const occurredAt = clampToWindow(input.at, session.startedAt, session.endsAt);
-        const rows = await tx
-          .update(participations)
-          .set({ endedAt: occurredAt, endedReason: participationReason })
-          .where(
-            and(
-              eq(participations.sessionId, session.id),
-              eq(participations.studentId, enrollment.studentId),
-              isNull(participations.endedAt),
-            ),
-          )
-          .returning({ id: participations.id });
-        // A live participation was ended: recorded on the session feed so the
-        // teacher's grid learns.
-        if (rows.length > 0) ended = { sessionId: session.id, occurredAt };
-      }
-
-      const isNew = await insertEvent(tx, {
-        eventId: input.eventId ?? newUuidV7(),
-        type: eventType,
-        sessionId: ended?.sessionId ?? null,
-        classId: enrollment.classId,
-        userId: enrollment.studentId,
-        occurredAt: ended?.occurredAt ?? input.at,
+      const endedParticipation = await endLiveEnrollment(tx, enrollment, {
+        ...input,
+        refuseInSession: input.reason === 'left_class',
       });
-      // The enrollment was live, so nothing has recorded its end: an id already
-      // on record names another event, and answering "ended" would leave the
-      // removal with no event of its own.
-      if (!isNew) {
-        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
-      }
       return {
         outcome: 'ended',
-        endedParticipation: ended !== null,
+        endedParticipation,
         classId: enrollment.classId,
         studentId: enrollment.studentId,
       };
     }),
   );
+}
+
+/**
+ * `endEnrollment`'s work on a live enrollment its caller has locked: in the
+ * caller's transaction, so an account's deletion ends each of its classes
+ * exactly as a leave does (C3). True when a live participation ended too.
+ * `refuseInSession`: a leave is refused while the class is in session (A19);
+ * a deletion is not.
+ */
+async function endLiveEnrollment(
+  tx: Database,
+  enrollment: typeof enrollments.$inferSelect,
+  input: Omit<EndEnrollmentInput, 'enrollmentId'> & { refuseInSession: boolean },
+): Promise<boolean> {
+  const eventType: EventType =
+    input.reason === 'left_class' ? 'enrollment_left' : 'enrollment_removed';
+  const participationReason: ParticipationEndedReason = input.reason;
+  // The class, shared. A Start takes it exclusively, so the two serialise: a
+  // leave sees a session a Start committed first, and a Start sees the
+  // enrollment a leave removed first — never a leave that misses a session
+  // starting under it, whose Start then joins the student from their waiting
+  // tap into a class they have left (A19).
+  await tx
+    .select({ id: classes.id })
+    .from(classes)
+    .where(eq(classes.id, enrollment.classId))
+    .for('share');
+
+  // This class's running session, locked so a concurrent tap/end into THIS
+  // class serializes (a removal can't leave a live participation stranded in
+  // an ended session, and endSession can't re-end this participation under a
+  // wrong reason), and a leave judges it with no extend landing in between.
+  const session = firstOrUndefined(
+    await tx
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.classId, enrollment.classId), isNull(sessions.endedAt)))
+      .limit(1)
+      .for('update'),
+  );
+  if (input.refuseInSession && session && sessionRunning(session, input.at)) {
+    throw new TransitionError('CLASS_IN_SESSION', 'the class is in session');
+  }
+
+  await tx
+    .update(enrollments)
+    .set({ removedAt: input.at })
+    .where(eq(enrollments.id, enrollment.id));
+
+  // Null when there was no live participation to end (no running session, or
+  // the student not in it): the event is then enrollment-level, with no
+  // session.
+  let ended: { sessionId: string; occurredAt: Date } | null = null;
+  if (session) {
+    // End the student's live participation with ONE guarded set-based UPDATE,
+    // matching endSession — no read-then-update-by-id (that pattern, held
+    // under two locks, made a cross-session tapIn deadlock near-certain). The
+    // isNull guard means a participation ended by a racing switch-tap is left
+    // as-is rather than overwritten.
+    const occurredAt = clampToWindow(input.at, session.startedAt, session.endsAt);
+    const rows = await tx
+      .update(participations)
+      .set({ endedAt: occurredAt, endedReason: participationReason })
+      .where(
+        and(
+          eq(participations.sessionId, session.id),
+          eq(participations.studentId, enrollment.studentId),
+          isNull(participations.endedAt),
+        ),
+      )
+      .returning({ id: participations.id });
+    // A live participation was ended: recorded on the session feed so the
+    // teacher's grid learns.
+    if (rows.length > 0) ended = { sessionId: session.id, occurredAt };
+  }
+
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId ?? newUuidV7(),
+    type: eventType,
+    sessionId: ended?.sessionId ?? null,
+    classId: enrollment.classId,
+    userId: enrollment.studentId,
+    occurredAt: ended?.occurredAt ?? input.at,
+  });
+  // The enrollment was live, so nothing has recorded its end: an id already
+  // on record names another event, and answering "ended" would leave the
+  // removal with no event of its own.
+  if (!isNew) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+  }
+  return ended !== null;
 }
 
 export interface RenameInput {
@@ -3501,6 +3537,8 @@ function renameOnce(db: Database, input: RenameInput): Promise<RenameResult> {
       await tx.select().from(users).where(eq(users.id, input.studentId)).for('no key update'),
     );
     if (!me) throw new Error('renameStudent: no such user');
+    // Deleted while this rename was on its way (C3): a name would name it again.
+    if (me.removedAt !== null) throw accountDeleted();
 
     // Replay first, as in extendSession: once recorded, the answer is the truth
     // now — never a refusal, even if a classmate has since taken the name.
@@ -3579,4 +3617,123 @@ function renameOnce(db: Database, input: RenameInput): Promise<RenameResult> {
     });
     return { outcome: 'applied', user };
   });
+}
+
+/** The `cognito_id` a deleted account keeps: no Cognito subject has this shape. */
+export const deletedCognitoId = (userId: string) => `deleted:${userId}`;
+
+export interface DeleteAccountInput {
+  userId: string;
+  /** The client's idempotency key for the account_deleted event (rule 4). */
+  eventId: string;
+  /** The server's clock: when it happened. */
+  at: Date;
+}
+export interface DeleteAccountResult {
+  /** 'deleted' this call deleted it; 'already_deleted' it was gone (idempotent no-op). */
+  outcome: 'deleted' | 'already_deleted';
+}
+
+/**
+ * An account deletes itself (C3, App Store 5.1.1(v); the owner's ruling,
+ * 2026-10-04, amending data-model decision 3). One transaction: each live
+ * class is left as a leave leaves it (`endLiveEnrollment`: its own
+ * `enrollment_left`, a live participation ended on the session's feed) — in
+ * session too, since a deletion never waits for a lesson; the row loses its
+ * name and its Cognito subject and is marked removed; each rename it made
+ * loses the names it carried (the one rewrite of `events` the database allows,
+ * migration 0015); and `account_deleted` is recorded under `eventId`, with no
+ * payload. Its other events stay, so each class's reports count as before,
+ * under a row that names no one.
+ *
+ * A teacher with a live class or block is refused `TEACHER_HAS_CLASSES`:
+ * their students' class would be left to no one, so that account goes
+ * through the school. Idempotent: an account already deleted no-ops.
+ */
+export async function deleteAccount(
+  db: Database,
+  input: DeleteAccountInput,
+): Promise<DeleteAccountResult> {
+  return withDeadlockRetry(() =>
+    db.transaction(async (tx): Promise<DeleteAccountResult> => {
+      // The student's taps first, as a tap takes them before its session, so a
+      // tap behind this finds the row removed and joins nothing. Then the row,
+      // as a rename and a join take it, so either one waits for this and then
+      // finds it deleted. NO KEY UPDATE, so the foreign-key checks an unlock of
+      // theirs takes go on until the row's own UPDATE below.
+      await lockStudentTaps(tx, input.userId);
+      const me = firstOrUndefined(
+        await tx.select().from(users).where(eq(users.id, input.userId)).for('no key update'),
+      );
+      if (!me) throw new Error('deleteAccount: no such user');
+      if (me.removedAt !== null) return { outcome: 'already_deleted' };
+
+      // An id another deletion holds is this deletion's retry reaching an account the
+      // same sign-in made since (a boot call between the two): the caller asked for
+      // no account, so this one goes too, under an id of its own. Any other event's
+      // id is a client bug, refused before anything changes.
+      const prior = firstOrUndefined(
+        await tx
+          .select({ type: events.type })
+          .from(events)
+          .where(eq(events.eventId, input.eventId))
+          .limit(1),
+      );
+      if (prior && prior.type !== 'account_deleted') {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      const eventId = prior ? newUuidV7() : input.eventId;
+
+      if (me.role === 'teacher') {
+        const owned = (table: typeof classes | typeof blocks) =>
+          tx
+            .select({ id: table.id })
+            .from(table)
+            .where(and(eq(table.teacherId, me.id), isNull(table.removedAt)))
+            .limit(1);
+        if ((await owned(classes)).length > 0 || (await owned(blocks)).length > 0) {
+          throw new TransitionError('TEACHER_HAS_CLASSES', 'a teacher with a class or block');
+        }
+      }
+
+      // Every class they are in, in one order, as a rename locks them; each
+      // ended exactly as a leave ends it.
+      const live = await tx
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.studentId, me.id), isNull(enrollments.removedAt)))
+        .orderBy(asc(enrollments.classId))
+        .for('update');
+      for (const enrollment of live) {
+        await endLiveEnrollment(tx, enrollment, {
+          reason: 'left_class',
+          at: input.at,
+          refuseInSession: false,
+        });
+      }
+
+      await tx
+        .update(users)
+        .set({ cognitoId: deletedCognitoId(me.id), displayName: null, removedAt: input.at })
+        .where(eq(users.id, me.id));
+      // After the row is marked removed: the trigger allows this rewrite only then.
+      await tx
+        .update(events)
+        .set({ payload: null })
+        .where(and(eq(events.userId, me.id), eq(events.type, 'display_name_changed')));
+
+      const isNew = await insertEvent(tx, {
+        eventId,
+        type: 'account_deleted',
+        userId: me.id,
+        occurredAt: input.at,
+      });
+      // Taken since the check above, by a write racing this one: refused, and the
+      // retry is judged afresh.
+      if (!isNew) {
+        throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+      }
+      return { outcome: 'deleted' };
+    }),
+  );
 }

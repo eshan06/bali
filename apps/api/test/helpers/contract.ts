@@ -41,6 +41,8 @@ import {
   type UnlockResponse,
   UPDATE_ME_OUTCOMES,
   type UpdateMeResponse,
+  DELETE_ME_OUTCOMES,
+  type DeleteMeResponse,
   USER_ROLES,
 } from '@bali/shared';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
@@ -74,6 +76,7 @@ interface Contract {
   JoinCodePreviewResponse: JoinCodePreviewResponse;
   HistoryPage: HistoryPage;
   UpdateMeResponse: UpdateMeResponse;
+  DeleteMeResponse: DeleteMeResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -206,6 +209,7 @@ export const SCHEMAS = {
     outcome: z.enum(UPDATE_ME_OUTCOMES),
     user: meUser,
   }),
+  DeleteMeResponse: object<DeleteMeResponse>()({ outcome: z.enum(DELETE_ME_OUTCOMES) }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -253,6 +257,8 @@ export const ENDPOINTS: Record<
   'GET /v1/me/history': { type: 'HistoryPage' },
   // Not an outbox record: the Me screen sends a rename while open (A8).
   'PATCH /v1/me': { type: 'UpdateMeResponse' },
+  // The account's deletion (C3), sent once the outbox is empty (C4).
+  'DELETE /v1/me': { type: 'DeleteMeResponse' },
   // A change of an unlock's reason, keyed by the unlock's own id (A20).
   'PATCH /v1/unlocks/{eventId}': { type: 'UnlockReasonResponse' },
 };

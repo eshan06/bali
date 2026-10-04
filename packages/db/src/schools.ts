@@ -188,6 +188,7 @@ export type RedeemInviteResult =
         | 'event_id_conflict'
         | 'already_teacher'
         | 'student_in_class'
+        | 'account_deleted'
         | 'invite_not_found'
         | 'invite_used'
         | 'invite_expired';
@@ -233,6 +234,8 @@ export async function redeemTeacherInvite(
           : { outcome: 'event_id_conflict' };
       }
 
+      // Deleted while this redeem waited on its row (C3): no code is spent on it.
+      if (user.removedAt !== null) return { outcome: 'account_deleted' };
       if (user.role === 'teacher') return { outcome: 'already_teacher' };
       const [enrolled] = await tx
         .select({ id: enrollments.id })

@@ -197,9 +197,10 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
 - The owner ruled (2026-10-04, `docs/DECISIONS.md`): named records are kept through the
   school year, then de-identified, and aggregates stay (C6b); a student's in-app account
   deletion de-identifies their events and deletes the account, name and sign-in (C3).
-  ARCHITECTURE's data-model decision 3 is amended with C3; Phase 6 C3–C6 build it.
+  ARCHITECTURE's data-model decision 3 is amended (C3 landed 2026-10-04: the deletion
+  is recorded as an `account_deleted` event naming no one); Phase 6 C4–C6 build the rest.
 
-**Done when:** the owner's policy is written, and C3–C6 have landed.
+**Done when:** the owner's policy is written, and C3–C6 have landed (C3 has).
 
 ---
 

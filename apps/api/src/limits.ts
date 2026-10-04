@@ -92,6 +92,8 @@ export function bucket(
   maxKeys = MAX_KEYS,
 ): Bucket {
   const perMs = perMinute / 60_000;
+  // A cap under one would evict nothing and let the map grow without bound.
+  const cap = Math.max(1, maxKeys);
   // What each key holds and since when; a key with its whole burst has no entry. A Map keeps
   // insertion order, and each use re-inserts its key, so the first key is the one idle longest.
   const held = new Map<string, { tokens: number; at: number }>();
@@ -105,7 +107,7 @@ export function bucket(
     if (left >= burst) return;
     // Full: the key idle longest goes. It starts again with its whole burst — a throttle that
     // forgets one idle key early, never a map that grows without bound.
-    if (held.size >= maxKeys) held.delete(held.keys().next().value as string);
+    if (held.size >= cap) held.delete(held.keys().next().value as string);
     held.set(key, { tokens: left, at });
   };
   const take = (key: string): number => {

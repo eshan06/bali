@@ -42,6 +42,7 @@ const REFUSED: Record<Refused, () => ApiError> = {
   invite_not_found: () => ApiError.notFound('no invite has that code', 'invite_not_found'),
   invite_used: () => ApiError.conflict('that invite code has been used', 'invite_used'),
   invite_expired: () => ApiError.conflict('that invite code has expired', 'invite_expired'),
+  account_deleted: () => refusal('ACCOUNT_DELETED'),
 };
 
 /**

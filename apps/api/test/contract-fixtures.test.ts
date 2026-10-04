@@ -3,6 +3,7 @@ import {
   API_ERROR_REASONS,
   type ApiErrorBody,
   CHECK_IN_STATUSES,
+  DELETE_ME_OUTCOMES,
   END_ENROLLMENT_OUTCOMES,
   ENROLLMENT_JOIN_OUTCOMES,
   HISTORY_EVENT_TYPES,
@@ -184,6 +185,11 @@ const SCENARIOS: Record<string, string> = {
   'name/400-invalid-request': 'A rename whose eventId is not a UUID: a client bug.',
   'name/401-unauthorized': 'A rename sent with no bearer token.',
   'name/403-teacher': 'A teacher setting their name: not here — the ruling is about students.',
+  'account/deleted':
+    'A student deletes their account (C3): every class left, their name and sign-in gone.',
+  'account/already-deleted': 'The retry of that deletion: this sign-in has no account now.',
+  'account/409-teacher-has-classes':
+    'A teacher with a class deleting their account: theirs goes through the school.',
 };
 
 interface Call {
@@ -783,6 +789,15 @@ async function captureAll() {
   await capture('name/401-unauthorized', rename(null, 'Eve'), 401, { code: 'unauthorized' });
   const theTeacher = rename(await token(naming.teacher.cognitoId), 'Ms. Park');
   await capture('name/403-teacher', theTeacher, 403, { code: 'forbidden' });
+
+  // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
+  const deletion = del(eve, '/v1/me');
+  await capture('account/deleted', deletion, 200, { outcome: 'deleted' });
+  await capture('account/already-deleted', deletion, 200, { outcome: 'already_deleted' });
+  const teacherLeaves = del(await token(naming.teacher.cognitoId), '/v1/me');
+  await capture('account/409-teacher-has-classes', teacherLeaves, 409, {
+    reason: 'teacher_has_classes',
+  });
 }
 
 beforeAll(async () => {
@@ -830,6 +845,7 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(valuesOf('ProtectionOnResponse', 'outcome')).toEqual(new Set(PROTECTION_ON_OUTCOMES));
     expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(CHECK_IN_STATUSES));
     expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(UPDATE_ME_OUTCOMES));
+    expect(valuesOf('DeleteMeResponse', 'outcome')).toEqual(new Set(DELETE_ME_OUTCOMES));
     const reasonChanges = valuesOf('UnlockReasonResponse', 'outcome');
     expect(reasonChanges).toEqual(new Set(UNLOCK_REASON_OUTCOMES));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');
@@ -900,7 +916,10 @@ describe('the contract fixtures (contracts/fixtures)', () => {
       'already_teacher',
       'student_in_class',
     ]);
-    const phones = API_ERROR_REASONS.filter((reason) => !portal.has(reason));
+    // Only a race reaches it: a join, rename or tap whose route found the
+    // account just before its deletion (C3); in sequence, the sign-in is a new account.
+    const raceOnly = new Set<string>(['account_deleted']);
+    const phones = API_ERROR_REASONS.filter((r) => !portal.has(r) && !raceOnly.has(r));
     expect(new Set(reasons)).toEqual(new Set(phones));
   });
 

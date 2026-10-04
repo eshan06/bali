@@ -195,6 +195,9 @@ export const EVENT_TYPES = [
   // owner's decision 2026-10-02): out of protection off to the state before
   // it — focused, or unlocked where their latest turn there is an unlock.
   'protection_on',
+  // An account deleted itself (C3): its row is named to no one now. No session
+  // and no class; each class it was in records its own `enrollment_left`.
+  'account_deleted',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
