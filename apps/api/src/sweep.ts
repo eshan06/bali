@@ -1,6 +1,8 @@
 import { type Database, expireDueSessions, markSilentParticipations } from '@bali/db';
 import type { FastifyInstance } from 'fastify';
 
+import { captureFailure } from './monitoring.js';
+
 /** How often the API sweeps by itself: every minute (hosting decision 3). */
 export const SWEEP_INTERVAL_MS = 60_000;
 
@@ -49,7 +51,10 @@ export function startSweeping(app: FastifyInstance, run: () => Promise<unknown>)
       .then(run)
       .then(
         () => undefined,
-        (err: unknown) => app.log.error({ err }, 'sweep failed; the next tick tries again'),
+        (err: unknown) => {
+          app.log.error({ err }, 'sweep failed; the next tick tries again');
+          captureFailure(err, 'sweep');
+        },
       )
       .finally(() => {
         inFlight = undefined;

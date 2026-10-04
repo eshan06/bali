@@ -25,6 +25,11 @@ if (loaded.error) {
   }
 }
 
+/** An optional variable set to the empty string reads as unset, never as a boot failure. */
+function blankIsUnset<T extends z.ZodType>(schema: T) {
+  return z.preprocess((value) => (value === '' ? undefined : value), schema);
+}
+
 const envSchema = z.object({
   // Default to production: unset env must take the safe JSON-logging path, never
   // the dev one (pino-pretty is a devDependency). `npm run dev` sets development.
@@ -76,6 +81,15 @@ const envSchema = z.object({
    * this API.
    */
   CORS_ORIGINS: z.string().optional(),
+  /**
+   * Error monitoring (monitoring.ts). Unset — the default, and always in tests
+   * and dev — means Sentry is off and nothing leaves the process.
+   */
+  SENTRY_DSN: blankIsUnset(z.string().url().optional()),
+  /** The Sentry environment tag (`dev`, `production`); unset, NODE_ENV. */
+  SENTRY_ENVIRONMENT: blankIsUnset(z.string().optional()),
+  /** Set by Railway on a deploy from git: the commit, used as the Sentry release. */
+  RAILWAY_GIT_COMMIT_SHA: blankIsUnset(z.string().optional()),
 });
 
 export type Env = z.infer<typeof envSchema>;

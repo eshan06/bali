@@ -2,8 +2,13 @@ import { createDb } from '@bali/db';
 
 import { buildApp } from './app.js';
 import { env } from './env.js';
+import { captureFailure, flushMonitoring, initMonitoring } from './monitoring.js';
 import { makeShutdown } from './shutdown.js';
 import { startSweeping, sweep } from './sweep.js';
+
+// Before the app, so a failure to start is reported too (a bad env fails the
+// import above, before Sentry could start). A no-op without SENTRY_DSN.
+initMonitoring(env);
 
 // postgres.js connects lazily, so this makes no network call at boot.
 const db = createDb(env.DATABASE_URL);
@@ -29,5 +34,7 @@ try {
   await app.listen({ port: env.PORT, host: env.HOST });
 } catch (err) {
   app.log.error(err, 'failed to start');
+  captureFailure(err, 'boot');
+  await flushMonitoring();
   process.exit(1);
 }
