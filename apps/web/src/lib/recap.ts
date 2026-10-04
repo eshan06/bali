@@ -51,7 +51,9 @@ export async function loadRecap(
       return;
     }
     show({ kind: 'loading', session });
-    const report = await api.get<SessionReportResponse>(`${reports}/${session.id}`);
+    const report = await api.get<SessionReportResponse>(
+      `${reports}/${encodeURIComponent(session.id)}`,
+    );
     show({ kind: 'ready', session, report });
   } catch (e) {
     show({ kind: 'error', message: errText(e) });

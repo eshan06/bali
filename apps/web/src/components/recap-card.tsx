@@ -60,12 +60,12 @@ export function RecapCard({ classId }: { classId: string }) {
       </div>
       {state.kind === 'loading' ? (
         <p role="status" className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Loading the recap…
+          Loading the last session…
         </p>
       ) : state.kind === 'error' ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <p role="alert" className="text-sm">
-            Couldn't load the recap.{' '}
+            Couldn't load the last session.{' '}
             <span className="text-slate-600 dark:text-slate-300">{state.message}</span>
           </p>
           <button
@@ -99,7 +99,7 @@ function Recap({ view }: { view: RecapView }) {
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             A phone is silent when it stops checking in. Silent time doesn't count as focus.
           </p>
-          <h3 className="mt-5 text-sm font-medium">Who joined</h3>
+          <h3 className="mt-5 text-sm text-slate-500 dark:text-slate-400">Who joined</h3>
           <ul className="mt-1 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
             {view.joined.map((s) => (
               <li key={s.key} className="break-words">
@@ -141,9 +141,9 @@ function Moments({
 }) {
   return (
     <>
-      <h3 className="mt-5 text-sm font-medium">{title}</h3>
+      <h3 className="mt-5 text-sm text-slate-500 dark:text-slate-400">{title}</h3>
       {moments.length === 0 ? (
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{empty}</p>
+        <p className="mt-1 text-sm">{empty}</p>
       ) : (
         <ul className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-6 gap-y-1 text-sm">
           {moments.map((m) => (
