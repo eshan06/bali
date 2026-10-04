@@ -64,6 +64,8 @@ export function LiveGrid({
     onEndedRef.current = onEnded;
   }, [onEnded]);
   const [students, setStudents] = useState<Students | null>(null);
+  // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
+  const [over, setOver] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,11 @@ export function LiveGrid({
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
-        if (snap.ended) onEndedRef.current?.(sessionId);
+        if (snap.ended) {
+          setOver(true);
+          onEndedRef.current?.(sessionId);
+          return;
+        }
         appliedSeq.current = snap.latestSeq;
         lastStreamActivity.current = Date.now();
         lastGridActivity.current = Date.now();
@@ -124,9 +130,10 @@ export function LiveGrid({
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
+    if (over) return;
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [over]);
 
   // Slow snapshot refresh keeps derived silence honest for quietly-present
   // students: heartbeats update last_seen_at server-side but emit no event
@@ -135,6 +142,7 @@ export function LiveGrid({
   // read before an unlock but resolving after it would put the chip back to
   // green for an unshielded phone.
   useEffect(() => {
+    if (over) return;
     const t = setInterval(() => {
       void api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`).then(
         (snap) => {
@@ -157,7 +165,7 @@ export function LiveGrid({
       );
     }, 15_000);
     return () => clearInterval(t);
-  }, [api, sessionId]);
+  }, [api, sessionId, over]);
 
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!students) return <p className="text-sm text-slate-500">Loading grid…</p>;
@@ -173,7 +181,7 @@ export function LiveGrid({
 
   return (
     <div className="space-y-3">
-      {stale ? (
+      {stale && !over ? (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {stale.reason === 'reconnecting' ? 'Reconnecting' : 'Live feed has gone quiet'} — last
           updated {stale.secondsAgo}s ago

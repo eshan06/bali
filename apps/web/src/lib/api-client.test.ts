@@ -65,6 +65,37 @@ describe('api-client', () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
+  it('carries the error’s reason, where the status alone doesn’t say which refusal it was', async () => {
+    const api = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              error: {
+                code: 'bad_input',
+                reason: 'unknown_cursor',
+                message: 'before is not a session of this class',
+              },
+            },
+            400,
+          ),
+        ),
+    });
+
+    await expect(api.get('/x')).rejects.toMatchObject({ status: 400, reason: 'unknown_cursor' });
+    const plain = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () =>
+        Promise.resolve(jsonResponse({ error: { code: 'conflict', message: 'nope' } }, 409)),
+    });
+    const err = await plain.get('/x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).reason).toBeUndefined();
+  });
+
   it('never signs out on a 5xx — a server hiccup is transient, not a bad token', async () => {
     // The honesty rule: only a 401 ends a session. A 500/502/503 is the server
     // failing, so the client keeps its session and retries (shared errors.ts

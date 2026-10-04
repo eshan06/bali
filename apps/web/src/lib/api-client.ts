@@ -14,6 +14,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Which refusal it was, where the status doesn't say (`API_ERROR_REASONS`): key on this. */
+    readonly reason?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -88,6 +90,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         res.status,
         parsed?.error?.code ?? 'error',
         parsed?.error?.message ?? `request failed (${res.status})`,
+        parsed?.error?.reason,
       );
     }
     if (res.status === 204) return undefined as T;
