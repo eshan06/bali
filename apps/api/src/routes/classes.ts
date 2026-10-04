@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { classNotFound, requireOwnClass, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { mapTransitionError } from './errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
 const CreateBody = z.object({ name: z.string().trim().min(1).max(120) });
@@ -68,11 +69,11 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
         // A class needs a school; a teacher without one isn't fully provisioned.
         throw ApiError.conflict('teacher is not assigned to a school');
       }
-      const klass = await createClass(db, {
-        teacherId: teacher.id,
-        schoolId: teacher.schoolId,
-        name: body.name,
-      });
+      // A teacher deleted while this was on its way (C3) is `409 account_deleted`.
+      const schoolId = teacher.schoolId;
+      const klass = await mapTransitionError(() =>
+        createClass(db, { teacherId: teacher.id, schoolId, name: body.name }),
+      );
       return toClassDetail(klass, null);
     },
   );

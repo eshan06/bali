@@ -3,12 +3,22 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { createBlock } from '../src/management.js';
+import { createBlock, createClass } from '../src/management.js';
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
 import { getSessionEvents, getSessionRoster } from '../src/queries.js';
-import { classes, enrollments, events, participations, schools, users } from '../src/schema.js';
+import {
+  armedTaps,
+  blocks,
+  classes,
+  enrollments,
+  events,
+  participations,
+  schools,
+  users,
+} from '../src/schema.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  armTap,
   deleteAccount,
   deletedCognitoId,
   endSession,
@@ -208,6 +218,18 @@ describe('deleteAccount (C3)', () => {
     expect(deletion.eventId).not.toBe(eventId);
   });
 
+  it('refuses another account’s deletion id when this account was there before it', async () => {
+    const { ana, ben } = await seed('c3-foreign');
+    const bens = newUuidV7();
+    await deleteAccount(db, { userId: ben.id, eventId: bens, at: new Date() });
+
+    await expect(
+      deleteAccount(db, { userId: ana.id, eventId: bens, at: new Date() }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    const row = one(await db.select().from(users).where(eq(users.id, ana.id)));
+    expect(row).toMatchObject({ cognitoId: 'ana-c3-foreign', displayName: 'Ana', removedAt: null });
+  });
+
   it('refuses an id another event holds, and changes nothing', async () => {
     const { ana, ben } = await seed('c3-conflict');
     const taken = newUuidV7();
@@ -280,6 +302,20 @@ describe('deleteAccount (C3)', () => {
         .where(and(eq(participations.studentId, ana.id), isNull(participations.endedAt))),
     ).toHaveLength(0);
 
+    // Nor is one armed for no one: the route found the caller, then found no lesson.
+    await expect(
+      armTap(db, {
+        studentId: ana.id,
+        teacherId: first.teacherId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+        expiresAt: fromNow(60 * MIN),
+      }),
+    ).rejects.toMatchObject(gone);
+    expect(await db.select().from(armedTaps).where(eq(armedTaps.studentId, ana.id))).toHaveLength(
+      0,
+    );
+
     // A redeem that waited on the row spends no code on it.
     const school = one(await db.insert(schools).values({ name: 'c3-after-school' }).returning());
     await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' });
@@ -297,6 +333,31 @@ describe('deleteAccount (C3)', () => {
       deviceTime: new Date(),
     });
     expect(late.outcome).toBe('recorded');
+  });
+});
+
+describe('a deleted teacher (C3)', () => {
+  it('is never given a class or a block', async () => {
+    const school = one(await db.insert(schools).values({ name: 'c3-gone-teacher' }).returning());
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'c3-gone-teacher', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    await deleteAccount(db, { userId: teacher.id, eventId: newUuidV7(), at: new Date() });
+    const gone = { code: 'ACCOUNT_DELETED' };
+
+    await expect(
+      createClass(db, { teacherId: teacher.id, schoolId: school.id, name: 'late' }),
+    ).rejects.toMatchObject(gone);
+    await expect(
+      createBlock(db, { teacherId: teacher.id, tagId: 'c3-gone-tag' }),
+    ).rejects.toMatchObject(gone);
+    expect(await db.select().from(classes).where(eq(classes.teacherId, teacher.id))).toHaveLength(
+      0,
+    );
+    expect(await db.select().from(blocks).where(eq(blocks.teacherId, teacher.id))).toHaveLength(0);
   });
 });
 
