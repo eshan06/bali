@@ -9,7 +9,8 @@ included. Run from the repository root, on Linux (no Xcode), this fails when:
     malformed entry or a reason code Apple does not document for its category;
   - Swift the target compiles in (its folder and the local packages it links, which end up in
     its binary) calls a required-reason API its manifest does not declare;
-  - the app's collected data types differ from docs/APP-STORE.md's privacy table.
+  - the app's collected data types differ from docs/APP-STORE.md's privacy table, or an
+    extension declares any (none calls the API, so none collects).
 The API scan is best effort: regexes for the spellings in USES, not a parse of the Swift, so
 a new required-reason call spelled another way (sysctl's kern.boottime, say) adds a pattern.
 GRDB ships its own manifest in its package, so third-party code is not scanned here.
@@ -76,12 +77,27 @@ def package_dirs(spec, block):
     return [folder / "Sources" for folder in seen]
 
 
+def code_of(line):
+    """A Swift line without its `//` comment: a `//` inside a string literal (a URL) stays."""
+    quoted = escaped = False
+    for at, char in enumerate(line):
+        if escaped:
+            escaped = False
+        elif quoted and char == "\\":
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif not quoted and line.startswith("//", at):
+            return line[:at]
+    return line
+
+
 def swift_uses(folders):
     used = {}
     for folder in folders:
         for file in sorted(folder.rglob("*.swift")):
             for number, line in enumerate(file.read_text().splitlines(), 1):
-                code = line.split("//", 1)[0]
+                code = code_of(line)
                 for category, pattern in USES.items():
                     if re.search(pattern, code):
                         used.setdefault(category, f"{file}:{number}")
@@ -133,6 +149,8 @@ def check(name, kind, block, spec):
     if kind == "application" and types != documented_types():
         fail(f"{path}: collected data types {sorted(types)} differ from docs/APP-STORE.md's "
              f"{sorted(documented_types())}")
+    elif kind != "application" and collected:
+        fail(f"{path}: an extension collects no data, but this declares {collected}")
 
     accessed = manifest.get("NSPrivacyAccessedAPITypes")
     if not isinstance(accessed, list):

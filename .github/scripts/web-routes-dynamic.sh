@@ -10,9 +10,20 @@ set -euo pipefail
 log=$1
 # The route table: from its header to the shared-chunks summary. A route line
 # names its path after its marker (`├ ƒ /login`); the header and the summary don't.
-routes=$(sed -n '/^Route (app)/,/^+ First Load JS/p' "$log" | grep -F ' /' || true)
-if [ -z "$routes" ]; then
+if ! grep -q '^Route (app)' "$log"; then
   echo "::error::no route table in $log: did the build run?"
+  exit 1
+fi
+# No summary after the header (a Next that prints the table another way) fails,
+# rather than reading every line to the end of the log as routes.
+if ! table=$(awk '/^Route \(app\)/ { on = 1 } on { print } on && /^\+ First Load JS/ { end = 1; exit }
+  END { exit !end }' "$log"); then
+  echo "::error::the route table in $log has no '+ First Load JS' line after it: update this script to where Next's table ends"
+  exit 1
+fi
+routes=$(grep -F ' /' <<<"$table" || true)
+if [ -z "$routes" ]; then
+  echo "::error::no routes in $log's route table: did the build run?"
   exit 1
 fi
 if not_dynamic=$(grep -vF ' ƒ /' <<<"$routes"); then

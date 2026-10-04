@@ -26,16 +26,21 @@ jobs:
   check:
     name: Typecheck · lint · unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Two deep, for the API snapshot's baseline: HEAD^1 (its step says why).
           fetch-depth: 2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Phase 6, S5: no known high or critical advisory in what ships (dev tools
+      # never reach a phone or the API), and every package as the registry signed it.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit signatures
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
@@ -93,6 +98,22 @@ jobs:
           npm run build -w @bali/web >"$log" 2>&1 || { cat "$log"; exit 1; }
           cat "$log"
           .github/scripts/web-routes-dynamic.sh "$log"
+      # The build above, served: a page's scripts carry the nonce its CSP names,
+      # or the browser refuses them all (Phase 6, S4).
+      - run: .github/scripts/web-csp-nonce.test.sh
+      - name: The served portal's scripts carry the CSP's nonce
+        shell: bash
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.invalid
+        run: |
+          npm run start -w @bali/web -- --port 3100 >"$RUNNER_TEMP/web.log" 2>&1 &
+          for _ in $(seq 30); do
+            curl -fsS -D "$RUNNER_TEMP/login.headers" -o "$RUNNER_TEMP/login.html" \
+              http://127.0.0.1:3100/login 2>/dev/null && break
+            sleep 1
+          done
+          [ -s "$RUNNER_TEMP/login.html" ] || { cat "$RUNNER_TEMP/web.log"; exit 1; }
+          .github/scripts/web-csp-nonce.sh "$RUNNER_TEMP/login.headers" "$RUNNER_TEMP/login.html"
 
   # The same Vitest suite, but against a real multi-connection Postgres. This is
   # the only lane where the engine's FOR UPDATE serialization actually contends,
@@ -102,6 +123,7 @@ jobs:
   test-postgres:
     name: Integration + race tests (real Postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
@@ -115,8 +137,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -143,9 +165,10 @@ jobs:
   swift:
     name: BaliCore Swift tests (Linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: swift:6.4-noble
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # SwiftPM's build output: a warm one about halves the build (its module
       # caches survive a fresh checkout). The key names the image — bump both
       # together, so a new compiler starts clean — and hashes the sources, so
@@ -153,7 +176,7 @@ jobs:
       # the key is evaluated again on the host after the job, when .build is
       # there, written from inside the container, and a pattern that reaches
       # into it fails the job (ios/BaliCore/**/*.swift did).
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ios/BaliCore/.build
           key: balicore-swift6.4-noble-${{ hashFiles('ios/BaliCore/Package.swift', 'ios/BaliCore/Sources/**', 'ios/BaliCore/Tests/**') }}
