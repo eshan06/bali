@@ -28,8 +28,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hold clicked text, console lines and fetched URLs), no HttpContext (the page URL, which
   carries a class id), no sessions, no replay, no tracing; `dataCollection` collects nothing;
   `beforeSend` (`scrubEvent`) drops the request, the user, extras, breadcrumbs and the
-  transaction, and cuts every URL in a message or a stack frame's filename to its origin and
-  template and every UUID to `:id`. Tokens live in sessionStorage, which nothing here reads;
+  transaction, and cuts every URL in a message to its origin and template, a relative path's
+  query, and every UUID to `:id`; a stack frame's file keeps its script path (it names code,
+  and Sentry groups by it) but loses its query and UUIDs. Tokens live in sessionStorage, which nothing here reads;
   request bodies are never attached. Proven by a test that drives a global error, a rejection
   and the API client (500, 503, the 4xx refusals, a dropped connection) through a fake
   transport with a class and session id, a student name, an unlock reason, an invite code, a

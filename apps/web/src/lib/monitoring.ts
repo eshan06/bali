@@ -22,6 +22,13 @@ export function templatePath(path: string): string {
 
 const URL_IN_TEXT = /\bhttps?:\/\/[^\s"'<>()]+/g;
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+/** A relative path's query or fragment (`/auth/callback?code=…`). */
+const PATH_QUERY = /(\/[^\s?#"'<>()]*)[?#][^\s"'<>()]*/g;
+
+/** A script's URL names code, not a person: only its query and any UUID go. */
+function scrubFileName(name: string): string {
+  return name.replace(/[?#].*$/, '').replace(UUID, ':id');
+}
 
 /** A URL keeps its origin and its path's template; a bare UUID becomes `:id`. */
 function scrubText(text: string): string {
@@ -34,6 +41,7 @@ function scrubText(text: string): string {
         return '[url]';
       }
     })
+    .replace(PATH_QUERY, '$1')
     .replace(UUID, ':id');
 }
 
@@ -69,8 +77,8 @@ export function scrubEvent(event: ErrorEvent, hint?: EventHint): ErrorEvent | nu
     if (exception.value !== undefined) exception.value = scrubText(exception.value);
     for (const frame of exception.stacktrace?.frames ?? []) {
       // An inline script's frames are named by the page URL.
-      if (frame.filename !== undefined) frame.filename = scrubText(frame.filename);
-      if (frame.abs_path !== undefined) frame.abs_path = scrubText(frame.abs_path);
+      if (frame.filename !== undefined) frame.filename = scrubFileName(frame.filename);
+      if (frame.abs_path !== undefined) frame.abs_path = scrubFileName(frame.abs_path);
       delete frame.vars;
     }
   }

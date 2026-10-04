@@ -87,7 +87,9 @@ describe('error monitoring in the portal', () => {
     const page = `https://portal.example/classes/${SECRETS.classId}/reports?before=${SECRETS.sessionId}`;
     const handlers = globalThis as unknown as GlobalHandlers;
     handlers.onerror('Uncaught Error', page, 1, 1, new Error(`could not draw ${page}`));
-    handlers.onunhandledrejection({ reason: new Error(`stalled on ${SECRETS.sessionId}`) });
+    handlers.onunhandledrejection({
+      reason: new Error(`stalled on ${SECRETS.sessionId} at /join?code=${SECRETS.inviteCode}`),
+    });
 
     // The API: a 5xx and a dropped connection are reported; refusals are not.
     const statuses = [500, 503, 400, 403, 404, 409, 429];
