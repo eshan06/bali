@@ -669,3 +669,64 @@ export interface EventsPage {
   /** Resume after this: the max seq returned, or the requested `after` when the page is empty. */
   nextAfter: number;
 }
+
+// GET /v1/classes/{id}/reports/sessions/{sessionId} — one session's report (R2), for the
+// class's own teacher: what `sessionReport` counts (R1). Aggregates only, never rankings: no
+// student's own minutes. Everyone it names took part — joined, unlocked or turned protection off
+// there — so a student removed from the class since is still named.
+/** A student as a report names them. */
+export interface ReportStudent {
+  id: string;
+  /** Their display name now; null when their account has none. */
+  displayName: string | null;
+}
+/** An emergency unlock in the session, listed whatever it changed. */
+export interface SessionReportUnlock {
+  eventId: string;
+  student: ReportStudent;
+  /** The device's time clamped into the session's window (rule 1). */
+  occurredAt: string;
+  /** Its reason now: its latest change's (A20), else the one sent with it; null when none. */
+  reason: UnlockReason | null;
+  /**
+   * Why it changed nothing, when it changed nothing: `superseded` (late, so it never ended
+   * focus), `protection_off`, `no_live_participation` or `after_session_end`. Null when it has
+   * no note this build knows: none, so it took effect; or a newer build's, which changed nothing
+   * either, since a note always means the engine did not apply the record. A client reads a note
+   * it doesn't know as none.
+   */
+  recordedAs: UnlockRecordedAs | null;
+}
+/** A protection-off ("Screen Time off") report in the session: it ends focus as an unlock does. */
+export interface SessionReportProtectionOff {
+  eventId: string;
+  student: ReportStudent;
+  occurredAt: string;
+  /** `after_session_end`: it reached the server after the end and changed nothing. Null as on an unlock. */
+  recordedAs: ProtectionOffRecordedAs | null;
+}
+/**
+ * Minutes are whole, each rounded to the nearest (a half up) from its exact figure: the total
+ * from the exact sum of every student's time, never a sum of rounded parts, and the average from
+ * the exact total over the students who joined. So the average times who joined can be a minute
+ * or so off the total.
+ */
+export interface SessionReportResponse {
+  /**
+   * Whether the session is marked over, as the grid's snapshot says it. False while it runs,
+   * and past its bell until the sweep marks it: the counts then run to now, or to the bell.
+   */
+  ended: boolean;
+  /** Who joined, in the order they first did: never a tap a Start declined, nor a late one. */
+  joined: ReportStudent[];
+  /** Focused and in contact: the whole class's. */
+  focusMinutes: number;
+  /** `focusMinutes` per student who joined; null when no one did. */
+  averageFocusMinutes: number | null;
+  /** Focused but gone quiet: never counted as focus. */
+  silentMinutes: number;
+  /** Oldest first. */
+  unlocks: SessionReportUnlock[];
+  /** Oldest first. */
+  protectionOffs: SessionReportProtectionOff[];
+}

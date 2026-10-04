@@ -43,8 +43,8 @@ export class ApiError extends Error {
   static forbidden(message = 'not allowed', reason?: ApiErrorReason): ApiError {
     return new ApiError('forbidden', message, undefined, reason);
   }
-  static notFound(message = 'not found'): ApiError {
-    return new ApiError('not_found', message);
+  static notFound(message = 'not found', reason?: ApiErrorReason): ApiError {
+    return new ApiError('not_found', message, undefined, reason);
   }
   static conflict(message: string): ApiError {
     return new ApiError('conflict', message);

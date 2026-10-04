@@ -437,7 +437,15 @@ Teacher app and web portal:
 - `POST /v1/sessions/{id}/end` and `POST /v1/sessions/{id}/extend`.
 - `GET /v1/sessions/{id}/events?after={number}` — catch-up reads of the event log.
   (The live stream endpoint is decided in the live-updates section.)
-- `GET /v1/classes/{id}/reports/…` — focus minutes and unlocks.
+- `GET /v1/classes/{id}/reports/sessions/{sessionId}` — one session's report (R2), for the
+  class's own teacher: who joined, by their display name now, the class's focus minutes (total,
+  and the average per student who joined) and silent minutes, and every unlock and protection off
+  with its note — aggregates only, never one student's minutes. Read from the session's own
+  events (rule 2's `sessionReport`), so a student removed from the class since is still named.
+  Whole minutes, each rounded from its exact figure: the total never a sum of rounded parts. A
+  session not yet marked over is answered too, counted to now or to its bell, with `ended: false`.
+  Another teacher and a student are `403`; a session not in the class is the unknown session's
+  `404 session_not_found`, an unknown class `404 class_not_found`.
 - `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
   block holds is a `409`; re-registering one's own tag returns that block (the retry of a
   lost response).

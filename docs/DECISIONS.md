@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **R2: one session's report, `GET /v1/classes/{id}/reports/sessions/{sessionId}`,
+  for the class's own teacher: R1's counts, named and rounded; a session not over yet is answered,
+  never refused; and a note this build doesn't know moves no one and reads as none.** **What it
+  answers:** `sessionReport` (R1) over every event the session holds, read in `seq` with each
+  student's display name now in one statement (`getSessionEvents`), by the server's clock. Who it
+  names took part there — joined, unlocked or reported protection off — so the names come from the
+  session's events, never the roster: a student removed from the class since is still named, as
+  the grid keeps them (data-model decision 3), by their name now, null when their account has
+  none. Aggregates only: who joined, the class's focus and silent minutes, and the average per
+  student who joined; no student's own minutes, so nothing ranks them. **Rounding:** whole
+  minutes, each the nearest (a half up) to its exact figure. The total is rounded from the exact
+  sum of every student's time, never summed from rounded parts: two students at 12.3 minutes are
+  25 in all, not 24. The average is rounded from the exact total over who joined: 12, where a
+  rounded total's would be 12.5, so 13. The average times who joined can then be a minute or so
+  off the total; each figure is the honest one. **A session not over yet:** answered with R1's
+  `now` — counted to now while it runs, to the bell past it — and `ended: false` until the sweep
+  marks it, the stored mark the grid's snapshot calls `ended`, so the two never disagree. Past the
+  bell the counts no longer grow (over by the server's clock, data-model decision 6), and the sweep
+  marks it within the minute. Never refused: a recap read mid-lesson says what it counted, and
+  that the lesson isn't over. **A note this build doesn't know** (#191's review WARN, closed): a
+  newer build's `recorded_as`, met mid-deploy, moves no one, since a note always means the engine
+  did not apply the record, and `moved` already reads any note so; it is listed with `recordedAs:
+  null`, as a client reads any vocabulary value it doesn't know as none (API decision 4; the grid's
+  snapshot does the same). The record is still listed: an unlock is never discarded. So the list
+  and the minutes tell one story, the docs no longer read null as "it took effect", and a test pins
+  both halves. A note added later must keep that meaning. **Errors:** a student and another teacher
+  `403`, as the roster's; a malformed id `400` in the one shape; an unknown class `404
+  class_not_found`; an unknown session, or one in another class (the teacher's own other class
+  included), `404 session_not_found`. A report is read under its own class, and an id of another
+  teacher's session says nothing about it. Both reasons were in the vocabulary already, so the
+  Swift mirror is untouched. **L1's review WARN, closed on the way:** `makeAuthedApp` builds the
+  other suites' app with budgets no test meets, so `rate-limits.test.ts` and `limits.test.ts` are
+  the only suites the production budgets touch; a test there sends one account past every burst.
+
 - **2026-10-04** — **R1: focus time is one pure function of a session's stored events
   (`sessionReport`, `@bali/shared`), read in the engine's order; silent time is not focus, and is
   counted apart.** **What it is:** the session's window (start, bell, end), its events as the

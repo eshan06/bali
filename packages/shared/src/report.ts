@@ -58,7 +58,11 @@ export interface ReportUnlock {
   occurredAt: Date;
   /** Its reason now: its latest change's (A20), else the one sent with it; null when none. */
   reason: UnlockReason | null;
-  /** Why it changed nothing, when it did not: `superseded` never ended focus. */
+  /**
+   * Why it changed nothing, when it did not: `superseded` never ended focus. Null when it has no
+   * note this build knows: none, or a newer build's — which moved no one either, since a note
+   * always means the engine did not apply the record (`moved`).
+   */
   recordedAs: UnlockRecordedAs | null;
 }
 
@@ -67,7 +71,7 @@ export interface ReportProtectionOff {
   eventId: string;
   studentId: string;
   occurredAt: Date;
-  /** `after_session_end`: it reached the server after the end, and changed nothing. */
+  /** `after_session_end`: it reached the server after the end, and changed nothing. Null as on an unlock. */
   recordedAs: ProtectionOffRecordedAs | null;
 }
 
@@ -117,6 +121,7 @@ function moved(
   note: unknown,
   turn: EventType | null,
 ): ParticipationState | null | undefined {
+  // Any note, one this build doesn't know included: the engine did not apply the record.
   if (note !== null) return undefined;
   switch (type) {
     case 'tap_in':
