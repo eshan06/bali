@@ -149,8 +149,9 @@ project for the API (its DSN).
       school gives you and copy the user's `sub`.
     - **Export it** from your machine, the output landing in a file there:
       `railway ssh --service <api service name> -- npm run --silent school -- export-student <sub> > record.json`
-      *(wording unsure: if `railway ssh` takes no command, run it in the shell as in step 9
-      and copy the output into `record.json`)*.
+      `railway ssh` runs the command after `--` and, with its output going to a file, opens
+      no terminal, so the file holds the record alone (an old CLI without that: `railway
+      upgrade` first).
     - **Check:** `jq '.format, .account.id, (.events | length)' record.json` prints
       `"bali.student-record/1"`, the account's id and a count; `jq` failing means the file
       holds something besides the record. `no account on record` means no account has that

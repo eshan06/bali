@@ -271,12 +271,21 @@ describe('npm run school -- export-student', () => {
     expect(record.events).toHaveLength(3);
   });
 
-  it('says so when no account has the id, and checks its arguments first', async () => {
+  it('says so when no account has the id, refuses a teacher’s, and checks its arguments first', async () => {
     const stranger = newUuidV7();
     const command = parseSchoolCommand(['export-student', stranger]);
     await expect(command!({ db, print: () => undefined })).rejects.toThrow(
       `no account on record has the id or Cognito subject ${stranger}`,
     );
+    const { teacher } = await seed('c5-teacher');
+    const printed: string[] = [];
+    await expect(
+      parseSchoolCommand(['export-student', teacher.id])!({
+        db,
+        print: (line) => printed.push(line),
+      }),
+    ).rejects.toThrow(`${teacher.id} is a teacher's account, not a student's`);
+    expect(printed).toEqual([]);
     expect(() => parseSchoolCommand(['export-student'])).toThrow(/needs the account's id/);
     expect(() => parseSchoolCommand(['export-student', stranger, 'more'])).toThrow(/unexpected/);
   });

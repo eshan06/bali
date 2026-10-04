@@ -137,7 +137,8 @@ npm run --silent school -- export-student <id> > record.json   # one student's w
   tap and redeemed invite keyed to them, every column, plus the names of the classes,
   sessions and school those rows point at. Nothing keyed to another student. It reads in
   one read-only transaction and writes nothing. A deleted account (C3) is found by its id
-  only, its record as the deletion left it. `STUDENT_RECORD_COVERAGE`
+  only, its record as the deletion left it. A teacher's account is refused: their classes
+  and blocks are the school's, so it would print a record that only looks whole. `STUDENT_RECORD_COVERAGE`
   (`packages/db/src/student-record.ts`) says where each foreign key to `users` stands, and a
   test fails when a new one is neither exported nor argued out. Running it on prod and
   delivering it: `docs/RUNBOOKS.md`, runbook 1, step 10.

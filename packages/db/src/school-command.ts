@@ -201,5 +201,10 @@ async function list({ db, print }: SchoolCommandIO): Promise<void> {
 async function exportStudent({ db, print }: SchoolCommandIO, who: string): Promise<void> {
   const record = await exportStudentRecord(db, who);
   if (!record) throw new Error(`no account on record has the id or Cognito subject ${who}`);
+  // A teacher's classes and blocks are the school's, never in the export: one
+  // would print as a record that only looks whole.
+  if (record.account.role !== 'student') {
+    throw new Error(`${who} is a ${record.account.role}'s account, not a student's`);
+  }
   print(JSON.stringify(record, null, 2));
 }
