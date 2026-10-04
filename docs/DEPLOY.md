@@ -177,7 +177,9 @@ What a run checks and needs:
   the certificate and the App Store profiles for the app and both extensions itself.
   If it says the key may not create a certificate or use cloud-managed distribution
   certificates, the key's role is too narrow for that: generate one with **Admin**
-  access and replace the three secrets. Each extension's Family Controls
+  access and replace the three secrets. A GitHub runner keeps no keychain, so a run
+  may leave a new Apple Development certificate on the team each time: revoke old
+  ones in the developer account if they pile up toward Apple's limit. Each extension's Family Controls
   (Distribution) entitlement must be approved on its own bundle ID too.
 - **The build number** is the run's number; the version stays `MARKETING_VERSION`.
   Apple refuses a number already uploaded, so re-running a run that got as far as the

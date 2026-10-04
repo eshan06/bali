@@ -130,7 +130,7 @@ jobs:
       # Release guard on what was built: the sign-in's settings are there, over HTTPS; the build
       # number is the run's; an icon exists (App Store Connect refuses a build without one); and
       # no binary holds text that only `#if DEBUG` code has — the readout's title and the
-      # monitor's lost-bell check. Renaming those texts means updating them here.
+      # monitor's lost-bell check.
       - name: 'Release guard: the archived app'
         run: |
           app="$ARCHIVE/Products/Applications/Bali.app"
@@ -151,13 +151,19 @@ jobs:
             || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }
           [ -n "$(plist CFBundleIconName)" ] \
             || { echo "::error::The app has no icon (CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
-          for marker in "Bali:Debug readout" "PlugIns/BaliMonitor.appex/BaliMonitor:lost on purpose (device check)"; do
-            binary="$app/${marker%%:*}"
-            if [ ! -f "$binary" ]; then
+          # binary | the source that has the text | the text. A text no longer in its source
+          # fails too, so a rename can't leave this check finding nothing.
+          for marker in "Bali|ios/Bali/BaliApp.swift|Debug readout" \
+            "PlugIns/BaliMonitor.appex/BaliMonitor|ios/BaliMonitor/SessionMonitor.swift|lost on purpose (device check)"; do
+            IFS='|' read -r binary source text <<< "$marker"
+            if ! grep -qF "$text" "$source"; then
+              echo "::error::\"$text\" is no longer in $source: point this guard at Debug-only text there."
+              fail=1
+            elif [ ! -f "$app/$binary" ]; then
               echo "::error::No $binary in the archive to check."
               fail=1
-            elif LC_ALL=C grep -qaF "${marker#*:}" "$binary"; then
-              echo "::error::$(basename "$binary") holds Debug-only code (\"${marker#*:}\")."
+            elif LC_ALL=C grep -qaF "$text" "$app/$binary"; then
+              echo "::error::$binary holds Debug-only code (\"$text\")."
               fail=1
             fi
           done
