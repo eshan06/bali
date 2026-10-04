@@ -30,6 +30,13 @@ const LESSON = { durationMinutes: 50 };
 const P95_MS = 500;
 /** A Start joins its 30 in one transaction, the bell's 30 Starts sharing 10 connections. */
 const START_P95_MS = 1000;
+/** The flood: one account at 50 a second for a minute, against its budget (`BUDGETS.account`). */
+const FLOOD_RATE = 50;
+const FLOOD_SECONDS = 60;
+const ACCOUNT_BURST = 120;
+const ACCOUNT_PER_SECOND = 2;
+/** The most `200`s that budget allows the flood, plus a few for requests in flight at the end. */
+const FLOOD_ANSWERED_MAX = ACCOUNT_BURST + ACCOUNT_PER_SECOND * FLOOD_SECONDS + 5;
 
 const school = (key) => new SharedArray(key, () => [JSON.parse(open(SCHOOL_FILE))[key]].flat());
 const students = school('students');
@@ -60,10 +67,12 @@ export const options = {
     flood: {
       executor: 'constant-arrival-rate',
       exec: 'flood',
-      rate: 50,
-      duration: '60s',
+      rate: FLOOD_RATE,
+      duration: `${FLOOD_SECONDS}s`,
       startTime: '30s',
       preAllocatedVUs: 10,
+      // Room for a slow answer (a second each); past it k6 drops iterations, which fails below.
+      maxVUs: FLOOD_RATE,
       tags: { who: 'flooder' },
     },
   },
@@ -80,8 +89,12 @@ export const options = {
     'http_req_duration{kind:start}': [`p(95)<${START_P95_MS}`],
     'http_req_duration{kind:me}': [`p(95)<${P95_MS}`],
     'http_req_duration{kind:checkin}': [`p(95)<${P95_MS}`],
-    // The flood: stopped by its own budget, every refusal a 429 with a Retry-After.
+    // The flood: stopped by its own budget, every refusal a 429 with a Retry-After. No more
+    // answered than the budget allows, so a raised budget fails; and every request sent, so a
+    // slow API can't thin the flood into passing.
     'http_reqs{who:flooder,status:429}': ['count>0'],
+    'http_reqs{who:flooder,status:200}': [`count<=${FLOOD_ANSWERED_MAX}`],
+    dropped_iterations: ['count==0'],
     'checks{who:flooder}': ['rate==1'],
   },
 };

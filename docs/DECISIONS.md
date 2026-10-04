@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S5: CI hardening.** **Pins:** every third-party and GitHub action in the
+  workflows CI runs is pinned to a commit, with its tag in a trailing comment (a bump is its own PR,
+  both changed together), so a moved tag can't move the code that runs; `claude-review.yml` and
+  `claude.yml` are S6's, untouched here (their tamper protection, GOTCHAS). Every job has a
+  `timeout-minutes`, so a hung step costs minutes, not six hours. **Audit:** `npm audit
+  --omit=dev --audit-level=high` — what ships, high and critical only; a dev tool's advisory
+  never reaches a phone or the API, and blocking on it would turn CI red over nothing a user
+  meets. `npm audit signatures` checks every installed package against the registry's
+  signatures. **Load gate:** the flooder's `200`s are capped at what its budget allows over the
+  flood's minute (120 at once, then 2 a second: 240, plus 5 for requests in flight; a run
+  measured 239), so a raised budget fails (240 at once measured 359); and `dropped_iterations`
+  must be zero, with `maxVUs` 50 (a second's latency each) so a slow API fails the gate rather
+  than quietly sending fewer requests. **The CSP nonce, served:** CI's check job starts the
+  built portal with `next start` and checks that every `<script>` on `/login` carries the
+  nonce its response's `script-src` names — the rendering-per-request test and the route
+  table check prove the precondition, this the outcome. The route table check fails when
+  the table has no `+ First Load JS` end, rather than reading every later line as routes.
+  **Privacy manifests:** a `//` inside a string literal no longer hides the rest of the line
+  from the scan; an extension declaring any collected data type fails (none calls the API);
+  TestFlight's Release guard lints each archived bundle's manifest, the build Apple reads.
 - **2026-10-04** — **S4: the portal's CSP, with a nonce, and its security headers.** **Why the
   CSP matters most:** the access token lives in sessionStorage (WEB.md), where any script on the
   page can read it; httpOnly cookies would need a server the SPA doesn't have. So the CSP is the

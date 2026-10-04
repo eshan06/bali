@@ -7,6 +7,7 @@ import contextlib
 import importlib.util
 import io
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -79,11 +80,24 @@ class PrivacyManifests(unittest.TestCase):
     def test_a_linked_package_call_undeclared(self):
         # The shield's own code calls nothing; BaliOutbox, which it links, reads the uptime.
         self.edit("ios/BaliShield/PrivacyInfo.xcprivacy", "<string>35F9.1</string>", "")
-        self.fails("SyncEngine.swift:18 uses NSPrivacyAccessedAPICategorySystemBootTime")
+        code, out = run(self.root)
+        self.assertEqual(code, 1, out)
+        self.assertRegex(out, r"SyncEngine\.swift:\d+ uses NSPrivacyAccessedAPICategorySystemBootTime")
 
     def test_a_call_in_a_comment_is_no_call(self):
         file = self.root / "ios/BaliShield/ShieldConfigurationExtension.swift"
         file.write_text(file.read_text() + "\n// statfs( volumeAvailableCapacity\n")
+        self.assertEqual(run(self.root)[0], 0)
+
+    def test_a_call_after_a_url_is_a_call(self):
+        file = self.root / "ios/BaliShield/ShieldConfigurationExtension.swift"
+        file.write_text(file.read_text() + '\nlet u = "https://a.example/\\"x"; let s = statfs(\n')
+        self.fails("ShieldConfigurationExtension.swift:")
+        self.fails("uses NSPrivacyAccessedAPICategoryDiskSpace")
+
+    def test_a_comment_after_a_string_is_no_call(self):
+        file = self.root / "ios/BaliShield/ShieldConfigurationExtension.swift"
+        file.write_text(file.read_text() + '\nlet u = "https://a.example" // statfs(\n')
         self.assertEqual(run(self.root)[0], 0)
 
     def test_a_new_call_undeclared(self):
@@ -94,6 +108,23 @@ class PrivacyManifests(unittest.TestCase):
     def test_data_types_drift_from_the_label(self):
         self.edit("docs/APP-STORE.md", "→ **Device ID**", "→ **Device Model**")
         self.fails("differ from docs/APP-STORE.md")
+
+    def test_an_extension_collecting_data(self):
+        manifest = "ios/BaliShield/PrivacyInfo.xcprivacy"
+        entry = (
+            "<dict><key>NSPrivacyCollectedDataType</key>"
+            "<string>NSPrivacyCollectedDataTypeDeviceID</string>"
+            "<key>NSPrivacyCollectedDataTypeLinked</key><true/>"
+            "<key>NSPrivacyCollectedDataTypeTracking</key><false/>"
+            "<key>NSPrivacyCollectedDataTypePurposes</key><array>"
+            "<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array></dict>"
+        )
+        text = (self.root / manifest).read_text()
+        self.assertRegex(text, r"<key>NSPrivacyCollectedDataTypes</key>\s*<array/>")
+        (self.root / manifest).write_text(re.sub(
+            r"(<key>NSPrivacyCollectedDataTypes</key>\s*)<array/>", rf"\1<array>{entry}</array>", text
+        ))
+        self.fails("an extension collects no data")
 
 
 if __name__ == "__main__":

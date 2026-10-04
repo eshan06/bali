@@ -42,6 +42,8 @@ expect fail 'a static route' "$(table ○)"
 expect fail 'an SSG route' "$(table ●)"
 expect fail 'a partially prerendered route' "$(table ◐)"
 expect fail 'no route table (the build failed)' 'Failed to compile.'
+expect fail 'a table with no end (Next changed its summary)' "$(table ƒ | grep -v '^+ First Load JS')"
+expect fail 'a table with no routes' "$(table ƒ | grep -v ' /')"
 
 if [ "$failures" -gt 0 ]; then exit 1; fi
 echo "web-routes-dynamic.sh: all cases pass"

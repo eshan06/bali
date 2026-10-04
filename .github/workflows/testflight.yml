@@ -130,7 +130,7 @@ jobs:
       # Release guard on what was built: the sign-in's settings are there, over HTTPS; the build
       # number is the run's; an icon exists (App Store Connect refuses a build without one); and
       # no binary holds text that only `#if DEBUG` code has — the readout's title and the
-      # monitor's lost-bell check.
+      # monitor's lost-bell check; and each bundle carries its privacy manifest.
       - name: 'Release guard: the archived app'
         run: |
           app="$ARCHIVE/Products/Applications/Bali.app"
@@ -166,6 +166,12 @@ jobs:
               echo "::error::$binary holds Debug-only code (\"$text\")."
               fail=1
             fi
+          done
+          # Every bundle Apple reads carries its privacy manifest (Phase 6, C1), here on the
+          # Release archive itself, not only on ios.yml's Debug build.
+          for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
+            plutil -lint "$bundle/PrivacyInfo.xcprivacy" \
+              || { echo "::error::No sound privacy manifest in $bundle."; fail=1; }
           done
           exit "$fail"
 

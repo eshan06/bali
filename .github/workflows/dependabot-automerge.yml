@@ -18,6 +18,7 @@ jobs:
     name: Arm auto-merge (patch/minor)
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Read update metadata
         id: meta
