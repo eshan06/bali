@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyEvent,
+  endsSession,
   fromSnapshot,
   gridDisplay,
   mergeSnapshot,
@@ -119,6 +120,14 @@ describe('grid-state', () => {
     s = applyEvent(s, evt(9, 'session_ended', null));
     expect(s.ana.endedAt).toBeInstanceOf(Date);
     expect(s.ben.endedAt).toBeInstanceOf(Date);
+  });
+
+  it('knows the session is over at the End or the sweep, and at nothing else (R4)', () => {
+    expect(endsSession(evt(9, 'session_ended', null))).toBe(true);
+    expect(endsSession(evt(9, 'session_expired', null))).toBe(true);
+    for (const type of ['session_extended', 'tap_in', 'unlock', 'went_silent'] as const) {
+      expect(endsSession(evt(9, type, 'ana'))).toBe(false);
+    }
   });
 
   it('marks a removed student as ended', () => {

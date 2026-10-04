@@ -8,6 +8,7 @@ import { config } from '@/lib/config';
 import { errText } from '@/lib/errors';
 import {
   applyEvent,
+  endsSession,
   fromSnapshot,
   gridDisplay,
   type GridDisplay,
@@ -47,9 +48,21 @@ const CHIP: Record<GridDisplay, { label: string; cls: string }> = {
   },
 };
 
-export function LiveGrid({ sessionId }: { sessionId: string }) {
+export function LiveGrid({
+  sessionId,
+  onEnded,
+}: {
+  sessionId: string;
+  /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
+  onEnded?: (sessionId: string) => void;
+}) {
   const api = useApi();
   const onUnauthorized = useSignOut();
+  // The newest callback, read where the session ends, so a new one never restarts the stream.
+  const onEndedRef = useRef(onEnded);
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
   const [students, setStudents] = useState<Students | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [status, setStatus] = useState<SseStatus>('connecting');
@@ -76,6 +89,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
+        if (snap.ended) onEndedRef.current?.(sessionId);
         appliedSeq.current = snap.latestSeq;
         lastStreamActivity.current = Date.now();
         lastGridActivity.current = Date.now();
@@ -89,6 +103,7 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
             if (e.seq > appliedSeq.current) appliedSeq.current = e.seq;
             lastStreamActivity.current = Date.now();
             lastGridActivity.current = Date.now();
+            if (endsSession(e)) onEndedRef.current?.(sessionId);
           },
           onActivity: () => {
             lastStreamActivity.current = Date.now();
@@ -130,6 +145,8 @@ export function LiveGrid({ sessionId }: { sessionId: string }) {
           // resets the counter four times per threshold and a stream that has
           // silently died never gets reported at all.
           lastGridActivity.current = Date.now();
+          // Over is over, however old the read: a stream that missed the end still ends here.
+          if (snap.ended) onEndedRef.current?.(sessionId);
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
           setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));

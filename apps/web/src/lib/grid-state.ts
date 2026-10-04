@@ -157,10 +157,19 @@ function unknownStudent(studentId: string): Student {
   };
 }
 
+/**
+ * Whether an event ends the session itself: the teacher's End, or the sweep at the bell (and a
+ * Start past it, A18). Only the server marks a session over, so the grid and the recap card wait
+ * for one of these, never the tab's own clock.
+ */
+export function endsSession(e: Pick<FeedEvent, 'type'>): boolean {
+  return e.type === 'session_ended' || e.type === 'session_expired';
+}
+
 /** Apply one streamed event onto a copy of the roster (idempotent for the grid). */
 export function applyEvent(prev: Students, e: FeedEvent): Students {
   const at = new Date(e.occurredAt);
-  if (e.type === 'session_ended' || e.type === 'session_expired') {
+  if (endsSession(e)) {
     const next: Students = {};
     for (const [id, s] of Object.entries(prev)) next[id] = s.endedAt ? s : { ...s, endedAt: at };
     return next;
