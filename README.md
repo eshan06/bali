@@ -153,6 +153,35 @@ ignores `HTTPS_PROXY` unless you set `NODE_USE_ENV_PROXY=1`.
 `npm run dev:teacher -- <command>` signs in as `DEMO_USER_TEACHER` to make a class, register a
 block, and start, watch and end a session on dev — `ios/README.md`, "To run it on your iPhone".
 
+## The load harness
+
+Phase 4's one-address load gate (L2b) drives a whole school at the bell. Two commands stand it
+up: the school, seeded into a database of its own on a real Postgres, and the real API serving it
+as a server process (every route, L1's rate limits, the minute sweep), trusting a token issuer of
+the harness's own.
+
+```bash
+export TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres  # this machine's
+npm run load:seed    # makes the database bali_load and writes apps/api/scripts/load/school.json
+npm run load:serve   # the API on it, at http://127.0.0.1:3001 (PORT and HOST move it)
+```
+
+- **The school:** 20 teachers, each with a block and the class they start at this bell, 30
+  students in each (600 phones behind one address), and every other teacher a second class,
+  which the room before theirs takes at another bell.
+- **`school.json`** (gitignored) is what the load script reads: per student, a token, the tag
+  of the block to tap and the class; per teacher, a token, the class to start and the block;
+  and the key `POST /internal/sweep` takes. Tokens last 12 hours. Each seed makes a new school
+  and a new key, so restart `load:serve` after one.
+- **The issuer:** each seed makes a key pair, signs every token with the private half and keeps
+  it nowhere. `load:serve` gives the API the public half through env alone (`AUTH_JWKS_URI` is a
+  `data:` URL holding the key set), so no API code knows the harness, and a deployed API, its
+  env naming Cognito's pool, never trusts these tokens.
+- **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
+  machine (`localhost`, `127.0.0.1`, `[::1]`), and the seed writes only into `bali_load`, which
+  it drops and makes anew each time. CI's real-Postgres lane seeds it, boots it and taps a class
+  in on every run (`apps/api/test/load-harness.test.ts`).
+
 ## Web portal
 
 The teacher portal lives in `apps/web` (Next.js). It runs locally against the dev

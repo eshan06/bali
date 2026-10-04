@@ -113,14 +113,13 @@ Family Controls framework, the one Bali's shields run on (§3.3.3(P); the text o
 or "offering individuals the ability to manage their devices to enable focus and
 productivity". The framework "may not be used for other purposes, such as ad blocking, in
 organizational settings, or for managing the device of another adult individual", and
-device or usage data received through it may not be shared "beyond … the individual and
-their device". Bali's sessions are started by a teacher at school, and the teacher's grid
-shows each student's state, "Screen Time off" included. A reviewer could read that as
-both. Apple granted the distribution entitlement on 2026-09-24, after the clause existed:
-a good sign, not a ruling. External TestFlight builds are reviewed too, so this can stop
-the pilot, not only the App Store. And the sharing bar covers device or usage data
-"received through the Family Controls Framework or otherwise", so it may reach what Bali
-records itself, not only what the framework hands it.
+device or usage data "received through the Family Controls Framework or otherwise" may not
+be shared "beyond … the individual and their device". Bali's sessions are started by a
+teacher at school, and the teacher's grid shows each student's state, "Screen Time off"
+included. A reviewer could read that as both. Apple granted the distribution entitlement on
+2026-09-24, after the clause existed: a good sign, not a ruling. External TestFlight builds
+are reviewed too, so this can stop the pilot, not only the App Store. And that "or
+otherwise" may reach what Bali records itself, not only what the framework hands it.
 
 **What others do (researched 2026-10-04).** Doorman (doorman.school), the closest
 competitor, mostly avoids the framework. Its Focus Mode "installs a secure and private VPN
@@ -140,9 +139,11 @@ consultations.
   themselves, taps in, and holds the exit; the teacher sees what the app records.
 - Fallback designs, settled with the owner before the answer comes, best fit first:
   school-owned devices under MDM (sanctioned, but never a student's own phone); a network
-  filter like Doorman's (outside the framework, weaker, and an ARCHITECTURE change); Family
-  Controls as a purely personal tool, no lock state leaving the phone. A grid showing only
-  what Bali itself records may not be enough alone, because of "or otherwise".
+  filter like Doorman's, which is the local VPN filter ARCHITECTURE already parks as a second
+  enforcement layer (iOS app structure, "Decided later, on purpose"), here made the only one:
+  outside the framework, weaker, and an ARCHITECTURE change; Family Controls as a purely
+  personal tool, no lock state leaving the phone. A grid showing only what Bali itself
+  records may not be enough alone, because of "or otherwise".
 - Phase 6 gates on it.
 
 **Done when:** Apple's answer is on record, and the design matches it.

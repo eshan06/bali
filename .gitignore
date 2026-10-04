@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 .env-archive/
+# The load harness's school: tokens `npm run load:seed` mints on each run
+apps/api/scripts/load/school.json
 
 # Local tooling and OS noise — but shared repo commands/skills ARE tracked
 .claude/*

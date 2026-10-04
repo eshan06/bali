@@ -9,6 +9,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "demo": "NODE_ENV=test tsx scripts/demo.ts",
     "dev:teacher": "tsx scripts/dev-teacher.ts",
+    "load:seed": "tsx scripts/load/seed.ts",
+    "load:serve": "tsx scripts/load/serve.ts",
     "fixtures": "UPDATE_FIXTURES=1 vitest run test/contract-fixtures.test.ts test/openapi.test.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
