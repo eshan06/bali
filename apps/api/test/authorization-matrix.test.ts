@@ -37,7 +37,9 @@ import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
  * account, so only the client id is wrong); the class's student, in its
  * session; a student of another class; that class's teacher; and the owner,
  * this class's teacher. /internal/* answers no key, a wrong key and the right
- * key; /healthz, anyone.
+ * key; /healthz, anyone. A route anywhere else fails the guard, whatever its
+ * row, until `callersOf` says who can call it: a new prefix (a /v2) is never
+ * public by default.
  *
  * Each row runs in a world of its own (`world`), so no row's write reaches
  * another's. And a 2xx to a stranger names nothing of this world's (`hidden`)
@@ -58,11 +60,12 @@ const KEYED = ['no key', 'a wrong key', 'the right key'] as const;
 const PUBLIC = ['anyone'] as const;
 type Caller = (typeof SIGNED_IN | typeof KEYED | typeof PUBLIC)[number];
 
-/** The callers a route answers, by where it lives. */
-function callersOf(url: string): readonly Caller[] {
+/** The callers a route answers, by where it lives: none known anywhere else, which the guard fails. */
+function callersOf(url: string): readonly Caller[] | undefined {
   if (url.startsWith('/v1/')) return SIGNED_IN;
   if (url.startsWith('/internal/')) return KEYED;
-  return PUBLIC;
+  if (url === '/healthz') return PUBLIC;
+  return undefined;
 }
 
 /** Callers with no claim on this world: a 2xx to one of them names nothing of it. */
@@ -80,7 +83,7 @@ const MATRIX = {
   //                                                            student  teacher
   'GET /v1/me':                             [401, 401, 200,     200,     200,     200],
   'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403],
-  'GET /v1/me/history':                     [401, 401, 200,     400,     403,     403],
+  'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
   'POST /v1/taps':                          [401, 401, 200,     200,     200,     200],
   'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200],
   'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404],
@@ -140,8 +143,10 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'POST /internal/sessions/expire': () => ({ url: '/internal/sessions/expire' }),
   'GET /v1/me': () => ({ url: '/v1/me' }),
   'PATCH /v1/me': () => ({ url: '/v1/me', body: { displayName: 'Ada', eventId: randomUUID() } }),
-  // The student's own event as the cursor: another history doesn't hold it.
-  'GET /v1/me/history': (w) => ({ url: `/v1/me/history?before=${w.tapId}` }),
+  // The first page, as the app asks for it: another student is answered their
+  // own history, so the stranger check reads it. (Another's cursor is a 400:
+  // history.test.ts.)
+  'GET /v1/me/history': () => ({ url: '/v1/me/history' }),
   'POST /v1/taps': (w) => ({ url: '/v1/taps', body: { tagId: w.block.tagId, ...stamped() } }),
   'POST /v1/taps/:eventId/unlock': (w) => ({ url: `/v1/taps/${w.tapId}/unlock`, body: stamped() }),
   'PATCH /v1/unlocks/:eventId': (w) => ({
@@ -215,14 +220,18 @@ const keyOf = (route: Pick<RouteOptions, 'method' | 'url'>) =>
 
 /**
  * The guard: each registered route the matrix has no row for — or a row that
- * doesn't answer every caller the route can meet — named as Fastify has it.
+ * doesn't answer every caller the route can meet, or no callers known where
+ * it lives — named as Fastify has it.
  */
 function unlisted(
   routes: readonly RouteOptions[],
   matrix: Record<string, readonly number[] | undefined> = MATRIX,
 ): string[] {
   return routes
-    .filter((route) => matrix[keyOf(route)]?.length !== callersOf(route.url).length)
+    .filter((route) => {
+      const callers = callersOf(route.url);
+      return !callers || matrix[keyOf(route)]?.length !== callers.length;
+    })
     .map((route) => `${String(route.method)} ${route.url}`);
 }
 
@@ -326,7 +335,10 @@ const routes = await routeTable();
 
 describe('the guard', () => {
   it('has a row for every route the app registers, answering every caller it can meet', () => {
-    expect(unlisted(routes), 'add each route’s authorization rows to MATRIX').toEqual([]);
+    expect(
+      unlisted(routes),
+      'add each route’s authorization rows to MATRIX — and a route outside /v1, /internal/* and /healthz its callers to callersOf first',
+    ).toEqual([]);
     const registered = new Set(routes.map(keyOf));
     const stale = Object.keys(MATRIX).filter((key) => !registered.has(key));
     expect(stale, 'a row for a route the app no longer registers').toEqual([]);
@@ -340,12 +352,25 @@ describe('the guard', () => {
       'HEAD /v1/me',
     ]);
   });
+
+  it('fails a route outside /v1, /internal/* and /healthz, whatever its row', () => {
+    const outside = ['/v2/me', '/healthz/db', '/internals/sweep', '/v1'].map(
+      (url): RouteOptions => ({ method: 'GET', url, handler: () => ({}) }),
+    );
+    const rows = (status: number[]) =>
+      Object.fromEntries(outside.map((route) => [keyOf(route), status]));
+    const named = outside.map((route) => `GET ${route.url}`);
+    // As public as /healthz, or with no callers at all: neither passes.
+    expect(unlisted(outside, rows([200]))).toEqual(named);
+    expect(unlisted(outside, rows([]))).toEqual(named);
+  });
 });
 
-// A route with a row registers one method (`unlisted` names any other).
+// A route with a row registers one method and lives where its callers are known
+// (`unlisted` names any other).
 describe.each(routes.filter((route) => unlisted([route]).length === 0))('$method $url', (route) => {
   const key = keyOf(route) as RouteKey;
-  const rows = callersOf(route.url).map((caller, i) => ({ caller, status: MATRIX[key][i]! }));
+  const rows = callersOf(route.url)!.map((caller, i) => ({ caller, status: MATRIX[key][i]! }));
 
   it.each(rows)('$caller → $status', async ({ caller, status }) => {
     const w = await world();

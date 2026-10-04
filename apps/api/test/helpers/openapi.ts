@@ -131,11 +131,18 @@ export function openApiDocument(routes: RouteOptions[]): Json {
 /** The snapshot's file as the generator writes it. */
 export const serialize = (doc: Json) => `${JSON.stringify(doc, null, 2)}\n`;
 
-/** The committed snapshot, or null before there is one. */
-export async function readSnapshot(file = SNAPSHOT_FILE): Promise<string | null> {
+/**
+ * The committed snapshot. A missing one fails, never reads as a fresh start:
+ * regenerated from nothing, the file would promise only what the app serves
+ * today, and a removal would pass unseen (O1b).
+ */
+export async function readSnapshot(file = SNAPSHOT_FILE): Promise<string> {
   return readFile(file, 'utf8').catch((err: NodeJS.ErrnoException) => {
-    if (err.code === 'ENOENT') return null;
-    throw err;
+    if (err.code !== 'ENOENT') throw err;
+    throw new Error(
+      `${file} is missing. It holds every /v1 promise, so it is never regenerated from nothing: ` +
+        'restore it (git checkout origin/main -- contracts/openapi.json), then run npm run fixtures.',
+    );
   });
 }
 

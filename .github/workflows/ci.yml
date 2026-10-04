@@ -28,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Two deep, for the API snapshot's baseline: HEAD^1 (its step says why).
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -44,7 +47,23 @@ jobs:
       # when one drifts; this runs the generators themselves and fails on any
       # diff — new, changed or deleted — so the committed tree is exactly what
       # `npm run fixtures` writes. A removal from /v1 fails before anything is
-      # written (additive-only).
+      # written (additive-only), judged against the base's copy of
+      # contracts/openapi.json, put in place first (O1b): a branch can delete,
+      # regenerate or edit its own copy, never the base's.
+      - name: The base's API snapshot, the baseline for additive-only
+        # On a PR, HEAD is the PR merged into its base (actions/checkout's
+        # default ref), so its first parent is the very base this tree was
+        # built on, however main has moved since; on a push to main, it is
+        # main before the push. A PR's HEAD that is no merge would make the
+        # baseline the branch's own past, so that fails.
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ] && ! git rev-parse -q --verify HEAD^2 >/dev/null; then
+            echo "::error::HEAD is not the PR merged into its base, so HEAD^1 is no baseline"
+            exit 1
+          fi
+          git show HEAD^1:contracts/openapi.json > contracts/openapi.json
       - run: npm run fixtures && git add --intent-to-add contracts && git diff --exit-code -- contracts
       # A schema.ts change must ship with its generated migration: regenerate
       # and fail if anything under migrations/ differs from what's committed.

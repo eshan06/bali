@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **O1b: CI judges a removal from `/v1` against the base branch's copy of the
+  snapshot.** O1's check compared the app with the `contracts/openapi.json` committed on the same
+  branch, so the branch owned its own baseline: delete the file and regenerate it, or edit it by
+  hand, and a removal passed. **Decided:** CI's `check` job puts the base's copy in place of the
+  branch's own before `npm run fixtures`, so the test's additive-only check, unchanged, meets what
+  the base promised; the drift step after it still compares what the generator writes with what
+  the branch committed. The base is `HEAD^1` (the checkout is two deep): on a PR, HEAD is the PR
+  merged into its base, so its first parent is the base this very tree was built on — not `main`'s
+  tip fetched later, which may have gained a route since, a false failure no re-run clears — and on
+  a push to `main`, `main` before the push. A PR whose HEAD is no merge fails the step, since its
+  `HEAD^1` would be the branch's own past. And a missing snapshot fails the test, where it read as
+  an empty one. **Why not only failing on a missing file:** it stops a deletion, not an edit — an
+  emptied, regenerated or hand-edited copy is still the branch's own baseline. **Why not a second
+  test reading the base:** one check and one message, with nothing new to keep in step; only the
+  baseline's source changes. O1's "not caught, left to review: a hand edit of the snapshot" is
+  caught now; a PR that edits the workflow or the check itself is still review's (Phase 6's
+  GitHub ruleset item). **Also in O1b:** a syntax scan of every file in `apps/api/src`, not only
+  the routes, fails a request's `params`, `query` or `body` read anywhere but `parseRequest` —
+  syntax, not types: a handler can type its request structurally, as `internal.ts` does, past a
+  type-aware scan. S1's matrix asks history for the first page, so another student's `200` meets
+  the stranger check, and its guard fails a route outside `/v1`, `/internal/*` and `/healthz`
+  until `callersOf` names its callers: a new prefix is never public by default.
+
 - **2026-10-04** — **Phase 6, security and compliance, added on the owner's ask after two
   investigations.** The owner asked whether a full security and compliance audit is necessary or
   beneficial. Two read-only investigations ran: one of the code and its infrastructure, one of
