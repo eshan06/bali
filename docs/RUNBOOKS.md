@@ -138,6 +138,26 @@ project for the API (its DSN).
    `railway link` (choose the project and `production`), then
    `railway ssh --service <api service name>`, and in that shell
    `npm run school -- list`. Never turn the TCP proxy back on for this.
+10. **A parent's inspection request (FERPA; C5).** The request reaches you through the
+    school; its data agreement gives you days, not weeks, to hand over the student's whole
+    record. The day it arrives:
+    - **Hold every disposal of the student's data until the school has the record:** no
+      school disposal (C6a) or retention run (C6b) that would touch them. A student's own
+      account deletion (C3) can't be held, but it keeps their records under the account's
+      id: export first all the same.
+    - **Find the account.** In the production pool's **Users**, search by the email the
+      school gives you and copy the user's `sub`.
+    - **Export it** from your machine, the output landing in a file there:
+      `railway ssh --service <api service name> -- npm run --silent school -- export-student <sub> > record.json`
+      *(wording unsure: if `railway ssh` takes no command, run it in the shell as in step 9
+      and copy the output into `record.json`)*.
+    - **Check:** `jq '.format, .account.id, (.events | length)' record.json` prints
+      `"bali.student-record/1"`, the account's id and a count; `jq` failing means the file
+      holds something besides the record. `no account on record` means no account has that
+      `sub`: a deleted account is found by its id only.
+    - **Deliver it to the school,** to the contact and by the channel the agreement names,
+      never as a plain email attachment, inside the agreement's days. Once the school confirms
+      it has the file, delete your copy and lift the hold.
 
 ---
 

@@ -136,7 +136,8 @@ way out.
 (`DELETE /v1/me`, App Store 5.1.1(v)). Through the engine, in one transaction: each class is
 left as a leave leaves it, in session too; the `users` row stays, so every event of theirs
 still counts in its class's reports, but it loses its name and its Cognito subject and is
-marked removed; a rename's payload, the one place an event carried their name, is emptied
+marked removed; a tap of theirs still waiting for a Start is consumed; a rename's payload, the
+one place an event carried their name, is emptied
 (the one rewrite of `events` the database allows, migration 0015); and an `account_deleted`
 event with no personal data records it. So the history stays answerable in counts and
 names no one. A teacher with a class or a block is refused: that account goes through the

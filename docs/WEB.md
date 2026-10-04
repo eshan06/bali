@@ -114,6 +114,8 @@ a checkout after `npm ci`:
 npm run school -- add "Lincoln High"                 # prints the school's id
 npm run school -- agreement <school-id> 2026-10-01   # its data agreement, signed that day
 npm run school -- invite <school-id>                 # one teacher's code, shown this once
+npm run school -- list                               # every school, its agreement, open invites
+npm run --silent school -- export-student <id> > record.json   # one student's whole record (C5)
 ```
 
 - **The data agreement comes first.** No invite is minted for a school without one on
@@ -127,6 +129,18 @@ npm run school -- invite <school-id>                 # one teacher's code, shown
   your own machine that is the Railway Postgres service's `DATABASE_PUBLIC_URL`; or
   run the command inside the API's service with `railway ssh`, where `DATABASE_URL` is
   already set and the image carries the command.
+- **A student's whole record, for a parent's inspection request (C5).** `export-student`
+  takes the account's id or its Cognito subject (`sub`: find the user by email in the
+  pool's Users list) and prints one JSON document, `bali.student-record/1`, and nothing
+  else, so `--silent` and a redirect save it whole: the account row, every enrollment,
+  participation, event (unlocks with their reasons, taps, protection off, renames…), armed
+  tap and redeemed invite keyed to them, every column, plus the names of the classes,
+  sessions and school those rows point at. Nothing keyed to another student. It reads in
+  one read-only transaction and writes nothing. A deleted account (C3) is found by its id
+  only, its record as the deletion left it. `STUDENT_RECORD_COVERAGE`
+  (`packages/db/src/student-record.ts`) says where each foreign key to `users` stands, and a
+  test fails when a new one is neither exported nor argued out. Running it on prod and
+  delivering it: `docs/RUNBOOKS.md`, runbook 1, step 10.
 
 **Redeeming it, on the portal (T2).** The teacher signs in to the portal with the
 account they will teach from. An account that isn't a teacher yet, as `GET /v1/me` says,

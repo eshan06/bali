@@ -1,11 +1,18 @@
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
 import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
-import { classes, enrollments, schools, users } from '../src/schema.js';
+import {
+  armedTaps,
+  classes,
+  enrollments,
+  events,
+  participations,
+  schools,
+  users,
+} from '../src/schema.js';
 import {
   exportStudentRecord,
   STUDENT_RECORD_COVERAGE,
@@ -241,17 +248,14 @@ describe('exportStudentRecord (C5)', () => {
 
   it('reads, and writes nothing: two exports agree, and every table keeps its rows', async () => {
     const { ana } = await seed('c5-read');
-    const counts = async () =>
-      (
-        await db.execute<{ n: number }>(sql`select
-          (select count(*) from events)::int + (select count(*) from participations)::int
-          + (select count(*) from armed_taps)::int + (select count(*) from enrollments)::int
-          + (select count(*) from users)::int as n`)
-      ).rows[0]?.n;
+    const counts = () =>
+      Promise.all(
+        [events, participations, armedTaps, enrollments, users].map((table) => db.$count(table)),
+      );
     const before = await counts();
     const at = new Date('2026-10-04T12:00:00Z');
     expect(await exported(ana.id, at)).toEqual(await exported(ana.id, at));
-    expect(await counts()).toBe(before);
+    expect(await counts()).toEqual(before);
   });
 });
 

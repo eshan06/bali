@@ -200,7 +200,11 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
   ARCHITECTURE's data-model decision 3 is amended (C3 landed 2026-10-04: the deletion
   is recorded as an `account_deleted` event naming no one); Phase 6 C4–C6 build the rest.
 
-**Done when:** the owner's policy is written, and C3–C6 have landed (C3 has).
+- A parent's inspection request (FERPA) is answered with the student's whole record by the
+  owner's `npm run school -- export-student` (C5, landed 2026-10-04); while one is open the
+  owner holds every disposal of that student's data (`docs/RUNBOOKS.md`, runbook 1, step 10).
+
+**Done when:** the owner's policy is written, and C3–C6 have landed (C3 and C5 have).
 
 ---
 
