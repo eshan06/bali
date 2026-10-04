@@ -3,11 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   createBlock,
-  listBlocks,
   createClass,
   generateJoinCode,
   JOIN_CODE_ALPHABET,
   JOIN_CODE_LENGTH,
+  listBlocks,
   updateClass,
 } from '../src/management.js';
 import { newUuidV7 } from '../src/ids.js';

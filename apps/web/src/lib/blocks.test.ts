@@ -124,6 +124,26 @@ describe('registerBlock', () => {
       });
     }
   });
+
+  it('answers whatever is thrown, so the form never sticks on Registering… (PR #203 review)', async () => {
+    // A 200 whose body isn't JSON (a proxy's HTML page): `res.json()` throws a SyntaxError,
+    // neither a NetworkError nor an ApiError. It must still come back as an answer to retry.
+    const html = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.resolve(new Response('<html>gateway</html>', { status: 200 })),
+    });
+    expect(await registerBlock(html, 'T7XK2M9QPF', [])).toEqual({
+      kind: 'failed',
+      message: CANT_REGISTER,
+    });
+    // Any other refusal says nothing written for a log either.
+    const other = api(403, { error: { code: 'forbidden', message: 'teacher access required' } });
+    expect(await registerBlock(other.client, 'T7XK2M9QPF', [])).toEqual({
+      kind: 'failed',
+      message: CANT_REGISTER,
+    });
+  });
 });
 
 describe('loadProblem', () => {

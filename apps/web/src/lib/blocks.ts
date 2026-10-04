@@ -38,12 +38,15 @@ export async function registerBlock(
     return { kind: 'registered', block, already: owned.some((b) => b.id === block.id) };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
-    if (!(e instanceof ApiError)) throw e;
     // The route's one 409 and its one 400: another teacher's tag, and an ID it can't take.
-    if (e.status === 409) return { kind: 'refused', message: BLOCK_TAKEN };
-    if (e.status === 400) return { kind: 'refused', message: NOT_A_BLOCK_ID };
-    if (e.status >= 500 || e.status === 408) return { kind: 'failed', message: CANT_REGISTER };
-    return { kind: 'failed', message: errText(e) };
+    if (e instanceof ApiError && e.status === 409) return { kind: 'refused', message: BLOCK_TAKEN };
+    if (e instanceof ApiError && e.status === 400) {
+      return { kind: 'refused', message: NOT_A_BLOCK_ID };
+    }
+    if (e instanceof ApiError && e.status === 429) return { kind: 'failed', message: errText(e) };
+    // Anything else (a 5xx, a timeout, a body that isn't JSON) is answered too, never thrown, so
+    // the form always comes back with words and Try again.
+    return { kind: 'failed', message: CANT_REGISTER };
   }
 }
 
