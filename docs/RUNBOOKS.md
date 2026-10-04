@@ -189,12 +189,15 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    5. Pool → **Sign-up**: **Self-service sign-up** on, and Cognito sends the email a
       verification code (**Cognito-assisted verification**, email), so nobody signs
       up with a school address they can't read.
+   6. The check runs only at sign-up, so nobody may change their email afterwards:
+      on both app clients (step 8) → **Attribute read and write permissions**
+      *(wording unsure)*, untick **email** under write.
    Accounts you make yourself under **Users → Create user** skip the check (e.g.
    App Review's demo account). A first sign-in through Apple or Google is checked
    like a sign-up, so a hidden Apple email is refused.
    **Check:** on the hosted page (step 9) → **Sign up**: a `@gmail.com` address is
-   refused with "Use your school email address to sign up. It ends in
-   @vanderbilt.edu."; a `@vanderbilt.edu` one is sent a code.
+   refused with "Use your @vanderbilt.edu email address to sign up."; a
+   `@vanderbilt.edu` one is sent a code.
 5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
    → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.
    **Check:** the page shows the new minimum.
@@ -202,9 +205,9 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    **Sign-in** → **Multi-factor authentication** → **Optional**, **Authenticator
    apps** only, no SMS. Cognito sets MFA for the whole pool, not per group, so
    **Required** would make students use it too; Optional lets each user turn it on,
-   and nothing forces a teacher to. Whether the hosted sign-in page itself walks an optional user through
-   setting up TOTP is unsure; try it with a test account before telling teachers it
-   works.
+   and nothing forces a teacher to. Whether the hosted sign-in page itself walks an
+   optional user through setting up TOTP is unsure; try it with a test account
+   before telling teachers it works.
 7. **Threat protection.** Pool → **Threat protection** *(formerly "advanced
    security")*. It needs the pool's **Plus** feature plan, which is billed per
    monthly active user; check the price first. Set it to **Full function**

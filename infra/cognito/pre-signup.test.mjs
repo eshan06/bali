@@ -12,8 +12,8 @@ const signUp = (email, triggerSource = 'PreSignUp_SignUp') => ({
 });
 
 const refusedWith = (pattern) => (err) => err instanceof Error && pattern.test(err.message);
-const SCHOOL = /^Use your school email address to sign up\. It ends in @vanderbilt\.edu\.$/;
-const CLOSED = /^Sign-up isn't working right now\./;
+const SCHOOL = /^Use your @vanderbilt\.edu email address to sign up\.$/;
+const CLOSED = /^Sign-up is closed right now\. Try again later\.$/;
 
 let saved;
 beforeEach(() => {
@@ -49,6 +49,8 @@ test('lookalike domains are refused', async () => {
     'x@vanderbilt.edu@evil.com',
     'x@vanderbilt.edu.',
     'vanderbilt.edu@evil.com',
+    'x@vanderbilt.edu ',
+    'x@ vanderbilt.edu',
   ]) {
     await assert.rejects(handler(signUp(email)), refusedWith(SCHOOL), email);
   }
@@ -86,7 +88,12 @@ test('several domains: each signs up, and the refusal names them all', async () 
   await handler(signUp('b@belmont.edu'));
   await assert.rejects(
     handler(signUp('c@gmail.com')),
-    refusedWith(/It ends in @vanderbilt\.edu or @belmont\.edu\.$/),
+    refusedWith(/^Use your @vanderbilt\.edu or @belmont\.edu email address to sign up\.$/),
+  );
+  process.env.ALLOWED_EMAIL_DOMAINS = 'a.edu,b.edu,c.edu';
+  await assert.rejects(
+    handler(signUp('c@gmail.com')),
+    refusedWith(/^Use your @a\.edu, @b\.edu or @c\.edu email address to sign up\.$/),
   );
 });
 

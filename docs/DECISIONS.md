@@ -24,7 +24,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sign-in) is checked like a sign-up, or it would be an open door; a hidden Apple relay
   address is therefore refused. `PreSignUp_AdminCreateUser` passes: only someone with AWS
   access makes those, e.g. App Review's demo account. Cognito's email verification proves the
-  address is the user's. This is the root fix S7 named for orphan-unlock rows from free
+  address is the user's, and the clients can't write `email` afterwards. This is the root fix S7 named for orphan-unlock rows from free
   accounts. Its tests run on node's own runner from the root `npm test`, outside the
   workspaces, so neither the lockfile nor the API's image changes.
 - **2026-10-04** — **The app icon is the mark (concept A), picked by the owner.** Three

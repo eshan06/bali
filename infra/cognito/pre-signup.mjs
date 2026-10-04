@@ -25,13 +25,11 @@ export const handler = async (event) => {
   const allowed = allowedDomains(process.env.ALLOWED_EMAIL_DOMAINS);
   if (allowed.length === 0) {
     console.error('ALLOWED_EMAIL_DOMAINS is unset or empty: every sign-up is refused');
-    throw new Error("Sign-up isn't working right now. Try again later, or let your teacher know.");
+    throw new Error('Sign-up is closed right now. Try again later.');
   }
 
   if (!allowed.includes(emailDomain(event.request?.userAttributes?.email))) {
-    throw new Error(
-      `Use your school email address to sign up. It ends in ${allowed.map((d) => '@' + d).join(' or ')}.`,
-    );
+    throw new Error(`Use your ${listed(allowed.map((d) => '@' + d))} email address to sign up.`);
   }
   return event;
 };
@@ -43,13 +41,14 @@ export function allowedDomains(value) {
     .filter(Boolean);
 }
 
-// The part after the last `@`, lowercased; '' when there is no usable address.
+// The part after the last `@`, lowercased, nothing trimmed; '' when there is no usable address.
 export function emailDomain(email) {
   if (typeof email !== 'string') return '';
   const at = email.lastIndexOf('@');
-  if (at < 1) return '';
-  return email
-    .slice(at + 1)
-    .trim()
-    .toLowerCase();
+  return at < 1 ? '' : email.slice(at + 1).toLowerCase();
+}
+
+// "a", "a or b", "a, b or c".
+function listed(items) {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items.at(-1)}`;
 }
