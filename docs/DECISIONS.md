@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **C1: privacy manifests, declared per binary, held to the code by a
+  Linux script.** **What each declares:** the required-reason APIs whose code is in that bundle's
+  binary: its own Swift plus the local packages it links. BaliOutbox, linked by all three, reads
+  the app group's defaults (`PhoneBell`, 1C8F.1) and `ProcessInfo.systemUptime`
+  (`SystemClock`, 35F9.1, for spans no clock change moves), so the shield declares both too,
+  though its own code calls neither: Apple scans the binary, and an over-declared reason costs
+  nothing while a missing one gets the upload flagged. The app adds CA92.1 for
+  `UserDefaults.standard`. `ContinuousClock` and `DispatchTime` are not on Apple's list; no file
+  timestamp, disk space or keyboard API is used. **Data types:** the app's manifest lists
+  APP-STORE.md's seven, linked, app functionality only, never tracking; the extensions list none,
+  since they never call the API. GRDB's own manifest covers GRDB. **Wiring:** each file is
+  excluded from its folder's sources and listed with `buildPhase: resources`, so no XcodeGen
+  version's default for `.xcprivacy` decides it. **The check:** Python's `plistlib` on the
+  runner, with no new dependency. It reads the targets from `project.yml` and fails on a missing
+  or unwired manifest, a malformed one, tracking, an undocumented reason code, a known
+  required-reason call the manifest omits (regexes over Swift, comments skipped), or app data
+  types that differ from APP-STORE.md's table, so the label and the manifest change together.
+  The iOS job checks that the built app and both appexes carry the file.
+
 - **2026-10-04** — **S2: log redaction, on Sentry's rule.** The security investigation found a
   Drizzle error carries its SQL parameters into the logs. **One rule:** P1's scrubber moved to
   `apps/api/src/redact.ts` (`scrubText`), and both Sentry's `beforeSend` and the logger use it,
