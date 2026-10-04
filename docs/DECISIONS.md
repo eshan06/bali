@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **S3: API tightening, from the security investigation.** **Access tokens
+  only:** `createVerifier` requires `token_use: 'access'` and checks the app client by
+  `client_id` alone; an id token, even this app's, is `401`. Every client already sent access
+  tokens (the portal stores `access_token`, the phone sends `accessToken`, the demo signs in for
+  `AccessToken`), and an id token says who signed in, for the client; it grants nothing. S7's
+  `it.todo` for it is now a passing test in `abuse.test.ts`.
+  **Headers:** an `onSend` hook (`apps/api/src/headers.ts`) puts HSTS (a year, with subdomains)
+  and `nosniff` on every answer, errors and `404`s included, and `Cache-Control: no-store` on
+  `/v1`'s; `/healthz` and `/internal` keep the default. The live stream hijacks its response, so
+  no hook sees it: it spreads the same headers into its own, and its `no-cache` became
+  `no-store, no-transform`. **`tagId`:** a tap's capped at 200, the block registration's cap, one
+  constant, so a tag that registers can always be tapped. **`INTERNAL_API_KEY`:** 32 characters at
+  least (was 16); DEPLOY.md and RUNBOOKS.md already say `openssl rand -hex 32`. A shorter key
+  fails the boot, so dev's key must be that long before its next deploy. **The limiter's map:**
+  each budget holds at most 100,000 keys; a Map in least-recently-used order (each use, a refused
+  one too, moves its key to the back), so a full map forgets the key idle longest, in O(1), and
+  that key starts again with its whole burst. Forgetting early is the permissive side, and only
+  a flood of 100,000 distinct keys inside one refill window ever does it.
+
 - **2026-10-04** — **S9: clock skew surfaced — a note on the record and a badge on the grid,
   never a rule.** The engine's one event writer (`insertEvent`) compares a phone's claimed time,
   unclamped, with when the server heard it (`heardNow`, the clock that stamps `last_seen_at`); a

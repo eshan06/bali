@@ -426,6 +426,19 @@ describe('POST /v1/taps', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('is a 400 for a tagId over 200 characters, as /v1/blocks caps it (Phase 6 S3)', async () => {
+    const { student } = await seedClassroom(db, 'tap-long');
+    const tapWith = async (tagId: string) =>
+      authedInject(ctx.app, await ctx.tokenFor(student.cognitoId), {
+        method: 'POST',
+        url: '/v1/taps',
+        payload: { tagId, eventId: randomUUID(), deviceTime: new Date().toISOString() },
+      });
+    expect((await tapWith('T'.repeat(201))).statusCode).toBe(400);
+    // 200 is read, and answered as any unknown block.
+    expect((await tapWith('T'.repeat(200))).statusCode).toBe(404);
+  });
+
   it('requires authentication', async () => {
     const res = await ctx.app.inject({ method: 'POST', url: '/v1/taps', payload: {} });
     expect(res.statusCode).toBe(401);

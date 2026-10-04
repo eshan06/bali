@@ -70,16 +70,30 @@ export function clientAddress(request: FastifyRequest): string {
   return typeof real === 'string' && isIP(real) !== 0 ? real : request.ip;
 }
 
-interface Bucket {
+export interface Bucket {
   /** Spend one when `key` can: 0, or the seconds to wait, with nothing spent. */
   take(key: string): number;
   /** Give `key` back one it spent. */
   refund(key: string): void;
+  /** How many keys it holds an entry for: never more than its `maxKeys`. */
+  size(): number;
 }
 
-function bucket({ burst, perMinute }: Budget, now: () => number): Bucket {
+/**
+ * The most keys one budget holds at once (Phase 6 S3). Without a cap, a flood of distinct keys —
+ * addresses, say — would grow the map until the next sweep, a full refill's time away. A key
+ * takes well under a kilobyte, so six budgets at the cap stay within tens of megabytes.
+ */
+export const MAX_KEYS = 100_000;
+
+export function bucket(
+  { burst, perMinute }: Budget,
+  now: () => number,
+  maxKeys = MAX_KEYS,
+): Bucket {
   const perMs = perMinute / 60_000;
-  // What each key holds and since when; a key with its whole burst has no entry.
+  // What each key holds and since when; a key with its whole burst has no entry. A Map keeps
+  // insertion order, and each use re-inserts its key, so the first key is the one idle longest.
   const held = new Map<string, { tokens: number; at: number }>();
   let sweptAt = now();
   const tokens = (key: string, at: number): number => {
@@ -87,8 +101,12 @@ function bucket({ burst, perMinute }: Budget, now: () => number): Bucket {
     return entry ? Math.min(burst, entry.tokens + Math.max(0, at - entry.at) * perMs) : burst;
   };
   const keep = (key: string, left: number, at: number): void => {
-    if (left >= burst) held.delete(key);
-    else held.set(key, { tokens: left, at });
+    held.delete(key);
+    if (left >= burst) return;
+    // Full: the key idle longest goes. It starts again with its whole burst — a throttle that
+    // forgets one idle key early, never a map that grows without bound.
+    if (held.size >= maxKeys) held.delete(held.keys().next().value as string);
+    held.set(key, { tokens: left, at });
   };
   const take = (key: string): number => {
     const at = now();
@@ -98,7 +116,15 @@ function bucket({ burst, perMinute }: Budget, now: () => number): Bucket {
       for (const k of held.keys()) if (tokens(k, at) >= burst) held.delete(k);
     }
     const left = tokens(key, at);
-    if (left < 1) return Math.ceil((1 - left) / perMs / 1000);
+    if (left < 1) {
+      // Refused, but in use: to the back of the line, so a key being hammered is never the idle one.
+      const entry = held.get(key);
+      if (entry) {
+        held.delete(key);
+        held.set(key, entry);
+      }
+      return Math.ceil((1 - left) / perMs / 1000);
+    }
     keep(key, left - 1, at);
     return 0;
   };
@@ -106,7 +132,7 @@ function bucket({ burst, perMinute }: Budget, now: () => number): Bucket {
     const at = now();
     keep(key, tokens(key, at) + 1, at);
   };
-  return { take, refund };
+  return { take, refund, size: () => held.size };
 }
 
 /** Over budget: a 429 in the one error shape, with when to try again. */

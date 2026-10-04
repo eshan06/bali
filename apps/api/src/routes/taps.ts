@@ -14,10 +14,10 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { mapTransitionError } from './errors.js';
-import { DeviceTime, Order } from './schemas.js';
+import { DeviceTime, Order, TAG_ID_MAX_LENGTH } from './schemas.js';
 
 const TapBody = z.object({
-  tagId: z.string().min(1),
+  tagId: z.string().min(1).max(TAG_ID_MAX_LENGTH),
   eventId: z.string().uuid(),
   deviceTime: DeviceTime,
   order: Order,

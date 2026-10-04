@@ -73,10 +73,25 @@ describe('authenticate', () => {
     expect(res.json()).toEqual({ sub: 'cognito-abc' });
   });
 
-  it('accepts an id token (client id in aud)', async () => {
+  it('refuses an id token 401, even one for this app (Phase 6 S3)', async () => {
     const res = await whoami(await issuer.sign({ audience: TEST_AUDIENCE, sub: 'id-user' }));
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ sub: 'id-user' });
+    expect(res.statusCode).toBe(401);
+    expect(errorOf(res).code).toBe('unauthorized');
+  });
+
+  it('refuses a token that says no token_use, or another one, with the right client id', async () => {
+    for (const tokenUse of [undefined, 'id', 'refresh', 'ACCESS']) {
+      const token = await issuer.sign({ extraClaims: { token_use: tokenUse } });
+      expect((await whoami(token)).statusCode, String(tokenUse)).toBe(401);
+    }
+  });
+
+  it('refuses an access token whose client id is only in aud', async () => {
+    const token = await issuer.sign({
+      audience: TEST_AUDIENCE,
+      extraClaims: { token_use: 'access' },
+    });
+    expect((await whoami(token)).statusCode).toBe(401);
   });
 
   it('rejects a missing Authorization header as 401 in the error shape', async () => {
@@ -154,17 +169,17 @@ describe('the app clients a token may come from', () => {
   const access = (clientId: string) => (issuer: TestIssuer) => issuer.sign({ clientId });
   const id = (audience: string) => (issuer: TestIssuer) => issuer.sign({ audience });
 
-  it('one id accepts that client, by either token, and no other', async () => {
+  it('one id accepts that client’s access token, and no other; never an id token', async () => {
     expect(await accepts(['web'], access('web'))).toBe(true);
-    expect(await accepts(['web'], id('web'))).toBe(true);
+    expect(await accepts(['web'], id('web'))).toBe('unauthorized');
     expect(await accepts(['web'], access('phone'))).toBe('unauthorized');
     expect(await accepts(['web'], id('phone'))).toBe('unauthorized');
   });
 
-  it('a list accepts a token from any client it names, by either token', async () => {
+  it('a list accepts an access token from any client it names; never an id token', async () => {
     for (const client of ['web', 'phone']) {
       expect(await accepts(['web', 'phone'], access(client))).toBe(true);
-      expect(await accepts(['web', 'phone'], id(client))).toBe(true);
+      expect(await accepts(['web', 'phone'], id(client))).toBe('unauthorized');
     }
   });
 

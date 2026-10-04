@@ -58,10 +58,11 @@ interface VerifierConfig {
 }
 
 /**
- * Build a verifier from a key resolver. Cognito issues both id tokens (the app
- * client id is in `aud`) and access tokens (it's in `client_id`, with no `aud`),
- * so we verify the signature/issuer/expiry with jose and then check either
- * claim against the accepted client ids ourselves.
+ * Build a verifier from a key resolver. Only an access token is accepted
+ * (`token_use: 'access'`, Phase 6 S3): it is what every client sends, and an id
+ * token is a statement about who signed in, meant for the client, not a grant to
+ * call an API. jose checks the signature, issuer and expiry; an access token
+ * carries its app client in `client_id` (it has no `aud`), checked here.
  */
 export function createVerifier(config: VerifierConfig): TokenVerifier {
   return async (token: string): Promise<AuthedIdentity> => {
@@ -82,9 +83,10 @@ export function createVerifier(config: VerifierConfig): TokenVerifier {
       throw ApiError.unavailable('could not verify token');
     }
 
-    const clientId = typeof payload.client_id === 'string' ? payload.client_id : undefined;
-    const audiences = toAudienceList(payload.aud);
-    if (!config.clientIds.some((id) => id === clientId || audiences.includes(id))) {
+    if (payload.token_use !== 'access') {
+      throw ApiError.unauthorized('not an access token');
+    }
+    if (typeof payload.client_id !== 'string' || !config.clientIds.includes(payload.client_id)) {
       throw ApiError.unauthorized('token was not issued for this app');
     }
     if (typeof payload.sub !== 'string' || payload.sub.length === 0) {
@@ -93,12 +95,6 @@ export function createVerifier(config: VerifierConfig): TokenVerifier {
 
     return { sub: payload.sub, claims: payload };
   };
-}
-
-function toAudienceList(aud: JWTPayload['aud']): string[] {
-  if (typeof aud === 'string') return [aud];
-  if (Array.isArray(aud)) return aud;
-  return [];
 }
 
 /** Claims that carry a name someone chose, best first. */
