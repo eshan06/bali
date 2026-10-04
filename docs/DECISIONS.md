@@ -19,7 +19,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`inviteCodeSymbols`: case, spaces and any dash set aside) and shown in fives as the command
   printed it (`formatInviteCode`), the caret kept after the same symbols. The dashes are the
   field's, so Backspace or Delete taking only a dash takes the symbol past it too, or the key would
-  seem to do nothing. Nothing is cut: a 26th symbol, or an O, stays in view for the check to name.
+  seem to do nothing; judged by the edit's `inputType`, never by length alone, so a paste or a cut
+  never eats a symbol (#198's review: the same code pasted over itself without its dashes lost its
+  last symbol). Nothing is cut: a 26th symbol, or an O, stays in view for the check to name.
   Not five boxes: one field pastes whole and reads as one value to a screen reader. **The check
   before sending is the redeem's own rule,** `INVITE_CODE_PATTERN`, so the code's rules moved into
   `@bali/shared` (`JOIN_CODE_ALPHABET`, `INVITE_CODE_LENGTH`, `INVITE_CODE_PATTERN`,

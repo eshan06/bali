@@ -44,8 +44,8 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
 
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { value, selectionStart } = e.target;
-    const forward = /Forward$/.test((e.nativeEvent as InputEvent).inputType ?? '');
-    const next = typedCode(code, value, selectionStart ?? value.length, forward);
+    const { inputType } = e.nativeEvent as InputEvent;
+    const next = typedCode(code, value, selectionStart ?? value.length, inputType);
     setSaid(null);
     if (next.value !== code) {
       caret.current = next.caret;

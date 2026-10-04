@@ -14,19 +14,22 @@ import { newEventId } from './event-id';
 /**
  * The field after an edit: what it holds, grouped in fives as the owner's command prints a code
  * (`formatInviteCode`) whatever the case, spaces or dashes it was typed or pasted with, and where
- * the caret goes: after the same symbols as before. The dashes are the field's, so an edit that
- * takes only a dash (Backspace or Delete beside one) takes the symbol past it too, as the key meant.
+ * the caret goes: after the same symbols as before. The dashes are the field's, so Backspace or
+ * Delete taking only a dash takes the symbol past it too, as the key meant. Only those two keys
+ * (the edit's `InputEvent.inputType`) ever eat a symbol: never a paste or a cut that leaves the
+ * symbols as they were, such as the same code pasted over the field without its dashes.
  */
 export function typedCode(
   before: string,
   typed: string,
   caret: number,
-  forward = false,
+  inputType = '',
 ): { value: string; caret: number } {
   let symbols = inviteCodeSymbols(typed);
   let at = inviteCodeSymbols(typed.slice(0, caret)).length;
-  if (typed.length < before.length && symbols === inviteCodeSymbols(before)) {
-    if (forward) symbols = symbols.slice(0, at) + symbols.slice(at + 1);
+  const key = /^deleteContent(Backward|Forward)$/.exec(inputType)?.[1];
+  if (key && before.length - typed.length === 1 && symbols === inviteCodeSymbols(before)) {
+    if (key === 'Forward') symbols = symbols.slice(0, at) + symbols.slice(at + 1);
     else if (at > 0) {
       symbols = symbols.slice(0, at - 1) + symbols.slice(at);
       at -= 1;
@@ -63,7 +66,7 @@ export type RedeemAnswer =
   | { kind: 'teacher' }
   /** Refused, nothing changed; `reason` says which, keyed on as `errText` is. */
   | { kind: 'refused'; message: string; reason: string | undefined }
-  /** No answer to go by (unreachable, a server error, over the budget): Try again resends it. */
+  /** No answer to go by (unreachable, a timeout, a 5xx, over the budget): Try again resends it. */
   | { kind: 'failed'; message: string };
 
 /** The refusals the code itself answers for, so the field is where the person puts it right. */
@@ -83,7 +86,8 @@ export async function redeemInvite(
     await api.post<RedeemTeacherInviteResponse>('/v1/teacher-invites/redeem', attempt);
     return { kind: 'teacher' };
   } catch (e) {
-    if (e instanceof ApiError && e.status !== 429 && e.status < 500) {
+    // 408 and 429 are the transport's, not a refusal, as the outbox's dispositions read them.
+    if (e instanceof ApiError && e.status < 500 && e.status !== 408 && e.status !== 429) {
       return { kind: 'refused', message: errText(e), reason: e.reason };
     }
     return { kind: 'failed', message: errText(e) };

@@ -51,10 +51,27 @@ describe('typedCode', () => {
 
   it('takes the symbol past a dash when Backspace or Delete takes only the dash', () => {
     // Backspace after the dash: the E goes, and the caret with it.
-    expect(typedCode('ABCDE-FGHJK', 'ABCDEFGHJK', 5)).toEqual({ value: 'ABCDF-GHJK', caret: 4 });
+    expect(typedCode('ABCDE-FGHJK', 'ABCDEFGHJK', 5, 'deleteContentBackward')).toEqual({
+      value: 'ABCDF-GHJK',
+      caret: 4,
+    });
     // Delete before the dash: the F goes, and the caret stays.
-    expect(typedCode('ABCDE-FGHJK', 'ABCDEFGHJK', 5, true)).toEqual({
+    expect(typedCode('ABCDE-FGHJK', 'ABCDEFGHJK', 5, 'deleteContentForward')).toEqual({
       value: 'ABCDE-GHJK',
+      caret: 5,
+    });
+  });
+
+  it('eats nothing when an edit only seems to take a dash: the code pasted over itself, a dash cut', () => {
+    // Select all, and paste the same code without its dashes: 25 characters over 29 (#198's review).
+    expect(typedCode(SHOWN, CODE, 25)).toEqual({ value: SHOWN, caret: 29 });
+    expect(typedCode(SHOWN, CODE.toLowerCase(), 25, 'insertFromPaste')).toEqual({
+      value: SHOWN,
+      caret: 29,
+    });
+    // A dash cut on its own comes back, and nothing else goes.
+    expect(typedCode('ABCDE-FGHJK', 'ABCDEFGHJK', 5, 'deleteByCut')).toEqual({
+      value: 'ABCDE-FGHJK',
       caret: 5,
     });
   });
@@ -162,7 +179,7 @@ describe('redeemInvite', () => {
     ]);
   });
 
-  it('keeps an answer that never came, or a server error, or the budget’s 429, to try again', async () => {
+  it('keeps an answer that never came, a timeout, a server error or the budget’s 429, to try again', async () => {
     const unreachable = createApiClient({
       baseUrl: 'http://api',
       getToken: () => 'tok',
@@ -184,5 +201,8 @@ describe('redeemInvite', () => {
       kind: 'failed',
       message: 'internal error',
     });
+    // A proxy's timeout is the transport's, as the outbox reads it (#198's review): resend it.
+    const slow = api(408, { message: 'request timeout' });
+    expect((await redeemInvite(slow.client, attempt)).kind).toBe('failed');
   });
 });
