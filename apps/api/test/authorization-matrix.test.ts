@@ -94,6 +94,8 @@ const MATRIX = {
   'GET /v1/classes/:id':                    [401, 401, 403,     403,     403,     200],
   'PATCH /v1/classes/:id':                  [401, 401, 403,     403,     403,     200],
   'GET /v1/classes/:id/roster':             [401, 401, 403,     403,     403,     200],
+  'GET /v1/classes/:id/reports/sessions/:sessionId':
+                                            [401, 401, 403,     403,     403,     200],
   'POST /v1/classes/:id/sessions':          [401, 401, 403,     403,     403,     200],
   'POST /v1/blocks':                        [401, 401, 403,     403,     409,     200],
   'GET /v1/sessions/:id':                   [401, 401, 403,     403,     403,     200],
@@ -167,6 +169,9 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'GET /v1/classes/:id': (w) => ({ url: `/v1/classes/${w.klass.id}` }),
   'PATCH /v1/classes/:id': (w) => ({ url: `/v1/classes/${w.klass.id}`, body: { name: 'Renamed' } }),
   'GET /v1/classes/:id/roster': (w) => ({ url: `/v1/classes/${w.klass.id}/roster` }),
+  'GET /v1/classes/:id/reports/sessions/:sessionId': (w) => ({
+    url: `/v1/classes/${w.klass.id}/reports/sessions/${w.sessionId}`,
+  }),
   'POST /v1/classes/:id/sessions': (w) => ({
     url: `/v1/classes/${w.klass.id}/sessions`,
     body: { durationMinutes: 25 },

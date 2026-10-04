@@ -645,6 +645,33 @@ export async function getEventsSince(
     .limit(limit);
 }
 
+export interface ReportEventRow extends FeedEventRow {
+  /** Its student's display name now; null when they have none, or the event names no one. */
+  displayName: string | null;
+}
+
+/**
+ * Every event of a session, in seq order: what its report counts (R2, `sessionReport`), each
+ * with its student's display name now, read in the same statement. By the session, never the
+ * roster, so a student removed from the class since is still there.
+ */
+export async function getSessionEvents(db: Database, sessionId: string): Promise<ReportEventRow[]> {
+  return db
+    .select({
+      seq: events.seq,
+      eventId: events.eventId,
+      type: events.type,
+      userId: events.userId,
+      occurredAt: events.occurredAt,
+      payload: events.payload,
+      displayName: users.displayName,
+    })
+    .from(events)
+    .leftJoin(users, eq(users.id, events.userId))
+    .where(eq(events.sessionId, sessionId))
+    .orderBy(asc(events.seq));
+}
+
 /*
  * GET /v1/me/history (A7) — a student's own timeline, newest first, a page at
  * a time. Two sources, merged: their own events (`user_id`), and the end of

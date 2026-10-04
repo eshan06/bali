@@ -295,6 +295,36 @@ describe('sessionReport', () => {
     ]);
   });
 
+  it('a note this build does not know moves no one, and is listed as none (#191’s review)', () => {
+    // A newer build's note, read here mid-deploy: a note always means the
+    // engine did not apply the record, so Ana stays focused to the bell and
+    // Ben never joins.
+    const newer = { recorded_as: 'a_newer_note' };
+    const report = sessionReport(
+      lesson,
+      recorded(
+        ['tap_in', 'ana', 1],
+        ['unlock', 'ana', 5, { ...newer, reason: 'nurse' }],
+        ['protection_off', 'ana', 10, newer],
+        ['tap_in', 'ben', 2, newer],
+      ),
+      later,
+    );
+    expect(report).toMatchObject({ joined: ['ana'], focusMinutes: 24, averageFocusMinutes: 24 });
+    expect(report.unlocks).toEqual([
+      {
+        eventId: 'event-2',
+        studentId: 'ana',
+        occurredAt: at(5),
+        reason: 'nurse',
+        recordedAs: null,
+      },
+    ]);
+    expect(report.protectionOffs).toEqual([
+      { eventId: 'event-3', studentId: 'ana', occurredAt: at(10), recordedAs: null },
+    ]);
+  });
+
   it('lists every unlock in the class with its note, oldest first', () => {
     const report = sessionReport(
       lesson,

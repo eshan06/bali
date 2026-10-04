@@ -7,7 +7,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { TokenVerifier } from '../src/auth/verify.js';
 import { ApiError } from '../src/errors.js';
-import type { LimitOptions } from '../src/limits.js';
+import { BUDGETS, type LimitOptions } from '../src/limits.js';
+import { authedInject, makeAuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
 import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
@@ -335,6 +336,20 @@ describe('what spends no budget', () => {
     for (let i = 0; i < 3; i += 1) {
       expect((await send(app, SCHOOL, sweep(testEnv.INTERNAL_API_KEY))).status).toBe(200);
       expect((await send(app, SCHOOL, sweep('not-the-internal-key-0123'))).status).toBe(401);
+    }
+  });
+});
+
+describe('the other suites’ app (makeAuthedApp)', () => {
+  it('meets no budget, so no other suite trips one: past each production burst, every answer is the route’s', async () => {
+    const ctx = await makeAuthedApp(db);
+    apps.push(ctx.app);
+    const token = await ctx.tokenFor('limits-roomy');
+    // One account at one address: past its 120, its 20 tries and the address's 100 misses.
+    const past = Math.max(BUDGETS.account.burst, BUDGETS.joinTries.burst, BUDGETS.joinMisses.burst);
+    for (let i = 0; i <= past; i += 1) {
+      const url = `/v1/join-codes/${NO_CLASS}`;
+      expect((await authedInject(ctx.app, token, { method: 'GET', url })).statusCode).toBe(404);
     }
   });
 });
