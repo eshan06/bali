@@ -4,17 +4,19 @@ import {
   createSchool,
   formatInviteCode,
   INVITE_LIFETIME_DAYS,
+  listSchools,
   mintTeacherInvite,
   recordAgreement,
+  schoolsNamed,
 } from './schools.js';
 import type { Database } from './types.js';
 
 /*
  * The owner's school commands, `npm run school -- <command>`
  * (apps/api/scripts/school.ts): add a school, record its data agreement, mint a
- * teacher invite, against DATABASE_URL as `npm run migrate` is. Every argument
- * is checked before anything connects, and each refusal says what was wrong and
- * how to say it.
+ * teacher invite, list the schools, against DATABASE_URL as `npm run migrate`
+ * is. Every argument is checked before anything connects, and each refusal says
+ * what was wrong and how to say it.
  */
 
 export const SCHOOL_USAGE = `usage: npm run school -- <command>
@@ -23,6 +25,8 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
   agreement <school-id> <day>   record the school's data agreement as signed on <day>, YYYY-MM-DD
   invite <school-id>            mint a teacher invite for the school: one code, for one teacher,
                                 good for ${INVITE_LIFETIME_DAYS} days, and shown this once only
+  list                          every school: its id, its agreement's day, and how many of its
+                                invites are open (not redeemed, not expired); never a code
 
 It runs against DATABASE_URL, as npm run migrate does.`;
 
@@ -80,6 +84,9 @@ export function parseSchoolCommand(
       checkSchoolId(schoolId);
       return (io) => invite(io, schoolId);
     }
+    case 'list':
+      nothingMore(args);
+      return list;
     default:
       throw new Error(`unknown command "${command}"`);
   }
@@ -115,6 +122,13 @@ function checkDay(day: string, now: Date): void {
 const noSchool = (schoolId: string) => `no school on record has the id ${schoolId}`;
 
 async function add({ db, print }: SchoolCommandIO, name: string): Promise<void> {
+  // Said, not refused: two schools may share a name, and a second run of one
+  // add — its answer lost — would otherwise go unseen (T1a's review).
+  for (const same of await schoolsNamed(db, name)) {
+    print(
+      `a school named "${same.name}" is on record already, its id ${same.id}: if you meant it, use that id`,
+    );
+  }
   const school = await createSchool(db, { name });
   print(`added "${school.name}"; its id is ${school.id}`);
   print(`once its data agreement is signed: npm run school -- agreement ${school.id} YYYY-MM-DD`);
@@ -150,4 +164,21 @@ async function invite({ db, print }: SchoolCommandIO, schoolId: string): Promise
   print(`  ${formatInviteCode(minted.code)}`);
   print('');
   print('This is the only time it is shown: only its hash is stored. Lost, mint another.');
+}
+
+/** One school a line, the name last so a long one never pushes the columns out. */
+async function list({ db, print }: SchoolCommandIO): Promise<void> {
+  const all = await listSchools(db);
+  if (all.length === 0) {
+    print('no school is on record yet: npm run school -- add "<name>"');
+    return;
+  }
+  const row = (id: string, day: string, open: string, name: string) =>
+    `${id.padEnd(36)}  ${day.padEnd(10)}  ${open.padEnd(12)}  ${name}`;
+  print(row('id', 'agreement', 'open invites', 'name'));
+  for (const school of all) {
+    print(
+      row(school.id, school.agreementSignedAt ?? 'none', String(school.openInvites), school.name),
+    );
+  }
 }

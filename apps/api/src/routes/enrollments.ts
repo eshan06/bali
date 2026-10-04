@@ -46,7 +46,8 @@ const teacherCannotJoin = () => ApiError.forbidden('teachers cannot join a class
  * join would refuse is refused here the same way.
  *
  * POST /v1/enrollments — join a class by code (auth decision 3). The caller is
- * enrolled as a student; joining a class they are already in is a no-op.
+ * enrolled as a student; joining a class they are already in is a no-op. A
+ * teacher is refused, judged in the join's own transaction (T1c).
  *
  * DELETE /v1/enrollments/:id — a student may delete their own enrollment
  * ('left_class'); the class's teacher may delete any of its enrollments
@@ -97,17 +98,18 @@ export function registerEnrollmentsRoutes(
       const identity = requireAuth(request);
       const body = parseRequest(request, 'body', JoinBody);
 
-      const student = await findOrCreateStudent(db, identity.sub);
-      // Enrollments are the student-to-class relation.
-      if (student.role === 'teacher') throw teacherCannotJoin();
+      const caller = await findOrCreateStudent(db, identity.sub);
       const result = await mapTransitionError(() =>
         joinClassByCode(db, {
-          studentId: student.id,
+          studentId: caller.id,
           joinCode: body.joinCode,
           eventId: body.eventId,
           occurredAt: new Date(body.deviceTime),
         }),
       );
+      // Enrollments are the student-to-class relation. The engine judges the
+      // role in its transaction, so an invite redeemed this instant is seen (T1c).
+      if (result.outcome === 'not_a_student') throw teacherCannotJoin();
       return {
         outcome: result.outcome,
         enrollmentId: result.enrollmentId,

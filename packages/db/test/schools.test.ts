@@ -18,6 +18,7 @@ import {
   inviteCodeSymbols,
   mintTeacherInvite,
   recordAgreement,
+  redeemTeacherInvite,
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import type { Database } from '../src/types.js';
@@ -408,6 +409,11 @@ describe('npm run school: its arguments', () => {
     );
     expect(refused('invite', id, 'now')).toBe('unexpected "now"');
   });
+
+  it('list: takes nothing more', () => {
+    expect(parse('list')).toBeTypeOf('function');
+    expect(refused('list', 'all')).toBe('unexpected "all"');
+  });
 });
 
 describe('npm run school: running it', () => {
@@ -461,5 +467,69 @@ describe('npm run school: running it', () => {
     expect(await refusal(run('agreement', unknown, '2026-10-01'))).toBe(
       `no school on record has the id ${unknown}`,
     );
+  });
+
+  it('add: says when a school of that name, in any case, is on record already, and adds it all the same', async () => {
+    const first = /its id is (\S+)$/.exec((await run('add', 'Twin Oaks'))[0] ?? '')?.[1];
+    const again = await run('add', 'twin oaks');
+    expect(again[0]).toBe(
+      `a school named "Twin Oaks" is on record already, its id ${first}: if you meant it, use that id`,
+    );
+    expect(again[1]).toMatch(/^added "twin oaks"; its id is /);
+    expect(
+      await db
+        .select()
+        .from(schools)
+        .where(sql`lower(${schools.name}) = 'twin oaks'`),
+    ).toHaveLength(2);
+  });
+
+  it('list: each school, its agreement and its open invites — never a code, nor its hash', async () => {
+    const signed = await signedSchool('Listed High');
+    const [open, used, lapsed] = [
+      await mint(signed.id),
+      await mint(signed.id),
+      await mint(signed.id),
+    ];
+    const [account] = await db
+      .insert(users)
+      .values({ cognitoId: `list-${newUuidV7()}`, role: 'student' })
+      .returning();
+    if (!account) throw new Error('no account');
+    const redeemed = await redeemTeacherInvite(db, {
+      userId: account.id,
+      code: used.code,
+      eventId: newUuidV7(),
+    });
+    expect(redeemed.outcome).toBe('redeemed');
+    await db
+      .update(teacherInvites)
+      .set({ expiresAt: sql`now() - interval '1 second'` })
+      .where(eq(teacherInvites.id, lapsed.invite.id));
+    const unsigned = await createSchool(db, { name: 'Unlisted Agreement High' });
+
+    const lines = await run('list');
+    expect(lines[0]).toBe(`${'id'.padEnd(36)}  agreement   open invites  name`);
+    expect(lines).toContain(`${signed.id}  2026-09-30  1             Listed High`);
+    expect(lines).toContain(`${unsigned.id}  none        0             Unlisted Agreement High`);
+    const printed = lines.join('\n');
+    for (const { code, invite } of [open, used, lapsed]) {
+      expect(printed).not.toContain(code);
+      expect(printed).not.toContain(invite.codeHash);
+    }
+  });
+
+  it('list: says when no school is on record, and how to add one', async () => {
+    const empty = await makeTestDb();
+    try {
+      const lines: string[] = [];
+      await parseSchoolCommand(
+        ['list'],
+        NOW,
+      )?.({ db: empty.db, print: (line) => lines.push(line) });
+      expect(lines).toEqual(['no school is on record yet: npm run school -- add "<name>"']);
+    } finally {
+      await empty.close();
+    }
   });
 });

@@ -1,11 +1,16 @@
 import {
   classes,
+  createSchool,
   type Database,
   enrollments,
   events,
+  findOrCreateStudent,
   findUserByCognitoId,
+  mintTeacherInvite,
   participations,
+  recordAgreement,
   startSession,
+  teacherInvites,
   users,
 } from '@bali/db';
 import type {
@@ -16,7 +21,8 @@ import type {
   MeResponse,
   RosterResponse,
 } from '@bali/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import type { LightMyRequestResponse } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -85,6 +91,11 @@ const noClass = {
   error: { code: 'not_found', reason: 'class_not_found', message: 'no class with that join code' },
 };
 
+/** A teacher's join, refused as it always has been: no reason, only the status. */
+const teacherRefused = {
+  error: { code: 'forbidden', message: 'teachers cannot join a class as a student' },
+};
+
 describe('POST /v1/enrollments', () => {
   it('a new student joins a class by its code', async () => {
     const { klass } = await seedClassroom(db, 'join');
@@ -125,14 +136,20 @@ describe('POST /v1/enrollments', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('a teacher cannot join a class as a student (403)', async () => {
+  it('a teacher cannot join a class as a student (403), and nothing is written', async () => {
     const { teacher, klass } = await seedClassroom(db, 'join-teacher');
-    const res = await join(await ctx.tokenFor(teacher.cognitoId), {
-      joinCode: klass.joinCode,
-      eventId: randomUUID(),
-      deviceTime: new Date().toISOString(),
-    });
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const res = await joinBy(token, klass.joinCode);
     expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual(teacherRefused);
+    // The account is judged before the code: one no class holds is the same 403.
+    const unknown = await joinBy(token, 'NOCODE');
+    expect(unknown.statusCode).toBe(403);
+    expect(unknown.json()).toEqual(teacherRefused);
+    expect(
+      await db.select().from(enrollments).where(eq(enrollments.studentId, teacher.id)),
+    ).toEqual([]);
+    expect(await db.select().from(events).where(eq(events.userId, teacher.id))).toEqual([]);
   });
 
   it('requires authentication', async () => {
@@ -538,4 +555,182 @@ describe('DELETE /v1/enrollments/:id', () => {
       error: { code: 'not_found', reason: 'enrollment_not_found', message: 'enrollment not found' },
     });
   });
+});
+
+// Only a real Postgres contends, so this runs where TEST_DATABASE_URL is set.
+const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
+
+describe.runIf(REAL_PG)('a join racing the same account’s redeem (real Postgres, T1c)', () => {
+  /**
+   * A class to join and an invite code to redeem, and an account that is a
+   * student in no class yet, so either alone would land: its phone joining
+   * while its portal redeems.
+   */
+  async function rivals(tag: string) {
+    const { klass } = await seedClassroom(db, tag);
+    const school = await createSchool(db, { name: `Invites ${tag}` });
+    await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-30' });
+    const minted = await mintTeacherInvite(db, { schoolId: school.id });
+    if (minted.outcome !== 'minted') throw new Error(`no invite: ${minted.outcome}`);
+    const account = await findOrCreateStudent(db, `t1c-${tag}`);
+    const token = await ctx.tokenFor(account.cognitoId);
+    return {
+      account,
+      klass,
+      invite: minted.invite,
+      join: () => joinBy(token, klass.joinCode),
+      redeem: () =>
+        authedInject(ctx.app, token, {
+          method: 'POST',
+          url: '/v1/teacher-invites/redeem',
+          payload: { code: minted.code, eventId: randomUUID() },
+        }),
+    };
+  }
+
+  /**
+   * One or the other, never both: the join enrolled a student and the redeem
+   * was refused as a student's in a class, or the redeem made a teacher and the
+   * join was refused as a teacher's always is. The rows agree. Says which won.
+   */
+  async function oneOrTheOther(
+    { account, invite }: Awaited<ReturnType<typeof rivals>>,
+    joined: LightMyRequestResponse,
+    redeemed: LightMyRequestResponse,
+  ): Promise<'join' | 'redeem'> {
+    const [user] = await db.select().from(users).where(eq(users.id, account.id));
+    const enrolled = await db
+      .select()
+      .from(enrollments)
+      .where(and(eq(enrollments.studentId, account.id), isNull(enrollments.removedAt)));
+    const [taken] = await db.select().from(teacherInvites).where(eq(teacherInvites.id, invite.id));
+    if (joined.statusCode === 200) {
+      expect(joined.json()).toMatchObject({ outcome: 'joined' });
+      expect(redeemed.statusCode, 'never both: enrolled as a student, and made a teacher').toBe(
+        409,
+      );
+      expect(redeemed.json()).toMatchObject({ error: { reason: 'student_in_class' } });
+      expect(user?.role).toBe('student');
+      expect(enrolled).toHaveLength(1);
+      expect(taken?.redeemedAt).toBeNull();
+      return 'join';
+    }
+    expect(joined.statusCode).toBe(403);
+    expect(joined.json()).toEqual(teacherRefused);
+    expect(redeemed.statusCode).toBe(200);
+    expect(redeemed.json()).toMatchObject({ outcome: 'redeemed' });
+    expect(user?.role).toBe('teacher');
+    expect(enrolled).toHaveLength(0);
+    expect(taken?.redeemedBy).toBe(account.id);
+    return 'redeem';
+  }
+
+  /** Hold `lock`'s rows until the release: whatever locks them parks behind it. */
+  async function hold(lock: (tx: Database) => Promise<unknown>): Promise<() => Promise<void>> {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const hasLock = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const holder = db
+      .transaction(async (tx) => {
+        await lock(tx);
+        locked();
+        await held;
+        throw new Error('rolled back on purpose');
+      })
+      .catch(() => undefined);
+    await hasLock;
+    return async () => {
+      release();
+      await holder;
+    };
+  }
+
+  /** Until `n` backends wait on a lock — or `call` has answered without waiting (taps.test.ts's). */
+  async function parked(n: number, call: Promise<unknown>): Promise<void> {
+    let answered = false;
+    const done = () => {
+      answered = true;
+    };
+    void call.then(done, done);
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const rows = (await db.execute(
+        sql`select count(*)::int as n from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock'`,
+      )) as { n: number }[];
+      if (answered || (rows[0]?.n ?? 0) >= n) return;
+      if (Date.now() > deadline) throw new Error(`fewer than ${n} backend(s) ever parked`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  /**
+   * `first` sent and parked behind `lock` (or answered), then `second` until it
+   * parks too or answers, then the lock let go: both answers, in that order.
+   */
+  async function staged(
+    lock: (tx: Database) => Promise<unknown>,
+    first: () => Promise<LightMyRequestResponse>,
+    second: () => Promise<LightMyRequestResponse>,
+  ): Promise<[LightMyRequestResponse, LightMyRequestResponse]> {
+    const release = await hold(lock);
+    let a: Promise<LightMyRequestResponse> | undefined;
+    let b: Promise<LightMyRequestResponse> | undefined;
+    try {
+      a = first();
+      await parked(1, a);
+      b = second();
+      await parked(2, b);
+    } finally {
+      await release();
+    }
+    return [await a, await b];
+  }
+
+  it('the join first: it holds the account while it waits on its class, so the redeem finds a student in a class', async () => {
+    // The join parked on its class's row, its account read a student; then
+    // the redeem. Judging the account before the join's enrollment commits, it
+    // would make a teacher of someone the join then enrolls.
+    for (let round = 0; round < 3; round += 1) {
+      const r = await rivals(`join-first-${round}`);
+      const [joined, redeemed] = await staged(
+        (tx) => tx.select().from(classes).where(eq(classes.id, r.klass.id)).for('update'),
+        r.join,
+        r.redeem,
+      );
+      expect(await oneOrTheOther(r, joined, redeemed), `round ${round}`).toBe('join');
+    }
+  }, 30_000);
+
+  it('the redeem first: the join waits it out and finds a teacher, writing nothing', async () => {
+    // The redeem holds the account, parked on its invite's row; then the join.
+    // Judged a student before the redeem commits, it would enroll the teacher
+    // the redeem makes a moment later.
+    for (let round = 0; round < 3; round += 1) {
+      const r = await rivals(`redeem-first-${round}`);
+      const [redeemed, joined] = await staged(
+        (tx) =>
+          tx.select().from(teacherInvites).where(eq(teacherInvites.id, r.invite.id)).for('update'),
+        r.redeem,
+        r.join,
+      );
+      expect(await oneOrTheOther(r, joined, redeemed), `round ${round}`).toBe('redeem');
+    }
+  }, 30_000);
+
+  it('sent at once, many times: one or the other, never both', async () => {
+    for (let round = 0; round < 30; round += 1) {
+      const r = await rivals(`at-once-${round}`);
+      // A head start for one side or neither, so the order they land in varies.
+      const lag = (side: number) =>
+        new Promise((resolve) => setTimeout(resolve, round % 3 === side ? 2 : 0));
+      const [joined, redeemed] = await Promise.all([lag(1).then(r.join), lag(2).then(r.redeem)]);
+      await oneOrTheOther(r, joined, redeemed);
+    }
+  }, 60_000);
 });

@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **T1c: the join judges the caller's role inside its own transaction, under
+  the caller's `users` row, closing T1b's known edge.** T1b's join read the role before its
+  transaction, so a join landing as the same account's redeem committed could enroll the new
+  teacher. Now `joinClassByCode` first reads the caller's row FOR SHARE and answers
+  `not_a_student`, writing nothing, for an account that is no student; the route refuses it with
+  the join's `403`, unchanged, and no longer judges the role itself. The redeem holds that row FOR
+  UPDATE, so the two run one at a time: the join first, and the redeem finds a student in a class
+  (`409 student_in_class`); the redeem first, and the join reads the teacher it made. **The
+  order:** the user row before the class, as a rename takes them (its row FOR NO KEY UPDATE, then
+  its classes); the redeem locks no class, and a Start or a tap takes no `users` row lock but the
+  foreign-key key-share a FOR SHARE lets through, so no cycle. **Shared, not exclusive,** so two
+  joins by one account, and the key-shares of its taps and unlocks, go on around it. The account
+  is judged before the code, as the route always judged it, so a teacher's join to an unknown
+  code is still the `403`. **Tests,** red first: three real-Postgres races in
+  `apps/api/test/enrollments.test.ts` (each order staged with a holder, and 30 rounds sent at
+  once), every one red on the old code and red again with the FOR SHARE alone removed; PGlite,
+  the re-check in the engine and the `403` through the route, nothing written. **Ride-along**
+  (T1a's review WARNs, left out of T1b for size): `npm run school -- list` (id, agreement day,
+  open invites — not redeemed, not expired by the database's clock — and name; never a code or
+  its hash), and `add` says when a school of that name, in any case, is on record already, then
+  adds it all the same: two schools may share a name.
+
 - **2026-10-04** — **T2: the portal's invite-code screen. A non-teacher's home is the code's
   field; the code is checked by the redeem's own rule before a try is spent; an attempt is resent
   under its own `eventId` only while its answer never came; and every refusal is said in its words,

@@ -406,7 +406,10 @@ Student app:
   class_not_found`, a teacher `403`. It reveals what a join to that code would, plus the
   teacher's name; per-account budgets on guessing codes arrive with ISSUES #1 (Phase 4).
 - `POST /v1/enrollments` — join a class by code, matched ignoring case and surrounding
-  whitespace (A6); a code longer than every minted one is `400` before any lookup.
+  whitespace (A6); a code longer than every minted one is `400` before any lookup. A teacher
+  is `403`, judged inside the join's transaction under the caller's `users` row (FOR SHARE,
+  taken before the class, as a rename takes them), the row the redeem holds: a join and the
+  same account's redeem run one at a time, so a new teacher is never enrolled (T1c).
 - `DELETE /v1/enrollments/{id}` — leave a class; recorded as its own event and visible
   to the teacher, so quietly leaving to dodge a session is always on the record. Never
   while the class has a session running by the server's clock, the student in it or not:
