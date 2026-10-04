@@ -165,7 +165,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
       issuer: TEST_ISSUER,
       audience: TEST_AUDIENCE,
       jwksUri: `data:application/json,${encodeURIComponent(jwks)}`,
-      internalKey: randomBytes(16).toString('hex'),
+      internalKey: randomBytes(32).toString('hex'),
     },
     teachers: await Promise.all(
       teachers.map(async (t) => ({
