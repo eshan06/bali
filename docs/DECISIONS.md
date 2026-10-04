@@ -8,6 +8,57 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **T1a: teacher invite codes, kept as a SHA-256 hash and minted only for a
+  school whose data agreement is on record, by the owner's `npm run school`.** **The code:** 25
+  symbols of the join code's unambiguous alphabet (`JOIN_CODE_ALPHABET`: 31 symbols, no `0`/`O`,
+  no `1`/`I`/`L`), each drawn by `crypto.randomInt`, which draws without bias, and shown in five
+  groups of five (`XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`), the dashes only separating them: 25 × log2 31
+  ≈ 124 bits. Long to type, but a teacher types it once, and pastes it more likely than not.
+  **The hash: SHA-256, in hex, with no salt, no pepper and no slow hash.** A slow hash (bcrypt,
+  scrypt, Argon2) and a salt exist to protect a secret with little entropy, a password, from a
+  search of a stolen table's hashes. A random 124-bit code leaves nothing to search: a rack of GPUs
+  at 10¹² SHA-256 a second, given a stolen copy of the table, finds one of a hundred live codes
+  in the 14 days they live with odds of about one in 10¹⁷. NIST SP 800-63B (§5.1.2.2, read on
+  2026-10-04) draws the line at 112 bits: a look-up secret with at least that many is hashed with
+  an approved one-way function, one with fewer salted and stretched. A pepper, an HMAC key kept
+  out of the database, would need one secret in two places (the API and the owner's command) and
+  buys nothing at this length. The hash is over the 25 symbols as minted, upper-case with no
+  dashes, so T1b hashes what a teacher types once it is put back in that form. `code_hash` is
+  unique, and a `CHECK` admits 64 lower-case hex digits only, which no code can be, so no code
+  path can store a code in its place. A draw that collides with another invite's (never, at 124
+  bits) is drawn again, up to 8 times, then refused with nothing stored: ON CONFLICT DO NOTHING
+  on the hash, as a join code's. **Single use, enforced by the database, ready for T1b:** the
+  redeem is the row's `redeemed_at`, `redeemed_by` and `redeem_event_id`, all three or none (a
+  `CHECK`). T1b sets them in one UPDATE guarded by `redeemed_at IS NULL` and the expiry, so of two
+  redeems at once only one takes the row, and `redeem_event_id` is unique, so a replay finds its
+  own redeem by its `eventId`. Once redeemed, the row never changes again: a trigger refuses any
+  UPDATE of it (migration 0013, a custom one, as the events table's append-only trigger is), so no
+  code path can redeem it twice, hand it to a second account or undo a redeem. The guarded UPDATE
+  never meets the trigger: a row its `WHERE` skips is not updated. **The expiry:** `expires_at` is the database's `now()` plus 336 hours, in the
+  statement whose `now()` fills `created_at`, so the two are exactly 14 days apart (the owner's
+  ruling) and on the server's clock wherever the command runs; hours, since a day in the
+  database's zone can be 23 or 25 of them. **The agreement:** `schools.agreement_signed_at`, a
+  `date`, the day written on the agreement, which no zone moves; the column's name is the one the
+  step named. The owner records it (`npm run school -- agreement <school-id> <day>`): a real day
+  written YYYY-MM-DD, never after today on the machine running it. Recorded again, the new day
+  replaces it and the command says what it said: an owner correcting a mistyped day. None on
+  record, and the mint refuses the school: FERPA's school-official terms and the state's
+  student-privacy law (or the SDPC NDPA) call for a signed agreement before a vendor holds a
+  school's data (`docs/ISSUES.md`, Phase 6). Nothing takes an agreement off the record, so the
+  mint reads it and then writes. **The commands:** `npm run school -- add <name> | agreement
+  <school-id> <day> | invite <school-id>`, against `DATABASE_URL` as `npm run migrate` is: from
+  the owner's machine with the Postgres service's public URL, or inside the API's service with
+  `railway ssh`, the image carrying the script. Their logic is `@bali/db`'s (`schools.ts`, and
+  `school-command.ts`, which checks every argument before anything connects), so it is tested
+  there; the script, `apps/api/scripts/school.ts`, only connects and prints. A code is printed
+  once, to the terminal, and is in no log, no error and no row; lost, the owner mints another.
+  They carry no `eventId`, as `POST /v1/classes` carries none: no client retries them over a
+  network that loses answers, since the owner reads each one at the terminal; `agreement` is
+  idempotent by its day, and each `invite` is meant to be a new code.
+  **Not in T1a:** the redeem (T1b: a route, rate-limited, refusing an account that is a student in
+  a live class), the portal's form (T2), revoking a code, and listing schools or invites. No
+  `/v1` route changed, so the OpenAPI snapshot and the authorization matrix stay as they are.
+
 - **2026-10-04** — **R5: the portal's reports page — a class's sessions newest first, a page at a
   time, each row opening its recap; and, at the bell, the ended grid stays under the recap card
   until the next Start.** **Where:** `/classes/{id}/reports`, reached by "Reports →" at the top of

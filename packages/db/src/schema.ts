@@ -8,6 +8,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   check,
+  date,
   index,
   jsonb,
   pgTable,
@@ -35,6 +36,12 @@ const removedAt = () => timestamp('removed_at', { withTimezone: true });
 export const schools = pgTable('schools', {
   id: id(),
   name: text('name').notNull(),
+  /**
+   * The day the school's data agreement was signed (FERPA's school-official terms, the state's
+   * student-privacy law), as the owner records it: a date, which no time zone moves. NULL = none
+   * on record, and no teacher invite is minted for the school (T1a).
+   */
+  agreementSignedAt: date('agreement_signed_at', { mode: 'string' }),
   createdAt: createdAt(),
   removedAt: removedAt(),
 });
@@ -331,5 +338,44 @@ export const armedTaps = pgTable(
       .on(t.teacherId)
       .where(sql`${t.consumedAt} IS NULL`),
     check('armed_taps_order_whole', sql`(${t.orderInstall} IS NULL) = (${t.orderSeq} IS NULL)`),
+  ],
+);
+
+/*
+ * Teacher invites (Phase 4, T1a). The owner mints one for a school whose data agreement is signed
+ * (`npm run school -- invite`) and gives its code to one teacher; redeeming it (T1b) makes that
+ * account a teacher at the school. The code itself is never stored: it is shown once, at minting,
+ * and only its hash is kept, so a copy of this table opens no school.
+ */
+export const teacherInvites = pgTable(
+  'teacher_invites',
+  {
+    id: id(),
+    schoolId: uuid('school_id')
+      .notNull()
+      .references(() => schools.id),
+    /** SHA-256 of the code, in hex (`hashInviteCode`). Unique: one invite per code. */
+    codeHash: text('code_hash').notNull().unique(),
+    createdAt: createdAt(),
+    /** 14 days after `created_at`, on the database's clock (the owner's ruling, 2026-10-04). */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /**
+     * The redeem (T1b): when, by whom, and the request's `eventId` — all three or none. Single
+     * use: a redeem is one UPDATE guarded by `redeemed_at IS NULL`, so of two at once only one
+     * sets them, and a replay finds its own by the unique `redeem_event_id`. Once set, the row
+     * never changes again: the database refuses it (0013_teacher_invites_single_use.sql).
+     */
+    redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
+    redeemedBy: uuid('redeemed_by').references(() => users.id),
+    redeemEventId: uuid('redeem_event_id').unique(),
+  },
+  (t) => [
+    // Only a hash fits: 64 lower-case hex digits, which no code (upper-case symbols) can be.
+    check('teacher_invites_code_hash_hex', sql`${t.codeHash} ~ '^[0-9a-f]{64}$'`),
+    // A redeem is whole: its time, its teacher and its eventId together, or none of them.
+    check(
+      'teacher_invites_redeem_whole',
+      sql`(${t.redeemedAt} IS NULL) = (${t.redeemedBy} IS NULL) AND (${t.redeemedAt} IS NULL) = (${t.redeemEventId} IS NULL)`,
+    ),
   ],
 );
