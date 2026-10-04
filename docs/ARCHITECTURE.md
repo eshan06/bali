@@ -442,7 +442,8 @@ Teacher app and web portal:
   already_teacher`, a student in a live class `409 student_in_class` (the owner's ruling: a
   separate account for teaching). Then the code: none with it `404 invite_not_found`, used `409
   invite_used`, expired `409 invite_expired`; one that can't be a code `400 invite_code_invalid`.
-  Each refusal changes nothing. Tries are budgeted per account and misses per address, as the
+  A refusal redeems nothing and changes no account: a first-time caller keeps only the student row
+  the boot call would have made. Tries are budgeted per account and misses per address, as the
   join's are. No event: the invite row is the record, kept by the database from change or deletion.
 - `POST` / `GET` / `PATCH` `/v1/classes…` — create and manage classes. A class named by its id is
   the caller's own: an unknown one is `404 class_not_found` on every route under

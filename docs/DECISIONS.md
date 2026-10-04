@@ -41,12 +41,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   NULL` and the expiry, so of two accounts racing for one code exactly one wins. Expiry is judged by
   the database's `now()`, the clock that set it, and the transaction's one `now()` keeps the read
   and the guard agreeing. Three real-Postgres races stage each case, every one failing with its
-  lock or guard removed. **An account with no row yet** gets one as the boot call makes it (a
-  student, named from its token), then is judged, so a teacher whose first call is the redeem keeps
-  their name. **No event:** the redeem writes `users` and `teacher_invites` only; the invite row is
-  the record. So **0014** makes 0013's trigger `BEFORE UPDATE OR DELETE` (T1a's review WARN): a
-  redeemed invite is never deleted, an unredeemed one may go; 0013 itself is not edited. TRUNCATE,
-  which no row trigger sees, is unguarded, as on every table but `events`: no code path runs it.
+  lock, guard or catch removed. **An account with no row yet** gets one as the boot call makes it
+  (a student, named from its token), then is judged, so a teacher whose first call is the redeem
+  keeps their name; refused, it keeps that student row and nothing else changes. **No event:** the
+  redeem writes `users` and `teacher_invites` only; the invite row is the record. So **0014** makes
+  0013's trigger `BEFORE UPDATE OR DELETE` (T1a's review WARN): a redeemed invite is never
+  deleted, an unredeemed one may go; 0013 itself is not edited. TRUNCATE, which no row trigger
+  sees, is unguarded, as on every table but `events`: no code path runs it.
   **Rate limits, L1's pattern** (`apps/api/src/limits.ts`): each account 5 tries, then 1 a minute;
   each address 20 misses, then 2 a minute, a miss held through its lookup and given back on any
   answer but the 404; buckets of their own, so a join code's guesses and an invite's never spend

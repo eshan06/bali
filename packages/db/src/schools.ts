@@ -259,7 +259,9 @@ export async function redeemTeacherInvite(
     });
   } catch (err) {
     // Another account's redeem took this eventId while this one waited on it:
-    // a client bug, as the read above would have said had it come second.
+    // a client bug, as the read above would have said had it come second. The
+    // only unique column this transaction writes is `redeem_event_id`; a write
+    // added here that could break another must tell its 23505 apart first.
     if (isUniqueViolation(err)) return { outcome: 'event_id_conflict' };
     throw err;
   }
