@@ -47,6 +47,10 @@ targets:
         INFOPLIST_FILE: Bali/Info.plist
         CODE_SIGN_ENTITLEMENTS: Bali/Bali.entitlements
         TARGETED_DEVICE_FAMILY: '1'
+        # The home-screen icon: Bali/Assets.xcassets's AppIcon, one 1024 image (Xcode makes every
+        # size), the mark on its stone-50 tile. Named here, the build writes CFBundleIconName,
+        # which the TestFlight release guard checks.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Where the app signs in and syncs (B4), read from Info.plist: public values, no secret —
         # the phone's Cognito app client is a public one. Dev's, until prod exists (Phase 5) and a
         # Release configuration overrides them: its API (Railway named it before the environment

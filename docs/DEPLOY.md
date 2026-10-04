@@ -175,9 +175,9 @@ What a run checks and needs:
   fails the run before anything is uploaded if a Release target compiles with
   `DEBUG`, if the app or the monitor holds text only `#if DEBUG` code has (the
   readout's title, the lost-bell device check), if a sign-in setting is empty or the
-  API isn't `https://`, or if the app has **no icon**. It has none yet: App Store
-  Connect refuses such a build, so the first run stops there until an `AppIcon` asset
-  catalog is added to the `Bali` target (#130, "Build and store setup").
+  API isn't `https://`, or if the app has **no icon** (App Store Connect refuses such a
+  build). The icon is `ios/Bali/Assets.xcassets`'s `AppIcon`, named by
+  `ASSETCATALOG_COMPILER_APPICON_NAME` in `ios/project.yml`.
 - **Signing:** `-allowProvisioningUpdates` with the key, so Xcode makes or fetches
   the certificate and the App Store profiles for the app and both extensions itself.
   If it says the key may not create a certificate or use cloud-managed distribution
@@ -189,8 +189,9 @@ What a run checks and needs:
 - **The build number** is the run's number; the version stays `MARKETING_VERSION`.
   Apple refuses a number already uploaded, so re-running a run that got as far as the
   upload fails: dispatch a new run.
-- App Store Connect asks the export-compliance question on each build until the app
-  declares it in `Info.plist`.
+- Export compliance is answered in the app's `Info.plist`
+  (`ITSAppUsesNonExemptEncryption` = `false`: Bali uses only the HTTPS that iOS provides,
+  which is exempt), so App Store Connect no longer asks on each build.
 
 ## Local run
 
