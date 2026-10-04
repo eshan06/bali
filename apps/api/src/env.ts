@@ -57,8 +57,8 @@ const envSchema = z.object({
   AUTH_ISSUER: z.string().url(),
   AUTH_JWKS_URI: z.string().url(),
   /**
-   * The Cognito app clients whose tokens are accepted — an access token's `client_id` or an id
-   * token's `aud` — comma-separated: the portal's and the phone's own (B4). One id accepts exactly
+   * The Cognito app clients whose access tokens are accepted — the token's `client_id` —
+   * comma-separated: the portal's and the phone's own (B4). One id accepts exactly
    * that client, as it always did; an empty entry fails the boot rather than drop a client.
    */
   AUTH_AUDIENCE: z
@@ -70,9 +70,10 @@ const envSchema = z.object({
   /**
    * Shared secret the backup sweep cron presents to the internal sweep
    * endpoint (hosting decision 3). Server-to-server, not a user JWT; long enough
-   * that it can't be guessed.
+   * that it can't be guessed: 32 characters or more (Phase 6 S3; it was 16) —
+   * `openssl rand -hex 32` gives 64.
    */
-  INTERNAL_API_KEY: z.string().min(16),
+  INTERNAL_API_KEY: z.string().min(32),
   /**
    * Comma-separated browser origins allowed by CORS (the web portal). Unset —
    * the default — means no CORS headers at all, which is correct while the API

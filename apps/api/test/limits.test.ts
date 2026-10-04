@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError } from '../src/errors.js';
 import {
+  bucket,
   BUDGETS,
   createLimiter,
   type Guess,
@@ -263,5 +264,34 @@ describe('the buckets', () => {
     limiter.settle(c, 404);
     lookUp(limiter, request('settled-d'), 404);
     expect(() => limiter.guess(request('settled-e'), 'join')).toThrow(ApiError);
+  });
+});
+
+/*
+ * Phase 6 S3: a budget holds at most `maxKeys` keys, so a flood of distinct keys
+ * — no refill ever due, no sweep ever run — cannot grow memory without bound.
+ */
+describe('a bucket at its key cap', () => {
+  const budget = { burst: 2, perMinute: 1 };
+
+  it('stays at the cap under a flood of distinct keys, with no time passing', () => {
+    const b = bucket(budget, () => 0, 100);
+    for (let i = 0; i < 10_000; i += 1) expect(b.take(`flood-${i}`)).toBe(0);
+    expect(b.size()).toBe(100);
+  });
+
+  it('forgets the key idle longest, and keeps one in use — even one being refused', () => {
+    const b = bucket(budget, () => 0, 2);
+    b.take('hammered');
+    b.take('hammered');
+    b.take('idle');
+    // hammered is out, and each refused try still counts as use.
+    expect(b.take('hammered')).toBeGreaterThan(0);
+    b.take('newcomer'); // full: idle goes, not hammered
+    expect(b.size()).toBe(2);
+    expect(b.take('hammered')).toBeGreaterThan(0);
+    // idle was forgotten, so it starts again with its whole burst.
+    expect(b.take('idle')).toBe(0);
+    expect(b.take('idle')).toBe(0);
   });
 });

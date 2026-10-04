@@ -24,7 +24,10 @@ export interface SignOptions {
   sub?: string;
   /** Cognito access tokens carry the client id here (and no `aud`). */
   clientId?: string;
-  /** Cognito id tokens carry the client id here instead. */
+  /**
+   * Set, the token is an id token, as Cognito mints one: `token_use: 'id'` and the client id
+   * here instead. The API refuses every id token (Phase 6 S3).
+   */
   audience?: string;
   issuer?: string;
   /** Seconds from now; negative for an already-expired token. */
@@ -57,7 +60,7 @@ export async function makeTestIssuer(): Promise<TestIssuer> {
     const now = Math.floor(Date.now() / 1000);
     const expiresIn = opts.expiresInSeconds ?? 3600;
     const claims: Record<string, unknown> = {
-      token_use: 'access',
+      token_use: opts.audience ? 'id' : 'access',
       client_id: opts.clientId ?? (opts.audience ? undefined : TEST_AUDIENCE),
       ...opts.extraClaims,
     };

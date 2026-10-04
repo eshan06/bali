@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { requireSessionOwner } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
+import { SECURITY_HEADERS } from '../headers.js';
 import { toFeedEvent } from '../sse/frame.js';
 import { createStreamHub, type StreamHubOptions } from '../sse/hub.js';
 
@@ -12,8 +13,11 @@ const Params = z.object({ id: z.string().uuid() });
 const AfterQuery = z.object({ after: z.coerce.number().int().min(0).default(0) });
 
 const SSE_HEADERS = {
+  // A hijacked response skips the onSend hook that sets these everywhere else.
+  ...SECURITY_HEADERS,
   'content-type': 'text/event-stream',
-  'cache-control': 'no-cache, no-transform',
+  // no-store, as every other /v1 answer; no-transform, so no proxy rewrites the stream.
+  'cache-control': 'no-store, no-transform',
   connection: 'keep-alive',
   // Ask nginx and similar proxies not to buffer the stream.
   'x-accel-buffering': 'no',
