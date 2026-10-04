@@ -14,6 +14,7 @@ import type {
   DeleteMeResponse,
   MeResponse,
   RosterResponse,
+  SessionReportResponse,
   SessionSnapshot,
   TapResponse,
   UpdateMeResponse,
@@ -1152,6 +1153,39 @@ describe('DELETE /v1/me (C3)', () => {
       url: `/v1/classes/${klass.id}/roster`,
     });
     expect(roster.json<RosterResponse>().students).toEqual([]);
+  });
+
+  it('leaves the class’s report of a past lesson adding up as before, naming no one', async () => {
+    const { teacher, student, klass, block } = await seedClassroom(db, 'del-report');
+    await db.update(users).set({ displayName: 'Ana' }).where(eq(users.id, student.id));
+    const now = Date.now();
+    const { session } = await startSession(db, {
+      classId: klass.id,
+      startedAt: new Date(now - 10 * 60_000),
+      endsAt: new Date(now + 25 * 60_000),
+    });
+    const token = await ctx.tokenFor(student.cognitoId);
+    await tap(token, block.tagId, ctx, new Date(now - 10 * 60_000));
+    await endSession(db, { sessionId: session.id, at: new Date(now), reason: 'ended' });
+    const teacherToken = await ctx.tokenFor(teacher.cognitoId);
+    const report = async () => {
+      const res = await authedInject(ctx.app, teacherToken, {
+        method: 'GET',
+        url: `/v1/classes/${klass.id}/reports/sessions/${session.id}`,
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json<SessionReportResponse>();
+    };
+    const before = await report();
+    expect(before.joined).toEqual([{ id: student.id, displayName: 'Ana' }]);
+
+    await deleteAs(token);
+
+    const after = await report();
+    expect(after).toEqual({
+      ...before,
+      joined: [{ id: student.id, displayName: null }],
+    });
   });
 
   it('answers its retry, and a new eventId, with the truth: no account, and none is made', async () => {

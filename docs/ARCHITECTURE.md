@@ -132,6 +132,16 @@ which keeps a student removed from the class mid-session who was in that session
 participation or an unlock there), so their unlock stays visible (ruled 2026-09-24, A9).
 Really deleting the row is exactly how v2 stranded a student in a locked session with no
 way out.
+*Amended 2026-10-04 (C3, the owner's ruling; ISSUES #5):* an account can delete itself
+(`DELETE /v1/me`, App Store 5.1.1(v)). Through the engine, in one transaction: each class is
+left as a leave leaves it, in session too; the `users` row stays, so every event of theirs
+still counts in its class's reports, but it loses its name and its Cognito subject and is
+marked removed; a rename's payload, the one place an event carried their name, is emptied
+(the one rewrite of `events` the database allows, migration 0015); and an `account_deleted`
+event with no personal data records it. So the history stays answerable in counts and
+names no one. A teacher with a class or a block is refused: that account goes through the
+school. "Never lost" keeps its meaning from the phone to the server — the phone sends its
+outbox before it deletes (C4).
 
 **4. A student can be in only one session at a time.** If a student in one session taps
 into another, their first participation is ended and recorded in the `events` table as
@@ -216,9 +226,8 @@ from `last_seen_at` (rule 2), never from the column.
 
 ### Decided later, on purpose
 
-- What happens when a family legally asks for their child's data to be deleted. That
-  collides with "unlock records are never lost," so it needs a deliberate policy decision,
-  not a quick rule.
+- A school's written request to dispose of its data, and the retention schedule (ISSUES
+  #5, Phase 6 C6a and C6b). A student's own deletion is decided (decision 3's amendment).
 
 ## Auth
 
@@ -317,6 +326,14 @@ Student app:
   of its school day by the server's clock, for a teacher of a class they are in — the taps a
   Start converts; false for a teacher. A phone waiting for its teacher's Start stops waiting once
   it is false.
+- `DELETE /v1/me` — the caller deletes their own account (C3, added 2026-10-04, additive):
+  `{ eventId }`, through the engine (data-model decision 3's amendment), answered `deleted`;
+  a retry, or any call from a sign-in with no account here, is `already_deleted`, and makes
+  none — a retry reaching an account a boot call made since deletes that one too. A teacher
+  with a live class or block is `409 teacher_has_classes`. A join, rename or tap still on its
+  way under the deleted account is `409 account_deleted`; an unlock is recorded, never
+  refused. The Cognito sign-in is the phone's to delete with its own access token once this
+  answers (C4): the API holds no AWS credential.
 - `PATCH /v1/me` — the student sets their own display name (A8): `{ displayName, eventId }`,
   stored trimmed with each run of spaces made one, answered with the user as `/v1/me`
   gives it. Unique within each class (owner decision 8): a name another student in any
@@ -805,9 +822,8 @@ Each exists because v2 broke it and shipped a real bug
   the six rules; live updates (SSE + Postgres LISTEN/NOTIFY); hosting (Railway, two
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
   (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements.
-- **Open:** two design questions, both Phase 6: ISSUES #3's fallback, should Apple's answer
-  call for one (the issue ranks the fallback designs, best fit first), and ISSUES #5's
-  amendment of data-model decision 3. Next: the build plan (what gets coded
+- **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
+  call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
 - **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
   `main` is v3 only.

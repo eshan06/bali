@@ -68,6 +68,9 @@ project for the API (its DSN).
      **Wait for CI**, turn it on, so a red `main` never deploys to prod.
    - **Settings → Networking → Generate Domain** for the public HTTPS URL (or add
      your own domain there and follow its DNS instructions). This is `<prod API URL>`.
+     Your own domain: the API's HSTS carries `includeSubDomains`, so once a browser has
+     seen it, every subdomain of that host must serve HTTPS too. Give the API a host
+     of its own (`api.<domain>`), never the apex a plain-HTTP site sits under.
    - **Settings → Replicas:** leave at 1. The rate limits live in each process's
      memory (`docs/DEPLOY.md`), so 2 replicas double every budget.
 6. **The variables.** API service → **Variables** → **Raw Editor**, then paste and fill
