@@ -6,8 +6,9 @@ import { ApiError, NetworkError } from './api-client';
  * Over the API's budget (`429`, L1). The API's own message ("too many requests from this
  * account") is written for a log; this one says what to do, in the phone's words for the same
  * answer but the wait, which its `Retry-After` picks: the account's budget, which every route
- * spends, says a second at L1's sizes, so "a moment"; the invite budget's tries come back one a
- * minute, so "a minute", the phone's words (S4a, from T2's review).
+ * spends, says a second at L1's sizes, so "a moment"; the guessing budgets wait longer (join
+ * tries up to 30 s, join misses 10 s, invite tries a minute), so "a minute", the phone's words
+ * (S4a, from T2's review).
  */
 export const TOO_MANY_TRIES = 'Too many tries for now. Wait a moment, then try again.';
 export const TOO_MANY_TRIES_MINUTE = 'Too many tries for now. Wait a minute, then try again.';

@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { endSession } from '@/lib/auth';
 
@@ -18,6 +18,14 @@ export function PortalBar() {
   const router = useRouter();
   const path = usePathname();
   const [leaving, setLeaving] = useState(false);
+
+  // Back here from the hosted UI by the back button (the page kept whole): Sign out works again.
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => e.persisted && setLeaving(false);
+    window.addEventListener('pageshow', back);
+    return () => window.removeEventListener('pageshow', back);
+  }, []);
+
   if (SIGNED_OUT_PATHS.test(path)) return null;
 
   function onSignOut() {
