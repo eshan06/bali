@@ -1,5 +1,6 @@
 import { type Database, users } from '@bali/db';
 import type { ApiErrorBody, ClassDetail, EnrollmentJoinResponse } from '@bali/shared';
+import type { InjectOptions } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -282,14 +283,15 @@ describe('every route under /v1/classes/:id', () => {
       ]),
     );
     for (const key of routes) {
-      const [method, url] = key.split(' ') as ['GET' | 'POST' | 'PATCH', string];
+      const [method, url] = key.split(' ') as [InjectOptions['method'], string];
       const res = await ctx.app.inject({
         method,
-        url: url.replace(':id', randomUUID()).replace(':sessionId', randomUUID()),
+        // Every id in the path unknown, the class's included.
+        url: url.replace(/:\w+/g, () => randomUUID()),
         headers: { authorization: `Bearer ${token}` },
         payload: BODIES[key],
       });
-      expect(res.statusCode, key).toBe(404);
+      expect(res.statusCode, `${key} (a 400: the route needs a body in BODIES)`).toBe(404);
       expect(res.json<ApiErrorBody>().error, key).toMatchObject({
         code: 'not_found',
         reason: 'class_not_found',

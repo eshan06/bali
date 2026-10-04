@@ -120,16 +120,18 @@ export function registerReportsRoutes(app: FastifyInstance, db: Database, clock:
         );
       }
 
+      if (page.sessions.length === 0) return { sessions: [], nextBefore: null };
+
       // Every row by one clock, from every event its session holds, read in one statement.
       const now = clock();
-      const ids = page.sessions.map((session) => session.id);
-      const bySession = new Map<string | null, ReportEvent[]>(
-        ids.map((sessionId) => [sessionId, []]),
+      const events = await sessionEvents(
+        db,
+        page.sessions.map((session) => session.id),
       );
-      for (const e of await sessionEvents(db, ids)) bySession.get(e.sessionId)?.push(e);
       return {
         sessions: page.sessions.map((session) => {
-          const report = counted(session, bySession.get(session.id) ?? [], now);
+          const own = events.filter((e) => e.sessionId === session.id);
+          const report = counted(session, own, now);
           return {
             id: session.id,
             startedAt: session.startedAt.toISOString(),

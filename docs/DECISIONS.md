@@ -40,8 +40,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   class's included, or none) is `400 unknown_cursor`, reload from the top; any other refusal of
   the request, the path's malformed id included, `400 invalid_request`, as wherever a 400 means
   more than one thing. `limit` asks for fewer, as there. 20 a page, because each row costs its
-  session's events. Who may read comes first: another teacher holding a valid cursor is `403`,
-  never told whether it is one. **The class routes' 404, aligned (#192's review WARN, closed):** R2
+  session's events. Who may read is checked before the cursor: another teacher sending one of the
+  class's sessions as `before` is `403`, never told whether it is one (a malformed query is `400`
+  first, and names nothing). **The class routes' 404, aligned (#192's review WARN, closed):** R2
   answered an unknown class `404 class_not_found`, while `GET` and `PATCH /v1/classes/{id}`, the
   roster and the Start answered a bare `404`: one condition in two shapes, what `refusal`'s
   contract exists to prevent. A reason is never removed, and R2's 404 needs one (it also means an

@@ -679,60 +679,6 @@ export async function getSessionEvents(db: Database, sessionId: string): Promise
   return sessionEvents(db, [sessionId]);
 }
 
-/** A session's place in its class's order: `at` its start as microsecond UTC text, as `HistoryKey`'s. */
-export interface ClassSessionKey {
-  at: string;
-  id: string;
-}
-
-/**
- * A class's sessions, newest first — by when each started, then by id — `take` at most, each older
- * than `key`, through their own index (R3). Unexecuted, so a test can EXPLAIN it.
- */
-export function classSessions(
-  db: Database,
-  classId: string,
-  key: ClassSessionKey | undefined,
-  take: number,
-) {
-  const older =
-    key && sql`(${sessions.startedAt}, ${sessions.id}) < (${key.at}::timestamptz, ${key.id}::uuid)`;
-  return db
-    .select()
-    .from(sessions)
-    .where(and(eq(sessions.classId, classId), older))
-    .orderBy(desc(sessions.startedAt), desc(sessions.id))
-    .limit(take);
-}
-
-/**
- * One page of a class's sessions, newest first (R3): at most `limit` older than the session
- * `before` (an id from an earlier page), and the id to pass for the page after — null when there
- * is none. Undefined when `before` is no session of the class. The cursor names a row, as the
- * history's does (A7), so a session started between two reads never shifts a page.
- */
-export async function getClassSessionsPage(
-  db: Database,
-  classId: string,
-  page: { before?: string; limit: number },
-): Promise<{ sessions: SessionRow[]; nextBefore: string | null } | undefined> {
-  let key: ClassSessionKey | undefined;
-  if (page.before !== undefined) {
-    [key] = await db
-      .select({ at: exactly(sessions.startedAt), id: sessions.id })
-      .from(sessions)
-      .where(and(eq(sessions.id, page.before), eq(sessions.classId, classId)))
-      .limit(1);
-    if (!key) return undefined;
-  }
-  const rows = await classSessions(db, classId, key, page.limit + 1);
-  const shown = rows.slice(0, page.limit);
-  return {
-    sessions: shown,
-    nextBefore: rows.length > page.limit ? shown[shown.length - 1]!.id : null,
-  };
-}
-
 /*
  * GET /v1/me/history (A7) — a student's own timeline, newest first, a page at
  * a time. Two sources, merged: their own events (`user_id`), and the end of
@@ -941,5 +887,59 @@ export async function getHistoryPage(
           : null,
     })),
     nextBefore: merged.length > page.limit ? rows[rows.length - 1]!.eventId : null,
+  };
+}
+
+/** A session's place in its class's order: `at` its start as microsecond UTC text, as `HistoryKey`'s. */
+export interface ClassSessionKey {
+  at: string;
+  id: string;
+}
+
+/**
+ * A class's sessions, newest first — by when each started, then by id — `take` at most, each older
+ * than `key`, through their own index (R3). Unexecuted, so a test can EXPLAIN it.
+ */
+export function classSessions(
+  db: Database,
+  classId: string,
+  key: ClassSessionKey | undefined,
+  take: number,
+) {
+  const older =
+    key && sql`(${sessions.startedAt}, ${sessions.id}) < (${key.at}::timestamptz, ${key.id}::uuid)`;
+  return db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.classId, classId), older))
+    .orderBy(desc(sessions.startedAt), desc(sessions.id))
+    .limit(take);
+}
+
+/**
+ * One page of a class's sessions, newest first (R3): at most `limit` older than the session
+ * `before` (an id from an earlier page), and the id to pass for the page after — null when there
+ * is none. Undefined when `before` is no session of the class. The cursor names a row, as the
+ * history's does (A7), so a session started between two reads never shifts a page.
+ */
+export async function getClassSessionsPage(
+  db: Database,
+  classId: string,
+  page: { before?: string; limit: number },
+): Promise<{ sessions: SessionRow[]; nextBefore: string | null } | undefined> {
+  let key: ClassSessionKey | undefined;
+  if (page.before !== undefined) {
+    [key] = await db
+      .select({ at: exactly(sessions.startedAt), id: sessions.id })
+      .from(sessions)
+      .where(and(eq(sessions.id, page.before), eq(sessions.classId, classId)))
+      .limit(1);
+    if (!key) return undefined;
+  }
+  const rows = await classSessions(db, classId, key, page.limit + 1);
+  const shown = rows.slice(0, page.limit);
+  return {
+    sessions: shown,
+    nextBefore: rows.length > page.limit ? shown[shown.length - 1]!.id : null,
   };
 }
