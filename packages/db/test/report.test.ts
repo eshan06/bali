@@ -405,15 +405,22 @@ describe('sessionReport over what the engine stores', () => {
     expect((await unlock(db, stuck)).recordedAs).toBe('superseded');
     await protectionOff(db, move(session, cy, 5));
     expect((await protectionOn(db, move(session, cy, 9))).state).toBe('focused');
+    // Di's unlock while it was off changed nothing then, and stands once it is back on.
+    const di = await enrol(klass, 'protection-4');
+    await tapIn(db, move(session, di, 1));
+    await protectionOff(db, move(session, di, 5));
+    expect((await unlock(db, move(session, di, 7))).recordedAs).toBe('protection_off');
+    expect((await protectionOn(db, move(session, di, 9))).state).toBe('unlocked');
     await endSession(db, { sessionId: session.id, at: at(25), reason: 'expired' });
 
     const report = await reportOf(session.id);
-    // Ana 4 + 16, Ben 2, Cy 4 + 16.
-    expect(report.focusMinutes).toBe(42);
+    // Ana 4 + 16, Ben 2, Cy 4 + 16, Di 4.
+    expect(report.focusMinutes).toBe(46);
     expect(report.protectionOffs.map((off) => [off.studentId, off.occurredAt])).toEqual([
       [ana.id, at(5)],
       [ben.id, at(5)],
       [cy.id, at(5)],
+      [di.id, at(5)],
     ]);
   });
 

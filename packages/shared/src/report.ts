@@ -89,7 +89,8 @@ export interface SessionReport {
 /**
  * Unlocks kept with no class (ISSUES #2: never discarded): in none until filed.
  * Filing records a new unlock in the session, naming the kept one
- * (`unattached_event_id`), and that one counts — the kept one never does.
+ * (`unattached_event_id`), and that one counts — the kept one never does. Nor
+ * is a kept one a turn: the engine keeps it in no session, out of `latestTurn`.
  */
 const UNATTACHED: readonly unknown[] = [
   'unknown_session',
@@ -150,6 +151,7 @@ export function sessionReport(
 ): SessionReport {
   const start = session.startedAt;
   const ran = Math.min(session.endsAt.getTime(), session.endedAt?.getTime() ?? Infinity);
+  // Never before its start: a window that would be counts nothing.
   const end = new Date(Math.max(start.getTime(), Math.min(ran, now.getTime())));
   const students = new Map<string, Student>();
   const joined = new Set<string>();
@@ -200,9 +202,9 @@ export function sessionReport(
     if (next === undefined && e.type !== 'went_silent' && e.type !== 'came_back') continue;
 
     advance(s, occurredAt);
-    // Silence is a focused phone's, opened by the sweep and closed by any
+    // Silence is a focused phone's, as the sweep marks it, closed by any
     // contact — which the engine records as `came_back` — or by the stint's end.
-    s.silent = e.type === 'went_silent';
+    s.silent = e.type === 'went_silent' && s.state === 'focused';
     if (next !== undefined) s.state = next;
     if (e.type === 'tap_in' && next === 'focused') joined.add(studentId);
   }
