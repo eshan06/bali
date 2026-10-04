@@ -1,5 +1,6 @@
-import type { Database } from '@bali/db';
-import type { BlockDetail } from '@bali/shared';
+import { blocks, type Database } from '@bali/db';
+import type { BlockDetail, BlockListResponse } from '@bali/shared';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
@@ -93,5 +94,56 @@ describe('POST /v1/blocks', () => {
       payload: { tagId: 'X' },
     });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('GET /v1/blocks', () => {
+  function list(token: string, url = '/v1/blocks') {
+    return authedInject(ctx.app, token, { method: 'GET', url });
+  }
+
+  it("lists the teacher's own live blocks, oldest first, with what a register answers", async () => {
+    const { teacher, block } = await seedClassroom(db, 'list');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const added = (await register(token, 'LIST-TAG-2')).json<BlockDetail>();
+
+    const res = await list(token);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<BlockListResponse>()).toEqual({
+      blocks: [
+        { id: block.id, tagId: block.tagId, createdAt: block.createdAt.toISOString() },
+        added,
+      ],
+    });
+  });
+
+  it("never lists another teacher's block, nor a removed one", async () => {
+    const mine = await seedClassroom(db, 'list-mine');
+    const theirs = await seedClassroom(db, 'list-theirs');
+    // Staged by soft-removing directly: no shipped path removes a block yet.
+    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, mine.block.id));
+
+    const res = await list(await ctx.tokenFor(mine.teacher.cognitoId));
+    expect(res.statusCode).toBe(200);
+    expect(res.json<BlockListResponse>()).toEqual({ blocks: [] });
+    expect(res.body).not.toContain(theirs.block.id);
+  });
+
+  it('a stray query changes nothing: the read takes no input', async () => {
+    const { teacher, block } = await seedClassroom(db, 'list-query');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const res = await list(token, `/v1/blocks?teacherId=${block.teacherId}&tagId=OTHER`);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<BlockListResponse>().blocks.map((b) => b.id)).toEqual([block.id]);
+  });
+
+  it('a student has no blocks to read (403), nor does an unknown caller', async () => {
+    const { student } = await seedClassroom(db, 'list-student');
+    expect((await list(await ctx.tokenFor(student.cognitoId))).statusCode).toBe(403);
+    expect((await list(await ctx.tokenFor('ghost'))).statusCode).toBe(403);
+  });
+
+  it('requires authentication', async () => {
+    expect((await ctx.app.inject({ method: 'GET', url: '/v1/blocks' })).statusCode).toBe(401);
   });
 });

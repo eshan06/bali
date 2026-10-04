@@ -485,6 +485,8 @@ Teacher app and web portal:
 - `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
   block holds is a `409`; re-registering one's own tag returns that block (the retry of a
   lost response).
+- `GET /v1/blocks` — the caller's own live blocks, oldest first (P3): never another teacher's,
+  never a soft-removed one. A student is `403`.
 
 **4. Every request is checked; every error has one shape.** No request body is trusted:
 each endpoint validates its input (right types, sane sizes) before touching the

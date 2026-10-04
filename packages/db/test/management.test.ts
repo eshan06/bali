@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   createBlock,
+  listBlocks,
   createClass,
   generateJoinCode,
   JOIN_CODE_ALPHABET,
@@ -238,5 +239,24 @@ describe('createBlock', () => {
     expect((await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-DEAD' })).outcome).toBe(
       'tag_taken',
     );
+  });
+});
+
+describe('listBlocks', () => {
+  it("lists a teacher's live blocks, oldest first, and no one else's", async () => {
+    const a = await makeTeacher('lb-a');
+    const b = await makeTeacher('lb-b');
+    const first = await createBlock(db, { teacherId: a.teacherId, tagId: 'LB-TAG-1' });
+    const second = await createBlock(db, { teacherId: a.teacherId, tagId: 'LB-TAG-2' });
+    const gone = await createBlock(db, { teacherId: a.teacherId, tagId: 'LB-TAG-3' });
+    await createBlock(db, { teacherId: b.teacherId, tagId: 'LB-TAG-B' });
+    if (first.outcome !== 'registered' || second.outcome !== 'registered') throw new Error('seed');
+    if (gone.outcome !== 'registered') throw new Error('seed');
+    // Staged by soft-removing directly: no shipped path removes a block yet.
+    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, gone.block.id));
+
+    const listed = await listBlocks(db, a.teacherId);
+    expect(listed.map((block) => block.tagId)).toEqual(['LB-TAG-1', 'LB-TAG-2']);
+    expect(await listBlocks(db, (await makeTeacher('lb-none')).teacherId)).toEqual([]);
   });
 });

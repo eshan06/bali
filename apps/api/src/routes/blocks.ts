@@ -1,5 +1,5 @@
-import { createBlock, type Database } from '@bali/db';
-import type { BlockDetail } from '@bali/shared';
+import { createBlock, type Database, listBlocks } from '@bali/db';
+import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -7,6 +7,14 @@ import { requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 
 const CreateBody = z.object({ tagId: z.string().trim().min(1).max(200) });
+
+type BlockRow = Awaited<ReturnType<typeof listBlocks>>[number];
+
+const toDetail = (block: BlockRow): BlockDetail => ({
+  id: block.id,
+  tagId: block.tagId,
+  createdAt: block.createdAt.toISOString(),
+});
 
 /**
  * POST /v1/blocks — a teacher registers a physical NFC tag to themselves. One
@@ -27,11 +35,21 @@ export function registerBlocksRoutes(app: FastifyInstance, db: Database): void {
       if (result.outcome === 'tag_taken') {
         throw ApiError.conflict('that tag is already registered to an active block');
       }
-      return {
-        id: result.block.id,
-        tagId: result.block.tagId,
-        createdAt: result.block.createdAt.toISOString(),
-      };
+      return toDetail(result.block);
+    },
+  );
+
+  /**
+   * GET /v1/blocks — the caller's own live blocks, oldest first (Phase 5 ·
+   * P3): what the portal shows beside the field that registers one. Never
+   * another teacher's, and a student has none to read (403).
+   */
+  app.get(
+    '/v1/blocks',
+    { preHandler: app.authenticate },
+    async (request): Promise<BlockListResponse> => {
+      const teacher = await requireTeacher(db, request);
+      return { blocks: (await listBlocks(db, teacher.id)).map(toDetail) };
     },
   );
 }
