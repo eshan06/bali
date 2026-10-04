@@ -57,6 +57,7 @@ async function makePgliteDb(): Promise<TestDb> {
 }
 
 async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
+  assertNotProduction('makeTestDb', 'makes and drops databases');
   // A fresh, uniquely-named database per call — the real-Postgres equivalent of
   // PGlite's per-call in-process instance, so tests never see each other's rows.
   const name = `bali_test_${randomUUID().replace(/-/g, '')}`;
@@ -97,9 +98,11 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
  * A fresh, migrated database `name` on the server at `baseUrl`, one of that name dropped first —
  * for the load harness (`apps/api/scripts/load`), whose database outlives the process that makes
  * it: the API serves it from its own. Returns its URL. It drops what it is given, on whatever
- * server: a caller checks the server is a local one first (the harness's `harnessServer`).
+ * server: a caller checks the server is a local one first (the harness's `harnessServer`). Never
+ * in production, as dropDatabase.
  */
 export async function recreateDatabase(baseUrl: string, name: string): Promise<string> {
+  assertNotProduction('recreateDatabase', 'drops and makes databases');
   await dropDatabase(baseUrl, name);
   await withAdmin(baseUrl, (sql) => createDatabase(sql, name));
   const url = databaseUrl(baseUrl, name);
@@ -110,9 +113,11 @@ export async function recreateDatabase(baseUrl: string, name: string): Promise<s
 /**
  * Drop the database `name` on the server at `baseUrl`, if it is there. WITH (FORCE) terminates
  * any lingering connections (Postgres 13+, and CI runs 16), so a leaked stream connection can't
- * keep it alive. The name is quoted into SQL, so only a plain lower-case one is taken.
+ * keep it alive. The name is quoted into SQL, so only a plain lower-case one is taken. Never in
+ * production (`assertNotProduction`): the image runs this source, and a drop is not undone.
  */
 export async function dropDatabase(baseUrl: string, name: string): Promise<void> {
+  assertNotProduction('dropDatabase', 'drops databases');
   if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`not a plain database name: ${name}`);
   await withAdmin(baseUrl, (sql) => sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`));
 }
@@ -159,16 +164,17 @@ export function databaseUrl(baseUrl: string, name: string): string {
  * publishes this module on a public subpath (`@bali/db/testing`) and the
  * production image runs TypeScript straight from source under tsx, so nothing
  * structural stops runtime code importing it and writing `participations`
- * behind the transition engine's back. NODE_ENV is `production` in the image
- * and unset in a bare shell, so this denies by default exactly the way
- * `apps/api/src/env.ts` does: only an explicit 'test' or 'development' passes.
+ * behind the transition engine's back, or dropping a database. NODE_ENV is
+ * `production` in the image and unset in a bare shell, so this denies by
+ * default exactly the way `apps/api/src/env.ts` does: only an explicit 'test'
+ * or 'development' passes.
  */
-function assertNotProduction(helper: string, writes: string): void {
+function assertNotProduction(helper: string, does: string): void {
   const env = process.env.NODE_ENV;
   if (env !== 'test' && env !== 'development') {
     throw new Error(
-      `${helper} is a test-only helper: it writes ${writes} outside the transition ` +
-        `engine and must not run with NODE_ENV=${env ?? '<unset>'}`,
+      `${helper} is a test-only helper: it ${does} and must not run with ` +
+        `NODE_ENV=${env ?? '<unset>'}`,
     );
   }
 }
@@ -187,7 +193,7 @@ export async function backdateLastSeen(
   where: { sessionId: string; studentId: string },
   at: Date,
 ): Promise<void> {
-  assertNotProduction('backdateLastSeen', 'participations');
+  assertNotProduction('backdateLastSeen', 'writes participations outside the transition engine');
   await db
     .update(schema.participations)
     .set({ lastSeenAt: at })
@@ -213,7 +219,7 @@ export async function backdateSessionEnd(
   where: { sessionId: string },
   endsAt: Date,
 ): Promise<void> {
-  assertNotProduction('backdateSessionEnd', 'sessions');
+  assertNotProduction('backdateSessionEnd', 'writes sessions outside the transition engine');
   await db
     .update(schema.sessions)
     .set({ endsAt })

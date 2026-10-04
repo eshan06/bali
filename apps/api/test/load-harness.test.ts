@@ -24,6 +24,11 @@ import { harnessServer, type SchoolFile, seedSchool } from '../scripts/load/scho
 
 const REAL_PG = Boolean(process.env.TEST_DATABASE_URL);
 const apiDir = fileURLToPath(new URL('..', import.meta.url));
+/**
+ * The suite vouches for its own server (`harnessServer`'s opt-in): every real-Postgres suite
+ * already makes and drops databases on TEST_DATABASE_URL, so this one adds nothing to that.
+ */
+const env = { ...process.env, LOAD_LOCAL_POSTGRES: '1' };
 
 /** The API's base URL, once its log says it listens; a process gone first fails with its output. */
 function listeningAt(child: ChildProcess, timeoutMs = 30_000): Promise<string> {
@@ -48,22 +53,36 @@ function listeningAt(child: ChildProcess, timeoutMs = 30_000): Promise<string> {
 }
 
 describe('harnessServer', () => {
-  it('takes a Postgres server on this machine', () => {
+  const vouched = { LOAD_LOCAL_POSTGRES: '1' };
+
+  it("takes a Postgres server on this machine, vouched for as this machine's", () => {
     for (const host of ['localhost', '127.0.0.1', '[::1]']) {
       const url = `postgres://postgres:postgres@${host}:5432/postgres`;
-      expect(harnessServer({ TEST_DATABASE_URL: url })).toBe(url);
+      expect(harnessServer({ TEST_DATABASE_URL: url, ...vouched })).toBe(url);
     }
   });
 
-  it('refuses one anywhere else, a list of hosts, no host (the driver would read PGHOST) and none', () => {
+  it('refuses one on this machine no one vouched for: localhost can be a tunnel to another', () => {
+    const url = 'postgres://postgres:postgres@localhost:5432/postgres';
+    for (const optIn of [undefined, '', '0', 'true', 'yes']) {
+      expect(() => harnessServer({ TEST_DATABASE_URL: url, LOAD_LOCAL_POSTGRES: optIn })).toThrow(
+        /set LOAD_LOCAL_POSTGRES=1 .* tunnel/,
+      );
+    }
+  });
+
+  it('refuses one anywhere else, a list of hosts, no host (the driver would read PGHOST) and none, vouched for or not', () => {
     for (const url of [
       'postgres://app:secret@containers-us-west-1.railway.app:5432/railway',
       'postgres://postgres@localhost,db.example.com:5432/postgres',
       'postgres:///postgres',
     ]) {
       expect(() => harnessServer({ TEST_DATABASE_URL: url })).toThrow(/on this machine/);
+      expect(() => harnessServer({ TEST_DATABASE_URL: url, ...vouched })).toThrow(
+        /on this machine/,
+      );
     }
-    expect(() => harnessServer({})).toThrow(/TEST_DATABASE_URL/);
+    expect(() => harnessServer({ ...vouched })).toThrow(/TEST_DATABASE_URL/);
   });
 });
 
@@ -77,7 +96,7 @@ describe.runIf(REAL_PG)('the load harness', () => {
   let base: string;
 
   beforeAll(async () => {
-    server = harnessServer(process.env);
+    server = harnessServer(env);
     dir = mkdtempSync(join(tmpdir(), 'bali-load-'));
     school = await seedSchool(server, database);
     const file = join(dir, 'school.json');
@@ -85,7 +104,7 @@ describe.runIf(REAL_PG)('the load harness', () => {
     api = spawn(process.execPath, ['--import', 'tsx', 'scripts/load/serve.ts'], {
       cwd: apiDir,
       env: {
-        ...process.env,
+        ...env,
         LOAD_SCHOOL_FILE: file,
         HOST: '127.0.0.1',
         PORT: '0',
@@ -112,6 +131,10 @@ describe.runIf(REAL_PG)('the load harness', () => {
     for (const t of school.teachers) {
       expect(school.students.filter((s) => s.classId === t.classId)).toHaveLength(30);
     }
+    // The school's 30 classes, for the gate to start them all: every other teacher has a second.
+    const second = school.teachers.map((t) => t.secondClassId).filter((id) => id !== null);
+    expect(second).toHaveLength(10);
+    expect(new Set([...tagOf.keys(), ...second]).size).toBe(30);
   });
 
   it('serves it: taps before the bell wait, the Start joins them, a late tap joins — all 200s', async () => {
@@ -154,5 +177,11 @@ describe.runIf(REAL_PG)('the load harness', () => {
     expect(live.size).toBe(2);
     expect(live.get(teacher.classId)).toBe(started.session.id);
     expect([...live.values()].filter((id) => id === null)).toHaveLength(1);
+  });
+
+  it("serves the gate's flooder: an account of the school's, in no class", async () => {
+    const call = createCall(base);
+    const me = await call<MeResponse>('GET', '/v1/me', { token: school.flooder.token });
+    expect(me).toMatchObject({ user: { role: 'student' }, classes: [], session: null });
   });
 });

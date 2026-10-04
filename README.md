@@ -158,29 +158,44 @@ block, and start, watch and end a session on dev — `ios/README.md`, "To run it
 Phase 4's one-address load gate (L2b) drives a whole school at the bell. Two commands stand it
 up: the school, seeded into a database of its own on a real Postgres, and the real API serving it
 as a server process (every route, L1's rate limits, the minute sweep), trusting a token issuer of
-the harness's own.
+the harness's own. Two more run the gate on it, with [k6](https://grafana.com/docs/k6/), and time
+the sweep on what it leaves.
 
 ```bash
 export TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres  # this machine's
+export LOAD_LOCAL_POSTGRES=1  # you vouch that it is: localhost could be a tunnel to another
 npm run load:seed    # makes the database bali_load and writes apps/api/scripts/load/school.json
 npm run load:serve   # the API on it, at http://127.0.0.1:3001 (PORT and HOST move it)
+npm run load:gate    # from another shell: the bell and the flood, about three minutes
+npm run load:sweep   # once load:serve has stopped: the sweep at that size, timed
 ```
 
 - **The school:** 20 teachers, each with a block and the class they start at this bell, 30
-  students in each (600 phones behind one address), and every other teacher a second class,
-  which the room before theirs takes at another bell.
+  students in each (600 phones behind one address), every other teacher a second class, which
+  the room before theirs takes at another bell, and one account in no class, the flooder.
 - **`school.json`** (gitignored) is what the load script reads: per student, a token, the tag
-  of the block to tap and the class; per teacher, a token, the class to start and the block;
-  and the key `POST /internal/sweep` takes. Tokens last 12 hours. Each seed makes a new school
-  and a new key, so restart `load:serve` after one.
+  of the block to tap and the class; per teacher, a token, the class to start, the block and the
+  second class; the flooder's token; and the key `POST /internal/sweep` takes. Tokens last 12
+  hours. Each seed makes a new school and a new key, so restart `load:serve` after one.
 - **The issuer:** each seed makes a key pair, signs every token with the private half and keeps
   it nowhere. `load:serve` gives the API the public half through env alone (`AUTH_JWKS_URI` is a
   `data:` URL holding the key set), so no API code knows the harness, and a deployed API, its
   env naming Cognito's pool, never trusts these tokens.
+- **The gate** (`apps/api/scripts/load/gate.js`): every request carries one `X-Real-IP`, the
+  school's address. The 600 students tap within the minute before the bell, the teachers start
+  all 30 classes at it, and each phone reads the truth every 30 s for three minutes, while one
+  account asks `GET /v1/me` 50 times a second. It passes when every school request is a 2xx (no
+  `429`, no `5xx`) with p95 under 500 ms (a Start's under 1 s), and the flooder is refused, each
+  `429` with a `Retry-After`. `load:sweep` then runs the API's own sweep on that bell, twice: 600 phones gone
+  quiet, then 30 sessions ending at once. CI's "Load gate" runs both on every PR that touches
+  `apps/api/`, `packages/db/`, `packages/shared/` or the root's `package.json`, lockfile or
+  `.nvmrc`, or by hand. Numbers and why: `docs/DECISIONS.md` (L2b).
 - **Never dev's or prod's data:** both commands refuse a `TEST_DATABASE_URL` that isn't on this
-  machine (`localhost`, `127.0.0.1`, `[::1]`), and the seed writes only into `bali_load`, which
-  it drops and makes anew each time. CI's real-Postgres lane seeds it, boots it and taps a class
-  in on every run (`apps/api/test/load-harness.test.ts`).
+  machine (`localhost`, `127.0.0.1`, `[::1]`), and one no one vouched for: `localhost` could be a
+  tunnel to another machine, and nothing can tell, so `LOAD_LOCAL_POSTGRES=1` says it is not
+  (CI sets it for its own service container). The seed writes only into `bali_load`, which it
+  drops and makes anew each time. CI's real-Postgres lane seeds it, boots it and taps a class in
+  on every run (`apps/api/test/load-harness.test.ts`).
 
 ## Web portal
 

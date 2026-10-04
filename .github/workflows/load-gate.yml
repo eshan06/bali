@@ -1,0 +1,100 @@
+# The one-address load gate (Phase 4, L2b; ISSUES #1): the load harness's school at the bell,
+# 600 phones behind one address, driven by k6 against the real API on a real Postgres while one
+# account floods; then the sweep timed at that size. What passes: apps/api/scripts/load/gate.js.
+name: Load gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-gate-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # Decided here, not by a paths filter on the workflow: a workflow filtered
+  # out never reports, so a required check would wait on it forever, while a
+  # job skipped by its `if` reports success (as in ios.yml). By hand, it runs.
+  changes:
+    name: Load gate changes
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.diff.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          # Through env, never inline: refnames may contain $, backticks, ;.
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        # The diff on its own line: piped into grep, a failing one would skip the gate.
+        run: |
+          run=true
+          if [ "$EVENT" = pull_request ]; then
+            changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
+            printf '%s\n' "$changed" | grep -qE '^(apps/api/|packages/(db|shared)/|package(-lock)?\.json$|\.nvmrc$|\.github/workflows/load-gate\.yml$)' || run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+  gate:
+    name: One-address load gate (k6)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # The harness's opt-in: this server is the runner's own service container.
+      LOAD_LOCAL_POSTGRES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The k6 the gate was measured with, from the action pinned to its commit.
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+        with:
+          k6-version: 2.3.0
+      - run: npm run load:seed
+      - name: Serve the school (the API, in the background)
+        working-directory: apps/api
+        run: |
+          node --import tsx scripts/load/serve.ts > "$RUNNER_TEMP/api.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/api.pid"
+          for _ in $(seq 30); do
+            curl -fsS http://127.0.0.1:3001/healthz > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+      - name: The bell and the flood (k6)
+        run: npm run load:gate -- --quiet
+      - name: Stop the API (its own minute sweep would race the timed one)
+        run: |
+          pid=$(cat "$RUNNER_TEMP/api.pid")
+          kill -TERM "$pid"
+          timeout 20 tail --pid="$pid" -f /dev/null
+      - name: The sweep at that size
+        run: npm run load:sweep
+      - name: The API's warnings and errors
+        if: failure()
+        run: grep -E '"level":(40|50|60)' "$RUNNER_TEMP/api.log" | tail -n 100 || true

@@ -2,7 +2,13 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as schema from '../src/schema.js';
-import { backdateLastSeen, backdateSessionEnd, dropDatabase, makeTestDb } from '../src/testing.js';
+import {
+  backdateLastSeen,
+  backdateSessionEnd,
+  dropDatabase,
+  makeTestDb,
+  recreateDatabase,
+} from '../src/testing.js';
 import type { Database } from '../src/types.js';
 
 /*
@@ -94,6 +100,43 @@ describe('dropDatabase', () => {
       await expect(dropDatabase(server, name)).rejects.toThrow(/not a plain database name/);
     }
   });
+});
+
+/*
+ * The helpers that drop databases carry the same guard, checked before any connection: nothing
+ * listens at this port, so a helper that connected first would fail on that instead.
+ */
+describe('the helpers that drop databases', () => {
+  const server = 'postgres://unused@127.0.0.1:1/postgres';
+  const helpers = {
+    dropDatabase: () => dropDatabase(server, 'bali_load'),
+    recreateDatabase: () => recreateDatabase(server, 'bali_load'),
+    // On the real-Postgres path: it makes a database that its close() drops.
+    makeTestDb: () => {
+      const saved = process.env.TEST_DATABASE_URL;
+      process.env.TEST_DATABASE_URL = server;
+      return makeTestDb().finally(() => {
+        if (saved === undefined) delete process.env.TEST_DATABASE_URL;
+        else process.env.TEST_DATABASE_URL = saved;
+      });
+    },
+  };
+
+  for (const [name, run] of Object.entries(helpers)) {
+    for (const env of ['production', undefined]) {
+      it(`${name} refuses to run with NODE_ENV=${env ?? '<unset>'}, before connecting`, async () => {
+        const saved = process.env.NODE_ENV;
+        try {
+          if (env === undefined) delete process.env.NODE_ENV;
+          else process.env.NODE_ENV = env;
+          await expect(run()).rejects.toThrow(`${name} is a test-only helper`);
+        } finally {
+          if (saved === undefined) delete process.env.NODE_ENV;
+          else process.env.NODE_ENV = saved;
+        }
+      });
+    }
+  }
 });
 
 /*

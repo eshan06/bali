@@ -22,6 +22,8 @@
     "dev:teacher": "npm run dev:teacher -w @bali/api --",
     "load:seed": "npm run load:seed -w @bali/api",
     "load:serve": "npm run load:serve -w @bali/api",
+    "load:gate": "npm run load:gate -w @bali/api --",
+    "load:sweep": "npm run load:sweep -w @bali/api",
     "fixtures": "npm run fixtures -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
     "lint": "eslint .",

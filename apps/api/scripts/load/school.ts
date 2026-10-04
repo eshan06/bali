@@ -39,15 +39,29 @@ export const SCHOOL_FILE =
 export interface SchoolFile {
   /** What serve.ts gives the API: its database on the server, and the issuer it trusts. */
   api: { database: string; issuer: string; audience: string; jwksUri: string; internalKey: string };
-  /** Per teacher: a token, the class they start at this bell, and their block. */
-  teachers: { token: string; classId: string; blockId: string; tagId: string }[];
+  /**
+   * Per teacher: a token, the class they start at this bell, their block, and the second class
+   * every other one teaches (null for the rest), which another room takes at another bell.
+   */
+  teachers: {
+    token: string;
+    classId: string;
+    blockId: string;
+    tagId: string;
+    secondClassId: string | null;
+  }[];
   /** Per student: a token, the tag of the block they tap, and their class there. */
   students: { token: string; tagId: string; classId: string }[];
+  /** An account of the school's in no class: the load gate's flooder. */
+  flooder: { token: string };
 }
 
 /**
  * The Postgres server in TEST_DATABASE_URL, the one the real-Postgres tests use, if it is on this
- * machine: neither command ever reaches dev's or prod's.
+ * machine: neither command ever reaches dev's or prod's. The URL must name this machine, and
+ * LOAD_LOCAL_POSTGRES=1 must vouch for the server behind it, as nothing can prove it: `localhost`
+ * can be a tunnel to another machine, whose server, reached on its own loopback, says it answered
+ * on loopback too — while CI's, a container on the runner, says it answered on Docker's network.
  */
 export function harnessServer(env: NodeJS.ProcessEnv): string {
   const url = env.TEST_DATABASE_URL;
@@ -55,6 +69,12 @@ export function harnessServer(env: NodeJS.ProcessEnv): string {
   const host = new URL(url).hostname;
   if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
     throw new Error(`TEST_DATABASE_URL must name a Postgres server on this machine, not ${host}`);
+  }
+  if (env.LOAD_LOCAL_POSTGRES !== '1') {
+    throw new Error(
+      `set LOAD_LOCAL_POSTGRES=1 to vouch that the Postgres at ${host} runs on this machine: ` +
+        'it could be a tunnel to another one, and nothing here can tell',
+    );
   }
   return url;
 }
@@ -109,6 +129,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
           schoolId,
           displayName: s.name,
         })),
+        { cognitoId: 'load-flooder', role: 'student' as const, schoolId, displayName: 'Flooder' },
       ]);
       await tx.insert(classes).values(
         teachers.flatMap((t) =>
@@ -152,6 +173,7 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
         classId: t.classId,
         blockId: t.blockId,
         tagId: t.tagId,
+        secondClassId: t.secondClassId,
       })),
     ),
     students: await Promise.all(
@@ -161,5 +183,6 @@ export async function seedSchool(server: string, database = 'bali_load'): Promis
         classId: s.teacher.classId,
       })),
     ),
+    flooder: { token: await token('load-flooder') },
   };
 }
