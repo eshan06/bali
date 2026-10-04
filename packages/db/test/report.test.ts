@@ -1,9 +1,9 @@
 import { sessionReport, type ActionOrder, type ReportEvent } from '@bali/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { newUuidV7 } from '../src/ids.js';
-import { getSessionEvents } from '../src/queries.js';
+import { classSessions, getSessionEvents, sessionEvents } from '../src/queries.js';
 import {
   armedTaps,
   classes,
@@ -479,5 +479,44 @@ describe('sessionReport over what the engine stores', () => {
       focusMinutes: 9,
       unlocks: [{ occurredAt: at(12), recordedAs: 'no_live_participation' }],
     });
+  });
+});
+
+/** The plan Postgres chooses for `query`, as text, as history.test.ts reads one. */
+async function planOf(query: SQLWrapper): Promise<string> {
+  return db.transaction(async (tx) => {
+    // Priced out, as there: on a near-empty table a sequential scan is the
+    // cheap plan whatever the indexes.
+    await tx.execute(sql`set local enable_seqscan = off`);
+    const result = await tx.execute(sql`explain ${query}`);
+    // postgres.js answers with the rows, PGlite with an object holding them.
+    const rows = (Array.isArray(result) ? result : (result as { rows: unknown[] }).rows) as Record<
+      string,
+      string
+    >[];
+    return rows.map((row) => Object.values(row).join(' ')).join('\n');
+  });
+}
+
+/*
+ * The list's reads (R3) cost a page's own size, however many sessions the class
+ * has run: its sessions through their own index, and every event they hold
+ * through the session's. Behaviour is tested through the endpoint
+ * (apps/api/test/reports.test.ts); this pins the plans, on both lanes.
+ */
+describe('the reports list’s reads', () => {
+  it.each([
+    ['a first page', undefined],
+    ['a later page', { at: '2026-03-02T09:00:00.000000Z', id: newUuidV7() }],
+  ])('read a class’s sessions through their own index on %s', async (_page, key) => {
+    const plan = await planOf(classSessions(db, newUuidV7(), key, 21));
+    expect(plan, plan).toContain('sessions_class_started_idx');
+    expect(plan, plan).not.toContain('Seq Scan');
+  });
+
+  it('read every event of a page’s sessions through the session’s index', async () => {
+    const plan = await planOf(sessionEvents(db, [newUuidV7(), newUuidV7()]));
+    expect(plan, plan).toContain('events_session_seq_idx');
+    expect(plan, plan).not.toContain('Seq Scan');
   });
 });

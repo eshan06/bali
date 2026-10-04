@@ -42,6 +42,9 @@ export const API_ERROR_REASONS = [
   'not_participating',
   'invalid_extension',
   'event_id_conflict',
+  // A 404: no live class holds the join code (the join and its preview), or
+  // none has the id on a route under /v1/classes/{id} — every one of them, so
+  // one condition reaches a client in one shape (R3, #192's review).
   'class_not_found',
   'enrollment_not_found',
   'protection_off',

@@ -1,0 +1,1 @@
+CREATE INDEX "sessions_class_started_idx" ON "sessions" USING btree ("class_id","started_at","id");

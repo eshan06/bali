@@ -8,6 +8,51 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **R3: the class's reports list, `GET /v1/classes/{id}/reports/sessions`, for the
+  class's own teacher: every session newest first, 20 a page, each row R2's figures counted on
+  read; and an unknown class is `404 class_not_found` on every class route.** **A row:** the
+  session's id, its window (`startedAt`, its bell `endsAt`, `endedAt` once marked), R2's `ended`
+  (the stored mark, so a session past its bell reads `false` until the sweep marks it), and its
+  totals: how many joined, the class's focus minutes (total, and the average per student who
+  joined, null when none did), silent minutes, and how many unlocks and protection offs its report
+  lists, whatever each changed. Counts only, no names: the report (R2) names. **One count for
+  both:** each row is `sessionReport` (R1) over every event its session holds, the page's read in
+  one statement (`sessionEvents`, which R2's read now goes through too), by one clock for the
+  page, and made whole by the same function R2 serves (`counted`), so a row never disagrees with
+  its session's report; a test reads both for every row of a page holding R2's rounding case,
+  silence, a late unlock, protection off, a session no one joined and one past its bell. **Why
+  counted on read, never stored:** the events are the one truth (data-model decision 1), and a
+  stored summary is a second copy that can drift, the bug that decision exists to end. Nor is a
+  session's count final at its end: an unlock or a protection off that first reaches the server
+  after it is recorded, never discarded, and counted, so a summary written at the end goes stale
+  unless every late write rewrites it in the engine's transaction. And the read is cheap at a
+  page's size: one index range for the page's sessions (`sessions_class_started_idx`, new) and one
+  for their events (`events_session_seq_idx`), both plans pinned on both lanes; 20 lessons of 30
+  students are a few thousand events. **When a stored summary would be worth it:** when a read
+  covers far more sessions than a page (a term's or a school's totals), or a page's events stop
+  being cheap (tens of thousands, say phones flapping in and out of silence for hours). Then the
+  transition engine writes it in the same transaction as each event, never a job catching up
+  after, or a cache keyed by the session's latest `seq` recomputes it when an event lands past
+  that. **Paging mirrors the history's (A7):** newest first by `started_at`, then by id, so the
+  order is total and two sessions started at one instant are neither skipped nor repeated;
+  `before` names the last row of the page before, and `nextBefore` the one to pass next, null at
+  the end. A `before` the class does not hold (another class's session, the teacher's own other
+  class's included, or none) is `400 unknown_cursor`, reload from the top; any other refusal of
+  the request, the path's malformed id included, `400 invalid_request`, as wherever a 400 means
+  more than one thing. `limit` asks for fewer, as there. 20 a page, because each row costs its
+  session's events. Who may read is checked before the cursor: another teacher sending one of the
+  class's sessions as `before` is `403`, never told whether it is one (a malformed query is `400`
+  first, and names nothing). **The class routes' 404, aligned (#192's review WARN, closed):** R2
+  answered an unknown class `404 class_not_found`, while `GET` and `PATCH /v1/classes/{id}`, the
+  roster and the Start answered a bare `404`: one condition in two shapes, what `refusal`'s
+  contract exists to prevent. A reason is never removed, and R2's 404 needs one (it also means an
+  unknown session), so the others gain it: every route under `/v1/classes/{id}` answers an
+  unknown class `404 class_not_found` through one guard (`requireOwnClass`), and a test over the
+  app's route table holds every such route to it, a new one included. Additive: the status is
+  unchanged, and a client reads a reason it doesn't expect as none. The vocabulary's rule stands
+  (no reason where the status says it all), with this beside it: a reason one route must send for
+  a condition, every route that meets it sends.
+
 - **2026-10-04** — **R2: one session's report, `GET /v1/classes/{id}/reports/sessions/{sessionId}`,
   for the class's own teacher: R1's counts, named and rounded; a session not over yet is answered,
   never refused; and a note this build doesn't know moves no one and reads as none.** **What it

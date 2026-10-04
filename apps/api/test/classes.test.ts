@@ -1,10 +1,12 @@
 import { type Database, users } from '@bali/db';
-import type { ClassDetail, EnrollmentJoinResponse } from '@bali/shared';
+import type { ApiErrorBody, ClassDetail, EnrollmentJoinResponse } from '@bali/shared';
+import type { InjectOptions } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { authedInject, makeAuthedApp, type AuthedApp } from './helpers/app.js';
 import { makeTestDb, seedClassroom } from './helpers/db.js';
+import { routeTable } from './helpers/openapi.js';
 
 let db: Database;
 let closeDb: () => Promise<void>;
@@ -253,5 +255,47 @@ describe('PATCH /v1/classes/:id', () => {
       name: 'Nope',
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('every route under /v1/classes/:id', () => {
+  /** What a route must be sent, beside the class's id, to reach its class. */
+  const BODIES: Record<string, object> = {
+    'PATCH /v1/classes/:id': { name: 'Renamed' },
+    'POST /v1/classes/:id/sessions': { durationMinutes: 25 },
+  };
+
+  it('answers an unknown class 404 class_not_found: one condition, one shape (R3)', async () => {
+    const { teacher } = await seedClassroom(db, 'unknown-class');
+    const token = await ctx.tokenFor(teacher.cognitoId);
+    const routes = (await routeTable())
+      .map((route) => `${String(route.method)} ${route.url}`)
+      .filter((key) => key.includes(' /v1/classes/:id') && !key.startsWith('HEAD '));
+    // The filter matches the routes there are today, so it can't quietly match none.
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        'GET /v1/classes/:id',
+        'PATCH /v1/classes/:id',
+        'GET /v1/classes/:id/roster',
+        'POST /v1/classes/:id/sessions',
+        'GET /v1/classes/:id/reports/sessions',
+        'GET /v1/classes/:id/reports/sessions/:sessionId',
+      ]),
+    );
+    for (const key of routes) {
+      const [method, url] = key.split(' ') as [InjectOptions['method'], string];
+      const res = await ctx.app.inject({
+        method,
+        // Every id in the path unknown, the class's included.
+        url: url.replace(/:\w+/g, () => randomUUID()),
+        headers: { authorization: `Bearer ${token}` },
+        payload: BODIES[key],
+      });
+      expect(res.statusCode, `${key} (a 400: the route needs a body in BODIES)`).toBe(404);
+      expect(res.json<ApiErrorBody>().error, key).toMatchObject({
+        code: 'not_found',
+        reason: 'class_not_found',
+      });
+    }
   });
 });

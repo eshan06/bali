@@ -24,6 +24,13 @@ export const EVENT_PAGE_LIMIT = 200;
 export const HISTORY_PAGE_LIMIT = 50;
 
 /**
+ * Sessions per page of a class's reports list (`GET /v1/classes/{id}/reports/sessions`, R3);
+ * `limit` may ask for fewer. Small: every row's totals are counted from its session's events on
+ * each read.
+ */
+export const SESSION_REPORTS_PAGE_LIMIT = 20;
+
+/**
  * Every join code's length (the server mints them, `generateJoinCode`), so the
  * longest code the join and its preview accept (A6) — and what a phone's or the
  * portal's code field holds to.

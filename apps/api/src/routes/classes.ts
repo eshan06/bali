@@ -1,7 +1,6 @@
 import {
   createClass,
   type Database,
-  findClassById,
   findLiveSessionForClass,
   getRoster,
   updateClass,
@@ -10,7 +9,7 @@ import type { ClassDetail, RosterResponse } from '@bali/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { requireTeacher } from '../auth/teacher.js';
+import { classNotFound, requireOwnClass, requireTeacher } from '../auth/teacher.js';
 import { ApiError, parseRequest } from '../errors.js';
 
 const Params = z.object({ id: z.string().uuid() });
@@ -51,6 +50,9 @@ function toClassDetail(
  * PATCH  /v1/classes/:id        rename and/or regenerate the join code
  * GET    /v1/classes/:id/roster the class's active roster
  *
+ * A class named by id is the caller's own (`requireOwnClass`): an unknown one is
+ * `404 class_not_found` on every class route, another teacher's `403`.
+ *
  * These writes never touch participations/events, so they call the `@bali/db`
  * management helpers directly rather than the engine. Creates return 200 with
  * the resource, matching the house style (start-session, enrollment-join).
@@ -81,9 +83,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
     async (request): Promise<ClassDetail> => {
       const teacher = await requireTeacher(db, request);
       const { id } = parseRequest(request, 'params', Params);
-      const klass = await findClassById(db, id);
-      if (!klass) throw ApiError.notFound('class not found');
-      if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
+      const klass = await requireOwnClass(db, teacher, id);
       return toClassDetail(klass, (await findLiveSessionForClass(db, id))?.id ?? null);
     },
   );
@@ -95,9 +95,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
       const teacher = await requireTeacher(db, request);
       const { id } = parseRequest(request, 'params', Params);
       const body = parseRequest(request, 'body', UpdateBody);
-      const klass = await findClassById(db, id);
-      if (!klass) throw ApiError.notFound('class not found');
-      if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
+      await requireOwnClass(db, teacher, id);
 
       const updated = await updateClass(db, {
         classId: id,
@@ -106,7 +104,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
       });
       // Undefined only if the class was removed between the check and the write
       // (no production path does this yet) — treat as gone.
-      if (!updated) throw ApiError.notFound('class not found');
+      if (!updated) throw classNotFound();
       return toClassDetail(updated, (await findLiveSessionForClass(db, id))?.id ?? null);
     },
   );
@@ -117,9 +115,7 @@ export function registerClassesRoutes(app: FastifyInstance, db: Database): void 
     async (request): Promise<RosterResponse> => {
       const teacher = await requireTeacher(db, request);
       const { id: classId } = parseRequest(request, 'params', Params);
-      const klass = await findClassById(db, classId);
-      if (!klass) throw ApiError.notFound('class not found');
-      if (klass.teacherId !== teacher.id) throw ApiError.forbidden('not your class');
+      await requireOwnClass(db, teacher, classId);
 
       const roster = await getRoster(db, classId);
       return {

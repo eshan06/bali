@@ -78,6 +78,13 @@
       "when": 1790816888640,
       "tag": "0010_unlock_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791097456257,
+      "tag": "0011_class_sessions",
+      "breakpoints": true
     }
   ]
 }
