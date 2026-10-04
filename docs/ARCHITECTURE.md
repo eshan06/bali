@@ -501,7 +501,9 @@ with no finer meaning than its status carries none.
   own session's shields back on, unless the student has refocused or re-tapped there
   since (ruled 2026-09-24; B3a, B3b-2; the answer's half B6b-2).
 - **Old apps call forever.** `/v1` plus additive-only is a discipline held in code
-  review, not a feature.
+  review, not a feature — and in CI, whose check of the API's surface against
+  `contracts/openapi.json` (generated from the app: every route and the request schema it
+  parses) fails a change that removes a `/v1` route, method or request field (Phase 4, O1).
 - **The fixtures are the phone's contract.** `contracts/fixtures/` holds the API's real
   answer to every student request, for each outcome a phone decodes — captured in memory,
   ids and times normalised — and a test fails when one drifts. BaliCore decodes every one

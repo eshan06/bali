@@ -89,6 +89,43 @@ export function parse<T>(schema: ZodType<T>, data: unknown, reason?: ApiErrorRea
   return result.data;
 }
 
+/** The parts of a request a route parses, each with the zod schema it parses it with. */
+export interface RequestSchemas {
+  params?: ZodType;
+  query?: ZodType;
+  body?: ZodType;
+}
+
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    /**
+     * What the route's handler parses (`parseRequest`), on the route table for
+     * the API snapshot (`contracts/openapi.json`, O1). Never Fastify's own
+     * validation: a handler parses in its own order, after its auth checks,
+     * and refuses in the one error shape.
+     */
+    parses?: RequestSchemas;
+  }
+}
+
+/**
+ * `parse` for one part of a request, with the schema its route declares in
+ * `config.parses`. Any other schema is a bug — a 500, which the route's own
+ * tests meet first — so the API snapshot never misses what a route parses.
+ */
+export function parseRequest<T>(
+  request: FastifyRequest,
+  part: keyof RequestSchemas,
+  schema: ZodType<T>,
+  reason?: ApiErrorReason,
+): T {
+  if (request.routeOptions.config.parses?.[part] !== schema) {
+    const route = `${request.method} ${request.routeOptions.url ?? request.url}`;
+    throw new Error(`${route} parses a ${part} its route does not declare in config.parses`);
+  }
+  return parse(schema, request[part], reason);
+}
+
 /**
  * Install the single error path: the error handler (maps ApiError, Zod errors,
  * Fastify's own 4xx, and anything unexpected to the shape) and the not-found

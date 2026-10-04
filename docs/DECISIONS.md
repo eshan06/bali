@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **O1: the OpenAPI snapshot check, built from the route table and zod 4's
+  `z.toJSONSchema`, with no new dependency.** The step deferred on 2026-09-19 as needing
+  `@fastify/swagger` needs none of it: swagger reads Fastify's `schema` slot, which Fastify also
+  validates with, before the handler — a bad body would answer `400` ahead of the `401` or `403` it
+  gets now, with Fastify's message in place of our per-field details — and our zod schemas aren't
+  JSON Schema; reaching them would take a type provider and its package too. **How:** each route
+  declares in its Fastify `config` — free-form; Fastify only carries it — the zod schemas its
+  handler parses (`config.parses`: `params`, `query`, `body`), and the handler parses through
+  `parseRequest`, which refuses a schema its route doesn't declare as a bug, a `500` the route's own
+  tests meet first: so the snapshot never misses what a route parses, nor names another schema for it.
+  Every parse keeps its place in its handler, after the auth checks, so no answer changes.
+  `buildApp` takes an `onRoute` hook (tests only) to read the route table;
+  `apps/api/test/helpers/openapi.ts` turns it into an OpenAPI 3.1 document, `contracts/openapi.json`:
+  every route Fastify registers (less the HEAD it adds beside each GET, and CORS's preflight,
+  `OPTIONS *`, which only a deploy naming origins has), each request part as a client sends it
+  (`io: 'input'`), an answer's schema where one is cheap — the student endpoints', from the contract
+  fixtures' strict schemas — and the one error shape on every route. A custom check has no JSON
+  Schema, so the phone's `order` reads as any value, as the server takes it. `npm run fixtures`
+  rewrites the file beside the fixtures, and CI's existing `git diff --exit-code -- contracts` step
+  fails on drift; no workflow changed but a comment. **Additive-only, mechanised:** the test fails,
+  with the rule's message, on anything a `/v1` route promised that the app no longer does — a route,
+  a method, a query parameter, a body field however deep (a rename is a removal) — before it
+  compares or writes, so a regenerate never writes a removal over the snapshot; an addition passes
+  once the regenerated file is committed. A path parameter is sent by its place, so renaming one is
+  no removal. `/healthz` and `/internal/*` are not the apps' contract: their changes are drift
+  only. **Not caught, left to review:** a field made required, a type narrowed, an enum value
+  dropped (they show as drift); and a hand edit of the snapshot, the one way past the check —
+  deliberate, and in the diff. **To know:** a zod bump that changes its JSON Schema output (a
+  pattern, a keyword) is drift too: regenerate. And the leave's body schema now says what the route
+  always did, an optional body (`.nullish()`, `?? {}` in the handler), so the snapshot doesn't call
+  it required.
+
 - **2026-10-03** — **User-facing words are written with `no-ai-slop`, on the owner's word.** The
   owner wants Bali's words free of AI-writing patterns too, and named Peter Yang's no-ai-slop
   skill (petergyang/no-ai-slop, MIT) for them. **What landed:** its `SKILL.md` and `eval.md`

@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireSessionOwner } from '../auth/teacher.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 import { toFeedEvent } from '../sse/frame.js';
 import { createStreamHub, type StreamHubOptions } from '../sse/hub.js';
 
@@ -65,9 +65,9 @@ export function registerFeedRoutes(
 
   app.get(
     '/v1/sessions/:id',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params } } },
     async (request): Promise<SessionSnapshot> => {
-      const { id } = parse(Params, request.params);
+      const { id } = parseRequest(request, 'params', Params);
       const { session } = await requireSessionOwner(db, request, id);
 
       // Read the cursor BEFORE the roster, never concurrently. Two independent
@@ -105,10 +105,10 @@ export function registerFeedRoutes(
 
   app.get(
     '/v1/sessions/:id/events',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { params: Params, query: AfterQuery } } },
     async (request): Promise<EventsPage> => {
-      const { id } = parse(Params, request.params);
-      const { after } = parse(AfterQuery, request.query);
+      const { id } = parseRequest(request, 'params', Params);
+      const { after } = parseRequest(request, 'query', AfterQuery);
       const { session } = await requireSessionOwner(db, request, id);
 
       const rows = await getEventsSince(db, session.id, after, EVENT_PAGE_LIMIT);
@@ -118,9 +118,13 @@ export function registerFeedRoutes(
     },
   );
 
-  app.get('/v1/sessions/:id/stream', { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = parse(Params, request.params);
-    const { after } = parse(AfterQuery, request.query);
+  const options = {
+    preHandler: app.authenticate,
+    config: { parses: { params: Params, query: AfterQuery } },
+  };
+  app.get('/v1/sessions/:id/stream', options, async (request, reply) => {
+    const { id } = parseRequest(request, 'params', Params);
+    const { after } = parseRequest(request, 'query', AfterQuery);
 
     // Watch for the client going away BEFORE the first await. A tab closed
     // while the ownership queries run fires 'close' immediately; a listener

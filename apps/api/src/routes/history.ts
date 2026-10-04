@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { requireAuth } from '../auth/plugin.js';
-import { ApiError, parse } from '../errors.js';
+import { ApiError, parseRequest } from '../errors.js';
 
 const HistoryQuery = z.object({
   /** The last event id of the page before: the cursor is a row, never an offset. */
@@ -44,12 +44,12 @@ function toHistoryEvent(row: HistoryRow): HistoryEvent {
 export function registerHistoryRoute(app: FastifyInstance, db: Database): void {
   app.get(
     '/v1/me/history',
-    { preHandler: app.authenticate },
+    { preHandler: app.authenticate, config: { parses: { query: HistoryQuery } } },
     async (request): Promise<HistoryPage> => {
       const identity = requireAuth(request);
       // A malformed query is a client bug; a cursor this history does not
       // hold is the phone's cue to reload from the top — a reason each.
-      const { before, limit } = parse(HistoryQuery, request.query, 'invalid_request');
+      const { before, limit } = parseRequest(request, 'query', HistoryQuery, 'invalid_request');
 
       // Looked up, never created: no row yet is no history yet.
       const caller = await findUserByCognitoId(db, identity.sub);
