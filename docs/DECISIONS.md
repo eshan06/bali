@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **L2a: the load harness trusts its issuer through env alone, and writes only
+  a database of its own on this machine.** `npm run load:serve` sets `AUTH_JWKS_URI` to a
+  `data:` URL holding the seed's public key (the verifier reads its key set through jose with
+  Node's `fetch`, which reads `data:` as it reads `https:`), and `AUTH_ISSUER` and
+  `AUTH_AUDIENCE` to the test issuer's, then imports `src/server.ts`. No API code changed: a
+  deployed API trusts only the key set its own env names, Cognito's, and the harness's key is
+  made by each seed, its private half never written down. Set before the API reads its env,
+  these win over a `.env` (dotenv never overrides), so one naming dev's database or Cognito's
+  pool changes none of them. Not taken: a key set served over local HTTP, one more port for the
+  same trust; a harness mode in the API, a switch a deploy could flip. **Data:** both commands
+  take `TEST_DATABASE_URL`, the real-Postgres tests' server, and refuse one not on this machine;
+  the seed drops and remakes `bali_load` and writes nowhere else, its rows in directly as the
+  tests seed theirs (no participation, no event). **The school:** 20 teachers starting a class
+  of 30 each at the bell (600 students), every other one with a second class the room before
+  theirs takes at another bell, so a student holds one or two enrollments and a teacher one or
+  two classes. **Watch:** narrowing `AUTH_JWKS_URI` (https only, say) breaks the harness; its
+  smoke test in the real-Postgres lane says so.
+
 - **2026-10-04** — **L1: the rate limits (ISSUES #1), sized from the clients' real cadence, and
   the caller's address read from Railway's `X-Real-IP`, not a `trustProxy` hop count.**
   **Budgets** (`BUDGETS`, `apps/api/src/limits.ts`; each a token bucket: a burst, refilled a
@@ -114,8 +132,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Cognito's prod settings are undocumented. **Compliance:** Apple's developer agreement §3.3.3(P)
   (added 2026-03-30; the text of 2026-08-18, read on Apple's site on 2026-10-04) limits Family
   Controls apps to parental controls or individuals managing their own focus, says the framework
-  "may not be used … in organizational settings", and bars sharing device or usage data beyond
-  the individual and their device (ISSUES #3); 33 states restrict phones at school (ISSUES #4);
+  "may not be used … in organizational settings", and bars sharing device or usage data
+  "received through the Family Controls Framework or otherwise" beyond the individual and their
+  device (ISSUES #3); 33 states restrict phones at school (ISSUES #4);
   App Store guideline 5.1.1(v) requires in-app account deletion, against data-model decision 3
   (ISSUES #5); there is no privacy manifest though the app uses `UserDefaults`; FERPA's
   school-official terms and the state's student-privacy law (or the SDPC NDPA) call for a signed

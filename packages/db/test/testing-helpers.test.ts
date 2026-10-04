@@ -2,7 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as schema from '../src/schema.js';
-import { backdateLastSeen, backdateSessionEnd, makeTestDb } from '../src/testing.js';
+import { backdateLastSeen, backdateSessionEnd, dropDatabase, makeTestDb } from '../src/testing.js';
 import type { Database } from '../src/types.js';
 
 /*
@@ -81,6 +81,17 @@ describe('backdateSessionEnd', () => {
       ).rejects.toThrow(/participations/);
     } finally {
       process.env.NODE_ENV = saved;
+    }
+  });
+});
+
+describe('dropDatabase', () => {
+  // The name is quoted into SQL, so anything but a plain one is refused before any connection:
+  // nothing listens at this port, and a check after connecting would fail on that instead.
+  it('refuses a name that is not a plain lower-case one', async () => {
+    const server = 'postgres://unused@127.0.0.1:1/postgres';
+    for (const name of ['bali_load"; DROP DATABASE postgres; --', 'Bali', '', '1st']) {
+      await expect(dropDatabase(server, name)).rejects.toThrow(/not a plain database name/);
     }
   });
 });

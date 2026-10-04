@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 
+import { runMigrations } from './migrate.js';
 import { MIGRATIONS_DIR } from './paths.js';
 import * as schema from './schema.js';
 import type { Database } from './types.js';
@@ -62,11 +63,6 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
 
   await withAdmin(baseUrl, (sql) => createDatabase(sql, name));
 
-  // WITH (FORCE) terminates any lingering connections (Postgres 13+, and CI runs
-  // 16), so a leaked stream connection can't keep the throwaway database alive.
-  const dropDatabase = () =>
-    withAdmin(baseUrl, (sql) => sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`));
-
   let client: Sql | undefined;
   try {
     client = postgres(databaseUrl(baseUrl, name), { max: 5, onnotice: () => {} });
@@ -80,7 +76,7 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
         // Drop even if the pool teardown rejects, so a failed end() can't strand
         // the database (the forced drop closes any connection end() missed).
         await pool.end({ timeout: 5 }).catch(() => {});
-        await dropDatabase();
+        await dropDatabase(baseUrl, name);
       },
     };
   } catch (err) {
@@ -92,9 +88,33 @@ async function makeRealPostgresDb(baseUrl: string): Promise<TestDb> {
     // released here, so an afterEach calling the undefined `close` is only
     // harmless noise on an already-failing test, never a leak.)
     if (client) await client.end({ timeout: 5 }).catch(() => {});
-    await dropDatabase().catch(() => {});
+    await dropDatabase(baseUrl, name).catch(() => {});
     throw err;
   }
+}
+
+/**
+ * A fresh, migrated database `name` on the server at `baseUrl`, one of that name dropped first —
+ * for the load harness (`apps/api/scripts/load`), whose database outlives the process that makes
+ * it: the API serves it from its own. Returns its URL. It drops what it is given, on whatever
+ * server: a caller checks the server is a local one first (the harness's `harnessServer`).
+ */
+export async function recreateDatabase(baseUrl: string, name: string): Promise<string> {
+  await dropDatabase(baseUrl, name);
+  await withAdmin(baseUrl, (sql) => createDatabase(sql, name));
+  const url = databaseUrl(baseUrl, name);
+  await runMigrations(url);
+  return url;
+}
+
+/**
+ * Drop the database `name` on the server at `baseUrl`, if it is there. WITH (FORCE) terminates
+ * any lingering connections (Postgres 13+, and CI runs 16), so a leaked stream connection can't
+ * keep it alive. The name is quoted into SQL, so only a plain lower-case one is taken.
+ */
+export async function dropDatabase(baseUrl: string, name: string): Promise<void> {
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`not a plain database name: ${name}`);
+  await withAdmin(baseUrl, (sql) => sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`));
 }
 
 /** Run one statement on the maintenance database, then close the connection. */
@@ -127,8 +147,8 @@ async function createDatabase(sql: Sql, name: string): Promise<void> {
   }
 }
 
-/** The base connection URL with its database name swapped for the throwaway one. */
-function databaseUrl(baseUrl: string, name: string): string {
+/** The base connection URL with its database name swapped for `name`. */
+export function databaseUrl(baseUrl: string, name: string): string {
   const url = new URL(baseUrl);
   url.pathname = `/${name}`;
   return url.toString();
