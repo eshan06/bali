@@ -758,8 +758,10 @@ Each exists because v2 broke it and shipped a real bug
   surface (REST, `/v1` additive-only, one error shape — endpoint list itself not final);
   the six rules; live updates (SSE + Postgres LISTEN/NOTIFY); hosting (Railway, two
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
-  (Next.js thin client on Vercel); both items in [ISSUES.md](ISSUES.md) are requirements.
-- **Open:** nothing — the design is complete. Next: the build plan (what gets coded
+  (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements.
+- **Open:** two design questions, both Phase 6: ISSUES #3's fallback (the grid shows only
+  what Bali itself records, never data received through Family Controls) and ISSUES #5's
+  amendment of data-model decision 3. Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
 - **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
   `main` is v3 only.

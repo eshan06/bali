@@ -16,9 +16,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   secret, and `npm audit --omit=dev` is clean; the JWT checks, every route's ownership check, the
   stream's header-only token, the internal key's timing-safe compare and the app's Keychain use
   are solid. The gaps sit where no review looks, in existing code and configuration: a Drizzle
-  error carries its SQL parameters (names, unlock reasons) into the logs, with no redaction; the
-  portal has no sign-out and never ends the Cognito session, so a shared classroom computer
-  opens the last teacher's account; no security headers or CSP on the portal; ID tokens accepted
+  error carries its SQL parameters (names, unlock reasons) into the logs, with no redaction; no
+  sign-out control on the portal (`signOut()` exists in `apps/web/src/lib/auth.ts`, wired only
+  to a 401), and the Cognito session is never ended, so a shared classroom computer opens the
+  last teacher's account; no security headers or CSP on the portal; ID tokens accepted
   beside access tokens; the API's database role could drop the append-only trigger; a PR runs its
   own copy of `claude-review.yml` (PLAN's carried edge) while `main` auto-merges and auto-deploys;
   Cognito's prod settings are undocumented. **Compliance:** Apple's developer agreement §3.3.3(P)
