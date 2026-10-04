@@ -31,10 +31,12 @@ import {
   armTap,
   changeUnlockReason,
   checkIn,
+  deleteAccount,
   endEnrollment,
   endSession,
   expireDueSessions,
   extendSession,
+  joinClassByCode,
   markSilentParticipations,
   protectionOff,
   protectionOn,
@@ -1729,6 +1731,70 @@ describe.runIf(REAL_PG)('engine concurrency (real Postgres)', () => {
       expect(participation.silentSince).toBeNull();
     }
   });
+});
+
+describe.runIf(REAL_PG)('account deletion under contention (real Postgres, C3)', () => {
+  it('a deletion racing an unlock, a rename, a join and the end of the lesson loses no unlock and leaves no name', async () => {
+    // The deletion takes the student's row first, as a rename and a join do,
+    // so those serialise with it: before it, the rename's names are emptied
+    // and the join's class left; after it, each is refused ACCOUNT_DELETED.
+    // The unlock and the end lock the lesson, as the deletion's leave does:
+    // the unlock is recorded whichever lands first (ISSUES #2), and the
+    // participation ends exactly once. Never a deadlock, never a 500.
+    for (let round = 0; round < 12; round += 1) {
+      const { classId, studentId } = await seed(`race-delete-${round}`);
+      await seed(`race-delete-other-${round}`); // a class whose code the join uses
+      const session = await openSession(classId);
+      await tapIn(db, {
+        sessionId: session.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      const unlockId = newUuidV7();
+      const deletion = () =>
+        deleteAccount(db, { userId: studentId, eventId: newUuidV7(), at: new Date() });
+
+      const [deleted, unlocked, renamed, joined, ended] = await Promise.allSettled([
+        round % 2 === 1
+          ? new Promise((resolve) => setTimeout(resolve, 10)).then(deletion)
+          : deletion(),
+        unlock(db, { sessionId: session.id, studentId, eventId: unlockId, deviceTime: new Date() }),
+        renameStudent(db, { studentId, displayName: `Late ${round}`, eventId: newUuidV7() }),
+        joinClassByCode(db, {
+          studentId,
+          joinCode: `race-delete-other-${round}`,
+          eventId: newUuidV7(),
+          occurredAt: new Date(),
+        }),
+        endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' }),
+      ]);
+
+      if (deleted.status === 'rejected') throw deleted.reason;
+      expect(deleted.value.outcome).toBe('deleted');
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      expect(ended.status).toBe('fulfilled');
+      for (const late of [renamed, joined]) {
+        if (late.status === 'rejected')
+          expect(late.reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+      }
+
+      expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });
+      const row = one(await db.select().from(users).where(eq(users.id, studentId)));
+      expect(row.displayName).toBeNull();
+      const renames = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
+      expect(renames.every((e) => e.payload === null)).toBe(true);
+      const stillIn = await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.studentId, studentId), isNull(enrollments.removedAt)));
+      expect(stillIn).toHaveLength(0);
+      expect(await liveOf(studentId)).toHaveLength(0);
+    }
+  }, 60_000);
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {

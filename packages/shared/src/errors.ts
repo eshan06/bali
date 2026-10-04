@@ -86,6 +86,11 @@ export const API_ERROR_REASONS = [
   'invite_expired',
   'already_teacher',
   'student_in_class',
+  // DELETE /v1/me (C3): a teacher who has a class is refused — their account
+  // goes through the school (a 409; nothing changed). And a join or a rename
+  // that reached an account deleted on the way — a 409; nothing recorded.
+  'teacher_has_classes',
+  'account_deleted',
 ] as const;
 export type ApiErrorReason = (typeof API_ERROR_REASONS)[number];
 

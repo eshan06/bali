@@ -50,6 +50,15 @@ const REFUSALS: Record<
   // Screen Time back on (#167) with the participation not in protection off: a
   // re-tap already left it, or it never went. Nothing was recorded.
   PROTECTION_NOT_OFF: ['conflict', 'protection_not_off', 'Screen Time permission is not off'],
+  // An account's deletion (C3): a teacher with a class or a block is deleted
+  // through the school. Nothing was changed.
+  TEACHER_HAS_CLASSES: [
+    'conflict',
+    'teacher_has_classes',
+    'a teacher with a class or a block: ask the school to delete the account',
+  ],
+  // A join or a rename that reached an account deleted on its way. Nothing was recorded.
+  ACCOUNT_DELETED: ['conflict', 'account_deleted', 'this account was deleted'],
 };
 
 /**
