@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **P6: the owner's runbooks in their own file, `docs/RUNBOOKS.md`.** DEPLOY.md
+  explains how the API runs; the runbooks are click-by-click and production-only, so they got
+  their own file, linked from DEPLOY.md and PLAN.md. **The restore drill restores into a copy,
+  never in place:** Railway's restore, as far as known, writes a backup back over the same
+  volume, so the drill dumps prod into a scratch Postgres inside prod's private network (no TCP
+  proxy opened), compares every table's count and one session's events, then deletes the copy;
+  Railway's own restore is practised on dev. **Unconfirmed, raised not settled:** Railway's
+  point-in-time recovery (hosting decision 4) — the runbook tells the owner to raise it if the
+  console has none. **CODEOWNERS:** sessions open PRs under the owner's account and GitHub never
+  lets an author approve their own PR, so a code-owner rule means the owner merges those PRs by
+  bypass; that is the intended control, said in the runbook.
 - **2026-10-04** — **P5: TestFlight from CI, by hand.** **Trigger:** `workflow_dispatch`
   only, with a choice of environment; dev is the only option, and builds with `project.yml`'s
   values, which are dev's. Prod adds an option and its overrides in the Archive step, so its

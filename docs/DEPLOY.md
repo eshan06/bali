@@ -51,6 +51,10 @@ These steps need credentials this repo doesn't hold — do them once per
 environment (start with **dev**, then **production**; hosting decision 2 keeps
 them fully separate):
 
+For **production**, follow `docs/RUNBOOKS.md` instead: the same steps, numbered,
+with prod's hardening (private-network database, Cognito per Phase 6) and a
+check after each.
+
 1. **Cognito** — create (or reuse the v2) user pool and its app clients: the
    portal's (`docs/WEB.md`) and the phone's (below). Note the issuer URL, JWKS
    URI, and app client ids for the `AUTH_*` variables.
