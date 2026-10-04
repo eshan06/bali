@@ -192,14 +192,17 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    5. Pool → **Sign-up**: **Self-service sign-up** on, and Cognito sends the email a
       verification code (**Cognito-assisted verification**, email), so nobody signs
       up with a school address they can't read.
-   6. The check runs only at sign-up, so nobody may change their email afterwards:
-      on both app clients (step 8) → **Attribute read and write permissions**
-      *(wording unsure)*, untick **email** under write.
+   6. Leave **email** writable on both app clients (step 8). Cognito won't take
+      write away from a required attribute, and hosted **Sign up** needs it to set
+      the address at all. The guard is the check itself: it runs only at sign-up,
+      so an account can only start from a school address, and Cognito sends a
+      changed email a code before it counts as verified.
    Accounts you make yourself under **Users → Create user** skip the check (e.g.
    App Review's demo account). A first sign-in through Apple or Google is checked
    like a sign-up, so a hidden Apple email is refused.
    **Check:** on the hosted page (step 9) → **Sign up**: a `@gmail.com` address is
-   refused with "Use your @vanderbilt.edu email address to sign up."; a
+   refused with "PreSignUp failed with error Use your @vanderbilt.edu email address
+   to sign up." (Cognito puts its own prefix before the Lambda's message); a
    `@vanderbilt.edu` one is sent a code.
 5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
    → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.

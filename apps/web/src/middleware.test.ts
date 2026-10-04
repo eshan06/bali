@@ -42,6 +42,9 @@ describe('middleware', () => {
     const pages = new RegExp(`^${rule.source}$`);
     expect(pages.test('/classes/abc/reports')).toBe(true);
     expect(pages.test('/_next/static/chunks/main.js')).toBe(false);
+    for (const icon of ['/icon.svg', '/icon.png', '/apple-icon.png']) {
+      expect(pages.test(icon)).toBe(false);
+    }
     expect(rule.missing.map((m) => m.key)).toEqual(['next-router-prefetch', 'purpose']);
   });
 });

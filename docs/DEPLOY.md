@@ -190,8 +190,9 @@ What a run checks and needs:
   Apple refuses a number already uploaded, so re-running a run that got as far as the
   upload fails: dispatch a new run.
 - Export compliance is answered in the app's `Info.plist`
-  (`ITSAppUsesNonExemptEncryption` = `false`: Bali uses only the HTTPS that iOS provides,
-  which is exempt), so App Store Connect no longer asks on each build.
+  (`ITSAppUsesNonExemptEncryption` = `false`: Bali's only cryptography is exempt: the HTTPS
+  that iOS provides, CryptoKit's SHA-256 for the sign-in's PKCE challenge, and the system
+  Keychain for its tokens), so App Store Connect no longer asks on each build.
 
 ## Local run
 

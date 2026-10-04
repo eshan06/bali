@@ -34,7 +34,7 @@ export const handler = async (event) => {
   return event;
 };
 
-export function allowedDomains(value) {
+function allowedDomains(value) {
   return (value ?? '')
     .split(',')
     .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
@@ -42,7 +42,7 @@ export function allowedDomains(value) {
 }
 
 // The part after the last `@`, lowercased, nothing trimmed; '' when there is no usable address.
-export function emailDomain(email) {
+function emailDomain(email) {
   if (typeof email !== 'string') return '';
   const at = email.lastIndexOf('@');
   return at < 1 ? '' : email.slice(at + 1).toLowerCase();
