@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-03** — **User-facing words are written with `no-ai-slop`, on the owner's word.** The
+  owner wants Bali's words free of AI-writing patterns too, and named Peter Yang's no-ai-slop
+  skill (petergyang/no-ai-slop, MIT) for them. **What landed:** its `SKILL.md` and `eval.md`
+  copied into `.claude/skills/no-ai-slop/` at a pinned upstream commit with a Bali block on top,
+  as the design skills were (2026-09-29); a row in DESIGN.md's Design tooling and a line in its
+  agent prompt guide; the CLAUDE.md working rule; and a line in `/santa-loop`'s design check,
+  which runs its Detect job over a PR's changed strings as WARNs, never blockers. **Scope:**
+  user-facing words wherever DESIGN.md says they live (the portal, the app, the shield, a demo
+  site, and the strings kept outside those folders); never code, docs or commits. **How:** the
+  skill edits a draft, so a worker drafts each new or changed string in DESIGN.md's voice, runs
+  the skill's Edit job on it and checks it against `eval.md`. **What it never overrides:**
+  DESIGN.md's voice (short, warm, second person, sentence case), the owner's ruled words ("Screen
+  Time off", the grid's state words) and the approved screens' words; its advice to keep a
+  writer's edge or profanity doesn't apply to a product's voice. Existing strings stay until a
+  planned step rewords them, as the em-dash cleanup does. **Not taken:** its Codex metadata
+  (`agents/openai.yaml`), and a global `npx skills add` (a cloud container forgets it, and a
+  pinned copy changes only by a PR).
+
 - **2026-10-03** — **Phase 3 closed (2026-10-03).** The iOS student app is on `main`; Phase 3 ends
   here and Phase 4 is next. The evidence, all on the owner's iPhone 15 Pro (iOS 18.6.2) against
   dev: E1, ISSUES #2 on hardware, passed on 2026-10-01 — Wi-Fi off mid-unlock, a force-quit right

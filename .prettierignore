@@ -33,3 +33,4 @@ ios/Bali/UI/bali-tokens.json
 .claude/skills/full-output-enforcement/
 .claude/skills/image-to-code/
 .claude/skills/web-design-guidelines/
+.claude/skills/no-ai-slop/

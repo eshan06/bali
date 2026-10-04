@@ -103,6 +103,7 @@ Runs beside the reviewers; skip it when the diff has no user-facing UI.
 - The diff touches `apps/web/src/app` or `apps/web/src/components`: run the `web-design-guidelines` skill over those changed files.
 - The diff touches `ios/Bali/UI` or `ios/BaliShield`: check the changed screens against `docs/DESIGN.md` (its tokens and its do's and don'ts).
 - The diff changes a user-facing string outside those folders (DESIGN.md's scope lists where they live): check its words against DESIGN.md's voice.
+- The diff adds or changes any user-facing string, in those folders or outside them: run the `no-ai-slop` skill's Detect job over the new and changed strings only, under its Bali block.
 
 Every design finding is a **WARN, never a blocker**: santa is never stricter than the final gate (Step 1). They go through Step 4, item 3, like any WARN.
 

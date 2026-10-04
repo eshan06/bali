@@ -264,6 +264,9 @@ design if it has one. Then:
   own when it is built.
 - **Use tokens, never raw values.** A value the tokens lack is a question for
   the owner, not an invention.
+- **Write the words with `no-ai-slop`:** draft each new or changed string in
+  this file's voice, then run the skill's Edit job on it and check it against
+  its `eval.md`. Its Bali block says what it may and may not change.
 - **Look before shipping** (web): run the portal (`npm run dev -w @bali/web`),
   screenshot the changed page with the `playwright` CLI (installed in cloud
   sessions; elsewhere `npx playwright`), and check it against this file.
@@ -292,6 +295,7 @@ them.
 | `full-output-enforcement` | Any UI deliverable: no placeholders, nothing left unfinished | taste-skill, MIT |
 | `image-to-code` | Dormant: the demo site, once an image-generation tool is set up | taste-skill, MIT |
 | `web-design-guidelines` | Reviewing the portal's UI; `/santa-loop` runs it on PRs that touch it (WARNs only) | [Vercel](https://github.com/vercel-labs/web-interface-guidelines), MIT, rules pinned in `rules.md` |
+| `no-ai-slop` | Writing or changing any user-facing string, wherever it lives: its Edit job on your own draft, checked against its `eval.md`; `/santa-loop` runs its Detect job over a PR's changed strings (WARNs only). This file's voice and the owner's ruled words win | [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop), MIT, its checks pinned in `eval.md` |
 
 **Updating one:** copy the newer upstream file over it, put its Bali block and
 `description` prefix back, update the pinned commit in the block, and say why
