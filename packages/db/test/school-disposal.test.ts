@@ -316,7 +316,11 @@ describe('disposeSchool (C6a)', () => {
     const s = await seed('c6a-again');
     await pastBell(s.lesson.id);
     const at = new Date();
-    const first = await disposeSchool(db, { schoolId: s.school.id, at, confirmName: s.school.name });
+    const first = await disposeSchool(db, {
+      schoolId: s.school.id,
+      at,
+      confirmName: s.school.name,
+    });
     if (first.outcome !== 'disposed') throw new Error(first.outcome);
     const before = await rowsOf(s);
     const disposals = () => db.$count(events, eq(events.type, 'school_disposed'));
