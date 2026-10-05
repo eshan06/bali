@@ -1,7 +1,7 @@
 # Owner runbooks — production
 
-Six runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
-Vercel, GitHub and Sentry. Phase 5's P6. Do them in this order the first time — each one
+Seven runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
+Vercel, GitHub, Sentry and Apple's developer site. Phase 5's P6. Do them in this order the first time — each one
 uses values the one before it produced:
 
 1. [Cognito for production](#2-cognito-for-production) (the API needs its pool's values),
@@ -11,6 +11,8 @@ uses values the one before it produced:
 5. [GitHub hardening](#5-github-hardening), any time.
 6. [Alerts: Sentry and an uptime check](#6-alerts-sentry-and-an-uptime-check), once prod
    runs with `SENTRY_DSN` set.
+7. [Push: the APNs key](#7-push-the-apns-key), any time; its end-to-end check once the
+   app half of the push ships.
 
 **Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
@@ -44,6 +46,8 @@ uses values the one before it produced:
   `pg_dump` into a scratch database, works without them (skip its step 1).
 - **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
 - **Runbook 6, alerts:** open.
+- **Runbook 7, push:** open (added 2026-10-06, N6). Until it's done the API logs
+  `push is off` at boot and sends no "class started" alert.
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
@@ -673,3 +677,71 @@ alerts, each to your email:
    `<prod API URL>/healthz-test` (it answers `404`), wait for the email, then set it back.
    Don't stop prod to test.
    **Check:** the email came, and the monitor reads up again after the fix.
+
+---
+
+## 7. Push: the APNs key
+
+What it makes: the "class started" alert switched on (ARCHITECTURE's "Push: a doorbell for
+students"; PLAN's N5b, N6). The API already sends it; it stays off until it holds an APNs
+signing key. One key serves both environments and both Railway services, and the App ID
+gets the Push Notifications capability. Token auth (a `.p8` key) needs no push certificate.
+
+**Before you start:** the Apple Developer account (team `H535678UF8`) with the Account
+Holder or Admin role, and the Railway project.
+
+1. **Make the key.** [developer.apple.com/account](https://developer.apple.com/account) →
+   **Certificates, Identifiers & Profiles** → **Keys** → **+**. Key name: `Bali APNs`. Tick
+   **Apple Push Notifications service (APNs)**. If it offers **Configure**, choose the
+   environment **Sandbox & Production** (Debug builds push on sandbox, TestFlight and the
+   App Store on production) and leave the key restriction at its default, team scoped
+   *(wording unsure)*. **Continue** → **Register**.
+   **Check:** the key's page shows its **Key ID**, 10 capitals or numerals.
+2. **Download it, once.** On that page, **Download**. Apple never offers the `.p8` file
+   again: put it in your password manager now, with the Key ID beside it, and delete the
+   copy in Downloads. Never in the repo, a chat or an issue. Lost before step 4? Revoke
+   it and make another (step 7); a team holds at most two APNs keys.
+   **Check:** the password manager holds `AuthKey_<Key ID>.p8`, beginning
+   `-----BEGIN PRIVATE KEY-----`, and the Key ID.
+3. **Push on the App ID.** **Identifiers** → `com.bali.Bali` → **Capabilities** → tick
+   **Push Notifications** (no certificate: skip its **Configure**; token auth needs none)
+   → **Save**, and confirm if it warns that the app's profiles change. Nothing to
+   regenerate by hand: automatic signing makes a profile with push on the next build,
+   TestFlight's included. A build made before this step can't register for push.
+   **Check:** the App ID's capability list shows Push Notifications ticked.
+4. **Railway, dev.** Railway → the project → environment `dev` *(as named there)* →
+   service `bali` → **Variables** → add:
+   - `APNS_KEY_P8`: the `.p8` file's whole contents, the `BEGIN` and `END` lines included.
+     Paste it with its line breaks as they are; if the field keeps one line only, write
+     each break as `\n` (the API accepts both, `apps/api/src/env.ts`).
+   - `APNS_KEY_ID`: the Key ID from step 1.
+   - `APNS_TEAM_ID`: `H535678UF8`.
+   - `APNS_TOPIC`: leave unset (it defaults to `com.bali.Bali`).
+
+   All three or none: one or two of them set and the API refuses to boot, naming the
+   variables; a key that isn't a P-256 private key also stops the boot. **Deploy** the
+   staged changes.
+   **Check:** the deploy's log says `push is on: "class started" alerts go to APNs`, not
+   `push is off`, and `/healthz` answers ok.
+5. **Railway, prod.** The same three variables, the same key, on environment `production`,
+   service `bali prod`. Deploy.
+   **Check:** as step 4, on prod's log and `https://bali-prod-production.up.railway.app/healthz`.
+6. **End to end, once the app half ships** (the Mac session's: the phone registering its
+   token, the `aps-environment` entitlement). A Debug build from Xcode, pointed at dev,
+   registers as `sandbox`; a TestFlight build on prod registers as `production`. On each:
+   sign in as a student in a class, allow notifications, tap the block while the class is
+   off (the tap waits for the Start), lock the phone, then press **Start** on the portal.
+   **Check:** within seconds the lock screen shows "{class name} has started" / "Open Bali
+   to lock your apps.", and the API's log shows no APNs refusal. A refusal is logged with
+   the student id and Apple's reason; `BadDeviceToken` there usually means the build
+   registered under the other environment (it loses that token until its next register,
+   PLAN's N6).
+7. **A leaked or lost key: rotate it.** Make the new key first (steps 1 and 2; with two
+   keys already, revoke first and accept the gap). Put its contents and Key ID on dev's
+   `bali` and prod's `bali prod` (steps 4 and 5) and deploy both; then **Keys** → the old
+   key → **Revoke**. Apple stops honouring a revoked key at once, so a service still
+   holding it sends nothing (each refusal logged) until it has the new one. Phones keep
+   their tokens: a token belongs to the app and the phone, not the key. Delete the old
+   `.p8` from the password manager.
+   **Check:** both deploy logs say `push is on`, the Keys list shows only the new key, and
+   step 6's alert still arrives.
