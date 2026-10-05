@@ -18,6 +18,7 @@ import {
   inviteCodeSymbols,
   mintTeacherInvite,
   recordAgreement,
+  recordYearEnd,
   redeemTeacherInvite,
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
@@ -507,6 +508,8 @@ describe('npm run school: running it', () => {
       .set({ expiresAt: sql`now() - interval '1 second'` })
       .where(eq(teacherInvites.id, lapsed.invite.id));
     const unsigned = await createSchool(db, { name: 'Unlisted Agreement High' });
+    const termed = await createSchool(db, { name: 'Termed High' });
+    await recordYearEnd(db, { schoolId: termed.id, endsOn: '2026-12-18' });
 
     const lines = await run('list');
     expect(lines[0]).toBe(`${'id'.padEnd(36)}  agreement   year ends   open invites  name`);
@@ -514,6 +517,7 @@ describe('npm run school: running it', () => {
     expect(lines).toContain(
       `${unsigned.id}  none        none        0             Unlisted Agreement High`,
     );
+    expect(lines).toContain(`${termed.id}  none        2026-12-18  0             Termed High`);
     const printed = lines.join('\n');
     for (const { code, invite } of [open, used, lapsed]) {
       expect(printed).not.toContain(code);
