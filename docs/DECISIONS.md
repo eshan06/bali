@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **The APNs client: Node's own HTTP/2 and crypto, a transport seam (N5a).**
+  No dependency: `node:crypto` signs the ES256 provider token (`dsaEncoding: 'ieee-p1363'`, the
+  raw r‖s a JWS needs) and `node:http2` carries the request; `jose`, already a dependency, only
+  verifies Cognito's tokens and would add nothing here. The token is reused for 50 minutes —
+  Apple refuses one older than an hour and throttles one refreshed more often than every 20 —
+  and signed afresh after an `ExpiredProviderToken`. "Gone" is `410`, `BadDeviceToken` or
+  `Unregistered`, the three Apple uses for a token that will never work again; every other
+  refusal keeps the token (a `DeviceTokenNotForTopic` or a `TooManyRequests` says nothing about
+  the phone). The client sends and reads; who gets an alert, and deleting a gone token, are
+  N5b's, in the route layer. Config: `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, all three or
+  none, so a half-set deploy fails its boot instead of running with push silently off; the key
+  is checked as a P-256 private key at boot, its line breaks as they are or written `\n` (for a
+  store that keeps one line). `APNS_TOPIC` defaults to `com.bali.Bali`. A request times out at 5 s, inside the
+  8 s shutdown deadline N5b's drain will sit under.
+
 - **2026-10-06** — **Post-merge CI runs on main are never cancelled; race tests stage, never aim.**
   `ci.yml` cancels only outdated PR runs; a push to main gets a per-commit concurrency group,
   because `cancel-in-progress: false` alone still lets GitHub cancel a queued run when a newer
