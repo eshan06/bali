@@ -351,6 +351,11 @@ by the owner in App Store Connect → the app → **TestFlight**. How builds are
   "How to try it" filled from section 4's choice and 5.4's accounts. Add one line at the
   top for the beta: "This build is for one university class's pilot (adult students on
   their own iPhones)."
+- **Export compliance:** nothing to answer per build. The app's `Info.plist` sets
+  `ITSAppUsesNonExemptEncryption` to `false` (Bali's only cryptography is exempt: iOS's
+  HTTPS, CryptoKit's SHA-256 for the sign-in's PKCE challenge, the system Keychain;
+  `docs/DEPLOY.md`, "TestFlight"). If App Store Connect still asks, the answer is **None
+  of the algorithms mentioned above** (no non-exempt encryption).
 
 ### 5.3 What to Test (each build's "What to Test", 4,000 characters)
 
