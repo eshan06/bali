@@ -205,6 +205,12 @@ by their build number: each run's name in the Actions list, `TestFlight (prod)`,
 summary say which environment its number was built for, so note it before handing a build
 to testers.
 
+**Keep the pilot's testers on prod builds only.** A TestFlight group is offered every
+build added to it, so once the pilot has a prod build, put its testers in an external
+group that gets prod builds and nothing else. Dev builds go to an internal group (the
+owner's own testers) and never to the pilot's group: a dev build there would point a
+classroom's phones at dev.
+
 What a run checks and needs:
 
 - **The release guard** (#130, "Nothing from Debug in Release"; part of Phase 6's S10)
