@@ -595,6 +595,9 @@ with no finer meaning than its status carries none.
 How a new row in the `events` table reaches the teacher's screen within a second or two.
 Only teacher screens get a live feed — student phones learn the truth from the responses
 to their own requests — so live connections ≈ one per running class, not one per student.
+*Amended 2026-10-06:* one push notification, a visible "class started" alert, rings a
+waiting student's phone when the Start converts their armed tap; it is a doorbell, never
+the truth, and no stream (see "Push: a doorbell for students" below).
 
 ### The decisions (2026-09-16)
 
@@ -633,6 +636,41 @@ phone follows a live lesson by polling `GET /v1/sessions/{id}/presentation` in t
 foreground, about every 2 s with an ETag. The teacher stream gains the lifecycle events
 `question_opened`, `question_closed` and `slide_shown`; a question's live counts are polled
 by the portal from the results endpoint, so no per-student answer enters the stream.
+
+### Push: a doorbell for students (2026-10-06)
+
+The owner's decision with the Mac session. A student whose armed tap (data-model decision 5)
+waits for the Start learns of it only at the phone's next 30 s read or return to the front
+(PLAN's open product decision 6). One push closes that gap without changing who owns the truth.
+
+- **A visible notification only.** No silent or background push, and nothing that locks a
+  phone remotely: a teacher-triggered remote lock is exactly the open §3.3.3(P) question to
+  Apple (ISSUES #3). The student still chooses to act — opening Bali is what shields.
+- **Who gets it:** only the students whose waiting armed tap *this* Start converts into a
+  participation. A student who taps after the Start joins at once and gets nothing; a tap the
+  Start declines (`armed_tap_skipped`, or noted `superseded`) gets nothing either.
+- **The words (final):** title "{class name} has started", body "Open Bali to lock your
+  apps." No other personal data in the payload — no student name, no ids.
+- **A doorbell, never the truth.** Opened, the phone reads the truth from the API, as the
+  portal's stream reads the `events` table after a LISTEN/NOTIFY ping. No code — server or
+  phone — may assume a notification arrived; the 30 s read and the return to the front stay.
+- **Sent after the Start's transaction commits** — never inside it, never from the
+  transition engine. One alert per converted student's tokens, over APNs HTTP/2 with token
+  auth (a `.p8` key): topic `com.bali.Bali`, team `H535678UF8`, `apns-push-type: alert`,
+  priority 10, `interruption-level: time-sensitive`, a short `apns-expiration`, and an
+  `apns-collapse-id` per session. A Start replay re-reads and sends nothing. A send failure
+  never fails or delays the Start; it is logged without the token. A token APNs reports gone
+  (`410`, or `BadDeviceToken`) is deleted. With the APNs configuration unset the sender is
+  off, as Sentry is.
+- **Device tokens.** An additive `/v1` endpoint lets a student register and remove its APNs
+  token with its APNs environment (`sandbox` for Debug builds, `production` for TestFlight
+  and the App Store), idempotent on a client-minted UUIDv7 `eventId`. A new table keyed by
+  the token; students only for now. Tokens are personal data: deleted by `deleteAccount`
+  (C3), a school's disposal (C6a) and the retention run (C6b); placed by C5's export and the
+  schema tests that place every foreign key to `users`; never logged.
+- **Not on the pilot's critical path.** It never delays C2 or the external TestFlight steps.
+  The app's half (registering, the `aps-environment` entitlement, the Time Sensitive
+  capability, the words) is the Mac session's.
 
 ## Hosting
 
@@ -1142,7 +1180,8 @@ Each exists because v2 broke it and shipped a real bug
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
   (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements;
   the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
-  totals only, phones polling), planned and not yet built.
+  totals only, phones polling), planned and not yet built; the Start's push to waiting
+  students (2026-10-06, a visible doorbell, never the truth), planned and not yet built.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.

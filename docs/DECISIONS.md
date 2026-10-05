@@ -8,6 +8,25 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **A "class started" push: a visible doorbell for waiting students.** The
+  owner's decision with the Mac session. A student whose armed tap waits for the Start found
+  it only at the phone's next 30 s read or return to the front (PLAN's open product decision
+  6 left push as "a later upgrade"). Now the Start sends one visible alert — "{class name} has
+  started" / "Open Bali to lock your apps." — to the students whose waiting tap *that* Start
+  converts, and to no one else. Why visible only: a silent push that shields, or any remote
+  lock, is the teacher-triggered lock ISSUES #3 asks Apple about (§3.3.3(P)); the student
+  still chooses to open Bali. Why a doorbell: like LISTEN/NOTIFY for the portal, the phone
+  reads the truth from the API when opened, and nothing assumes delivery. Why after commit
+  and outside the engine: a send must never fail, delay or roll back a Start, and a replay
+  must not re-send. APNs over HTTP/2 with a `.p8` key (topic `com.bali.Bali`, team
+  `H535678UF8`, time-sensitive, collapse id per session); off when unconfigured, like Sentry.
+  Device tokens get an additive `/v1` register/remove endpoint (UUIDv7 `eventId`, the APNs
+  environment carried) and their own table keyed by the token, students only; they are
+  personal data, so C3, C6a, C6b, C5's export and the foreign-key guards cover them, and
+  they are never logged. Not on the pilot's critical path. Recorded in ARCHITECTURE
+  ("Push: a doorbell for students") and PLAN (steps N1–N6); the app half is the Mac
+  session's.
+
 - **2026-10-05** — **PLAN's "Now" is a short handoff; its old prose is archived here.**
   PLAN.md's "Now" had grown to ~780 lines of landed-step news, opening with Phase 5's, and
   its header line to a paragraph; the Phases table still read Phase 4 "in progress" and
