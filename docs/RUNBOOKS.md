@@ -44,7 +44,7 @@ uses values the one before it produced:
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
-teacher there with the block `BALIBLOCK1` and a class. The first prod TestFlight build was
+teacher there with the owner's block (registered 2026-10-05) and a class. The first prod TestFlight build was
 dispatched 2026-10-05 (Actions run 37267876703).
 
 How to read them:
@@ -422,9 +422,10 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
 
 What it makes: a new Vercel project that builds the portal (`apps/web`) from `main`.
 
-**Pick the moment.** The v2 demo site is deployed by the **existing** Vercel project,
-from its production branch `v2-archive` (ARCHITECTURE, Status). The flip must not
-replace it by accident. Do this on a day you can watch both sites, after runbooks 1–2.
+**Done 2026-10-05** (the status list at the top). The v2 demo site is the older Vercel
+project `bali-web`, which turned out **not connected to the repo**: no push reaches it,
+so steps 1–2 weren't needed. They stay below for a rebuild where a demo project is
+connected. Left to do: step 6.
 
 **What the repo says about `vercel.json`:** the file at the repo root only turns off
 deploys of `main`. Vercel reads `vercel.json` from a project's **Root Directory**, so
@@ -435,7 +436,8 @@ your Vercel projects; step 1 tells you which case you're in.
 1. **Look at the existing project, change nothing.** Vercel → the existing project →
    **Settings → General:** note its **Root Directory**. **Settings → Git:** note its
    **Production Branch** (expected `v2-archive`).
-2. **Protect the demo before anything changes.** Still in the existing project →
+2. **Protect the demo before anything changes** *(only if a demo project is connected to
+   the repo; not needed 2026-10-05)*. Still in the existing project →
    **Settings → Git → Ignored Build Step** → **Custom**:
    `[ "$VERCEL_GIT_COMMIT_REF" != "v2-archive" ]` (exit 0 means skip, so it builds
    only `v2-archive`). Never set its production branch to `main` unless you mean to
@@ -487,11 +489,11 @@ your Vercel projects; step 1 tells you which case you're in.
      takes no wildcards) and listed in dev's `CORS_ORIGINS`. Previews that can't sign
      in are fine; to sign in on one, register one fixed branch alias, never every URL.
 6. **Remove `vercel.json`'s deploy block.** Ask a session for a PR that deletes
-   `vercel.json` (the block is the whole file) — after step 2, so the existing
-   project still builds only `v2-archive`.
-   **Check:** after it merges, the new project deploys `main` to production; the
-   existing project shows the build skipped by its Ignored Build Step; the demo site
-   is unchanged.
+   `vercel.json` (the block is the whole file). It governs only a project rooted at the
+   repo root, and none is connected (step 2's note), so the portal already deploys `main`
+   without it; the file is dead weight that misleads.
+   **Check:** after it merges, the next push to `main` deploys `bali-portal` as before,
+   and the demo site is unchanged.
 7. **End to end.** On `https://<portal domain>`: sign in (prod pool), the classes page
    loads, Sign out returns to `/login` saying you're signed out. In the browser's
    developer tools, the API calls go to `<prod API URL>` and none fails with a CORS
