@@ -120,7 +120,7 @@ jobs:
           # App Store Connect refused run 37273876331's upload on both (ITMS-90778, ITMS-90360):
           # the NFC formats entitlement may hold TAG only (an NDEF reader session runs under it),
           # and each extension needs a display name. testflight.yml checks the signed archive.
-          formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" Bali/Bali.entitlements)
+          formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" Bali/Bali.entitlements 2>/dev/null || true)
           if ! grep -qw TAG <<< "$formats" || grep -qw NDEF <<< "$formats"; then
             echo "::error::Bali.entitlements' NFC formats must be TAG alone (App Store Connect refuses NDEF): $formats"
             exit 1
