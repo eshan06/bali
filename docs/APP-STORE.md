@@ -308,3 +308,157 @@ only if App Review rejects under 2.1 after seeing the video, and then build it a
 planned step with the security review it needs. Raise the question in ISSUES #3's App
 Review consultation too: "how would you like to review a feature that needs our NFC
 block?" costs nothing to ask.
+
+---
+
+## 5. TestFlight external beta (the Vanderbilt pilot)
+
+The pilot's students install Bali through TestFlight's **external** testing, and Apple's
+**Beta App Review** checks the first build offered to an external group (later builds of
+the same version usually go straight through). It reads the same §3.3.3(P) rules as App
+Review, so ISSUES #3's consultation comes first (5.6 below). 🔧 Everything here is pasted
+by the owner in App Store Connect → the app → **TestFlight**. How builds are made:
+`docs/DEPLOY.md`, "TestFlight"; the pilot itself: `docs/PILOT.md`.
+
+### 5.1 The groups: prod builds to the pilot, dev builds stay internal
+
+- **External group `Vanderbilt pilot`** (TestFlight → External Testing → +): **prod builds
+  only**, each one dispatched with `environment: prod` (the run's name reads
+  `TestFlight (prod)`; note its build number). Add the students by email, or turn on its
+  **public link** with a tester limit near the class's size and send the link only to the
+  class.
+- **Internal group** (the owner and anyone on the team): dev builds, and a prod build
+  before it goes external. Internal testing needs no Beta App Review.
+- **Never add a dev build to the external group:** it would point a classroom's phones at
+  dev. A build added to a group stays offered to it, so check the number twice.
+- A build expires 90 days after upload: the pilot's term (to 2026-12-18) fits in one
+  build uploaded on or after 2026-10-05, but any fix is a new prod dispatch and, for a
+  new version, a new Beta App Review.
+
+### 5.2 Test Information (TestFlight → Test Information)
+
+- **Beta App Description:** the store listing's promotional text (section 1) is enough.
+- **Feedback email:** `eshan.shah@vanderbilt.edu` (P4's support address). Testers' in-app
+  feedback (a screenshot from TestFlight) reaches App Store Connect → TestFlight →
+  Feedback.
+- **Marketing URL / Privacy policy URL:** the support page
+  `https://bali-portal.vercel.app/support`, and C2's policy page once it exists. ⚖️ Test
+  Information asks for a privacy policy URL, and C2 is a Phase 6 gate item for the
+  student-facing steps anyway: its page (the lawyer's words) comes before the first
+  external build.
+- **Beta App Review Information:** contact name, email and phone (🔧 the owner's); the
+  sign-in the reviewer uses (5.4); **Review Notes:** section 2's review notes, with its
+  "How to try it" filled from section 4's choice and 5.4's accounts. Add one line at the
+  top for the beta: "This build is for one university class's pilot (adult students on
+  their own iPhones)."
+
+### 5.3 What to Test (each build's "What to Test", 4,000 characters)
+
+Written in DESIGN.md's voice and edited with `no-ai-slop`; no em dashes. It tells testers
+what to try and what to report, in the words a student uses; change it with a build only
+when what to try changes.
+
+> Thanks for trying Bali in class this term.
+>
+> What to try:
+> - Sign up with your @vanderbilt.edu email, give Bali Screen Time access, and join your
+>   class with the code your professor gives you.
+> - When class starts, hold your iPhone to the Bali block. Your apps lock until the class
+>   ends. Calls, FaceTime, Messages and Emergency SOS still work.
+> - If you need your phone, hold Emergency Unlock. It works without a signal. Your
+>   professor sees that you unlocked, and the reason if you give one.
+> - When class ends, your apps unlock on their own, even if Bali is closed.
+>
+> Tell us if anything stays locked when it shouldn't, if a screen says something that
+> isn't true, or if Bali gets in your way. Send feedback from TestFlight with a
+> screenshot, or write to eshan.shah@vanderbilt.edu.
+
+### 5.4 Review and demo accounts
+
+Prod's pool only lets `@vanderbilt.edu` addresses sign up: the Pre sign-up Lambda
+(`infra/cognito/pre-signup.mjs`) refuses any other on the hosted page. It lets an account
+the owner makes in the console through (Cognito's `AdminCreateUser`, trigger source
+`PreSignUp_AdminCreateUser`: only someone with AWS access to the pool can make one), so
+review accounts are made there:
+
+1. **A mailbox you control** for each account (a `+review` alias of your own address is
+   enough; Apple never needs to receive mail there).
+2. **Create the user:** AWS console → Cognito → `bali-production` → **Users** → **Create
+   user**: the email as username and email, **Mark email address as verified**, **Set a
+   password** (12+ characters, the pool's policy), and don't send an invitation.
+3. **Make the password permanent,** so the reviewer isn't asked to change it on first
+   sign-in:
+   ```bash
+   aws cognito-idp admin-set-user-password --user-pool-id us-east-1_C55e0fhX8 \
+     --username <email> --password '<password>' --permanent
+   ```
+   **Check:** the user's **Confirmation status** reads Confirmed. The password goes into
+   App Store Connect's review fields and your password manager, never the repo.
+4. **The student review account** signs in once on the app (its first sign-in makes it a
+   student, as anyone's does) and joins the demo class with its join code, so the
+   reviewer lands where section 4's option A starts.
+5. **The teacher review account** (optional, to watch the live grid): an invite redeemed
+   on the portal, as `docs/PILOT.md`'s setup steps 3–4 do. 🔧 Decide where the demo class
+   lives: under the Vanderbilt school its accounts and sessions are in that school's
+   reports, export and retention run; a separate demo school keeps them apart, but
+   `npm run school` mints its invite only once an agreement day is recorded for it, and
+   that record should be true. Either way, name the class "Demo" so it's never mistaken for
+   a real one.
+6. **After review,** set a new password on both, or disable them (**Users** → the user →
+   **Disable**), and re-enable them for the next review.
+
+### 5.5 What the beta can't show the reviewer
+
+The tap needs a block and a running session (section 4). For Beta App Review, section 4's
+recommendation stands: the recorded tap in the review notes, the accounts above for
+everything around it.
+
+### 5.6 Ask Apple first: §3.3.3(P) (ISSUES #3)
+
+ISSUES #3: Beta App Review applies §3.3.3(P), so the pilot's first external build can be
+stopped by it. Ask before submitting the first external build, through App Store Connect →
+**Contact Us** → App Review → *(wording unsure)* a question about a guideline or the
+developer agreement, or through an App Review appointment at a Meet with Apple session.
+The draft to paste (the owner edits it; the facts are true of the code today):
+
+> Hello App Review,
+>
+> We'd like guidance before we submit our first build for external TestFlight testing.
+>
+> Bali (bundle ID com.bali.Bali, with its extensions com.bali.Bali.BaliMonitor and
+> com.bali.Bali.BaliShield; Family Controls distribution entitlement granted 2026-09-24)
+> helps a student keep their own iPhone out of the way during class. The student installs
+> Bali, approves Screen Time access for themselves with `.individual` authorization, joins
+> their class with a code, and taps their iPhone on their teacher's NFC tag when class
+> starts. Bali then shields all app and web categories (`.all()`) until the class's end
+> time. The student can hold Emergency Unlock at any time to remove the shields at once,
+> with or without a network; calls, FaceTime, Messages and Emergency SOS keep working; and
+> revoking Screen Time access or deleting the app ends it.
+>
+> Bali never uses a FamilyActivityPicker and never receives which apps the student has or
+> uses. The teacher sees only what Bali records itself, which the student reads before
+> joining: whether each student is focused, unlocked (with an optional reason), or has
+> turned Screen Time access off; the last contact during class; tap-in and end times; and
+> leaving the class.
+>
+> Our first users are adult students at Vanderbilt University, on their own iPhones, in
+> one professor's class.
+>
+> Our questions about section 3.3.3(P) of the Apple Developer Program License Agreement:
+>
+> 1. Is this use, where each student approves Family Controls on their own device to
+>    manage their own focus, within "offering individuals the ability to manage their
+>    devices to enable focus and productivity", given that a teacher starts the class
+>    session?
+> 2. Does sharing with the teacher the state Bali records itself (focused, unlocked,
+>    Screen Time access off), with the student's consent before joining, fall under the
+>    restriction on sharing data "received through the Family Controls Framework or
+>    otherwise"? If so, what may the teacher see?
+> 3. How would you like to review a feature that needs our NFC tag? We plan to include a
+>    screen recording of the tap and accounts for everything around it.
+>
+> Thank you,
+> [🔧 name, team, contact]
+
+Record the answer, its date and case number in ISSUES #3, and the review notes' top line
+(section 2).
