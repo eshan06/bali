@@ -25,8 +25,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   removal deletes the row and keeps no `eventId`, so a stale register arriving after a removal
   cannot be told from a new one and registers the token again. A tombstone would fix it; not
   built — the harm is one "class started" nudge to a phone whose student removed it, and the
-  next register or removal settles it. A client that sends a v4 `eventId` gets a random order;
-  the contract asks for UUIDv7 already.
+  next register or removal settles it. Also accepted: the order is the phone's clock, so a
+  clock that ran ahead and was set back, or a non-v7 `eventId` that sorts high (the contract
+  asks for UUIDv7; the route checks only that it is a UUID), holds the row until a register
+  sorts after it or its owner removes it — a later owner of that phone meanwhile gets
+  `replay` and no pushes. And `replay` can now mean "a newer register holds the token",
+  possibly another account's, not only "this one is yours".
 
 - **2026-10-06** — **Device tokens: `PUT`/`DELETE /v1/me/push-token`, a row that really goes
   (N3).** The token travels in the body, never the URL, so no request log holds it (Fastify
