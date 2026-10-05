@@ -184,11 +184,17 @@ export function http2Transport(timeoutMs = APNS_REQUEST_TIMEOUT_MS): ApnsTranspo
           ':path': path,
           ...headers,
         });
-        stream.setTimeout(timeoutMs, () => {
+        // A wall clock from the send, connecting included, and every way the
+        // stream can stop settles the promise once.
+        const fail = (error: Error) => {
+          clearTimeout(timer);
+          reject(error);
+        };
+        const timer = setTimeout(() => {
           stream.close(constants.NGHTTP2_CANCEL);
-          reject(new Error('APNs request timed out'));
-        });
-        let status = 0;
+          fail(new Error('APNs request timed out'));
+        }, timeoutMs);
+        let status: number | undefined;
         let data = '';
         stream.setEncoding('utf8');
         stream.on('response', (answer) => {
@@ -198,15 +204,18 @@ export function http2Transport(timeoutMs = APNS_REQUEST_TIMEOUT_MS): ApnsTranspo
           data += chunk;
         });
         stream.on('end', () => {
+          if (status === undefined) return fail(new Error('APNs stream ended with no answer'));
           let reason: string | undefined;
           try {
             reason = data ? (JSON.parse(data) as { reason?: string }).reason : undefined;
           } catch {
             reason = undefined;
           }
+          clearTimeout(timer);
           resolve({ status, reason });
         });
-        stream.on('error', reject);
+        stream.on('error', fail);
+        stream.on('close', () => fail(new Error('APNs stream closed with no answer')));
         stream.end(json);
       }),
     close: () => {

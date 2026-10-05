@@ -259,7 +259,7 @@ words — is the Mac session's**, in parallel.
     (`api.sandbox.push.apple.com` / `api.push.apple.com`) with `apns-topic`, `apns-push-type:
     alert`, priority 10, `apns-expiration` and `apns-collapse-id`; the answer read as delivered or
     refused, `gone` for `410`, `BadDeviceToken` or `Unregistered`. One HTTP/2 connection per
-    host, a 5 s timeout a request. The transport is a seam (`ApnsTransport`), so tests send to a
+    host, a 5 s wall-clock limit a request (connecting included). The transport is a seam (`ApnsTransport`), so tests send to a
     fake or a local server. Config: `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` (all three or
     none, the key checked as P-256 at boot), `APNS_TOPIC` (unset, `com.bali.Bali`); in `.env.example`
     and DEPLOY's table. Nothing calls it yet

@@ -41,7 +41,7 @@ with notes. The ones a deploy must set:
 | `LOG_LEVEL` | `info` in production. |
 | `SENTRY_DSN` | Optional. The Sentry project's DSN; unset, error monitoring is off. When set, a 500 or a crash is reported with the route, never the request, the user or query values, and each minute's sweep checks in to the cron monitor `api-sweep` (`apps/api/src/monitoring.ts`; alerts: `docs/RUNBOOKS.md`, runbook 6). |
 | `SENTRY_ENVIRONMENT` | Optional. The environment Sentry files events under (`dev`, `production`); unset, `NODE_ENV`, which reads `production` on every deploy. Railway's `RAILWAY_GIT_COMMIT_SHA` is the release, nothing to set. |
-| `APNS_KEY_P8` / `APNS_KEY_ID` / `APNS_TEAM_ID` | Optional, all three or none (the API refuses to boot on one or two). The APNs auth key's `.p8` contents (line breaks as they are or written `\n`), its 10-character key id, and the team id (`H535678UF8`). Unset, the "class started" push is off and the boot log says so (`apps/api/src/push/apns.ts`; the console steps: N6). |
+| `APNS_KEY_P8` / `APNS_KEY_ID` / `APNS_TEAM_ID` | Optional, all three or none (the API refuses to boot on one or two). The APNs auth key's `.p8` contents (line breaks as they are or written `\n`), its 10-character key id, and the team id (`H535678UF8`). Unset, the "class started" push is off (`apps/api/src/push/apns.ts`; wired to the Start in N5b; the console steps: N6). |
 | `APNS_TOPIC` | Optional. The app's bundle id, sent as `apns-topic`; unset, `com.bali.Bali`. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | Set above `SHUTDOWN_DEADLINE_MS` (8s) so graceful shutdown finishes before SIGKILL. |
 

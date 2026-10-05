@@ -195,7 +195,7 @@ describe('the HTTP/2 transport', () => {
 
   /** A local cleartext HTTP/2 server answering every request with `status` and `body`. */
   async function serve(
-    answer: { status: number; body?: string; hang?: boolean },
+    answer: { status: number; body?: string; hang?: boolean; reset?: boolean },
     seen: { headers: IncomingHttpHeaders; body: string }[] = [],
   ): Promise<string> {
     server = createServer();
@@ -206,6 +206,7 @@ describe('the HTTP/2 transport', () => {
       stream.on('end', () => {
         seen.push({ headers, body });
         if (answer.hang) return;
+        if (answer.reset) return stream.close();
         stream.respond({ ':status': answer.status });
         stream.end(answer.body);
       });
@@ -249,5 +250,11 @@ describe('the HTTP/2 transport', () => {
     transport = http2Transport(100);
     await expect(transport.send(request(origin))).rejects.toThrow(/timed out/);
     await expect(transport.send(request('http://127.0.0.1:1'))).rejects.toThrow();
+  });
+
+  it('rejects a stream the server closes with no answer', async () => {
+    const origin = await serve({ status: 200, reset: true });
+    transport = http2Transport();
+    await expect(transport.send(request(origin))).rejects.toThrow(/no answer/);
   });
 });
