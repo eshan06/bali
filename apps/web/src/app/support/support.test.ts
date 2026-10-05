@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 /*
  * The help page (P4) and the student app must say the same thing about what a teacher sees: the
- * page's lists are the app's `ConsentCard` lists, a colon in place of the app's dash.
+ * page's lists are the app's `ConsentCard` lists, word for word.
  */
 const page = readFileSync(fileURLToPath(new URL('./page.tsx', import.meta.url)), 'utf8');
 const swift = readFileSync(
@@ -16,7 +16,7 @@ const swift = readFileSync(
 function swiftList(name: string): string[] {
   const body = new RegExp(`static let ${name} = \\[([\\s\\S]*?)\\]`).exec(swift)?.[1];
   if (!body) throw new Error(`ConsentCard.${name} not found in JoinView.swift`);
-  return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replaceAll(' — ', ': '));
+  return [...body.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
 }
 
 function pageList(name: string): string[] {

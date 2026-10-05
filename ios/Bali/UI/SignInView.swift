@@ -25,7 +25,7 @@ struct SignInView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Sign in").textStyle(.h1)
                             Text(
-                                "Use the account your school gave you. You only do this once — after that, Bali remembers you."
+                                "Use the account your school gave you. You only do this once. After that, Bali remembers you."
                             )
                             .textStyle(.bodyLg).foregroundStyle(Theme.textSecondary)
                         }

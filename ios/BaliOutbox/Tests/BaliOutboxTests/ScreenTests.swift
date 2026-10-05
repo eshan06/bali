@@ -968,7 +968,7 @@ struct ScreenTests {
         let asked = Permission.notDetermined.screenTimeWords
         #expect(asked.ask == "Ask me" && asked.settings == nil)
         #expect(asked.body.hasPrefix("iOS asks once. Bali uses Screen Time only to pause apps"))
-        #expect(asked.body.hasSuffix("your teacher simply sees 'Screen Time off'."))
+        #expect(asked.body.hasSuffix("your teacher simply sees “Screen Time off”."))
         #expect(Permission.approved.screenTimeWords == asked)
         let denied = Permission.denied.screenTimeWords
         #expect(denied.settings == "Open Settings" && denied.ask == "Ask again")

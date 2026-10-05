@@ -243,7 +243,7 @@ hands the old session back.
    step last.
 8. **The monitor never stalls.** Every `Monitor:` line above took a fraction of a second, never the
    2-second bound on its whole open and read of the file, and none says `not finished`; and the
-   app, opened straight after each wake, started normally — no `The outbox could not be opened`, no
+   app, opened straight after each wake, started normally — no `Bali couldn't open its storage`, no
    `storage failed`. A wake that could not read the file says `file not read — kept, again <time>`,
    and the monitor tries again a minute on, as `tick` or `tock`.
 9. **Two extensions in one class: the monitor's own wakes never set each other off (B5b-5).**

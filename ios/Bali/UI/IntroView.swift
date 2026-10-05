@@ -67,7 +67,7 @@ struct IntroView: View {
             BaliMark(size: 160)
             words(
                 "Your class, focused together",
-                "Bali pauses every app on your phone during class — until the bell. Calls, FaceTime, Messages and Emergency SOS always work."
+                "During class, Bali pauses every app on your phone until the bell. Calls, FaceTime, Messages and Emergency SOS always work."
             )
         }
     }
@@ -95,7 +95,7 @@ struct IntroView: View {
             .accessibilityHidden(true)
             words(
                 "Tap your teacher's block to start",
-                "Everything comes back at the bell — or instantly, any time, with Emergency Unlock. No questions asked."
+                "Everything comes back at the bell, or instantly with Emergency Unlock, any time. No questions asked."
             )
         }
     }

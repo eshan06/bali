@@ -400,12 +400,12 @@ extension Permission {
         switch self {
         case .denied:
             (
-                "Screen Time access is turned off for Bali, so nothing pauses during class and your teacher sees 'Screen Time off'. Turn it on in Settings → Screen Time → Apps with Screen Time Access. iOS may not ask again here.",
+                "Screen Time access is turned off for Bali, so nothing pauses during class and your teacher sees “Screen Time off”. Turn it on in Settings → Screen Time → Apps with Screen Time Access. iOS may not ask again here.",
                 "Ask again", "Open Settings"
             )
         case .approved, .notDetermined:
             (
-                "iOS asks once. Bali uses Screen Time only to pause apps while your class is in focus. Turning it off later is always possible, and your teacher simply sees 'Screen Time off'.",
+                "iOS asks once. Bali uses Screen Time only to pause apps while your class is in focus. Turning it off later is always possible, and your teacher simply sees “Screen Time off”.",
                 "Ask me", nil
             )
         }

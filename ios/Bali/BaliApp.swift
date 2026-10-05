@@ -669,8 +669,9 @@ final class Phone {
         guard engine == nil, !starting, !frozen else { return }
         starting = true
         defer { starting = false }
+        // The build's sign-in settings: ios/project.yml, docs/DEPLOY.md.
         guard let config = AppConfig(info: Bundle.main.infoDictionary ?? [:]) else {
-            problem = "Sign-in is not set up in this build: ios/project.yml, docs/DEPLOY.md"
+            problem = "This copy of Bali isn't set up to sign in. Ask your teacher."
             return
         }
         let outbox: Outbox
@@ -678,7 +679,9 @@ final class Phone {
             guard let url = Outbox.appGroupURL else { throw CocoaError(.fileNoSuchFile) }
             outbox = try Outbox(at: url)
         } catch {
-            problem = "The outbox could not be opened: \(error)"
+            // The error stays, in parentheses: it is what a support request needs.
+            problem =
+                "Bali couldn't open its storage on this phone (\(error)). Try again, or ask your teacher."
             return
         }
         problem = nil
