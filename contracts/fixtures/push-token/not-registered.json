@@ -1,0 +1,16 @@
+{
+  "endpoint": "DELETE /v1/me/push-token",
+  "scenario": "The retry of that removal: the caller holds no such token now, and nothing changes.",
+  "request": {
+    "path": "/v1/me/push-token",
+    "body": {
+      "token": "A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "RemovePushTokenResponse",
+  "body": {
+    "outcome": "not_registered"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "endpoint": "PUT /v1/me/push-token",
+  "scenario": "The same phone signed in to another account: the token moves to it, one phone, one owner.",
+  "request": {
+    "path": "/v1/me/push-token",
+    "body": {
+      "token": "A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4",
+      "environment": "sandbox",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "RegisterPushTokenResponse",
+  "body": {
+    "outcome": "registered",
+    "environment": "sandbox"
+  }
+}

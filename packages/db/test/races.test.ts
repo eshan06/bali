@@ -2,6 +2,7 @@ import type { EventType } from '@bali/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { findOrCreateStudent, findUserByCognitoId } from '../src/queries.js';
@@ -10,6 +11,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -4177,6 +4179,37 @@ describe.runIf(REAL_PG)('teacher invites redeemed under contention (real Postgre
         .from(teacherInvites)
         .where(eq(teacherInvites.redeemEventId, eventId));
       expect(taken).toHaveLength(1);
+    }
+  }, 30_000);
+});
+
+describe.runIf(REAL_PG)('device tokens registered under contention (real Postgres, N3)', () => {
+  const student = async (tag: string) =>
+    one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `race-push-${tag}-${newUuidV7()}`, role: 'student' })
+        .returning(),
+    );
+  const token = () => newUuidV7().replace(/-/g, '').repeat(2);
+
+  it('two accounts sending one eventId at once: one registers, the other is told it is taken', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const [a, b] = [await student(`a-${round}`), await student(`b-${round}`)];
+      const eventId = newUuidV7();
+      // Both may read the eventId free; the later then meets the earlier at its unique index,
+      // and is answered on a second read — never a 23505.
+      const results = await Promise.all(
+        [a, b].map((s) =>
+          registerPushToken(db, { userId: s.id, token: token(), environment: 'sandbox', eventId }),
+        ),
+      );
+      expect(results.map((r) => r.outcome).sort(), `round ${round}`).toEqual([
+        'event_id_conflict',
+        'registered',
+      ]);
+      const rows = await db.select().from(deviceTokens).where(eq(deviceTokens.eventId, eventId));
+      expect(rows).toHaveLength(1);
     }
   }, 30_000);
 });

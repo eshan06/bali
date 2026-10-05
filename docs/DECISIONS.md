@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **Device tokens: `PUT`/`DELETE /v1/me/push-token`, a row that really goes
+  (N3).** The token travels in the body, never the URL, so no request log holds it (Fastify
+  logs no body; a database error's values are scrubbed, S2). The table is keyed by the
+  lower-cased token, so one phone has one owner and a register from another account moves the
+  row. Written beside the engine (`packages/db/src/device-tokens.ts`), as schools.ts is, each
+  call holding the caller's row `FOR SHARE` so a redeem or a deletion is judged in the same
+  transaction. Idempotency mirrors the invite redeem's: the row keeps the `eventId` of the
+  register that wrote it, a replay finds it there, and an `eventId` another token's, another
+  account's, or (for a removal) any register's row holds is `409 event_id_conflict`; `events`
+  is not checked, as the redeem does not. A removal deletes the row outright — a token is no
+  record of anything — so its retry reads the truth, `not_registered`, and keeps no `eventId`;
+  only a token's latest register is remembered. A teacher is `403` with no reason, as `PATCH
+  /v1/me`'s. No new refusal reason. Until N4, the three foreign-key coverage maps list
+  `device_tokens.user_id` as "NOT YET": nothing deletes or exports a token yet.
+
 - **2026-10-06** — **The push guard reads the exported build, not the archive (N2).** A
   TestFlight or App Store build signed with `aps-environment` = `development` gets no pushes
   and says nothing. The archive can't show it: automatic signing archives with the development

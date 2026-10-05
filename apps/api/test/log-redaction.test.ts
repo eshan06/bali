@@ -1,6 +1,7 @@
-import type { Database } from '@bali/db';
+import { type Database, deviceTokens, users } from '@bali/db';
 import { DrizzleQueryError, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -9,6 +10,7 @@ import { ApiError } from '../src/errors.js';
 import { serializeError } from '../src/redact.js';
 import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
+import { makeTestIssuer, type TestIssuer } from './helpers/test-issuer.js';
 
 // Phase 6, S2: none of this may reach a log line.
 const SECRETS = {
@@ -176,5 +178,62 @@ describe('log redaction', () => {
       where: 'JSON data, line 1: [scrubbed]',
       bytes: '[binary]',
     });
+  });
+});
+
+// N3: a phone's APNs device token is personal data, and no log line holds one —
+// not a request's, at the chattiest level, nor a database failure's.
+describe('a device token', () => {
+  const token = 'c0ffee'.repeat(10) + 'beef';
+  let tokenApp: FastifyInstance;
+  let issuer: TestIssuer;
+
+  beforeAll(async () => {
+    issuer = await makeTestIssuer();
+    tokenApp = buildApp(
+      { ...testEnv, LOG_LEVEL: 'trace' },
+      { db, verifyToken: issuer.verifier, logStream },
+    );
+  });
+
+  afterAll(async () => {
+    await tokenApp.close();
+  });
+
+  it('never reaches a log line, registered, refused or removed', async () => {
+    lines.length = 0;
+    const authorization = `Bearer ${await issuer.sign({ sub: 'n3-log-redaction' })}`;
+    const send = (method: 'PUT' | 'DELETE', payload: object) =>
+      tokenApp.inject({ method, url: '/v1/me/push-token', headers: { authorization }, payload });
+    const registered = await send('PUT', { token, environment: 'sandbox', eventId: randomUUID() });
+    expect(registered.statusCode).toBe(200);
+    const refused = await send('PUT', { token, environment: 'staging', eventId: randomUUID() });
+    expect(refused.statusCode).toBe(400);
+    expect((await send('DELETE', { token, eventId: randomUUID() })).statusCode).toBe(200);
+    expect(logged()).toContain('"url":"/v1/me/push-token"');
+    expect(logged()).not.toContain(token);
+  });
+
+  it('is cut from a database failure that names it', async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ cognitoId: 'n3-log-redaction-db', role: 'student' })
+      .returning();
+    const row = { token, userId: user!.id, environment: 'sandbox' as const };
+    await db.insert(deviceTokens).values({ ...row, eventId: randomUUID() });
+    const failure = await db
+      .insert(deviceTokens)
+      .values({ ...row, eventId: randomUUID() })
+      .then(
+        () => undefined,
+        (err: unknown) => err as Error,
+      );
+    // Unscrubbed, it carries the token: as a parameter, and echoed in Postgres's detail.
+    expect((failure as Error & { params: unknown[] }).params).toContain(token);
+    expect(String((failure?.cause as { detail?: string }).detail)).toContain(token);
+    lines.length = 0;
+    tokenApp.log.error({ err: failure }, 'device token failure');
+    expect(logged()).toContain('device_tokens_pkey');
+    expect(logged()).not.toContain(token);
   });
 });

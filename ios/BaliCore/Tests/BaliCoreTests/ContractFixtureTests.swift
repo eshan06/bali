@@ -48,6 +48,8 @@ enum Contract {
         "MeResponse": MeResponse.self,
         "UpdateMeResponse": UpdateMeResponse.self,
         "DeleteMeResponse": DeleteMeResponse.self,
+        "RegisterPushTokenResponse": RegisterPushTokenResponse.self,
+        "RemovePushTokenResponse": RemovePushTokenResponse.self,
         "TapResponse": TapResponse.self,
         "CheckInResponse": CheckInResponse.self,
         "UnlockResponse": UnlockResponse.self,
@@ -66,6 +68,8 @@ enum Contract {
     static let requestTypes: [String: any (Codable & Sendable).Type] = [
         "PATCH /v1/me": UpdateMeRequest.self,
         "DELETE /v1/me": DeleteMeRequest.self,
+        "PUT /v1/me/push-token": RegisterPushTokenRequest.self,
+        "DELETE /v1/me/push-token": RemovePushTokenRequest.self,
         "POST /v1/taps": TapRequest.self,
         "POST /v1/sessions/{id}/checkin": CheckInRequest.self,
         "POST /v1/sessions/{id}/unlock": UnlockRequest.self,

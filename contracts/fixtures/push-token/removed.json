@@ -1,0 +1,16 @@
+{
+  "endpoint": "DELETE /v1/me/push-token",
+  "scenario": "A student removes its phone’s token.",
+  "request": {
+    "path": "/v1/me/push-token",
+    "body": {
+      "token": "A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 200,
+  "type": "RemovePushTokenResponse",
+  "body": {
+    "outcome": "removed"
+  }
+}

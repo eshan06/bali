@@ -4,7 +4,8 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — C4a, the phone's Delete account engine, landed (C4b, its Me screen
+_Last updated: 2026-10-06 — N3: device tokens, `PUT`/`DELETE /v1/me/push-token` (the interface is
+on N3's line). Before it, C4a, the phone's Delete account engine, landed (C4b, its Me screen
 button and confirm step, is next). Before it, P10, the class page's session length and Extend,
 landed; P11, New join code, parked on the API's CORS (Phase 5 steps). Before it, N2:
 testflight.yml guards the exported build's `aps-environment`, and the "class started" push
@@ -42,8 +43,9 @@ why, Open owner items the owner's queue.
   items).
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
-  whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs) ✅; next the
-  backend steps N2–N6 (cloud sessions) and the app half (the Mac session), in parallel. Not on
+  whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
+  token endpoints; the app half's interface is on N3's line) ✅; next the backend steps N4–N6
+  (cloud sessions) and the app half (the Mac session), in parallel. Not on
   the pilot's critical path: it never delays C2 or the external TestFlight steps.
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
@@ -220,7 +222,20 @@ words — is the Mac session's**, in parallel.
   `com.apple.developer.usernotifications.time-sensitive` = true
 - **N3** The device-token table (keyed by the token, with its APNs environment; students only)
   and `/v1` register/remove endpoints, idempotent on a UUIDv7 `eventId`; OpenAPI, fixtures,
-  BaliCore's wire types and `APIClient` methods — ⬜
+  BaliCore's wire types and `APIClient` methods — ✅ `device_tokens` (migration 0018; token
+  PK, lower-case hex, `user_id`, `environment`, `event_id`), written beside the engine
+  (`packages/db/src/device-tokens.ts`). **The interface, for the Mac session:**
+  `PUT /v1/me/push-token` `{ token, environment: "sandbox"|"production", eventId }` → `200
+  { outcome: "registered"|"replay", environment }`; `DELETE /v1/me/push-token` `{ token,
+  eventId }` → `200 { outcome: "removed"|"not_registered" }`. `token`: the device token's bytes
+  in hex, 64–200 digits, either case. Refusals: `400` (bad body), `401`, `403` (not a student),
+  `409 event_id_conflict` (the `eventId` another register holds), and on PUT a race-only `409
+  account_deleted`. A token another account holds moves to the caller; a DELETE never touches
+  another account's. BaliCore: `APIClient.registerPushToken(_: RegisterPushTokenRequest)` and
+  `APIClient.removePushToken(_: RemovePushTokenRequest)`, with `PushEnvironment` (`.sandbox`,
+  `.production`), `RegisterPushTokenResponse`, `RemovePushTokenResponse`. Fixtures:
+  `contracts/fixtures/push-token/`. Until N4, the foreign-key coverage maps list
+  `device_tokens.user_id` as "NOT YET". Why: `docs/DECISIONS.md` (N3)
 - **N4** Tokens as personal data: deleted by `deleteAccount` (C3), the disposal (C6a) and the
   retention run (C6b); in C5's export and the foreign-key coverage tests; redacted from logs —
   ⬜

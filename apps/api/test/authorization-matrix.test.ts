@@ -88,6 +88,8 @@ const MATRIX = {
   'PATCH /v1/me':                           [401, 401, 200,     200,     403,     403],
   'DELETE /v1/me':                          [401, 401, 200,     200,     409,     409],
   'GET /v1/me/history':                     [401, 401, 200,     200,     403,     403],
+  'PUT /v1/me/push-token':                  [401, 401, 200,     200,     403,     403],
+  'DELETE /v1/me/push-token':               [401, 401, 200,     200,     403,     403],
   'POST /v1/taps':                          [401, 401, 200,     200,     200,     200],
   'POST /v1/taps/:eventId/unlock':          [401, 401, 200,     200,     200,     200],
   'PATCH /v1/unlocks/:eventId':             [401, 401, 200,     404,     404,     404],
@@ -145,6 +147,9 @@ interface Sent {
 /** A phone's record: its own id, and its clock. */
 const stamped = () => ({ eventId: randomUUID(), deviceTime: new Date().toISOString() });
 
+/** An APNs device token no phone has registered: 64 hex digits. */
+const pushToken = () => randomUUID().replace(/-/g, '').repeat(2);
+
 /** Each route's request, against a row's world. A HEAD sends its GET's. */
 const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'GET /healthz': () => ({ url: '/healthz' }),
@@ -158,6 +163,15 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   // own history, so the stranger check reads it. (Another's cursor is a 400:
   // history.test.ts.)
   'GET /v1/me/history': () => ({ url: '/v1/me/history' }),
+  // Students only (N3): each student registers, or removes, a token of their own phone's.
+  'PUT /v1/me/push-token': () => ({
+    url: '/v1/me/push-token',
+    body: { token: pushToken(), environment: 'production', eventId: randomUUID() },
+  }),
+  'DELETE /v1/me/push-token': () => ({
+    url: '/v1/me/push-token',
+    body: { token: pushToken(), eventId: randomUUID() },
+  }),
   'POST /v1/taps': (w) => ({ url: '/v1/taps', body: { tagId: w.block.tagId, ...stamped() } }),
   'POST /v1/taps/:eventId/unlock': (w) => ({ url: `/v1/taps/${w.tapId}/unlock`, body: stamped() }),
   'PATCH /v1/unlocks/:eventId': (w) => ({

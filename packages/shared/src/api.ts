@@ -151,6 +151,54 @@ export interface DeleteMeResponse {
   outcome: DeleteMeOutcome;
 }
 
+// PUT /v1/me/push-token — a student registers its phone's APNs device token
+// (N3; ARCHITECTURE, "Push: a doorbell for students"). One phone, one current
+// owner: a token another account registered moves to the caller. Students only
+// (a teacher is `403`). DELETE /v1/me/push-token removes it again.
+/** The APNs environment a token was issued for: `sandbox` (Debug builds) or `production`. */
+export const PUSH_ENVIRONMENTS = ['sandbox', 'production'] as const;
+export type PushEnvironment = (typeof PUSH_ENVIRONMENTS)[number];
+/** The longest device token the API reads, in hex digits: APNs's are 64 today. */
+export const PUSH_TOKEN_MAX_LENGTH = 200;
+export interface RegisterPushTokenRequest {
+  /** The token APNs gave the phone, in hex (either case; stored lower-case). */
+  token: string;
+  environment: PushEnvironment;
+  /** Client idempotency key (rule 4). */
+  eventId: string;
+}
+/** Every outcome `PUT /v1/me/push-token` answers with (`RegisterPushTokenResponse.outcome`). */
+export const REGISTER_PUSH_TOKEN_OUTCOMES = ['registered', 'replay'] as const;
+export type RegisterPushTokenOutcome = (typeof REGISTER_PUSH_TOKEN_OUTCOMES)[number];
+export interface RegisterPushTokenResponse {
+  /**
+   * 'registered' the token is the caller's now, with `environment`; 'replay'
+   * this eventId already registered it — nothing is written again, and
+   * `environment` is the token's now.
+   */
+  outcome: RegisterPushTokenOutcome;
+  environment: PushEnvironment;
+}
+
+// DELETE /v1/me/push-token — a student removes its phone's token (signing out,
+// or notifications turned off). A token not the caller's is never touched.
+export interface RemovePushTokenRequest {
+  token: string;
+  /** Client idempotency key (rule 4). */
+  eventId: string;
+}
+/** Every outcome `DELETE /v1/me/push-token` answers with (`RemovePushTokenResponse.outcome`). */
+export const REMOVE_PUSH_TOKEN_OUTCOMES = ['removed', 'not_registered'] as const;
+export type RemovePushTokenOutcome = (typeof REMOVE_PUSH_TOKEN_OUTCOMES)[number];
+export interface RemovePushTokenResponse {
+  /**
+   * 'removed' this call removed it; 'not_registered' the caller holds no such
+   * token — the retry of a removal that landed, or it moved to another account.
+   * Either way it is not the caller's now.
+   */
+  outcome: RemovePushTokenOutcome;
+}
+
 // POST /v1/teacher-invites/redeem — a signed-in account redeems the invite code
 // the owner minted for a school (T1b), and is a teacher there from then on.
 export interface RedeemTeacherInviteRequest {

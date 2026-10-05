@@ -1,0 +1,20 @@
+{
+  "endpoint": "PUT /v1/me/push-token",
+  "scenario": "A teacher registering a token: students only, for now.",
+  "request": {
+    "path": "/v1/me/push-token",
+    "body": {
+      "token": "A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4",
+      "environment": "production",
+      "eventId": "00000000-0000-7000-8000-000000000001"
+    }
+  },
+  "status": 403,
+  "type": "ApiErrorBody",
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "message": "only a student registers a device for notifications"
+    }
+  }
+}
