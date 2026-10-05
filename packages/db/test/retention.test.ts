@@ -6,13 +6,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { getSessionEvents } from '../src/queries.js';
+import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
   armedTaps,
+  blocks,
   classes,
   enrollments,
   events,
   schools,
+  sessions,
   teacherInvites,
   users,
 } from '../src/schema.js';
@@ -389,6 +392,84 @@ describe('applyRetention (C6b)', () => {
     }
   });
 
+  it('keeps each person whose one record after the year is an event, a block, their class’s lesson or a tap on them', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'Keeps High', schoolYearEndsOn: localDay(1) })
+      .returning();
+    if (!school) throw new Error('seed');
+    const old = fromNow(-30 * DAY);
+    const after = fromNow(2 * DAY + 12 * 60 * MIN);
+    const [teacher, blocker, lessoned, tapped, student] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'keeps-t', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-block', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-lesson', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-tapped', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-s', role: 'student', displayName: 'Keeps S', createdAt: old },
+      ])
+      .returning();
+    if (!teacher || !blocker || !lessoned || !tapped || !student) throw new Error('seed');
+    const [live, gone] = await db
+      .insert(classes)
+      .values([
+        { teacherId: teacher.id, schoolId: school.id, name: 'Live', joinCode: 'KEEP-1' },
+        {
+          teacherId: lessoned.id,
+          schoolId: school.id,
+          name: 'Gone',
+          joinCode: 'KEEP-2',
+          removedAt: after,
+          createdAt: old,
+        },
+      ])
+      .returning();
+    if (!live || !gone) throw new Error('seed');
+    await db
+      .insert(enrollments)
+      .values({ classId: live.id, studentId: student.id, createdAt: old });
+    // The student: an event after the year, nothing else.
+    await db.insert(events).values({
+      eventId: newUuidV7(),
+      type: 'enrollment_left',
+      userId: student.id,
+      classId: gone.id,
+      occurredAt: after,
+    });
+    // A block made after the year, removed since.
+    await db
+      .insert(blocks)
+      .values({ tagId: 'keeps-tag', teacherId: blocker.id, createdAt: after, removedAt: after });
+    // A lesson of the teacher's own (removed) class, ended after the year.
+    await db
+      .insert(sessions)
+      .values({ classId: gone.id, startedAt: old, endsAt: after, endedAt: after });
+    // A tap on a teacher with no block left, made after the year.
+    await db.insert(armedTaps).values({
+      studentId: student.id,
+      teacherId: tapped.id,
+      eventId: newUuidV7(),
+      deviceTime: after,
+      expiresAt: fromNow(3 * DAY),
+      createdAt: after,
+    });
+
+    const result = await applyRetention(db, {
+      schoolId: school.id,
+      at: LATER(),
+      confirmName: school.name,
+    });
+    if (result.outcome !== 'applied') throw new Error(result.outcome);
+    expect(result.continuing).toEqual(
+      [teacher.id, blocker.id, lessoned.id, tapped.id, student.id].sort(),
+    );
+    expect(result.counts).toMatchObject({ students: 0, teachers: 0, armedTaps: 0 });
+    expect(
+      await db.select().from(armedTaps).where(eq(armedTaps.teacherId, tapped.id)),
+    ).toHaveLength(1);
+  });
+
   it('keeps a teacher who came in by an invite after the year, with no class yet, or a student who joined since', async () => {
     const s = await seed('c6b-newcomer');
     const [hire, joiner] = await db
@@ -471,5 +552,105 @@ describe('applyRetention (C6b)', () => {
       outcome: 'school_disposed',
       school: { id: school.id, name: school.name },
     });
+  });
+});
+
+describe('npm run school -- year-end / retention', () => {
+  const run = async (argv: string[]) => {
+    const lines: string[] = [];
+    const command = parseSchoolCommand(argv);
+    if (!command) throw new Error('usage');
+    await command({ db, print: (l) => lines.push(l) });
+    return lines;
+  };
+
+  it('checks its arguments before anything connects', () => {
+    const id = newUuidV7();
+    expect(() => parseSchoolCommand(['year-end', id])).toThrow(/year-end <school-id> YYYY-MM-DD/);
+    expect(() => parseSchoolCommand(['year-end', id, '2026-02-30'])).toThrow(/not a day/);
+    expect(() => parseSchoolCommand(['year-end', 'nope', '2026-12-18'])).toThrow(/not a school id/);
+    expect(() => parseSchoolCommand(['retention'])).toThrow(/retention <school-id>/);
+    expect(() => parseSchoolCommand(['retention', id, '--yes'])).toThrow(/--confirm "<name>"/);
+    expect(() => parseSchoolCommand(['retention', id, '--confirm', 'A', 'B'])).toThrow(
+      /unexpected/,
+    );
+    // A year's end may be in the future, unlike an agreement's day.
+    expect(parseSchoolCommand(['year-end', id, '2099-06-01'])).toBeTypeOf('function');
+  });
+
+  it('records the year end, refuses before it, and says so when none is on record', async () => {
+    const [school] = await db.insert(schools).values({ name: 'Command High' }).returning();
+    if (!school) throw new Error('seed');
+    await expect(run(['retention', school.id])).rejects.toThrow(
+      /no year end on record, so nothing was written.*year-end/,
+    );
+    expect(await run(['year-end', school.id, '2099-06-01'])).toEqual([
+      `"Command High": its year's last day is on record as 2099-06-01`,
+      `after it, preview its retention run: npm run school -- retention ${school.id}`,
+    ]);
+    expect((await run(['year-end', school.id, '2099-06-02']))[0]).toContain('(it said 2099-06-01)');
+    await expect(run(['retention', school.id])).rejects.toThrow(
+      /ends on 2099-06-02, so it isn't over until .*nothing was written/,
+    );
+    await expect(run(['year-end', newUuidV7(), '2099-06-01'])).rejects.toThrow(/no school/);
+  });
+
+  it('previews, then runs once confirmed by name, and a re-run says it ran', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: "St. Mary's", schoolYearEndsOn: '2020-06-01' })
+      .returning();
+    if (!school) throw new Error('seed');
+    const [kim] = await db
+      .insert(users)
+      .values({
+        cognitoId: 'kim-cmd',
+        role: 'student',
+        displayName: 'Kim',
+        createdAt: new Date('2020-01-01'),
+      })
+      .returning();
+    const [teacher] = await db
+      .insert(users)
+      .values({ cognitoId: 't-cmd', role: 'teacher', schoolId: school.id, displayName: 'T' })
+      .returning();
+    if (!kim || !teacher) throw new Error('seed');
+    const [klass] = await db
+      .insert(classes)
+      .values({ teacherId: teacher.id, schoolId: school.id, name: 'Old', joinCode: 'CMD-1' })
+      .returning();
+    if (!klass) throw new Error('seed');
+    await db
+      .insert(enrollments)
+      .values({ classId: klass.id, studentId: kim.id, createdAt: new Date('2020-01-02') });
+
+    const preview = await run(['retention', school.id]);
+    expect(preview[0]).toBe(
+      `the retention run for "St. Mary's" (${school.id}), its year ending 2020-06-01, would ` +
+        'de-identify: students 1, teachers 0, enrollments 1, pre-bell taps 0; kept named 1',
+    );
+    expect(preview[1]).toContain(teacher.id);
+    expect(preview.join('\n')).toContain('Nothing was written');
+    expect(preview.at(-1)).toBe(
+      `To go ahead: npm run school -- retention ${school.id} --confirm 'St. Mary'\\''s'`,
+    );
+    expect((await userRow(kim.id)).removedAt).toBeNull();
+
+    const done = await run(['retention', school.id, '--confirm', "St. Mary's"]);
+    expect(done).toEqual([
+      expect.stringMatching(
+        new RegExp(
+          `^retention run for school ${school.id}, year ending 2020-06-01, on \\S+: ` +
+            'students 1, teachers 0, enrollments 1, pre-bell taps 0; kept named 1$',
+        ),
+      ),
+    ]);
+    expect(done[0]).not.toContain('Mary');
+    expect((await userRow(kim.id)).displayName).toBeNull();
+    expect(await run(['retention', school.id])).toEqual([
+      expect.stringMatching(
+        /^the retention run for "St. Mary's"'s year ending 2020-06-01 ran on \S+: students 1, .*nothing more to do\. For its next year: npm run school -- year-end/,
+      ),
+    ]);
   });
 });

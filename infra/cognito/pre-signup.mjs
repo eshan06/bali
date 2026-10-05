@@ -25,11 +25,11 @@ export const handler = async (event) => {
   const allowed = allowedDomains(process.env.ALLOWED_EMAIL_DOMAINS);
   if (allowed.length === 0) {
     console.error('ALLOWED_EMAIL_DOMAINS is unset or empty: every sign-up is refused');
-    throw new Error('Sign-up is closed right now. Try again later.');
+    throw new Error('Sign-up is closed right now. Try again later');
   }
 
   if (!allowed.includes(emailDomain(event.request?.userAttributes?.email))) {
-    throw new Error(`Use your ${listed(allowed.map((d) => '@' + d))} email address to sign up.`);
+    throw new Error(`Use your ${listed(allowed.map((d) => '@' + d))} email address to sign up`);
   }
   return event;
 };

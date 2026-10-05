@@ -7,17 +7,24 @@ import {
   listSchools,
   mintTeacherInvite,
   recordAgreement,
+  recordYearEnd,
   schoolsNamed,
 } from './schools.js';
 import { exportStudentRecord } from './student-record.js';
-import { type DisposalCounts, disposeSchool } from './transitions.js';
+import {
+  applyRetention,
+  type DisposalCounts,
+  disposeSchool,
+  type RetentionCounts,
+} from './transitions.js';
 import type { Database } from './types.js';
 
 /*
  * The owner's school commands, `npm run school -- <command>`
  * (apps/api/scripts/school.ts): add a school, record its data agreement, mint a
  * teacher invite, list the schools, export one student's record, dispose of a
- * school's data, against DATABASE_URL as `npm run migrate`
+ * school's data, record its year's end and run its retention, against
+ * DATABASE_URL as `npm run migrate`
  * is. Every argument is checked before anything connects, and each refusal says
  * what was wrong and how to say it.
  */
@@ -28,8 +35,10 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
   agreement <school-id> <day>   record the school's data agreement as signed on <day>, YYYY-MM-DD
   invite <school-id>            mint a teacher invite for the school: one code, for one teacher,
                                 good for ${INVITE_LIFETIME_DAYS} days, and shown this once only
-  list                          every school: its id, its agreement's day, and how many of its
-                                invites are open (not redeemed, not expired); never a code
+  year-end <school-id> <day>    record the last day of the school's year (or term), YYYY-MM-DD
+  list                          every school: its id, its agreement's day, its year's last day,
+                                and how many of its invites are open (not redeemed, not
+                                expired); never a code
   export-student <id>           one student's whole record, as JSON on standard output, for a
                                 parent's inspection request; <id> is their account's id or
                                 their Cognito subject (sub). It reads, and writes nothing
@@ -39,6 +48,12 @@ export const SCHOOL_USAGE = `usage: npm run school -- <command>
                                 dispose of it: its teachers and students de-identified, its
                                 classes, blocks and open invites removed, logged by counts and
                                 never a name. Refused while a lesson of it runs
+  retention <school-id>         once the school's year is over, who its retention run would
+                                de-identify; it writes nothing
+  retention <school-id> --confirm "<name>"
+                                run it: everyone whose records all lie in the year that ended
+                                de-identified, their classes left; the lessons stay, logged by
+                                counts and never a name
 
 It runs against DATABASE_URL, as npm run migrate does.`;
 
@@ -87,6 +102,18 @@ export function parseSchoolCommand(
       checkDay(day, now);
       return (io) => agreement(io, schoolId, day);
     }
+    case 'year-end': {
+      const [schoolId, day, ...extra] = args;
+      if (schoolId === undefined || day === undefined) {
+        throw new Error(
+          `year-end needs the school's id and the last day of its year: year-end <school-id> YYYY-MM-DD`,
+        );
+      }
+      nothingMore(extra);
+      checkSchoolId(schoolId);
+      checkDay(day);
+      return (io) => yearEnd(io, schoolId, day);
+    }
     case 'invite': {
       const [schoolId, ...extra] = args;
       if (schoolId === undefined) {
@@ -124,6 +151,21 @@ export function parseSchoolCommand(
       nothingMore(extra);
       return (io) => dispose(io, schoolId, name);
     }
+    case 'retention': {
+      const [schoolId, flag, name, ...extra] = args;
+      if (schoolId === undefined) {
+        throw new Error(`retention needs the school's id: retention <school-id>`);
+      }
+      checkSchoolId(schoolId);
+      if (flag === undefined) return (io) => retention(io, schoolId);
+      if (flag !== '--confirm' || !name?.trim()) {
+        throw new Error(
+          `retention is confirmed with the school's name: retention <school-id> --confirm "<name>"`,
+        );
+      }
+      nothingMore(extra);
+      return (io) => retention(io, schoolId, name);
+    }
     default:
       throw new Error(`unknown command "${command}"`);
   }
@@ -138,15 +180,17 @@ function checkSchoolId(schoolId: string): void {
 }
 
 /**
- * A real day of the calendar, written YYYY-MM-DD, and not after today in this
- * machine's zone (`TZ`: the school's on the API's service, DEPLOY.md).
+ * A real day of the calendar, written YYYY-MM-DD, and, given `now` (an
+ * agreement's day), not after today in this machine's zone (`TZ`: the
+ * school's on the API's service, DEPLOY.md).
  */
-function checkDay(day: string, now: Date): void {
+function checkDay(day: string, now?: Date): void {
   const at = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00Z`) : null;
   // A day past its month's end parses as one of the next month's, so it reads back changed.
   if (!at || Number.isNaN(at.getTime()) || at.toISOString().slice(0, 10) !== day) {
     throw new Error(`"${day}" is not a day written YYYY-MM-DD`);
   }
+  if (now === undefined) return;
   const two = (n: number) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
   if (day > today) {
@@ -183,6 +227,15 @@ async function agreement(
   print(`"${school.name}": its data agreement is on record as signed on ${day}${replaced}`);
 }
 
+async function yearEnd({ db, print }: SchoolCommandIO, schoolId: string, day: string) {
+  const recorded = await recordYearEnd(db, { schoolId, endsOn: day });
+  if (!recorded) throw new Error(noSchool(schoolId));
+  const { school, before } = recorded;
+  const replaced = before !== null && before !== day ? ` (it said ${before})` : '';
+  print(`"${school.name}": its year's last day is on record as ${day}${replaced}`);
+  print(`after it, preview its retention run: npm run school -- retention ${schoolId}`);
+}
+
 async function invite({ db, print }: SchoolCommandIO, schoolId: string): Promise<void> {
   const minted = await mintTeacherInvite(db, { schoolId });
   if (minted.outcome === 'unknown_school') throw new Error(noSchool(schoolId));
@@ -210,12 +263,18 @@ async function list({ db, print }: SchoolCommandIO): Promise<void> {
     print('no school is on record yet: npm run school -- add "<name>"');
     return;
   }
-  const row = (id: string, day: string, open: string, name: string) =>
-    `${id.padEnd(36)}  ${day.padEnd(10)}  ${open.padEnd(12)}  ${name}`;
-  print(row('id', 'agreement', 'open invites', 'name'));
+  const row = (id: string, day: string, end: string, open: string, name: string) =>
+    `${id.padEnd(36)}  ${day.padEnd(10)}  ${end.padEnd(10)}  ${open.padEnd(12)}  ${name}`;
+  print(row('id', 'agreement', 'year ends', 'open invites', 'name'));
   for (const school of all) {
     print(
-      row(school.id, school.agreementSignedAt ?? 'none', String(school.openInvites), school.name),
+      row(
+        school.id,
+        school.agreementSignedAt ?? 'none',
+        school.schoolYearEndsOn ?? 'none',
+        String(school.openInvites),
+        school.name,
+      ),
     );
   }
 }
@@ -258,7 +317,9 @@ async function dispose(
       throw new Error(noSchool(schoolId));
     case 'already_disposed':
       print(
-        `school ${schoolId} was disposed of already, on ${result.disposedAt.toISOString()}: nothing more to do`,
+        `school ${schoolId} was disposed of already, on ${result.disposedAt.toISOString()}` +
+          (result.counts ? `: ${tally(result.counts)}` : '') +
+          '; nothing more to do',
       );
       return;
     case 'name_mismatch':
@@ -297,5 +358,88 @@ async function dispose(
     case 'disposed':
       print(`disposed of school ${schoolId} on ${at.toISOString()}: ${tally(result.counts)}`);
       return;
+    default:
+      return unreachable(result);
+  }
+}
+
+function unreachable(result: never): never {
+  throw new Error(`unexpected outcome ${JSON.stringify(result)}`);
+}
+
+const retained = (c: RetentionCounts) =>
+  `students ${c.students}, teachers ${c.teachers}, enrollments ${c.enrollments}, ` +
+  `pre-bell taps ${c.armedTaps}; kept named ${c.continuing}`;
+
+/**
+ * Without a name, whom the school's retention run would de-identify; with the
+ * school's own, the run, logged by the school's id, the year's last day and
+ * counts alone (C6b).
+ */
+async function retention(
+  { db, print }: SchoolCommandIO,
+  schoolId: string,
+  confirmName?: string,
+): Promise<void> {
+  // This machine's clock, the server's inside the API service: it judges the year over.
+  const at = new Date();
+  const result = await applyRetention(db, { schoolId, at, confirmName });
+  const setYearEnd = `npm run school -- year-end ${schoolId} YYYY-MM-DD`;
+  switch (result.outcome) {
+    case 'unknown_school':
+      throw new Error(noSchool(schoolId));
+    case 'school_disposed':
+      print(`school ${schoolId} was disposed of: its people are de-identified already`);
+      return;
+    case 'no_year_end':
+      throw new Error(
+        `"${result.school.name}" has no year end on record, so nothing was written. ` +
+          `Ask the school for its year's (or term's) last day, then: ${setYearEnd}`,
+      );
+    case 'year_not_over':
+      throw new Error(
+        `"${result.school.name}"'s year ends on ${result.yearEndsOn}, so it isn't over until ` +
+          `${result.overAt.toLocaleString()} on this machine's clock; nothing was written. A wrong day: ${setYearEnd}`,
+      );
+    case 'name_mismatch':
+      throw new Error(
+        `school ${schoolId} is named "${result.school.name}"; nothing was written. ` +
+          `To confirm: retention ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+      );
+    case 'already_applied':
+      print(
+        `the retention run for "${result.school.name}"'s year ending ${result.yearEndsOn} ` +
+          `ran on ${result.appliedAt.toISOString()}: ${retained(result.counts)}; nothing more ` +
+          `to do. For its next year: ${setYearEnd}`,
+      );
+      return;
+    case 'preview':
+      print(
+        `the retention run for "${result.school.name}" (${schoolId}), its year ending ` +
+          `${result.yearEndsOn}, would de-identify: ${retained(result.counts)}`,
+      );
+      if (result.continuing.length > 0) {
+        print(
+          'Kept named (records after the year, at another school, or a live class or block): ' +
+            result.continuing.join(', '),
+        );
+      }
+      print('Their lessons, taps and unlocks stay, naming no one. Nothing was written.');
+      print(
+        "First check no parent's inspection request is open for one of its students " +
+          '(docs/RUNBOOKS.md, runbook 1, step 10).',
+      );
+      print(
+        `To go ahead: npm run school -- retention ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+      );
+      return;
+    case 'applied':
+      print(
+        `retention run for school ${schoolId}, year ending ${result.yearEndsOn}, on ` +
+          `${at.toISOString()}: ${retained(result.counts)}`,
+      );
+      return;
+    default:
+      return unreachable(result);
   }
 }
