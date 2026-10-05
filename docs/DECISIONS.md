@@ -280,6 +280,39 @@ a real decision? Add a dated entry at the top: what was decided and why.
   grey stay, since no allowed class reaches them. Shipped into `main`: the owner put D2 back on
   and reversed the `ui`-branch rule (2026-10-05), so D2's PRs go into `main`.
 
+- **2026-10-05** — **D2c: the portal's foundation, and the owner's answers to D2b's three
+  questions.** **The rulings:** the Present view's names are 20 px and its labels 14 px, as drawn
+  on D2a's canvas: a Present-only style on the type scale, with line heights on the 4-pt grid
+  (D2f draws it; the design system gains it at the owner's next export); the tray's inset stays
+  `space-2` (8 px), where the canvas drew 6 and 10; a chip's padding stays `space-2` × `space-3`,
+  where the canvas drew 4 × 10. **The tokens in the portal:** `bali-tokens.json` is written out
+  as CSS variables in `apps/web/src/app/globals.css`, `--bali-<token>`, the light values on
+  `:root` and the dark ones under `prefers-color-scheme: dark`, a semantic token referencing its
+  primitive by `var()` as the JSON does by `{name}`, and mapped into Tailwind v4's theme
+  (`@theme inline` for the colours and families, `@theme` for the radii, the spacing unit and the
+  type scale); `tokens.test.ts` pins every variable, radius, the unit and each style to the JSON,
+  as `AppTests.tokens` pins `Theme.swift`. Hand-written, not generated: the test is the lock, as
+  on iOS, and a generator would be a second build step. The tokens' five radii and three shadows
+  replace Tailwind's; its default colours and sizes stay in the theme until D2e–D2g redraw the
+  screens still on them (the entry pages use none). The shadows are `@utility` classes, not theme
+  shadows: `shadow-1` is `none` in dark, which Tailwind's composed `box-shadow` cannot hold. **The
+  focus ring** is one global rule on `:focus-visible` (`outline: 2px solid
+  var(--bali-focus-ring-color); outline-offset: 2px`) rather than the `focus-ring` shadow token:
+  an outline follows a pill's radius, never fights a card's shadow, and its gap shows whatever the
+  control sits on, where the token's gap is the page colour; the per-element emerald classes go.
+  **Reduced motion** is one global rule too (`animation` and `transition` none, `!important`,
+  under `prefers-reduced-motion: reduce`). **The fonts:** `next/font/local` over
+  `next/font/google`, which fetches from Google at every build (a cloud session's egress is
+  allowlisted): the latin subset of each variable font from `@fontsource-variable` 5.3.0,
+  committed with its OFL licence under `apps/web/src/app/fonts/` and served from the portal's own
+  origin, so the CSP's missing `font-src` falls back to `default-src 'self'`, and the `@font-face`
+  rules ride in the stylesheet under its nonce-only `style-src`; proven on a built portal with
+  the nonce script and a browser console that refuses nothing. **The icons:** `lucide-react`,
+  named by this step as DESIGN.md requires. **The bar's Sign out** is the standard 40 px
+  secondary pill (§4), not the canvas's 36: DESIGN.md wins on a value. **Nothing invented:** the
+  destructive button has no hover shade because the tokens name none; a button size, a card-edge
+  token and the Present style's exact line heights are the owner's to add.
+
 - **2026-10-05** — **D2b: DESIGN.md takes the owner's D2 picks, made 2026-10-04 on D2a's canvas
   ([Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)); the Cognito
   sign-in page joins D2's scope.** The canvas drew three styles on the same four screens inside

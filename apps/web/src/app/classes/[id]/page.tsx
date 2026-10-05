@@ -33,11 +33,14 @@ import { LiveGrid } from '@/components/live-grid';
 import { RecapCard } from '@/components/recap-card';
 
 const SECONDARY =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
+  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
 
-/** A length's pill: the radio inside it is read by screen readers, the label shows its state. */
+/**
+ * A length's pill: the radio inside it is read by screen readers, the label shows its state. The
+ * radio is clipped away, so the focus ring (globals.css) is drawn on the label for it.
+ */
 const PILL =
-  'cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm tabular-nums transition-colors select-none hover:bg-slate-100 has-checked:border-emerald-700 has-checked:bg-emerald-50 has-checked:font-semibold has-checked:text-emerald-900 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-emerald-600 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900 dark:has-checked:border-emerald-500 dark:has-checked:bg-emerald-950 dark:has-checked:text-emerald-100';
+  'cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm tabular-nums transition-colors select-none hover:bg-slate-100 has-checked:border-emerald-700 has-checked:bg-emerald-50 has-checked:font-semibold has-checked:text-emerald-900 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900 dark:has-checked:border-emerald-500 dark:has-checked:bg-emerald-950 dark:has-checked:text-emerald-100';
 
 export default function ClassDetailPage() {
   const api = useApi();
@@ -260,7 +263,7 @@ export default function ClassDetailPage() {
                       readOnly={busy}
                       aria-invalid={lengthSaid}
                       aria-describedby={`${id}-help${lengthSaid ? ` ${id}-said` : ''}`}
-                      className="mt-2 w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
+                      className="mt-2 w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
                     />
                     <p
                       id={`${id}-help`}

@@ -1,15 +1,25 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import { PortalBar } from '@/components/portal-bar';
+
+import { instrumentSans, jetBrainsMono } from './fonts';
 
 import './globals.css';
 
 // Rendered per request, so each page carries its CSP nonce (src/middleware.ts).
 export const dynamic = 'force-dynamic';
 
+/** The browser's own chrome in the page colour, light and dark (surface-page; tokens.test.ts). */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f7f5f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#141312' },
+  ],
+};
+
 export const metadata: Metadata = {
-  title: 'Bali — teacher portal',
+  title: 'Bali teacher portal',
   description: 'Live classroom focus grid.',
   // From public/, not app/icon.*: Next builds those as static routes, which the CSP's
   // every-route-dynamic check refuses (.github/scripts/web-routes-dynamic.sh).
@@ -24,8 +34,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+    <html lang="en" className={`${instrumentSans.variable} ${jetBrainsMono.variable}`}>
+      <body className="min-h-screen bg-surface-page font-sans text-text-primary antialiased tabular-nums">
         <PortalBar />
         {children}
       </body>

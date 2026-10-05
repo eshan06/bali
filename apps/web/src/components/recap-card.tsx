@@ -78,7 +78,7 @@ export function RecapCard({ classId, session }: { classId: string; session?: Sum
           <button
             type="button"
             onClick={retry}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900"
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900"
           >
             Try again
           </button>

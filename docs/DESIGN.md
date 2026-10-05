@@ -55,16 +55,22 @@ PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`), in D1's shapes; its screens take the Soft
-premium style in D2h–D2k. The portal does not yet: it is Tailwind v4 with its
-defaults (slate neutrals, a system font, no icon set) and follows the phone's
-or computer's dark mode (`color-scheme: light dark`, `dark:` classes). The
-tokens come into the portal in the next step, D2c (`docs/PLAN.md`): both
-themes, Instrument Sans self-hosted through `next/font`, lucide, the buttons
-and the focus ring. **Until D2c lands, portal work keeps its current Tailwind
-styling** (dark variants included) and follows the rules here that need no
-tokens: what each colour means, a state never shown by colour alone (colour +
-label today; icons come with the icon set), the motion budget, the voice and
-sentence case. It adds no token layer, font or icon set on the way.
+premium style in D2h–D2k. The portal draws from them too, from D2c on
+(`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every token as
+a `--bali-*` variable, light on `:root` and dark under the device's dark mode,
+and as Tailwind's theme (`bg-surface-page`, `text-text-secondary`,
+`rounded-md`, `p-4` for `space-4`, `text-h1`, `shadow-1`); Instrument Sans
+and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
+(`lucide-react`) as the icon set; the buttons (`components/button.tsx`) and
+the mark (`components/mark.tsx`); the focus ring on every control and all
+animation off under reduced motion, both global rules. The bar and `/login`
+are in the picked style (D2c-1); the callback, `/support` and the invite-code
+screen follow (D2c-2); the classes home, the grid, the recap and reports keep
+their Tailwind classes on the new base (the page colour, the font, the ring)
+until D2e–D2g, which also retire Tailwind's default colours and sizes, kept
+in the theme only for them. **A portal page uses the tokens' utilities and no
+Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
+question for the owner.
 
 ## 1. Visual theme and atmosphere
 
@@ -90,9 +96,9 @@ In this file's terms:
 - **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
   at `radius-lg`; each card inside is `surface-card` at `radius-md` with
   `shadow-1`, the outer and inner corners one nested pair (§4, Card and tray;
-  the canvas drew the inset at 6 and 10 px, and `space-2` is the nearest
-  token, noted for the owner in `docs/DECISIONS.md`, 2026-10-05). In dark the
-  shadow goes and a `border-default` hairline carries the edge.
+  the inset is `space-2`, the owner's ruling of 2026-10-05 over the canvas's
+  6 and 10 px). In dark the shadow goes and a `border-default` hairline
+  carries the edge.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
 - **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
@@ -240,7 +246,9 @@ not-joined pair.
   with spacing or a hairline.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
-  `space-2` × `space-3` per the tokens (the web), and D1's 6 × 12 pt on iOS.
+  `space-2` × `space-3` on the web (the tokens' values, kept by the owner's
+  ruling of 2026-10-05 over the canvas's 4 × 10 px), and D1's 6 × 12 pt on
+  iOS.
   Silent and Unknown add a 1 px dashed `border-strong` edge (§2). A chip
   never pulses but as §7 allows.
 - **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
@@ -280,9 +288,11 @@ not-joined pair.
   colour alone), switches into the **projector view**: four columns, names at
   20/26 semibold, chip labels at 14/18, cells at least 88 px tall, readable
   from the back of a classroom; the same chips, the same words. Those two
-  sizes are not in the type scale yet: D2f draws them as picked, and the
-  design system gains them when the owner next exports it. The grid reflows
-  by column count below the desktop width, never by shrinking type.
+  sizes are a Present-only style on the type scale (the owner's ruling,
+  2026-10-05): names 20 px and labels 14 px, as drawn, with their line
+  heights on the 4-pt grid; D2f draws it, and the design system gains it when
+  the owner next exports it. The grid reflows by column count below the
+  desktop width, never by shrinking type.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,

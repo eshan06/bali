@@ -11,7 +11,7 @@ import { useApi } from '@/lib/use-api';
 
 /** The secondary button, as the recap card's Try again. */
 const BUTTON =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
+  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
 const COLUMNS = ['Joined', 'Focus time', 'Average', 'Silent', 'Unlocks', 'Protection off'];
 const CELL = 'py-2 pl-4 text-right tabular-nums';
 const LINE = 'border-b border-slate-200 dark:border-slate-800';
@@ -107,7 +107,7 @@ export default function ReportsPage() {
                           aria-expanded={isOpen}
                           aria-controls={isOpen ? `recap-${session.id}` : undefined}
                           onClick={() => setOpen(isOpen ? null : session.id)}
-                          className="flex w-full cursor-pointer items-baseline gap-2 rounded py-2 text-left font-medium tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                          className="flex w-full cursor-pointer items-baseline gap-2 rounded py-2 text-left font-medium tabular-nums hover:underline"
                         >
                           <span aria-hidden="true" className="w-3 text-slate-500">
                             {isOpen ? '▾' : '▸'}

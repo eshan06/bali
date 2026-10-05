@@ -105,7 +105,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           translate="no"
           aria-invalid={codeRefused}
           aria-describedby={`${id}-help${said ? ` ${id}-said` : ''}`}
-          className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-base tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
+          className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-base tracking-wide aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
         />
         <p id={`${id}-help`} className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           25 letters and digits. Paste it, or type it with or without dashes.
@@ -121,7 +121,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           type={teaches ? 'button' : 'submit'}
           onClick={teaches ? onTeacher : undefined}
           aria-disabled={busy}
-          className="mt-6 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 aria-disabled:opacity-60 motion-reduce:transition-none"
+          className="mt-6 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 aria-disabled:opacity-60 motion-reduce:transition-none"
         >
           {busy
             ? 'Redeeming…'
