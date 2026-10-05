@@ -18,7 +18,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   doorbell (the 30 s read stays). A gone token is deleted by token, owner and `eventId` together,
   so a token that moved to another account or was registered again while the send was in flight
   is left alone. A refusal from APNs is logged at warn and not sent to Sentry (a phone's state,
-  not our bug); a failure of ours (reading or deleting tokens) is logged at error and reported.
+  not our bug); a failure of ours (reading or deleting tokens) is logged at error and reported
+  Known: APNs answers `BadDeviceToken` also for a token sent to the wrong host, so a phone that
+  registered under the wrong `environment` loses its token (logged with the reason); its next
+  register restores it.
 
 - **2026-10-06** — **The APNs client: Node's own HTTP/2 and crypto, a transport seam (N5a).**
   No dependency: `node:crypto` signs the ES256 provider token (`dsaEncoding: 'ieee-p1363'`, the

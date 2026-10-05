@@ -55,7 +55,8 @@ export function classStartedNotifier(
   app.log.info('push is on: "class started" alerts go to APNs');
   const inFlight = new Set<Promise<void>>();
   app.addHook('onClose', async () => {
-    await Promise.allSettled([...inFlight]);
+    // Until none is left: a Start still answering as the close began may add one.
+    while (inFlight.size > 0) await Promise.allSettled([...inFlight]);
     client.close();
   });
 
