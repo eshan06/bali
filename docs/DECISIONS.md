@@ -8,6 +8,48 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **D2b: DESIGN.md takes the owner's D2 picks, made 2026-10-04 on D2a's canvas
+  ([Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)); the Cognito
+  sign-in page joins D2's scope.** The canvas drew three styles on the same four screens inside
+  Bali's tokens and asked seven questions; the owner answered by letter. **Q1, the style: B, Soft
+  premium** (the `high-end-visual-design` skill's language): cards in a `surface-sunken` tray,
+  pill chips and buttons, radii 20 / 14 / full, `shadow-1`'s soft warm shadow, generous space, all
+  within the tokens; the B artboards are the reference. **Q2, the two Left chips: A.** Each takes
+  its state's own colour: "Left · unlocked" is `state-emergency-*` (warm orange), "Left ·
+  protection off" is `state-revoked-*` (red). This closes DESIGN.md's open exception to the red
+  rule; ISSUES #2's reason stands, carried by the icons (the flag, then the state's) and the
+  label. D2f recolours the shipped grid. **Q3, Silent and Unknown: A.** Silent is the ended pair
+  (stone) with a dashed `border-strong` edge, wifi-off, and how long in the label ("Silent ·
+  2 min"); Unknown is dashed with no fill (`state-nodevice-bg`), `text-primary` ink and a question
+  mark ("Unknown · refresh"). Neither is ever green. **Q4, density:** standard, six columns with
+  `body` (15 px) names, plus a Present toggle into a projector view of four columns, 20 px names,
+  14 px labels and 88 px cells. **Q5, colour strength: A, tinted chips:** the chip carries the
+  state's tint; the cell stays the card colour. **Q6, theme:** the app and the shield stay
+  light-only (D1); the portal follows the device's light and dark with the tokens' dark values.
+  **Q7, `bali-softpulse`: A, a glow ring:** a 6 px `box-shadow` ring of orange-400 at 35%
+  (orange-300 in dark) swells and fades, 1.2 s × 2, `standard` easing, nothing under reduced
+  motion; the student's own chip never pulses. **Also the owner's:** the Cognito sign-in page
+  (classic Hosted UI, both pools, used by the portal and the phone) is in D2's scope, as D2d: a
+  logo and CSS per pool, a test that the CSS uses only Cognito's allowed classes, the owner
+  uploading to dev, then prod. **What landed:** DESIGN.md's style section; its states table
+  (Silent, Unknown, both Left chips; Home's Waiting and History's "Screen Time back on" were not
+  drawn, so they get their look in D2i and D2j); the red rule closed; `bali-softpulse` defined with
+  its CSS; the grid's density and Present; the theme paragraph; "Where it stands today" pointing
+  at D2c; the tooling table; and the list of where user-facing strings live, verified by grep:
+  BaliOutbox's `Focus`, `Unlocked`, `ProtectionOff`, `History`, `Me` and `SyncEngine` words were
+  missing, and in `apps/web/src/lib` `api-client`, `recap` and `blocks` (D2a's audit also named
+  `reports` and `invite`: by grep they hold none, their words being in the reports page,
+  `invite-code.tsx` and `errors.ts`). The two style skills not picked are deleted
+  (`.claude/skills/`, `.prettierignore`), and `high-end-visual-design`'s Bali block and
+  `description` now say it is Bali's style, applied under DESIGN.md alongside
+  `design-taste-frontend`, DESIGN.md winning and its fonts and palette never overriding the
+  tokens. PLAN.md lists D2's remaining steps, D2c–D2k, one PR each, each doing the em-dash cleanup
+  for the strings it owns. **No token changed.** Three values the picks or the canvas carry have no
+  token, noted for the owner rather than invented: the projector view's 20 px names and 14 px
+  labels (not in the type scale; D2f draws them as picked, and the design system gains them when
+  the owner next exports it); the tray's inset, drawn at 6 and 10 px (DESIGN.md says `space-2`);
+  and the canvas's chip padding of 4 × 10 px (DESIGN.md keeps the tokens' `space-2` × `space-3`).
+
 - **2026-10-05** — **C6b: the retention run — the owner's command, per school, per year.**
   The engine's `applyRetention` lands first; the owner's commands (`year-end`, `retention`)
   and the runbook land as C6b's second PR.

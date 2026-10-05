@@ -7,34 +7,53 @@ collects), plus Bali's design tooling at the end.
 
 **Scope: user-facing UI only.** That means the portal's pages and components
 (`apps/web/src/app`, `apps/web/src/components`), the student app's screens
-(`ios/Bali/UI`), the shield (`ios/BaliShield`), a future demo site, and
-**user-facing strings wherever they live**. Several live outside those
-folders: `ios/BaliOutbox/Sources/BaliOutbox/` (`ShieldWords.swift`, and the
-`words` in `Screen.swift` and `Join.swift`, sign-in's included), and
-`apps/web/src/lib/errors.ts` and `grid-state.ts` (the grid's notes). Their
-voice follows this file; their logic does not. It never covers the API,
-`packages/`, or `apps/web/src/lib` and the iOS engine and outbox beyond those
-strings.
+(`ios/Bali/UI`), the shield (`ios/BaliShield`), the Cognito sign-in page (its
+logo and CSS; D2d, `docs/PLAN.md`), a future demo site, and **user-facing
+strings wherever they live**. Several live outside those folders (found by
+grep, 2026-10-05; a new one joins this list). In
+`ios/BaliOutbox/Sources/BaliOutbox/`: `ShieldWords.swift`; the `words` in
+`Screen.swift` and `Join.swift`, sign-in's included; `FocusWords` in
+`Focus.swift`; `UnlockedWords` in `Unlocked.swift`; `ProtectionOffWords` in
+`ProtectionOff.swift`; History's row labels and refusals in `History.swift`;
+Me's name, leave and `SignOutWords` sentences in `Me.swift`; and the two
+refusals `SyncEngine.swift` hands a screen ("Bali couldn't save your reason.
+Try again.", "Bali couldn't lock your apps. Try again."). In
+`apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and
+badges); `api-client.ts` (`NetworkError`'s and `UnauthorizedError`'s words);
+`recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
+9:30 AM"); and `blocks.ts` ("Couldn't load your blocks."). `reports.ts` and
+`invite.ts` hold none: their words are in the reports page, `invite-code.tsx`
+and `errors.ts`. Their voice follows this file; their logic does not. It never
+covers the API, `packages/`, or `apps/web/src/lib` and the iOS engine and
+outbox beyond those strings.
 
 **Sources, and who wins.** The source of truth is the
 [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
 (`docs/DECISIONS.md`, 2026-09-20). Its token export sits in the repo, byte for
 byte, at `ios/Bali/UI/bali-tokens.json`. Where this file and the tokens
-disagree on a value, the tokens win: fix this file. The approved screen designs
-(D1, the student app, `docs/PLAN.md`) win over both for the screens they draw.
-Changing any of it is the owner's call, made on a design canvas, never a
-side effect of a PR.
+disagree on a value, the tokens win: fix this file. The style is the owner's
+pick on the
+[Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)
+(2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
+to Q2–Q7 are the reference for what this file says about it. The approved
+screen designs (D1, the student app, `docs/PLAN.md`) win over both for the
+screens they draw, until a D2 step redraws a screen in the picked style
+(D2h–D2k): from then on that step's screen is the approved one. Changing any
+of it is the owner's call, made on a design canvas, never a side effect of a
+PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
-pinned by `AppTests.tokens`). The portal does not yet: it is Tailwind v4 with
-its defaults (slate neutrals, a system font, no icon set) and follows the
-phone's or computer's dark mode (`color-scheme: light dark`, `dark:` classes).
-Bringing the tokens into the portal is a later planned step. **Until then,
-portal work keeps its current Tailwind styling** (dark variants included) and
-follows the rules here that need no tokens: what each colour means, a state
-never shown by colour alone (colour + label today; icons come with the icon
-set), the motion budget, the voice and sentence case. It adds no token layer,
-font or icon set on the way.
+pinned by `AppTests.tokens`), in D1's shapes; its screens take the Soft
+premium style in D2h–D2k. The portal does not yet: it is Tailwind v4 with its
+defaults (slate neutrals, a system font, no icon set) and follows the phone's
+or computer's dark mode (`color-scheme: light dark`, `dark:` classes). The
+tokens come into the portal in the next step, D2c (`docs/PLAN.md`): both
+themes, Instrument Sans self-hosted through `next/font`, lucide, the buttons
+and the focus ring. **Until D2c lands, portal work keeps its current Tailwind
+styling** (dark variants included) and follows the rules here that need no
+tokens: what each colour means, a state never shown by colour alone (colour +
+label today; icons come with the icon set), the motion budget, the voice and
+sentence case. It adds no token layer, font or icon set on the way.
 
 ## 1. Visual theme and atmosphere
 
@@ -53,11 +72,32 @@ honesty without harshness.
 - **Warm, not corporate.** Paper-warm stone neutrals, an evergreen brand, warm
   shadow blacks. Never blue-grey, never pure black, never acid green.
 
+**The style: Soft premium** (the owner's pick, 2026-10-04, Q1 B on D2a's
+canvas; the `high-end-visual-design` skill's language, inside Bali's tokens).
+In this file's terms:
+
+- **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
+  at `radius-lg`; each card inside is `surface-card` at `radius-md` with
+  `shadow-1`, so the two corners read as one concentric pair (§4, Card and
+  tray). In dark the shadow goes and a `border-default` hairline carries the
+  edge.
+- **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
+  inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
+- **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
+  popover, `shadow-3` on sheets: warm black, never blue-grey, never a hard
+  drop (§6).
+- **Tinted chips on plain cells** (Q5 A). The chip is filled with its state's
+  tint; the cell stays the card colour and the name stays `text-primary`.
+- **Capped by the tokens.** No 2 rem radii, no glass, no gradient washes, no
+  OLED black, no font but §3's, no icons but §2's (lucide, SF Symbols), motion
+  inside §7's budget. Where the skill and this file disagree, this file wins.
+
 Density: the teacher's live grid is dense (many students at a glance); the
-student app is airy and simple. Theme: **light** for the app and the shield:
-D1 was approved light-only, and the app renders light in every appearance. The
-portal follows the device's dark mode today (above). The tokens carry designed
-dark values, unused until a plan step adopts them.
+student app is airy and simple. Theme: **light** for the app and the shield
+(D1 was approved light-only, and the owner kept it so on 2026-10-04, Q6 A):
+the app renders light in every appearance. **The portal follows the device's
+light and dark**, with the tokens' dark values from D2c on (today's Tailwind
+dark variants until then).
 
 ## 2. Colour palette and roles
 
@@ -95,10 +135,11 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | `unlocked` | emergency_unlocked | `state-emergency-*` | lock-open / lock.open | "Unlocked" |
 | `protection_off` | revoked | `state-revoked-*` | shield-off / shield.slash | grid "Protection off"; app "Screen Time off" |
 | `ended` | ended | `state-ended-*` | flag / flag | grid "Left" |
-| `silent` (derived, never stored) | none: the design system has staleness as a badge only | none yet | none yet | grid "Silent" |
+| `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent · 2 min": how long since the last check-in, in the label |
 | grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
-| grid `left_unprotected`, `left_protection_off` | none | red today (see the colour rules) | none yet | "Left · unlocked", "Left · protection off" |
-| grid `unknown` | none | none yet | none yet | "Unknown · refresh" |
+| grid `left_unprotected` | none | `state-emergency-*` (Q2 A) | flag, then lock-open | "Left · unlocked" |
+| grid `left_protection_off` | none | `state-revoked-*` (Q2 A) | flag, then shield-off | "Left · protection off" |
+| grid `unknown` | none | no fill (`state-nodevice-bg`), a 1 px dashed `border-strong` edge, `text-primary` ink (Q3 A) | circle-help / questionmark.circle | "Unknown · refresh": refresh is the action |
 | none in v3 | pass (passes became an unlock's reason at launch) | `state-pass-*`, unused | ticket / ticket | none |
 | none in v3 | no_device | `state-nodevice-*`, unused | smartphone / iphone.slash | none |
 
@@ -106,18 +147,27 @@ The words for a state are decided per surface, and several are owner rulings
 (`docs/PLAN.md`, `docs/DECISIONS.md`): the grid's "Protection off" is the app's
 "Screen Time off" (the owner's 2026-09-27 ruling replaced D1's "Permission
 off"). `silent` is a real display state, derived from the last check-in and
-never stored (data-model decision 7), so it is never green; staleness short of
-silence ("last seen 4m ago") is a badge on any state. The rows marked "none
-yet" get their look in the design step (D2, `docs/PLAN.md`).
+never stored (data-model decision 7), so it is never green, and neither is
+`unknown`; staleness short of silence ("last seen 4m ago") is a `caption` in
+`text-tertiary` beside any chip, never a colour change. Unknown's dashed edge
+is `border-strong` on purpose, the pick's (Q3 A), where the borrowed
+`state-nodevice-bg` token's own note says `border-default`. The two Left chips
+each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
+ISSUES #2's reason still stands: a phone that left the roster while unshielded
+must never read as the quiet "Left", so the icon and the label carry it, the
+flag first and the state's icon after it. Two app chips the canvas did not
+draw get their look in their screen group's step: Home's Waiting (D2i) and
+History's "Screen Time back on" (D2j); until then they stay as built, on the
+not-joined pair.
 
 **Colour rules (law):**
 
 - **Red is reserved** for exactly two things: the revoked (protection off)
-  state and destructive actions. **One shipped exception is open:** the grid's
-  "Left · unlocked" and "Left · protection off" chips are red on purpose
-  (`apps/web/src/components/live-grid.tsx`, ISSUES #2: a phone left unshielded
-  and off the roster must not read as the quiet "Left"). The owner settles it
-  in D2; don't recolour them before then.
+  state and destructive actions. No exception stands: "Left · protection off"
+  is the revoked state, so it is red, and "Left · unlocked" is emergency
+  orange (the owner's pick, 2026-10-04, Q2 A). The shipped grid still paints
+  both red (`apps/web/src/components/live-grid.tsx`); D2f recolours them, and
+  no other PR does.
 - **Emergency is warm orange**, never red: the unlock is allowed, and the
   colour must say so.
 - **Blue belongs to passes** and nothing else.
@@ -127,7 +177,8 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 
 ## 3. Typography rules
 
-- **Families:** Instrument Sans on the web; the system font (SF Pro) on iOS at
+- **Families:** Instrument Sans on the web, self-hosted through `next/font`
+  (the CSP has no `font-src`; D2c); the system font (SF Pro) on iOS at
   the same sizes, scaled with Dynamic Type (`docs/DECISIONS.md`: the shield
   takes no custom font, so the app matches it). JetBrains Mono for join codes
   only. Large numerals: ui-rounded / SF Pro Rounded.
@@ -149,10 +200,12 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 
 ## 4. Component stylings
 
-- **Primary button:** `action-primary-bg`, white label, hover or pressed
-  `action-primary-bg-hover`, no shadow. On iOS (D1): full width, 56 pt tall,
-  `radius-md`, a 17 semibold label, dimmed to 60% while disabled or busy. On
-  the web, `radius-sm` per the tokens.
+- **Primary button:** `action-primary-bg`, `action-primary-fg` label, hover
+  or pressed `action-primary-bg-hover`, no shadow; a pill (`radius-full`) in
+  Soft premium. On iOS: full width, 56 pt tall, a 17 semibold label, dimmed
+  to 60% while disabled or busy (D1's `radius-md` holds on a shipped screen
+  until its D2 step). On the web: 40 px tall, `space-4` side padding, a
+  `body` semibold label.
 - **Secondary button:** the primary's shape, `surface-card` with a
   `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
 - **Destructive button:** `action-destructive-*`, only for removing a student
@@ -165,13 +218,23 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
   between anyone and the exit. Warm orange, `radius-full`; the hold's progress
   is a ring, and the `spring` easing is its spring-back on an early release.
   Always reachable when the shields are on.
-- **Card:** `surface-card`, `shadow-1`; `radius-md` and `space-4` padding per
-  the tokens (the web), and D1's `radius-lg` with 20 pt padding on iOS. Use a
-  card only when elevation means hierarchy; otherwise group with spacing or a
-  hairline.
-- **State chip:** the state's fill and ink, its icon, the `label` style in
-  uppercase, `radius-md`; padding `space-2` × `space-3` per the tokens (the
-  web), and D1's 6 × 12 pt on iOS.
+- **Card and tray:** a card is `surface-card` with `shadow-1` at rest and, in
+  dark, a `border-default` hairline instead. A group of cards sits in a tray:
+  `surface-sunken` at `radius-lg` with a `space-2` inset, the cards inside at
+  `radius-md` with `space-4` padding (the grid's cells, Home's tap card). A
+  card standing alone (the recap, a sheet) is `radius-lg` with `space-6`
+  padding (`space-5` on iOS), its stat tiles and wells `surface-sunken` at
+  `radius-md`. Use a card only when elevation means hierarchy; otherwise group
+  with spacing or a hairline.
+- **State chip:** a pill (`radius-full`) filled with the state's tint, its
+  icon and label in the state's ink, the `label` style in uppercase; padding
+  `space-2` × `space-3` per the tokens (the web), and D1's 6 × 12 pt on iOS.
+  Silent and Unknown add a 1 px dashed `border-strong` edge (§2). A chip
+  never pulses but as §7 allows.
+- **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
+  canvas): stone, not amber. `surface-sunken` with a `border-default`
+  hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
+  alarmed.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
   focus shows the focus ring.
 - **The mark:** the session arc as emblem: a green-200 track ring and a
@@ -195,10 +258,22 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
   outgrows it, so no line is ever cut off.
 - **Web:** 40 px page gutters on desktop; the live grid is the page's main
   object, laid out with CSS Grid.
-- **Radii:** `radius-xs` 6 (small controls, badges) · `radius-sm` 10 (buttons,
-  inputs) · `radius-md` 14 (cards, chips) · `radius-lg` 20 (sheets, hero
-  containers) · `radius-full` (pills and Emergency Unlock). One system, used
-  everywhere.
+- **The grid's density** (the owner's pick, 2026-10-04, Q4): **standard** is
+  six columns at the desktop width, cells in the tray, the name in `body`
+  (15 px) over the chip in `label` (12 px). **Present**, a toggle in the
+  grid's header (a secondary pill whose pressed state is shown, never by
+  colour alone), switches into the **projector view**: four columns, names at
+  20/26 semibold, chip labels at 14/18, cells at least 88 px tall, readable
+  from the back of a classroom; the same chips, the same words. Those two
+  sizes are not in the type scale yet: D2f draws them as picked, and the
+  design system gains them when the owner next exports it. The grid reflows
+  by column count below the desktop width, never by shrinking type.
+- **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
+  `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
+  its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
+  used everywhere. These roles are this file's (the pick): the tokens win on
+  values, and their usage notes still name `radius-sm` for buttons and
+  `radius-md` for chips until the owner next exports the design system.
 
 ## 6. Depth and elevation
 
@@ -207,9 +282,10 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
   and sheets.
 - **Focus ring, everywhere, no exceptions:** a 2 px page-colour gap, then a
   2 px `focus-ring-color` ring.
-- Dark values (for later): elevation from lighter surfaces and hairlines, not
-  shadows; state inks move to the 300 step; tints are hand-mixed, never alpha
-  overlays.
+- Dark values (the portal, from D2c on): elevation from lighter surfaces and
+  hairlines, not shadows (`shadow-1` is none; a card takes a `border-default`
+  edge); state inks move to the 300 step; tints are hand-mixed, never alpha
+  overlays. The app and the shield never render them.
 
 ## 7. Do's and don'ts
 
@@ -217,8 +293,9 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 
 - Show every state as colour + icon + label.
 - Keep motion inside its budget: `fast` 150 ms (a chip's crossfade), `base`
-  200 ms (toasts, sheets), `slow` 300 ms (the ceiling for everything else),
-  `arc` 600 ms (the one theatrical moment: the countdown arc drawing in).
+  200 ms (toasts, sheets), `slow` 300 ms (the ceiling for everything else,
+  `bali-softpulse` excepted, below), `arc` 600 ms (the one theatrical moment:
+  the countdown arc drawing in).
   Easing `standard` `cubic-bezier(0.2, 0, 0, 1)`; `spring`
   `cubic-bezier(0.34, 1.3, 0.64, 1)` for Emergency Unlock's spring-back.
 - Turn all animation off under `prefers-reduced-motion` (on iOS, Reduce
@@ -233,17 +310,35 @@ yet" get their look in the design step (D2, `docs/PLAN.md`).
 
 - Use red for anything but protection off and destructive actions, or blue for
   anything but passes.
-- Pulse or loop anything. The emergency chip may pulse softly exactly twice
-  (`bali-softpulse`, 1.2 s × 2), never forever. `bali-softpulse` is named
-  but not yet defined anywhere: it is to be designed in D2, so don't invent
-  its keyframes before then.
+- Pulse or loop anything. The one pulse is `bali-softpulse` (defined below):
+  the emergency chip, exactly twice, never forever.
 - Use pure black, blue-grey neutrals, purple-to-blue gradients, neon glows,
   glassmorphism for decoration, or emoji in the UI.
 - Paint silence or staleness green, or show a state the server can't vouch for.
 - Add an animation library, font, icon set or component kit without a plan
   step that names it.
-- Add new em-dashes to user-facing strings. Existing ones stay until the
-  owner's em-dash cleanup; don't strip them piecemeal in unrelated PRs.
+- Add new em-dashes to user-facing strings. Existing ones go in D2's screen
+  group steps, each cleaning the strings it owns (the owner's em-dash cleanup,
+  `docs/PLAN.md`); don't strip them piecemeal in unrelated PRs.
+
+**`bali-softpulse`** (the owner's pick, 2026-10-04, Q7 A: a glow ring). When
+an Emergency Unlock lands on the grid, its chip's ring swells and fades, 1.2 s
+× 2, then is still: a `box-shadow` ring of orange-400 at 35%
+(`rgba(219,147,71,0.35)`; the token's own note names it the soft-pulse glow),
+from 0 to 6 px at the midpoint and back; in dark the ring is orange-300
+(`rgba(229,175,111,0.35)`). Nothing moves and the chip's shape stays. Easing
+`standard`, exactly two iterations, never a loop, and nothing at all under
+reduced motion. The student's own Unlocked chip never pulses: the pulse is
+the teacher's cue.
+
+```css
+@keyframes bali-softpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(219, 147, 71, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(219, 147, 71, 0.35); }
+}
+.chip-emergency.just-unlocked { animation: bali-softpulse 1.2s cubic-bezier(0.2, 0, 0, 1) 2; }
+@media (prefers-reduced-motion: reduce) { .chip-emergency.just-unlocked { animation: none; } }
+```
 
 ## 8. Responsive behaviour
 
@@ -263,6 +358,11 @@ design if it has one. Then:
 - **Name the design read** in one line before code, as
   `design-taste-frontend` §0 asks. For example: "the teacher's live grid, for a
   teacher mid-lesson, calm and dense, in the Bali Design System."
+- **Build with both skills:** `design-taste-frontend` for the read, the
+  discipline and the tells; `high-end-visual-design` for Soft premium's shape
+  language (the tray, the pills, the soft shadow, the spacing rhythm). Where
+  either disagrees with this file, this file wins; neither's fonts, palette,
+  icons or motion override the tokens.
 - **Use the dials for product UI:** `DESIGN_VARIANCE 3`, `MOTION_INTENSITY 2`,
   `VISUAL_DENSITY 7` on the live grid and 4 elsewhere. The demo site sets its
   own when it is built.
@@ -295,7 +395,7 @@ them.
 | --- | --- | --- |
 | `design-taste-frontend` | Designing or building any UI. The portal and the app take its product-safe parts; the demo site takes all of it | [taste-skill](https://github.com/Leonxlnx/taste-skill) v2, MIT |
 | `redesign-existing-projects` | Auditing an existing screen for a design step; its fixes happen only inside an approved plan step | taste-skill, MIT |
-| `minimalist-ui`, `high-end-visual-design`, `industrial-brutalist-ui` | Style options, for the owner's comparison on a design canvas only. The pick is written into this file; the other two are deleted | taste-skill, MIT |
+| `high-end-visual-design` | Bali's style, Soft premium (the owner's pick on D2a's canvas, 2026-10-04): used alongside `design-taste-frontend` whenever UI is designed or built, under this file (§1, The style). This file wins where they disagree, and its fonts and palette never override the tokens. The two style options not picked were deleted with the pick (`docs/DECISIONS.md`, 2026-10-05) | taste-skill, MIT |
 | `full-output-enforcement` | Any UI deliverable: no placeholders, nothing left unfinished | taste-skill, MIT |
 | `image-to-code` | Dormant: the demo site, once an image-generation tool is set up | taste-skill, MIT |
 | `web-design-guidelines` | Reviewing the portal's UI; `/santa-loop` runs it on PRs that touch it (WARNs only) | [Vercel](https://github.com/vercel-labs/web-interface-guidelines), MIT, rules pinned in `rules.md` |

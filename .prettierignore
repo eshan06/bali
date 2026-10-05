@@ -28,9 +28,7 @@ ios/Bali/UI/bali-tokens.json
 # a Bali block; excluded so a re-vendor stays a clean diff
 .claude/skills/design-taste-frontend/
 .claude/skills/redesign-existing-projects/
-.claude/skills/minimalist-ui/
 .claude/skills/high-end-visual-design/
-.claude/skills/industrial-brutalist-ui/
 .claude/skills/full-output-enforcement/
 .claude/skills/image-to-code/
 .claude/skills/web-design-guidelines/
