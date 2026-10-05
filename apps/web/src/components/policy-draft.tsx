@@ -13,7 +13,7 @@ import type { ReactNode } from 'react';
 const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
 
 const LINK =
-  'font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300';
+  'font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300';
 
 /** A link in the page's words, styled as the help page styles its own. */
 export function TextLink({ href, children }: { href: string; children: ReactNode }) {

@@ -1,15 +1,268 @@
 @import 'tailwindcss';
 
+/*
+ * The Bali Design System's tokens (ios/Bali/UI/bali-tokens.json; DESIGN.md §2 to §6) as CSS
+ * variables, `--bali-<token>`: the light values on :root, the dark ones under the device's dark
+ * mode, so a page reads the same token in both. tokens.test.ts pins every value here to the JSON,
+ * so the two cannot drift; a value the tokens lack is a question for the owner, never written here.
+ * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
+ * reference (a page uses semantic tokens, never a primitive).
+ */
 :root {
   color-scheme: light dark;
+
+  --bali-green-100: #dcede3;
+  --bali-green-200: #bcdcca;
+  --bali-green-300: #92c3a9;
+  --bali-green-400: #62a483;
+  --bali-green-600: #2c6f51;
+  --bali-green-700: #245a43;
+  --bali-green-800: #1e4936;
+  --bali-stone-50: #f7f5f2;
+  --bali-stone-100: #efece7;
+  --bali-stone-200: #e3dfd8;
+  --bali-stone-300: #d2ccc2;
+  --bali-stone-400: #aba59a;
+  --bali-stone-600: #6b665d;
+  --bali-stone-700: #524e47;
+  --bali-orange-100: #f7e6d2;
+  --bali-orange-300: #e5af6f;
+  --bali-orange-800: #6f3f1b;
+  --bali-blue-100: #e0ebfa;
+  --bali-blue-300: #8fb4e8;
+  --bali-blue-700: #28528e;
+  --bali-red-100: #fae3e0;
+  --bali-red-300: #e89b92;
+  --bali-red-500: #c44a3c;
+  --bali-red-600: #a93d31;
+  --bali-red-700: #8c342b;
+
+  --bali-surface-page: var(--bali-stone-50);
+  --bali-surface-card: #ffffff;
+  --bali-surface-sunken: var(--bali-stone-100);
+  --bali-surface-raised: #ffffff;
+  --bali-surface-brand: var(--bali-green-700);
+  --bali-border-default: var(--bali-stone-200);
+  --bali-border-strong: var(--bali-stone-300);
+  --bali-text-primary: #211f1b;
+  --bali-text-secondary: #5b564e;
+  --bali-text-tertiary: var(--bali-stone-600);
+  --bali-text-disabled: var(--bali-stone-400);
+  --bali-text-on-brand: #ffffff;
+  --bali-text-brand: var(--bali-green-700);
+  --bali-action-primary-bg: var(--bali-green-700);
+  --bali-action-primary-bg-hover: var(--bali-green-800);
+  --bali-action-primary-fg: #ffffff;
+  --bali-action-destructive-bg: var(--bali-red-600);
+  --bali-action-destructive-fg: #ffffff;
+  --bali-state-notjoined-fg: var(--bali-stone-700);
+  --bali-state-notjoined-bg: var(--bali-stone-100);
+  --bali-state-focused-fg: var(--bali-green-700);
+  --bali-state-focused-bg: var(--bali-green-100);
+  --bali-state-pass-fg: var(--bali-blue-700);
+  --bali-state-pass-bg: var(--bali-blue-100);
+  --bali-state-emergency-fg: var(--bali-orange-800);
+  --bali-state-emergency-bg: var(--bali-orange-100);
+  --bali-state-revoked-fg: var(--bali-red-700);
+  --bali-state-revoked-bg: var(--bali-red-100);
+  --bali-state-nodevice-fg: var(--bali-stone-600);
+  --bali-state-nodevice-bg: rgba(0, 0, 0, 0);
+  --bali-state-ended-fg: var(--bali-stone-600);
+  --bali-state-ended-bg: var(--bali-stone-100);
+  --bali-arc-track: var(--bali-stone-200);
+  --bali-arc-fill: var(--bali-green-600);
+  --bali-arc-final2: var(--bali-green-400);
+  --bali-focus-ring-color: var(--bali-green-600);
+
+  --bali-shadow-1: 0 1px 2px rgba(33, 28, 21, 0.06);
+  --bali-shadow-2: 0 2px 8px rgba(33, 28, 21, 0.08), 0 1px 2px rgba(33, 28, 21, 0.05);
+  --bali-shadow-3: 0 8px 24px rgba(33, 28, 21, 0.12), 0 2px 6px rgba(33, 28, 21, 0.06);
+
+  /* bali-softpulse's glow ring (DESIGN.md §7): orange-400 at 35 %, orange-300 in dark. */
+  --bali-softpulse-glow: rgba(219, 147, 71, 0.35);
 }
 
-body {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bali-surface-page: #141312;
+    --bali-surface-card: #1d1b19;
+    --bali-surface-sunken: #100f0e;
+    --bali-surface-raised: #262421;
+    --bali-surface-brand: var(--bali-green-800);
+    --bali-border-default: #2e2b27;
+    --bali-border-strong: #3c3934;
+    --bali-text-primary: #f1efeb;
+    --bali-text-secondary: #b0aaa1;
+    --bali-text-tertiary: #837d74;
+    --bali-text-disabled: #5c574f;
+    --bali-text-brand: var(--bali-green-300);
+    --bali-action-primary-bg: var(--bali-green-400);
+    --bali-action-primary-bg-hover: var(--bali-green-300);
+    --bali-action-primary-fg: #06130d;
+    --bali-action-destructive-bg: var(--bali-red-500);
+    --bali-state-notjoined-fg: #b0aaa1;
+    --bali-state-notjoined-bg: #242220;
+    --bali-state-focused-fg: var(--bali-green-300);
+    --bali-state-focused-bg: #1e2f27;
+    --bali-state-pass-fg: var(--bali-blue-300);
+    --bali-state-pass-bg: #1d2938;
+    --bali-state-emergency-fg: var(--bali-orange-300);
+    --bali-state-emergency-bg: #38291a;
+    --bali-state-revoked-fg: var(--bali-red-300);
+    --bali-state-revoked-bg: #341f1c;
+    --bali-state-nodevice-fg: #a39d94;
+    --bali-state-ended-fg: #a39d94;
+    --bali-state-ended-bg: #242220;
+    --bali-arc-track: #2e2b27;
+    --bali-arc-fill: var(--bali-green-400);
+    --bali-arc-final2: var(--bali-green-300);
+    --bali-focus-ring-color: var(--bali-green-300);
+
+    --bali-shadow-1: none;
+    --bali-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --bali-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    --bali-softpulse-glow: rgba(229, 175, 111, 0.35);
+  }
+}
+
+/*
+ * The tokens as Tailwind's theme, so a page writes `bg-surface-page`, `text-text-secondary`,
+ * `rounded-md`, `p-4`, `text-h1`. Tailwind's own radii and shadows go: the tokens' five radii and
+ * three shadows are the whole set. Its default colours and sizes stay until the screens still on
+ * them are redrawn (D2e to D2g); the entry pages use none of them.
+ */
+@theme {
+  /* §5: the 4-point grid, px on the web: `p-4` is space-4, 16 px. */
+  --spacing: 4px;
+
+  /* §7: a transition is `fast` on the `standard` easing unless a class says otherwise. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+
+  --radius-*: initial;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  --shadow-*: initial;
+
+  /* §3: the type scale. `text-label` adds `uppercase`; `text-data-lg` takes `font-num`, `text-code` `font-mono`. */
+  --text-display: 56px;
+  --text-display--line-height: 60px;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: 32px;
+  --text-h1--line-height: 38px;
+  --text-h1--font-weight: 600;
+  --text-h1--letter-spacing: -0.01em;
+  --text-h2: 24px;
+  --text-h2--line-height: 30px;
+  --text-h2--font-weight: 600;
+  --text-h3: 18px;
+  --text-h3--line-height: 24px;
+  --text-h3--font-weight: 600;
+  --text-body-lg: 17px;
+  --text-body-lg--line-height: 26px;
+  --text-body-lg--font-weight: 400;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-body--font-weight: 400;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 400;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.06em;
+  --text-data: 14px;
+  --text-data--line-height: 20px;
+  --text-data--font-weight: 500;
+  --text-data-lg: 28px;
+  --text-data-lg--line-height: 32px;
+  --text-data-lg--font-weight: 600;
+  --text-code: 14px;
+  --text-code--line-height: 20px;
+  --text-code--font-weight: 500;
+}
+
+@theme inline {
+  /* §3's families: the self-hosted faces (fonts.ts), and the rounded numerals' stack. */
+  --font-sans: var(--font-instrument-sans);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-num: ui-rounded, 'SF Pro Rounded', var(--font-instrument-sans);
+
+  --color-surface-page: var(--bali-surface-page);
+  --color-surface-card: var(--bali-surface-card);
+  --color-surface-sunken: var(--bali-surface-sunken);
+  --color-surface-raised: var(--bali-surface-raised);
+  --color-surface-brand: var(--bali-surface-brand);
+  --color-border-default: var(--bali-border-default);
+  --color-border-strong: var(--bali-border-strong);
+  --color-text-primary: var(--bali-text-primary);
+  --color-text-secondary: var(--bali-text-secondary);
+  --color-text-tertiary: var(--bali-text-tertiary);
+  --color-text-disabled: var(--bali-text-disabled);
+  --color-text-on-brand: var(--bali-text-on-brand);
+  --color-text-brand: var(--bali-text-brand);
+  --color-action-primary-bg: var(--bali-action-primary-bg);
+  --color-action-primary-bg-hover: var(--bali-action-primary-bg-hover);
+  --color-action-primary-fg: var(--bali-action-primary-fg);
+  --color-action-destructive-bg: var(--bali-action-destructive-bg);
+  --color-action-destructive-fg: var(--bali-action-destructive-fg);
+  --color-state-notjoined-fg: var(--bali-state-notjoined-fg);
+  --color-state-notjoined-bg: var(--bali-state-notjoined-bg);
+  --color-state-focused-fg: var(--bali-state-focused-fg);
+  --color-state-focused-bg: var(--bali-state-focused-bg);
+  --color-state-pass-fg: var(--bali-state-pass-fg);
+  --color-state-pass-bg: var(--bali-state-pass-bg);
+  --color-state-emergency-fg: var(--bali-state-emergency-fg);
+  --color-state-emergency-bg: var(--bali-state-emergency-bg);
+  --color-state-revoked-fg: var(--bali-state-revoked-fg);
+  --color-state-revoked-bg: var(--bali-state-revoked-bg);
+  --color-state-nodevice-fg: var(--bali-state-nodevice-fg);
+  --color-state-nodevice-bg: var(--bali-state-nodevice-bg);
+  --color-state-ended-fg: var(--bali-state-ended-fg);
+  --color-state-ended-bg: var(--bali-state-ended-bg);
+  --color-arc-track: var(--bali-arc-track);
+  --color-arc-fill: var(--bali-arc-fill);
+  --color-arc-final2: var(--bali-arc-final2);
+  --color-focus-ring: var(--bali-focus-ring-color);
+
+  /* A bridge for the screens D2e to D2g redraw: their `text-slate-500` helper lines sit on the
+     stone page now, below AA; text-tertiary is the pre-solved ink for them. It recolours every
+     slate-500 utility, the Unknown chip's `border-slate-500` dashed edge included (the state still
+     reads from its label and edge). Goes with the last `slate-` class. */
+  --color-slate-500: var(--bali-text-tertiary);
+}
+
+/* §6: the three shadows, by name; shadow-1 is none in dark, so a card's edge is its hairline. */
+@utility shadow-1 {
+  box-shadow: var(--bali-shadow-1);
+}
+@utility shadow-2 {
+  box-shadow: var(--bali-shadow-2);
+}
+@utility shadow-3 {
+  box-shadow: var(--bali-shadow-3);
+}
+
+@layer base {
+  /* §6: the focus ring, everywhere, no exceptions: a 2 px gap, then a 2 px ring. */
+  :focus-visible {
+    outline: 2px solid var(--bali-focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  /* §7: every animation off under reduced motion; a fade is instant. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 }

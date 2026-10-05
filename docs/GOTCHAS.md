@@ -102,8 +102,10 @@ touching infra, CI, git plumbing, or the dev environment.
   160.79.106.x, 9+ addresses in 18 requests), so one session can't exhaust a per-address budget
   on dev (L1's). Test per-address limits in process (`apps/api/test/rate-limits.test.ts`) or in
   CI, never against dev from a session.
-- **Workers (sub-agents) have no Agent tool.** So `/santa-loop`'s reviewers run as headless
-  `claude -p` processes, one per reviewer. Never create remote sessions for them.
+- **Santa's reviewers run in the worker's own turn, in the foreground, and the worker waits for
+  them.** A reviewer started as a background Agent is lost or unheard once the worker's turn ends
+  (D2b's worker lost both that way; foreground `claude -p` re-runs worked). Foreground `claude -p`,
+  or Agent calls not in the background; never remote sessions.
 - **Sessions on dev really expire.** The API sweeps every minute by itself
   (session expiry + silence detection), and a Railway cron POSTs
   `/internal/sweep` as its backup. Timing-sensitive steps against dev must

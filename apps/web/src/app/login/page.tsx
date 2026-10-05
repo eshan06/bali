@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { Button } from '@/components/button';
+import { Mark } from '@/components/mark';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
 
 /** What a Sign out in this tab (S4a) left behind, said once on the way back here. */
@@ -20,7 +22,7 @@ const PUBLIC_PAGES = [
 ];
 
 const PUBLIC_LINK =
-  'text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:text-slate-300 dark:hover:text-slate-100';
+  'rounded-xs font-medium text-text-brand underline underline-offset-2 hover:decoration-2';
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -31,30 +33,36 @@ export default function LoginPage() {
 
   function onSignIn() {
     setError(null);
-    startLogin().catch(() => setError('Could not start sign-in. Check the portal configuration.'));
+    startLogin().catch(() => setError("Bali couldn't open the sign-in page. Try again."));
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-6 px-4">
-      <h1 className="text-2xl font-semibold">Bali</h1>
-      {left ? (
-        <p role="status" className="text-center text-sm font-medium">
-          {SIGNED_OUT[left]}
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
+      {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding; in dark its hairline edge. */}
+      <div className="rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
+        <p translate="no" className="inline-flex items-center gap-2 text-body font-semibold">
+          <Mark size={28} />
+          Bali
         </p>
-      ) : null}
-      <p className="text-center text-sm text-slate-500">
-        Teacher portal — sign in to see your classes.
-      </p>
-      <button
-        type="button"
-        onClick={onSignIn}
-        className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
-      >
-        Sign in
-      </button>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <nav aria-label="Help and policies">
-        <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+        <h1 className="mt-6 text-h1 text-balance">Teacher portal</h1>
+        <p className="mt-2 text-body-lg text-text-secondary">Sign in to see your classes.</p>
+        {left ? (
+          <p role="status" className="mt-6 text-body">
+            {SIGNED_OUT[left]}
+          </p>
+        ) : null}
+        <Button onClick={onSignIn} className="mt-6 w-full">
+          Sign in
+        </Button>
+        {error ? (
+          <p role="alert" className="mt-4 text-body">
+            {error}
+          </p>
+        ) : null}
+      </div>
+      {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
+      <nav aria-label="Help and policies" className="mt-6 px-6">
+        <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>
               <Link href={page.href} className={PUBLIC_LINK}>
