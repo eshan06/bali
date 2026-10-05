@@ -54,9 +54,9 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function Question({ title, children }: { title: string; children: ReactNode }) {
+function Question({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <div>
+    <div id={id} className="scroll-mt-6">
       <h3 className="text-base font-semibold">{title}</h3>
       <div className="mt-2 max-w-[65ch] space-y-3 text-slate-700 dark:text-slate-300">
         {children}
@@ -129,7 +129,7 @@ export default function SupportPage() {
               Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
-          <Question title="What your teacher sees">
+          <Question id="teacher-sees" title="What your teacher sees">
             <ul className="list-disc space-y-2 pl-5">
               {TEACHER_SEES.map((line) => (
                 <li key={line}>{line}</li>
@@ -195,8 +195,19 @@ export default function SupportPage() {
               have: it quiets every app it can, so there&apos;s no list to read.
             </p>
           </Question>
-          <Question title="Privacy policy">
-            <p>Our full privacy policy is coming soon.</p>
+          <Question title="Privacy policy and terms">
+            <p>
+              The full privacy policy and terms are coming from Bali&apos;s lawyer. Until they
+              arrive, the{' '}
+              <Link href="/privacy" className={LINK}>
+                privacy policy
+              </Link>{' '}
+              and{' '}
+              <Link href="/terms" className={LINK}>
+                terms
+              </Link>{' '}
+              pages show the sections each will have.
+            </p>
           </Question>
         </Section>
 
