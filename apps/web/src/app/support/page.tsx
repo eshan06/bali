@@ -10,7 +10,7 @@ import { TEXT_LINK, TextLink } from '@/components/text-link';
  * The public help page (Phase 5, P4): read without signing in, so it calls no API and keeps no
  * state. It renders per request like every page (the root layout's `dynamic`), for the CSP nonce.
  * The teacher-sees lists are the student app's own (`ConsentCard`, ios/Bali/UI/JoinView.swift),
- * a colon in place of the app's dash; if the app's lists change, these change with them.
+ * word for word; if the app's lists change, these change with them.
  */
 
 export const metadata: Metadata = {

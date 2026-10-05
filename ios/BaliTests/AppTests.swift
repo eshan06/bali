@@ -1758,8 +1758,8 @@ struct AppTests {
             defer { window.isHidden = true }
             window.layoutIfNeeded()
             let scrolls = scrollViews(in: window)
-            // Every screen scrolls once its text outgrows it, but the starting mark and Storage.
-            #expect(scrolls.isEmpty == ["starting", "storage"].contains(name), "\(name)")
+            // Every screen scrolls once its text outgrows it, but the starting mark.
+            #expect(scrolls.isEmpty == (name == "starting"), "\(name)")
             expectEdges(of: scrolls, in: window, name)
             // The page a pager shows is among those checked: its own scroll view.
             for pager in scrolls where pager.isPagingEnabled {

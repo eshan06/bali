@@ -109,8 +109,9 @@ private struct Styled: ViewModifier {
 }
 
 /// The primary action, a pill (D2h) at D1's 56 pt: the brand's fill — pressed, its darker shade —
-/// and a white 17 semibold label; dimmed while disabled, as a busy one is. `destructive`, the same
-/// in DESIGN.md's destructive red: Delete account's confirm (C4b), and nothing else.
+/// and a white 17 semibold label, 20 pt in from the round ends so a long label that wraps stays
+/// clear of the curve (santa's round 1); dimmed while disabled, as a busy one is. `destructive`,
+/// the same in DESIGN.md's destructive red: Delete account's confirm (C4b), and nothing else.
 struct PrimaryButtonStyle: ButtonStyle {
     var destructive = false
     @Environment(\.isEnabled) private var enabled
@@ -119,8 +120,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         let (fill, pressed) =
             destructive
             ? (Theme.destructive, Theme.destructivePressed) : (Theme.brand, Theme.brandPressed)
-        configuration.label.textStyle(.button).foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 56)
+        configuration.label.pillLabel().foregroundStyle(.white)
             .background(configuration.isPressed ? pressed : fill, in: .capsule)
             .opacity(enabled ? 1 : 0.6)
     }
@@ -132,8 +132,7 @@ struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.textStyle(.button).foregroundStyle(Theme.text)
-            .frame(maxWidth: .infinity, minHeight: 56)
+        configuration.label.pillLabel().foregroundStyle(Theme.text)
             .background(configuration.isPressed ? Theme.sunken : Theme.card, in: .capsule)
             .overlay(Capsule().stroke(Theme.borderStrong))
             .opacity(enabled ? 1 : 0.6)
@@ -141,10 +140,22 @@ struct SecondaryButtonStyle: ButtonStyle {
 }
 
 extension View {
-    /// DESIGN.md's focus ring, `shown` while an input is focused: a 2-pt gap of the page's colour,
-    /// then a 2-pt ring in `focus-ring-color`, around a shape of `radius`.
+    /// A pill button's label: the button style, centred when it wraps, 20 pt in from the ends, in
+    /// a full-width 56-pt pill.
+    fileprivate func pillLabel() -> some View {
+        textStyle(.button).multilineTextAlignment(.center).padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 56)
+    }
+
+    /// DESIGN.md's focus ring, `shown` while an input is focused: a 2-pt gap in the page's colour
+    /// — drawn, so the ring reads the same on a card — then a 2-pt ring in `focus-ring-color`,
+    /// around a shape of `radius`.
     func focusRing(_ shown: Bool, radius: CGFloat) -> some View {
         overlay(
+            RoundedRectangle(cornerRadius: radius + 1)
+                .stroke(shown ? Theme.page : .clear, lineWidth: 2).padding(-1)
+        )
+        .overlay(
             RoundedRectangle(cornerRadius: radius + 3)
                 .stroke(shown ? Theme.focusRing : .clear, lineWidth: 2).padding(-3))
     }

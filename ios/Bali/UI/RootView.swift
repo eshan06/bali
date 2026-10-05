@@ -141,19 +141,25 @@ struct TabBar: View {
 }
 
 /// The app could not start (rule 5): why, and **Try again** — `Phone.start()`, which runs again.
+/// Laid out as Sign in is, scrolling once the phone's text size outgrows it (santa's round 1).
 struct StorageView: View {
     let problem: String
     let retry: () async -> Void
 
     var body: some View {
         ScreenScaffold {
-            Spacer()
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Bali couldn't start").textStyle(.h2)
-                Text(problem).textStyle(.body).foregroundStyle(Theme.textSecondary)
+            PageScroll {
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Bali couldn't start").textStyle(.h2)
+                        Text(problem).textStyle(.body).foregroundStyle(Theme.textSecondary)
+                    }
+                    Spacer()
+                    Button("Try again") { Task { await retry() } }
+                        .buttonStyle(PrimaryButtonStyle())
+                }
             }
-            Spacer()
-            Button("Try again") { Task { await retry() } }.buttonStyle(PrimaryButtonStyle())
         }
     }
 }
