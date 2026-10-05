@@ -8,6 +8,59 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-04** — **C6a: a school's data disposed of on its written request — de-identified,
+  as C3 leaves an account, not destroyed.** The engine's `disposeSchool`, one transaction; the
+  owner's command (`npm run school -- dispose`, a preview, then `--confirm "<name>"`) and its
+  runbook land as C6a's second PR. **What
+  "dispose" means:** every person of the school — its teachers (`users.school_id`), and anyone
+  enrolled in, present in or recorded in one of its classes (a student has no school of their
+  own) — is de-identified exactly as C3 leaves a deleted account: no name, `cognito_id`
+  `deleted:<id>`, removed, a rename's names emptied (migration 0015's rewrite, so no new
+  migration and no new hole in the append-only history). Its enrollments end; its classes are
+  removed and their names emptied (a class name can name a teacher); its teachers' blocks are
+  removed, freeing the tags; its open invites and every pre-bell tap of its people or on its
+  teachers are deleted (transient rows, with the phone's install number); the school row is
+  marked removed, keeping its name (an institution, not a person). **What stays, and why:**
+  the lessons, their participations and events (times, states, unlock reasons, the phone's
+  install number on an event), under rows that name no one: the owner's rulings keep
+  aggregates (C6b) and C3 keeps the same rows for a deleted account. Destroying them would
+  need a DELETE through the events trigger. Whether a school's agreement accepts
+  de-identification for disposal is the lawyer's to confirm with the agreement (an open owner
+  item); a school whose agreement demands destruction is raised before running it, not served
+  by this disposal. The redeemed invites
+  stay too: 0013/0014 make them immutable, and they name only a de-identified row. **Logged
+  without personal data:** a `school_disposed` event (no session, class or user), its payload
+  the school's id and seven counts. **Safety:** without `confirmName` it is a preview that runs
+  the whole disposal and rolls it back, so its counts are exact; the confirmation is the
+  school's name, exactly. **Refused, writing nothing:** while a lesson of
+  the school runs (one past its bell, unswept, is ended as the sweep ends it, A18's way); and
+  while a person of it has records at another school (`shared_accounts`, by id): that account
+  is the other school's too, and moving one school's rows to a stand-in would mean rewriting
+  `events.user_id`. Not built until a second school shares a student. **The inspection
+  hold** stays a runbook step (C5). **Idempotent** on the
+  school row: a second run is `already_disposed`. **Locks:** the school, then its people's
+  rows, then its classes, then its lessons — a join, rename and deletion take a person before
+  a class, so none waits in a cycle with it; an invite's mint and its redeem hold the school
+  FOR SHARE (#220's review: a redeem held nothing of the school, so one landing mid-disposal
+  left a named teacher on a disposed school, past any re-run), the redeem before the caller's
+  row, in the disposal's order — so a redeem lands before it (its teacher is read as one of
+  the school's people) or after it (`invite_not_found`); a Start behind it finds its class removed
+  (`startSession` now refuses a removed class, `CLASS_NOT_FOUND`); an arm or rename finds the
+  account deleted; an unlock is recorded whichever lands first (the old account's in its
+  lesson, or a reborn account's as `not_enrolled`). The Cognito sign-ins and backups are the
+  owner's, in the command's runbook. **No event per enrollment:** a leave records
+  `enrollment_left` for the grid's sake, and a disposal has no grid left to tell; its
+  `school_disposed` is the why for every enrollment it ends, as `account_deleted` is for a
+  deletion's pre-bell tap. A person's pre-bell taps go whatever block they wait on (their
+  account goes). **Known, kept:** an outsider's tap racing the disposal on one of its
+  teachers' blocks can still arm after it (the arm path holds the student's row, not the
+  teacher's); the row names a de-identified teacher, no Start can take it (the classes are
+  gone), and it expires that day. **Rode along (#219's review):** C5's export carries the
+  lessons' own events (start, extend, end, expiry: no one's id) as `sessionEvents`, so it says
+  when the student's lesson ended; `deleteAccount` records no event for the pre-bell tap it
+  consumes, on purpose: a Start's decline says why a student is not in the session that
+  declined them, and a deletion has no session; its `account_deleted` is the why.
+
 - **2026-10-04** — **C3's follow-up (#217's review).** The arm path refuses a deleted account
   like the join path: it reads the student's row FOR SHARE, which waits out the deletion's NO KEY
   UPDATE, rather than taking the student's tap lock as `tapIn` does — a Start holds armed rows

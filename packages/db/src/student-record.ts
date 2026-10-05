@@ -1,4 +1,4 @@
-import { asc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { validate as isUuid } from 'uuid';
 
 import {
@@ -117,6 +117,26 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
             .where(inArray(sessions.id, sessionIds))
             .orderBy(asc(sessions.startedAt), asc(sessions.id))
         : [];
+      // Those lessons' own moments, which carry no one's id: their start, a bell
+      // moved, their end (#219's review) — when the student's lesson ended.
+      const sessionEvents = sessionIds.length
+        ? await tx
+            .select()
+            .from(events)
+            .where(
+              and(
+                inArray(events.sessionId, sessionIds),
+                isNull(events.userId),
+                inArray(events.type, [
+                  'session_started',
+                  'session_extended',
+                  'session_ended',
+                  'session_expired',
+                ]),
+              ),
+            )
+            .orderBy(asc(events.seq))
+        : [];
       const classIds = unique([
         ...enrolled.map((e) => e.classId),
         ...happened.map((e) => e.classId),
@@ -161,6 +181,7 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         invitesRedeemed,
         classes: classRows,
         sessions: sessionRows,
+        sessionEvents,
         schools: schoolRows,
       };
     },

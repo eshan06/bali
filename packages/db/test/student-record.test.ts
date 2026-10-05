@@ -23,6 +23,8 @@ import { makeTestDb } from '../src/testing.js';
 import {
   armTap,
   deleteAccount,
+  endSession,
+  extendSession,
   renameStudent,
   startSession,
   tapIn,
@@ -193,6 +195,9 @@ describe('exportStudentRecord (C5)', () => {
       { id: second.id, name: 'Chemistry', teacherDisplayName: 'Ms Rivera' },
     ]);
     expect(record.sessions).toMatchObject([{ id: session.id, classId: first.id }]);
+    expect(record.sessionEvents).toMatchObject([
+      { type: 'session_started', sessionId: session.id, userId: null },
+    ]);
     expect(record.schools).toEqual([{ id: school.id, name: school.name }]);
   });
 
@@ -203,6 +208,19 @@ describe('exportStudentRecord (C5)', () => {
     expect(text).not.toContain(ben.cognitoId);
     expect(text).not.toContain('Ben c5-others');
     expect(text).not.toContain('bathroom');
+  });
+
+  it('carries when the student’s lesson ended, which its end records under no one (#219)', async () => {
+    const { ana, session } = await seed('c5-ended');
+    await extendSession(db, { sessionId: session.id, durationMinutes: 5, at: new Date() });
+    await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+    const record = await exported(ana.id);
+    expect(record.sessionEvents.map((e) => e.type)).toEqual([
+      'session_started',
+      'session_extended',
+      'session_ended',
+    ]);
+    expect(record.participations).toMatchObject([{ endedReason: 'session_ended' }]);
   });
 
   it('finds the account by its Cognito subject too, and none for a stranger', async () => {
@@ -226,6 +244,7 @@ describe('exportStudentRecord (C5)', () => {
       record.invitesRedeemed,
       record.classes,
       record.sessions,
+      record.sessionEvents,
       record.schools,
     ]) {
       expect(section).toEqual([]);

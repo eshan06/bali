@@ -198,6 +198,9 @@ export const EVENT_TYPES = [
   // An account deleted itself (C3): its row is named to no one now. No session
   // and no class; each class it was in records its own `enrollment_left`.
   'account_deleted',
+  // A school's data disposed of on its written request (C6a): no session, no
+  // class, no user. Its payload is the school's id and counts, never a name.
+  'school_disposed',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

@@ -1,7 +1,7 @@
 import { createHash, randomInt } from 'node:crypto';
 
 import { INVITE_CODE_LENGTH, JOIN_CODE_ALPHABET } from '@bali/shared';
-import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 
 import { classes, enrollments, schools, teacherInvites, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
@@ -148,7 +148,7 @@ export type MintInviteResult =
  *
  * The school's row is held (FOR SHARE) from the read of its agreement to the
  * invite's write, so nothing that takes an agreement back off the record or
- * removes the school can come between the two; nothing does yet.
+ * removes the school — a disposal (C6a) — can come between the two.
  */
 export async function mintTeacherInvite(
   db: Database,
@@ -221,6 +221,30 @@ export async function redeemTeacherInvite(
 ): Promise<RedeemInviteResult> {
   try {
     return await db.transaction(async (tx): Promise<RedeemInviteResult> => {
+      // The code's school first, held (FOR SHARE) to the end, as the mint holds
+      // it: a disposal (C6a) takes it FOR UPDATE, so a redeem lands before it
+      // — and the new teacher is read as one of the school's people — or after
+      // it, and finds the school gone. Before the caller's row, in the
+      // disposal's order (school, then people), so the two never deadlock.
+      // Only taken here; nothing of the code is answered before the account.
+      const codeHash = hashInviteCode(input.code);
+      const [school] = await tx
+        .select({ id: schools.id })
+        .from(schools)
+        .where(
+          and(
+            inArray(
+              schools.id,
+              tx
+                .select({ id: teacherInvites.schoolId })
+                .from(teacherInvites)
+                .where(eq(teacherInvites.codeHash, codeHash)),
+            ),
+            isNull(schools.removedAt),
+          ),
+        )
+        .for('share');
+
       const [user] = await tx.select().from(users).where(eq(users.id, input.userId)).for('update');
       if (!user) throw new Error('redeemTeacherInvite: no account has that id');
 
@@ -259,10 +283,13 @@ export async function redeemTeacherInvite(
           expired: sql<boolean>`${teacherInvites.expiresAt} <= now()`,
         })
         .from(teacherInvites)
-        .where(eq(teacherInvites.codeHash, hashInviteCode(input.code)));
+        .where(eq(teacherInvites.codeHash, codeHash));
       if (!invite) return { outcome: 'invite_not_found' };
       if (invite.redeemedAt !== null) return { outcome: 'invite_used' };
       if (invite.expired) return { outcome: 'invite_expired' };
+      // Its school disposed of (its open invites go with it), or not the one
+      // held above: no invite to redeem.
+      if (invite.schoolId !== school?.id) return { outcome: 'invite_not_found' };
 
       // `now()` is the transaction's start, so the guard's expiry agrees with
       // the read's; a row the guard skips — taken since — is never updated.

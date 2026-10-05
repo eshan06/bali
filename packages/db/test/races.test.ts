@@ -32,6 +32,7 @@ import {
   changeUnlockReason,
   checkIn,
   deleteAccount,
+  disposeSchool,
   endEnrollment,
   endSession,
   expireDueSessions,
@@ -1926,6 +1927,228 @@ describe.runIf(REAL_PG)('a deletion staged against an arm and a create (real Pos
       0,
     );
     expect(await db.select().from(blocks).where(eq(blocks.teacherId, teacher.id))).toHaveLength(0);
+  });
+});
+
+describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)', () => {
+  it('a disposal racing a Start, a join, an arm, a rename, a redeem and an unlock in the school loses no unlock and leaves no one named', async () => {
+    // The disposal takes the school, then its people, then its classes, then
+    // its lessons — a redeem waits on the school, a join, a rename and an arm
+    // on the person's row, a Start and a join on the class — so each lands
+    // before it (and is disposed of with the rest) or after it (and is
+    // refused). A Start that wins leaves a lesson running, and the disposal is
+    // refused whole. The unlock is recorded whichever lands first (ISSUES #2).
+    // Never a deadlock, never a 500.
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-dispose-${round}`;
+      const { classId, studentId, teacherId } = await seed(tag);
+      const schoolId = one(
+        await db.select({ id: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
+      ).id;
+      const lesson = await openSession(classId);
+      await tapIn(db, {
+        sessionId: lesson.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      await endSession(db, { sessionId: lesson.id, at: new Date(), reason: 'ended' });
+      const stranger = await findOrCreateStudent(db, `stranger-${tag}`, `Stranger ${round}`);
+      await recordAgreement(db, { schoolId, signedOn: '2026-09-01' });
+      const invite = await mintTeacherInvite(db, { schoolId });
+      if (invite.outcome !== 'minted') throw new Error('mint');
+      const newcomer = await findOrCreateStudent(db, `newcomer-${tag}`, `Newcomer ${round}`);
+      const unlockId = newUuidV7();
+      const disposal = () =>
+        disposeSchool(db, { schoolId, at: new Date(), confirmName: `School ${tag}` });
+      // Later and later, so some calls land before the disposal and some behind it.
+      const later = <T>(ms: number, call: () => Promise<T>) =>
+        new Promise((resolve) => setTimeout(resolve, ms)).then(call);
+      const lag = (round % 3) * 12;
+
+      const [disposed, started, joined, armed, renamed, redeemed, unlocked] =
+        await Promise.allSettled([
+          round % 2 === 1
+            ? new Promise((resolve) => setTimeout(resolve, 5)).then(disposal)
+            : disposal(),
+          later((round % 4) * 8, () => openSession(classId)),
+          later(lag, () =>
+            joinClassByCode(db, {
+              studentId: stranger.id,
+              joinCode: tag,
+              eventId: newUuidV7(),
+              occurredAt: new Date(),
+            }),
+          ),
+          later(lag, () =>
+            armTap(db, {
+              studentId,
+              teacherId,
+              eventId: newUuidV7(),
+              deviceTime: new Date(),
+              expiresAt: new Date(Date.now() + 3_600_000),
+            }),
+          ),
+          later(lag, () =>
+            renameStudent(db, { studentId, displayName: `Late ${round}`, eventId: newUuidV7() }),
+          ),
+          later(lag, () =>
+            redeemTeacherInvite(db, {
+              userId: newcomer.id,
+              code: invite.code,
+              eventId: newUuidV7(),
+            }),
+          ),
+          unlock(db, {
+            sessionId: lesson.id,
+            studentId,
+            eventId: unlockId,
+            deviceTime: new Date(),
+          }),
+        ]);
+
+      if (disposed.status === 'rejected') throw disposed.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      if (redeemed.status === 'rejected') throw redeemed.reason;
+      // Before the disposal, or after it: the school's invites went with it.
+      expect(['redeemed', 'invite_not_found']).toContain(redeemed.value.outcome);
+      expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });
+      if (started.status === 'rejected') {
+        expect(started.reason).toMatchObject({ code: 'CLASS_NOT_FOUND' });
+      }
+      if (joined.status === 'rejected') {
+        expect(joined.reason).toMatchObject({ code: 'CLASS_NOT_FOUND' });
+      }
+      for (const late of [armed, renamed]) {
+        if (late.status === 'rejected') {
+          expect(late.reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+        }
+      }
+
+      if (disposed.value.outcome === 'in_session') {
+        // The Start won: the lesson it made runs, and nothing was disposed of.
+        expect(started.status).toBe('fulfilled');
+        expect(one(await db.select().from(schools).where(eq(schools.id, schoolId))).removedAt).toBe(
+          null,
+        );
+        continue;
+      }
+      expect(disposed.value.outcome).toBe('disposed');
+      const running = await db
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.classId, classId), isNull(sessions.endedAt)));
+      expect(running).toHaveLength(0);
+      const stillIn = await db
+        .select()
+        .from(enrollments)
+        .where(and(eq(enrollments.classId, classId), isNull(enrollments.removedAt)));
+      expect(stillIn).toHaveLength(0);
+      // Everyone the class ever held names no one now: the stranger too, if they got in.
+      const held = await db
+        .select({ displayName: users.displayName, removedAt: users.removedAt })
+        .from(users)
+        .innerJoin(enrollments, eq(enrollments.studentId, users.id))
+        .where(eq(enrollments.classId, classId));
+      expect(held.every((u) => u.displayName === null && u.removedAt !== null)).toBe(true);
+      const renames = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
+      expect(renames.every((e) => e.payload === null)).toBe(true);
+      expect(
+        await db.select().from(armedTaps).where(eq(armedTaps.teacherId, teacherId)),
+      ).toHaveLength(0);
+      // A teacher who came in by the invite is one of its people, de-identified;
+      // one refused is untouched, and no teacher of it.
+      const after = one(await db.select().from(users).where(eq(users.id, newcomer.id)));
+      if (redeemed.value.outcome === 'redeemed') {
+        expect(after.displayName).toBeNull();
+        expect(after.removedAt).not.toBeNull();
+      } else {
+        expect(after).toMatchObject({
+          role: 'student',
+          schoolId: null,
+          displayName: `Newcomer ${round}`,
+          removedAt: null,
+        });
+      }
+    }
+  }, 60_000);
+
+  it('a redeem behind a disposal finds no invite, and one ahead of it is disposed of with the school', async () => {
+    // Staged both ways, each transaction held open while the other waits on
+    // the school's row: the disposal's FOR UPDATE, the redeem's FOR SHARE.
+    async function staged(tag: string) {
+      const { classId } = await seed(tag);
+      const schoolId = one(
+        await db.select({ id: classes.schoolId }).from(classes).where(eq(classes.id, classId)),
+      ).id;
+      await recordAgreement(db, { schoolId, signedOn: '2026-09-01' });
+      const invite = await mintTeacherInvite(db, { schoolId });
+      if (invite.outcome !== 'minted') throw new Error('mint');
+      const newcomer = await findOrCreateStudent(db, `newcomer-${tag}`, `Newcomer ${tag}`);
+      const redeem = (on: Database) =>
+        redeemTeacherInvite(on, { userId: newcomer.id, code: invite.code, eventId: newUuidV7() });
+      const dispose = (on: Database) =>
+        disposeSchool(on, { schoolId, at: new Date(), confirmName: `School ${tag}` });
+      const account = async () =>
+        one(await db.select().from(users).where(eq(users.id, newcomer.id)));
+      return { redeem, dispose, account };
+    }
+    async function holding<T>(first: (tx: Database) => Promise<T>) {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let ran!: (value: T) => void;
+      const result = new Promise<T>((resolve) => {
+        ran = resolve;
+      });
+      const committed = db.transaction(async (tx) => {
+        ran(await first(tx));
+        await held;
+      });
+      return { result: await result, release, committed };
+    }
+
+    // The disposal first: the redeem waits on the school, then finds it gone.
+    const behind = await staged('race-dispose-redeem-behind');
+    const disposal = await holding(behind.dispose);
+    expect(disposal.result.outcome).toBe('disposed');
+    const late = behind.redeem(db);
+    late.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      disposal.release();
+      await disposal.committed;
+    }
+    expect(await late).toEqual({ outcome: 'invite_not_found' });
+    expect(await behind.account()).toMatchObject({
+      role: 'student',
+      schoolId: null,
+      displayName: 'Newcomer race-dispose-redeem-behind',
+      removedAt: null,
+    });
+
+    // The redeem first: the disposal waits on the school, then reads the new
+    // teacher as one of its people.
+    const ahead = await staged('race-dispose-redeem-ahead');
+    const redeem = await holding(ahead.redeem);
+    expect(redeem.result.outcome).toBe('redeemed');
+    const disposing = ahead.dispose(db);
+    disposing.catch(() => undefined);
+    try {
+      await waitForBlockedBackend();
+    } finally {
+      redeem.release();
+      await redeem.committed;
+    }
+    expect(await disposing).toMatchObject({ outcome: 'disposed', counts: { teachers: 2 } });
+    const teacher = await ahead.account();
+    expect(teacher).toMatchObject({ role: 'teacher', displayName: null });
+    expect(teacher.removedAt).not.toBeNull();
   });
 });
 
