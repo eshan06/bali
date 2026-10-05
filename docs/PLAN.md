@@ -4,7 +4,7 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — the "class started" push planned (N1, docs: ARCHITECTURE's
+_Last updated: 2026-10-06 — N2: testflight.yml guards the exported build's `aps-environment`. Before it, the "class started" push planned (N1, docs: ARCHITECTURE's
 "Push: a doorbell for students", steps N1–N6 below). Before it, 2026-10-05: the handoff
 rewritten; the prose this file carried until then is kept word for word in
 `docs/DECISIONS.md`, "Archive: PLAN's old Now (to 2026-10-05)"._
@@ -204,7 +204,14 @@ words — is the Mac session's**, in parallel.
 - **N1** The decision written down: ARCHITECTURE (the live-feed line amended, "Push: a doorbell
   for students"), DECISIONS, these steps — ✅
 - **N2** CI accepts the `aps-environment` entitlement and the Time Sensitive capability
-  (`ios.yml`'s entitlement checks and testflight.yml's release guard) — ⬜
+  (`ios.yml`'s entitlement checks and testflight.yml's release guard) — ✅ neither had an
+  allow-list, so both pass as is; testflight.yml adds "Release guard: the exported app pushes
+  on production": it exports a copy the way the upload does and fails unless its signed
+  `aps-environment` is `production` (absent passes). The export, not the archive: automatic
+  signing archives with the development profile, and the export re-signs it. For the Mac
+  session: keep the one `Bali/Bali.entitlements` with `aps-environment` = `development` (ios.yml's
+  NFC check reads that path; a split file fails it), and
+  `com.apple.developer.usernotifications.time-sensitive` = true
 - **N3** The device-token table (keyed by the token, with its APNs environment; students only)
   and `/v1` register/remove endpoints, idempotent on a UUIDv7 `eventId`; OpenAPI, fixtures,
   BaliCore's wire types and `APIClient` methods — ⬜

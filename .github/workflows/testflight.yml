@@ -218,9 +218,8 @@ jobs:
           done
           exit "$fail"
 
-      # Signed for App Store Connect and uploaded in one step: `destination: upload` sends the build
-      # with the same key, so no other uploader is needed.
-      - name: Export and upload to TestFlight
+      # How the build is signed for App Store Connect: the next two steps export with it.
+      - name: Write the export options
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -235,6 +234,45 @@ jobs:
           </dict>
           </plist>
           PLIST
+
+      # Push (N2): the build App Store Connect gets must ask for production APNs. The archive
+      # above is signed with the development profile; the export re-signs it with the
+      # distribution one, which sets `aps-environment`. So this exports a copy the same way
+      # (`destination: export`) and reads the entitlement the upload carries. A TestFlight build
+      # on `development` gets no pushes and nothing says so. No `aps-environment` passes: an app
+      # without push. codesign's own failure is said as itself, as in the archive's guard.
+      - name: 'Release guard: the exported app pushes on production'
+        run: |
+          cp "$RUNNER_TEMP/ExportOptions.plist" "$RUNNER_TEMP/ExportCheck.plist"
+          plutil -replace destination -string export "$RUNNER_TEMP/ExportCheck.plist"
+          xcodebuild -exportArchive -quiet -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportCheck.plist" -exportPath "$RUNNER_TEMP/check" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+          [ -f "$RUNNER_TEMP/check/Bali.ipa" ] \
+            || { echo "::error::The export made no Bali.ipa to check:"; ls -la "$RUNNER_TEMP/check"; exit 1; }
+          unzip -q "$RUNNER_TEMP/check/Bali.ipa" -d "$RUNNER_TEMP/check/ipa"
+          entitlements="$RUNNER_TEMP/check/entitlements.plist"
+          if ! codesign -d --entitlements - --xml "$RUNNER_TEMP/check/ipa/Payload/Bali.app" \
+            > "$entitlements" 2> "$RUNNER_TEMP/check/codesign.err"; then
+            echo "::error::codesign could not read the exported app's entitlements: $(cat "$RUNNER_TEMP/check/codesign.err")"
+            exit 1
+          fi
+          # Unreadable entitlements fail here, so a key missing below means the app has none.
+          plutil -lint "$entitlements" \
+            || { echo "::error::The exported app's entitlements are not a sound plist."; exit 1; }
+          if aps=$(/usr/libexec/PlistBuddy -c "Print :aps-environment" "$entitlements" 2>/dev/null); then
+            echo "aps-environment = $aps"
+            [ "$aps" = production ] \
+              || { echo "::error::The exported app's aps-environment is \"$aps\", not production: TestFlight and App Store builds would get no pushes."; exit 1; }
+          else
+            echo "aps-environment: none (the app does not ask for push)"
+          fi
+
+      # Signed for App Store Connect and uploaded in one step: `destination: upload` sends the build
+      # with the same key, so no other uploader is needed.
+      - name: Export and upload to TestFlight
+        run: |
           xcodebuild -exportArchive -archivePath "$ARCHIVE" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
