@@ -270,12 +270,15 @@ struct DeletingTests {
         #expect(
             said(.signInFirst)?.body.hasSuffix("Sign out and sign in again, then delete your account.")
                 == true)
-        #expect(said(.unlockUnsent)?.title == notDeleted)
         #expect(said(.unlockUnsent)?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher yet.") == true)
         #expect(said(.unread)?.body.hasSuffix("Try again in a moment.") == true)
         #expect(said(.teacherHasClasses)?.body.contains("through your school") == true)
-        #expect(said(.unread)?.title == notDeleted && said(.teacherHasClasses)?.title == notDeleted)
-        // The deletion's own answer lost may have landed (C4a): its title claims neither way.
+        #expect(said(.teacherHasClasses)?.title == notDeleted)
+        // A deletion sent by a try before, its answer lost, may have landed (C4a): every stop that
+        // can follow one claims neither way; only a refusal before anything could be sent says
+        // "isn't deleted".
+        #expect(said(.unlockUnsent)?.title == Deleting.notFinished)
+        #expect(said(.unread)?.title == Deleting.notFinished)
         for result in [SendResult.networkError, .status(500), .status(429)] {
             #expect(said(.notDeleted(result))?.title == Deleting.notFinished, "\(result)")
             #expect(said(.notDeleted(result))?.title != notDeleted, "\(result)")

@@ -88,11 +88,12 @@ public enum Deleting: Sendable, Hashable {
             self = .stopped(title: Self.notDeleted, why: Self.signInFirst, retries: false)
         case .teacherHasClasses:
             self = .stopped(title: Self.notDeleted, why: Self.teacherHasClasses, retries: false)
+        // Nothing deleted that the phone knows of: a try before may have sent a deletion whose answer
+        // was lost, which landed (C4a; santa's round 2) — so the title claims neither, and Try
+        // again settles it.
         case .unlockUnsent:
-            self = .stopped(title: Self.notDeleted, why: Self.unlockUnsent, retries: true)
-        case .unread: self = .stopped(title: Self.notDeleted, why: Self.unread, retries: true)
-        // Nothing deleted that the phone knows of: a deletion whose answer was lost may have landed
-        // (C4a), so the title claims neither, and Try again settles it.
+            self = .stopped(title: Self.notFinished, why: Self.unlockUnsent, retries: true)
+        case .unread: self = .stopped(title: Self.notFinished, why: Self.unread, retries: true)
         case .notDeleted(let result):
             self = .stopped(title: Self.notFinished, why: Joining.words(result, nil), retries: true)
         }
@@ -145,10 +146,11 @@ public enum Deleting: Sendable, Hashable {
     public static let consequence =
         "Bali deletes your account, your name and your sign-in. This can't be undone. Lessons you were in still count in your teachers' reports, with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."
 
-    /// The title of a stop before anything was sent: nothing deleted, for certain.
+    /// The title of a stop that refuses before anything could ever be sent — the sign-in, or the
+    /// account itself (a teacher's), or a phone not started: nothing deleted, for certain.
     public static let notDeleted = "Your account isn't deleted"
-    /// The title of a stop at the deletion's own answer, or none: a deletion whose answer was lost
-    /// may have landed (C4a), so this claims neither.
+    /// The title of every other stop: a deletion sent by a try before, its answer lost, may have
+    /// landed (C4a), so this claims neither.
     public static let notFinished = "Bali couldn't finish deleting your account"
 
     /// The sign-in was made before the phone asked for the scope Cognito's DeleteUser needs: a

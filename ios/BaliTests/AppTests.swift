@@ -344,8 +344,8 @@ struct AppTests {
         for (name, retries, title) in [
             ("deletingSignInFirst", false, Deleting.notDeleted),
             ("deletingTeacher", false, Deleting.notDeleted),
-            ("deletingUnlockUnsent", true, Deleting.notDeleted),
-            ("deletingUnread", true, Deleting.notDeleted),
+            ("deletingUnlockUnsent", true, Deleting.notFinished),
+            ("deletingUnread", true, Deleting.notFinished),
             ("deletingNotDeleted", true, Deleting.notFinished),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))

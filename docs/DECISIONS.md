@@ -107,10 +107,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   student with no signal who pressed it mid-class is never left shielded with no exit. The one
   cost is `notDeleted`'s race, a deletion that landed with its answer lost: a read then makes a
   fresh account, which the next Try again deletes too (C3's `already_deleted` rule), and the words
-  claim nothing either way: that stop is titled "Bali couldn't finish deleting your account", where
-  a stop before anything was sent is "Your account isn't deleted" (santa's round 1). `notDeleted` is
-  said in the Join screen's words for its answer (`Joining.words`), one vocabulary for the server
-  not answering. **No Back** while the deletion
+  claim nothing either way: that stop, and every stop a later try can end in after it
+  (`unlockUnsent`, `unread`), is titled "Bali couldn't finish deleting your account"; only a
+  refusal before anything could ever be sent (`signInFirst`, `teacherHasClasses`) is "Your account
+  isn't deleted" (santa's rounds 1 and 2). `notDeleted` is said in the Join screen's words for its
+  answer (`Joining.words`), one vocabulary for the server not answering. **No Back** while the deletion
   runs, nor once the account is deleted and the sign-in waits (`signInNotDeleted`, and
   `SignIn.deletionPending` at a relaunch, read with who is signed in): Try again alone, as C4a
   asks. **Who is signed in changing** drops the question or a stop (the words were the last
