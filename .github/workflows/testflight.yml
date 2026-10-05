@@ -3,6 +3,7 @@
 # TestFlight → Run workflow). Without the key's three secrets it says so and passes, building
 # nothing. Setup, and what a run needs on Apple's side: docs/DEPLOY.md, "TestFlight".
 name: TestFlight
+run-name: TestFlight (${{ inputs.environment }})
 
 on:
   workflow_dispatch:
@@ -122,11 +123,13 @@ jobs:
             # the phone's client `bali-ios`. The redirect URI is the same, so project.yml's stands.
             prod)
               api=https://bali-prod-production.up.railway.app
-              echo "EXPECTED_API_URL=$api" >> "$GITHUB_ENV" # the guard below checks it took
+              domain=https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com
+              client=5dr74i0iqnth9p4c4k594r27aj
+              # The guard below checks each one took.
+              printf 'EXPECTED_API_URL=%s\nEXPECTED_DOMAIN=%s\nEXPECTED_CLIENT_ID=%s\n' \
+                "$api" "$domain" "$client" >> "$GITHUB_ENV"
               overrides=(
-                BALI_API_URL="$api"
-                BALI_COGNITO_DOMAIN=https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com
-                BALI_COGNITO_CLIENT_ID=5dr74i0iqnth9p4c4k594r27aj
+                BALI_API_URL="$api" BALI_COGNITO_DOMAIN="$domain" BALI_COGNITO_CLIENT_ID="$client"
               ) ;;
             *) echo "::error::No values for the environment \"$ENVIRONMENT\"."; exit 1 ;;
           esac
@@ -156,10 +159,14 @@ jobs:
               *) echo "::error::$key is not an https:// URL."; fail=1 ;;
             esac
           done
-          # A prod build talks to prod's API, never project.yml's dev one.
-          if [ -n "${EXPECTED_API_URL:-}" ] && [ "$(plist BaliAPIURL)" != "$EXPECTED_API_URL" ]; then
-            echo "::error::BaliAPIURL is not $ENVIRONMENT's ($EXPECTED_API_URL)."; fail=1
-          fi
+          # A prod build talks to prod's API and pool, never project.yml's dev ones.
+          for pair in "BaliAPIURL|${EXPECTED_API_URL:-}" "BaliCognitoDomain|${EXPECTED_DOMAIN:-}" \
+            "BaliCognitoClientID|${EXPECTED_CLIENT_ID:-}"; do
+            IFS='|' read -r key expected <<< "$pair"
+            if [ -n "$expected" ] && [ "$(plist "$key")" != "$expected" ]; then
+              echo "::error::$key is not $ENVIRONMENT's ($expected)."; fail=1
+            fi
+          done
           [ "$(plist CFBundleVersion)" = "$GITHUB_RUN_NUMBER" ] \
             || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }
           [ -n "$(plist CFBundleIconName)" ] \

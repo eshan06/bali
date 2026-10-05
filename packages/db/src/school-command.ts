@@ -204,7 +204,7 @@ function checkDay(day: string, now?: Date): void {
 const noSchool = (schoolId: string) => `no school on record has the id ${schoolId}`;
 
 /** A day recorded, or the refusal that says why not: no such school, or one disposed of. */
-function recorded(schoolId: string, result: RecordDayResult) {
+function dayRecorded(schoolId: string, result: RecordDayResult) {
   if (result.outcome === 'unknown_school') throw new Error(noSchool(schoolId));
   if (result.outcome === 'disposed') {
     throw new Error(
@@ -233,7 +233,7 @@ async function agreement(
   schoolId: string,
   day: string,
 ): Promise<void> {
-  const { school, before } = recorded(
+  const { school, before } = dayRecorded(
     schoolId,
     await recordAgreement(db, { schoolId, signedOn: day }),
   );
@@ -242,7 +242,10 @@ async function agreement(
 }
 
 async function yearEnd({ db, print }: SchoolCommandIO, schoolId: string, day: string) {
-  const { school, before } = recorded(schoolId, await recordYearEnd(db, { schoolId, endsOn: day }));
+  const { school, before } = dayRecorded(
+    schoolId,
+    await recordYearEnd(db, { schoolId, endsOn: day }),
+  );
   const replaced = before !== null && before !== day ? ` (it said ${before})` : '';
   print(`"${school.name}": its year's last day is on record as ${day}${replaced}`);
   print(`after it, preview its retention run: npm run school -- retention ${schoolId}`);

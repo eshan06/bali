@@ -201,8 +201,9 @@ says which are missing, and passes. Once, before the first run:
 **A prod build:** GitHub → the repo → Actions → TestFlight → **Run workflow** → branch
 `main`, environment **`prod`** → Run workflow (or `gh workflow run testflight.yml -f
 environment=prod`). Dev and prod builds go to the same app in TestFlight, told apart only
-by their build number: the run's summary names the environment each number was built
-for, so note it before handing a build to testers.
+by their build number: each run's name in the Actions list, `TestFlight (prod)`, and its
+summary say which environment its number was built for, so note it before handing a build
+to testers.
 
 What a run checks and needs:
 
@@ -210,7 +211,7 @@ What a run checks and needs:
   fails the run before anything is uploaded if a Release target compiles with
   `DEBUG`, if the app or the monitor holds text only `#if DEBUG` code has (the
   readout's title, the lost-bell device check), if a sign-in setting is empty or the
-  API isn't `https://`, if a `prod` build's API isn't production's, or if the app has
+  API isn't `https://`, if a `prod` build's API, domain or client id isn't production's, or if the app has
   **no icon** (App Store Connect refuses such a
   build). The icon is `ios/Bali/Assets.xcassets`'s `AppIcon`, named by
   `ASSETCATALOG_COMPILER_APPICON_NAME` in `ios/project.yml`.
