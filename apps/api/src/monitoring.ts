@@ -109,6 +109,33 @@ export function captureFailure(error: unknown, where: string): void {
   });
 }
 
+/** The sweep's Sentry Cron monitor, made (or updated) by its first check-in. */
+export const SWEEP_MONITOR_SLUG = 'api-sweep';
+
+const SWEEP_MONITOR_CONFIG: Parameters<typeof Sentry.withMonitor>[2] = {
+  // The API's own minute tick (sweep.ts), not Railway's five-minute cron.
+  schedule: { type: 'interval', value: 1, unit: 'minute' },
+  // A deploy's restart or one skipped tick stays inside the margin.
+  checkinMargin: 2,
+  // A run in progress longer than this is reported as timed out.
+  maxRuntime: 5,
+  // One failed run already reaches Sentry as an error (captureFailure); the
+  // monitor opens an issue when the sweep keeps failing or stops checking in.
+  failureIssueThreshold: 2,
+  recoveryThreshold: 1,
+};
+
+/**
+ * Run one sweep inside a Sentry Cron check-in: `in_progress` when it starts,
+ * then `ok`, or `error` when it throws (the error is rethrown unchanged). A
+ * process that stops sweeping stops checking in, which the monitor reports as
+ * missed. A check-in carries the slug, status and duration, nothing else. A
+ * plain call when monitoring is off.
+ */
+export function withSweepMonitor<T>(run: () => Promise<T>): Promise<T> {
+  return Sentry.withMonitor(SWEEP_MONITOR_SLUG, run, SWEEP_MONITOR_CONFIG);
+}
+
 /** Wait for queued events to send, before the process exits. A no-op when off. */
 export async function flushMonitoring(): Promise<void> {
   await Sentry.flush(2000);
