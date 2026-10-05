@@ -37,6 +37,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ("Push: a doorbell for students") and PLAN (steps N1–N6); the app half is the Mac
   session's.
 
+- **2026-10-05** — **C2a: the policy pages ship as a marked draft outline, placeholder text
+  included.** P4 (2026-10-04, below) kept `/support`'s policy line at "coming soon" and ruled out
+  placeholder text until C2 brought the lawyer's words. The owner's pick for C2a changes that:
+  `/privacy` and `/terms` exist now, so the links the portal and the app need (`/login`,
+  `/support`, and C2b's intro, Sign in and Me screens) can ship ahead of the words, as a marked
+  draft outline, never as a policy. Each page says at the top that it isn't the policy yet, that
+  the final text is coming from Bali's lawyer and that nothing on it is a promise; every section's
+  line is marked "Placeholder." and names only what the final text will cover, linking to
+  `/support` where a fact is already public there rather than restating it; no legal claim
+  anywhere, and the pages are not indexed by search engines while they stay a placeholder. The
+  lawyer's words replace the placeholders in place. P4's "never placeholder text" is superseded by
+  this entry; the rest of P4 stands.
+
 - **2026-10-05** — **PLAN's "Now" is a short handoff; its old prose is archived here.**
   PLAN.md's "Now" had grown to ~780 lines of landed-step news, opening with Phase 5's, and
   its header line to a paragraph; the Phases table still read Phase 4 "in progress" and
@@ -390,7 +403,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   pilot as it is (adults at Vanderbilt, one professor): a teacher asks us for an invite code by
   email, since the owner mints them. Left out on purpose until they are true: account deletion
   (C3, C4), the 13+ line (C7), retention (C6b) and any legal promise; the privacy policy is
-  "coming soon" until C2 brings the lawyer's words, never placeholder text. Support goes to
+  "coming soon" until C2 brings the lawyer's words, never placeholder text (superseded
+  2026-10-05, C2a: a marked draft outline; the entry of that date above). Support goes to
   eshan.shah@vanderbilt.edu (owner).
 
 - **2026-10-04** — **S3: API tightening, from the security investigation.** **Access tokens
