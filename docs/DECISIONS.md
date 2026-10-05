@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **Phase 7, Live lesson, planned** (L0; ARCHITECTURE's "Live lesson (Phase
+  7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended with the owner's
+  approval, who asked for the phase to be written into it before building). During a running
+  session the teacher asks a question (Slice 1, single choice) and presents PDF slides (Slice
+  2); students see both on Bali's own screen, which works shielded, unlocked or with no Screen
+  Time access, and never covers or delays Emergency Unlock. **The owner's rulings:** results
+  are **totals only**; phones follow by **foreground polling** (~2 s, ETag/`304`), not a
+  student stream; **any student enrolled in the running session's class may answer**, tapped
+  in or not; questions and presenting exist **only within a running session**. **Why, and
+  what follows:** totals-only puts answers **outside `events`** — the events feed streams to
+  the teacher's browser, so a per-student answer event would hand the teacher who answered
+  what; answers live in `responses`, read only as counts, while the lifecycle events with no
+  student (`question_opened`, `question_closed`, `slide_shown`) do go through `insertEvent`
+  for the stream and the recap. Polling over a student stream: no new connection kind (a
+  stream per student is ~600 at a school against today's one per class), it reuses the
+  per-account budget (30 a minute inside 120, measured by L4), and a missed poll costs two
+  seconds, not a resync. **Defaults recorded (the owner may change them):** one open
+  question per session, a new one closing the last and the session's end closing it; a
+  **small-group guard** — the per-option breakdown only once 3 have answered, "N answered"
+  before, so a class of two can't be read off a bar chart; a correct option revealed on
+  close if the teacher asks; no leaderboards, grading or per-student participation; **no
+  outbox for answers** — unlike an unlock an answer is not a must-never-lose record, and one
+  landing after the close would be refused anyway, so it is one request with an honest retry
+  and never queues ahead of an unlock; a student's later answer replaces the earlier only when
+  its UUIDv7 `event_id` sorts after (the phone's own order, as A12); the slide state in a
+  `session_presentations` row, not columns on the hot `sessions` row; decks in a private
+  bucket per environment behind a storage interface with a fake (S3 recommended, the API's
+  first AWS credential, scoped to the bucket), ≤ 25 MB and ≤ 200 pages, PDF.js ≥ 4.2.67 with
+  eval off on the portal and PDFKit on the phone. **Privacy:** responses are education
+  records (kept de-identified by C3, C6a, C6b; in the student's C5 export); question texts
+  emptied by the disposal; decks are the teacher's content, their stored objects deleted with
+  their rows' removal. Open for the owner: the threshold, reveal on or off, the storage
+  provider, the size cap.
+
 - **2026-10-05** — **Production as it stands; no prod backups for the Vanderbilt pilot; live
   questions show totals only.** **Backups (the owner's ruling):** Railway's backups need its
   **Pro** plan ($20 a month), not Hobby as the runbooks said; the account is on Hobby

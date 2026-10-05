@@ -104,6 +104,10 @@ never stored here, no screen can ever show it.
 - `teacher_invites` — one row per invite code the owner mints for a school (Phase 4, T1a):
   the code's hash, never the code, its expiry 14 days on, and the one account that redeemed
   it, once (T1b) — after which the row is never changed or deleted.
+- `questions`, `responses`, `decks`, `session_presentations` — a live lesson's questions,
+  each student's answer now, the teacher's PDF decks and the slide a session shows (Phase 7;
+  "Live lesson", decision 4). Written only by the transition engine; an answer never writes
+  to `events`.
 
 ### The decisions (2026-09-15)
 
@@ -515,6 +519,9 @@ Teacher app and web portal:
 - `GET /v1/blocks` — the caller's own live blocks, oldest first (P3): never another teacher's,
   never a soft-removed one. A student is `403`.
 
+Live lesson (Phase 7, planned 2026-10-05): the question, answer, results, presentation, deck
+and slide routes are listed in "Live lesson (Phase 7)", decision 6.
+
 **4. Every request is checked; every error has one shape.** No request body is trusted:
 each endpoint validates its input (right types, sane sizes) before touching the
 database. Failures return one standard JSON error shape with the right status code —
@@ -620,6 +627,12 @@ grid loads and goes live in one round trip. The stream reads the Authorization h
 — never a token in the query string — so the portal drives it with `fetch`, not
 `EventSource`.
 
+*Amended 2026-10-05 (Phase 7, Live lesson, decision 7):* students still get no stream — a
+phone follows a live lesson by polling `GET /v1/sessions/{id}/presentation` in the
+foreground, about every 2 s with an ETag. The teacher stream gains the lifecycle events
+`question_opened`, `question_closed` and `slide_shown`; a question's live counts are polled
+by the portal from the results endpoint, so no per-student answer enters the stream.
+
 ## Hosting
 
 Where everything physically runs.
@@ -656,6 +669,11 @@ any K-12 school (`docs/DECISIONS.md`, 2026-10-05).
 school's: bell times render in it (carried over from v2) and an armed tap's
 "end of the school day" expiry is computed against it. Railway defaults to UTC,
 so this must be set explicitly per environment.
+
+**6. Uploaded decks live in a private bucket per environment** (Phase 7, Slice 2; "Live
+lesson", decision 8): AWS S3 recommended, reached by presigned URLs, behind a storage
+interface with an in-memory fake for CI and the demo. The API's credential reaches that one
+bucket only.
 
 Context from v2: Cognito was AWS (kept for v3) and an RDS Postgres instance existed,
 but the v2 API itself was never deployed — it only ran locally, with the website on
@@ -695,6 +713,11 @@ and the grid shows "last seen 4m ago" rather than pretending silence is focus.
 **5. The teacher iOS app is a thin client sharing a `BaliCore` Swift package.** Same API as
 the web portal, no enforcement machinery. Both apps share one package holding the API client
 and data types, so the two apps can't drift out of type-agreement.
+
+**6. A live lesson shows on the app's own screen** (Phase 7, "Live lesson"): the open
+question's answer card and the current slide, polled in the foreground while a session of
+the student's class runs, and rendered natively (PDFKit). It needs no Family Controls,
+never covers or delays Emergency Unlock, and its answers never enter the outbox.
 
 ### Rules that keep the phone honest
 
@@ -785,6 +808,217 @@ updated 40s ago" instead of freezing green, then catches up by event number. Onl
 has its own cursor; capped at 5 per account), and a tab left open across a deploy gets a
 "new version — refresh" banner.
 
+**6. Live lesson's screens are the portal's too** (Phase 7): asking a question and its
+results, the projector's view, the deck library and the presenter — thin client screens on
+the same `/v1` API, under the rules of "Live lesson (Phase 7)" below.
+
+## Live lesson (Phase 7)
+
+During a running session the teacher can ask the class a question (Slice 1) and present
+slides (Slice 2); each student follows on their own phone, on Bali's own screen. Planned
+2026-10-05 from the research in `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in
+`docs/PLAN.md`, and its decision entry is `docs/DECISIONS.md`, 2026-10-05.
+
+### The decisions (2026-10-05)
+
+**1. What it is.** While a session runs, the teacher opens a question and the students
+answer it, and (Slice 2) the teacher shows a page of a PDF deck and the students see that
+page. Both appear on Bali's own screen, which works while the phone is shielded: the
+authorizing app is not shielded in practice (`PhoneScreenTime.swift` shields `.all()`, and
+Bali's Focus screen and Emergency Unlock already work mid-session). Slides render natively
+with PDFKit, never in a `WKWebView`. Live lesson never depends on Family Controls: it works
+the same for a student who is unlocked, whose protection is off, or who never granted
+Screen Time access. **Emergency Unlock is never covered or delayed by it:** the answer card
+and the slide view leave the Unlock control where it is, its one-second hold unchanged, and
+nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
+
+**2. The owner's rulings (2026-10-05).**
+- **Results are totals only.** No screen, stream, report or export shown to a teacher or a
+  projector ever names who answered what, or which students answered at all: a teacher sees
+  counts. The one record that holds a student's answers by name is the student's own export
+  (C5), which shows that student their own.
+- **Phones follow by foreground polling**, about every 2 s with an ETag and `304`, not by a
+  student stream (Live updates stays teacher-only).
+- **Any student enrolled in the class whose session is running may answer**: tapped in or
+  not, unlocked or focused, protection off included.
+- **Questions and presenting exist only within a running session**, for now: nothing is
+  opened or shown outside one, and a session's end closes what it had open.
+
+**3. Defaults recorded as decisions (the owner may change them; PLAN's Open owner items).**
+- **One question kind in Slice 1: single choice**, 2–6 options, with an optional correct
+  option the teacher may reveal when closing it. The prompt is at most 500 characters, each
+  option at most 200; plain text.
+- **One open question per session.** Opening a new one closes the previous one in the same
+  transaction. The session ending — End, the bell, the sweep, a Start past the bell (A18) —
+  closes any open question, in the transaction that ends it; past the bell, before the
+  sweep, a question already counts as closed (A17's rule: the server's clock decides).
+- **The small-group guard.** The per-option breakdown is shown only once at least **3**
+  students have answered; before that a teacher sees "N answered" only, open or closed. The
+  teacher sees "N of M answered", M the students enrolled in the class now, and never which
+  students answered or didn't. No answer's time is exposed.
+- **No leaderboards, no grading, no per-student participation** in any report, recap or
+  export a teacher reads. Totals-only governs what Bali shows; it cannot stop a teacher
+  watching a student's screen in the room, and the guard removes the trivial cases.
+
+**4. The data model (additive).** Four tables, each row's id a UUIDv7 (data-model decision 2):
+- `questions` — one row per question: `id`, `session_id`, `prompt`, `options` (jsonb, an
+  array of 2–6 strings, answered by index), `correct_option` (nullable index), `event_id`
+  (unique: the open's, also its `question_opened` event's), `opened_at`, `closed_at`
+  (nullable), `revealed` (bool), `created_by` (the teacher). A partial unique index on
+  `session_id` where `closed_at` is null is the database's backstop for one open question
+  per session.
+- `responses` — one row per student per question, their answer now: `question_id`,
+  `student_id`, `option` (an index into the question's options), `event_id` (unique),
+  `answered_at` (the server's clock, when it received the answer); unique (`question_id`,
+  `student_id`). While the question is open a student's later answer replaces their
+  earlier one — only when its `event_id` sorts after the stored one: the phone mints
+  UUIDv7s in the order it acts, so a slow first answer landing after the second never
+  undoes it (the phone's own order, as A12's counter orders an unlock). An older or equal
+  id changes nothing and is answered with the answer now. A clock turned back reorders only
+  the student's own answers, and the answer now is always what the phone is told.
+- `decks` (Slice 2) — one row per uploaded PDF: `id`, `teacher_id`, `school_id`, `title`,
+  `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
+  `rejected`), `created_at`, `removed_at` (decision 3's soft removal).
+- `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
+  `deck_id` (nullable: nothing shown), `page`, `updated_at`, and the `event_id` of the
+  slide change that set it. **A row of its own, not columns on `sessions`:** `sessions` is
+  read and locked on every tap, check-in, unlock and the sweep, and a teacher paging through
+  60 slides would rewrite that hot row 60 times; the separate row keeps those paths
+  untouched (additive in fact, not only in name) while a slide change still takes the
+  session row FOR SHARE to serialise with its end.
+
+Retention, disposal, deletion and export (ISSUES #5). The coverage guards
+(`STUDENT_RECORD_COVERAGE`, `SCHOOL_DISPOSAL_COVERAGE`, `RETENTION_COVERAGE`) fail CI until
+every new key to `users` or `schools` is placed, so the PR that adds a key places it:
+- **Responses are education records.** Account deletion (C3) keeps them under the
+  de-identified user, so the counts stay and name no one; the student's export (C5) includes
+  every response of theirs with its question's prompt, options and session; a school's
+  disposal (C6a) and the retention run (C6b) keep them under the person they de-identify.
+- **Questions are the teacher's words.** Kept with their session. The disposal empties each
+  question's prompt and option texts, as it empties class names, since a prompt can name a
+  person (the counts by option index stay); the retention run does the same for the
+  questions of a teacher it de-identifies. In a student's export only as the question one of
+  their responses answers.
+- **Decks are the teacher's content, not a student's record.** Not in a student's export.
+  A teacher removing a deck sets `removed_at` and deletes its stored object; the disposal,
+  and the retention run for a teacher it de-identifies, do the same to every such deck, so
+  no stored object outlives its row's removal. A presentation row is kept, pointing at a
+  removed deck, as the history of what was shown.
+
+**5. Writers.** Questions, responses and presentation state are written only by the
+transition engine (`packages/db/src/transitions.ts`), each mutation in one transaction with
+a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
+current truth. Locks are taken session row first, then question row, in every transition,
+so an answer racing a close or the session's end either commits before it and counts, or
+sees it and is refused.
+- **Answers never write to `events`.** The events feed streams to the teacher's browser
+  (Live updates), so a per-student answer event would put who answered what on the
+  teacher's screen and break totals-only. The `responses` row is the record; its own
+  `event_id` is its idempotency key.
+- **Session lifecycle events with no student go through `insertEvent`** (rule 6; the
+  doorbell rings for them), additive to `EVENT_TYPES`: `question_opened` (payload: the
+  question's id), `question_closed` (its id, whether it was revealed, and by what: the
+  teacher, a newer question, or the session's end) and, in Slice 2, `slide_shown` (the
+  deck's id and page, or none when the teacher stops presenting). No `user_id`, and no
+  answer counts: the timeline reads them, and counts are read through the guard (decision
+  6). None is in `HISTORY_EVENT_TYPES`; `sessionReport`, the grid and the phones skip a type
+  they don't count, so old clients ignore them.
+- **The server owns the clock.** An answer counts only if the server receives it while the
+  question is open and the session is running by the server's clock; otherwise it is `409
+  question_closed` and nothing is recorded. No device time is stored for an answer.
+- **Answers are not queued in the phone's outbox.** Unlike taps and unlocks, an answer is
+  not a must-never-lose record, and one landing after the question closed would be refused
+  anyway. The phone sends it as one request; a failure is said honestly on the card with a
+  retry (rule 5), and the outbox never holds an answer ahead of an unlock.
+
+**6. The API (additive `/v1`).** Bodies validated at the boundary; every mutation carries
+`eventId`; new refusal reasons join `API_ERROR_REASONS` in `@bali/shared`
+(`question_not_found`, `question_closed`, `invalid_option`, and in Slice 2 `deck_not_found`,
+`deck_not_ready`, `deck_rejected`, `deck_in_use`, `page_out_of_range`), never renamed.
+
+Teacher (the class's own teacher only; another teacher and a student `403`):
+- `POST /v1/sessions/{id}/questions` — open a question: `{ eventId, prompt, options,
+  correctOption? }`, answered with the question, its correct option included. A session not
+  running by the server's clock is `409 session_not_running`; an open question closes in the
+  same transaction.
+- `POST /v1/questions/{id}/close` — `{ eventId, reveal? }`: closes it, revealing the correct
+  option when asked and one exists. A replay, or a close of a question already closed,
+  answers the question now and changes nothing.
+- `GET /v1/questions/{id}/results` — the aggregate: `answered` (N), `enrolled` (M), whether
+  it is open, the correct option and whether it is revealed, and `counts` per option — null
+  until at least 3 have answered (the guard is the server's, never only the portal's).
+  ETag and `304`.
+- The session's boot snapshot (`GET /v1/sessions/{id}`) gains the open question, and in
+  Slice 2 the presentation, as optional fields, so a reloaded portal finds them.
+
+Student (enrolled in the session's class now; anyone else `403`, an unknown id `404`):
+- `GET /v1/sessions/{id}/presentation` — what the phone shows: whether the session is
+  running (false tells the phone to stop polling); the current question — the open one, or
+  the last closed one until another opens — with its prompt and options, the correct option
+  only once revealed, and never anyone's counts; the caller's own answer, if any; and in
+  Slice 2 the slide (deck id, `sha256`, `page`, `page_count`, and a short-lived download
+  URL). A read that writes nothing. A strong ETag over the body; `If-None-Match` answers
+  `304`.
+- `POST /v1/questions/{id}/answers` — `{ eventId, option }`, answered with the caller's
+  answer now. `400 invalid_option` for an index the question lacks; `409 question_closed`
+  past its close or the bell; a replay (or an older answer, decision 4) answers the answer
+  now. An `event_id` another student's response holds is `409 event_id_conflict`.
+
+Slice 2, teacher:
+- `POST /v1/decks` — `{ eventId, title, bytes, sha256 }`: a `pending` deck and a presigned
+  PUT, signed for `application/pdf` and that exact length, the browser uploads to directly.
+  More than 25 MB is refused before any URL is minted.
+- `POST /v1/decks/{id}/complete` — `{ eventId }`: the API reads the object and checks it —
+  the `%PDF-` magic bytes, its size ≤ 25 MB and equal to the declared, the `sha256`, ≤ 200
+  pages, not encrypted — then marks it `ready` with its page count, or `rejected` with the
+  reason and its object deleted. A deck left `pending` 24 hours is rejected by the sweep.
+- `GET /v1/decks` — the caller's own decks, never a removed one; `DELETE /v1/decks/{id}` —
+  remove one (`409 deck_in_use` while a running session shows it).
+- `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
+  the caller's own `ready` decks, or stop presenting; recorded as `slide_shown`.
+  `400 page_out_of_range` past its page count; `409 session_not_running` as for questions.
+
+Authorization: every new route gets its rows in S1's matrix
+(`apps/api/test/authorization-matrix.test.ts`) — no token, another app's token, a student,
+another student, a teacher who isn't the owner, the owner — and its request schema in
+`contracts/openapi.json`; the student routes get fixtures in `contracts/fixtures/` that
+BaliCore decodes. **Rate limits** (ISSUES #1): the 2 s poll is 30 requests a minute per
+account, inside the 120-a-minute budget beside the check-in's two; the portal polls results
+from its one visible tab. L4 measures a class of polling phones in the load gate and adds a
+dedicated budget only if it must.
+
+**7. Live updates are amended, not replaced.** Students still have no stream; the poll is
+their own request and its answer is the truth (Live updates' opening paragraph). The teacher
+stream carries decision 5's lifecycle events. Live result counts are polled by the portal,
+about every 2 s while a question is open, from the results endpoint, so no per-student data
+and no count below the guard ever enters the stream.
+
+**8. Storage (Slice 2).** A private bucket per environment, made by the owner (AWS S3 in the
+Cognito account recommended; M0), with no public access and CORS for the portal's origins
+only. Uploads go by presigned PUT; clients read by short-lived presigned GET (minutes),
+minted per request for a caller allowed to see the deck. It sits behind a storage interface
+in the API with an in-memory fake, so CI and `npm run demo` need no AWS. This is the API's
+first AWS credential (C3's "the API holds no AWS credential" was about Cognito): an IAM
+identity allowed only to put, get and delete objects in that one bucket, its keys Railway
+secrets. The portal renders with PDF.js ≥ 4.2.67 (the fix for CVE-2024-4367),
+`isEvalSupported: false`, its worker self-hosted (the CSP's `worker-src 'self'`, and the
+bucket's origin in `connect-src`). The phone renders with PDFKit, a deck cached by its
+`sha256` for the session and deleted when the session ends; links inside a deck are not
+opened. Each page's text layer is its VoiceOver label (a page with none says which slide it
+is).
+
+**9. Apple and privacy.** Answers are Bali's own data, not Family Controls data, but the
+feature strengthens the "organizational setting" reading of §3.3.3(P) (ISSUES #3), so the
+owner's App Review question describes it. The steps that ship it update the privacy
+manifest, `docs/APP-STORE.md`'s privacy table (answers as "Other User Content") and the
+consent preview's "what your teacher sees" list (your answers count in the class's totals;
+your teacher never sees your answer).
+
+**10. Compatibility.** Everything is additive: no existing endpoint, field, table or event
+changes behaviour. Old app builds can't answer and don't poll, so the count is only ever of
+who answered: the portal never calls the rest "didn't answer" or implies the whole class
+could.
+
 ## The six rules
 
 Each exists because v2 broke it and shipped a real bug
@@ -825,7 +1059,10 @@ Each exists because v2 broke it and shipped a real bug
 6. **Live updates are rows, not broadcasts.** Every change is inserted as a numbered event
    row. Live screens stream those rows and, after a disconnect, resume from the last number
    they received — nothing missed, nothing duplicated. (v2: held one event in memory and
-   dropped simultaneous ones.)
+   dropped simultaneous ones.) A live lesson's answers are the one deliberate exception to
+   "every change is an event": they are rows in `responses`, read only as totals, so the
+   stream never names who answered what (Live lesson, decision 5); its lifecycle events
+   are rows like any other.
 
 ## Status
 
@@ -834,7 +1071,9 @@ Each exists because v2 broke it and shipped a real bug
   surface (REST, `/v1` additive-only, one error shape — endpoint list itself not final);
   the six rules; live updates (SSE + Postgres LISTEN/NOTIFY); hosting (Railway, two
   environments); iOS app structure (native, app + extension, mirror-not-cage); web portal
-  (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements.
+  (Next.js thin client on Vercel); the items in [ISSUES.md](ISSUES.md) are requirements;
+  the live lesson (Phase 7, 2026-10-05: questions and slides within a running session,
+  totals only, phones polling), planned and not yet built.
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
