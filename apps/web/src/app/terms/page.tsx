@@ -20,7 +20,7 @@ export default function TermsPage() {
       title="Terms of use"
       notice={{
         lead: "These aren't the terms yet.",
-        body: "Bali's lawyer is writing them. Until the final text arrives, this page shows the sections they will have, each marked as a placeholder. Nothing here is a promise.",
+        body: "The final text is coming from Bali's lawyer. Until it arrives, this page shows the sections they will have, each marked as a placeholder. Nothing here is a promise.",
       }}
       sections={[
         {
@@ -51,7 +51,7 @@ export default function TermsPage() {
         {
           id: 'changes',
           title: 'Changes to these terms',
-          placeholder: 'The final text will say how Bali tells you when the terms change.',
+          placeholder: 'The final text will say how these terms can change.',
         },
       ]}
       related={{ href: '/privacy', label: 'Privacy policy' }}

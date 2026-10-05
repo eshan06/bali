@@ -197,8 +197,8 @@ export default function SupportPage() {
           </Question>
           <Question title="Privacy policy and terms">
             <p>
-              Bali&apos;s lawyer is writing the full privacy policy and terms. Until they&apos;re
-              done, the{' '}
+              The full privacy policy and terms are coming from Bali&apos;s lawyer. Until they
+              arrive, the{' '}
               <Link href="/privacy" className={LINK}>
                 privacy policy
               </Link>{' '}

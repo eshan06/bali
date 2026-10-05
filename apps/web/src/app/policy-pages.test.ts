@@ -29,11 +29,11 @@ const bar = read('../components/portal-bar.tsx');
 
 describe('the policy pages are a marked draft outline', () => {
   it.each(Object.entries(pages))(
-    '/%s says at the top that the lawyer is writing it and nothing on it is a promise',
+    '/%s says at the top that the final text is coming from the lawyer and nothing on it is a promise',
     (_, page) => {
       expect(page).toContain('<PolicyDraft');
       expect(page).toMatch(/lead: "Th(is|ese) (isn't|aren't) the .* yet\."/);
-      expect(page).toContain("Bali's lawyer is writing");
+      expect(page).toContain("The final text is coming from Bali's lawyer.");
       expect(page).toContain('Nothing here is a promise.');
     },
   );
@@ -72,7 +72,7 @@ describe('the policy pages are a marked draft outline', () => {
       expect(pages.terms).toContain(`title: '${title}'`);
     }
     expect(draft).toContain('id="contact"');
-    expect(draft).toContain("export const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';");
+    expect(draft).toContain("const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';");
     // The same address the help page gives.
     expect(support).toContain("const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';");
     expect(draft).toContain('href={`mailto:${SUPPORT_EMAIL}`}');

@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       title="Privacy policy"
       notice={{
         lead: "This isn't the privacy policy yet.",
-        body: "Bali's lawyer is writing it. Until the final text arrives, this page shows the sections it will have, each marked as a placeholder. Nothing here is a promise.",
+        body: "The final text is coming from Bali's lawyer. Until it arrives, this page shows the sections it will have, each marked as a placeholder. Nothing here is a promise.",
       }}
       sections={[
         {
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
           title: 'What your teacher sees',
           placeholder: (
             <>
-              The final text will cover what a teacher sees. Until then, the help page lists{' '}
+              The final text will cover what your teacher sees. Until then, the help page lists{' '}
               <TextLink href="/support#teacher-sees">what your teacher sees</TextLink> and what they
               never see.
             </>

@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
  * there instead of restating it.
  */
 
-export const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
+const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
 
 const LINK =
   'font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300';
@@ -91,7 +91,7 @@ export function PolicyDraft({
       </div>
 
       <nav
-        aria-label="More about Bali"
+        aria-label="Help and policies"
         className="mt-12 border-t border-slate-200 pt-8 text-sm dark:border-slate-800"
       >
         <ul className="flex flex-wrap gap-x-6 gap-y-2">
