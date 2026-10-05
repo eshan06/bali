@@ -204,33 +204,22 @@ export default function ClassDetailPage() {
               <fieldset>
                 <legend className="text-sm font-medium">Session length</legend>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {LENGTH_PRESETS.map((preset) => (
-                    <label key={preset} className={PILL}>
+                  {[...LENGTH_PRESETS, 'other' as const].map((option) => (
+                    <label key={option} className={PILL}>
                       <input
                         type="radio"
                         name="session-length"
-                        value={preset}
-                        checked={pick === preset}
+                        value={option}
+                        checked={pick === option}
                         onChange={() => {
-                          setPick(preset);
+                          setPick(option);
                           setLengthSaid(false);
                         }}
                         className="sr-only"
                       />
-                      {preset} min
+                      {option === 'other' ? 'Other…' : `${option} min`}
                     </label>
                   ))}
-                  <label className={PILL}>
-                    <input
-                      type="radio"
-                      name="session-length"
-                      value="other"
-                      checked={pick === 'other'}
-                      onChange={() => setPick('other')}
-                      className="sr-only"
-                    />
-                    Other…
-                  </label>
                 </div>
                 {pick === 'other' ? (
                   <div className="mt-3">
@@ -243,6 +232,7 @@ export default function ClassDetailPage() {
                       name="minutes"
                       type="number"
                       inputMode="numeric"
+                      autoComplete="off"
                       min={1}
                       max={480}
                       step={1}
