@@ -7,6 +7,7 @@ import {
   listSchools,
   mintTeacherInvite,
   recordAgreement,
+  type RecordDayResult,
   recordYearEnd,
   schoolsNamed,
 } from './schools.js';
@@ -202,6 +203,18 @@ function checkDay(day: string, now?: Date): void {
 
 const noSchool = (schoolId: string) => `no school on record has the id ${schoolId}`;
 
+/** A day recorded, or the refusal that says why not: no such school, or one disposed of. */
+function recorded(schoolId: string, result: RecordDayResult) {
+  if (result.outcome === 'unknown_school') throw new Error(noSchool(schoolId));
+  if (result.outcome === 'disposed') {
+    throw new Error(
+      `school ${schoolId} was disposed of on ${result.disposedAt.toISOString()}, ` +
+        'so it takes no day; nothing was written',
+    );
+  }
+  return result;
+}
+
 async function add({ db, print }: SchoolCommandIO, name: string): Promise<void> {
   // Said, not refused: two schools may share a name, and a second run of one
   // add — its answer lost — would otherwise go unseen (T1a's review).
@@ -220,17 +233,16 @@ async function agreement(
   schoolId: string,
   day: string,
 ): Promise<void> {
-  const recorded = await recordAgreement(db, { schoolId, signedOn: day });
-  if (!recorded) throw new Error(noSchool(schoolId));
-  const { school, before } = recorded;
+  const { school, before } = recorded(
+    schoolId,
+    await recordAgreement(db, { schoolId, signedOn: day }),
+  );
   const replaced = before !== null && before !== day ? ` (it said ${before})` : '';
   print(`"${school.name}": its data agreement is on record as signed on ${day}${replaced}`);
 }
 
 async function yearEnd({ db, print }: SchoolCommandIO, schoolId: string, day: string) {
-  const recorded = await recordYearEnd(db, { schoolId, endsOn: day });
-  if (!recorded) throw new Error(noSchool(schoolId));
-  const { school, before } = recorded;
+  const { school, before } = recorded(schoolId, await recordYearEnd(db, { schoolId, endsOn: day }));
   const replaced = before !== null && before !== day ? ` (it said ${before})` : '';
   print(`"${school.name}": its year's last day is on record as ${day}${replaced}`);
   print(`after it, preview its retention run: npm run school -- retention ${schoolId}`);
