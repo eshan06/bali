@@ -26,8 +26,9 @@ are in `blocks.tsx`, the reports page, `invite-code.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
-start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start");
-and `Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. The
+start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start";
+its two values still read as a developer's, D2h's to reword); and
+`Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. The
 Debug readout's words are not user-facing. Their voice follows this file;
 their logic does not. It never
 covers the API, `packages/`, or `apps/web/src/lib` and the iOS engine and
@@ -39,8 +40,9 @@ outbox beyond those strings.
 byte, at `ios/Bali/UI/bali-tokens.json`. Where this file and the tokens
 disagree on a value, the tokens win: fix this file. A usage note is not a
 value: the notes on `radius-sm` ("Buttons, inputs"), `radius-md` ("Cards,
-chips") and `space-5` ("Sheet padding") predate the pick and follow it at the
-owner's next export. The style is the owner's
+chips"), `radius-lg` ("Sheets, hero containers") and `space-5` ("Sheet
+padding") predate the pick and follow it at the owner's next export. The
+style is the owner's
 pick on the
 [Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
@@ -88,9 +90,9 @@ In this file's terms:
 - **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
   at `radius-lg`; each card inside is `surface-card` at `radius-md` with
   `shadow-1`, the outer and inner corners one nested pair (§4, Card and tray;
-  the canvas drew the inset at 6 px, exactly 20 − 14, and `space-2` is the
-  nearest token: the owner's call, `docs/DECISIONS.md`, 2026-10-05). In dark
-  the shadow goes and a `border-default` hairline carries the edge.
+  the canvas drew the inset at 6 and 10 px, and `space-2` is the nearest
+  token, noted for the owner in `docs/DECISIONS.md`, 2026-10-05). In dark the
+  shadow goes and a `border-default` hairline carries the edge.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
 - **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
