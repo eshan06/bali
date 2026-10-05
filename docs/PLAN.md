@@ -4,7 +4,10 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N5a: the APNs client (`apps/api/src/push/apns.ts`, off unless
+_Last updated: 2026-10-06 — D2d's files have landed (`infra/cognito/hosted-ui/`: the sign-in page's CSS, its
+two logos, their test and the upload steps); the uploads are the owner's, still to do, dev's
+pool first and then prod's, by the README, and the three files also sit in
+`~/bali-notes/d2/cognito/upload/`. Before it, N5a: the APNs client (`apps/api/src/push/apns.ts`, off unless
 `APNS_KEY_P8`/`APNS_KEY_ID`/`APNS_TEAM_ID` are set; nothing calls it yet — N5b, wiring it to the
 Start, is next). Before it, N4: device tokens are personal data (deleted by C3, C6a and C6b,
 in C5's export), and a register applies only after the row's eventId (N5, the APNs sender, is
@@ -35,8 +38,8 @@ why, Open owner items the owner's queue.
   consoles and their status), `docs/PILOT.md` (running the pilot).
 
 **In flight.**
-- **The owner's Mac session (all UI):** D2, the redesign, on the `ui` branch (on hold while the
-  pilot's controls land). Of the three class-page controls the pilot needs, the session length
+- **The owner's Mac session (all UI):** D2, the redesign, back on (the owner, 2026-10-05); its PRs go
+  into `main` now, not the `ui` branch. Of the three class-page controls the pilot needs, the session length
   at Start and Extend are built (P10, Phase 5 steps); New join code is built and parked (P11):
   the API's CORS must allow `PATCH` first, a cloud session's one-line PR with a test.
 - **The prod TestFlight build:** uploaded. Run 37279657642 (build 4, 2026-10-05) passed
@@ -307,7 +310,7 @@ plan backstop already treats it as source).
 - **D1** Design the student screens with no reference screen, on a canvas built with the Bali Design System — ✅ approved (2026-09-24) after the owner's changes: a light theme like the teacher app, the ring mark without its tile, no allowed-apps screen, and a Focus screen in three states (normal, final two minutes, offline): [Bali student app screens](https://claude.ai/artifact/DdfRPhHu4whXLxe58hBAie)
 - **D2** Design direction and redesign — 🔄 the picks are made; the screens follow, one PR each. **D2a** ✅ the audit of the portal and the student screens with `redesign-existing-projects`, and three styles (minimalist, soft premium, brutalist) drawn on the same four screens in Bali's tokens with seven questions, on the [Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd); the owner picked on 2026-10-04 (`docs/DECISIONS.md`, 2026-10-05): B, Soft premium; the two Left chips in their states' colours (orange, red); Silent a dashed stone chip with how long, Unknown dashed with no fill; standard density, six columns, plus a Present toggle into a four-column projector view; tinted chips on plain cells; the app and the shield light-only, the portal following the device; `bali-softpulse` a glow ring, 1.2 s × 2. The Cognito sign-in page (classic Hosted UI, both pools, the portal's and the phone's) joins D2's scope. **D2b** ✅ DESIGN.md takes the picks (the style, the states, the red rule closed, `bali-softpulse` defined, the grid's density and Present, the theme, the tooling table, the list of where user-facing strings live), the two unpicked style skills are deleted, and `high-end-visual-design` is Bali's style skill under DESIGN.md. **The remaining steps**, one PR each; each group also does the em-dash cleanup for the strings it owns:
   - **D2c** 👀 the portal's foundation: the tokens in the portal, light and dark, pinned to `ios/Bali/UI/bali-tokens.json` by a test; Instrument Sans self-hosted through `next/font` (the CSP has no `font-src`); lucide as the portal's icon set; the buttons and the focus ring; then the entry pages (the bar, `/login`, `/auth/callback`, `/support`, the invite code) and `lib/errors.ts`.
-  - **D2d** 👀🔧 the Cognito sign-in page: a logo and a CSS file for the classic Hosted UI, one per pool, in the repo, and a test that the CSS uses only the classes Cognito allows; the owner uploads them to dev's pool, looks, then to prod's (#148).
+  - **D2d** 👀🔧 the Cognito sign-in page: a logo and a CSS file for the classic Hosted UI, one per pool, in the repo, and a test that the CSS uses only the classes Cognito allows; the owner uploads them to dev's pool, looks, then to prod's (#148) — ✅ (the files) `infra/cognito/hosted-ui/`: `hosted-ui.css`, one file for both pools so they can't drift (Bali's tokens on Cognito's class names; a property outside AWS's per-class list is marked "if kept", and the page holds without it), `logo-prod.png` and `logo-dev.png` (the lockup, the mark beside "Bali"; dev's with a Dev tag; `make-logo.mjs` draws them from `apps/web/public/icon.svg`), `hosted-ui.test.mjs` (fails on a selector off Cognito's list, an at-rule, a logo over 100 KB or an upload over its cap), and the README's click-by-click upload steps for both pools. 🔧 Still to do, the owner's, by the README's steps: upload `logo-dev.png` and the CSS to dev's pool (**Branding → Managed login → Hosted UI settings → Style → Edit**, the pool-wide default both app clients take), look at the real pages, then `logo-prod.png` and the same CSS to prod's; the three files also sit in `~/bali-notes/d2/cognito/upload/`. The dev page shows which "if kept" properties Cognito keeps; any fix is a small follow-up PR.
   - **D2e** 👀 the classes home and "Your block".
   - **D2f** 👀 the live grid and the class page: the chips with their icons, the two Left chips recoloured, Silent and Unknown, the stale banner, the Present toggle, `bali-softpulse`.
   - **D2g** 👀 the recap card and the reports page.
@@ -427,7 +430,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - 🚨 Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): ask App Review now (Phase 6).
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
-- #148 the sign-in page: D2d draws it; 🔧 the owner uploads its logo and CSS to dev's pool, looks, then to prod's.
+- #148 the sign-in page: D2d drew it (`infra/cognito/hosted-ui/`); 🔧 the owner uploads its logo and CSS to dev's pool, looks, then to prod's, by the README.
 - #165 the Me page (D2j).
 - #115 the older screens' design pass (D2h).
 - #130 App Store readiness.
