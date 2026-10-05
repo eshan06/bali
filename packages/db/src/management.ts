@@ -4,7 +4,7 @@ import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@bali/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { findClassById } from './queries.js';
-import { blocks, classes, users } from './schema.js';
+import { blocks, classes, schools, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
 import { TransitionError } from './transitions.js';
 import type { Database } from './types.js';
@@ -102,6 +102,15 @@ export async function createClass(
   gen: () => string = generateJoinCode,
 ): Promise<ClassRow> {
   return db.transaction(async (tx) => {
+    // The school before the teacher, in a disposal's order (school, then its
+    // people): the insert's foreign key takes the school's KEY SHARE, and
+    // taking it only there, after the teacher, could deadlock with a disposal
+    // (C6a's review). A disposal ahead of this then leaves the teacher removed.
+    await tx
+      .select({ id: schools.id })
+      .from(schools)
+      .where(eq(schools.id, input.schoolId))
+      .for('key share');
     await holdLiveTeacher(tx, input.teacherId);
     for (let attempt = 0; attempt < JOIN_CODE_ATTEMPTS; attempt += 1) {
       const [row] = await tx

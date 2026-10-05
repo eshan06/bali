@@ -25,6 +25,7 @@ import {
   between,
   eq,
   gt,
+  gte,
   inArray,
   isNotNull,
   isNull,
@@ -3842,15 +3843,21 @@ export interface DisposalCounts {
 type NamedSchool = { id: string; name: string };
 export type DisposeSchoolResult =
   | { outcome: 'disposed' | 'preview'; school: NamedSchool; counts: DisposalCounts }
-  | { outcome: 'already_disposed'; school: NamedSchool; disposedAt: Date }
+  | {
+      outcome: 'already_disposed';
+      school: NamedSchool;
+      disposedAt: Date;
+      /** What it took, from its `school_disposed` event; null when none is on record. */
+      counts: DisposalCounts | null;
+    }
   | { outcome: 'name_mismatch'; school: NamedSchool }
   | { outcome: 'in_session'; school: NamedSchool; sessions: number }
   | { outcome: 'shared_accounts'; school: NamedSchool; userIds: string[] }
   | { outcome: 'unknown_school' };
 
 /** A preview's answer, carried out of the transaction it rolls back. */
-class DisposalPreview extends Error {
-  constructor(readonly result: DisposeSchoolResult) {
+class Preview<T> extends Error {
+  constructor(readonly result: T) {
     super('preview');
   }
 }
@@ -3881,7 +3888,7 @@ export async function disposeSchool(
   try {
     return await withDeadlockRetry(() => db.transaction((tx) => disposeOnce(tx, input)));
   } catch (err) {
-    if (err instanceof DisposalPreview) return err.result;
+    if (err instanceof Preview) return err.result as DisposeSchoolResult;
     throw err;
   }
 }
@@ -3895,7 +3902,31 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
   if (!row) return { outcome: 'unknown_school' };
   const school = { id: row.id, name: row.name };
   if (row.removedAt !== null) {
-    return { outcome: 'already_disposed', school, disposedAt: row.removedAt };
+    const logged = firstOrUndefined(
+      await tx
+        .select({ payload: events.payload })
+        .from(events)
+        .where(
+          and(
+            eq(events.type, 'school_disposed'),
+            sql`${events.payload}->>'school_id' = ${school.id}`,
+          ),
+        )
+        .limit(1),
+    );
+    const p = logged?.payload as Record<string, number> | undefined;
+    const counts: DisposalCounts | null = p
+      ? {
+          teachers: p.teachers ?? 0,
+          students: p.students ?? 0,
+          classes: p.classes ?? 0,
+          sessions: p.sessions ?? 0,
+          blocks: p.blocks ?? 0,
+          openInvites: p.open_invites ?? 0,
+          armedTaps: p.armed_taps ?? 0,
+        }
+      : null;
+    return { outcome: 'already_disposed', school, disposedAt: row.removedAt, counts };
   }
   if (input.confirmName !== undefined && input.confirmName.trim() !== row.name.trim()) {
     return { outcome: 'name_mismatch', school };
@@ -3979,24 +4010,7 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     .delete(teacherInvites)
     .where(and(eq(teacherInvites.schoolId, school.id), isNull(teacherInvites.redeemedAt)))
     .returning({ id: teacherInvites.id });
-  if (liveIds.length) {
-    await tx
-      .update(users)
-      // `deletedCognitoId`'s format, set-based: a change to one changes both.
-      .set({ cognitoId: sql`'deleted:' || ${users.id}`, displayName: null, removedAt: input.at })
-      .where(inArray(users.id, liveIds));
-    // After the rows are marked removed: the trigger allows this rewrite only then.
-    await tx
-      .update(events)
-      .set({ payload: null })
-      .where(
-        and(
-          inArray(events.userId, liveIds),
-          eq(events.type, 'display_name_changed'),
-          isNotNull(events.payload),
-        ),
-      );
-  }
+  await deIdentify(tx, liveIds, input.at);
   await tx.update(schools).set({ removedAt: input.at }).where(eq(schools.id, school.id));
 
   const counts: DisposalCounts = {
@@ -4027,9 +4041,34 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
   }
   if (input.confirmName === undefined) {
-    throw new DisposalPreview({ outcome: 'preview', school, counts });
+    throw new Preview<DisposeSchoolResult>({ outcome: 'preview', school, counts });
   }
   return { outcome: 'disposed', school, counts };
+}
+
+/**
+ * The accounts `ids` de-identified as a deletion leaves one (C3): no name, no
+ * Cognito subject, removed; each rename's names emptied (migration 0015's one
+ * rewrite of `events`). The caller holds their rows.
+ */
+async function deIdentify(tx: Database, ids: string[], at: Date): Promise<void> {
+  if (ids.length === 0) return;
+  await tx
+    .update(users)
+    // `deletedCognitoId`'s format, set-based: a change to one changes both.
+    .set({ cognitoId: sql`'deleted:' || ${users.id}`, displayName: null, removedAt: at })
+    .where(inArray(users.id, ids));
+  // After the rows are marked removed: the trigger allows this rewrite only then.
+  await tx
+    .update(events)
+    .set({ payload: null })
+    .where(
+      and(
+        inArray(events.userId, ids),
+        eq(events.type, 'display_name_changed'),
+        isNotNull(events.payload),
+      ),
+    );
 }
 
 /** Ids, once each, sorted: one order to lock them in. */
@@ -4123,6 +4162,306 @@ async function tiedElsewhere(tx: Database, schoolId: string, ids: string[]): Pro
         and(
           inArray(events.userId, ids),
           or(inArray(events.classId, elsewhere), inArray(events.sessionId, lessons)),
+        ),
+      )),
+  ]);
+}
+
+/**
+ * Where each foreign key to `users` stands in a retention run (C6b): what
+ * `applyRetention` does with the rows of a person it de-identifies. A test
+ * holds this to the schema, so a new table or column keyed to a person fails
+ * CI until the run handles it.
+ */
+export const RETENTION_COVERAGE = {
+  'classes.teacher_id':
+    'a teacher with a live class is continuing; a de-identified teacher’s removed classes lose their names',
+  'blocks.teacher_id': 'a teacher with a live block is continuing, kept named',
+  'enrollments.student_id': 'each live one ended as a removal ends it, the student de-identified',
+  'participations.student_id':
+    'kept, under a person de-identified; a live one makes them continuing',
+  'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
+  'armed_taps.student_id': 'deleted: the taps of a person it de-identifies',
+  'armed_taps.teacher_id': 'deleted: the taps on a teacher it de-identifies',
+  'teacher_invites.redeemed_by':
+    'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
+} as const;
+
+export interface ApplyRetentionInput {
+  schoolId: string;
+  /** The server's clock: when it happened, and what the year is judged over by. */
+  at: Date;
+  /** The school's name, typed by the owner to confirm. Absent, nothing is written: a preview. */
+  confirmName?: string;
+  /** The idempotency key for the retention_applied event (rule 4); one is minted when absent. */
+  eventId?: string;
+}
+
+/**
+ * What a retention run took, as its `retention_applied` event records it:
+ * counts, never a name. Students and teachers: the accounts it de-identified.
+ * Enrollments and armed taps: those it ended or deleted. Continuing: the
+ * school's accounts it kept named (records after the year, at another school,
+ * or a live class or block).
+ */
+export interface RetentionCounts {
+  students: number;
+  teachers: number;
+  enrollments: number;
+  armedTaps: number;
+  continuing: number;
+}
+
+export type ApplyRetentionResult =
+  | {
+      outcome: 'applied' | 'preview';
+      school: NamedSchool;
+      yearEndsOn: string;
+      counts: RetentionCounts;
+      /** The accounts kept named, by id: the owner's to look at, never logged. */
+      continuing: string[];
+    }
+  | {
+      outcome: 'already_applied';
+      school: NamedSchool;
+      yearEndsOn: string;
+      appliedAt: Date;
+      counts: RetentionCounts;
+    }
+  | { outcome: 'no_year_end'; school: NamedSchool }
+  | { outcome: 'year_not_over'; school: NamedSchool; yearEndsOn: string; overAt: Date }
+  | { outcome: 'name_mismatch'; school: NamedSchool }
+  | { outcome: 'school_disposed'; school: NamedSchool }
+  | { outcome: 'unknown_school' };
+
+/**
+ * The instant a year whose last day is `day` (YYYY-MM-DD) is over: the
+ * midnight after it, by the server's clock and zone (`TZ`, the school's).
+ */
+export function yearOverAt(day: string): Date {
+  const [y = NaN, m = NaN, d = NaN] = day.split('-').map(Number);
+  return new Date(y, m - 1, d + 1);
+}
+
+/**
+ * A school year's retention run (C6b; the owner's ruling, 2026-10-04: named
+ * records are kept through the school year, then de-identified; aggregates
+ * stay). Once the school's recorded year is over, each person of the school
+ * whose records all lie in it is de-identified as an account deletion leaves
+ * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
+ * each live enrollment ended as a removal ends it; their pre-bell taps
+ * deleted; a de-identified teacher's removed classes lose their names. Their
+ * lessons, participations and events stay, so every count still adds up.
+ *
+ * Kept named, and reported by id (`continuing`): an account with a record
+ * after the year's last day (an event, a lesson, a pre-bell tap, an invite
+ * redeemed, a class joined, a class or block made, the account itself made), with records at another school, or a
+ * teacher with a live class or block (as C3 refuses one). Splitting an
+ * account's years would mean rewriting `events.user_id`; not built.
+ *
+ * Refused, writing nothing: no year end on record (`no_year_end`: it never
+ * guesses), or the year not over yet. Without `confirmName` it is a preview:
+ * the whole run, rolled back, so its counts are exact. Idempotent per year: a
+ * second run for the same last day is answered with the first one's counts.
+ * Logged as one `retention_applied` event of the school's id, the day and counts.
+ */
+export async function applyRetention(
+  db: Database,
+  input: ApplyRetentionInput,
+): Promise<ApplyRetentionResult> {
+  try {
+    return await withDeadlockRetry(() => db.transaction((tx) => retainOnce(tx, input)));
+  } catch (err) {
+    if (err instanceof Preview) return err.result as ApplyRetentionResult;
+    throw err;
+  }
+}
+
+async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<ApplyRetentionResult> {
+  // The school first, as a disposal takes it, so two runs and a disposal serialise on it.
+  const row = firstOrUndefined(
+    await tx.select().from(schools).where(eq(schools.id, input.schoolId)).for('update'),
+  );
+  if (!row) return { outcome: 'unknown_school' };
+  const school = { id: row.id, name: row.name };
+  if (row.removedAt !== null) return { outcome: 'school_disposed', school };
+  const yearEndsOn = row.schoolYearEndsOn;
+  if (yearEndsOn === null) return { outcome: 'no_year_end', school };
+  const overAt = yearOverAt(yearEndsOn);
+  if (input.at < overAt) return { outcome: 'year_not_over', school, yearEndsOn, overAt };
+  if (input.confirmName !== undefined && input.confirmName.trim() !== row.name.trim()) {
+    return { outcome: 'name_mismatch', school };
+  }
+  const prior = firstOrUndefined(
+    await tx
+      .select({ occurredAt: events.occurredAt, payload: events.payload })
+      .from(events)
+      .where(
+        and(
+          eq(events.type, 'retention_applied'),
+          sql`${events.payload}->>'school_id' = ${school.id}`,
+          sql`${events.payload}->>'year_ends_on' = ${yearEndsOn}`,
+        ),
+      )
+      .limit(1),
+  );
+  if (prior) {
+    const p = (prior.payload ?? {}) as Record<string, number>;
+    return {
+      outcome: 'already_applied',
+      school,
+      yearEndsOn,
+      appliedAt: prior.occurredAt,
+      counts: {
+        students: p.students ?? 0,
+        teachers: p.teachers ?? 0,
+        enrollments: p.enrollments ?? 0,
+        armedTaps: p.armed_taps ?? 0,
+        continuing: p.continuing ?? 0,
+      },
+    };
+  }
+
+  // Each person's taps, then their row, as a deletion takes them (C3): a tap,
+  // join, rename or arm behind this finds the account deleted, and one ahead
+  // of it is read below as a record after the year.
+  const candidates = await peopleOf(tx, school.id);
+  for (const id of candidates) await lockStudentTaps(tx, id);
+  const people = (await lockPeople(tx, candidates)).filter((p) => p.removedAt === null);
+  const ids = people.map((p) => p.id);
+  const kept = new Set([
+    ...(await tiedElsewhere(tx, school.id, ids)),
+    ...(await activeSince(tx, ids, overAt)),
+  ]);
+  const gone = people.filter((p) => !kept.has(p.id));
+  const goneIds = gone.map((p) => p.id);
+  const teacherIds = gone.filter((p) => p.role === 'teacher').map((p) => p.id);
+
+  const live = goneIds.length
+    ? await tx
+        .select()
+        .from(enrollments)
+        .where(and(inArray(enrollments.studentId, goneIds), isNull(enrollments.removedAt)))
+        .orderBy(asc(enrollments.classId), asc(enrollments.id))
+        .for('update')
+    : [];
+  // None of them is in a lesson (a live participation is a record after the
+  // year), so each ends with its own event and no participation.
+  for (const enrollment of live) {
+    await endLiveEnrollment(tx, enrollment, {
+      reason: 'removed_from_class',
+      at: input.at,
+      refuseInSession: false,
+    });
+  }
+  const armed = goneIds.length
+    ? await tx
+        .delete(armedTaps)
+        .where(or(inArray(armedTaps.studentId, goneIds), inArray(armedTaps.teacherId, goneIds)))
+        .returning({ id: armedTaps.id })
+    : [];
+  // A class name can name its teacher; theirs are all removed (a live one keeps them named).
+  if (teacherIds.length) {
+    await tx.update(classes).set({ name: '' }).where(inArray(classes.teacherId, teacherIds));
+  }
+  await deIdentify(tx, goneIds, input.at);
+
+  const counts: RetentionCounts = {
+    students: gone.length - teacherIds.length,
+    teachers: teacherIds.length,
+    enrollments: live.length,
+    armedTaps: armed.length,
+    continuing: kept.size,
+  };
+  const isNew = await insertEvent(tx, {
+    eventId: input.eventId ?? newUuidV7(),
+    type: 'retention_applied',
+    occurredAt: input.at,
+    payload: {
+      school_id: school.id,
+      year_ends_on: yearEndsOn,
+      students: counts.students,
+      teachers: counts.teachers,
+      enrollments: counts.enrollments,
+      armed_taps: counts.armedTaps,
+      continuing: counts.continuing,
+    },
+  });
+  if (!isNew) {
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
+  }
+  const result = {
+    school,
+    yearEndsOn,
+    counts,
+    continuing: [...kept].sort(),
+  };
+  if (input.confirmName === undefined) {
+    throw new Preview<ApplyRetentionResult>({ outcome: 'preview', ...result });
+  }
+  return { outcome: 'applied', ...result };
+}
+
+/**
+ * Those of `ids` with a record from `since` on: the account made, an event of
+ * theirs, a participation in a lesson not over by then, a pre-bell tap, an
+ * invite redeemed, a class joined, or, as
+ * a teacher, a class or block still live or made since, or a lesson of a class
+ * of theirs not over by then.
+ */
+async function activeSince(tx: Database, ids: string[], since: Date): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const notOver = or(isNull(sessions.endedAt), gte(sessions.endedAt, since));
+  const lateLessons = tx.select({ id: sessions.id }).from(sessions).where(notOver);
+  const lateClasses = tx.select({ id: sessions.classId }).from(sessions).where(notOver);
+  return idsOf([
+    ...(await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, ids), gte(users.createdAt, since)))),
+    ...(await tx
+      .selectDistinct({ id: events.userId })
+      .from(events)
+      .where(and(inArray(events.userId, ids), gte(events.occurredAt, since)))),
+    ...(await tx
+      .selectDistinct({ id: participations.studentId })
+      .from(participations)
+      .where(
+        and(inArray(participations.studentId, ids), inArray(participations.sessionId, lateLessons)),
+      )),
+    ...(await tx
+      .selectDistinct({ id: armedTaps.studentId })
+      .from(armedTaps)
+      .where(and(inArray(armedTaps.studentId, ids), gte(armedTaps.createdAt, since)))),
+    // A redeem and a join are records too, whatever events they wrote.
+    ...(await tx
+      .selectDistinct({ id: teacherInvites.redeemedBy })
+      .from(teacherInvites)
+      .where(and(inArray(teacherInvites.redeemedBy, ids), gte(teacherInvites.redeemedAt, since)))),
+    ...(await tx
+      .selectDistinct({ id: enrollments.studentId })
+      .from(enrollments)
+      .where(and(inArray(enrollments.studentId, ids), gte(enrollments.createdAt, since)))),
+    ...(await tx
+      .selectDistinct({ id: classes.teacherId })
+      .from(classes)
+      .where(
+        and(
+          inArray(classes.teacherId, ids),
+          or(
+            isNull(classes.removedAt),
+            gte(classes.createdAt, since),
+            inArray(classes.id, lateClasses),
+          ),
+        ),
+      )),
+    ...(await tx
+      .selectDistinct({ id: blocks.teacherId })
+      .from(blocks)
+      .where(
+        and(
+          inArray(blocks.teacherId, ids),
+          or(isNull(blocks.removedAt), gte(blocks.createdAt, since)),
         ),
       )),
   ]);

@@ -77,6 +77,7 @@ export interface SchoolListing {
   id: string;
   name: string;
   agreementSignedAt: string | null;
+  schoolYearEndsOn: string | null;
   /** Its invites still open: neither redeemed nor past their expiry by the database's clock. */
   openInvites: number;
 }
@@ -88,6 +89,7 @@ export async function listSchools(db: Database): Promise<SchoolListing[]> {
       id: schools.id,
       name: schools.name,
       agreementSignedAt: schools.agreementSignedAt,
+      schoolYearEndsOn: schools.schoolYearEndsOn,
       openInvites: sql<number>`count(${teacherInvites.id})::int`,
     })
     .from(schools)
@@ -111,24 +113,41 @@ export async function listSchools(db: Database): Promise<SchoolListing[]> {
  * row is locked from its read to its write, so two runs at once each name the
  * day their own write replaced. Undefined when no live school has the id.
  */
-export async function recordAgreement(
+export function recordAgreement(
   db: Database,
   input: { schoolId: string; signedOn: string },
 ): Promise<{ school: SchoolRow; before: string | null } | undefined> {
+  return recordSchoolDay(db, input.schoolId, 'agreementSignedAt', input.signedOn);
+}
+
+/**
+ * Record the last day of the school's current year or term (C6b), as
+ * `recordAgreement` records its agreement's: replaced by a second run, `before`
+ * the day it replaced. The retention run reads it.
+ */
+export function recordYearEnd(
+  db: Database,
+  input: { schoolId: string; endsOn: string },
+): Promise<{ school: SchoolRow; before: string | null } | undefined> {
+  return recordSchoolDay(db, input.schoolId, 'schoolYearEndsOn', input.endsOn);
+}
+
+async function recordSchoolDay(
+  db: Database,
+  schoolId: string,
+  field: 'agreementSignedAt' | 'schoolYearEndsOn',
+  day: string,
+): Promise<{ school: SchoolRow; before: string | null } | undefined> {
   return db.transaction(async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(schools)
-      .where(liveSchool(input.schoolId))
-      .for('update');
+    const [current] = await tx.select().from(schools).where(liveSchool(schoolId)).for('update');
     if (!current) return undefined;
     const [school] = await tx
       .update(schools)
-      .set({ agreementSignedAt: input.signedOn })
+      .set({ [field]: day })
       .where(eq(schools.id, current.id))
       .returning();
     if (!school) return undefined;
-    return { school, before: current.agreementSignedAt };
+    return { school, before: current[field] };
   });
 }
 
