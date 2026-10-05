@@ -4,10 +4,10 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-05 — the handoff below rewritten for the next session (Phases 4–7's
-true status, production, what's in flight, the pilot's path, who does what). The prose this
-file carried until today is kept word for word in `docs/DECISIONS.md`, "Archive: PLAN's old
-Now (to 2026-10-05)"._
+_Last updated: 2026-10-06 — the "class started" push planned (N1, docs: ARCHITECTURE's
+"Push: a doorbell for students", steps N1–N6 below). Before it, 2026-10-05: the handoff
+rewritten; the prose this file carried until then is kept word for word in
+`docs/DECISIONS.md`, "Archive: PLAN's old Now (to 2026-10-05)"._
 
 ## Now
 
@@ -36,6 +36,11 @@ why, Open owner items the owner's queue.
   NFC entitlement listed NDEF; the extensions had no `CFBundleDisplayName`), fixed by #236,
   which made the entitlement TAG alone. Next: the owner's phone test on it (Open owner
   items).
+
+- **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
+  whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs) ✅; next the
+  backend steps N2–N6 (cloud sessions) and the app half (the Mac session), in parallel. Not on
+  the pilot's critical path: it never delays C2 or the external TestFlight steps.
 
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
 test on prod, a block tap included → the privacy page (C2, the lawyer's words) → the external
@@ -187,6 +192,32 @@ docs only, nothing built):
   are read, reports and the recap included, not only the results route.
 - The `sha256` check of a deck's bytes is specified for the phone only, not for the
   portal's renderer.
+
+### Push: class started (N steps; one PR each; 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
+
+Decided 2026-10-06 (`docs/DECISIONS.md`); the design is ARCHITECTURE's "Push: a doorbell for
+students". Phase 6-adjacent, **not on the pilot's critical path**: no step here delays C2 or
+the external TestFlight steps. Cloud sessions build the backend steps; **the app half —
+registering the token, the `aps-environment` entitlement, the Time Sensitive capability, the
+words — is the Mac session's**, in parallel.
+
+- **N1** The decision written down: ARCHITECTURE (the live-feed line amended, "Push: a doorbell
+  for students"), DECISIONS, these steps — ✅
+- **N2** CI accepts the `aps-environment` entitlement and the Time Sensitive capability
+  (`ios.yml`'s entitlement checks and testflight.yml's release guard) — ⬜
+- **N3** The device-token table (keyed by the token, with its APNs environment; students only)
+  and `/v1` register/remove endpoints, idempotent on a UUIDv7 `eventId`; OpenAPI, fixtures,
+  BaliCore's wire types and `APIClient` methods — ⬜
+- **N4** Tokens as personal data: deleted by `deleteAccount` (C3), the disposal (C6a) and the
+  retention run (C6b); in C5's export and the foreign-key coverage tests; redacted from logs —
+  ⬜
+- **N5** The APNs sender, after the Start's transaction commits: one alert per converted
+  student's tokens (HTTP/2, `.p8` token auth, time-sensitive, collapse id per session, short
+  expiration); never on a replay; a failure logged without the token and never failing the
+  Start; a gone token (`410`, `BadDeviceToken`) deleted; off when unconfigured — ⬜
+- **N6** 🔧 `docs/RUNBOOKS.md`: the owner's console steps (the APNs key, the App ID's Push
+  Notifications capability, Railway's variables); `docs/APP-STORE.md`'s privacy answers for
+  the device token — ⬜
 
 ### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
 
@@ -404,6 +435,8 @@ layer → roster import (CSV / Google Classroom).
    to the front. While the phone waits, it reads
    `GET /v1/me` every 30 s in the foreground only — the check-in's cadence —
    and at every return to the front; push notifications are a later upgrade.
+   *Since 2026-10-06:* a visible "class started" alert rings the converted students
+   (steps N1–N6); the 30 s read stays, since no code assumes the alert arrived.
 7. The default end for a tap made with no signal — **decided 2026-09-24:**
    shield at once; if the phone never reaches the server, the shields come off
    on their own after **50 minutes** (the owner's length; iOS can't schedule
