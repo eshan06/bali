@@ -4178,7 +4178,8 @@ export const RETENTION_COVERAGE = {
     'a teacher with a live class is continuing; a de-identified teacher’s removed classes lose their names',
   'blocks.teacher_id': 'a teacher with a live block is continuing, kept named',
   'enrollments.student_id': 'each live one ended as a removal ends it, the student de-identified',
-  'participations.student_id': 'kept, under a person de-identified; a live one makes them continuing',
+  'participations.student_id':
+    'kept, under a person de-identified; a live one makes them continuing',
   'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
   'armed_taps.student_id': 'deleted: the taps of a person it de-identifies',
   'armed_taps.teacher_id': 'deleted: the taps on a teacher it de-identifies',

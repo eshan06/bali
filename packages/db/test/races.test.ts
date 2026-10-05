@@ -28,6 +28,7 @@ import {
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
+  applyRetention,
   armTap,
   changeUnlockReason,
   checkIn,
@@ -1966,7 +1967,7 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
         new Promise((resolve) => setTimeout(resolve, ms)).then(call);
       const lag = (round % 3) * 12;
 
-      const [disposed, started, joined, armed, renamed, redeemed, unlocked] =
+      const [disposed, started, joined, armed, renamed, redeemed, unlocked, created] =
         await Promise.allSettled([
           round % 2 === 1
             ? new Promise((resolve) => setTimeout(resolve, 5)).then(disposal)
@@ -2005,6 +2006,8 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
             eventId: unlockId,
             deviceTime: new Date(),
           }),
+          // The school before the teacher, as the disposal takes them: never a deadlock.
+          later(lag, () => createClass(db, { teacherId, schoolId, name: `Late ${round}` })),
         ]);
 
       if (disposed.status === 'rejected') throw disposed.reason;
@@ -2019,7 +2022,7 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
       if (joined.status === 'rejected') {
         expect(joined.reason).toMatchObject({ code: 'CLASS_NOT_FOUND' });
       }
-      for (const late of [armed, renamed]) {
+      for (const late of [armed, renamed, created]) {
         if (late.status === 'rejected') {
           expect(late.reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
         }
@@ -2039,6 +2042,13 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
         .from(sessions)
         .where(and(eq(sessions.classId, classId), isNull(sessions.endedAt)));
       expect(running).toHaveLength(0);
+      // A class made ahead of it went with the rest.
+      expect(
+        await db
+          .select()
+          .from(classes)
+          .where(and(eq(classes.schoolId, schoolId), isNull(classes.removedAt))),
+      ).toHaveLength(0);
       const stillIn = await db
         .select()
         .from(enrollments)
@@ -2150,6 +2160,129 @@ describe.runIf(REAL_PG)('school disposal under contention (real Postgres, C6a)',
     expect(teacher).toMatchObject({ role: 'teacher', displayName: null });
     expect(teacher.removedAt).not.toBeNull();
   });
+});
+
+describe.runIf(REAL_PG)('a retention run under contention (real Postgres, C6b)', () => {
+  it('a retention run racing a tap, a join, an arm, a rename and an unlock leaves no one half kept', async () => {
+    // The run takes the school, then each person's taps and row, as a deletion
+    // does (C3): a tap, join, rename or arm behind it finds the account deleted;
+    // one ahead of it is read. A tap into the lesson still running is a record
+    // after the year, so a student whose tap wins is kept named and in it; one
+    // whose tap loses is de-identified and in nothing. The unlock is recorded
+    // whichever lands first (ISSUES #2). Never a deadlock, never a 500.
+    for (let round = 0; round < 12; round += 1) {
+      const tag = `race-retain-${round}`;
+      const { classId, studentId, teacherId } = await seed(tag);
+      const { schoolId } = one(
+        await db
+          .select({ schoolId: classes.schoolId })
+          .from(classes)
+          .where(eq(classes.id, classId)),
+      );
+      const two = (n: number) => String(n).padStart(2, '0');
+      const tomorrow = new Date(Date.now() + 86_400_000);
+      await db
+        .update(schools)
+        .set({
+          schoolYearEndsOn: `${tomorrow.getFullYear()}-${two(tomorrow.getMonth() + 1)}-${two(tomorrow.getDate())}`,
+        })
+        .where(eq(schools.id, schoolId));
+      const past = await openSession(classId);
+      await tapIn(db, {
+        sessionId: past.id,
+        studentId,
+        eventId: newUuidV7(),
+        deviceTime: new Date(),
+      });
+      await endSession(db, { sessionId: past.id, at: new Date(), reason: 'ended' });
+      const { classId: otherClass } = await seed(`${tag}-other`);
+      await db.update(classes).set({ schoolId }).where(eq(classes.id, otherClass));
+      const running = await openSession(classId);
+      const unlockId = newUuidV7();
+      const later = <T>(ms: number, call: () => Promise<T>) =>
+        new Promise((resolve) => setTimeout(resolve, ms)).then(call);
+      const lag = (round % 3) * 12;
+
+      const [retained, tapped, joined, armed, renamed, unlocked] = await Promise.allSettled([
+        later((round % 2) * 5, () =>
+          applyRetention(db, {
+            schoolId,
+            at: new Date(Date.now() + 3 * 86_400_000),
+            confirmName: `School ${tag}`,
+          }),
+        ),
+        later(lag, () =>
+          tapIn(db, {
+            sessionId: running.id,
+            studentId,
+            eventId: newUuidV7(),
+            deviceTime: new Date(),
+          }),
+        ),
+        later(lag, () =>
+          joinClassByCode(db, {
+            studentId,
+            joinCode: `${tag}-other`,
+            eventId: newUuidV7(),
+            occurredAt: new Date(),
+          }),
+        ),
+        later(lag, () =>
+          armTap(db, {
+            studentId,
+            teacherId,
+            eventId: newUuidV7(),
+            deviceTime: new Date(),
+            expiresAt: new Date(Date.now() + 3_600_000),
+          }),
+        ),
+        later(lag, () =>
+          renameStudent(db, { studentId, displayName: `Late ${round}`, eventId: newUuidV7() }),
+        ),
+        unlock(db, { sessionId: past.id, studentId, eventId: unlockId, deviceTime: new Date() }),
+      ]);
+
+      if (retained.status === 'rejected') throw retained.reason;
+      if (unlocked.status === 'rejected') throw unlocked.reason;
+      expect(retained.value.outcome).toBe('applied');
+      expect(await eventOf(unlockId)).toMatchObject({ userId: studentId, type: 'unlock' });
+      for (const late of [tapped, joined, armed, renamed]) {
+        if (late.status === 'rejected') {
+          expect(late.reason).toMatchObject({ code: 'ACCOUNT_DELETED' });
+        }
+      }
+      const student = one(await db.select().from(users).where(eq(users.id, studentId)));
+      const inLesson = await db
+        .select()
+        .from(participations)
+        .where(
+          and(eq(participations.sessionId, running.id), eq(participations.studentId, studentId)),
+        );
+      if (student.removedAt === null) {
+        // Kept: only a tap into the running lesson, ahead of the run, keeps them.
+        expect(tapped.status).toBe('fulfilled');
+        expect(inLesson).toHaveLength(1);
+        continue;
+      }
+      // De-identified: in no class, no lesson, no waiting tap, and no name anywhere.
+      expect(student.displayName).toBeNull();
+      expect(inLesson.filter((p) => p.endedAt === null)).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(enrollments)
+          .where(and(eq(enrollments.studentId, studentId), isNull(enrollments.removedAt))),
+      ).toHaveLength(0);
+      expect(
+        await db.select().from(armedTaps).where(eq(armedTaps.studentId, studentId)),
+      ).toHaveLength(0);
+      const renames = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.userId, studentId), eq(events.type, 'display_name_changed')));
+      expect(renames.every((e) => e.payload === null)).toBe(true);
+    }
+  }, 60_000);
 });
 
 describe.runIf(REAL_PG)('provisioning concurrency (real Postgres)', () => {
