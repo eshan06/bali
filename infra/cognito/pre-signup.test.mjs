@@ -12,8 +12,8 @@ const signUp = (email, triggerSource = 'PreSignUp_SignUp') => ({
 });
 
 const refusedWith = (pattern) => (err) => err instanceof Error && pattern.test(err.message);
-const SCHOOL = /^Use your @vanderbilt\.edu email address to sign up\.$/;
-const CLOSED = /^Sign-up is closed right now\. Try again later\.$/;
+const SCHOOL = /^Use your @vanderbilt\.edu email address to sign up$/;
+const CLOSED = /^Sign-up is closed right now\. Try again later$/;
 
 let saved;
 beforeEach(() => {
@@ -88,12 +88,12 @@ test('several domains: each signs up, and the refusal names them all', async () 
   await handler(signUp('b@belmont.edu'));
   await assert.rejects(
     handler(signUp('c@gmail.com')),
-    refusedWith(/^Use your @vanderbilt\.edu or @belmont\.edu email address to sign up\.$/),
+    refusedWith(/^Use your @vanderbilt\.edu or @belmont\.edu email address to sign up$/),
   );
   process.env.ALLOWED_EMAIL_DOMAINS = 'a.edu,b.edu,c.edu';
   await assert.rejects(
     handler(signUp('c@gmail.com')),
-    refusedWith(/^Use your @a\.edu, @b\.edu or @c\.edu email address to sign up\.$/),
+    refusedWith(/^Use your @a\.edu, @b\.edu or @c\.edu email address to sign up$/),
   );
 });
 

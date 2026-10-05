@@ -573,7 +573,12 @@ describe('npm run school -- dispose', () => {
       ),
     );
     expect(await run(['dispose', s.school.id])).toEqual([
-      expect.stringMatching(/^school \S+ was disposed of already, on \S+: nothing more to do$/),
+      expect.stringMatching(
+        new RegExp(
+          `^school \\S+ was disposed of already, on \\S+: teachers 1, students 2, classes 2, ` +
+            'sessions 2, blocks 1, open invites 1, pre-bell taps 0; nothing more to do$',
+        ),
+      ),
     ]);
   });
 
