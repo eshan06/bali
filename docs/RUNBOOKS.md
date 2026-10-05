@@ -47,8 +47,8 @@ uses values the one before it produced:
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
-teacher there with a block and a class. 🔧 That block's first code reached the repo's history (#228): before the first class, write and register a fresh one (`docs/PILOT.md`, setup step 6). The first prod TestFlight build was
-dispatched 2026-10-05 (Actions run 37267876703).
+teacher there with a block and a class. 🔧 That block's first code reached the repo's history (#228): before the first class, write and register a fresh one (`docs/PILOT.md`, setup step 6). The first prod TestFlight build uploaded
+2026-10-05 (Actions run 37279657642, build 4, after three failed runs: `docs/PLAN.md`, P5).
 
 How to read them:
 
@@ -637,11 +637,12 @@ alerts, each to your email:
 
 - **A new or returning error** in the API or the portal.
 - **The sweep stopped or keeps failing.** Each minute's sweep checks in to a Sentry Cron
-  monitor, `api-sweep` (`apps/api/src/monitoring.ts`). A stopped API sends nothing, and
-  Sentry calls it missed after 3 minutes (a minute's schedule plus a 2-minute margin); a
-  hung run holds its check-in open and the API skips the next ticks, so Sentry calls it
-  timed out after 5 minutes; 2 failed runs in a row also open an issue. Sessions then stop
-  ending at their bell, so this one matters.
+  monitor, `api-sweep` (`apps/api/src/monitoring.ts`). A stopped API sends nothing: Sentry
+  marks a check-in missed after 3 minutes (a minute's schedule plus a 2-minute margin), and
+  the issue, your email, opens on the second miss in a row, about a minute later. A hung run
+  holds its check-in open while the API skips the next ticks, so Sentry calls it timed out
+  after 5 minutes. 2 failed runs in a row also open an issue. Sessions then stop ending at
+  their bell, so this one matters.
 - **The API is down.** An outside check on `<prod API URL>/healthz`. `/healthz` answers
   `{"status":"ok","version":…}` whenever the process is up; it doesn't touch Postgres. A
   database outage shows up as the sweep's failed check-ins and as 5xx errors instead.
@@ -657,7 +658,9 @@ alerts, each to your email:
    Open it → **Edit** *(wording unsure)* → **Notify** you. Leave its schedule alone (each
    check-in sends it, so an edit is overwritten on the next sweep). dev's API checks in to
    the same monitor under environment `dev`; notify on `production` only, if the page lets
-   you choose.
+   you choose. Sentry's cron quota counts each monitor environment: check that `production`
+   is active, not just `dev` (or stop setting `SENTRY_DSN` on dev), since a green dev monitor
+   says nothing about prod.
    **Check:** the monitor shows a green check-in each minute in `production`.
 3. **The uptime check.** Sentry → **Alerts → Create Alert → Uptime Monitor**
    *(wording unsure; if your plan doesn't offer it, a free outside monitor such as

@@ -4,786 +4,53 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-05 — **Phase 7, Live lesson: planned; build on hold by the owner (2026-10-05) — nothing starts until the owner says so; when resumed, backend only first (no UI/app/portal changes).** The plan (L0, docs only): during a running session a teacher asks a question and presents slides, students follow on Bali's own screen, results totals only, phones polling; ARCHITECTURE's "Live lesson (Phase 7)", the steps under "Phase 7 steps", `docs/DECISIONS.md` 2026-10-05. **`npm audit` clean:** a root `overrides` entry lifts drizzle-kit's dev-only `@esbuild-kit/core-utils` off esbuild 0.18 (GHSA-67mh-4wv8-2f99; DECISIONS 2026-10-05). Rode along, #236's WARN: `testflight.yml`'s release guard says a `codesign` failure as itself, no longer as a wrong NFC entitlement. **P9, the sweep's cron monitor:** each minute's sweep checks in to Sentry Cron `api-sweep` (off without `SENTRY_DSN`), and runbook 6 sets the owner's alerts (errors, the monitor, an uptime check on `/healthz`). Before that, **TestFlight external beta prep** ([`docs/APP-STORE.md`](APP-STORE.md), section 5): the groups (prod builds to the pilot's external group only, dev builds internal), Test Information and Beta App Review info, a "What to Test" text, review accounts made with Cognito's `AdminCreateUser` (the Pre sign-up Lambda lets only that through for a non-school address), and the §3.3.3(P) question to Apple drafted to paste (ISSUES #3). The 2026-10-05 investigation's owner decisions are listed under Open owner items. **The Vanderbilt pilot's runbook is [`docs/PILOT.md`](PILOT.md):** the setup in order (school, agreement, year end, invite through `railway ssh --service "bali prod"`, the professor's redeem, the class, the block, the prod-only external TestFlight group, the join code), the professor's day-of checklist, support (eshan.shah@vanderbilt.edu, Emergency Unlock, the API down), where to look, and after the pilot; behaviour, not screen wording. Rode along, #228's WARNs: no live block code in the docs, runbook 3 says the demo project isn't connected (steps 1–2 not needed, step 6's check fixed), and Phase 5's and 6's owner lists brought up to date. **Production as it stands (the owner, 2026-10-05):** the sweep cron `sweep-cron` runs in prod every 5 minutes (first run: expired 0, wentSilent 0); the portal is live on Vercel as `bali-portal` (`https://bali-portal.vercel.app`, Node 22.x pinned), prod's CORS checked; **no prod backups for the Vanderbilt pilot** (Railway's need the Pro plan; the owner is on Hobby; an accepted risk, revisited before K-12); root AWS MFA on, the prod pool's password minimum 12, prod's Postgres with no public proxy; the school "Vanderbilt" made in prod with its agreement and year's end (2026-12-18); the first prod TestFlight build dispatched. `docs/RUNBOOKS.md` and `docs/DEPLOY.md` say it all. Added: P8, `railway.json` to Railway's new config file before 2026-12-01; two proposed future phases, not scheduled (SIS/LMS rosters; presenting and live questions, results totals only), in `docs/ROADMAP-RESEARCH.md`. **D2b has landed: DESIGN.md takes the owner's D2 picks** (made 2026-10-04 on D2a's canvas): Soft premium; the two Left chips in their states' colours; Silent and Unknown dashed; a Present toggle into a projector view; tinted chips on plain cells; the app and the shield light-only, the portal following the device; `bali-softpulse` a glow ring. The two unpicked style skills are deleted, and the Cognito sign-in page joins D2's scope. Next for design: D2c, the tokens in the portal (D2's steps are under Phase 3 steps). **#224's WARNs settled:** `npm run school -- invite` on a school disposed of now says when it was disposed of and that nothing was written (the mint's new `disposed` outcome), not that no school has the id; `docs/DEPLOY.md` says to keep the pilot's TestFlight testers in a prod-only external group, dev builds to an internal one. **Production is up (the owner, 2026-10-04, runbooks 1–2):** its API (`https://bali-prod-production.up.railway.app`), its Cognito pool `bali-production` with the portal's and the phone's clients, recorded in `docs/DEPLOY.md`; the TestFlight workflow builds against it when dispatched with `prod` (dev stays the default; the release guard checks a prod build's API, hosted-UI domain and client id are prod's). `docs/RUNBOOKS.md` says which steps are done, skipped for the pilot, and still open. Rode along from #223's review: `agreement`/`year-end` on a disposed school say so instead of "no school on record"; the retention command's other-name and disposed refusals tested; the keep-list's pre-bell tap "of theirs or on them". Next: E1. **Phase 6's C6b has landed — the retention run, the owner's commands:** `npm run school -- year-end <school-id> <day>` records the school's last day of its year or term (`list` shows it); after it, `npm run school -- retention <school-id>` previews (counts, and the ids it keeps named) and `--confirm "<name>"` runs it, printing one line of counts with no name; no day on record, a year not over or another name refuses, saying nothing was written; a re-run prints the first run's counts. Runbook 1, step 12: recording the day, the calendar entry, the inspection hold, running it on prod. The engine (`applyRetention`) landed in C6b's first PR: everyone whose records all lie in the year de-identified as C3 leaves an account, anyone with a later record, at another school or with a live class or block kept named; `retention_applied` counts. Rode along: `already_disposed` prints its counts; never-checks on the command's switches; runbook 1 step 11's clock sentence; the Pre sign-up Lambda's messages lose their final period, as deployed. Next: E1. **Phase 6's C6a has landed — the owner's command:** `npm run school -- dispose <school-id>` prints the preview (the school's name and what would go; nothing written) with a reminder of the inspection hold and the confirming line to paste, the name single-quoted for the shell; `… --confirm "<name>"` disposes and prints one line of the school's id, the time and the counts, no name; each refusal (another name, a lesson running, accounts shared with another school, no such school) says why and that nothing was written; a re-run says it was disposed of already. Runbook 1, step 11: running it on prod through `railway ssh`, deleting the school's Cognito sign-ins, the backups' expiry, and writing back to the school. Next: E1. **Phase 6's C6a engine has landed — a school's data disposed of on its written request:** `disposeSchool` previews without the school's name (the whole disposal, rolled back: exact counts, nothing written) and with it disposes in one engine transaction: every person of the school de-identified as C3 leaves an account, its enrollments ended, its classes removed and nameless, its blocks removed, its open invites and pre-bell taps deleted, the school marked removed; its lessons and their history stay, naming no one; logged as a `school_disposed` event of the school's id and counts. Refused while a lesson of it runs, or while a person of it has records at another school (by id); a re-run says it is disposed of already; a Start behind it finds its class gone; an unlock after it is still recorded. `SCHOOL_DISPOSAL_COVERAGE` and a schema test place every foreign key to `users` or `schools`; a real-Postgres race (disposal vs a Start, join, arm, rename, redeem and unlock; a teacher invite's redeem holds its school as the mint does, so it lands wholly before a disposal or finds no invite after it, #220's review). Next: the owner's command, `npm run school -- dispose`, and its runbook (C6a's second PR), then E1. Rode along (#219's review): C5's export carries the lessons' own events (`sessionEvents`); `deleteAccount`'s consumed pre-bell tap is argued, not recorded. **Phase 6's C5 has landed — a student's whole record for a parent's inspection request:** the owner's `npm run --silent school -- export-student <id or Cognito sub> > record.json` prints one JSON document of every row keyed to the student (account, enrollments, participations, events, armed taps, redeemed invites) with the classes, sessions and school named, nothing of another student's, in one read-only transaction; a schema test fails when a new foreign key to `users` is neither exported nor argued out. On prod through `railway ssh` (runbook 1, step 10), which also has the owner hold every disposal while a request is open. Rode along: `deleteAccount` consumes the student's waiting armed taps (a real-Postgres race with a Start); the reborn-account test no longer ties on PGlite's clock. Next: E1. **C3's follow-up has landed (#217's review WARNs):** a pre-bell tap racing a deletion is `409 account_deleted`, never armed for no one (the arm path reads the student's row FOR SHARE); a class or block created racing a teacher's deletion is `409 account_deleted`, so none is owned by no one; `deleteAccount`'s replay is scoped to its caller (another account's deletion id is `409 event_id_conflict`, unless this account was made after that deletion, the reborn sign-in's shape); migration 0016 nests the events trigger's UPDATE test so a TRUNCATE never reads OLD; C4 now requires the outbox drained before `DELETE /v1/me`. Rode along: the Pre sign-up Lambda exports only its handler; runbook 2 keeps email writable (Cognito re-verifies a changed email; an account can only start from a school address) and shows Cognito's "PreSignUp failed with error " prefix; the portal's middleware skips its static icons; the export-compliance note names CryptoKit's SHA-256 (PKCE) and the Keychain beside HTTPS; a Linux BaliCore test pins `project.yml`'s AppIcon to an icon set that exists. Next: E1. **Phase 6's C3 has landed — account deletion:** `DELETE /v1/me` `{ eventId }` through the engine's `deleteAccount`, one transaction: each class left as a leave leaves it (in session too), the row's name and Cognito subject gone and the row marked removed, each rename's payload emptied (migration 0015, the one rewrite the events trigger allows), and an `account_deleted` event naming no one; the student's events stay, so reports add up as before. A teacher with a class or block is `409 teacher_has_classes`; a join, rename or tap still on its way is `409 account_deleted`; an unlock is still recorded. ARCHITECTURE's data-model decision 3 is amended. The Cognito sign-in is the phone's to delete (C4): 🔧 owner, before C4, the phone's app client must allow the `aws.cognito.signin.user.admin` scope, which Cognito's `DeleteUser` needs. Rode along: a rate-limit cap under one now holds one key, not unbounded; RUNBOOKS notes HSTS's `includeSubDomains` for a custom API domain; the load gate is a required check (owner, 2026-10-04). Next: E1. **Phase 6's S11 has landed — the Cognito Pre sign-up Lambda**: `infra/cognito/pre-signup.mjs` refuses a sign-up whose email domain isn't on `ALLOWED_EMAIL_DOMAINS` (exact match, any case; unset refuses everyone), so prod's self sign-up is gated to `@vanderbilt.edu`. Rode along: the owner's rulings for the pilot on production (gated sign-up, MFA Optional with TOTP, the portal on `<project>.vercel.app`), in runbooks 2 and 3. 🔧 Owner: runbook 2, step 4. Next: E1. **The app icon has landed:** the owner picked concept A, the mark on its stone-50 tile, as the student app's `AppIcon` (one 1024 image, named in `ios/project.yml` so the release guard finds `CFBundleIconName`) and the portal's favicon and Apple touch icon (`apps/web/public`, named in the root layout's metadata); the app also declares `ITSAppUsesNonExemptEncryption = false`, so TestFlight stops asking the export question. **Phase 5's P4 has landed — the public help page**: `/support` on the portal, linked from `/login` and read without signing in: what Bali is, what students and teachers do, what a teacher sees and never sees (the app's `ConsentCard` lists, held to them by a test), privacy in plain words with the policy coming soon, and the support email (eshan.shah@vanderbilt.edu). Every Phase 5 cloud step has landed. Rode along: dev's portal client `bali-web-dev` recorded, and two old phone clients listed for deletion. Next: E1. **Phase 6's S3 has landed — API tightening:** the API takes access tokens only (`token_use: 'access'`; an id token is `401`); every answer carries HSTS and `nosniff`, every `/v1` one `Cache-Control: no-store`, the live stream included; a tap's `tagId` is capped at 200, as a block's is; `INTERNAL_API_KEY` must be 32 characters or more, or the API does not boot; and each rate-limit budget holds at most 100,000 keys, the one idle longest forgotten first. Dev's key is 64 characters (the owner confirmed); prod's follows the runbook's `openssl rand -hex 32`. Next: E1. **Phase 6's S9 has landed — clock skew surfaced**: a phone's claimed time more than 2 minutes ahead of when the server heard it adds `clock_ahead_s` to that event's payload (the engine's `insertEvent`; `CLOCK_AHEAD_THRESHOLD_MS` in `@bali/shared`), only ahead because a claim behind is what every offline catch-up looks like; the clamp, the order rules (A10–A14) and every state are unchanged. The grid's snapshot carries `clockOff` (additive) and the chip shows a "Clock off" badge beside the name, in the chip's own ink. Rode along: the owner's second set of rulings (retention, deletion, 13+, and the pilot: first a preliminary one at Vanderbilt with adults, later K-12 likely Los Angeles or New Jersey; ISSUES #4 names their laws). Next: E1. **Phase 6's S7 has landed — abuse tests, in process** (`apps/api/test/abuse.test.ts`): join-code guessing meets each account's tries, then the address's misses, at production's budgets, and a 429 for tries gives back the held miss; an orphan-unlock flood records no more than the account's budget; another student's `event_id` on a tap, an unlock, a refocus or a redeem is `409` with nothing written; 26 forged or malformed tokens are each `401`; an oversized body is `413`, a non-UUID path parameter `400`, all in the one error shape. One bug found and fixed: a path the router refuses (a parameter past 100 characters, a bad percent-encoding) left in Fastify's own shape, echoing the path (`routerRefusal`, `apps/api/src/errors.ts`). The ID-token test waits on S3 (#209). Next: E1. **Phase 6's S5 has landed — CI hardening**: every action outside `claude-review.yml` and `claude.yml` pinned by commit SHA, every job a `timeout-minutes`; `npm audit --omit=dev --audit-level=high` and `npm audit signatures` in CI's check job; the load gate caps the flooder's `200`s at its budget (120 + 2/s for 60 s, plus 5) and fails on any `dropped_iterations` (`maxVUs` 50); the privacy-manifest check keeps a `//` inside a string, holds the extensions to no collected data, and TestFlight's Release guard lints each archived bundle's manifest; CI serves the built portal and checks `/login`'s scripts carry the CSP's nonce (`.github/scripts/web-csp-nonce.sh`), and the route-table check fails when the table has no end. Next: E1. **Phase 6's S4 has landed — the portal's CSP and security headers** (`apps/web/src/lib/csp.ts`, `apps/web/src/middleware.ts`, `next.config.ts`): a per-request nonce for every script (`'strict-dynamic'`, no inline or eval), styles from the portal's own stylesheet, `connect-src` only the configured API, Cognito and Sentry origins, `frame-ancestors 'none'`, `object-src 'none'`; HSTS, `nosniff`, `strict-origin-when-cross-origin` and a Permissions-Policy on every response. The CSP is the access token's defence in sessionStorage. Next: E1. **Phase 6's C1 has landed — privacy manifests** (`ios/*/PrivacyInfo.xcprivacy`): the app and both extensions declare no tracking, `UserDefaults` (CA92.1, 1C8F.1) and boot time (35F9.1), and the app APP-STORE.md's seven collected data types; a Linux CI script fails on a missing or malformed manifest or a required-reason call it omits, and the iOS job checks every built bundle carries one. Next: E1. **Phase 6's S2 has landed — log redaction** (`apps/api/src/redact.ts`): the API's logger censors the Authorization, `x-internal-key` and cookie headers wherever a headers object is logged, and its `err` serializer drops Drizzle's `params` and a driver's `parameters` and cuts the values out of every message, stack and Postgres detail, by the same rule Sentry scrubs with (P1); the error class, the SQL text and the route stay. A real unique violation through PGlite proves it. Next: E1. **P7 has landed — App Store drafts** ([`docs/APP-STORE.md`](APP-STORE.md)): the listing framed as the student managing their own focus (ISSUES #3), review notes, privacy-label and age-rating answers with ⚖️ marks, and three ways App Review can try Bali without a block (recommended: a recorded tap plus review accounts). 🔧 Owner: choose the review path, then paste. Next: P4. **P6 has landed — the owner's runbooks** (`docs/RUNBOOKS.md`): production on Railway (private-network Postgres, backups, every variable and its secret, the backup cron, 2FA), Cognito for production hardened per Phase 6's list (plus CloudTrail, root MFA, and Sign in with Apple only if Google is offered), the Vercel flip with the `v2-archive` demo kept safe, the backup-restore drill, and GitHub hardening (CODEOWNERS and the ruleset, secret scanning, CodeQL, the load gate required). Railway's point-in-time recovery is unconfirmed; the runbook says to raise it. 🔧 Owner: follow them. Next: P4. **P5 has landed — a TestFlight workflow:** dispatched by hand for dev, it archives the app as Release, signs it through the owner's App Store Connect API key and uploads it, the build number the run's; a release guard fails it on a `DEBUG` flag, Debug-only text, an empty or non-HTTPS sign-in setting, or no app icon (none yet); without the key's secrets it says so and passes. 🔧 Owner: the App Store Connect app record, an App Manager key, the secrets `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8`, and an app icon. Next: P4. **P3 has landed — teachers register their block on the portal by its ID:** a "Your block" section on the classes page lists the teacher's live blocks (new `GET /v1/blocks`, additive) and registers one by the ten letters and digits written on it (`POST /v1/blocks`), checked as the phone reads a tag before it is sent; another teacher's block, a malformed ID, too many tries and no connection each said under the field, with the way on. Next: P4. **P2 has landed — Sentry in the portal:** off without `NEXT_PUBLIC_SENTRY_DSN` at build time; when on, only uncaught errors and the API client's 5xx and network failures are sent, never a 4xx, with the path's template (`/v1/classes/:id`) and none of the URL, tokens, breadcrumbs, form values, bodies or a replay. New dependency `@sentry/browser`. 🔧 Owner: `NEXT_PUBLIC_SENTRY_DSN` (and `NEXT_PUBLIC_SENTRY_ENVIRONMENT`) on the portal's build. Next: P3. **Phase 5's cloud parts are planned (P1–P7), and P1 has landed — Sentry in the API:** off without `SENTRY_DSN` (tests and dev never set it); when on, only real failures are sent (a 5xx from the error handler, a failed sweep or start, an uncaught exception or rejection), never a 4xx refusal, scrubbed of the request (URL, query, headers, body), the user, breadcrumbs and Drizzle's query parameters, with the route template, the release (Railway's commit) and the environment. New dependency `@sentry/node`. 🔧 Owner: a Sentry project, then `SENTRY_DSN` and `SENTRY_ENVIRONMENT` on Railway. Next: P2. **S4a has landed, pulled forward from Phase 6's S4 — a real Sign out on the portal:** a bar with Sign out on every signed-in page, the invite-code screen's included; it forgets the token and sends the browser to Cognito's hosted-UI `/logout`, which ends the Cognito session and comes back to `/login`, "You're signed out.", so a shared classroom computer never opens the last account. With no hosted UI to send it to, the token is still gone and the page says the sign-in page may still remember you. 🔧 Owner: dev's web app client must list `http://localhost:3000/login` as an allowed sign-out URL (`docs/WEB.md`). Ride-alongs: a 429 says "a moment" or "a minute" by its `Retry-After`; `event_id_conflict` in words; the reports fallback's `restarted: false`. 👀 screenshots sent to the owner. Next: E1 (💻). **T1c has landed — the join refuses a teacher inside its own transaction, closing T1b's known edge:** `joinClassByCode` reads the caller's row FOR SHARE before its class, the row the redeem holds FOR UPDATE, so a join and the same account's redeem at one instant run one at a time and never both land; a teacher's join is the same `403` as ever. Three real-Postgres races, red on the old code and red again with the lock alone removed. Ride-along: `npm run school -- list`, and `add` warns of a school of the same name. No `/v1` change. Next: E1 (💻). **T2 has landed — the portal's invite-code screen:** a signed-in account that isn't a teacher yet, as `GET /v1/me` says, gets it in place of the classes view. The code goes in typed or pasted, in any case, with or without its dashes or spaces, shown in fives as the owner's command printed it, and is checked by the redeem's own rule before one of the account's tries is spent (the code's rules now live in `@bali/shared`); it is redeemed under a UUIDv7 `eventId` the portal mints, an answer that never came resent under the same one, and on success the page reads `/v1/me` again and shows the classes, no reload. Every refusal is said in its words, keyed on `reason`: a code that can't be one, unknown, used, expired, a teacher already (Go to your classes), a student in a class (a separate account for teaching, the owner's ruling), too many tries, no connection (Try again). Ride-alongs: R5's two `readSessions` WARNs, and ARCHITECTURE.md's redeem sentence corrected (T1b's review). 👀 screenshots sent to the owner. Next: E1 (💻). **T1b has landed — an account becomes a teacher by redeeming its invite code:** `POST /v1/teacher-invites/redeem` with `{ code, eventId }`, the code matched as the command printed it (case, spaces and dashes set aside), looked up by its hash and sent in the body, so no request log holds it. In one transaction the account becomes a teacher at the code's school (`role`, `school_id`) and the invite is marked redeemed by T1a's guarded UPDATE, so of two accounts racing for a code exactly one wins; idempotent on `eventId`, a replay answered with the account now. The account is judged first — `409 already_teacher`, `409 student_in_class` (the owner's ruling) — then the code: `404 invite_not_found`, `409 invite_used`, `409 invite_expired`, and `400 invite_code_invalid` for one that can't be a code; none changes anything. Tries per account and misses per address, as the join's are. A redeemed invite can't be deleted now either (migration 0014). No event: the invite row is the record. Next: T2. **T1a has landed — teacher invite codes, stored, and the owner's command to mint them:** `npm run school`, against `DATABASE_URL` as `npm run migrate` is, adds a school, records its data agreement as signed on a day, and mints a teacher invite only for a school whose agreement is on record: 25 symbols of the join code's alphabet (≈124 bits), printed once in five groups of five, with only its SHA-256 stored (`teacher_invites`; a `CHECK` lets nothing but a hash in); single use, enforced by the database (the redeem's three columns whole, its `eventId` unique, and a redeemed row never changed again), ready for T1b's guarded update; expiring 14 days after minting by the database's clock. No `/v1` route changed. Next: T1b. **R5 has landed — the reports page:** "Reports →" on the class page opens the class's sessions, newest first, 20 a page with Show earlier, each row when it ran, how many joined, the class's focus minutes (total and average), silent minutes and how many unlocks and protection offs, and each opening its recap (R4's card, fed by R2); only sessions the server has marked over are listed; loading, a failure with Try again, no reports yet and a stale cursor (the newest page read again, and said) are each said; aggregates only. At the bell the class page now keeps the ended grid under the card until the next Start, drawn once from the ended session's snapshot, and a `429` says to wait a moment. The owner's rulings of 2026-10-04 are recorded: T1a's invite-code rules and the reports' silence rule. 👀 screenshots sent to the owner. Next: T1a. **R4 has landed — the recap card:** once the server marks a class's session over (the End's answer, the grid's end event or snapshot, or on a fresh visit R3's newest row), the class page shows that session's report (R2) until a new session starts: the day and times, who joined, the class's focus minutes (total and per student who joined), silent minutes, every unlock (who, when, reason) and protection off, with loading, a failure and Try again, nobody joined and no unlocks each said; aggregates only. A `429` now reads in the phone's words on the portal (L1's review). 👀 screenshots sent to the owner. Next: R5. **R3 has landed — the class's reports list:** `GET /v1/classes/{id}/reports/sessions`, for the class's own teacher: every session, newest first, the running one too, 20 a page by a cursor that names a session (`before`, `nextBefore`), each row with its window, R2's `ended`, how many joined, the class's focus minutes (total and average), silent minutes, and how many unlocks and protection offs — R2's figures, counted on read by the same `sessionReport` and rounding, so a row never disagrees with its report; a cursor the class doesn't hold is `400 unknown_cursor`. Every route under `/v1/classes/{id}` now answers an unknown class `404 class_not_found` (#192's review). Next: R4. **R2 has landed — one session's report:** `GET /v1/classes/{id}/reports/sessions/{sessionId}`, for the class's own teacher, serves R1's `sessionReport`: who joined, by their display name now (a student removed since is still named), the class's focus minutes (total, and the average per student who joined) and silent minutes, whole minutes each rounded from its exact figure, and every unlock and protection off with its note; no student's own minutes. A session not over yet is answered, counted to now or to its bell, with `ended: false`; a note this build doesn't know moves no one and reads as none (#191's review). Next: R3. **R1 has landed — focus time as one shared pure function:** `sessionReport` (`@bali/shared`) takes a session's window and its stored events and gives who joined, the class's focus minutes (total, and the average per student who joined), the minutes it went silent, and every unlock and protection-off report with its note — read in `seq`, the engine's order, so a record the engine noted moves no one and a student's own unlock and return keep the phone's order (A12); nothing counts past `ended_at` or the bell. Silence is not counted as focus but apart, the default until the owner rules. Next: R2. **L2b has landed — the one-address load gate (ISSUES #1 done):** k6 drives L2a's school at the bell from one address (`X-Real-IP`) — 600 taps within a minute, all 30 classes started at the bell, each phone's read every 30 s for three minutes — while one account floods `GET /v1/me`: the school met no `429` and no `5xx`, p95 8.5 ms against a 500 ms bound, and the flooder 2,762 `429`s, each with `Retry-After`; the sweep at that size marked 600 phones silent in 1.2 s and ended 30 sessions at once in 91 ms, with no deadlock, so L3 is not needed at this size. CI's "Load gate" runs it on PRs touching the API, the engine, the shared contract or the root manifests; the harness needs `LOAD_LOCAL_POSTGRES=1`, and the helpers that drop databases refuse in production. Next: R1. **L2a has landed — the load harness:** `npm run load:seed` seeds a school at the bell (20 teachers, 30 classes, 600 students enrolled where they tap) into a database of its own on a local Postgres and writes each one's token, tag and class for the load script; `npm run load:serve` runs the real API on it, trusting the seed's issuer through env alone (a `data:` URL key set, no API change); CI's real-Postgres lane seeds it, boots it and taps a class in. Next: L2b. **L1 has landed — the rate limits (ISSUES #1):** a budget per verified account on every signed-in route, never per address; one per address only where no one is signed in, sized for a whole school; the join-code preview and the join held to tries per account and a backstop on misses per address; over budget, a `429` in the one error shape with `Retry-After`, an unlock's still "retry"; the address read from Railway's `X-Real-IP`, `trustProxy` off. Next: L2a. **O1b has landed — the gaps O1's and S1's reviews left, closed (tests and CI only):** CI judges a removal from `/v1` against the base branch's copy of `contracts/openapi.json`, so a branch that deletes, regenerates or edits its own copy can't hide one, and a missing snapshot fails the test; no code in the API reads a request's params, query or body but `parseRequest`, so no route parses outside the snapshot; the authorization matrix reads another student's history for the class's ids, and fails a route outside `/v1`, `/internal/*` and `/healthz`. Next: L1. **S1 has landed — the authorization matrix (Phase 6's first security step, run inside Phase 4):** one table, `apps/api/test/authorization-matrix.test.ts`, of every route the app registers against each caller it can meet; a registered route with no row fails the suite, and it found no authorization bug. **Phase 4 is under way (2026-10-04): its steps are under Phases, and O1 has landed — the OpenAPI snapshot check:** `contracts/openapi.json` holds every route the API serves and the request schema each one parses, generated from the app; `npm test` and CI fail on drift, and on any removal from `/v1` (additive-only). **Phase 6 is planned (2026-10-04): security and compliance, from two investigations; it gates Phase 5's student-facing steps, and its S1 (an authorization test over every route) ran first, inside Phase 4.** **Phase 3 is complete (2026-10-03): the iOS student app is on `main`, E1 (ISSUES #2 on hardware) passed on the owner's iPhone 15 Pro (iOS 18.6.2) against dev on 2026-10-01, and the final phone check (2026-10-03) proved F1b (#144), F13b (#167) and F14 (#166). Its known edges, carried forward, and the open owner items are under Phases. Next: Phase 4.** **F11b has landed: the review WARNs' sweep, part 3** — History on screen is read again as the app comes back from the background; the "couldn't update" card says Reading… on its Try again while it reads, its words kept; a teacher's account reads no history; a sign-in Bali couldn't check is said once; History's days are drawn once per change, each card keeping its id through Show earlier; and the tests' hygiene (a fixture's bounded wait, the intro's pages each opened, Me's fixtures by screen, the past-bell tap's join, one unsent ask at a time, a sturdier bell test, `Tokens.init`'s source check back). **F14 (#166), 📱 awaiting the owner's phone check: a wait the server has dropped is Home, never Waiting** — `GET /v1/me` says whether a tap of the student's still waits for a Start that would join them (`armed`, additive), and a waiting phone's 30 s read ends the wait once none does: Home, its in-session card with Tap in where a class of theirs runs; offline, the phone ends the wait at the midnight after its arming, the server's own end of the school day. **F11a-2 has landed: the review WARNs' sweep, part 2** — Me's "hasn't reached your teacher yet" goes once the unlock has gone, even where the phone could not read its queue; Me lets go of a class's Leave at its lesson's bell by itself; a leave refused 403 is never said in the join's words; on Home in no class, a refused tap's way on is the Try again beside it, as that Home has no Tap in; a reason picked for one unlock never holds back the picks for the next; and a leave answered after another student signs in takes nothing of theirs. **F13b (#167), 📱 awaiting the owner's phone check: Screen Time turned back on in the class the phone was protection off in puts it back where it stood, with no re-tap** — after Turn on Screen Time is answered (or at the next check), the marker there again, the phone goes back at once, focused or still unlocked, the shields with it, and tells the server through the outbox; the Screen Time off screen's second step reads "Bali puts you back in class by itself". **F13a (#167) has landed: the server half of Screen Time back on with no re-tap** (the owner's decision, 2026-10-02) — `POST /v1/sessions/{id}/protection-on` returns a student in protection off to where their latest turn in the class says, focused or still unlocked, recorded as its own event beside the protection off; refused past the bell, for anyone not live, and `409 protection_not_off` where protection is not off; the grid's chip and History's "Screen Time back on" follow; with F1b's three review WARNs (#169). **F1b (#144), 📱 awaiting the owner's phone check: a running Bali notices Screen Time access taken back, with no relaunch** — by a marker iOS deletes with the shields (the 2026-10-02 device experiment), never by Family Controls' read, which a running app keeps approved: protection off reported at the next check, no shields put back over it, a launch decided at once (#145), the monitor's note reported past the bell, one ask of iOS at a time. **F12 has landed: a PR merges only after its Claude Review has passed** — the review runs on drafts too and fails there ("Draft: the review runs when the PR is marked ready."), so a draft marked ready stays blocked until the review that marking it ready starts has passed; skipped, the check had counted as passing, and #154 merged unreviewed. **F11a-1 has landed: the review WARNs' sweep, part 1** — another student signing in on a phone never sees the last one's name or classes, not even for a moment; a class code being looked up or joined as who is signed in changes goes with them, its answer dropped; the screen leaving takes no touch; and the tokens always say whose email they name. **F10 (#150) has landed: Join fades in over Home, and Home fades back in at Back — so do the other screens a student opens over another, Home over Waiting or Unlocked and Join over Me — in DESIGN.md's base 200 ms, with nothing under Reduce Motion and the router's own changes never animated; Back lets Join's keyboard go first, so it goes down with Join and never lingers over Home.** **F8 (#143) has landed: a student removed from their last class, or who left it, lands on Home, not the first-run Join** — its tab bar, History and Me — whose card in the hero's place says "You're not in any classes. Join one with the class code from your teacher." with Join a class; a student never in a class on this phone keeps Join, as before, and so does another student signing in on it (the phone keeps the id of the student it last saw in a class, so no one else inherits it). Saying what happened ("You're no longer in …") waits for the owner's OK. **F9 (#147) has landed: Me says whose sign-in this is** — "You're signed in as <email>." under Sign out, the email from Cognito's ID token, so the name a student's teachers see is never taken for what they sign in with. **F7 (#151, #149) has landed: Waiting's Back to home goes to the regular Home** — its tab bar, no back arrow — whose card says the student is tapped in and when the phone locks, in place of "Tap your teacher's block" (the owner's decision), Tap in kept on it, secondary; Waiting stays the tap's answer, and fits the iPhone 17e, Back to home included, with a second card too. **F2 (#145), 📱 awaiting the owner's phone re-test: with Screen Time access off at a launch, the Screen Time off screen shows within 10 s, not 30 — the grace one named constant (`Enforcer.grace`), the check made again every second within it — and never over an approved phone whose read settles within it; with F1's review's two WARNs: a doubt's end ends its run of not determined, and a bell window not begun is no sign yet. The Debug readout's `Launch:` line shows how long the read was not determined after a launch, and `iOS:` marks a window not begun; ios/README.md's round 1 steps 12–13 say what the re-test must see.** **F5 (#139), 📱 awaiting the owner's phone re-test: History scrolls without a shadow per line.** A card's shadow-1 is drawn once, on its shape, where it shadowed every line, icon and button inside the card; History's days and cards are built as they come on screen, each card by its own id. No visual change: every fixture was shot before and after on the simulator. The fair re-test is a Release build on the phone, over a long history. **F6 (#146) has landed: a refused tap is said only while it is the phone's newest tap** — a scan of a block no teacher set up stops being said on Home, Waiting and Protection off once any later tap is made, the refused one still kept, retried and in the readout (the conductor's default; an end-of-day drop or a dismiss button stay the owner's to pick). **F4 (#141) has landed: History shows at once — the moments read kept while the app runs and the newest page read again quietly each time History shows (and once at a sign-in, so even the first visit is instant); a read again that fails keeps them and says so above them, with Try again; who is signed in changing forgets them. Next: the other fixes from the owner's 2026-10-01 device check (F, #139–#151), then E1 (the device test gate, 📱).** **F1 (#144), 📱 awaiting the owner's phone re-test: a running Bali notices Screen Time access taken back, with no relaunch.** A running app keeps reading the permission approved after access is turned off (the owner's device check, 2026-10-01), so each check also asks iOS's DeviceActivity center whether it still holds the bell's window: gone, it is asked for again — refused as unauthorized, protection off at once; taken yet still not held, B5a-2's grace, then off; held again (another app's grant changed), nothing. The Debug readout shows the signals; ios/README.md's round 1 step 12 says what the re-test must see. **F3 (#140) has landed: on Unlocked, a reason picked shows its check at once and every reason stays open while a change of it is on its way; once that change answers, only the newest pick goes, the picks between never sent. Next: the other fixes from the owner's 2026-10-01 device check (F, #139–#151), then E1 (the device test gate, 📱).** **C3c has landed: Home's card for a class in session — not in it, "<class> is in session. Tap your teacher's block to join." with Tap in; unlocked in it, "You're unlocked in <class> until <bell>." with Lock my apps again, or a re-tap by Unlocked's own rule — over each class's running session on `GET /v1/me` (`liveSession`, additive) and a read every 30 s in the foreground out of a session, the conductor's decisions under the owner's delegation. Next: E1 (the device test gate, 📱).** **C5c has landed: Unlocked on the owner's rulings — the reason changeable (the check on the reason on record, a light haptic as one is picked, a change through A20 once the server has the unlock, every failure said), "Go to Home" the primary way on (Home over Unlocked, with its tab bar, the apps still open) and "Lock my apps again" secondary; History says "Locked apps again". Next: C3c, Home's in-session card.** **A20 has landed: the student changes their unlock's reason while it stands (the owner's ruling, 2026-09-30, from tonight's device check) — `PATCH /v1/unlocks/{eventId}`, recorded as an `unlock_reason_changed` event of its own (the unlock's event never rewritten), refused `409 unlock_superseded` once a return, tap or unlock of theirs came since and `409 session_not_running` past the bell; the grid, its stream and the history show the latest. Next: C5c, the Unlocked screen (the reason changeable, a check mark and a light haptic; Home the primary action; "Lock my apps again"), then C3c, Home's in-session card.** **The scroll bar sits at the screen's edge on every screen, never over the cards** (the owner's phone check, 2026-09-30): each scroll view in a screen reaches past D1's 24-pt gutters, its content inside them as before (`screenWide`), pinned over every fixture by `AppTests.scrollEdges`. Next: E1 (the device test gate, 📱). **A18 has landed: a Start past the bell of a session not yet swept ends it itself, as the sweep would — at its bell, its rows closed, one `session_expired` — and starts the next in the same request, so back-to-back classes never wait for the sweep's minute; a Start before the bell still answers with the class running (the owner's ruling, 2026-09-30).** **C6c has landed: D1's Leave on Me — each class asks its question first ("Leave <class>?"), sent through the engine under one event id, the class gone at once and every refusal said under the question; held while the phone stands in that class's lesson, and the server's `class_in_session` said. Next: E1 (the device test gate, 📱).** **A19 has landed: a student leaves a class, never while it is in session** (the owner's approval, 2026-09-30) — `DELETE /v1/enrollments/{id}` is refused `409 class_in_session` while the class has a session running by the server's clock, takes an optional `eventId`, and serialises with a Start on the class row; `GET /v1/me`'s classes carry `enrollmentId`. Next: **C6c**, D1's Leave button. **A17 has landed: a tap after the bell never joins the session that just ended — past its bell by the server's clock, before the sweep marks it, a tap arms for the teacher's next Start as when nothing runs, and a return to focus is refused as after the sweep; one rule for "running" (`sessionRunning`), shared with the extend (decision 12). An unlock or protection off there is recorded as ever.** **The C riders are complete: Riders-2 (polish) has landed — History never reloads a refused top read forever, is read anew when it shows again by any way, and shares one ask of the router with its tab bar; D1's "Tap not used. It already counted in <class>." on the owner's ruling; Unlocked's reasons tapped together go one at a time, its card reads this class's unlock and says a reason the server kept instead of the phone's; Me sends a name as the API stores it (a pasted tab or unseen character never refused unseen), keeps a failed Sign out's words off the hold, gives the keyboard back after a failed save, and forgets the last student's name keyed on the account; Sign out, the forget and History's pages are tested through a phone over stand-ins. Next: E1 (the device test gate, 📱).** **A16 has landed: an extend racing the sweep never says "extended" for a session that ends anyway — an expiry is judged again under the session's lock, so whichever takes the session first wins, the extend's answer true either way; and, on the owner's ruling (open decision 12, 2026-09-30), a session past its bell by the server's clock is not extended, swept or not — `409 session_not_running`, and the teacher starts a new session.** **The C riders' first PR has landed (Riders-1, honesty and safety — the review WARNs C4–C6b left open): Sign out on the router's own Join, the one screen a student in no class reaches (signed in with the wrong account, they could not leave without joining a class); Protection off says what the Unlocked or Home screen it takes over would have — an unlock stuck on the phone, a tap the server refused, the classes not read — and never that the teacher "will see" a report never saved, on every way back; Session over's Done keeps the bell it closed, so an extension rings one of its own, and a Done racing a read closes nothing new; a refused tap stays said as refused whatever answers follow (the outbox keeps the refusal on its record, migration v5); Focus says a sign-out, a sign-in not renewed or storage refusing, beside the countdown; and D1's See history on Session over, held through the read after the bell. On the owner's rulings (2026-09-30): ARCHITECTURE's force-quit question is decided, (a); and dev's cron runs every 5 minutes. Next: Riders-2 (polish: History, Unlocked, Me).** **C6b-2 has landed: the Me screen as D1 draws it — the name the student's teachers see, edited in place and saved through C6b-1's engine, a refusal said under the field with Save as the way on; their classes with each teacher and Join a class, with its way back to Me; D1's card of Bali in class, Screen Time's state (Settings on a tap) and what a teacher sees, the intro's own page in a sheet; and Sign out, held and said why while an Emergency Unlock is unsent. D1's Leave buttons are not built: `GET /v1/me`'s classes carry no enrollment id to leave by. C1–C6 are complete.** **C6b-1 has landed: Me's engine side — the student's name edited through A8 (`Naming`: whole characters within `DISPLAY_NAME_MAX_LENGTH`, one event id per name tried, every refusal said: taken in a class, invalid, a teacher's account, else the Join screen's words) and `SyncEngine.rename`, the name `me`'s at once and never taken back by an older read; Sign out, which forgets the sign-in's tokens and never the standing, the shields or a queued record, held while an Emergency Unlock is unsent — signed out, it would go under whoever signs in next; and, where someone signs in after a sign-out, the last student's name and classes forgotten. The screen is C6b-2, stacked on it.** **C5b has landed: D1's Protection off and Session over screens. In a running session the permission judged off is Protection off over any standing but focused (the in-session gate the brief asked for was already on `main`; this closes the unlocked and unknown standings); Session over shows from the bell by the phone's own clock until a read says where the phone stands, or Done; a refused Back to focus is said where the student lands, the way back a re-tap; and the bell wait wakes when iOS says the time was set.** **C6a-2 has landed: the History screen as D1 draws it — the student's own moments in days and class cards, their times in the phone's locale and time zone; reading, nothing yet and a failed read each said, a failure with Try again; older pages on Show earlier; read anew each time the student comes to it.** **C6a-1 has landed: D1's tab bar under Home, History and Me — the router's input, shown only where it honours a tab — with History and Me placeholders meanwhile; and History's rules, on Linux (D1's days and class cards, each moment's words, the pages), with the engine's call. The History screen is C6a-2, stacked on it.** **B5b-5 has landed: the monitor's own wakes never wake each other — a wake of `tick` or `tock` more than a minute before the end the monitor asked for there is a stop's or a replacement's, and asks nothing; the test center now wakes the monitor on a stop or a replacement, as the phone does, and every three of the app's moves and iOS's ends are run through it. #113's open path is closed; round 2 gains step 9 for the next sitting.** **C5a-2 has landed: the Unlocked screen as D1 draws it — the class, everything open until the bell, the teacher seeing it once the unlock has gone; D1's reason card, a pick going with the unlock (C5a-1's hold); Back to focus, or Tap in where protection off was reported; and the screen chosen again at the bell. Emergency Unlock now presses through `pressUnlock`: the send waits up to 15 s for the reason, and a press that found nothing to unlock is said. Focus says why a late unlock put the shields back.** **C5a-1 has landed: the Unlocked screen's engine side — an Emergency Unlock pressed in a session is sent up to 15 s later, for the reason the Unlocked screen will ask (the shields off and the record queued at once, and a reason given, any change of the phone's, or Bali going behind sends it sooner); Back to focus, or a re-tap where protection off was reported; a late unlock that puts the shields back said why on Focus's words; a press that finds nothing to unlock said; and Emergency Unlock's one-second hold pinned by a test. The screen is C5a-2.** **The owner's two rulings are applied: Emergency Unlock is a one-second hold — DESIGN.md §4 and ARCHITECTURE now say so, as D1 draws it and C4 built it — and Waiting no longer promises the phone locks the moment class starts: "Your phone locks when class starts, as long as Bali is open. No need to tap again."** **The device check's rounds 1–3 are recorded (the owner's iPhone 15 Pro, iOS 18.6.2, against dev; each step's result on its line under Phases). Round 1 passed, all 14 steps. Round 2 answered Phase 0's question — with the app force-quit, the monitor took the shields off 31 s after the bell — and passed steps 1–6, and 8 so far; step 7 waits for the next sitting. Round 3's step 1 found B5c-2 (below), and it and step 3 wait for the next sitting too, as does round 4. Found in round 2: stopping or replacing a DeviceActivity window wakes the monitor at once — harmless as seen, no code change here; one path not seen, the monitor's own asks waking it back to back, was disclosed as open and is closed by B5b-5 (`docs/DECISIONS.md`) — so round 2's step 4 now expects lines at the unlock; steps 3–6 run in 3-minute classes.** **C4b has landed: Home opened over Waiting has a way back to it, and a tap still being sent is never called refused.** **C4 has landed: the Focus screen in D1's three states — the countdown to the bell by the phone's own clock, the ring, the last two minutes and offline — claiming only what the enforcer verified (a tap held with Screen Time taken back shows no countdown, and says how back), and Emergency Unlock on the live screen, held a second as D1 draws it; and #103's rider, the monitor's refusal no longer cleared by a pass that asked iOS for nothing. Home holds Emergency Unlock over the last run's shields too, and Tap in is in every build.** **C3b has landed: Home and Waiting are drawn — Home greets the student, holds Tap in (the block's scan; in Debug builds until C4 brings Emergency Unlock) and their classes with each teacher, and opens Join with a way back; Waiting says the phone locks when class starts, as long as Bali is open (the owner's words since, above).** **A15 has landed: the API sweeps every minute by itself — a session ends at its bell and a quiet phone shows within the minute — since Railway's cron runs at most every 5 minutes, and not to the minute (the device check saw a session on dev close 19 minutes after its bell); the cron stays as its backup, every 5 minutes (DEPLOY.md step 4; set on dev, the owner confirmed 2026-09-29).** **C3a has landed: the classes from `GET /v1/me` in the engine, so the live app reaches Join for a student in no class; the join and the look-up through the engine, the class counted at once; and open decision 6, the owner's ruling (2026-09-29) — a phone waiting for its teacher's Start reads the truth every 30 s while Bali is open.** **B5c-2: Bali's shield reads nothing and shows no time. Round 3 of the device check found every shield saying Bali's name alone: iOS's sandbox refuses a shield extension the outbox file — its file coordinator, then SQLite's own locks — and, on the owner's ruling, the shield says "Focused with Bali" and D1's line sends the student to Bali for the time, with no second copy of the bell kept for it; the monitor's read is unchanged. Round 3's steps 1 and 3 now expect those words.** **A design framework for user-facing UI has landed (owner's request): taste-skill and Vercel's web interface guidelines, pinned in `.claude/skills/`, and `docs/DESIGN.md`, the design system in DESIGN.md form; UI work reads DESIGN.md and `/santa-loop` runs a design check (WARNs only). Scope: user-facing UI only. Next for design, unscheduled: D2 (below).** Before it, 2026-09-27: **C1c has landed: D1's tokens file is in the repo (`ios/Bali/UI/bali-tokens.json`) and a test pins every `Theme` colour to it; #105's review WARNs are fixed — the denied Screen Time screen puts Open Settings first — and, on the owner's word, rule 3's check runs at every foreground wake of the sync loop, out of a session too, so a grant taken back with the app left open shows within about a minute.** **C2b has landed: the Join screen and its class preview — a code typed, what it opens (the class, its teacher, what that teacher sees) and the join, every failure said with a way on — and, on the owner's ruling, the one consent list names the grid's silence and last-seen time; "Screen Time off" stays the student's words.** C1b before them drew the intro's three pages (the privacy contract) and the Screen Time grant screen — the app's first run end to end. **The owner's device check began (2026-09-26: round 1's steps 1–13 PASS on an iPhone 15 Pro, iOS 18.6.2). Its first finding was dev's, not the app's: the phone's Cognito app client had a client secret, so every sign-in ended `invalid_client`; it was replaced by a public one, `bali-ios-dev-public` (DEPLOY.md).** **Phase 3 (iOS student app) has started**, API and contract work first: the step list is under Phases, A1 (the unlock's optional reason), A2 (protection off, end to end on the server), A2b (no deadlock reaches a phone as a 500), A2c (a protection-off reaching the server after the bell is recorded with a note), A3 (the tap and state-change outbox tables, in `@bali/shared`), A4 (a retried tap or refocus recorded but no longer current is answered `200 replay` naming no session), A5 (contract fixtures of every student endpoint in `contracts/fixtures/`, and a machine-readable `reason` on errors), A6 (the join-code preview, `GET /v1/join-codes/{code}`), A7 (the student's own history, `GET /v1/me/history`), A8 (a student edits their own display name, `PATCH /v1/me`, unique within each class) and A9 (the portal's live grid shows an unlock's reason, an unlock under protection off, and late records that survive the refresh) have landed — the API and contract steps are done. **A10 has landed too, on the owner's ruling: a late unlock — stuck on the phone while the student's own refocus or tap went ahead of it — is recorded, never applied (noted `superseded`), and ARCHITECTURE gained two clauses (a stuck record stops holding reads; the live grid keeps a student removed mid-session).** **A11 has landed, on the owner's decision 11: an unlock made while the phone's own tap is unanswered is sent under that tap (`POST /v1/taps/{eventId}/unlock`, BaliCore's `unlock(tap:_:)`) and filed in whatever session the tap landed in, or kept with no session, noted `tap_armed` / `unknown_tap` — and a tap landing after its unlock files it then, so both arrival orders end alike. A late unlock stays `superseded` once the student has left the session (#76's review).** **A12 has landed, on the owner's ruling: the phone's own order, not its clock, decides whether a student's unlock came after their own refocus or tap — one optional `order` field (its outbox file's install and the record's seq) on every record the outbox sends, BaliOutbox sending it — so a clock turned back between the two never undoes a real unlock.** **A13 has landed, on the owner's ruling: the same order, read the other way — a refocus or re-tap the phone made before an unlock the server already has, landing after it, is recorded, never applied (noted `superseded`), so the unlock stands; A12's disclosed gap is closed.** **A14 has landed, on the owner's ruling: the same order, tap against tap — a tap the phone made before a later tap of its own into another class, reaching the server after it, is recorded, never applied (noted `superseded`): no switch back, and no arm a Start would convert; A13's disclosed tap-versus-tap gap is closed.** **The iOS steps have begun, and B1 — BaliCore — is complete: B1a (the `BaliCore` Swift package — every student wire type, decoded against every contract fixture on a Linux Swift CI job), B1b (the outbox tables ported to Swift, proven equal to the TypeScript's on every fixture and on generated cases in `contracts/outbox/`) and B1c (the API client: one call per student endpoint, answering with exactly what the outbox tables take, auth through an injected token provider) have landed. B2 has landed too: the app and its two extensions as an XcodeGen project (`ios/project.yml`; the Xcode project is generated, not committed), built and BaliCore tested on an iOS Simulator by a macOS CI job on PRs that touch `ios/` — and BaliCore's client now refuses redirects. B3a has landed: the phone's outbox store (`ios/BaliOutbox`, GRDB in the app group), BaliCore's tables applied, with a retry bound — a refused record, or one left unsettled by 8 server answers, is stuck: kept (an unlock until recorded), retried and shown, holding neither the records behind it nor the phone's reads, though an unrecorded unlock still guards its session. B3b has landed, in two parts — the sync engine (`SyncEngine`, in `ios/BaliOutbox`). B3b-1, its drain: the outbox sent through the app's one `APIClient`, a retry-now, and the waits on sign-in (no token: nothing sent or counted; a 401: B4's refresh, then everything again at once, once per rejection), with `settle` reading an answer only by its own record's table. B3b-2: the 30-second check-in in the foreground; the reconcile — the phone's truth (`SyncState.standing`, and a tap not yet answered) from its own changes, their answers and reads stamped by `readMayReconcile`, with the unlock guard — observable for the screens and enforcement; and one outbox file for the app and its extensions (a busy timeout, suspension behind the app, persistent WAL). B4, sign-in, ships in three for size: B4a has landed — the API accepts a list of app client ids (`AUTH_AUDIENCE`: the portal's and the phone's own, in one pool), and the dev pool has the phone's client and a hosted-UI domain — and B4b has landed: BaliCore's `SignIn`, Cognito's hosted UI with PKCE over the phone's public client, the tokens in the Keychain, renewed one at a time on their own clock, and only Cognito refusing the refresh token (`invalid_grant`) signs anyone out — and B4c has landed, so B4 is complete: the app's one sync engine starts over the sign-in (`SyncEngine.make`), dev's API and sign-in are in `ios/project.yml`, a Debug-only readout shows the engine reaching dev for B5's device check, and a locked phone's Keychain is never a sign-out (only an item not found is nobody signed in). B5 (enforcement, 📱) ships in three, and B5a has landed: the shields follow the sync engine (`Enforcer` — focused, until the bell; a tap not yet answered, to decision 7's 50-minute cap), the Screen Time permission's API for C1, rule 3's check before each check-in (the shields put back, protection off reported — again whenever the phone stands focused, A13's rider), and the standing kept in the app group, so a relaunch keeps the shields; its device checklist, which opens with B4c's sign-in, is the owner's to run. B5b has landed too (below), and B5b-2 (its riders and #91's review), and B5c (Bali's own shield); B6 (the NFC tap) shipped in three — B6a, B6b and B6c have landed (below): B6 is complete.** **T1 has landed: `npm run dev:teacher`, the device checks' teacher on dev from the terminal — a class, a block, a session and each student's state as it changes — since the portal cannot reach dev yet.** **B5a-2 has landed: #86's four review WARNs, fixed before the owner's device check — a standing the app group will not give back never takes the shields off, a check's finding is never lost to a pass, and a permission read not determined is reported only once it lasts a check-in interval, so a relaunch shows no false protection off.** **B5a-3 has landed: the remaining WARNs of #86's and #88's reviews, fixed before the device check — an Emergency Unlock kept with its standing in one write, so a relaunch after a kill never shields over it; rule 3's check offline too; no protection off after the phone's own bell, nor from a clock set forward; an unread standing that keeps an armed tap waiting and lets the enforcer's own shields go at the cap; the kept standing's form pinned — and the cause of `ReadTests.cadence`'s CI flake, an alarm ringing a pause it no longer owned.** **B5b has landed: the bell with the app force-quit, ARCHITECTURE's leaning (a) — the window the shields are on is registered with iOS as a DeviceActivity schedule (ending at the first whole minute on or after the bell or decision 7's cap, and 15 minutes long, iOS's floor: a shorter window starts in the past, its end never moved), and the monitor extension clears the shields at its end by the phone's clock and the standing kept in the app group — never over a session the standing says still runs, nor over a file it cannot read within 2 s, where it keeps them and tries again a minute on. Rider: the test rig's held sleeps. Its round 2 device checklist — Phase 0's question — is the owner's.** **B5b-2 has landed: B5b's app-side riders — an app test target (`BaliTests`, on the iOS Simulator) pinning the foreground check reading the scene phase as it runs, and the Info.plist keys pinned to BaliCore's config reader (`AppConfig`) — and #91's review: the app's open of the outbox never waits with no end, and only its first grant opens the file; a window iOS refuses the monitor, the app closed, is shown at the app's next open; the monitor's whole open and read waits at most 2 s; the cap never takes the last run's shields off over a standing not read (B5b's rider reversed: a session they may be for may still run); and B5b's stated bound corrected — with the app closed, the shields come off less than a minute after the bell, or less than two when iOS wakes the monitor early.** **B5c has landed: Bali's own shield over a blocked app, in D1's light look with the ring mark — "Focused with Bali until 9:42", the bell read from the standing the app keeps in the app group as the monitor reads it (within 2 s), in the phone's own time format; "Focused with Bali — waiting for your class" while a tap is unanswered; and "Focused with Bali" alone when the bell cannot be known — never a time it cannot know. Its round 3 device checklist is the owner's.** **B6a has landed: the NFC tap — a block is the code written on it (v2's ten letters and digits, in its NDEF Text or URI record), read with an NDEF reader session into the tap, shielded at once and sent — and decision 11 on the phone: an Emergency Unlock made while the phone's own tap is unanswered is filed under that tap (`POST /v1/taps/{eventId}/unlock`), always, guarding every session until that answer names one; the outbox file's migration keeps A12's counter. Its round 4 device checklist is the owner's.** **B6b has landed: Emergency Unlock over a standing the outbox file will not give back — the shields off at once, the last run's too, the unlock kept until the phone knows where it stands and then filed there (naming no session, under the phone's last tap), never discarded; no fail-safe ceiling over the last run's shields, Emergency Unlock being their way out — and, on the owner's ruling (2026-09-25), a scan that joins no class has its unlock filed again in the class the student stood in: one press, two records. #94's riders rode along. Round 4 gains a step 6, the ruling on the owner's iPhone.** **B6b-2 has landed: #95's two enforcement WARNs — no answer turns a session's shields back on over an Emergency Unlock the server has yet to record, where only a tap's answer was guarded (an unlock's late answer, a refocus's, protection off's too; the student's own return, by the phone's order, still focuses), and an unlock not filed yet is filed by what the outbox file holds, never by a queue a failed read left behind.** **B6c has landed: the extensions' read — the shield's at each blocked app, the monitor's at each wake — read only (a reading coordination and one read-only connection: no write transaction, nothing written, no file made) and all of it within a hard 2 s ceiling; a file this build has yet to migrate — the app not opened since an update — is migrated where the monitor reads it, once, so the bell still clears the shields; and the monitor's refusal bookkeeping in `Bell`, tested on Linux. No device check changes.** **B6c-2 has landed: #97's review — after an app update, the monitor's migrating open (the one that takes the outbox file's write lock) is waited out, never given up on at the 2 s ceiling, so no kill for that lock can cost the monitor its next wake; the shield never migrates the file ("Focused with Bali" until the monitor or the app has); a close that fails never discards a read; and whether an unlock was filed is its UPDATE's own answer. No device check changes. Found here: on iOS 18, `startMonitoring` called inside `intervalDidEnd` for the same activity deadlocks (FB14664238) — B5b's monitor made that call when it kept the shields (woken before the bell) or could not read the file; B5b-3 takes it off it.** **B5b-3 has landed: the bell's wakes off iOS 18's deadlock, and a lost wake survivable — each window an activity of its own (the app's `bell` and its `backup`, the monitor's own `tick` and `tock`, in turn), so no wake asks iOS anything of the window that woke it, and nothing asks for `activities`; a backup window the app registers beside the bell's, two minutes later, whose wake reads and clears as the bell's does, so a wake that dies — hung, killed, refused — costs two minutes past the bell, not until the app is opened; the app's registration stops the monitor's own wakes, and no window stops all four; the waited-out migration keeps no second ceiling (the backup makes a wake lost to it again); and `writerWaitedOut` never passes untold. Round 2 gains a step: a lost wake, the backup clearing (a Debug toggle), and `Monitor:` names each wake, its last three shown. Next: the owner's pause before the C screens.** **B5b-4 has landed (#99's review): the monitor's next wake is asked for anew at every wake — never skipped for a window iOS holds under its own name, one its earlier wake spent — and the app stops the monitor's own wakes only when the bell's window is new.** **C1a lands in two PRs, for size. Its first has landed: the student app's skeleton — `Screen.choose` (`ios/BaliOutbox`), the one pure router of the screens, tested on Linux; `RootView` over it, light in every appearance (D1 is light), a placeholder naming its step for every screen not drawn yet, the Debug readout behind a **Readout** button; D1's theme (`ios/Bali/UI/Theme.swift`, the system font at D1's sizes); and `PreviewFixtures`, named app states a Debug build renders with no server (`-bali-screen <name>`). Its second, the Sign in screen, has landed too — D1's Main artboard over `SignIn` in an ephemeral browser session, a sign-in that did not finish said under its button — so C1a is complete.** **C2a has landed: `GET /v1/me`'s classes carry their teacher (`teacher.displayName`, additive), the name Home and Me show under every class and Focus says "with".** **The owner ruled on open decisions 7–11 (2026-09-24):** decision 11 files an unlock made while the phone's own tap is unanswered under that tap — A11 built its endpoint, B6 and C5 use it. **The owner ruled out a student allow-list — the shield blocks every app a third party can block — and approved D1, so A6–A8 no longer wait on it (2026-09-24).** **Phase 2 is complete: the exit demo ran green against Railway dev.** Retroactive audit of the pre-gates Phase 1/2 code: nine findings confirmed, landing as gated PRs; offset timestamps and the SSE write-after-end crash are on `main`. **The owner ruled on the audit's held `/v1` questions (yes to all five): #29, then #28, then the block fix.** `/v1/me` now stores a display name the token actually carries, so the live grid shows a readable name wherever the token has one, instead of a UUID prefix._
+_Last updated: 2026-10-05 — the handoff below rewritten for the next session (Phases 4–7's
+true status, production, what's in flight, the pilot's path, who does what). The prose this
+file carried until today is kept word for word in `docs/DECISIONS.md`, "Archive: PLAN's old
+Now (to 2026-10-05)"._
 
 ## Now
 
-- **Phase 5's cloud parts are under way** (2026-10-04): their steps are under
-  Phases ("Phase 5 steps"), one PR each. **P1 has landed — Sentry in the API**
-  (`apps/api/src/monitoring.ts`): off without `SENTRY_DSN`; a 5xx, a failed sweep or
-  start, and an uncaught exception or rejection only, scrubbed of student data before it
-  leaves (a test sends a Drizzle-style failure through a fake transport and
-  finds none). 🔧 Owner: a Sentry project, then `SENTRY_DSN` and
-  `SENTRY_ENVIRONMENT` on Railway (`docs/DEPLOY.md`). **P2 has landed — Sentry in
-  the portal** (`apps/web/src/lib/monitoring.ts`, `@sentry/browser`): off without
-  `NEXT_PUBLIC_SENTRY_DSN` at build time; uncaught errors and the API's 5xx and
-  network failures only, never a 4xx, with no URL beyond its template, no token,
-  breadcrumbs, form values, bodies or replay (a fake-transport test proves it).
-  🔧 Owner: `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` on the
-  portal's build (`docs/WEB.md`). **P3 has landed — a teacher registers their block
-  on the portal by its ID** (`apps/web/src/components/blocks.tsx`, on the classes page;
-  `GET /v1/blocks` added to list it). **P5 has landed — the TestFlight
-  workflow** (`.github/workflows/testflight.yml`), run by hand: a Release archive signed
-  through the owner's App Store Connect API key and uploaded, behind a release guard;
-  without the key it skips. 🔧 Owner: the app record, the key and three secrets
-  (`docs/DEPLOY.md`, "TestFlight"). The app icon has landed (concept A, the mark). **P6 has landed — the owner's runbooks**
-  (`docs/RUNBOOKS.md`): production on Railway, Cognito for production, the Vercel
-  flip, the backup-restore drill, GitHub hardening, each step with a check. 🔧 Owner:
-  follow them, Cognito first; the drill's result goes on P6's line. **P7 has landed —
-  App Store drafts** ([`docs/APP-STORE.md`](APP-STORE.md)): listing, review notes,
-  privacy-label and age-rating answers, and the review-path options. 🔧 Owner: choose
-  how App Review tries Bali (lean: a recorded tap plus review accounts), then paste.
-  **P4 has landed — the public help page** (`/support`, linked from `/login`): how
-  Bali works for students and teachers, what a teacher sees (the app's own lists),
-  privacy in plain words with the policy coming soon, and the support email. 👀 Owner:
-  the screenshots. Every Phase 5 cloud step has landed; next: E1, then Phase 6.
-- **Phase 6 is planned** (2026-10-04): security and compliance, under Phases
-  ("Phase 6 steps"). Two investigations (`docs/DECISIONS.md`, 2026-10-04) found
-  pilot blockers no step covered: Apple's developer agreement §3.3.3(P) on Family
-  Controls (ISSUES #3), phone bans at school (ISSUES #4), in-app account deletion
-  against "nothing is truly deleted" (ISSUES #5), the policy pages and the
-  school's data agreement; and security gaps: personal data in error logs; no
-  sign-out control on the portal, and the Cognito session never ended (closed by
-  S4a, inside Phase 4); a PR able to rewrite its own review; Cognito's prod
-  settings. It gates Phase 5's
-  student-facing steps. S1 has landed, inside Phase 4, and O1b closed the gaps
-  its review left. T1a has landed: an invite is minted only for a school whose data
-  agreement is on record; T1b: redeeming one makes the account a teacher there; T2:
-  the portal's screen for it; and T1c: a join at the instant of the same account's
-  redeem never enrolls the new teacher. **S2 has landed — log redaction**
-  (`apps/api/src/redact.ts`): no secret header and no query value reaches a log line;
-  logs and Sentry share one scrubbing rule. **C1 has landed — privacy manifests**
-  for the app and both extensions (`PrivacyInfo.xcprivacy`; `UserDefaults` and boot
-  time with their reasons, no tracking, APP-STORE.md's data types), held to the Swift
-  by a CI lint (`.github/scripts/privacy-manifests.py`). **S4 has landed — the portal's
-  CSP and security headers** (`apps/web/src/lib/csp.ts`, `src/middleware.ts`): scripts run
-  only with each request's nonce, and the page reaches only the configured API, Cognito and
-  Sentry origins; HSTS, `nosniff`, a referrer policy and a Permissions-Policy on every
-  response. **S5 has landed — CI hardening:** every action outside the Claude
-  workflows pinned by commit, every job a timeout; `npm audit` (high, shipped
-  code) and `npm audit signatures` gate CI; the load gate fails on a raised flood
-  budget or a thinned flood; the served portal's scripts are checked for the CSP's
-  nonce. **S7 has landed — abuse tests, in process** (`apps/api/test/abuse.test.ts`):
-  guessing, an orphan-unlock flood, reused `event_id`s, forged tokens, oversized bodies and
-  bad path parameters each end in an honest 4xx in the one error shape, never a 5xx; a
-  router refusal now does too (it left in Fastify's shape). Known edge: an account's budget
-  is all that bounds its orphan unlocks (`docs/DECISIONS.md`, S7). **S9 has landed — clock
-  skew surfaced:** a record from a phone clock more than 2 minutes ahead of the server carries
-  `clock_ahead_s`, and the teacher's grid shows "Clock off" on that student's chip; advisory
-  only, nothing it orders or counts changes (`docs/DECISIONS.md`, S9). The owner's second set of
-  rulings (retention, deletion, 13+, the pilot) is recorded (`docs/DECISIONS.md`, 2026-10-04).
-  **S3 has landed — API tightening:** access tokens only, HSTS, `nosniff` and `/v1`'s
-  `no-store`, a capped `tagId`, a 32-character minimum `INTERNAL_API_KEY` (dev's is 64),
-  and a bounded rate-limiter map.
-  Next: E1, Phase 4's exit check (💻).
-- **Phase 4 is under way** (2026-10-04): its steps are under Phases ("Phase 4
-  steps"), one PR each. **S4a has landed — a real Sign out on the portal**, pulled
-  forward from Phase 6's S4 (`PortalBar`, `apps/web/src/components/portal-bar.tsx`,
-  in the root layout; `endSession`, `apps/web/src/lib/auth.ts`): on every signed-in page,
-  the invite-code screen's included, Sign out forgets the token, then sends the browser
-  to the hosted UI's `/logout` (`client_id`, `logout_uri` = the callback's origin +
-  `/login`), so the Cognito session ends too and `/login` says "You're signed out."; with
-  no hosted UI to send it to, the token is still gone and `/login` says the sign-in page
-  may still remember you, and to close the browser. 🔧 **Owner action:** dev's web app
-  client must list `http://localhost:3000/login` under Allowed sign-out URLs
-  (`docs/WEB.md`); this session's AWS user can't read the client to confirm it does.
-  Ride-alongs (T2's review WARNs): a 429's words follow its `Retry-After` ("a moment" up
-  to 5 s, else "a minute"), `event_id_conflict` in words, the reports fallback's
-  `restarted: false`. Next: E1 (💻). Why: `docs/DECISIONS.md` (S4a).
-  **T1c has landed — the join refuses a teacher inside its own
-  transaction, closing T1b's known edge** (`joinClassByCode`, `packages/db/src/transitions.ts`):
-  the join reads the caller's row FOR SHARE before its class, the row the redeem holds FOR
-  UPDATE, so a join and the same account's redeem at one instant run one at a time — the join
-  first, and the redeem is refused `student_in_class`; the redeem first, and the join is refused
-  as a teacher's always was (`403`, unchanged). Never a teacher enrolled as a student. The route
-  no longer judges the role before the transaction. A real-Postgres race of the two, each order
-  staged and 30 rounds sent at once, went red on the old code, and red again with the
-  FOR SHARE alone removed; green now. **Ride-along** (T1a's review WARNs): `npm run school -- list` (each school's
-  id, agreement day, open invites and name; never a code or its hash), and `add` says when a
-  school of that name is on record already. No `/v1` route or field changed, so the OpenAPI
-  snapshot stands. Next: E1 (💻). Why: `docs/DECISIONS.md` (T1c).
-  **T2 has landed — the portal's invite-code screen** (`InviteCode`,
-  `apps/web/src/components/invite-code.tsx`; its logic `apps/web/src/lib/invite.ts`, tested): an
-  account `GET /v1/me` says isn't a teacher gets it on the home page in place of the classes view.
-  The code typed or pasted in any case, with or without its dashes or spaces, is shown in fives as
-  the command printed it and checked by the redeem's own rule (`INVITE_CODE_PATTERN`, moved with the
-  code's other rules into `@bali/shared`, `@bali/db` re-exporting them) before a try is spent;
-  redeemed under a UUIDv7 `eventId` the portal mints (`apps/web/src/lib/event-id.ts`, no
-  dependency), an answer that never came resent under the same one by Try again; on success the
-  page reads `/v1/me` again and shows the classes, its heading focused, no reload. Each refusal is
-  said in its words, keyed on `reason` (`errText`): a code that can't be one (also before sending),
-  unknown, used, expired (ask whoever sent it for a new one), a teacher already (Go to your
-  classes), a student in a class (a separate account for teaching, the owner's ruling), too many
-  tries (wait a moment), and no connection (Try again). A failed boot read now has Try again too.
-  **Ride-alongs:** R5's review: Show earlier at the end reads nothing, and a stale-cursor restart
-  that fails keeps no cursor; T1b's review: ARCHITECTURE.md's redeem sentence corrected (a refused
-  first redeem can fill a missing display name, as `/v1/me` would), a test pinning it. **To know:**
-  the class page's grid state is still untested (no component harness; left for the next step that
-  touches the page), and there is no Sign out on the screen for a student account to switch: S4
-  brings the real one. 👀 Its screenshots went to the owner. Next: E1 (💻). Why:
-  `docs/DECISIONS.md` (T2).
-  **T1b has landed — an account becomes a teacher by redeeming its invite
-  code** (`POST /v1/teacher-invites/redeem`, `apps/api/src/routes/teacher-invites.ts`; its logic
-  `redeemTeacherInvite`, `packages/db/src/schools.ts`): the code matched as printed, its case,
-  spaces and dashes set aside, and looked up by its hash; in one transaction the account becomes a
-  teacher at the code's school and the invite is marked redeemed, by one guarded UPDATE, the
-  caller's row held to the end; idempotent on `eventId`. Refused with nothing changed: a teacher
-  already, a student in a live class, an unknown, used or expired code, one that can't be a code.
-  Rate-limited as the join is: tries per account, misses per address. Migration 0014 keeps a
-  redeemed invite from deletion too. The authorization matrix and the OpenAPI snapshot carry the
-  route. Until T2, a teacher redeems through the API (`docs/WEB.md`, "Making a teacher"). Next:
-  T2. Why: `docs/DECISIONS.md` (T1b).
-  **T1a has landed — teacher invite codes, stored, and the owner's
-  command to mint them** (`packages/db/src/schools.ts`, `school-command.ts`, run by
-  `apps/api/scripts/school.ts`): `npm run school -- add <name>` adds a school and prints its id,
-  `agreement <school-id> <day>` records its data agreement as signed that day (a real day, never
-  after today; again, it replaces the day and says what it said), and `invite <school-id>` mints a
-  teacher invite for a school with one on record, refusing any other. A code is 25 symbols of the
-  join code's unambiguous alphabet (≈124 bits, past the 112 at which NIST SP 800-63B lets a plain
-  hash keep a look-up secret), printed once in five groups of five; only its SHA-256 is stored
-  (`teacher_invites.code_hash`, unique, a `CHECK` letting in 64 hex digits only). It expires 14
-  days after minting by the database's clock, and is single use: the redeem's `redeemed_at`,
-  `redeemed_by` and `redeem_event_id` are whole or none, the last unique, so T1b's one guarded
-  UPDATE takes it once and a replay finds its own, and a trigger refuses any change to a redeemed
-  row. Arguments are checked before anything connects,
-  each refusal saying how to put it right. No `/v1` route changed, so the OpenAPI snapshot and the
-  authorization matrix stand. Until T1b, the role and school are set by hand (`docs/WEB.md`,
-  "Making a teacher"). Next: T1b. Why: `docs/DECISIONS.md` (T1a).
-  **R5 has landed — the reports page**
-  (`apps/web/src/app/classes/[id]/reports/page.tsx`, "Reports →" on the class page): the class's
-  sessions newest first from R3, 20 a page with Show earlier (the phone's History paging), each
-  row when it ran, how many joined, the class's focus minutes (total, and per student who joined),
-  silent minutes, and how many unlocks and protection offs, worded by the card's own function so a
-  row and its recap agree; a row opens its recap, R4's `RecapCard` fed by R2. Only sessions the
-  server has marked over are listed: a running one is on the class page. Loading, a failure (said
-  where it happened, with Try again), no reports yet, and a stale cursor (`400 unknown_cursor`:
-  the newest page read again, and said) are each said; aggregates only. The logic is
-  `apps/web/src/lib/reports.ts`, tested. **Ride-alongs:** at the bell the class page keeps the
-  ended grid under the card until the next Start ("How it ended"), so who was still unlocked at
-  the end stays in view (R4's review WARN, the owner's default); it is drawn once from the ended
-  session's snapshot, so it holds none of the account's live streams. A `429` says "Wait a
-  moment" (its `Retry-After` is a second on every route the portal calls), and the owner's rulings
-  of 2026-10-04 are recorded: T1a's invite-code rules and the reports' silence rule. 👀 Its
-  screenshots went to the owner. Next: T1a. Why: `docs/DECISIONS.md` (R5).
-  **R4 has landed — the recap card** (`RecapCard`,
-  `apps/web/src/components/recap-card.tsx`, beside the live grid): once the server marks the
-  class's session over — the End's answer, the grid's stream (`session_ended`, `session_expired`)
-  or a snapshot saying `ended` — the last session's report (R2) shows above the grid, which R5
-  keeps as it ended, and a fresh visit finds it through R3's newest row; it stays until a new
-  session starts. It says the day and
-  times the session ran, who joined, the class's focus minutes (total, and per student who joined),
-  silent minutes, every unlock (who, when, reason) and every protection off; loading, a failure
-  (with Try again), nobody joined and no unlocks are each said. Aggregates only; the card reads the
-  report once each time it shows. The logic is `apps/web/src/lib/recap.ts`, tested, as the grid's
-  is. **To know:** it says "Protection off", the grid's word, not the app's "Screen Time off" (the
-  owner may rule otherwise); and a `429` now reads in the phone's words on every portal error,
-  closing L1's review WARN (its wait "a moment" since R5). 👀 Its screenshots went to the owner.
-  Next: R5, the reports page. Why: `docs/DECISIONS.md` (R4).
-  **R3 has landed — the class's reports list:**
-  `GET /v1/classes/{id}/reports/sessions` (`apps/api/src/routes/reports.ts`), the class's own
-  teacher only: its sessions newest first by when each started, the running one too, each with
-  its window (`startedAt`, `endsAt`, `endedAt`), R2's `ended`, and its totals — how many joined,
-  the class's focus minutes (total, and per student who joined), silent minutes, and how many
-  unlocks and protection offs. Each row is R2's figures: the same `sessionReport` over every event
-  the session holds, the page's read in one statement, made whole by the same function, so a row
-  never disagrees with its report (a test reads both). Counted on read, never stored: a record
-  reaching the server after the end still counts. Paged as the history is: 20 a page, `before`
-  the last session's id and `nextBefore` the next, a session index (`sessions_class_started_idx`)
-  so a page costs its own size; a `before` the class doesn't hold is `400 unknown_cursor`, a
-  malformed request `400 invalid_request`. Another teacher and a student are `403`, an unknown
-  class `404 class_not_found` — now on every route under `/v1/classes/{id}`, through one guard,
-  closing #192's review WARN. Next: R4, the recap card. Why: `docs/DECISIONS.md` (R3).
-  **R2 has landed — one session's report:**
-  `GET /v1/classes/{id}/reports/sessions/{sessionId}` (`apps/api/src/routes/reports.ts`), the
-  class's own teacher only, serves R1's `sessionReport` over every event the session holds:
-  who joined, the class's focus minutes (total, and per student who joined), its silent
-  minutes, and every unlock (its student, time, reason now and note) and protection off.
-  Names are each student's display name now, null when none, read from the session's events
-  rather than the roster, so a student removed since is still named. Minutes are whole, each
-  rounded from its exact figure — the total never a sum of rounded parts. A session not over
-  yet is answered, counted to now or to its bell, with `ended: false` until the sweep marks
-  it. Another teacher and a student are `403`; a session not in the class, or an unknown
-  one, `404 session_not_found`, an unknown class `404 class_not_found`. **To know:** a note
-  this build doesn't know (a newer build's, mid-deploy) moves no one and is listed as none,
-  closing #191's review WARN; the API's test app (`makeAuthedApp`) now has budgets no test
-  meets, closing L1's. Next: R3, the class's past sessions. Why: `docs/DECISIONS.md` (R2).
-  **R1 has landed — focus time as one shared pure
-  function** (`sessionReport`, `packages/shared/src/report.ts`): a session's
-  window, its stored events and the server's `now` give who joined, the class's
-  focus minutes (total, and per student who joined), the minutes it went
-  silent, and every unlock and protection-off report with its note; aggregates
-  only, a student's own minutes never leave it. It reads the events in `seq`,
-  the engine's order, and a record the engine noted (`recorded_as`) moves no
-  one: a late unlock never ends focus, a late return never starts it, a
-  student's own unlock and return keep the phone's order (A12), never their
-  times'; a declined or late tap never joins; an unlock kept with no class is in
-  none until its tap files it. Times are held to the window the session really
-  ran, so nothing counts past `ended_at` or the bell. **To know:** silence
-  (`went_silent` until contact) is counted apart from focus (`silentMinutes`) —
-  the docs say nothing on it, so that is the default until the owner rules; the
-  average divides by the students who joined, and is null when none did;
-  minutes are exact, and the reader rounds. Why: `docs/DECISIONS.md` (R1).
-  **L2b has landed — the one-address load gate**, so
-  ISSUES #1 is done: `npm run load:gate` (k6) drives the harness's school at the
-  bell, every request from one address (`X-Real-IP`) — the 600 taps within the
-  minute, all 30 classes started at the bell, each phone's read every 30 s for
-  three minutes — while one account floods `GET /v1/me` 50 times a second. The
-  school met no `429` and no `5xx`, p95 8.5 ms (the bound is 500 ms, a
-  Start's 1 s); the
-  flooder met 2,762 `429`s, each with `Retry-After`. `npm run load:sweep` then
-  times the API's own sweep on that bell: 600 phones marked silent in 1.2 s,
-  30 sessions ended at once in 91 ms, and no deadlock in the whole run, so L3
-  is not needed at this size. CI's "Load gate" runs both on every PR touching
-  `apps/api/`, `packages/db/`, `packages/shared/` or the root manifests, or by
-  hand; making it a required check is the owner's ruleset toggle. **To know:**
-  the harness's two commands now also need `LOAD_LOCAL_POSTGRES=1`
-  (`localhost` can be a tunnel, and nothing can tell), and
-  `@bali/db/testing`'s helpers that drop databases refuse outside `NODE_ENV`
-  test or development. Numbers and why:
-  `docs/DECISIONS.md` (L2b). **L2a has landed — the load harness** (for L2b's
-  one-address gate): `npm run load:seed` seeds a school at the bell — 20
-  teachers with a block each, 30 classes, 600 students enrolled where they tap —
-  into a database of its own on this machine's Postgres, and writes
-  `school.json`, each one's token, tag and class, for L2b's k6 to read.
-  `npm run load:serve` runs the real API (`src/server.ts`) on it, trusting the
-  seed's issuer through env alone: `AUTH_JWKS_URI` is a `data:` URL holding the
-  seed's key, so no API code changed. CI's real-Postgres lane seeds it, boots
-  it and taps a class in on every run. **To know:** both commands refuse a
-  Postgres that isn't on this machine, and one no one vouched for (L2b); each
-  seed makes a new key, so restart `load:serve` after one. Commands: README, "The load harness".
-  **L1 has landed — the rate limits** (ISSUES #1):
-  every signed-in request spends its verified account's budget, never its
-  address's (120 at once, 120 a minute); a request with no sign-in, or a
-  refused one, its address's (1,200 at once, 600 a minute); the join-code
-  preview and the join, 20 tries per account and 100 misses per address, the
-  backstop free accounts need. Over budget is a `429` in the one error shape
-  with `Retry-After`, and an unlock's stays "retry". The address is Railway's
-  `X-Real-IP`: Railway documents no hop count, and Fastify 5.12 ignores a
-  numeric `trustProxy`, so it stays off. **To know:** the buckets live in each
-  process's memory, so N instances are N times each budget; the phone needs no
-  change (it says a 429 honestly everywhere it reads). Sizes and why:
-  `docs/DECISIONS.md`. **O1b has landed — the gaps O1's and S1's reviews
-  left, closed** (tests and CI only): CI puts the base branch's copy of
-  `contracts/openapi.json` in place before it regenerates, so a removal from
-  `/v1` is judged against what the base promised — a branch can delete,
-  regenerate or edit its own copy, never the base's — and a missing snapshot
-  fails the test instead of being written from nothing. A syntax scan of every
-  file in `apps/api/src` fails a request's params, query or body read anywhere
-  but `parseRequest`, so no route parses outside the snapshot. The matrix's
-  history row asks for the first page, so another student's `200` is read for
-  the class's ids (another's cursor, a `400`, stays `history.test.ts`'s), and
-  a route outside `/v1`, `/internal/*` and `/healthz` fails the guard,
-  whatever its row, until `callersOf` names who can call it.
-  **S1 has landed — the authorization matrix** (Phase 6's
-  first security step, run here): `apps/api/test/authorization-matrix.test.ts`
-  is one table of every route the app registers, each HEAD as its GET, against
-  each caller it can meet — on `/v1`, no token, another app's token, the
-  class's student, another class's student and teacher, and the owner; on
-  `/internal/*`, no key, a wrong key and the right key; `/healthz`, anyone —
-  each row in a world of its own, and a 2xx to a stranger names nothing of
-  that world. A registered route with no row fails the suite, so a new route
-  ships with its rows. It found no authorization bug. **To know:** it pins the
-  routes no one is refused as they are — any signed-in account, a teacher's
-  too, is answered `200` on a tap (it arms, and only an enrolled student's
-  converts), an unlock (an orphan, noted) and a check-in (`gone`).
-  **O1 has landed — the OpenAPI snapshot check:**
-  `contracts/openapi.json` is every route the API serves and the request schema
-  each one parses (the zod schemas a route declares in `config.parses`, which
-  `parseRequest` holds its handler to), with a student endpoint's answer and the
-  one error shape, generated from the app by `npm run fixtures`. `npm test` and
-  CI fail on drift, and a removed `/v1` route, method or request field fails
-  with an additive-only message, even on a regenerate.
-- **Phase 3 is complete** (2026-10-03): the iOS student app is on `main`, its
-  device checks done on the owner's iPhone 15 Pro (iOS 18.6.2) against dev —
-  E1 passed on hardware (2026-10-01), and the final phone check (2026-10-03)
-  proved the last fixes. The open owner items, and Phase 3's known edges
-  carried forward, are below, after Phase 3's steps.
-- **Phase 2 is merged to `main`** (steps 1–8) — the walking skeleton is complete: session lifecycle over HTTP, events feed + SSE live grid, teacher portal, phone simulator.
-- **Dev runs Phase 2** (2026-09-20): Railway auto-deploy repaired (the Railway
-  GitHub App was never installed — it is now), environment renamed `dev`, and
-  the sweep cron created, POSTing `/internal/sweep`. It was meant to run every
-  minute, but Railway runs a cron at most every 5 minutes, and not to the
-  minute — so since A15 (2026-09-29) the API sweeps every minute by itself and
-  the cron is its backup, every 5 minutes (`*/5 * * * *`, DEPLOY.md step 4 —
-  done: the owner confirmed dev's schedule on 2026-09-29). (The earlier
-  "repoint the cron" note is settled; the Phase 1 path is kept as an alias,
-  nothing 404s.)
-- **Owner actions from the Phase 2 merge: done** — "Integration + race tests
-  (real Postgres)" is now a required check, and the Claude workflows bill the
-  owner's subscription (see `docs/DECISIONS.md`).
-- **Phase 2 exit demo: PASSED against dev** (2026-09-22) — every incident green
-  against the deployed API with real Cognito: tap → session, unlock **delivered
-  live on the SSE stream**, refocus, one real 90-second silence episode and one
-  `came_back`, a removed student's unlock still **recorded**, and a session that
-  **expired by itself at the bell**. The waits were real, not backdated. This run
-  carried the sweep key, so its own `/internal/sweep` call opened the episode and
-  expired the session; without the key the API's own per-minute sweep (A15)
-  does the identical job, which is why the demo asserts on the event and not
-  the caller. Re-run it
-  via the README, "Running it against a deployed API".
-- **Dev provisioning it needed** (one-time, owner-run): a `schools` row plus
-  `school_id` on the test teacher — see the teacher-gating row under Go-live.
-  Two things to know next time: a session cannot run this itself (dev Postgres
-  exposes only `postgres.railway.internal`, and reaching it means publishing the
-  database through Railway's TCP proxy), and `schools.id` has no DB default, so
-  raw SQL must supply a UUIDv7 (ids are minted in TypeScript, decision 2). The
-  demo now prints that statement with a freshly minted id, ready to paste — and
-  the tests now **execute** the printed recipe against a migrated database
-  instead of string-matching it, since the missing-`id` bug read perfectly and
-  only failed at the database. The `UPDATE` half also refuses to run when there
-  is no live school (`AND EXISTS`), so pasting only the second statement reports
-  `UPDATE 0` rather than setting `school_id` NULL and looking like success.
-- **The live grid shows a readable name wherever the token carries one**
-  (2026-09-22). `/v1/me` read
-  `claims.name`, but Cognito puts profile attributes in the ID token and every
-  client here sends an **access** token — the portal stores `access_token`
-  and nothing else, the exit demo signs in for `AuthenticationResult.AccessToken`
-  — so that read found nothing on every real request, `display_name` stayed NULL,
-  and the grid fell back to eight characters of a UUID. Setting a `name`
-  attribute on the pool would not have fixed it — only a pre-token-generation
-  Lambda adds claims to an access token, and nothing here has one. `/v1/me` now walks
-  `name → preferred_username → cognito:username → username`, so a real name still
-  wins wherever one exists, and `findOrCreateStudent` **fills** a NULL
-  `display_name` on a later sign-in instead of only setting it at creation —
-  otherwise every existing account would have kept its UUID prefix forever. A
-  fill, never an overwrite: "edit own name" (`PATCH /v1/me`, A8 ✅) makes that
-  field the student's own once they set it. Where the pool's usernames are readable, a
-  remote exit-demo run labels its actors with them, because `me.user.displayName`
-  finally answers. **Not checked yet:** whether the dev pool's usernames are
-  readable. A pool that signs users in by email (`UsernameAttributes: ['email']`)
-  gives every user a UUID username, which is not stored, and its access tokens
-  carry no `name`; there the grid keeps its UUID prefix until the student sets
-  a name (A8's API is in, and its screen, C6b) or a pre-token-generation Lambda
-  supplies one.
-- **Exit-demo follow-ups from #15's review (done):** the sign-in's redaction now
-  scrubs enumerable own properties, not just messages (inspecting an error
-  prints them, so a client hanging the request body off it leaked through a path
-  no message-only scrub reached), and both the redaction and the detail walk
-  follow `AggregateError.errors` as well as `cause` — a host whose addresses all
-  refuse arrives as an AggregateError with an empty message, so the operator was
-  getting "fetch failed" and nothing else.
-- **Exit-demo follow-ups from #14's review (done):** Ben's own check-in closes
-  his silence episode with no pump running, so the incident proves his return
-  did it rather than "some check-in did"; a fetch failure reports its cause
-  chain, because Node reports every network error as a bare `fetch failed` and
-  puts ENOTFOUND on `cause`; that detail is redacted so a client echoing the
-  request body could not leak `DEMO_PASSWORD`; and a non-JSON body names the
-  status that actually came back.
-- **Exit-demo follow-ups from #13's review (done):** the second heartbeat stretch
-  now includes Ben, so a slow remote run cannot fabricate a second silence
-  episode and blame the engine for a simulation artefact; a Cognito failure that
-  is not a timeout no longer reports one (a mistyped region fails DNS instantly);
-  and a 200 that is not JSON names the request that produced it.
-- **Also needed per environment (AWS, one-time):** test users with **permanent**
-  passwords (a temporary one parks the account in `NEW_PASSWORD_REQUIRED`) and
-  `ALLOW_USER_PASSWORD_AUTH` on the app client. The demo names whichever is
-  missing; the README lists them with the school step.
-- **Retroactive audit of the pre-gates code: run** (2026-09-20). Ten leads
-  reviewed against `apps/` + `packages/`; nine reproduced and are landing as
-  small gated PRs, one PR per finding or related pair: offset timestamps
-  (**landed**), an SSE write-after-end that kills the API process (**landed**),
-  the armTap insert race and its event-id integrity gap (**landed**; its
-  review follow-ups are #29), a replayed tap re-resolved to another session
-  and extend's arithmetic outside the engine transaction (**#28, which lands
-  after #29 — ruled in, and landing now**), the portal's reconnect backoff and staleness banner
-  (**landed**), and one shared SQLSTATE helper (**landed**). Block
-  re-registration by the tag's own teacher answers 200 with their own block,
-  where `/v1` answered 409 before; **the owner ruled that correction in
-  (2026-09-22)**, and it landed as its own PR after #29, which carries the
-  ARCHITECTURE note allowing it (**landed**).
-  The tenth, `POST /v1/classes`'s missing idempotency key, was re-examined and
-  the deferral stands.
-- **The owner ruled on #28's held question (2026-09-22): the `409`s stand** —
-  until A4 (2026-09-24) replaced them with the "recorded, no longer current"
-  answer they were waiting for. A retried tap that landed names its session
-  only while what it recorded is still true (the participation live, its
-  session running); otherwise it is answered `200 replay` with no session, so
-  the outbox deletes it and re-reads the truth (tap step 10). The
-  spent-armed-tap skip it depended on landed first, in #29.
-- **Found while fixing the audit, on `main` rather than in the audit's list:**
-  the SSE hub's `close()` did not wait for a LISTEN it had started, so a
-  shutdown during setup left a query on a pool being torn down — an unhandled
-  `write CONNECTION_ENDED` that failed the real-Postgres lane with every test
-  green (**landed**; see `docs/DECISIONS.md`).
-- **Phase 3 is under way** (2026-09-23): the step list under Phases replaces
-  the earlier unwritten 10-step outline. The API and shared-contract steps land
-  first, so the iOS client implements against finished, tested contracts —
-  the `unlockDisposition` pattern. **A1 (unlock reason), A2 (protection off),
-  A2b (deadlock retry), A2c (protection off after the bell, recorded), A3
-  (the outbox tables), A4 (recorded, no longer current), A5 (the contract
-  fixtures), A6 (the join-code preview), A7 (the student's history), A8
-  (edit own name, unique within each class), A9 (the live grid's unlocks
-  and late records), A10 (a late unlock recorded, never applied — the
-  owner's ruling), A11 (an unlock sent under its unanswered tap, filed
-  where the tap landed — decision 11), A12 (the phone's own order, not
-  its clock, orders a student's unlock against their return — the owner's
-  ruling), A13 (the same order, the other way: a return older than an
-  unlock the server has is recorded, never applied — the owner's ruling),
-  A14 (the same order, tap against tap: a tap older than a later tap
-  into another class is recorded, never applied — the owner's ruling)
-  and A15 (the sweep every minute, run by the API itself — the device
-  check's finding) landed, and so has all of B1 — B1a (BaliCore's wire
-  types and the fixture contract tests), B1b (the outbox tables in Swift)
-  and B1c (the API client) — B2 (the app skeleton and its macOS CI), B3a
-  (the outbox store and its retry bound), B3b, the sync engine (B3b-1,
-  its drain; B3b-2, the check-in, the reconcile and one file for the app
-  and its extensions), B4a (the API accepts the phone's own app client
-  beside the portal's: `AUTH_AUDIENCE` is a list), B4b (BaliCore's
-  sign-in: `SignIn` and its Keychain store) and B4c (the app's wiring: the
-  one engine over the sign-in, dev's values, a Debug readout) — B4 is
-  complete — B5a (the shields follow the engine, the permission,
-  rule 3's check and protection off, the standing kept), B5a-2 (#86's
-  review: no false protection off after a relaunch, no standing from
-  nothing) and B5a-3 (the rest of #86's and #88's reviews: an unlock
-  kept with its standing, the check offline too, the unread standing's
-  gaps, and `cadence`'s flake), B5b (the schedule and the monitor: the
-  bell with the app force-quit), B5b-2 (its app-side riders, an app test
-  target among them, and #91's review), B5c (Bali's own shield; its
-  words read nothing since B5c-2), B6a (the NFC tap, and decision 11
-  on the phone), B6b (Emergency Unlock over an unread standing, and
-  a scan that joins no class — the owner's ruling), B6b-2 (#95's
-  review: the unlock guard on every answer, and an unlock not filed yet
-  filed from the file) and B6c (the extensions' read, read only and
-  within a hard 2 s ceiling, and the monitor's bookkeeping): B6 is
-  complete — then B6c-2 (#97's review: the monitor's migration waited
-  out) and B5b-3 (the bell's wakes off iOS 18's deadlock, and a backup
-  window, so a lost wake is survivable). Next: the owner's pause before
-  the C screens.**
-  Of the owner decisions Phase 3
-  needs (items 6–11 under Open product decisions), all are decided — 7–11
-  on 2026-09-24, and 6 on 2026-09-29 (C3a);
-  steps that need the owner's iPhone are marked 📱. Phase 0's open question
-  is answered: B5b's round 2 on the owner's iPhone saw the DeviceActivity
-  extension fire at interval END with the app force-quit (2026-09-27).
-- **BaliCore has landed** (B1a, 2026-09-24): `ios/BaliCore`, the iOS apps'
-  Swift package, decodes every contract fixture in the "BaliCore Swift tests
-  (Linux)" CI job — and since B1b its outbox tables must give every fixture's
-  disposition and every generated case in `contracts/outbox/` the
-  TypeScript's answer there too, so a change to a table in `@bali/shared`
-  fails that job until the port follows — and since B1c its API client must
-  send every fixture's request as recorded and return its answer as the
-  status and body that land on its disposition. **Owner's call:** whether to make
-  that job a required check in `protect-main` — it runs on every PR, not
-  path-filtered, so requiring it never leaves a PR waiting on a check that
-  did not run.
-- **The iOS app skeleton has landed** (B2, 2026-09-24): `ios/project.yml`
-  generates the Xcode project — the app and its DeviceActivity monitor and
-  shield extensions, on v2's identifiers — and the **iOS** workflow's
-  "iOS app + BaliCore tests (iOS Simulator)" job builds the app and runs
-  BaliCore's tests on an iOS Simulator (Xcode 26.6, GitHub's `macos-26`) on
-  every PR that touches `ios/`; other PRs skip it, and a skipped job reports
-  success. **To run it on your iPhone** (B5, B6): `ios/README.md` —
-  `brew install xcodegen`, `xcodegen generate` in `ios/`, sign in to team
-  `H535678UF8` in Xcode, run the **Bali** scheme on the phone. **Owner's
-  calls:** whether to make the job required in `protect-main` (it reports on
-  every PR, so requiring it never leaves one waiting); and once the repo is
-  private, moving it to your Mac is its `runs-on` line (decision 9).
-- **No student allow-list, and D1 approved** (owner, 2026-09-24). The shield
-  blocks every app a third party can block (`.all()`, no app picker anywhere);
-  iOS itself keeps calls, FaceTime, Messages and Emergency SOS working. Known
-  gap: an app a student medically needs is blocked too — Emergency Unlock is
-  the exit at launch, and any carve-out is the owner's later call
-  (ARCHITECTURE, iOS "Decided later"). D1's screens are approved, so A6–A8 no
-  longer wait on the owner. Why: `docs/DECISIONS.md`.
-- **A late unlock is recorded, never applied** (owner, 2026-09-24; A10 ✅):
-  an unlock stuck on the phone while the student's own refocus or tap went
-  ahead of it lands noted `superseded`, the return left standing. **To know:**
-  closed for a build that sends the phone's own order (A12 ✅ — BaliOutbox
-  sends it with every record): "after" is then the order the phone acted in,
-  so a clock turned back between the student's tap and a real unlock no
-  longer makes that unlock read as late. It stays for a build that sends no
-  order, and for a pair the order cannot place (another install's return — a
-  reinstall, another phone): there the clamped times still decide, so such a
-  clock makes a real unlock read as late — recorded all the same, and
-  answered with the focus the phone then shields to, so the grid is never
-  green over an unshielded phone, but that unlock does not take until the
-  clock is right (C5). Why: `docs/DECISIONS.md`.
-- **A late return is recorded, never applied** (owner, 2026-09-24; A13 ✅):
-  a refocus whose request outlived the phone's wait, or a re-tap stuck at
-  the retry bound, that lands after the student's own later unlock is noted
-  `superseded` and changes nothing — by the phone's order only; with none,
-  or another install's, it applies as it arrives. **To know (owner):** one
-  shape stays open, outside the ruling. A re-tap older than a *protection
-  off* report still applies, lifting the row to focus over a phone iOS
-  unshielded — the phone now says so again (B5a ✅): its check before the
-  next check-in reports protection off again whenever the phone stands
-  focused while the permission is off, so the grid is green for at most
-  one check-in; the owner can still extend the rule to it on the server.
-  The other shape A13 disclosed — a tap older than a later tap into another
-  class switching the student back — is closed by A14 ✅. Why:
-  `docs/DECISIONS.md`.
-- **A late tap is recorded, never applied** (owner, 2026-09-25; A14 ✅):
-  a tap the phone made before a later tap of its own into another class,
-  reaching the server after it, is noted `superseded` and changes nothing —
-  no switch back, no join; one that would only arm is kept consumed, so no
-  Start converts it; and a waiting tap such a later tap went ahead of is
-  declined at its Start, recorded there, never joined (decision 5's second
-  exception). By the phone's order only; with none, or another install's,
-  it applies as it arrives. **To know:** a student's taps now serialise on
-  a per-student lock (~0.6 ms a tap with the look, measured); a tap that
-  arms takes no lock, so one racing the later tap may still arm — its Start
-  then declines it. Why: `docs/DECISIONS.md`.
-- **An unlock made before the tap's answer is filed under its tap** (owner
-  decision 11; A11 ✅): `POST /v1/taps/{eventId}/unlock` files it in the
-  session the caller's own tap landed in, or keeps it with no session —
-  `tap_armed` (the Start then joins the student without it), `unknown_tap`
-  (not arrived, refused, or another's). **To know, decided here:** a tap
-  that lands after its unlock files the kept record then (a fresh `unlock`
-  naming it, `unattached_event_id`), so the order the two reach the server
-  never changes the truth; they serialise on the tap (an advisory lock),
-  about 0.6 ms a tap. An armed tap's Start files nothing. Why:
-  `docs/DECISIONS.md`.
-- **The phone's sign-in exists on dev** (owner, 2026-09-24; B4a ✅): the
-  pool's hosted-UI domain, `https://bali-dev.auth.us-east-1.amazoncognito.com`,
-  and the phone's public client `bali-ios-dev-public` (`7u6trs6gv805oi35ima29em6oe`; its first client, `bali-ios-dev`, had a secret and was replaced 2026-09-26),
-  checked with an authorize request — `docs/DEPLOY.md`, "The phone's
-  sign-in". Both are in place (2026-09-25 for the first client, 2026-09-26
-  for its replacement): the client id is on dev's `AUTH_AUDIENCE` (appended
-  once B4a had deployed), and both values are in `ios/project.yml` (B4c). The
-  client's refresh-token expiration is raised above Cognito's 30-day default,
-  at which every student would be signed out monthly — done for dev (owner,
-  2026-09-25; 365 days was asked for, and the replacement client was made
-  with 365 days, read back).
-  Production's client and domain are still to make (Phase 5), that setting
-  with them.
-- **BaliCore signs the student in** (B4b ✅, 2026-09-25): `SignIn` runs
-  Cognito's hosted UI with PKCE in a browser session the app hands it
-  (ephemeral: no cookie outlives a sign-out), keeps the tokens in the
-  Keychain (`WhenUnlockedThisDeviceOnly` — B5 revisits it if work behind a
-  locked phone needs a token), and signs out only when Cognito refuses the
-  refresh token (`invalid_grant`); a network blip, a 5xx or the API's own
-  `401` never does, and a sign-out never touches a queued record. **To
-  know:** the Keychain store has no test in the package — a package's tests
-  carry no entitlement, so the Keychain refuses them — so it first runs in
-  the app, on the owner's iPhone (B5's checklist); how it reads each
-  Keychain status is pinned on the iOS Simulator (B4c). Why:
-  `docs/DECISIONS.md`.
-- **The app signs in and syncs with dev** (B4c ✅, 2026-09-25): `BaliApp`
-  starts the app's one sync engine over `SignIn` (`SyncEngine.make`), with
-  dev's API and sign-in in `ios/project.yml`. A Debug build's placeholder
-  shows a temporary readout — the engine's link (reached, unreachable,
-  sign-in, storage failed), when the server last answered, whether someone
-  is signed in — with **Sign in** and **Sign out**, for B5's device check;
-  C1–C6 draw the real screens. **To know:** the app has only ever been
-  built on CI's simulator — its first run on a phone, the Keychain's
-  included, is B5's checklist (under Phases). Rode along (#83's review):
-  the PKCE verifier and state come from `SymmetricKey`; a sign-out the
-  locked Keychain could not make is made at the next ask; a token the API
-  refused stays refused across a relaunch. Why: `docs/DECISIONS.md`.
-- **The shields follow the engine** (B5a ✅, 2026-09-25): while the phone
-  stands focused, until the bell, and for a tap not yet answered, to
-  decision 7's 50-minute cap; Emergency Unlock drops them at once. Rule 3's
-  check before each check-in puts them back if iOS lost them and reports a
-  revoked permission as protection off; the screens will claim only what
-  it verified. The standing is kept in the app group, so a relaunch keeps
-  the shields, offline too. **📱 The device checklist: passed, all 14
-  steps** (2026-09-26 and 27; B5a's line under Phases, `ios/README.md` for
-  the setup) — a Debug build against dev: the six sign-in checks from
-  B4c, then the permission, a tap by a typed tag, Emergency Unlock, a
-  revoked permission on the grid, a relaunch and the bell with the app
-  open. **To know:** with the app
-  closed, B5b's monitor takes the shields off at the bell (below; its
-  round 2 saw it on the phone). The teacher's side is
-  `npm run dev:teacher` (T1 ✅).
-  **Hardened (B5a-2 ✅):** a standing the app group will not give back at
-  launch leaves the shields as they were until it is read or the server
-  answers, and a permission read not determined is reported only once it
-  lasts a check-in interval — step 13 expects no false protection off after
-  a relaunch. **Hardened again (B5a-3 ✅), the checklist unchanged:** an
-  Emergency Unlock and the standing it leaves are one write, so a relaunch
-  after a kill never shields over it; rule 3's check runs every 30 s in
-  the foreground offline too; no protection off is reported for a session
-  the phone's own clock has ended, nor from a clock set forward (the grace
-  window is measured by uptime); the app's foreground check reads the
-  phase as it runs, and a report the suspended file refuses shows no
-  failure; the kept standing's form is pinned; over an unread standing an
-  armed tap stays waiting, and the shields the enforcer put on for a tap
-  still come off at the cap. Why: `docs/DECISIONS.md`.
-- **The bell with the app closed** (B5b ✅, 2026-09-25): the app registers
-  the window the shields are on as a DeviceActivity schedule — ending at the
-  first whole minute on or after the bell, or decision 7's cap, 15 minutes
-  long (iOS's floor; a shorter window, a tap in a session's last minutes,
-  starts in the past and keeps its end) — again as it moves, and cancelled
-  once the shields are off. At its end the monitor extension reads the
-  standing and the queue the app keeps and clears the shields when nothing
-  keeps them on by the phone's clock; a session the standing says still runs
-  keeps them, and so does a file it cannot read within 2 s, where it asks to
-  be woken a minute on. **📱 Owner: round 2** (B5b's line under Phases,
-  `ios/README.md`): force-quit at the bell, a window under the floor, an
-  unlock and an extension, the cap with the app closed (a Debug toggle caps
-  a tap at 15 minutes), and the monitor never stalling — its readout line
-  says when it woke and how long it took — run 2026-09-27, all but the cap
-  (step 7), which waits for the next sitting. **To know:** a window starting
-  in the past, and a wake no earlier than the whole minute, were iOS
-  behaviour assumed; round 2 settled both with Phase 0's question: a
-  3-minute class's window, started in the past, woke the monitor at its
-  end, and each window that ran to its end woke it within 2 s after that
-  whole minute. Found there: stopping or replacing a window wakes the
-  monitor at once — harmless as seen; one path, the monitor's own asks
-  waking it back to back, closed by B5b-5 (below).
-  With the app closed, the shields come off less than a minute after the
-  bell — less than two if iOS wakes the monitor before it, which then
-  keeps them and asks to be woken the next whole minute on (B5b-2
-  corrected the bound; round 2 says so). Why:
-  `docs/DECISIONS.md`.
-- **B5b's riders and #91's review** (B5b-2 ✅, 2026-09-25): the app has a
-  test target, `BaliTests`, hosted in the app and run by the iOS Simulator
-  job — it pins the foreground check reading the scene phase as it runs, and
-  that the built app's Info.plist gives a config; the config reader is
-  BaliCore's `AppConfig`, its keys pinned to `Bali/Info.plist` and
-  `project.yml` on Linux too. From #91's review: the app's open of the
-  outbox ends in an error it shows, with Try again, if NSFileCoordinator
-  ever returns without granting, and only the first grant opens the file; a
-  window iOS refuses the monitor, the app closed, is shown at the app's next
-  open (`Protection.monitorUnscheduled`) until one is registered again, and
-  the skip rule of the registration is tested behind a protocol
-  (`BellCenter`); the monitor's whole open and read waits at most 2 s,
-  SQLite's locks included; and over a standing not read, the cap never takes
-  off the last run's shields — a session they may be for may still run —
-  so only the file read again, or the server's truth, ends them. **To
-  know:** that reverses B5b's rider (#90's review): an offline tap over an
-  unreadable standing keeps the last run's shields past its cap until the
-  file reads or the server answers, as B5a-2 had it. Why:
-  `docs/DECISIONS.md`.
-- **Bali's own shield** (B5c ✅, 2026-09-25; B5c-2 ✅, 2026-09-29): over
-  a blocked app, "Focused with Bali" — the same whatever the phone stands
-  in — in D1's light look with the ring mark, and D1's line beneath,
-  which sends the student to Bali for the time: "This app is paused for
-  class. Calls, FaceTime, Messages and Emergency SOS always work. Open
-  Bali to see when class ends. Emergency Unlock is always there." ("This
-  website…" over a website). The shield reads nothing: iOS's sandbox
-  refuses a shield extension the outbox file — its file coordinator, then
-  SQLite's own locks, round 3 found both — and the owner ruled against a
-  second copy of the bell kept for it (v2's disease); iOS may keep a
-  shield's words until the shields change (not documented), so a time
-  there could go stale after an extension, and Bali's Focus screen (C4) shows the
-  countdown. **OK** closes the app; Emergency Unlock stays in the app
-  (C5). **📱 Owner: round 3** (B5c's line under Phases, `ios/README.md`):
-  those words over a blocked app, with no time; no shield after Emergency
-  Unlock; the same words for a tap in Airplane Mode. D1's font, sizes and
-  layout are iOS's on a shield. Why: `docs/DECISIONS.md`.
-- **The NFC tap, and decision 11 on the phone** (B6a ✅, 2026-09-25): a
-  block is the code written on it — ten letters and digits, as v2 wrote
-  every block (`T7XK2M9QPF`), in its NDEF Text record or at the end of
-  its link (`bali://t/<code>`, `https://…/t/<code>`) — not the chip's id;
-  the phone reads it with an NDEF reader session, as v2 did, and a block
-  read is the tap: recorded, shielded at once, sent. Any other tag is said
-  so and records nothing. Emergency Unlock is filed where decision 11
-  says: under a tap not yet answered — `POST /v1/taps/{eventId}/unlock`,
-  always, even once the tap's answer names a session, whose shields it
-  then guards (every session's until then: any may be the tap's) — else
-  in the session the phone is in. **📱 Owner: round
-  4** (B6a's line under Phases, `ios/README.md`): register your block
-  (**Read block code**, then `npm run dev:teacher -- block <code>`), a
-  real **Scan**, a scan in Airplane Mode with Emergency Unlock before its
-  answer, a tag that is not a block, a scan cancelled. **To know:** B6b (below)
-  closed both of its disclosures: a scan that only arms, or is refused,
-  has the unlock filed again in the class the phone stood in, and
-  Emergency Unlock works over an unread standing. Why: `docs/DECISIONS.md`.
-- **Emergency Unlock over an unread standing, and a scan that joins no
-  class** (B6b ✅, 2026-09-25): over a standing the outbox file will not
-  give back, Emergency Unlock takes the shields off at once — the last
-  run's too — and is kept, never sent, until the phone knows where it
-  stands (the file read again, or the server's truth); then it is filed
-  in that session — naming none, under the phone's last tap — and sent.
-  Until then it guards every session, and a relaunch keeps it. **No
-  fail-safe ceiling** over the last run's shields: Emergency Unlock is
-  their way out, always recorded, where a ceiling would end a session
-  that may still run, unrecorded. **The owner's ruling (2026-09-25):**
-  an Emergency Unlock made under a scan before its answer (decision 11),
-  when the scan joins no class — armed, or refused — is filed again in
-  the class the student stood in when they pressed: a record of its own,
-  with the press's reason, time and order, so that class's grid shows it
-  and the shields stay off — one press, two records. **📱 Owner: round
-  4, step 6** (`ios/README.md`): a scan of a block no teacher registered,
-  in Airplane Mode, and Emergency Unlock before its answer. **To know:**
-  over an unread standing, a press under a scan that joins no class gets
-  no second record — where the phone stood is not known — and an unread
-  standing can't be made on a phone by hand: tests cover it. Why:
-  `docs/DECISIONS.md`.
-- **The unlock guard on every answer, and an unlock not filed yet filed
-  from the file** (B6b-2 ✅, 2026-09-25): #95's two enforcement WARNs.
-  No answer turns a session's shields back on over an Emergency Unlock
-  the server has yet to record — an unlock's late answer, a refocus's,
-  protection off's, as a tap's already was — unless the student has
-  returned there since: the phone focused there already, or the answer is
-  to their own tap or refocus, made after it by the phone's order. An
-  unlock pressed over an unread standing is filed by what the outbox file
-  holds, in every write that keeps the standing — a change's own too —
-  never by the queue in memory, which a failed read leaves behind; and
-  the press takes the shields off at once, whatever that read does. No
-  device check: tests cover it. Why: `docs/DECISIONS.md`.
-- **The extensions' read, read only and within 2 s** (B6c ✅, 2026-09-25):
-  #93's review and #92's. The monitor at each wake reads the outbox file
-  read only (the shield did too, until B5c-2: it reads nothing now) — a
-  reading coordination, which no other reader waits on, and one read-only
-  connection: no write
-  transaction, nothing written, no file made where there is none — and all of
-  it within 2 s, a ceiling now: an open still under way then is left to
-  finish on its own thread. A file this build has yet to migrate (the app
-  not opened since an update) is migrated where the monitor reads it,
-  once, as the app's open would, so the bell still clears the shields (the
-  shield never migrates it since B6c-2); one a newer build migrated, or no
-  file, reads as unreadable — the monitor keeps the shields and tries
-  again a minute on. The monitor's refusal
-  bookkeeping is `Bell`'s (`carryOut`), tested on Linux. **To know:** no
-  device check changes — the students see what they saw. Why:
-  `docs/DECISIONS.md`.
-- **The monitor's migration waited out, and the shield never migrating**
-  (B6c-2 ✅, 2026-09-25): #97's review. After an app update, the
-  monitor's migrating open — the one that takes the outbox file's write
-  lock — is waited out once granted, never given up on at the 2 s
-  ceiling, so the read returns holding no lock before the monitor asks
-  iOS for its next wake; everything else keeps the hard ceiling. The
-  shield never migrates the file: one this build has yet to migrate says
-  "Focused with Bali" until the monitor or the app has (moot since
-  B5c-2: the shield reads nothing). A close that
-  fails never discards what was read, and whether an unlock was filed is
-  what its UPDATE returns. **To know:** no device check changes. Found
-  here: on iOS 18, `startMonitoring` called inside `intervalDidEnd` for
-  the same activity deadlocks (Apple's forums, FB14664238) — why the
-  retry is not asked for before the read — and B5b's monitor makes that
-  call when it keeps the shields (woken before the bell) or cannot read
-  the file: in round 2 that would be shields kept past the bell until the
-  app is opened, with no new `Monitor:` line. B5b-3 (below) takes the
-  monitor off that call. Why: `docs/DECISIONS.md`.
-- **The bell's wakes off iOS 18's deadlock, and a lost wake survivable**
-  (B5b-3 ✅, 2026-09-25): #98's review and B6c-2's question. Each window
-  is an activity of its own — the app's `bell` (B5b's name) and its
-  `backup`, the monitor's own `tick` and `tock`, asked for in turn — so
-  no wake asks iOS anything of the window that woke it (on iOS 18,
-  `startMonitoring` for it inside its own `intervalDidEnd` deadlocks),
-  and nothing asks for `activities`. The app registers a backup window
-  beside the bell's, ending two minutes after it, whose wake reads and
-  clears exactly as the bell's: a wake that dies — hung, killed,
-  refused — costs two minutes past the bell, where it cost until the app
-  was opened. The app's registration stops the monitor's own wakes once
-  a window of its own is new and taken (superseded by B5b-4: once the
-  bell's is new), and no window stops all four; a
-  sign-out changes none. The waited-out migration keeps no second ceiling — a ceiling
-  could only abandon the open holding the write lock, and the backup
-  makes a wake lost to a stall again — and `writerWaitedOut` never passes
-  untold. **📱 Owner: round 2 changed** (`ios/README.md`): `Monitor:`
-  shows the last three wakes, naming each (`bell`, `backup`, `tick`,
-  `tock`), `cleared` or `nothing to clear`; the backup's wake follows the
-  bell's two minutes on; and a new step 6 — **Lose the bell's next wake
-  (device check)** — shows the backup clearing the shields when the
-  bell's wake did nothing. **To know:** one backup, not more — what kills
-  two wakes in a row (the monitor's memory, a migration too heavy for
-  any wake) kills every one; and whether a call of another name inside
-  a callback is free of the deadlock is the forum thread's reading,
-  which round 2's early or unread wakes (`tick`) would show — round 2
-  showed it free (2026-09-27; `docs/DECISIONS.md`, 2026-09-29). Why:
-  `docs/DECISIONS.md`.
-- **The device checks' teacher, from the terminal** (T1 ✅, 2026-09-25):
-  `npm run dev:teacher -- class | block | start | watch | extend | end`
-  signs in as the exit demo's teacher (`.env.demo`, the demo's variables)
-  and does on dev what the portal cannot yet — its dev client has no
-  localhost callback, and no screen registers a block: a class and its join
-  code, the block `DEVICE-CHECK-1`, a session, and `watch`, each student's
-  state as the portal's grid would show it. **To know:** its first real run
-  is the owner's — no session here has dev's credentials. Why:
-  `docs/DECISIONS.md`.
+A short handoff. The Phase step lists under Phases are the record, `docs/DECISIONS.md` the
+why, Open owner items the owner's queue.
+
+**Production is live (2026-10-05).**
+- API `https://bali-prod-production.up.railway.app` (Railway, service `bali prod`; Postgres
+  `postgres prod` with no public proxy). Portal `https://bali-portal.vercel.app` (Vercel
+  `bali-portal`). Cognito pool `bali-production`: sign-up for `@vanderbilt.edu` only (the
+  Pre sign-up Lambda); review accounts by `AdminCreateUser` (`docs/APP-STORE.md`, 5.4).
+- The sweep runs every minute in the API, with the `sweep-cron` backup every 5 minutes, and
+  checks in to Sentry Cron `api-sweep` (P9).
+- **No prod backups** for the pilot (the owner's ruling: Railway's need the Pro plan; revisit
+  before any K-12 school). The school "Vanderbilt" is set up, its year end 2026-12-18.
+- Where it's written down: `docs/DEPLOY.md` (values), `docs/RUNBOOKS.md` (the owner's
+  consoles and their status), `docs/PILOT.md` (running the pilot).
+
+**In flight.**
+- **The owner's Mac session (all UI):** D2, the redesign, on the `ui` branch; and three
+  class-page controls the pilot needs, whose APIs already exist: the session length (Start is
+  hardcoded to 25 minutes), Extend, and New join code.
+- **The prod TestFlight build:** uploaded. Run 37279657642 (build 4, 2026-10-05) passed
+  after #236. The runs before it: 1, the key's PEM refused (the owner re-pasted the secret);
+  2, the icon guard's false alarm (#235); 3, uploaded and refused by App Store Connect (the
+  NFC entitlement listed NDEF; the extensions had no `CFBundleDisplayName`), fixed by #236,
+  which made the entitlement TAG alone. Next: the owner's phone test on it (Open owner
+  items).
+
+**The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
+test on prod, a block tap included → the privacy page (C2, the lawyer's words) → the external
+TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →
+Apple's answer on §3.3.3(P) (ISSUES #3; ask before the first external build).
+
+**Who does what.**
+- Cloud sessions: the backend, CI and docs. Never UI, never a console.
+- The Mac session: all UI (`apps/web/src/app`, `apps/web/src/components`, `ios/Bali/UI`,
+  `ios/BaliShield`, user-facing strings).
+- The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
+  lawyer, the school, and every iPhone check.
+
+**On hold.** Phase 7, Live lesson: planned, the build on hold by the owner (2026-10-05).
+Nothing starts until the owner says so; when resumed, backend only first.
 
 ## Phases
 
@@ -793,10 +60,10 @@ _Last updated: 2026-10-05 — **Phase 7, Live lesson: planned; build on hold by 
 | 1 | The spine: monorepo, CI, schema + constraints, transition engine, Cognito auth, `/v1/me`, `/v1/taps`, session start, armed taps, Railway dev deploy | ✅ on `main` |
 | 2 | Walking skeleton: real-Postgres CI lane + race tests, unlock recorded-with-a-note contract, enrollments, classes/blocks, session lifecycle + silence events, events feed + SSE (LISTEN/NOTIFY), teacher portal + live grid, phone simulator | ✅ **complete** — merged to `main` and the exit demo passed against dev (2026-09-22) |
 | 3 | iOS student app: BaliCore (contract fixtures TS↔Swift), GRDB outbox + sync engine, enforcement (shields + DeviceActivity extension), Cognito PKCE auth, screens, device test gate (ISSUES #2 on hardware) | ✅ **complete** (2026-10-03) — the iOS student app on `main`, the device checks done on the owner's iPhone 15 Pro (iOS 18.6.2) against dev, and E1 passed on hardware (2026-10-01) |
-| 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check, the authorization matrix (S1, from Phase 6), and both checks' gaps (O1b). The load gate sizes the sweep too: its per-row deadlock retry runs in a serial loop, so its worst case is candidates × 4 backoff sleeps — if the sweep grows, bound it (a shared retry budget per run, or batching) (#56's review) | 🔄 in progress — see Phase 4 steps |
-| 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs. Its student-facing steps (an external TestFlight build, a student on prod, App Store review) wait for Phase 6's gate items | 🔄 cloud parts in progress — see Phase 5 steps |
-| 6 | Security and compliance (added 2026-10-04): the authorization matrix, log redaction, the portal's headers and sign-out, CI hardening, least-privilege database roles; privacy manifests, account deletion, the policy pages, a student's record exported and a school's data disposed of, the 13+ screen; and the owner's Apple, legal, school and console items. Runs after Phase 4 (S1 inside it) and gates Phase 5's student-facing steps | ⬜ — see Phase 6 steps |
-| 7 | Live lesson (planned 2026-10-05): during a running session the teacher asks a question (Slice 1) and presents PDF slides (Slice 2); students see both on Bali's own screen, shielded or not; results totals only; phones poll. Design: ARCHITECTURE, "Live lesson (Phase 7)". Comes after the pilot path (Phases 5 and 6). | ⏸ planned; build on hold by the owner (2026-10-05) — nothing starts until the owner says so; when resumed, backend only first (no UI/app/portal changes). Steps under "Phase 7 steps" |
+| 4 | Reports + recap, rate limiting (ISSUES #1 per-account budgets), school-behind-one-IP load gate (k6), OpenAPI snapshot check, the authorization matrix (S1, from Phase 6), and both checks' gaps (O1b). The load gate sizes the sweep too: its per-row deadlock retry runs in a serial loop, so its worst case is candidates × 4 backoff sleeps — if the sweep grows, bound it (a shared retry budget per run, or batching) (#56's review) | ✅ cloud steps done — open: E1, the exit check on dev (💻, the owner's Mac); see Phase 4 steps |
+| 5 | Pilot readiness: prod environment, monitoring/Sentry, backup restore drill, Vercel flip (portal + marketing), TestFlight, App Store submission, teacher invite gating docs. Its student-facing steps (an external TestFlight build, a student on prod, App Store review) wait for Phase 6's gate items | ✅ cloud steps done; **prod live 2026-10-05**: API `https://bali-prod-production.up.railway.app`, portal `https://bali-portal.vercel.app`, Cognito pool `bali-production` (Vanderbilt-only sign-up), the sweep cron, no prod backups (the owner's ruling); the prod TestFlight build uploaded (build 4). Open: P8 (a session's PR after the owner's `railway config migrate`) and the owner's items (Open owner items, Phase 5 steps' 🔧) |
+| 6 | Security and compliance (added 2026-10-04): the authorization matrix, log redaction, the portal's headers and sign-out, CI hardening, least-privilege database roles; privacy manifests, account deletion, the policy pages, a student's record exported and a school's data disposed of, the 13+ screen; and the owner's Apple, legal, school and console items. Runs after Phase 4 (S1 inside it) and gates Phase 5's student-facing steps | ✅ cloud steps done — open: C2 the privacy page (⚖️ the lawyer's words), C4 Delete account UI 📱, C7 the age screen 📱, S6 (the owner's ruleset toggle), S8 (the owner's decision), S10 📱; see Phase 6 steps |
+| 7 | Live lesson (planned 2026-10-05): during a running session the teacher asks a question (Slice 1) and presents PDF slides (Slice 2); students see both on Bali's own screen, shielded or not; results totals only; phones poll. Design: ARCHITECTURE, "Live lesson (Phase 7)". Comes after the pilot path (Phases 5 and 6). | ⏸ planned (ARCHITECTURE, Live lesson; #230); build on hold by the owner (2026-10-05); when resumed, backend only first. Steps under "Phase 7 steps" |
 
 ### Phase 5 steps (cloud parts; one PR each; 👀 = owner looks at screenshots; 🔧 = owner in a console)
 
@@ -804,7 +71,7 @@ _Last updated: 2026-10-05 — **Phase 7, Live lesson: planned; build on hold by 
 - **P2** Sentry in the portal, the same rules — ✅ `apps/web/src/lib/monitoring.ts`, `@sentry/browser` started by `src/instrumentation-client.ts` when `NEXT_PUBLIC_SENTRY_DSN` is set at build time: uncaught errors and rejections (Next hands React's uncaught render errors to `reportError`), and the API client's 5xx and network failures as `ApiFailure` with the method and the path's template; never a 4xx, nor an `ApiError` rejected uncaught. An allow-list of integrations (no breadcrumbs, no HttpContext page URL, no sessions, no replay, no tracing), `dataCollection` all off, and `beforeSend` dropping the request, the user, extras, breadcrumbs and the transaction, and cutting URLs to their template and UUIDs to `:id` in messages and stack frames. A fake-transport test finds no class or session id, student name, unlock reason, invite code, token or form value in the envelopes, and no event for a 4xx. 🔧 Owner: `NEXT_PUBLIC_SENTRY_DSN` (and `NEXT_PUBLIC_SENTRY_ENVIRONMENT`) on the portal's build (`docs/WEB.md`).
 - **P3** 👀 Teachers register their block on the portal by its ID — ✅ a "Your block" section under the classes on the portal's home page (`apps/web/src/components/blocks.tsx`, logic in `src/lib/blocks.ts`): the teacher's live blocks, read by the new `GET /v1/blocks` (their own, oldest first, none soft-removed; a student `403`; S1 matrix rows; the OpenAPI snapshot regenerated), and a field that registers one by `POST /v1/blocks`. The ID is checked as BaliCore's `BlockTag` reads a tag (ten ASCII letters and digits, any case and spacing, sent upper-case) before a try is spent on it. The route takes no `eventId`: it is idempotent on the tag, so Try again resends as it was. Said under the field: another teacher's block (the route's one `409`), a malformed ID, too many tries (`429`, by its `Retry-After`), no connection or a 5xx. Tests: `apps/api/test/blocks.test.ts`, `apps/web/src/lib/blocks.test.ts`. Why: `docs/DECISIONS.md` (P3)
 - **P4** 👀 A public support and FAQ page; its support email is eshan.shah@vanderbilt.edu (owner, 2026-10-04) — ✅ `apps/web/src/app/support/page.tsx`, `/support`, linked from `/login` ("Help and questions"): read without signing in, no API call, rendered per request like every page (S4's CSP); no Sign out bar there (`PortalBar` skips it as it does `/login`). What Bali is in two sentences; for students: joining, tapping in (a tap before Start waits), Emergency Unlock (a second's hold, no connection needed, an optional reason), calls, FaceTime, Messages and SOS, the bell with the app closed, turning Screen Time off, and the teacher-sees lists word for word from `ConsentCard` (a test reads `JoinView.swift` and fails on drift); for teachers: the invite code (asked of us by email; once, 14 days), registering the block, running a class, reports; privacy in plain words with the policy "coming soon" (C2 writes it); the support email as a `mailto:` link. No legal claims. Rode along: dev's portal client `bali-web-dev` recorded (`docs/WEB.md`, `docs/DEPLOY.md`), and two old phone clients listed for deletion under Phase 6's owner items
-- **P5** 🔧 A CI workflow that uploads a TestFlight build when the owner's App Store Connect API key secrets exist (manual dispatch; skips cleanly without them) — ✅ (the code half) `.github/workflows/testflight.yml`, dispatched by hand with the environment to build against (dev, the default, or prod, whose values the Archive step sets; 2026-10-05): a Linux job checks the three secrets and, any missing, says which and passes; on `macos-26`, XcodeGen as `ios.yml`, a Release archive signed through the key (`-allowProvisioningUpdates`), the build number the run's, then `-exportArchive` with `destination: upload` sends it to TestFlight, no new dependency. A release guard (#130; part of S10) fails first on a `DEBUG` flag in Release, Debug-only text in the app or the monitor, an empty or non-HTTPS sign-in setting, or no app icon (the icon landed 2026-10-04: concept A, the mark on its stone-50 tile). Actions pinned by SHA, `contents: read`, timeouts, the key removed at the end. 🔧 Owner: the App Store Connect app record, an App Manager API key, and the secrets `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8` (`docs/DEPLOY.md`, "TestFlight"). Why: `docs/DECISIONS.md` (P5)
+- **P5** 🔧 A CI workflow that uploads a TestFlight build when the owner's App Store Connect API key secrets exist (manual dispatch; skips cleanly without them) — ✅ (the code half) `.github/workflows/testflight.yml`, dispatched by hand with the environment to build against (dev, the default, or prod, whose values the Archive step sets; 2026-10-05): a Linux job checks the three secrets and, any missing, says which and passes; on `macos-26`, XcodeGen as `ios.yml`, a Release archive signed through the key (`-allowProvisioningUpdates`), the build number the run's, then `-exportArchive` with `destination: upload` sends it to TestFlight, no new dependency. A release guard (#130; part of S10) fails first on a `DEBUG` flag in Release, Debug-only text in the app or the monitor, an empty or non-HTTPS sign-in setting, or no app icon (the icon landed 2026-10-04: concept A, the mark on its stone-50 tile). Actions pinned by SHA, `contents: read`, timeouts, the key removed at the end. 🔧 Owner: the App Store Connect app record, an App Manager API key, and the secrets `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8` (`docs/DEPLOY.md`, "TestFlight"). **The first prod build (2026-10-05):** run 1 failed on the key (its PEM refused; the owner re-pasted the secret); run 2 on the icon guard's false alarm (#235); run 3 uploaded and App Store Connect refused it (the NFC entitlement listed NDEF, ITMS-90778; the extensions had no `CFBundleDisplayName`, ITMS-90360), fixed by #236 (the entitlement TAG alone, the extensions named, both checked by `ios.yml` and the release guard); run 37279657642 (build 4) uploaded. Why: `docs/DECISIONS.md` (P5)
 - **P6** Owner runbooks: the production Railway environment, Cognito hardening for prod (Phase 6's list), the Vercel flip, the backup-restore drill — ✅ [`docs/RUNBOOKS.md`](RUNBOOKS.md), five numbered runbooks, each step with where to click and a check: (1) production on Railway — the environment, its Postgres on the private network with no TCP proxy, daily backups, every variable and how to make each secret, the backup sweep cron, 2FA, `/healthz`; (2) Cognito for production — a new pool, self sign-up off or gated, PKCE-only public clients with no password flows, a password policy, user-existence errors prevented, MFA, threat protection, exact callback and sign-out URLs, unused clients deleted, CloudTrail, MFA on the AWS root, and Sign in with Apple only if Google is offered; (3) the Vercel flip — the existing project kept building only `v2-archive` first, a new project rooted at `apps/web`, the domain, previews protected and never on prod's values, then `vercel.json` removed; (4) the restore drill — prod dumped into a scratch Postgres inside its private network, counts and one session's events compared, timed, the copy destroyed, and Railway's in-place restore practised on dev; (5) GitHub — CODEOWNERS and the ruleset, secret scanning with push protection, private vulnerability reporting, CodeQL, fork-workflow approval, the load gate required. Railway's point-in-time recovery is unconfirmed: the runbook says to raise it if the console has none (hosting decision 4). 🔧 Owner: follow them; record the drill's result here, on this line. Why: `docs/DECISIONS.md` (P6)
 - **P7** 👀 App Store drafts: description (student-focus framing, ISSUES #3), review notes, privacy-label and age-rating answers, options for how App Review tries Bali without a block (#130) — ✅ (drafts) [`docs/APP-STORE.md`](APP-STORE.md): name, subtitle, promotional text, description and keywords framed as the student managing their own focus (never "schools stay in control"), the teacher-sees lists word for word from `ConsentCard`; review notes (`.individual`, `.all()` shields, Emergency Unlock always, calls/FaceTime/Messages/SOS, the bell with the app closed, deleting the app); the App Privacy table (email, name, user ID, install ID, product interaction, unlock reasons, class membership; App Functionality, linked, no tracking) and the age-rating answers, ⚖️ marks for the lawyer; three ways for App Review to try Bali without a block, recommending a recorded tap plus review accounts. 🔧 Owner: decide the review path (section 4), then fill the accounts and paste.
 - **P8** 🔧 Railway's config-as-code moves from `railway.json` to `.railway/railway.ts` before 2026-12-01, when the CLI says `railway.json` stops working (it warns it is deprecated). The owner runs `railway config migrate` on their computer (it isn't run unattended), then a session's PR commits the new file, removes `railway.json`, and updates `docs/DEPLOY.md`, `docs/RUNBOOKS.md` (runbooks 1 and 5) and CODEOWNERS' list; check a dev deploy still builds from the `Dockerfile` with `npm run migrate && npm start` and `/healthz`. ⬜
@@ -911,6 +178,16 @@ Slice 2 — slides:
 - **M9** Load and demo: the demo presents a deck through the fake; the load gate polls with a slide shown — validation: `npm run demo`, the load gate green
 - **M10** 📱 Exit check: a real class on prod follows a deck
 
+**Open design questions, to settle in ARCHITECTURE before L1 is cut** (#230's final review;
+docs only, nothing built):
+- `event_id` uniqueness between `responses` and `events` is one-directional: the answers
+  route checks `events`, but nothing yet stops a later tap, unlock or other mutation from
+  reusing an `event_id` a response already holds.
+- The small-group guard (3 answers before a breakdown) must bind to the counts wherever they
+  are read, reports and the recap included, not only the results route.
+- The `sha256` check of a deck's bytes is specified for the phone only, not for the
+  portal's renderer.
+
 ### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
 
 API and shared contracts come first; Swift lives in a root `ios/` folder (the
@@ -952,7 +229,7 @@ plan backstop already treats it as source).
 - **B1a** `BaliCore` Swift package: skeleton, every wire type, fixture decode tests, a Linux Swift CI job — ✅ `ios/BaliCore` (Swift 6, Foundation only; iOS 17, macOS 14, and Linux for the tests): every student endpoint's request and response and the vocabularies they use, mirroring `@bali/shared`. A closed vocabulary decodes as `OrUnknown` — a value this build does not know is `.unknown`, never a failed decode — and an error's `reason` it does not know reads as none. Times accept `toISOString()`'s milliseconds or none, and encode with them. The contract test walks `contracts/fixtures/` in place: each body decodes strictly as the type it names and encodes back the same, each request body encodes as sent, a fixture of a type BaliCore does not map fails; the vocabularies are also checked against the TypeScript lists themselves. CI: "BaliCore Swift tests (Linux)" in `ci.yml`, in `swift:6.4-noble`, on every PR — making it required is the owner's ruleset call
 - **B1b** The outbox tables in BaliCore: `tapDisposition`, `stateChangeDisposition` and `unlockDisposition` ported, and `readMayReconcile`; the contract test checks each fixture's `disposition` against the port — ✅ `UnlockContract.swift` and `OutboxContract.swift`: the same names, a `SendResult` (a status, or `.networkError`) and the answer decoded as its response type — nil when there is none or it does not decode, and an outcome the build does not know is `.unknown`: both `retry`, the record kept — each rule's comment carried over (no unlock result ever means discard; a refused state change is final for its `eventId`), exhaustive switches in place of the TS `Record` tables. Parity, both ways: every fixture's `disposition` must be the port's (a disposition on an endpoint with no port fails), and `contracts/outbox/` holds the TypeScript's own answer on inputs the API does not send — 25 results (no answer, each status class's edges, 408, 429) × 37 bodies (none; every outcome any table knows, each unknown to another, and five none knows; with a session, a null one, none) per table, and 81 pairs of stamps for `readMayReconcile` — written by a golden test in `@bali/shared` (`outbox-cases.test.ts`), which `npm test` fails on drift and `npm run fixtures` (now every workspace's generator) rewrites; CI diffs all of `contracts/`. The cases reach every value of each TS disposition union, and the Swift enums must be exactly the values they reach; `readMayReconcile`'s scenarios are ported as Swift tests. Rode along (#69's review): the inline unions BaliCore mirrors are `as const` lists in `@bali/shared` (`UPDATE_ME_OUTCOMES`, `CHECK_IN_STATUSES`, `REFOCUS_OUTCOMES`, `PROTECTION_OFF_OUTCOMES`, `ENROLLMENT_JOIN_OUTCOMES`, `END_ENROLLMENT_OUTCOMES`, `END_ENROLLMENT_REASONS`), read by the vocabulary test and used by the fixture schemas; and each null field of a fixture is now compared too — sent a probe no type takes, which BaliCore must refuse or bring back
 - **B1c** The API client: `URLSession` with async/await and an injected token provider (`FoundationNetworking` on Linux), coding with `BaliJSON` — ✅ `APIClient.swift`: one method per student endpoint, typed request in, `APIResponse` out — the `SendResult` and the body for that status (the response type on a 2xx, `ApiErrorBody` on any other, nil when it does not decode), which the outbox tables take whole; no method throws, and it sends each request once and judges nothing. The bearer token comes from an injected `TokenProvider`, asked before every request: none to give is `.networkError` with `noAnswer: .noToken` — nothing sent, the record kept, never a sign-out — and a `401` comes back as a value for the caller's `reauth`. An `HTTPTransport` seam, over an ephemeral, cache-less URLSession by default; 15 s without a byte, 30 s a whole exchange, a timeout `.networkError`; a JSON content type only with a body (Fastify 400s one on a bodiless `DELETE`); path and query values escaped. Its tests send every fixture's request through a transport double and feed its answer back to its disposition, plus no answer, undecodable bodies, a 401, no token, and a real local socket (an answer, and a timeout). Rode along (#70's review): `stateChangeDisposition` is one entry point, so a literal `nil` body compiles. **B1 is complete**
-- **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI on GitHub-hosted runners, only on PRs touching `ios/` (decision 9). Identifiers — v2's, as the Family Controls entitlement request used them: team `H535678UF8`; app `com.bali.Bali`; extensions `com.bali.Bali.BaliShield` (shield UI) and `com.bali.Bali.BaliMonitor` (DeviceActivity monitor); app group `group.com.bali.shared` — ✅ `ios/project.yml` is the project: `xcodegen generate` writes `Bali.xcodeproj`, which git ignores (`ios/README.md` says how to open and run it). Three targets on iOS 17, iPhone only, Swift 6, automatic signing on the team: `Bali` (SwiftUI; a placeholder screen showing BaliCore is linked — the screens are C1–C6), `BaliMonitor` (principal class `SessionMonitor`, a `DeviceActivityMonitor`) and `BaliShield` (`ShieldConfigurationExtension`, iOS's default shield for now), both embedded in the app, their overrides empty with a `// B5:` note each. Hand-written `Info.plist` (only what Xcode does not generate) and `.entitlements` per target, v2's: Family Controls and the app group on all three, NFC tag reading (v2's formats, NDEF and TAG) and its usage string on the app. CI: the **iOS** workflow — a Linux job reads the PR's changed files, and only when `ios/` or the workflow changed does "iOS app + BaliCore tests (iOS Simulator)" run on `macos-26` with Xcode 26.6: XcodeGen 2.46.0 (pinned, checksummed), the app built for the simulator with signing off, BaliCore's tests run on it. Moving it to the owner's Mac is its `runs-on` line. Rode along (#71's review, security): BaliCore's URLSession transport refuses redirects — a 3xx comes back as its status (`retry`, the record kept) instead of resending the request, bearer token and all, to the host a `Location` names; proven over the local-socket harness. And #71's socket timeout test is bounded against a session of its own that would wait four minutes, not the default's fifteen seconds: the simulator on GitHub's runner stalls for up to thirteen seconds at a time, once past its old ten-second bound
+- **B2** App + extension skeleton (XcodeGen: app, DeviceActivity monitor, shield UI, app group) + macOS CI on GitHub-hosted runners, only on PRs touching `ios/` (decision 9). Identifiers — v2's, as the Family Controls entitlement request used them: team `H535678UF8`; app `com.bali.Bali`; extensions `com.bali.Bali.BaliShield` (shield UI) and `com.bali.Bali.BaliMonitor` (DeviceActivity monitor); app group `group.com.bali.shared` — ✅ `ios/project.yml` is the project: `xcodegen generate` writes `Bali.xcodeproj`, which git ignores (`ios/README.md` says how to open and run it). Three targets on iOS 17, iPhone only, Swift 6, automatic signing on the team: `Bali` (SwiftUI; a placeholder screen showing BaliCore is linked — the screens are C1–C6), `BaliMonitor` (principal class `SessionMonitor`, a `DeviceActivityMonitor`) and `BaliShield` (`ShieldConfigurationExtension`, iOS's default shield for now), both embedded in the app, their overrides empty with a `// B5:` note each. Hand-written `Info.plist` (only what Xcode does not generate) and `.entitlements` per target, v2's: Family Controls and the app group on all three, NFC tag reading (formats: TAG alone, 2026-10-05, #236; v2's NDEF and TAG until then) and its usage string on the app. CI: the **iOS** workflow — a Linux job reads the PR's changed files, and only when `ios/` or the workflow changed does "iOS app + BaliCore tests (iOS Simulator)" run on `macos-26` with Xcode 26.6: XcodeGen 2.46.0 (pinned, checksummed), the app built for the simulator with signing off, BaliCore's tests run on it. Moving it to the owner's Mac is its `runs-on` line. Rode along (#71's review, security): BaliCore's URLSession transport refuses redirects — a 3xx comes back as its status (`retry`, the record kept) instead of resending the request, bearer token and all, to the host a `Location` names; proven over the local-socket harness. And #71's socket timeout test is bounded against a session of its own that would wait four minutes, not the default's fifteen seconds: the simulator on GitHub's runner stalls for up to thirteen seconds at a time, once past its old ten-second bound
 - **B3a** The outbox store: GRDB in the app group, BaliCore's tables applied, and the retry bound — ✅ `ios/BaliOutbox` (GRDB 7.11.1, pinned; student-only, linked by the app): `outbox.sqlite` in `group.com.bali.shared` (`Outbox.appGroupURL`), one row per record (a UUIDv7 minted when the phone acted, its kind and payload, `recordedAt` sent as `deviceTime`, attempts, the next attempt, `stuck`, the last answer for a screen). `record(_:now:)` queues a change: a tap or an unlock supersedes every queued refocus, unsent, and protection off is reported once per revocation (again after a tap, `protectionRestored()`, or in another session). `nextDue(now:)` goes in the order the phone acted: a pending record holds the ones behind it, a stuck one steps aside, and a refocus waits for the unlock it returns from, stuck or not. `settle(eventId:with:now:)` applies the table: an ending disposition deletes, any other keeps, due after 2 s, 4 s, 8 s… capped at 60 s, plus up to as much again at random. **The bound** (#59's, #70's reviews): refused, or left unsettled by 8 server answers (any status but 401, 408, 429 — a 5xx, a 3xx, a 2xx this build cannot read), a record is stuck: kept (an unlock until recorded, a tap until a 2xx; a state change is never dropped for it), retried and shown, holding neither the records behind it nor the phone's reads (`awaiting()`), while an unrecorded unlock still guards its session (`holdsUnlock(session:)`: no read puts its shields back on). Its tests run on Linux (`ci.yml`) and on the iOS Simulator (`ios.yml`), against `contracts/outbox/` and the fixtures. Rode along: ESLint skips SwiftPM's `.build` (GRDB's checkout carries JavaScript)
 - **B3b-1** The sync engine's drain: the loop draining `nextDue` through one shared `APIClient`, the waits on sign-in, a retry-now — ✅ `SyncEngine` (`ios/BaliOutbox/SyncEngine.swift`), an actor holding the app's one `APIClient` (one URLSession for the app's life; `engine.client` for the screens' own calls). `run()` drains in the order the phone acted: the record due is sent (`OutboxRecord.send(through:)`) and settled, then the next — or a wait for its backoff, or for a ring (`record`, the only way the app queues a change, or a retry). No token (`.noToken`): nothing was sent, so nothing is settled or counted, and the record waits on sign-in — a ring, or a minute — never a sign-out, never dropped. A 401 settles as `reauth` and asks B4's seam, `refresh` (true once a fresh token is ready), then sends everything again at once — once per rejection, so a server rejecting every token never makes the phone spin. `retryNow()` (`Outbox.retryNow(now:)`, moved from B3a): everything queued due now — the student's retry (rule 5), and B4's after a sign-in; stuck stays stuck. `updates()` streams `SyncState` for the screens: the queue (a stuck record with its last answer), the link (reached, unreachable, sign-in, storage failed), when the server last answered, when the outbox sends next, and the last state change the server refused — dropped for good, so kept to show. Rode along (#73's review): `settle` takes a `Sent`, which only `send(through:)` makes — the record's own endpoint, read by its own kind's table — so a mismatched answer cannot happen. Tests: the drain against a hand-answered transport and a clock the test moves, on Linux and the iOS Simulator. Split from B3b for size
 - **B3b-2** The check-in and the reconcile, and one file for the app and its extensions — ✅ `SyncState.standing` is the phone's truth — out, waiting (armed), or in a session in a state, shielded only while `focused` (a state this build does not know never is) — beside `pendingTap`, a tap not yet answered, which B5 shields for at once to decision 7's cap. The phone's own change stands at once; a change's own answer applies when it names a live session (a session and a state) unless a later change of the phone's still waits for its own; armed waits for the Start but never ends a session the phone is in; an answer naming no live session re-reads the truth (`GET /v1/me`). Reads — the check-in every 30 s in the foreground only (`setForeground`), and `GET /v1/me` on coming to the foreground and whenever an answer says so — are stamped when sent and applied only when `readMayReconcile` says no change can be newer; `gone` or a `404` re-reads. The unlock guard: no read turns a session's shields back on over an unrecorded unlock (`holdsUnlock`) — its window applies, as `unlocked` — unless the phone is focused there already, by a refocus or a tap made since; the end, or another session, always applies. Each step changes the state at once, so enforcement never sees half of one. One file, as GRDB's "Sharing a Database" says: a 5 s busy timeout; `Outbox.suspend()` and `resume()`, posted by the app as it leaves and enters the foreground (`BaliApp`), so no lock is held while it is suspended (0xdead10cc) — a write refused then is no failure, and the engine sends again once the app is back; persistent WAL for the processes that only read; the open and the migration coordinated (`NSFileCoordinator`); a file a newer build migrated refused. Tests on Linux and the iOS Simulator, two connections on one file among them. An unlock made while the phone's own tap is unanswered is decision 11's, filed under that tap (A11's `POST /v1/taps/{eventId}/unlock`, BaliCore's `unlock(tap:_:)`; until B6 and C5 use it, `record` needs a session). Rode along (#74's review): a cancelled `run()` runs again; a refused change is shown until the phone's next change; `Sent` carries its answer's session and state, which the reconcile applies; two 401s at once — the drain's and a read's — share one refresh; and a failed read of the outbox anywhere in the engine is shown
@@ -1056,6 +333,8 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 6. Vercel `bali-portal`: an Ignored Build Step `[ "$VERCEL_GIT_COMMIT_REF" != "main" ]`, so PR previews (which fail without env, by design) stop building.
 
 
+- 📱 Tap a block on the first prod TestFlight build (build 4): #236 changed the NFC entitlement to TAG alone and `BlockReader` uses `NFCNDEFReaderSession`. Apple's docs say that works, but no device has confirmed it (B6's check ran under NDEF and TAG). If the tap fails, NDEF has to come back, and the new `ios.yml`/`testflight.yml` guards with it.
+- 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - 🚨 Apple's developer agreement §3.3.3(P) on Family Controls (ISSUES #3): ask App Review now (Phase 6).
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
@@ -1192,7 +471,9 @@ decision log, <date>" means the entry with that date there.
 
 ## How to update this file (every session that changes code)
 
-- Flip statuses, refresh **Now**, and re-date the header line.
+- Flip statuses, refresh **Now** (a short handoff: production, what's in flight, the critical
+  path, who does what; history goes in the step lines or `docs/DECISIONS.md`), and re-date the
+  header line.
 - Made a real decision? It goes at the top of `docs/DECISIONS.md`, not here.
 - Built a new feature? Add a row under Go-live features with a one-line
   architecture note; if a design decision changed, ARCHITECTURE.md is updated
