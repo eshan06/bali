@@ -637,9 +637,11 @@ alerts, each to your email:
 
 - **A new or returning error** in the API or the portal.
 - **The sweep stopped or keeps failing.** Each minute's sweep checks in to a Sentry Cron
-  monitor, `api-sweep` (`apps/api/src/monitoring.ts`): no check-in for 3 minutes (a
-  minute's schedule plus a 2-minute margin), a run over 5 minutes, or 2 failed runs in a
-  row opens an issue. Sessions then stop ending at their bell, so this one matters.
+  monitor, `api-sweep` (`apps/api/src/monitoring.ts`). A stopped API sends nothing, and
+  Sentry calls it missed after 3 minutes (a minute's schedule plus a 2-minute margin); a
+  hung run holds its check-in open and the API skips the next ticks, so Sentry calls it
+  timed out after 5 minutes; 2 failed runs in a row also open an issue. Sessions then stop
+  ending at their bell, so this one matters.
 - **The API is down.** An outside check on `<prod API URL>/healthz`. `/healthz` answers
   `{"status":"ok","version":…}` whenever the process is up; it doesn't touch Postgres. A
   database outage shows up as the sweep's failed check-ins and as 5xx errors instead.

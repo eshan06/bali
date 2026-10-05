@@ -109,7 +109,11 @@ export function captureFailure(error: unknown, where: string): void {
   });
 }
 
-/** The sweep's Sentry Cron monitor, made (or updated) by its first check-in. */
+/**
+ * The sweep's Sentry Cron monitor, made (or updated) by its first check-in.
+ * Every environment (dev, production) checks in to this one slug under its own
+ * environment, and each check-in sends the config below: change it for all.
+ */
 export const SWEEP_MONITOR_SLUG = 'api-sweep';
 
 const SWEEP_MONITOR_CONFIG: Parameters<typeof Sentry.withMonitor>[2] = {
