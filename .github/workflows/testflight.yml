@@ -169,8 +169,10 @@ jobs:
           done
           [ "$(plist CFBundleVersion)" = "$GITHUB_RUN_NUMBER" ] \
             || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }
-          [ -n "$(plist CFBundleIconName)" ] \
-            || { echo "::error::The app has no icon (CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
+          # On iOS, actool writes the icon's name under CFBundleIcons, not at the top level
+          # (macOS's place): ios.yml checks the same key on every iOS PR.
+          [ -n "$(plist CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] \
+            || { echo "::error::The app has no icon (CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
           # binary | the source that has the text | the text. A text no longer in its source
           # fails too, so a rename can't leave this check finding nothing.
           for marker in "Bali|ios/Bali/BaliApp.swift|Debug readout" \
