@@ -162,6 +162,20 @@ public struct APIClient: Sendable {
         await send("DELETE", "/v1/me", request)
     }
 
+    /// `PUT /v1/me/push-token` — the student registers its phone's APNs token (N3).
+    public func registerPushToken(_ request: RegisterPushTokenRequest) async
+        -> APIResponse<RegisterPushTokenResponse>
+    {
+        await send("PUT", "/v1/me/push-token", request)
+    }
+
+    /// `DELETE /v1/me/push-token` — the student removes its phone's APNs token (N3).
+    public func removePushToken(_ request: RemovePushTokenRequest) async
+        -> APIResponse<RemovePushTokenResponse>
+    {
+        await send("DELETE", "/v1/me/push-token", request)
+    }
+
     /// `POST /v1/taps` — for `tapDisposition`.
     public func tap(_ request: TapRequest) async -> APIResponse<TapResponse> {
         await send("POST", "/v1/taps", request)

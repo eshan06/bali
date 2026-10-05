@@ -11,7 +11,10 @@ import {
   type MeResponse,
   PROTECTION_OFF_OUTCOMES,
   PROTECTION_ON_OUTCOMES,
+  PUSH_ENVIRONMENTS,
   REFOCUS_OUTCOMES,
+  REGISTER_PUSH_TOKEN_OUTCOMES,
+  REMOVE_PUSH_TOKEN_OUTCOMES,
   TAP_OUTCOMES,
   UNLOCK_REASON_OUTCOMES,
   UNLOCK_RECORDED_AS,
@@ -185,6 +188,19 @@ const SCENARIOS: Record<string, string> = {
   'name/400-invalid-request': 'A rename whose eventId is not a UUID: a client bug.',
   'name/401-unauthorized': 'A rename sent with no bearer token.',
   'name/403-teacher': 'A teacher setting their name: not here — the ruling is about students.',
+  'push-token/registered':
+    'A student registers its phone’s APNs token (N3), sent upper-case and stored lower-case.',
+  'push-token/replay': 'The retry of that register: written again by nothing, the token as it is.',
+  'push-token/moved':
+    'The same phone signed in to another account: the token moves to it, one phone, one owner.',
+  'push-token/409-event-id-conflict': 'A register under an eventId another register holds.',
+  'push-token/400-invalid': 'A register whose token is not hex: a client bug.',
+  'push-token/401-unauthorized': 'A register sent with no bearer token.',
+  'push-token/403-teacher': 'A teacher registering a token: students only, for now.',
+  'push-token/removed': 'A student removes its phone’s token.',
+  'push-token/not-registered':
+    'The retry of that removal: the caller holds no such token now, and nothing changes.',
+  'push-token/remove-403-teacher': 'A teacher removing a token: students only, for now.',
   'account/deleted':
     'A student deletes their account (C3): every class left, their name and sign-in gone.',
   'account/already-deleted': 'The retry of that deletion: this sign-in has no account now.',
@@ -195,7 +211,7 @@ const SCENARIOS: Record<string, string> = {
 interface Call {
   /** A bearer token, or null to send none. */
   as: string | null;
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   path: string;
   body?: object;
   /** When the server hears a call whose body names no time (a read): now, unless said. */
@@ -790,6 +806,42 @@ async function captureAll() {
   const theTeacher = rename(await token(naming.teacher.cognitoId), 'Ms. Park');
   await capture('name/403-teacher', theTeacher, 403, { code: 'forbidden' });
 
+  // A student's phone's APNs token (N3): registered, moved, removed.
+  const pushToken = 'A1B2C3D4'.repeat(8);
+  const pushPath = '/v1/me/push-token';
+  const register = (as: string | null, body: object): Call => ({
+    as,
+    method: 'PUT',
+    path: pushPath,
+    body: { token: pushToken, environment: 'production', eventId: randomUUID(), ...body },
+  });
+  const unregister = (as: string, eventId = randomUUID()): Call => ({
+    as,
+    method: 'DELETE',
+    path: pushPath,
+    body: { token: pushToken, eventId },
+  });
+  const firstOwner = await token('student-fx-push-first');
+  const registered = register(firstOwner, {});
+  await capture('push-token/registered', registered, 200, { outcome: 'registered' });
+  await capture('push-token/replay', registered, 200, { outcome: 'replay' });
+  const pushEventId = (registered.body as { eventId: string }).eventId;
+  const reused = register(firstOwner, { token: 'f'.repeat(64), eventId: pushEventId });
+  await capture('push-token/409-event-id-conflict', reused, 409, { reason: 'event_id_conflict' });
+  const notHex = register(firstOwner, { token: 'not-a-token' });
+  await capture('push-token/400-invalid', notHex, 400, { code: 'bad_input' });
+  await capture('push-token/401-unauthorized', register(null, {}), 401, { code: 'unauthorized' });
+  const pushTeacher = await token(naming.teacher.cognitoId);
+  await capture('push-token/403-teacher', register(pushTeacher, {}), 403, { code: 'forbidden' });
+  const nextOwner = await token(naming.student.cognitoId);
+  const moved = register(nextOwner, { environment: 'sandbox' });
+  await capture('push-token/moved', moved, 200, { outcome: 'registered' });
+  const removal = unregister(nextOwner);
+  await capture('push-token/removed', removal, 200, { outcome: 'removed' });
+  await capture('push-token/not-registered', removal, 200, { outcome: 'not_registered' });
+  const teacherRemoves = unregister(pushTeacher);
+  await capture('push-token/remove-403-teacher', teacherRemoves, 403, { code: 'forbidden' });
+
   // The account's deletion (C3), last: it leaves Eve's classes and her row named to no one.
   const deletion = del(eve, '/v1/me');
   await capture('account/deleted', deletion, 200, { outcome: 'deleted' });
@@ -846,6 +898,12 @@ describe('the contract fixtures (contracts/fixtures)', () => {
     expect(valuesOf('CheckInResponse', 'status')).toEqual(new Set(CHECK_IN_STATUSES));
     expect(valuesOf('UpdateMeResponse', 'outcome')).toEqual(new Set(UPDATE_ME_OUTCOMES));
     expect(valuesOf('DeleteMeResponse', 'outcome')).toEqual(new Set(DELETE_ME_OUTCOMES));
+    const registers = valuesOf('RegisterPushTokenResponse', 'outcome');
+    expect(registers).toEqual(new Set(REGISTER_PUSH_TOKEN_OUTCOMES));
+    const environments = valuesOf('RegisterPushTokenResponse', 'environment');
+    expect(environments).toEqual(new Set(PUSH_ENVIRONMENTS));
+    const removals = valuesOf('RemovePushTokenResponse', 'outcome');
+    expect(removals).toEqual(new Set(REMOVE_PUSH_TOKEN_OUTCOMES));
     const reasonChanges = valuesOf('UnlockReasonResponse', 'outcome');
     expect(reasonChanges).toEqual(new Set(UNLOCK_REASON_OUTCOMES));
     const joins = valuesOf('EnrollmentJoinResponse', 'outcome');

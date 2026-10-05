@@ -2,6 +2,7 @@ import type {
   EventType,
   ParticipationEndedReason,
   ParticipationState,
+  PushEnvironment,
   UserRole,
 } from '@bali/shared';
 import { sql } from 'drizzle-orm';
@@ -384,5 +385,35 @@ export const teacherInvites = pgTable(
       'teacher_invites_redeem_whole',
       sql`(${t.redeemedAt} IS NULL) = (${t.redeemedBy} IS NULL) AND (${t.redeemedAt} IS NULL) = (${t.redeemEventId} IS NULL)`,
     ),
+  ],
+);
+
+/*
+ * Device tokens (N3; ARCHITECTURE, "Push: a doorbell for students"): a student's phone's APNs
+ * token, so a Start can ring the students it converts (N5). Keyed by the token, so one phone has
+ * one current owner: registered from another account, the row moves to it. Written beside the
+ * transition engine (`device-tokens.ts`), never inside it. Personal data, and the one table whose
+ * rows are really deleted: a removed or gone token is no record of anything, and nothing
+ * references it.
+ */
+export const deviceTokens = pgTable(
+  'device_tokens',
+  {
+    /** The token APNs gave the phone, in lower-case hex. */
+    token: text('token').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    environment: text('environment').$type<PushEnvironment>().notNull(),
+    /** The eventId of the register that wrote the row as it is: a replay finds its own here. */
+    eventId: uuid('event_id').notNull().unique(),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // A Start reads a student's tokens (N5); a deletion removes them (N4).
+    index('device_tokens_user_idx').on(t.userId),
+    check('device_tokens_token_hex', sql`${t.token} ~ '^[0-9a-f]{64,200}$'`),
+    check('device_tokens_environment', sql`${t.environment} IN ('sandbox', 'production')`),
   ],
 );

@@ -127,6 +127,13 @@
       "when": 1791161991229,
       "tag": "0017_school_year_ends_on",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791222483726,
+      "tag": "0018_device_tokens",
+      "breakpoints": true
     }
   ]
 }

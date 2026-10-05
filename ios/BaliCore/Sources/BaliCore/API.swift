@@ -113,6 +113,40 @@ public struct DeleteMeResponse: Codable, Sendable, Hashable {
     public let outcome: OrUnknown<Outcome>
 }
 
+/// `PUT /v1/me/push-token` — a student registers its phone's APNs device token (N3). One phone, one
+/// current owner: a token another account registered moves to this one. A teacher is `403`.
+public struct RegisterPushTokenRequest: Codable, Sendable, Hashable {
+    /// The token's bytes in hex, as APNs gave them; the server keeps it lower-case.
+    public let token: String
+    public let environment: PushEnvironment
+    public let eventId: String
+    public init(token: String, environment: PushEnvironment, eventId: String) {
+        (self.token, self.environment, self.eventId) = (token, environment, eventId)
+    }
+}
+
+public struct RegisterPushTokenResponse: Codable, Sendable, Hashable {
+    /// `REGISTER_PUSH_TOKEN_OUTCOMES`: either way, the token is this account's now.
+    public enum Outcome: String, CaseIterable, Sendable { case registered, replay }
+    public let outcome: OrUnknown<Outcome>
+    public let environment: OrUnknown<PushEnvironment>
+}
+
+/// `DELETE /v1/me/push-token` — a student removes its phone's token. A teacher is `403`.
+public struct RemovePushTokenRequest: Codable, Sendable, Hashable {
+    public let token: String
+    public let eventId: String
+    public init(token: String, eventId: String) { (self.token, self.eventId) = (token, eventId) }
+}
+
+public struct RemovePushTokenResponse: Codable, Sendable, Hashable {
+    /// `REMOVE_PUSH_TOKEN_OUTCOMES`: either way, the token is not this account's now.
+    public enum Outcome: String, CaseIterable, Sendable {
+        case removed, notRegistered = "not_registered"
+    }
+    public let outcome: OrUnknown<Outcome>
+}
+
 /// `POST /v1/taps`.
 public struct TapRequest: Codable, Sendable, Hashable {
     public let tagId: String

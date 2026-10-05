@@ -41,6 +41,8 @@ export const STUDENT_RECORD_COVERAGE = {
     'classes.teacher_id': "a teacher's classes: the school's records, with other students in them",
     'blocks.teacher_id': "a teacher's blocks: the school's equipment",
     'armed_taps.teacher_id': "the taps other students made on a teacher's block",
+    // Theirs, and listed here only until N4 exports it (PLAN, "Push: class started").
+    'device_tokens.user_id': 'NOT YET: theirs; N4 adds their device tokens to the export',
   },
 } as const;
 

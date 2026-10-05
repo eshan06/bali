@@ -90,6 +90,9 @@ public enum ProtectionOffRecordedAs: String, CaseIterable, Sendable {
 public enum ReturnRecordedAs: String, CaseIterable, Sendable { case superseded }
 /// `UNLOCK_REASONS`. Codable because the phone sends one; an answer carries it as `OrUnknown`.
 public enum UnlockReason: String, CaseIterable, Sendable, Codable { case bathroom, nurse, other }
+/// `PUSH_ENVIRONMENTS`: the APNs environment a device token was issued for — `sandbox` for a Debug
+/// build, `production` for TestFlight and the App Store. Codable because the phone sends one.
+public enum PushEnvironment: String, CaseIterable, Sendable, Codable { case sandbox, production }
 /// `HISTORY_EVENT_TYPES`: the moments a student's history shows; the app skips an unknown one.
 public enum HistoryEventType: String, CaseIterable, Sendable {
     case tapIn = "tap_in", refocus, unlock, protectionOff = "protection_off"

@@ -3809,6 +3809,8 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'armed_taps.teacher_id': "deleted: the taps on its teachers' blocks",
   'teacher_invites.school_id': 'an open invite deleted; a redeemed one kept, naming no one',
   'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
+  // Not handled yet: N4 deletes them (PLAN, "Push: class started").
+  'device_tokens.user_id': 'NOT YET: kept; N4 deletes the device tokens of its people',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -4193,6 +4195,9 @@ export const RETENTION_COVERAGE = {
     'deleted: the taps on a teacher it de-identifies; one made after the year keeps them named',
   'teacher_invites.redeemed_by':
     'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
+  // Not handled yet: N4 deletes them (PLAN, "Push: class started").
+  'device_tokens.user_id':
+    'NOT YET: kept; N4 deletes the device tokens of a person it de-identifies',
 } as const;
 
 export interface ApplyRetentionInput {

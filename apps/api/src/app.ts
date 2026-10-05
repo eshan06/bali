@@ -17,6 +17,7 @@ import { registerFeedRoutes } from './routes/feed.js';
 import { registerHistoryRoute } from './routes/history.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMeRoute } from './routes/me.js';
+import { registerPushTokenRoutes } from './routes/push-token.js';
 import { registerReportsRoutes } from './routes/reports.js';
 import { registerSessionsRoute } from './routes/sessions.js';
 import { registerTapsRoute } from './routes/taps.js';
@@ -115,6 +116,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   app.get('/healthz', (): HealthzResponse => ({ status: 'ok', version: API_VERSION }));
   const clock = deps.clock ?? (() => new Date());
   registerMeRoute(app, deps.db, clock);
+  registerPushTokenRoutes(app, deps.db);
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
   registerSessionsRoute(app, deps.db, clock);

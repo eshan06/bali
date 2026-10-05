@@ -43,6 +43,11 @@ import {
   type UpdateMeResponse,
   DELETE_ME_OUTCOMES,
   type DeleteMeResponse,
+  PUSH_ENVIRONMENTS,
+  REGISTER_PUSH_TOKEN_OUTCOMES,
+  type RegisterPushTokenResponse,
+  REMOVE_PUSH_TOKEN_OUTCOMES,
+  type RemovePushTokenResponse,
   USER_ROLES,
 } from '@bali/shared';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
@@ -77,6 +82,8 @@ interface Contract {
   HistoryPage: HistoryPage;
   UpdateMeResponse: UpdateMeResponse;
   DeleteMeResponse: DeleteMeResponse;
+  RegisterPushTokenResponse: RegisterPushTokenResponse;
+  RemovePushTokenResponse: RemovePushTokenResponse;
   ApiErrorBody: ApiErrorBody;
 }
 export type FixtureType = keyof Contract;
@@ -210,6 +217,13 @@ export const SCHEMAS = {
     user: meUser,
   }),
   DeleteMeResponse: object<DeleteMeResponse>()({ outcome: z.enum(DELETE_ME_OUTCOMES) }),
+  RegisterPushTokenResponse: object<RegisterPushTokenResponse>()({
+    outcome: z.enum(REGISTER_PUSH_TOKEN_OUTCOMES),
+    environment: z.enum(PUSH_ENVIRONMENTS),
+  }),
+  RemovePushTokenResponse: object<RemovePushTokenResponse>()({
+    outcome: z.enum(REMOVE_PUSH_TOKEN_OUTCOMES),
+  }),
   ApiErrorBody: object<ApiErrorBody>()({
     error: object<ApiErrorBody['error']>()({
       code: z.enum(Object.keys(API_ERROR_STATUS) as ApiErrorCode[]),
@@ -259,6 +273,8 @@ export const ENDPOINTS: Record<
   'PATCH /v1/me': { type: 'UpdateMeResponse' },
   // The account's deletion (C3), sent once the outbox is empty (C4).
   'DELETE /v1/me': { type: 'DeleteMeResponse' },
+  'PUT /v1/me/push-token': { type: 'RegisterPushTokenResponse' },
+  'DELETE /v1/me/push-token': { type: 'RemovePushTokenResponse' },
   // A change of an unlock's reason, keyed by the unlock's own id (A20).
   'PATCH /v1/unlocks/{eventId}': { type: 'UnlockReasonResponse' },
 };

@@ -52,6 +52,9 @@ struct VocabularyTests {
         // `removed_from_class` is a teacher's answer, never in a student fixture.
         ("api.ts", "UPDATE_ME_OUTCOMES", values(UpdateMeResponse.Outcome.self)),
         ("api.ts", "DELETE_ME_OUTCOMES", values(DeleteMeResponse.Outcome.self)),
+        ("api.ts", "PUSH_ENVIRONMENTS", values(PushEnvironment.self)),
+        ("api.ts", "REGISTER_PUSH_TOKEN_OUTCOMES", values(RegisterPushTokenResponse.Outcome.self)),
+        ("api.ts", "REMOVE_PUSH_TOKEN_OUTCOMES", values(RemovePushTokenResponse.Outcome.self)),
         ("api.ts", "CHECK_IN_STATUSES", values(CheckInResponse.Status.self)),
         ("api.ts", "REFOCUS_OUTCOMES", values(RefocusResponse.Outcome.self)),
         ("api.ts", "UNLOCK_REASON_OUTCOMES", values(UnlockReasonResponse.Outcome.self)),

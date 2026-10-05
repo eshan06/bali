@@ -96,6 +96,14 @@ struct APIClientFixtureTests {
             let request = try fixture.sent(DeleteMeRequest.self)
             return try answered(await client.deleteMe(request), fixture)
         },
+        "PUT /v1/me/push-token": { client, fixture in
+            let request = try fixture.sent(RegisterPushTokenRequest.self)
+            return try answered(await client.registerPushToken(request), fixture)
+        },
+        "DELETE /v1/me/push-token": { client, fixture in
+            let request = try fixture.sent(RemovePushTokenRequest.self)
+            return try answered(await client.removePushToken(request), fixture)
+        },
         "POST /v1/taps": { client, fixture in
             let request = try fixture.sent(TapRequest.self)
             let response = await client.tap(request)
