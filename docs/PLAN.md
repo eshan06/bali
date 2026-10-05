@@ -4,9 +4,10 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N5a: the APNs client (`apps/api/src/push/apns.ts`, off unless
-`APNS_KEY_P8`/`APNS_KEY_ID`/`APNS_TEAM_ID` are set; nothing calls it yet — N5b, wiring it to the
-Start, is next). Before it, N4: device tokens are personal data (deleted by C3, C6a and C6b,
+_Last updated: 2026-10-06 — N5b: a Start sends the "class started" alert to the students whose
+waiting tap it converted, after its commit and in the background (off until `APNS_KEY_P8`/
+`APNS_KEY_ID`/`APNS_TEAM_ID` are set — N6, the owner's console steps, is next). Before it, N5a:
+the APNs client (`apps/api/src/push/apns.ts`). Before it, N4: device tokens are personal data (deleted by C3, C6a and C6b,
 in C5's export), and a register applies only after the row's eventId (N5, the APNs sender, is
 next). Before it, N3: device tokens, `PUT`/`DELETE /v1/me/push-token` (the interface is
 on N3's line). Before it, C4a, the phone's Delete account engine, landed (C4b, its Me screen
@@ -268,11 +269,20 @@ words — is the Mac session's**, in parallel.
     fake or a local server. Config: `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` (all three or
     none, the key checked as P-256 at boot), `APNS_TOPIC` (unset, `com.bali.Bali`); in `.env.example`
     and DEPLOY's table. Nothing calls it yet
-  - **N5b** Wiring it to the Start — ⬜ `startSession` reports the students it converted
-    (additive; empty on a replay); after the commit the route fires one alert per their tokens
-    without awaiting it, a shutdown drains the sends; failures logged with the student id and
-    APNs's reason, never the token; a gone token's row deleted only as read (still the student's,
-    same `eventId`); off with one boot log line when the key is unset
+  - **N5b** Wiring it to the Start — ✅ `startSession` reports `convertedStudentIds` (additive
+    to the engine's result; empty on a replay, `existing`, and for a declined tap). After the
+    commit the Start route hands them to `push/class-started.ts`, which reads their tokens
+    (`pushTargetsOf`) and sends each one alert — "{class name} has started" / "Open Bali to lock
+    your apps.", time-sensitive, collapse id the session's, expiring 10 minutes after the start —
+    in the background: never awaited, so a hung or failing APNs never fails or delays the
+    Start; `app.close()` waits out the sends in flight (each bounded at 5 s). A refusal is
+    logged with the student id, status and reason, a transport failure with its message (the
+    token scrubbed), never the token; our own failure (the database) is logged and reported to
+    Sentry. A gone token is deleted only as read (`deleteGonePushToken`: the same token, still
+    the student's, same `eventId`, N4's order). Off without the key, with one boot line ("push is
+    off"); on, one line saying so. Tests: a fake APNs transport (who, both hosts, the payload and
+    headers, a replay, a post-Start tap, a hung and a throwing transport, the cleanup and its
+    moved-token guard, off, no token in a log line); the engine's PGlite tests pin the ids
 - **N6** 🔧 `docs/RUNBOOKS.md`: the owner's console steps (the APNs key, the App ID's Push
   Notifications capability, Railway's variables); `docs/APP-STORE.md`'s privacy answers for
   the device token — ⬜

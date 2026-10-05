@@ -8,6 +8,18 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **The Start's push: fired after the commit, drained at shutdown, a gone token
+  deleted only as read (N5b).** The engine only reports whom it converted
+  (`convertedStudentIds`, empty on `existing`, so a replay can't send twice); the route sends,
+  after `startSession` returns, so the transaction has committed and no send can roll it back.
+  Not awaited: the Start answers at once and the sends run in a tracked set that `app.close()`
+  waits out — the sweep's pattern — each bounded by the client's 5 s limit, inside the 8 s
+  shutdown deadline. A Start in the same process as a crash loses its alerts: accepted, a
+  doorbell (the 30 s read stays). A gone token is deleted by token, owner and `eventId` together,
+  so a token that moved to another account or was registered again while the send was in flight
+  is left alone. A refusal from APNs is logged at warn and not sent to Sentry (a phone's state,
+  not our bug); a failure of ours (reading or deleting tokens) is logged at error and reported.
+
 - **2026-10-06** — **The APNs client: Node's own HTTP/2 and crypto, a transport seam (N5a).**
   No dependency: `node:crypto` signs the ES256 provider token (`dsaEncoding: 'ieee-p1363'`, the
   raw r‖s a JWS needs) and `node:http2` carries the request; `jose`, already a dependency, only
