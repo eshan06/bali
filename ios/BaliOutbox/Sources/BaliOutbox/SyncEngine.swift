@@ -300,6 +300,17 @@ public actor SyncEngine {
     private var waiters: [Loop: (pause: Int, wake: CheckedContinuation<Void, Never>)] = [:]
     private var rung: Set<Loop> = []
     private var pauses = 0
+    /// An account deletion under way (C4): the loops send nothing meanwhile — a record or a read
+    /// landing after the deletion would make a fresh account — and it waits out what they have on
+    /// its way: `underway`, until the last lands.
+    private var deleting = false
+    private var underway = 0
+    private var landed: [CheckedContinuation<Void, Never>] = []
+    /// The last deletion sent that no answer settled: tried again under the same event id (rule 4).
+    private var deletionId: String?
+    /// The account deletion under way, whose answer a second press shares: never two at once, one
+    /// of which would let the loops go while the other's `DELETE /v1/me` is on its way.
+    private var deletion: Task<AccountDeletion, Never>?
 
     /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready. It
     /// must return at once — false when only the student can give a token, whose sign-in then calls
@@ -591,6 +602,64 @@ public actor SyncEngine {
         reread()
     }
 
+    /// Me's Delete account (C4): the one call the screen makes, answered with where the deletion
+    /// stands — a press while one is under way shares its answer. Each step only once the last is
+    /// done:
+    /// - `signIn` can delete itself — its token carries the scope Cognito's DeleteUser needs — or a
+    ///   fresh sign-in comes first, before anything is sent: no one is deleted here but left in Cognito;
+    /// - the loops hold, what they have on its way lands, and the outbox goes (`sendAll`), every
+    ///   Emergency Unlock first: one the server has not recorded holds the deletion back;
+    /// - `DELETE /v1/me` (`sendDeletion`);
+    /// - deleted, the sign-in gives the API no token any more (`SignIn.accountDeleted`), what the
+    ///   account still had queued is let go — never an unlock, and none is left — and the phone
+    ///   stands in no session, its shields off, with no Emergency Unlock recorded (the owner's ruling):
+    ///   one sent now would land under a fresh account;
+    /// - Cognito's DeleteUser, which the next call tries again, alone, until it is done; done, the
+    ///   sign-in is forgotten, as Sign out forgets it.
+    ///
+    /// What the student does while it runs, or while DeleteUser waits — a tap, Back to focus, a
+    /// join, a rename — is C4b's to keep from happening: none reaches an account the server keeps,
+    /// and an Emergency Unlock made under such a tap would wait for the next sign-in.
+    public func deleteAccount(_ signIn: SignIn) async -> AccountDeletion {
+        if let deletion { return await deletion.value }
+        let task = Task { await self.delete(signIn) }
+        deletion = task
+        defer { deletion = nil }
+        return await task.value
+    }
+
+    private func delete(_ signIn: SignIn) async -> AccountDeletion {
+        if await !signIn.deletionPending() {
+            guard await signIn.mayDelete() else { return .signInFirst }
+            deleting = true
+            defer {
+                deleting = false
+                ring(.drain)
+                ring(.read)
+            }
+            while underway > 0 { await withCheckedContinuation { landed.append($0) } }
+            if let held = await sendAll() { return held }
+            let answer = await sendDeletion()
+            switch answer.answer?.outcome.known {
+            case .deleted?, .alreadyDeleted?: deletionId = nil
+            case nil:
+                return answer.error?.error.reason == .teacherHasClasses
+                    ? .teacherHasClasses : .notDeleted(answer.result)
+            }
+            await signIn.accountDeleted()
+        }
+        // Again on a later call: the file may not have taken it, nor let go of a record since.
+        _ = stored { try outbox.accountDeleted() }
+        refreshQueue()
+        state.standing = .out
+        let failed = await signIn.deleteUser()
+        // And once more as DeleteUser answers: what came meanwhile, or a write the file refused,
+        // never waits for the next sign-in.
+        _ = stored { try outbox.accountDeleted() }
+        refreshQueue()
+        return failed.map(AccountDeletion.signInNotDeleted) ?? .deleted
+    }
+
     /// Everything queued goes now, and the truth is read again: the student's "retry" (rule 5), and
     /// B4's once a sign-in gives it a token.
     public func retryNow() {
@@ -647,13 +716,18 @@ public actor SyncEngine {
     private func drain() async {
         while !Task.isCancelled {
             rung.remove(.drain)  // what this pass does answers every ring made before it
+            // An account deletion sends the outbox itself (C4): nothing goes from here till it rings.
+            guard !deleting else {
+                await pause(.drain, until: nil)
+                continue
+            }
             var wake: Date?
             do {
                 switch try outbox.nextDue(now: clock.now()) {
                 case .send(let record):
                     // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
                     state.sending.insert(record.eventId)
-                    guard let sent = await record.send(through: client) else {
+                    guard let sent = await counted({ await record.send(through: client) }) else {
                         state.sending.remove(record.eventId)
                         break
                     }
@@ -677,6 +751,66 @@ public actor SyncEngine {
             state.retryAt = wake
             await pause(.drain, until: wake)
         }
+    }
+
+    /// The outbox sent before an account deletion (C4), each record once, in the order
+    /// `nextBeforeDeletion` gives — every Emergency Unlock first — each answer settled and applied as
+    /// the drain's is; then what holds the deletion back, if anything: an unlock the server has not
+    /// recorded, never let go; else a record no answer settled, with the last answer. A tap the
+    /// server refused holds nothing back.
+    private func sendAll() async -> AccountDeletion? {
+        var (tried, last) = (Set<String>(), SendResult.networkError)
+        do {
+            while let record = try outbox.nextBeforeDeletion(tried: tried) {
+                tried.insert(record.eventId)
+                state.sending.insert(record.eventId)
+                // No token, nothing went (the drain's rule): said as no answer, nothing settled.
+                guard let sent = await record.send(through: client), sent.noAnswer != .noToken else {
+                    state.sending.remove(record.eventId)
+                    break
+                }
+                let disposition = try outbox.settle(sent, now: clock.now())
+                await answered(record, sent, disposition)
+                if disposition?.keeps == true { last = sent.result }
+            }
+            let left = try outbox.records()
+            if left.contains(where: \.change.isUnlock) { return .unlockUnsent }
+            return left.allSatisfy(\.refusedForGood) ? nil : .notDeleted(last)
+        } catch {
+            _ = failed(error)
+            return .unread
+        }
+    }
+
+    /// `DELETE /v1/me` (C3), its token renewed once on a 401 — and once more under a fresh event id
+    /// when the server says another event holds it: a boot call racing a deletion can make the
+    /// account it makes look older than the deletion, whose retry then reads as another's.
+    private func sendDeletion() async -> APIResponse<DeleteMeResponse> {
+        let answer = await deleteMe()
+        guard answer.error?.error.reason == .eventIdConflict else { return answer }
+        deletionId = nil
+        return await deleteMe()
+    }
+
+    /// One `DELETE /v1/me`, under the last one's event id while no answer settled it (rule 4).
+    private func deleteMe() async -> APIResponse<DeleteMeResponse> {
+        let eventId = deletionId ?? EventID.mint(at: clock.now())
+        deletionId = eventId
+        return await Joining.send(renewing: refresh) {
+            await client.deleteMe(DeleteMeRequest(eventId: eventId))
+        }
+    }
+
+    /// A request of the loops', counted while it is on its way: an account deletion waits it out (C4).
+    private func counted<Answer>(_ send: () async -> Answer) async -> Answer {
+        underway += 1
+        let answer = await send()
+        underway -= 1
+        if underway == 0 {
+            for waiting in landed { waiting.resume() }
+            landed = []
+        }
+        return answer
     }
 
     /// A change's answer, settled. A change's own answer is the truth as of that change — but a
@@ -791,11 +925,12 @@ public actor SyncEngine {
             // conductor's decision under the owner's delegation, 2026-09-30).
             let outInClass = state.standing == .out && state.hasClasses == true
             if foreground, state.standing == .waiting || outInClass { rereading = true }
-            if let sent = stored(stamp) {
+            // Never during an account deletion (C4): `GET /v1/me` would make a fresh account.
+            if !deleting, let sent = stored(stamp) {
                 if rereading {
                     rereading = false
                     let changesThen = meChanges
-                    let response = await client.me()
+                    let response = await counted { await client.me() }
                     await heard(response.result, response.noAnswer)
                     if let me = response.answer {
                         // Its `me`, unless the phone changed that since it was sent.
@@ -809,8 +944,10 @@ public actor SyncEngine {
                         state.meFailed = response.result
                     }
                 } else if foreground, case .inSession(let session, _) = state.standing {
-                    let response = await client.checkIn(
-                        session: session.id, CheckInRequest(deviceTime: clock.now()))
+                    let request = CheckInRequest(deviceTime: clock.now())
+                    let response = await counted {
+                        await client.checkIn(session: session.id, request)
+                    }
                     await heard(response.result, response.noAnswer)
                     switch response.answer?.status.known {
                     case .live?:
