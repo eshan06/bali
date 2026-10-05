@@ -25,6 +25,23 @@ export function parseMinutes(typed: string): number | null {
   return minutes >= 1 && minutes <= MAX_SESSION_MINUTES ? minutes : null;
 }
 
+/** The picker's state: a preset, or Other with the minutes typed under it. */
+export interface LengthPick {
+  pick: number | 'other';
+  other: string;
+}
+
+/**
+ * The picker as a remembered length opens it: a preset selects itself; any other length reopens
+ * Other with it typed in; none remembered picks the default.
+ */
+export function pickFor(minutes: number | null): LengthPick {
+  if (minutes === null) return { pick: DEFAULT_MINUTES, other: '' };
+  return LENGTH_PRESETS.some((preset) => preset === minutes)
+    ? { pick: minutes, other: '' }
+    : { pick: 'other', other: String(minutes) };
+}
+
 /** Where a class's last pick is kept on this computer: a key of its own, so classes share none. */
 const lengthKey = (classId: string) => `bali.session-minutes.${classId}`;
 
@@ -82,6 +99,15 @@ export type ExtendAnswer =
   | { kind: 'refused'; message: string; reason: string | undefined }
   /** No answer to go by (unreachable, a timeout, a 5xx, over the budget): Try again resends it. */
   | { kind: 'failed'; message: string };
+
+/**
+ * What stays unanswered after `answer` to `attempt`: the attempt itself when no answer came (it
+ * may have landed, so only a resend under its id is safe); nothing once the server answered, an
+ * extend or a refusal, since the next press is then a new one (rule 4).
+ */
+export function keepUnanswered(attempt: ExtendAttempt, answer: ExtendAnswer): ExtendAttempt | null {
+  return answer.kind === 'failed' ? attempt : null;
+}
 
 /** Add `attempt.minutes` to the session (`POST /v1/sessions/{id}/extend`), its answer in words. */
 export async function extendSession(

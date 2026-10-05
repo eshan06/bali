@@ -9,9 +9,11 @@ import {
   EXTEND_PRESETS,
   extendAttemptFor,
   extendSession,
+  keepUnanswered,
   laterBell,
   LENGTH_PRESETS,
   parseMinutes,
+  pickFor,
   rememberedMinutes,
   rememberMinutes,
 } from './session-controls';
@@ -106,6 +108,14 @@ describe('the remembered pick', () => {
     }
   });
 
+  it('opens the picker on the remembered length: a preset itself, any other under Other, else the default', () => {
+    expect(pickFor(null)).toEqual({ pick: DEFAULT_MINUTES, other: '' });
+    expect(pickFor(25)).toEqual({ pick: 25, other: '' });
+    expect(pickFor(75)).toEqual({ pick: 75, other: '' });
+    expect(pickFor(90)).toEqual({ pick: 'other', other: '90' });
+    expect(pickFor(1)).toEqual({ pick: 'other', other: '1' });
+  });
+
   it('works without storage, and when storage throws', () => {
     expect(rememberedMinutes(CLASS, null)).toBeNull();
     expect(() => rememberMinutes(CLASS, 50, null)).not.toThrow();
@@ -139,6 +149,21 @@ describe('extendAttemptFor', () => {
   it('sends other minutes as a new attempt', () => {
     const unanswered = { minutes: 5, eventId: 'event-sent' };
     expect(extendAttemptFor(unanswered, 10, mint).eventId).not.toBe('event-sent');
+  });
+
+  it('keeps an attempt unanswered only while no answer came, never after an extend or a refusal', () => {
+    const attempt = { minutes: 5, eventId: 'event-sent' };
+    expect(keepUnanswered(attempt, { kind: 'failed', message: 'no answer' })).toBe(attempt);
+    expect(
+      keepUnanswered(attempt, { kind: 'extended', endsAt: '2026-10-05T14:35:00.000Z' }),
+    ).toBeNull();
+    expect(
+      keepUnanswered(attempt, {
+        kind: 'refused',
+        message: 'past the bell',
+        reason: 'session_not_running',
+      }),
+    ).toBeNull();
   });
 });
 

@@ -41,6 +41,13 @@ export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} 
 export const CANT_ADD_TIME = "Bali couldn't add the time just now. Try again.";
 
 /**
+ * A Start answered `existing` (P10): a session of the class was already running, started from
+ * another tab or a phone, so the length picked here set nothing; the bell beside the grid is its.
+ */
+export const SESSION_ALREADY_RUNNING =
+  "A session was already running, so the length you picked wasn't used. It ends at the time shown.";
+
+/**
  * The refusals a person can act on, in their words (T2): keyed on the error's `reason`, never its
  * message, which is written for a log. Each says what happened and what to do next.
  */

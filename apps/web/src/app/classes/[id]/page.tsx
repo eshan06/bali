@@ -1,23 +1,30 @@
 'use client';
 
-import type { ClassDetail, RosterResponse, SessionView, StartSessionResponse } from '@bali/shared';
+import {
+  type ClassDetail,
+  MAX_SESSION_MINUTES,
+  type RosterResponse,
+  type SessionView,
+  type StartSessionResponse,
+} from '@bali/shared';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
-import { errText, NOT_A_SESSION_LENGTH } from '@/lib/errors';
+import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import {
   bellTime,
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
-  type ExtendAnswer,
   type ExtendAttempt,
   extendAttemptFor,
   extendSession,
+  keepUnanswered,
   laterBell,
   LENGTH_PRESETS,
   parseMinutes,
+  pickFor,
   rememberedMinutes,
   rememberMinutes,
 } from '@/lib/session-controls';
@@ -53,9 +60,10 @@ export default function ClassDetailPage() {
   const [other, setOther] = useState('');
   const [lengthSaid, setLengthSaid] = useState(false);
   const otherField = useRef<HTMLInputElement>(null);
-  // Extend (P10): the last attempt whose answer never came, resent by Try again; what was said.
+  // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
+  // beside the grid: a failure (with Try again), a refusal, or a note on the session shown.
   const unanswered = useRef<ExtendAttempt | null>(null);
-  const [extendSaid, setExtendSaid] = useState<Exclude<ExtendAnswer, { kind: 'extended' }> | null>(
+  const [said, setSaid] = useState<{ kind: 'failed' | 'refused' | 'note'; message: string } | null>(
     null,
   );
 
@@ -91,13 +99,9 @@ export default function ClassDetailPage() {
   // The class's last pick on this computer, read once the page is in the browser (never at render,
   // where the server has no storage); a length that isn't a preset reopens Other with it.
   useEffect(() => {
-    const minutes = rememberedMinutes(classId);
-    if (minutes === null) return;
-    if (LENGTH_PRESETS.some((preset) => preset === minutes)) setPick(minutes);
-    else {
-      setPick('other');
-      setOther(String(minutes));
-    }
+    const remembered = pickFor(rememberedMinutes(classId));
+    setPick(remembered.pick);
+    setOther(remembered.other);
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another
@@ -115,6 +119,15 @@ export default function ClassDetailPage() {
     });
   }, []);
 
+  // A bell that moved settles an extend whose answer never came: the lost one landed, or another
+  // tab's did, and either way the truth is on screen. The failure line goes, and the next press
+  // is a fresh one, never a resend that would add nothing. A refusal or a note stays said.
+  const bell = grid?.endsAt ?? null;
+  useEffect(() => {
+    unanswered.current = null;
+    setSaid((cur) => (cur?.kind === 'failed' ? null : cur));
+  }, [bell]);
+
   const minutes = pick === 'other' ? parseMinutes(other) : pick;
 
   function startSession(e: React.FormEvent) {
@@ -131,9 +144,12 @@ export default function ClassDetailPage() {
       .then(
         (res) => {
           setBusy(false);
-          unanswered.current = null;
-          setExtendSaid(null);
           setGrid({ id: res.session.id, over: false, endsAt: res.session.endsAt });
+          // `existing`: a session was running already (another tab's, a phone's), so the length
+          // picked here set nothing; said, since the bell shown is that session's.
+          setSaid(
+            res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
+          );
         },
         (e: unknown) => {
           setBusy(false);
@@ -162,12 +178,12 @@ export default function ClassDetailPage() {
     if (!grid) return;
     const session = grid.id;
     setBusy(true);
-    setExtendSaid(null);
+    setSaid(null);
     const answer = await extendSession(api, session, attempt);
-    unanswered.current = answer.kind === 'failed' ? attempt : null;
+    unanswered.current = keepUnanswered(attempt, answer);
     setBusy(false);
     if (answer.kind === 'extended') onSession({ id: session, classId, endsAt: answer.endsAt });
-    else setExtendSaid(answer);
+    else setSaid(answer);
   }
 
   return (
@@ -234,7 +250,7 @@ export default function ClassDetailPage() {
                       inputMode="numeric"
                       autoComplete="off"
                       min={1}
-                      max={480}
+                      max={MAX_SESSION_MINUTES}
                       step={1}
                       value={other}
                       onChange={(e) => {
@@ -250,7 +266,7 @@ export default function ClassDetailPage() {
                       id={`${id}-help`}
                       className="mt-2 text-sm text-slate-500 dark:text-slate-400"
                     >
-                      A whole number from 1 to 480.
+                      A whole number from 1 to {MAX_SESSION_MINUTES}.
                     </p>
                   </div>
                 ) : null}
@@ -307,12 +323,12 @@ export default function ClassDetailPage() {
                 </button>
               </div>
             </div>
-            {extendSaid ? (
+            {said ? (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <p role="alert" className="text-sm font-medium">
-                  {extendSaid.message}
+                <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-sm font-medium">
+                  {said.message}
                 </p>
-                {extendSaid.kind === 'failed' ? (
+                {said.kind === 'failed' ? (
                   <button
                     type="button"
                     onClick={() => {

@@ -6,6 +6,7 @@ import {
   errText,
   NOT_A_SESSION_LENGTH,
   NOT_AN_INVITE_CODE,
+  SESSION_ALREADY_RUNNING,
   TOO_MANY_TRIES,
   TOO_MANY_TRIES_MINUTE,
 } from './errors';
@@ -66,7 +67,10 @@ describe('errText', () => {
       'A session runs 1 to 480 minutes. Enter a whole number of minutes.',
     );
     expect(CANT_ADD_TIME).toBe("Bali couldn't add the time just now. Try again.");
-    for (const words of [NOT_A_SESSION_LENGTH, CANT_ADD_TIME]) {
+    expect(SESSION_ALREADY_RUNNING).toBe(
+      "A session was already running, so the length you picked wasn't used. It ends at the time shown.",
+    );
+    for (const words of [NOT_A_SESSION_LENGTH, CANT_ADD_TIME, SESSION_ALREADY_RUNNING]) {
       expect(words).not.toMatch(/[—!]/);
     }
   });
