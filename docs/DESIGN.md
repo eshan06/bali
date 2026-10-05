@@ -56,8 +56,9 @@ PR.
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`), in D1's shapes; its screens take the Soft
 premium style in D2h–D2k. The portal draws from them too, from D2c on
-(`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every token as
-a `--bali-*` variable, light on `:root` and dark under the device's dark mode,
+(`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
+token as a `--bali-*` variable (and the primitives they and the mark
+reference), light on `:root` and dark under the device's dark mode,
 and as Tailwind's theme (`bg-surface-page`, `text-text-secondary`,
 `rounded-md`, `p-4` for `space-4`, `text-h1`, `shadow-1`); Instrument Sans
 and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
@@ -66,9 +67,9 @@ the mark (`components/mark.tsx`); the focus ring on every control and all
 animation off under reduced motion, both global rules. The bar and `/login`
 are in the picked style (D2c-1); the callback, `/support` and the invite-code
 screen follow (D2c-2); the classes home, the grid, the recap and reports keep
-their Tailwind classes on the new base (the page colour, the font, the ring)
-until D2e–D2g, which also retire Tailwind's default colours and sizes, kept
-in the theme only for them. **A portal page uses the tokens' utilities and no
+their Tailwind classes on the new base (the page colour, the font, the ring,
+and the radii: their `rounded-lg` is now 20 px) until D2e–D2g, which also
+retire Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
 Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
 question for the owner.
 

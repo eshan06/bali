@@ -306,8 +306,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   allowlisted): the latin subset of each variable font from `@fontsource-variable` 5.3.0,
   committed with its OFL licence under `apps/web/src/app/fonts/` and served from the portal's own
   origin, so the CSP's missing `font-src` falls back to `default-src 'self'`, and the `@font-face`
-  rules ride in the stylesheet under its nonce-only `style-src`; proven on a built portal with
-  the nonce script and a browser console that refuses nothing. **The icons:** `lucide-react`,
+  rules ride in the stylesheet, which its `style-src` of `'self'` and the nonce admits; proven on
+  a built portal with the nonce script and a browser console that refuses nothing. The faces
+  take no metric-matched Arial fallback (`adjustFontFallback: false`), so the runtime stack is
+  the tokens' exactly, and a glyph outside the latin subset falls to the system face. **The icons:** `lucide-react`,
   named by this step as DESIGN.md requires. **The bar's Sign out** is the standard 40 px
   secondary pill (§4), not the canvas's 36: DESIGN.md wins on a value. **Nothing invented:** the
   destructive button has no hover shade because the tokens name none; a button size, a card-edge

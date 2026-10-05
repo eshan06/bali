@@ -5,7 +5,8 @@
  * variables, `--bali-<token>`: the light values on :root, the dark ones under the device's dark
  * mode, so a page reads the same token in both. tokens.test.ts pins every value here to the JSON,
  * so the two cannot drift; a value the tokens lack is a question for the owner, never written here.
- * The primitives are only the ones a semantic token or the mark reference.
+ * Every semantic token is here; of the primitives, only the ones a semantic token or the mark
+ * reference (a page uses semantic tokens, never a primitive).
  */
 :root {
   color-scheme: light dark;
@@ -135,6 +136,10 @@
   /* §5: the 4-point grid, px on the web: `p-4` is space-4, 16 px. */
   --spacing: 4px;
 
+  /* §7: a transition is `fast` on the `standard` easing unless a class says otherwise. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+
   --radius-*: initial;
   --radius-xs: 6px;
   --radius-sm: 10px;
@@ -225,6 +230,11 @@
   --color-arc-fill: var(--bali-arc-fill);
   --color-arc-final2: var(--bali-arc-final2);
   --color-focus-ring: var(--bali-focus-ring-color);
+
+  /* A bridge for the screens D2e to D2g redraw: their `text-slate-500` helper lines sit on the
+     stone page now, below AA; text-tertiary is the pre-solved ink for them. Goes with the last
+     `slate-` class. */
+  --color-slate-500: var(--bali-text-tertiary);
 }
 
 /* §6: the three shadows, by name; shadow-1 is none in dark, so a card's edge is its hairline. */

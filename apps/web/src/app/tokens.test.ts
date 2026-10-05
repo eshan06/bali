@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -29,6 +30,14 @@ interface Tokens {
 }
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
+/** The portal's own source files under src/, tests left out. */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return sources(path);
+    return /\.(tsx?|css)$/.test(entry.name) && !entry.name.includes('.test.') ? [path] : [];
+  });
+}
 const css = read('./globals.css');
 const fonts = read('./fonts.ts');
 const tokens = JSON.parse(read('../../../../ios/Bali/UI/bali-tokens.json')) as Tokens;
@@ -42,9 +51,11 @@ function declarations(block: string | undefined): Map<string, string> {
   ]);
   return new Map(entries as [string, string][]);
 }
-const roots = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map((m) => m[1]);
-const light = declarations(roots[0]);
-const dark = declarations(roots[1]);
+const light = declarations(/^:root\s*\{([^}]*)\}/m.exec(css)?.[1]);
+// The dark values hold only under the device's dark mode: the :root inside that media query.
+const dark = declarations(
+  /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1],
+);
 const theme = declarations(/@theme\s*\{([^}]*)\}/.exec(css)?.[1]);
 const inline = declarations(/@theme inline\s*\{([^}]*)\}/.exec(css)?.[1]);
 
@@ -117,6 +128,31 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
+  it('the three shadows are utilities of the tokens’ names; reduced motion stops everything', () => {
+    for (const token of semantic(tokens.shadow.tokens)) {
+      if (token.name === 'focus-ring') continue;
+      expect(css).toMatch(
+        new RegExp(
+          `@utility ${token.name}\\s*\\{\\s*box-shadow: var\\(--bali-${token.name}\\);\\s*\\}`,
+        ),
+      );
+    }
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\*,\s*::before,\s*::after\s*\{\s*animation: none !important;\s*transition: none !important;/,
+    );
+  });
+
+  it('every --bali- variable the stylesheet or a component references is declared on :root', () => {
+    const refs = new Set<string>();
+    for (const file of sources(fileURLToPath(new URL('../', import.meta.url)))) {
+      for (const m of readFileSync(file, 'utf8').matchAll(/var\((--bali-[\w-]+)\)/g)) {
+        refs.add(m[1] ?? '');
+      }
+    }
+    expect(refs.size).toBeGreaterThan(40);
+    for (const ref of refs) expect(light.has(ref), ref).toBe(true);
+  });
+
   it('bali-softpulse’s glow is orange-400 at 35 %, orange-300 in dark (DESIGN.md §7)', () => {
     const glow = (mode: 'light' | 'dark', primitive: string) => {
       const value = (mode === 'light' ? light : dark).get('--bali-softpulse-glow') ?? '';
@@ -170,6 +206,8 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(fonts).toContain(`fallback: ${list(monoRest)}`);
     expect(fonts).toContain("src: './fonts/instrument-sans-");
     expect(fonts).toContain("src: './fonts/jetbrains-mono-");
+    // Exactly the stacks: no metric-matched Arial ahead of them on either face.
+    expect(fonts.match(/adjustFontFallback: false/g)).toHaveLength(2);
     expect(inline.get('--font-sans')).toBe('var(--font-instrument-sans)');
     expect(inline.get('--font-mono')).toBe('var(--font-jetbrains-mono)');
     expect(tokens.type.families.num.startsWith('ui-rounded, "SF Pro Rounded"')).toBe(true);

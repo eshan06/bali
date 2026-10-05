@@ -43,7 +43,8 @@ export function PortalBar() {
       <div className="flex h-14 items-center justify-between px-4 sm:px-10">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-primary"
+          translate="no"
+          className="inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-primary hover:underline"
         >
           <Mark size={24} />
           Bali

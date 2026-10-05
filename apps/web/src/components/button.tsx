@@ -8,7 +8,8 @@ import type { ButtonHTMLAttributes } from 'react';
  * to 60 % while disabled, or while busy but kept focusable with `aria-disabled`.
  */
 const VARIANTS = {
-  primary: 'bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover',
+  primary:
+    'bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover active:bg-action-primary-bg-hover',
   secondary:
     'border border-border-strong bg-surface-card text-text-primary hover:bg-surface-sunken active:bg-surface-sunken',
   destructive: 'bg-action-destructive-bg text-action-destructive-fg',
