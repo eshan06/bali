@@ -8,6 +8,15 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **Post-merge CI runs on main are never cancelled; race tests stage, never aim.**
+  `ci.yml` cancels only outdated PR runs; a push to main gets a per-commit concurrency group,
+  because `cancel-in-progress: false` alone still lets GitHub cancel a queued run when a newer
+  one queues behind it. The conversion-gap race test (`races.test.ts`) aimed its refresh by
+  polling `pg_stat_activity` for a brief armed-tap statement, which can miss on a loaded
+  runner (main, run 37350621890); it now parks the Start behind a held running-session row,
+  after its taps are locked and before any is consumed, and fires the refresh only then. A
+  race test parks one side on a held lock it can observe; it never fires on a guessed moment.
+
 - **2026-10-06** — **Device tokens are personal data, and a newer register wins (N4).**
   `deleteAccount` (C3), a school's disposal (C6a) and the retention run (C6b) delete the
   tokens of the people they de-identify, in their own transaction, beside the pre-bell taps
