@@ -246,6 +246,8 @@ async function dispose(
   schoolId: string,
   confirmName?: string,
 ): Promise<void> {
+  // This machine's clock, the server's inside the API service (runbook 1, step 11). No
+  // eventId: a re-run is answered by the school row, which says it is disposed of already.
   const at = new Date();
   const result = await disposeSchool(db, { schoolId, at, confirmName });
   switch (result.outcome) {

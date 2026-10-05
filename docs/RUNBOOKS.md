@@ -164,15 +164,18 @@ project for the API (its DSN).
     many days you have. Before you start:
     - **Check no parent's inspection request is open** for a student of the school (step
       10): if one is, export that record and deliver it first.
-    - **Preview it** inside the API service (step 9):
-      `railway ssh --service <api service name> -- npm run school -- dispose <school-id>`
-      (`npm run school -- list` gives the id). It prints the school's name and what would go
+    - **Open a shell in the API service** (step 9): `railway ssh --service <api service
+      name>`, and run the next two commands in that shell, never from your machine with
+      `railway ssh … --`: there the school's name in quotes would reach the remote shell
+      unquoted, and the clock that judges whether a lesson runs is the server's only there.
+    - **Preview it:** `npm run school -- dispose <school-id>` (`npm run school -- list`
+      gives the id). It prints the school's name and what would go
       (teachers, students, classes, sessions, blocks, open invites, pre-bell taps) and writes
       nothing. "lesson(s) running" means a class is in session: run it again after the bell.
       "records at another school too" lists accounts by id: nothing was written, and this
       command can't split one; stop and raise it.
     - **Dispose of it**, with the name exactly as the preview printed it:
-      `railway ssh --service <api service name> -- npm run school -- dispose <school-id> --confirm "<name>"`.
+      `npm run school -- dispose <school-id> --confirm "<name>"`.
       It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
       it with the school's request. Running it again says it was disposed of already.
     - **Delete the school's sign-ins in Cognito.** The disposal can't reach them (the API

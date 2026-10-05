@@ -578,6 +578,12 @@ describe('npm run school -- dispose', () => {
     await expect(fail(['dispose', s.school.id, '--confirm', s.school.name])).rejects.toThrow(
       '1 lesson(s) running; nothing was written',
     );
+    const other = await seed('c6a-refuse-other');
+    await db.insert(enrollments).values({ classId: other.first.id, studentId: s.ben.id });
+    await pastBell(s.lesson.id);
+    await expect(fail(['dispose', s.school.id])).rejects.toThrow(
+      `1 account(s) of "${s.school.name}" have records at another school too`,
+    );
     const stranger = newUuidV7();
     await expect(fail(['dispose', stranger])).rejects.toThrow(
       `no school on record has the id ${stranger}`,
