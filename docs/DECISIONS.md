@@ -86,6 +86,41 @@ a real decision? Add a dated entry at the top: what was decided and why.
   /v1/me`'s. No new refusal reason. Until N4, the three foreign-key coverage maps list
   `device_tokens.user_id` as "NOT YET": nothing deletes or exports a token yet.
 
+- **2026-10-05** — **C4b: Delete account on Me, and the deletion's own screen over everything,
+  Focus included.** The owner's picks (2026-10-05): a red "Delete account" text button at the very
+  bottom of Me, under Sign out and whose sign-in it is; the confirm inline under the button, as
+  Leave asks its question; the fuller consequence line ("Bali deletes your account, your name and
+  your sign-in. This can't be undone. Lessons you were in still count in your teachers' reports,
+  with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an
+  Emergency Unlock."); then a short done screen with OK to Sign in. **Where the lock-down lives:**
+  C4a asks that from the press to the end the app offer nothing but the deletion and its retry.
+  That is the router's job, not each screen's: `Screen.choose` takes `deleting` and answers the
+  deletion's own screen (`Screen.deleting`, `DeletingView`) before everything but a start that
+  failed, with no tab bar — disabling Me's own buttons would leave Home's Tap in, History, the tab
+  bar and the standing's own screens, and a standing changed by the deletion sends the tab Home.
+  **Above Focus, on purpose:** the shields' Focus holds Emergency Unlock, always allowed, and this
+  is the one screen placed over it. While the deletion runs the drain is held, so an unlock made
+  then would wait for the next sign-in and land under whoever makes it (B4's rule) — and the
+  deletion takes the shields off itself within moments, as the question said ("your apps
+  unlock"). **A stop that deleted nothing offers Back** (`signInFirst`, `teacherHasClasses`,
+  `unlockUnsent`, `unread`, `notDeleted`): nothing is pending, so the app is itself again — a
+  student with no signal who pressed it mid-class is never left shielded with no exit. The one
+  cost is `notDeleted`'s race, a deletion that landed with its answer lost: a read then makes a
+  fresh account, which the next Try again deletes too (C3's `already_deleted` rule), and the words
+  claim nothing either way. `notDeleted` is said in the Join screen's words for its answer
+  (`Joining.words`), one vocabulary for the server not answering. **No Back** while the deletion
+  runs, nor once the account is deleted and the sign-in waits (`signInNotDeleted`, and
+  `SignIn.deletionPending` at a relaunch, read with who is signed in): Try again alone, as C4a
+  asks. **Who is signed in changing** drops the question or a stop (the words were the last
+  sign-in's) and holds a deletion under way, a sign-in waiting and the done screen: the deletion's
+  own end is such a change, and its answer is still to come. **The Debug readout** hides over the
+  deletion's screen: its Sign out, Join and Tap are what the screen keeps from happening. **A
+  token question for the owner:** the tokens name `action-destructive-bg` (red-600) but no
+  pressed shade for it; the pressed fill is red-700, the next red primitive, until the design
+  system names one. Delete account is not dimmed while an Emergency Unlock is unsent, as Sign out
+  is: the engine reads the file itself and answers `unlockUnsent`, said on the screen with Try
+  again, so one judge decides and Sign out's `unsentCheck` machinery is not repeated.
+
 - **2026-10-06** — **The push guard reads the exported build, not the archive (N2).** A
   TestFlight or App Store build signed with `aps-environment` = `development` gets no pushes
   and says nothing. The archive can't show it: automatic signing archives with the development

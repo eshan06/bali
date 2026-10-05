@@ -23,6 +23,11 @@ enum Theme {
     static let arcFinal = Color(hex: 0x62A483)
     static let arcTrack = border
     static let markTrack = Color(hex: 0xBCDCCA)
+    /// action-destructive-bg, red-600, for the one destructive action: Me's Delete account (C4b;
+    /// DESIGN.md §2, red reserved). Pressed, red-700: the tokens name no pressed shade for it, so
+    /// the next red primitive stands in (`docs/DECISIONS.md`, C4b).
+    static let destructive = Color(hex: 0xA93D31)
+    static let destructivePressed = Color(hex: 0x8C342B)
     /// shadow-1, a resting card's: 0 1px 2px, warm black at 6 %.
     static let shadow = Color(hex: 0x211C15).opacity(0.06)
 
@@ -99,16 +104,19 @@ private struct Styled: ViewModifier {
 }
 
 /// D1's primary action: 56 pt tall, radius 14, the brand's fill — pressed, its darker shade — and a
-/// white 17 semibold label; dimmed while disabled, as a busy one is.
+/// white 17 semibold label; dimmed while disabled, as a busy one is. `destructive`, the same in
+/// DESIGN.md's destructive red: Delete account's confirm (C4b), and nothing else.
 struct PrimaryButtonStyle: ButtonStyle {
+    var destructive = false
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let (fill, pressed) =
+            destructive
+            ? (Theme.destructive, Theme.destructivePressed) : (Theme.brand, Theme.brandPressed)
         configuration.label.textStyle(.button).foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(
-                configuration.isPressed ? Theme.brandPressed : Theme.brand,
-                in: .rect(cornerRadius: Theme.Radius.md))
+            .background(configuration.isPressed ? pressed : fill, in: .rect(cornerRadius: Theme.Radius.md))
             .opacity(enabled ? 1 : 0.6)
     }
 }

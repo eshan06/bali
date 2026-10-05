@@ -319,6 +319,67 @@ struct AppTests {
         let lesson = try #require(inLesson.sync)
         #expect(Leaving.held(period3, lesson, now: Date()) == Leaving.inSession(period3))
         #expect(Leaving.held(period3, try #require(me.sync), now: Date()) == nil)
+        // Delete account (C4b): its question on Me, its tab bar kept; confirmed, the deletion's own
+        // screen and no tab bar — a frozen phone's says it has not started, with Try again, and
+        // Back returns to Me; under way, over Focus and its shields too; each stop; the sign-in
+        // waiting to be deleted; and done, OK leaving to Sign in. Nothing of Me's or Join's is
+        // offered there (`offersSignOut`).
+        let asking = Phone(fixture: try #require(PreviewFixtures.all["meDeleteAsk"]))
+        #expect(asking.shown == (.me, true) && asking.deleting == .asking)
+        asking.deleting.cancel()
+        #expect(asking.deleting == .none && asking.shown == (.me, true))
+        asking.deleting.ask()
+        await asking.deleteAccount()
+        #expect(asking.deleting == .stopped(Joining.notStarted, retries: true))
+        #expect(asking.shown == (.deleting, false) && !asking.offersSignOut)
+        asking.deleting.close()
+        #expect(asking.deleting == .none && asking.shown == (.me, true))
+        let busy = Phone(fixture: try #require(PreviewFixtures.all["deleting"]))
+        #expect(busy.shown == (.deleting, false) && busy.deleting == .busy)
+        let shieldedDeleting = Phone(fixture: try #require(PreviewFixtures.all["deletingShielded"]))
+        #expect(shieldedDeleting.sync?.shieldedUntil(Date()) != nil)
+        #expect(shieldedDeleting.shown == (.deleting, false))
+        for (name, retries) in [
+            ("deletingSignInFirst", false), ("deletingTeacher", false), ("deletingUnlockUnsent", true),
+            ("deletingUnread", true), ("deletingNotDeleted", true),
+        ] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            #expect(phone.shown == (.deleting, false), "\(name)")
+            guard case .stopped(let why, let again) = phone.deleting else {
+                Issue.record("\(name) is not a stop")
+                continue
+            }
+            #expect(again == retries && !why.isEmpty, "\(name)")
+            #expect(phone.deleting.said?.title == "Your account isn't deleted", "\(name)")
+            phone.deleting.close()
+            #expect(phone.deleting == .none && phone.shown.screen != .deleting, "\(name)")
+        }
+        let pending = Phone(fixture: try #require(PreviewFixtures.all["deletingPending"]))
+        #expect(pending.shown == (.deleting, false) && pending.deleting == .pending)
+        pending.deleting.close()
+        #expect(pending.deleting == .pending)
+        let done = Phone(fixture: try #require(PreviewFixtures.all["deletingDone"]))
+        #expect(done.shown == (.deleting, false) && done.signedIn == false)
+        done.deleting.close()
+        #expect(done.deleting == .none && done.shown == (.signIn, false))
+        // Who is signed in changing takes the question with it, and holds a deletion under way,
+        // one waiting for DeleteUser and the done screen; a sign-in whose account is deleted lands
+        // on the deletion's screen at once, as a relaunch does (`follow`).
+        let askedThenOut = Phone(fixture: try #require(PreviewFixtures.all["meDeleteAsk"]))
+        askedThenOut.signed(in: false)
+        #expect(askedThenOut.deleting == .none && askedThenOut.shown.screen == .signIn)
+        for name in ["deleting", "deletingPending", "deletingDone"] {
+            let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+            let before = phone.deleting
+            phone.signed(in: false)
+            #expect(phone.deleting == before && phone.shown.screen == .deleting, "\(name)")
+        }
+        let relaunched = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        relaunched.signed(in: true, as: "ana", pending: true)
+        #expect(relaunched.deleting == .pending && relaunched.shown == (.deleting, false))
+        let busyStays = Phone(fixture: try #require(PreviewFixtures.all["deleting"]))
+        busyStays.signed(in: true, as: "ana", pending: true)
+        #expect(busyStays.deleting == .busy)
     }
 
     @Test(
@@ -558,7 +619,8 @@ struct AppTests {
         // opened over Home or Me, whose way back reaches Me, nor elsewhere.
         for (name, offers) in [
             ("me", true), ("join", true), ("joinSignOutHeld", true), ("joinFromHome", false),
-            ("home", false), ("focus", false), ("signIn", false),
+            ("home", false), ("focus", false), ("signIn", false), ("deleting", false),
+            ("deletingPending", false),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             #expect(phone.offersSignOut == offers, "\(name)")
@@ -767,6 +829,49 @@ struct AppTests {
         await phone.signOut()
         #expect(phone.signOutFailed == nil && keychain.empty)
         #expect(await phone.signIn?.account() == nil)
+    }
+
+    @Test(
+        "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
+        .timeLimit(.minutes(3)))
+    func deleteAccountWiring() async throws {
+        let server = Deleter(deleteUser: [nil, 200])
+        let keychain = Keychain(account: "ana", scoped: true)
+        let (phone, engine) = try standIn(server, keychain: keychain)
+        let signIn = try #require(phone.signIn)
+        let following = Task { await phone.follow(signIn) }
+        defer { following.cancel() }
+        try await until { phone.signedIn == true }
+        // A phone of the test's own has seen no intro and runs no enforcer: the router shows the
+        // intro, so only the deletion's screen is asked after here, never Me.
+        #expect(phone.deleting == .none && phone.shown.screen != .deleting)
+        phone.deleting.ask()
+        #expect(phone.shown.screen != .deleting)
+        let deleting = Task { await phone.deleteAccount() }
+        try await until { phone.deleting == .busy }
+        #expect(phone.shown == (.deleting, false))
+        await deleting.value
+        #expect(phone.deleting == .pending && phone.shown == (.deleting, false))
+        #expect(await signIn.deletionPending() && !keychain.empty)
+        let sent = (deletions: await server.deletions, deleteUsers: await server.deleteUsers)
+        #expect(sent.deletions == 1 && sent.deleteUsers == 1)
+        // A relaunch: a fresh phone over the same Keychain finds the sign-in waiting to be deleted.
+        let (relaunched, _) = try standIn(server, keychain: keychain)
+        let relaunchedSignIn = try #require(relaunched.signIn)
+        let followingRelaunch = Task { await relaunched.follow(relaunchedSignIn) }
+        defer { followingRelaunch.cancel() }
+        try await until { relaunched.signedIn == true }
+        #expect(relaunched.deleting == .pending && relaunched.shown == (.deleting, false))
+        // Try again: DeleteUser alone, no deletion again; done, the sign-in forgotten.
+        await phone.deleteAccount()
+        #expect(phone.deleting == .done && phone.shown == (.deleting, false))
+        let again = (deletions: await server.deletions, deleteUsers: await server.deleteUsers)
+        #expect(again.deletions == 1 && again.deleteUsers == 2)
+        try await until { phone.signedIn == false }
+        #expect(phone.deleting == .done && phone.shown == (.deleting, false) && keychain.empty)
+        phone.deleting.close()
+        #expect(phone.deleting == .none && phone.shown.screen != .deleting)
+        _ = engine
     }
 
     @Test(
@@ -1357,6 +1462,7 @@ struct AppTests {
             ("border-strong", Theme.borderStrong), ("text-primary", Theme.text),
             ("text-secondary", Theme.textSecondary), ("text-tertiary", Theme.textTertiary),
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
+            ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
             ("green-200", Theme.markTrack),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
@@ -1858,6 +1964,41 @@ private actor Reasons: HTTPTransport {
     }
 }
 
+/// The API and Cognito as a stand-in answers Delete account (C4b): `GET /v1/me` with a student in
+/// no class, `DELETE /v1/me` with `deleted`, and Cognito's DeleteUser from `deleteUser` in turn —
+/// a status, or nil for no answer at all — counting each; anything else gets no answer.
+private actor Deleter: HTTPTransport {
+    private var deleteUser: [Int?]
+    private(set) var deletions = 0
+    private(set) var deleteUsers = 0
+
+    init(deleteUser: [Int?]) { self.deleteUser = deleteUser }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        var (status, body) = (200, "")
+        switch (request.httpMethod ?? "", url.host(), url.path()) {
+        case ("GET", _, "/v1/me"):
+            body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
+        case ("DELETE", _, "/v1/me"):
+            deletions += 1
+            body = #"{"outcome":"deleted"}"#
+        case ("POST", "cognito-idp.us-east-1.amazonaws.com"?, "/"):
+            deleteUsers += 1
+            guard !deleteUser.isEmpty, let answer = deleteUser.removeFirst() else {
+                throw URLError(.notConnectedToInternet)
+            }
+            (status, body) = (answer, "{}")
+        default: throw URLError(.notConnectedToInternet)
+        }
+        guard
+            let response = HTTPURLResponse(
+                url: url, statusCode: status, httpVersion: nil, headerFields: nil)
+        else { throw URLError(.badURL) }
+        return (Data(body.utf8), response)
+    }
+}
+
 /// A page of history as `GET /v1/me/history` answers it: a tap for each of `ids`, then `next`.
 private func page(_ ids: [String], next: String?) -> String {
     let events = ids.map {
@@ -1868,17 +2009,21 @@ private func page(_ ids: [String], next: String?) -> String {
 }
 
 /// The Keychain's stand-in: the tokens a sign-in of `account` keeps — its access token's payload
-/// naming it, and the `email` its ID token named (#147), if any — or none; one a test can lock, as a
-/// locked phone's is.
+/// naming it, and the `email` its ID token named (#147), if any; `scoped`, with the scope and the
+/// pool Cognito's DeleteUser needs (C4) — or none; one a test can lock, as a locked phone's is.
 private final class Keychain: TokenStore, @unchecked Sendable {
     struct Locked: Error {}
     private let lock = NSLock()
     private var saved: Data?
     private var isLocked = false
 
-    init(account: String?, email: String? = nil) {
+    init(account: String?, email: String? = nil, scoped: Bool = false) {
         saved = account.map { account in
-            let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600}"#
+            let scope =
+                scoped
+                ? #","scope":"openid email profile aws.cognito.signin.user.admin","iss":"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YTloqilwT""#
+                : ""
+            let claims = #"{"sub":"\#(account)","iat":1000000000,"exp":1000003600\#(scope)}"#
             let payload = Data(claims.utf8).base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
                 .replacingOccurrences(of: "=", with: "")

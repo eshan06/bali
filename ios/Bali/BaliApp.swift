@@ -123,6 +123,10 @@ final class Phone {
     /// Me's Leave (C6c): the class whose Leave was pressed, its question, and why the last leave
     /// did not finish.
     var leaving = Leaving()
+    /// Me's Delete account (C4b): its question asked, the deletion under way, where it stopped and
+    /// its way on, or done — the router's input too: from the press to the end the deletion's own
+    /// screen shows and nothing else (`Deleting.shows`, `Screen.deleting`).
+    var deleting = Deleting.none
     /// Unlocked's reason card (C5c): the newest reason picked, its check shown until it is
     /// answered, and why the last did not go.
     private(set) var picking: UnlockReason?
@@ -166,6 +170,7 @@ final class Phone {
             (opened, tab, history) = (fixture.opened, fixture.tab, fixture.history)
             (naming, signOutFailed, email) = (fixture.naming, fixture.signOutFailed, fixture.email)
             (leaving, picking, pickFailed) = (fixture.leaving, fixture.picking, fixture.pickFailed)
+            deleting = fixture.deleting
         }
 
         /// A phone over a sign-in and an engine a test made, never started (BaliTests): the calls
@@ -188,8 +193,8 @@ final class Phone {
     /// The router's answer over what the phone knows, with `opened` as the screens opened.
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
-            problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
-            everApproved: everApproved, everInClass: everInClass, sync: sync,
+            problem: problem, deleting: deleting.shows, introSeen: introSeen, signedIn: signedIn,
+            protection: protection, everApproved: everApproved, everInClass: everInClass, sync: sync,
             hasClasses: hasClasses, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab,
             now: Date())
     }
@@ -268,12 +273,14 @@ final class Phone {
     private(set) var email: String?
 
     /// Follows who is signed in on `signIn` for the app's life: each change to `signed`, with the
-    /// account and the email the tokens name then.
+    /// account and the email the tokens name then, and whether the account is deleted and its
+    /// sign-in waits to be (C4b: a relaunch lands on the deletion's screen).
     func follow(_ signIn: SignIn) async {
         for await signedIn in await signIn.signedIn() {
             signed(
                 in: signedIn, as: signedIn ? await signIn.account() : nil,
-                email: signedIn ? await signIn.email() : nil)
+                email: signedIn ? await signIn.email() : nil,
+                pending: signedIn ? await signIn.deletionPending() : false)
         }
     }
 
@@ -287,8 +294,14 @@ final class Phone {
     /// the phone shows at once, and from the engine's states until the engine has forgotten it too
     /// (`synced`; #160's review). Signed in, the student's history is read once `GET /v1/me` names
     /// them a student — at once where it already does — so even their first visit to History shows
-    /// it (#141); a teacher's account reads none, which the API would refuse (F4's review).
-    func signed(in signedIn: Bool?, as account: String? = nil, email: String? = nil) {
+    /// it (#141); a teacher's account reads none, which the API would refuse (F4's review). A
+    /// deletion's question or stop goes with the change too, while one under way, waiting for
+    /// DeleteUser or done holds (`Deleting.signInChanged`); `pending`, the API has deleted the
+    /// account and its Cognito sign-in waits to be — a relaunch (C4b) — so the deletion's screen
+    /// shows at once, Try again its one way on.
+    func signed(
+        in signedIn: Bool?, as account: String? = nil, email: String? = nil, pending: Bool = false
+    ) {
         let another =
             account.map { self.account != nil && $0 != self.account }
             ?? (signedIn == true && self.signedIn == false)
@@ -298,7 +311,9 @@ final class Phone {
             forgetHistory()
             (naming, signOutFailed, leaving) = (Naming(), nil, Leaving())
             (joining, signIns) = (Joining(), signIns + 1)
+            deleting.signInChanged()
         }
+        if pending, deleting == .none { deleting = .pending }
         if another {
             sync?.me = nil
             sync?.meFailed = nil
@@ -368,6 +383,19 @@ final class Phone {
         } catch {
             signOutFailed = SignOutWords.failed
         }
+    }
+
+    /// Me's Delete account, confirmed, or the screen's Try again (C4b): the one engine call,
+    /// `SyncEngine.deleteAccount` — the outbox first, then `DELETE /v1/me`, then Cognito's DeleteUser
+    /// (C4a) — the deletion's screen showing meanwhile and its answer put in words there
+    /// (`Deleting.answered`). Nothing where no try can help, nor while one runs. A phone whose
+    /// engine has not started — a frozen one too — says so (rule 5).
+    func deleteAccount() async {
+        guard deleting.start() else { return }
+        guard let engine, let signIn else {
+            return deleting = .stopped(Joining.notStarted, retries: true)
+        }
+        deleting.answered(await engine.deleteAccount(signIn))
     }
 
     /// The bell of the session the phone stands in, where the router chooses again (C5a).
