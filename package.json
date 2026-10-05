@@ -10,9 +10,12 @@
   "engines": {
     "node": "^22"
   },
-  "//": "overrides.postcss patches the vulnerable copy Next 15 pins; retire the override when the Next 16 migration lands (docs/PLAN.md decision log, 2026-09-20).",
+  "//": "overrides.postcss patches the vulnerable copy Next 15 pins; retire the override when the Next 16 migration lands (docs/PLAN.md decision log, 2026-09-20). overrides.@esbuild-kit/core-utils lifts drizzle-kit's dev-only esbuild 0.18 (via @esbuild-kit) onto the hoisted patched one, past GHSA-67mh-4wv8-2f99 (docs/DECISIONS.md, 2026-10-05); retire it when drizzle-kit drops @esbuild-kit.",
   "overrides": {
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "@esbuild-kit/core-utils": {
+      "esbuild": ">=0.25.0"
+    }
   },
   "scripts": {
     "dev:api": "npm run dev -w @bali/api",

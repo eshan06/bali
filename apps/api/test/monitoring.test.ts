@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../src/app.js';
 import { ApiError } from '../src/errors.js';
-import { captureFailure, initMonitoring } from '../src/monitoring.js';
+import { SWEEP_MONITOR_SLUG, captureFailure, initMonitoring } from '../src/monitoring.js';
 import { SWEEP_INTERVAL_MS, startSweeping } from '../src/sweep.js';
 import { makeTestDb } from './helpers/db.js';
 import { testEnv } from './helpers/env.js';
@@ -35,6 +35,20 @@ const fakeTransport = (options: Parameters<typeof Sentry.makeNodeTransport>[0]) 
   });
 
 const eventEnvelopes = (): string[] => sent.filter((body) => body.includes('"type":"event"'));
+const checkIns = (): string[] => sent.filter((body) => body.includes('"type":"check_in"'));
+
+/** Run `startSweeping` with `run` for `ticks` minutes, then close it. */
+async function sweepTicks(run: () => Promise<unknown>, ticks = 1): Promise<void> {
+  const sweeper = Fastify({ logger: false });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  try {
+    startSweeping(sweeper, run);
+    for (let i = 0; i < ticks; i++) await vi.advanceTimersByTimeAsync(SWEEP_INTERVAL_MS);
+    await sweeper.close();
+  } finally {
+    vi.useRealTimers();
+  }
+}
 
 let app: FastifyInstance | undefined;
 let db: Database;
@@ -51,11 +65,15 @@ afterAll(async () => {
 });
 
 describe('error monitoring', () => {
-  it('is off without SENTRY_DSN', () => {
+  it('is off without SENTRY_DSN', async () => {
     expect(initMonitoring(testEnv)).toBe(false);
     expect(Sentry.isInitialized()).toBe(false);
     // Reporting with monitoring off does nothing and throws nothing.
     captureFailure(new Error('nowhere to go'), 'GET /healthz');
+    // The sweep still runs, and checks in nowhere.
+    const run = vi.fn(() => Promise.resolve({ expired: 0, wentSilent: 0 }));
+    await sweepTicks(run);
+    expect(run).toHaveBeenCalledTimes(1);
     expect(sent).toEqual([]);
   });
 
@@ -142,20 +160,58 @@ describe('error monitoring', () => {
     const res = await server.inject({ method: 'GET', url: '/v1/unavailable' });
     expect(res.statusCode).toBe(503);
 
-    const sweeper = Fastify({ logger: false });
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    try {
-      startSweeping(sweeper, () => Promise.reject(new Error('the expiry pass failed')));
-      await vi.advanceTimersByTimeAsync(SWEEP_INTERVAL_MS);
-      await sweeper.close();
-    } finally {
-      vi.useRealTimers();
-    }
+    await sweepTicks(() => Promise.reject(new Error('the expiry pass failed')));
     await Sentry.flush(5000);
 
     const events = eventEnvelopes();
     expect(events).toHaveLength(2);
     expect(events.some((e) => e.includes('"route":"GET /v1/unavailable"'))).toBe(true);
     expect(events.some((e) => e.includes('"route":"sweep"'))).toBe(true);
+  });
+
+  it('checks each sweep in to its cron monitor: in progress, then ok or error', async () => {
+    sent.length = 0;
+    let calls = 0;
+    // The first run succeeds, the second fails.
+    await sweepTicks(() => {
+      calls += 1;
+      return calls === 1
+        ? Promise.resolve({ expired: 0, wentSilent: 0 })
+        : Promise.reject(new Error('the silence pass failed'));
+    }, 2);
+    await Sentry.flush(5000);
+
+    const sentCheckIns = checkIns().map((body) => {
+      const payload = JSON.parse(body.trim().split('\n').at(-1)!) as {
+        check_in_id: string;
+        monitor_slug: string;
+        status: string;
+        duration?: number;
+        environment?: string;
+        monitor_config?: { schedule: unknown; checkin_margin: number; max_runtime: number };
+      };
+      return payload;
+    });
+    expect(sentCheckIns.map((c) => c.status)).toEqual([
+      'in_progress',
+      'ok',
+      'in_progress',
+      'error',
+    ]);
+    expect(new Set(sentCheckIns.map((c) => c.monitor_slug))).toEqual(new Set([SWEEP_MONITOR_SLUG]));
+    // Each run's closing check-in names its opening one, with a duration.
+    expect(sentCheckIns[1]!.check_in_id).toBe(sentCheckIns[0]!.check_in_id);
+    expect(sentCheckIns[3]!.check_in_id).toBe(sentCheckIns[2]!.check_in_id);
+    expect(sentCheckIns[0]!.check_in_id).not.toBe(sentCheckIns[2]!.check_in_id);
+    expect(typeof sentCheckIns[1]!.duration).toBe('number');
+    expect(sentCheckIns[0]!.environment).toBe('dev');
+    // The monitor's schedule rides along, so Sentry makes the monitor itself.
+    expect(sentCheckIns[0]!.monitor_config).toMatchObject({
+      schedule: { type: 'interval', value: 1, unit: 'minute' },
+      checkin_margin: 2,
+      max_runtime: 5,
+    });
+    // The failed run is still reported as an error, as before.
+    expect(eventEnvelopes().some((e) => e.includes('"route":"sweep"'))).toBe(true);
   });
 });

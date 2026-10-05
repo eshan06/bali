@@ -39,7 +39,7 @@ with notes. The ones a deploy must set:
 | `INTERNAL_API_KEY` | Long random secret (`openssl rand -hex 32`) for the backup sweep cron; under 32 characters, the API refuses to boot. |
 | `TZ` | The school's zone (e.g. `America/Chicago`). Bell times and armed-tap end-of-day expiry use server-local time; Railway defaults to UTC. |
 | `LOG_LEVEL` | `info` in production. |
-| `SENTRY_DSN` | Optional. The Sentry project's DSN; unset, error monitoring is off. When set, a 500 or a crash is reported with the route, never the request, the user or query values (`apps/api/src/monitoring.ts`). |
+| `SENTRY_DSN` | Optional. The Sentry project's DSN; unset, error monitoring is off. When set, a 500 or a crash is reported with the route, never the request, the user or query values, and each minute's sweep checks in to the cron monitor `api-sweep` (`apps/api/src/monitoring.ts`; alerts: `docs/RUNBOOKS.md`, runbook 6). |
 | `SENTRY_ENVIRONMENT` | Optional. The environment Sentry files events under (`dev`, `production`); unset, `NODE_ENV`, which reads `production` on every deploy. Railway's `RAILWAY_GIT_COMMIT_SHA` is the release, nothing to set. |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | Set above `SHUTDOWN_DEADLINE_MS` (8s) so graceful shutdown finishes before SIGKILL. |
 
