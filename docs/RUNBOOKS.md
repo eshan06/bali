@@ -159,6 +159,40 @@ project for the API (its DSN).
     - **Deliver it to the school,** to the contact and by the channel the agreement names,
       never as a plain email attachment, inside the agreement's days. Once the school confirms
       it has the file, delete your copy and lift the hold.
+11. **A school's written request to dispose of its data (C6a).** The request comes in
+    writing from the contact the school's data agreement names, and the agreement says how
+    many days you have. Before you start:
+    - **Check no parent's inspection request is open** for a student of the school (step
+      10): if one is, export that record and deliver it first.
+    - **Open a shell in the API service** (step 9): `railway ssh --service <api service
+      name>`, and run the next two commands in that shell, never from your machine with
+      `railway ssh … --`: there the school's name in quotes would reach the remote shell
+      unquoted, and the clock that judges whether a lesson runs is the server's only there.
+    - **Preview it:** `npm run school -- dispose <school-id>` (`npm run school -- list`
+      gives the id). It prints the school's name and what would go
+      (teachers, students, classes, sessions, blocks, open invites, pre-bell taps) and writes
+      nothing. "lesson(s) running" means a class is in session: run it again after the bell.
+      "records at another school too" lists accounts by id: nothing was written, and this
+      command can't split one; stop and raise it.
+    - **Dispose of it**, with the name exactly as the preview printed it: paste the
+      preview's last line, `npm run school -- dispose <school-id> --confirm '<name>'` (the
+      name single-quoted, so an apostrophe or `$` in it reaches the command as typed).
+      It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
+      it with the school's request. Running it again says it was disposed of already.
+    - **Delete the school's sign-ins in Cognito.** The disposal can't reach them (the API
+      holds no AWS credential), and each still holds an email address. In the production
+      pool's **Users**, delete every user whose email is at the school's domain. A sign-in
+      left there only ever makes a new, empty account.
+    - **Backups:** Railway's backups (step 4) still hold the school's data until they age
+      out. Note the day the last backup from before the disposal expires (the Backups tab
+      lists each backup's time; its retention is the schedule's).
+    - **Write back to the school,** by the agreement's channel, inside its days: the date of
+      the disposal; what was removed (every name, Cognito subject and sign-in, class name,
+      block, open invite and pre-bell tap of the school); what stays (lessons,
+      unlocks with their reason, taps and their times, under accounts that name no one, kept
+      as counts); and the day the last backup holding its data expires. If the agreement
+      requires that de-identified records go too, stop before disposing and raise it: this
+      command keeps them.
 
 ---
 

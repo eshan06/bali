@@ -204,7 +204,12 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
   owner's `npm run school -- export-student` (C5, landed 2026-10-04); while one is open the
   owner holds every disposal of that student's data (`docs/RUNBOOKS.md`, runbook 1, step 10).
 
-**Done when:** the owner's policy is written, and C3–C6 have landed (C3 and C5 have).
+- A school's written request is answered by the owner's `npm run school -- dispose` (C6a,
+  landed 2026-10-05): its people de-identified as C3 leaves an account, its classes, blocks,
+  open invites and pre-bell taps removed, logged as a `school_disposed` event of counts
+  (`docs/RUNBOOKS.md`, runbook 1, step 11).
+
+**Done when:** the owner's policy is written, and C3–C6 have landed (C3, C5 and C6a have).
 
 ---
 
