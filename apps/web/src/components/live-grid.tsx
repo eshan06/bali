@@ -1,6 +1,11 @@
 'use client';
 
-import { EVENT_RESUME_OVERLAP, type SessionSnapshot, STREAM_HEARTBEAT_MS } from '@bali/shared';
+import {
+  EVENT_RESUME_OVERLAP,
+  type SessionSnapshot,
+  type SessionView,
+  STREAM_HEARTBEAT_MS,
+} from '@bali/shared';
 import { useEffect, useRef, useState } from 'react';
 
 import { getAccessToken } from '@/lib/auth';
@@ -51,18 +56,23 @@ const CHIP: Record<GridDisplay, { label: string; cls: string }> = {
 export function LiveGrid({
   sessionId,
   onEnded,
+  onSession,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
   onEnded?: (sessionId: string) => void;
+  /** Called with the session as each snapshot the grid keeps says it is: its bell (P10). */
+  onSession?: (session: SessionView) => void;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
-  // The newest callback, read where the session ends, so a new one never restarts the stream.
+  // The newest callbacks, read where a snapshot lands, so a new one never restarts the stream.
   const onEndedRef = useRef(onEnded);
+  const onSessionRef = useRef(onSession);
   useEffect(() => {
     onEndedRef.current = onEnded;
-  }, [onEnded]);
+    onSessionRef.current = onSession;
+  }, [onEnded, onSession]);
   const [students, setStudents] = useState<Students | null>(null);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
@@ -93,6 +103,7 @@ export function LiveGrid({
         const snap = await api.get<SessionSnapshot>(`/v1/sessions/${sessionId}`);
         if (cancelled) return;
         setStudents(fromSnapshot(snap));
+        onSessionRef.current?.(snap.session);
         if (snap.ended) {
           setOver(true);
           onEndedRef.current?.(sessionId);
@@ -160,6 +171,7 @@ export function LiveGrid({
           if (!snapshotIsFresh(snap.latestSeq, appliedSeq.current)) return;
           appliedSeq.current = snap.latestSeq;
           setStudents((cur) => (cur ? mergeSnapshot(cur, snap) : fromSnapshot(snap)));
+          onSessionRef.current?.(snap.session);
         },
         () => {
           /* keep the last-known grid; the banner already shows staleness */
