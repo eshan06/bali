@@ -56,6 +56,7 @@ struct DeleteUserTests {
         for issuer in [
             "https://cognito-idp.us-east-1.example.com/us-east-1_x",
             "https://cognito-idp.bucket.s3.amazonaws.com/us-east-1_x",
+            "https://cognito-idp.s3.amazonaws.com/us-east-1_x",  // a bucket named cognito-idp
         ] {
             let phone = await signIn(try .holding(admin("a1", issuer: issuer)), endpoint, told: Told())
             #expect(await !phone.mayDelete(), "\(issuer)")

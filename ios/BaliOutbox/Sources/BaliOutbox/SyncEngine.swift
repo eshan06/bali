@@ -652,7 +652,12 @@ public actor SyncEngine {
         _ = stored { try outbox.accountDeleted() }
         refreshQueue()
         state.standing = .out
-        return await signIn.deleteUser().map(AccountDeletion.signInNotDeleted) ?? .deleted
+        let failed = await signIn.deleteUser()
+        // And once more as DeleteUser answers: what came meanwhile, or a write the file refused,
+        // never waits for the next sign-in.
+        _ = stored { try outbox.accountDeleted() }
+        refreshQueue()
+        return failed.map(AccountDeletion.signInNotDeleted) ?? .deleted
     }
 
     /// Everything queued goes now, and the truth is read again: the student's "retry" (rule 5), and

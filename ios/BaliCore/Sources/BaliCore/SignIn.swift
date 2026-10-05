@@ -167,8 +167,7 @@ struct Tokens: Codable, Sendable {
         guard let claims = claims(Claims.self, of: token),
             claims.scope.split(separator: " ").contains(where: { $0 == SignIn.deleteScope }),
             let host = URLComponents(string: claims.iss)?.host,
-            host.split(separator: ".").count == 4, host.hasPrefix("cognito-idp."),
-            host.hasSuffix(".amazonaws.com")
+            host.wholeMatch(of: /cognito-idp\.[a-z]{2}(-[a-z]+)+-[0-9]+\.amazonaws\.com/) != nil
         else { return nil }
         return URL(string: "https://\(host)/")
     }

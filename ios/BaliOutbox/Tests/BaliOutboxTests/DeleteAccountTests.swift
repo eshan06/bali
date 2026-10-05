@@ -81,9 +81,12 @@ struct DeleteAccountTests {
         delete.reply(200, deletedAnswer)
         let cognito = try await rig.server.next(deleteUserRoute)
         #expect(await rig.server.waiting.isEmpty)
-        // While DeleteUser is on its way, a read of the truth asked for sends nothing.
+        // While DeleteUser is on its way, a read of the truth asked for sends nothing — nor does a
+        // tap made then, which goes with the account as DeleteUser answers.
         await rig.engine.setForeground(true)
         await rig.until { $0.link == .signIn }
+        try await rig.engine.record(.tap(tagId: "tag"))
+        await rig.until { $0.queued.count == 1 }
         #expect(await rig.server.waiting.isEmpty)
         cognito.reply(200, "{}")
 
@@ -256,6 +259,66 @@ struct DeleteAccountTests {
         try await rig.server.next(deleteMeRoute).reply(200, deletedAnswer)
         try await rig.server.next(deleteUserRoute).reply(200, "{}")
         #expect(await deletion.value == .deleted)
+        await rig.stop()
+    }
+
+    @Test(
+        "A record the drain has on its way when Delete account is pressed lands before anything of the deletion goes, never sent twice; and while the deletion runs the drain sends nothing — a record made meanwhile goes with the account"
+    )
+    func drainHeld() async throws {
+        let rig = try await SignedRig()
+        try await rig.signIn(me: Answer.me())
+        await rig.until { $0.standing == .inSession(session(), .focused) }
+        try await rig.engine.emergencyUnlock()
+        let onItsWay = try await rig.server.next(unlockRoute)
+        let deletion = rig.deleting()
+        try await Task.sleep(for: .milliseconds(200))
+        try #require(await rig.server.waiting.isEmpty)  // neither the unlock again nor the deletion
+        onItsWay.reply(200, Answer.unlocked())
+        let delete = try await rig.server.next(deleteMeRoute)
+        try await rig.engine.record(.protectionOff(session: "s"))
+        try await Task.sleep(for: .milliseconds(200))
+        try #require(await rig.server.waiting.isEmpty)  // the drain holds it
+        delete.reply(200, deletedAnswer)
+        try await rig.server.next(deleteUserRoute).reply(200, "{}")
+        #expect(await deletion.value == .deleted)
+        #expect(try rig.outbox.records().isEmpty)
+        #expect(await rig.server.waiting.isEmpty)
+        await rig.stop()
+    }
+
+    @Test(
+        "A check-in on its way when Delete account is pressed lands before anything of the deletion goes"
+    )
+    func checkInLands() async throws {
+        let rig = try await SignedRig()
+        try await rig.signIn(me: Answer.me())
+        await rig.engine.setForeground(true)
+        try await rig.server.next(meRoute).reply(200, Answer.me())
+        try await eventually { rig.clock.deadlines.contains(at(30)) }
+        rig.clock.advance(by: 30)
+        let checkIn = try await rig.server.next(checkInRoute)
+        let deletion = rig.deleting()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await rig.server.waiting.isEmpty)
+        checkIn.reply(200, Answer.live())
+        try await rig.server.next(deleteMeRoute).reply(200, deletedAnswer)
+        try await rig.server.next(deleteUserRoute).reply(200, "{}")
+        #expect(await deletion.value == .deleted)
+        await rig.stop()
+    }
+
+    @Test(
+        "An outbox file that cannot be read holds the deletion back — whether an unlock waits is not known — with nothing sent and the sign-in kept"
+    )
+    func unread() async throws {
+        let rig = try await SignedRig()
+        try await rig.signIn()
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE outbox RENAME TO gone") }
+        #expect(await rig.engine.deleteAccount(rig.signIn) == .unread)
+        #expect(await rig.server.waiting.isEmpty)
+        #expect(await rig.signIn.mayDelete())
+        try await rig.outbox.pool.write { try $0.execute(sql: "ALTER TABLE gone RENAME TO outbox") }
         await rig.stop()
     }
 

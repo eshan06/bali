@@ -17,7 +17,8 @@ public enum AccountDeletion: Sendable, Hashable {
     /// A teacher with a class or a block (`409 teacher_has_classes`): the school deletes that account.
     case teacherHasClasses
     /// The last answer, when something else the phone queued, or the deletion itself, got none that
-    /// settled it: nothing deleted that the phone knows of.
+    /// settled it: nothing deleted that the phone knows of — though a deletion with no answer may
+    /// have landed, which a try again settles, deleting too any account a read has made since (C3).
     case notDeleted(SendResult)
     /// The account is deleted on the server, but not its Cognito sign-in: what Cognito answered. The
     /// sign-in is kept to try again, and gives the API no token meanwhile.

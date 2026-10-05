@@ -54,9 +54,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hold** while it runs, and what they had on its way lands first: a boot read, a check-in or a
   record reaching the API after the deletion makes a fresh account under the same sign-in, which
   nothing would delete. A second press while one runs shares its answer: two at once, the one
-  ending first would let the loops go while the other's `DELETE /v1/me` was on its way. **The deletion:** under one event id while no answer settled it (rule 4),
-  once more under a fresh one on `409 event_id_conflict` (C3: a boot call racing the deletion makes
-  the reborn account look older than it), and `teacher_has_classes` its own state. **After it:**
+  ending first would let the loops go while the other's `DELETE /v1/me` was on its way. **The
+  deletion:** under one event id while no answer settled it (rule 4), once more under a fresh one
+  on `409 event_id_conflict` (C3: a boot call racing the deletion makes the reborn account look
+  older than it), and `teacher_has_classes` its own state. **After it:**
   the sign-in gives the API no token (`Tokens.deleted`, saved in the Keychain and carried through
   renewals), so neither the engine, a screen nor a relaunch makes a boot read before DeleteUser.
   The deleted account's queued records are let go, all but an unlock — a judgment call: a refused
@@ -67,8 +68,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `cognito-idp.<region>.amazonaws.com`, so any hosted-UI domain works and the token goes nowhere
   else; no AWS credential. A failure keeps the token and is said (`signInNotDeleted`), and the next
   call tries DeleteUser alone; `NotAuthorizedException` renews the token once and tries again, a
-  renewal refused for good meaning the sign-in is gone already (a try whose answer was lost);
-  `UserNotFoundException` is done. Done, the tokens are forgotten as Sign out forgets them. **Not
+  renewal refused for good meaning the sign-in is gone already (a try whose answer was lost) — its
+  known limit: a refresh token expired or revoked between the two calls is refused alike, and then
+  the Cognito sign-in stays; `UserNotFoundException` is done. Done, the tokens are forgotten as
+  Sign out forgets them, and what the account queued meanwhile goes with it. **Not
   covered, for C4b:** what the student does from the press until the sign-in is deleted. A join or
   a rename landing after the deletion makes a fresh account; a tap or Back to focus made while it
   runs, or a tap while DeleteUser waits, is let go with the account, but an Emergency Unlock made
