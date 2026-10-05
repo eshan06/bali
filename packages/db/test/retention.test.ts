@@ -653,4 +653,30 @@ describe('npm run school -- year-end / retention', () => {
       ),
     ]);
   });
+  it('refuses another name, saying the right one and writing nothing; a disposed school, says so', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: "O'Neil Prep", schoolYearEndsOn: '2020-06-01' })
+      .returning();
+    if (!school) throw new Error('seed');
+    const logged = await db.$count(events);
+    await expect(run(['retention', school.id, '--confirm', 'ONeil Prep'])).rejects.toThrow(
+      `school ${school.id} is named "O'Neil Prep"; nothing was written. ` +
+        `To confirm: retention ${school.id} --confirm 'O'\\''Neil Prep'`,
+    );
+    expect(await db.$count(events)).toBe(logged);
+    expect(
+      (await db.select().from(schools).where(eq(schools.id, school.id)))[0]?.removedAt,
+    ).toBeNull();
+
+    const disposed = await disposeSchool(db, {
+      schoolId: school.id,
+      at: new Date(),
+      confirmName: school.name,
+    });
+    expect(disposed.outcome).toBe('disposed');
+    expect(await run(['retention', school.id, '--confirm', school.name])).toEqual([
+      `school ${school.id} was disposed of: its people are de-identified already`,
+    ]);
+  });
 });

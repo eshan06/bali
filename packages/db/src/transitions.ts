@@ -4262,8 +4262,8 @@ export function yearOverAt(day: string): Date {
  * lessons, participations and events stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
- * after the year's last day (an event, a lesson, a pre-bell tap, an invite
- * redeemed, a class joined, a class or block made, the account itself made), with records at another school, or a
+ * after the year's last day (an event, a lesson, a pre-bell tap of theirs or
+ * on them, an invite redeemed, a class joined, a class or block made, the account itself made), with records at another school, or a
  * teacher with a live class or block (as C3 refuses one). Splitting an
  * account's years would mean rewriting `events.user_id`; not built.
  *
@@ -4369,6 +4369,8 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
         .returning({ id: armedTaps.id })
     : [];
   // A class name can name its teacher; theirs are all removed (a live one keeps them named).
+  // `isNotNull(classes.removedAt)` is a belt, not the live-class rule: activeSince keeps
+  // any live class's teacher named, so none of theirs is live here.
   if (teacherIds.length) {
     await tx
       .update(classes)

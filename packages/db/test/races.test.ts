@@ -4008,7 +4008,9 @@ describe.runIf(REAL_PG)(
           recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-01' }),
           recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-02' }),
         ]);
-        if (!a || !b) throw new Error('both runs found the school');
+        if (a.outcome !== 'recorded' || b.outcome !== 'recorded') {
+          throw new Error('both runs found the school');
+        }
         const [first, second] = a.before === null ? [a, b] : [b, a];
         expect(first.before).toBeNull();
         expect(second.before).toBe(first.school.agreementSignedAt);

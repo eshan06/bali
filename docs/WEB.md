@@ -175,7 +175,7 @@ npm run school -- retention <school-id> --confirm "<name>"   # run it, once the 
   enrollments end as a removal ends them (`enrollment_removed`, so a grid hears it); their
   pre-bell taps are deleted; a de-identified teacher's removed classes lose their names.
   Kept named, and listed by id in the preview: anyone with a record after the day (an
-  event, a lesson, a pre-bell tap, an invite redeemed, a class joined, a class or block
+  event, a lesson, a pre-bell tap of theirs or on them, an invite redeemed, a class joined, a class or block
   made, the account itself), with
   records at another school, or a teacher with a live class or block. Lessons,
   participations and events stay, so reports add up. Logged as one `retention_applied`

@@ -106,17 +106,23 @@ export async function listSchools(db: Database): Promise<SchoolListing[]> {
     .orderBy(asc(schools.name), asc(schools.createdAt));
 }
 
+export type RecordDayResult =
+  | { outcome: 'recorded'; school: SchoolRow; before: string | null }
+  | { outcome: 'unknown_school' }
+  | { outcome: 'disposed'; disposedAt: Date };
+
 /**
  * Record the school's data agreement as signed on `signedOn`, a day written
  * YYYY-MM-DD (the command checks it). Recording it again replaces the day — the
  * owner correcting a mistyped one — and `before` is the day it replaced: the
  * row is locked from its read to its write, so two runs at once each name the
- * day their own write replaced. Undefined when no live school has the id.
+ * day their own write replaced. A school disposed of (C6a) takes no day:
+ * `disposed`, with when; `unknown_school` when no school ever had the id.
  */
 export function recordAgreement(
   db: Database,
   input: { schoolId: string; signedOn: string },
-): Promise<{ school: SchoolRow; before: string | null } | undefined> {
+): Promise<RecordDayResult> {
   return recordSchoolDay(db, input.schoolId, 'agreementSignedAt', input.signedOn);
 }
 
@@ -128,7 +134,7 @@ export function recordAgreement(
 export function recordYearEnd(
   db: Database,
   input: { schoolId: string; endsOn: string },
-): Promise<{ school: SchoolRow; before: string | null } | undefined> {
+): Promise<RecordDayResult> {
   return recordSchoolDay(db, input.schoolId, 'schoolYearEndsOn', input.endsOn);
 }
 
@@ -137,17 +143,18 @@ async function recordSchoolDay(
   schoolId: string,
   field: 'agreementSignedAt' | 'schoolYearEndsOn',
   day: string,
-): Promise<{ school: SchoolRow; before: string | null } | undefined> {
-  return db.transaction(async (tx) => {
-    const [current] = await tx.select().from(schools).where(liveSchool(schoolId)).for('update');
-    if (!current) return undefined;
+): Promise<RecordDayResult> {
+  return db.transaction(async (tx): Promise<RecordDayResult> => {
+    const [current] = await tx.select().from(schools).where(eq(schools.id, schoolId)).for('update');
+    if (!current) return { outcome: 'unknown_school' };
+    if (current.removedAt !== null) return { outcome: 'disposed', disposedAt: current.removedAt };
     const [school] = await tx
       .update(schools)
       .set({ [field]: day })
       .where(eq(schools.id, current.id))
       .returning();
-    if (!school) return undefined;
-    return { school, before: current[field] };
+    if (!school) throw new Error('recordSchoolDay: the update returned no row');
+    return { outcome: 'recorded', school, before: current[field] };
   });
 }
 

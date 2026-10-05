@@ -91,7 +91,7 @@ checked with a public authorize request (`bali://auth/callback`, scope
 - **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`). Dev's `AUTH_AUDIENCE` is the phone's id plus this one: `7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v`
 - **Dev's API:** `https://bali-production-09a2.up.railway.app` — dev's, despite
   the name: Railway named the service before the environment was renamed dev.
-  No production API exists yet (Phase 5).
+  Production's is below.
 - **In place** (2026-09-26, for the replacement client; the first was in place
   2026-09-25): all three are in `ios/project.yml` (B4c), and the client id is on
   dev's `AUTH_AUDIENCE`, appended after B4a deployed.
@@ -100,7 +100,36 @@ checked with a public authorize request (`bali://auth/callback`, scope
   Cognito's 30-day default (step 3 below; 365 days was asked for), which no
   request from outside can show.
 
-**Production — still to do**, in its own pool (hosting decision 2). In the AWS
+**Production — done** (owner, 2026-10-04, `docs/RUNBOOKS.md` runbooks 1–2), in its
+own pool (hosting decision 2). None of these is secret:
+
+- **Production's API:** `https://bali-prod-production.up.railway.app` — Railway
+  environment `production`, services `bali prod` and `postgres prod`; `/healthz`
+  answers ok.
+- **The pool:** `bali-production`, id `us-east-1_C55e0fhX8`; `AUTH_ISSUER`
+  `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8`. Deletion
+  protection on; MFA optional (TOTP); self sign-up gated by the Pre sign-up Lambda
+  `bali-pre-signup` with `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu` (checked: a gmail
+  sign-up is refused). The API's `TZ` is `America/Chicago`.
+- **Hosted-UI domain:** `https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com`
+  (Hosted UI classic).
+- **The portal's app client:** `bali-web`, id `36meb9r9h0cdrt2a1schcv9abs` — a
+  public SPA client, PKCE, SRP and refresh only; callback
+  `https://bali-portal.vercel.app/auth/callback`, sign-out
+  `https://bali-portal.vercel.app/login`. The Vercel project isn't made yet
+  (runbook 3): if it ends up under another name, both URLs change with it.
+- **The phone's app client:** `bali-ios`, id `5dr74i0iqnth9p4c4k594r27aj` — public,
+  callback `bali://auth/callback`, scopes `openid email profile` and
+  `aws.cognito.signin.user.admin` (for C4's `DeleteUser`), refresh token 365 days,
+  SRP and refresh only.
+- **`AUTH_AUDIENCE`:** `36meb9r9h0cdrt2a1schcv9abs,5dr74i0iqnth9p4c4k594r27aj`.
+- **In the build:** the TestFlight workflow's `prod` choice (below) sets the API,
+  the domain and the phone's client id; `ios/project.yml` keeps dev's for every
+  other build. The app asks for `openid email profile` only
+  (`ios/BaliCore/Sources/BaliCore/SignIn.swift`); asking for the admin scope too is
+  C4's change, which the client already allows.
+
+How a pool's phone client is made (as production's was; for a rebuild). In the AWS
 console → Cognito → that user pool:
 
 1. **Hosted-UI domain**, if the pool has none: **Branding → Domain → Create
@@ -126,11 +155,11 @@ console → Cognito → that user pool:
 
 **Where the values go** (each environment's own):
 
-- **The domain and the client id:** `ios/project.yml`'s build settings,
-  `BALI_COGNITO_DOMAIN` and `BALI_COGNITO_CLIENT_ID` — dev's are in (B4c);
-  production's go there once it exists (Phase 5), beside its API in
-  `BALI_API_URL`, which must never be dev's URL above. A build with any of
-  them empty says sign-in is not set up.
+- **The domain and the client id:** the build settings `BALI_COGNITO_DOMAIN`
+  and `BALI_COGNITO_CLIENT_ID`, beside the API in `BALI_API_URL` — dev's in
+  `ios/project.yml` (B4c), production's as the TestFlight workflow's `prod`
+  overrides, whose `BALI_API_URL` must never be dev's URL (its release guard
+  checks). A build with any of them empty says sign-in is not set up.
 - **The client id, again:** appended to that environment's `AUTH_AUDIENCE`,
   after the id already there (`<that id>,<the phone's>`) — **only once B4a is
   deployed there.** Before it, the API reads `AUTH_AUDIENCE` as a single id,
@@ -151,9 +180,9 @@ console → Cognito → that user pool:
 The **TestFlight** workflow (`.github/workflows/testflight.yml`, Phase 5's P5) archives
 the student app as Release, signs it through an App Store Connect API key, and uploads
 it. It runs only by hand: Actions → TestFlight → Run workflow, choosing whose API and
-sign-in the build talks to (dev, the only one until prod exists; then it gets prod's
-values in its "Archive" step). Without the key's secrets it builds nothing, says which
-are missing, and passes. Once, before the first run:
+sign-in the build talks to: `dev` (the default; `ios/project.yml`'s values) or `prod`
+(production's, set in its "Archive" step). Without the key's secrets it builds nothing,
+says which are missing, and passes. Once, before the first run:
 
 1. **The app record.** App Store Connect → Apps → + → New App: iOS, the name, a
    language, bundle ID `com.bali.Bali` (registered on team `H535678UF8` by the first
@@ -169,13 +198,21 @@ are missing, and passes. Once, before the first run:
    - `APP_STORE_CONNECT_KEY_P8` — the whole `.p8` file, its `BEGIN` and `END` lines
      included.
 
+**A prod build:** GitHub → the repo → Actions → TestFlight → **Run workflow** → branch
+`main`, environment **`prod`** → Run workflow (or `gh workflow run testflight.yml -f
+environment=prod`). Dev and prod builds go to the same app in TestFlight, told apart only
+by their build number: each run's name in the Actions list, `TestFlight (prod)`, and its
+summary say which environment its number was built for, so note it before handing a build
+to testers.
+
 What a run checks and needs:
 
 - **The release guard** (#130, "Nothing from Debug in Release"; part of Phase 6's S10)
   fails the run before anything is uploaded if a Release target compiles with
   `DEBUG`, if the app or the monitor holds text only `#if DEBUG` code has (the
   readout's title, the lost-bell device check), if a sign-in setting is empty or the
-  API isn't `https://`, or if the app has **no icon** (App Store Connect refuses such a
+  API isn't `https://`, if a `prod` build's API, domain or client id isn't production's, or if the app has
+  **no icon** (App Store Connect refuses such a
   build). The icon is `ios/Bali/Assets.xcassets`'s `AppIcon`, named by
   `ASSETCATALOG_COMPILER_APPICON_NAME` in `ios/project.yml`.
 - **Signing:** `-allowProvisioningUpdates` with the key, so Xcode makes or fetches

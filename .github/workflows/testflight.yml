@@ -3,6 +3,7 @@
 # TestFlight → Run workflow). Without the key's three secrets it says so and passes, building
 # nothing. Setup, and what a run needs on Apple's side: docs/DEPLOY.md, "TestFlight".
 name: TestFlight
+run-name: TestFlight (${{ inputs.environment }})
 
 on:
   workflow_dispatch:
@@ -10,8 +11,8 @@ on:
       environment:
         description: Whose API and sign-in the build talks to
         type: choice
-        # Only dev exists. When prod does, add it here and its values in "Archive" below.
-        options: [dev]
+        # dev stays the default: a pilot build is chosen on purpose. Each one's values: "Archive" below.
+        options: [dev, prod]
         default: dev
 
 permissions:
@@ -118,7 +119,18 @@ jobs:
         run: |
           case "$ENVIRONMENT" in
             dev) overrides=() ;; # project.yml's values are dev's.
-            # prod) overrides=(BALI_API_URL=… BALI_COGNITO_DOMAIN=… BALI_COGNITO_CLIENT_ID=…) ;;
+            # Production's (docs/DEPLOY.md, "The phone's sign-in"): its API, its pool's hosted UI,
+            # the phone's client `bali-ios`. The redirect URI is the same, so project.yml's stands.
+            prod)
+              api=https://bali-prod-production.up.railway.app
+              domain=https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com
+              client=5dr74i0iqnth9p4c4k594r27aj
+              # The guard below checks each one took.
+              printf 'EXPECTED_API_URL=%s\nEXPECTED_DOMAIN=%s\nEXPECTED_CLIENT_ID=%s\n' \
+                "$api" "$domain" "$client" >> "$GITHUB_ENV"
+              overrides=(
+                BALI_API_URL="$api" BALI_COGNITO_DOMAIN="$domain" BALI_COGNITO_CLIENT_ID="$client"
+              ) ;;
             *) echo "::error::No values for the environment \"$ENVIRONMENT\"."; exit 1 ;;
           esac
           xcodebuild archive -quiet -project Bali.xcodeproj -scheme Bali -configuration Release \
@@ -146,6 +158,14 @@ jobs:
               https://*) ;;
               *) echo "::error::$key is not an https:// URL."; fail=1 ;;
             esac
+          done
+          # A prod build talks to prod's API and pool, never project.yml's dev ones.
+          for pair in "BaliAPIURL|${EXPECTED_API_URL:-}" "BaliCognitoDomain|${EXPECTED_DOMAIN:-}" \
+            "BaliCognitoClientID|${EXPECTED_CLIENT_ID:-}"; do
+            IFS='|' read -r key expected <<< "$pair"
+            if [ -n "$expected" ] && [ "$(plist "$key")" != "$expected" ]; then
+              echo "::error::$key is not $ENVIRONMENT's ($expected)."; fail=1
+            fi
           done
           [ "$(plist CFBundleVersion)" = "$GITHUB_RUN_NUMBER" ] \
             || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }

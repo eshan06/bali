@@ -22,6 +22,7 @@ import {
   redeemTeacherInvite,
 } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
+import { disposeSchool } from '../src/transitions.js';
 import type { Database } from '../src/types.js';
 
 /*
@@ -232,18 +233,20 @@ describe('recordAgreement', () => {
     const school = await createSchool(db, { name: 'Agreement High' });
     expect(school.agreementSignedAt).toBeNull();
     const first = await recordAgreement(db, { schoolId: school.id, signedOn: '2026-09-30' });
-    expect(first?.before).toBeNull();
-    expect(first?.school.agreementSignedAt).toBe('2026-09-30');
+    if (first.outcome !== 'recorded') throw new Error(`recorded, got ${first.outcome}`);
+    expect(first.before).toBeNull();
+    expect(first.school.agreementSignedAt).toBe('2026-09-30');
     const fixed = await recordAgreement(db, { schoolId: school.id, signedOn: '2026-10-01' });
-    expect(fixed?.before).toBe('2026-09-30');
+    if (fixed.outcome !== 'recorded') throw new Error(`recorded, got ${fixed.outcome}`);
+    expect(fixed.before).toBe('2026-09-30');
     const [row] = await db.select().from(schools).where(eq(schools.id, school.id));
     expect(row?.agreementSignedAt).toBe('2026-10-01');
   });
 
-  it('is undefined for a school not on record', async () => {
-    expect(
-      await recordAgreement(db, { schoolId: newUuidV7(), signedOn: '2026-10-01' }),
-    ).toBeUndefined();
+  it('is unknown_school for a school not on record', async () => {
+    expect(await recordAgreement(db, { schoolId: newUuidV7(), signedOn: '2026-10-01' })).toEqual({
+      outcome: 'unknown_school',
+    });
   });
 });
 
@@ -468,6 +471,19 @@ describe('npm run school: running it', () => {
     expect(await refusal(run('agreement', unknown, '2026-10-01'))).toBe(
       `no school on record has the id ${unknown}`,
     );
+  });
+
+  it('says a school disposed of takes no day, never that it is not on record', async () => {
+    const school = await createSchool(db, { name: 'Gone High' });
+    const at = new Date('2026-10-04T15:00:00Z');
+    const disposed = await disposeSchool(db, { schoolId: school.id, at, confirmName: 'Gone High' });
+    expect(disposed.outcome).toBe('disposed');
+    const said = `school ${school.id} was disposed of on ${at.toISOString()}, so it takes no day; nothing was written`;
+    expect(await refusal(run('agreement', school.id, '2026-10-01'))).toBe(said);
+    expect(await refusal(run('year-end', school.id, '2026-12-18'))).toBe(said);
+    const [row] = await db.select().from(schools).where(eq(schools.id, school.id));
+    expect(row?.agreementSignedAt).toBeNull();
+    expect(row?.schoolYearEndsOn).toBeNull();
   });
 
   it('add: says when a school of that name, in any case, is on record already, and adds it all the same', async () => {

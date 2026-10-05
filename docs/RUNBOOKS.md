@@ -10,6 +10,29 @@ uses values the one before it produced:
 4. [The backup-restore drill](#4-the-backup-restore-drill), once prod holds data,
 5. [GitHub hardening](#5-github-hardening), any time.
 
+**Where production stands** (the owner, 2026-10-04; its values are in `docs/DEPLOY.md`,
+"The phone's sign-in", none secret):
+
+- **Runbook 2, Cognito — done:** the pool `bali-production` with deletion protection
+  (step 3); sign-up gated to `vanderbilt.edu` by `bali-pre-signup`, a gmail sign-up
+  checked refused (4); MFA optional, TOTP (6); both app clients, SRP and refresh only,
+  the phone's with the 365-day refresh token and the `aws.cognito.signin.user.admin`
+  scope C4 needs (8); the hosted-UI domain, classic (9); the values handed to Railway and
+  to the iOS build (12). Not needed: Sign in with Apple (11; no Google sign-in).
+- **Runbook 2 — skipped for the pilot, still to do:** threat protection (7; it needs
+  the Plus plan, billed per user), CloudTrail (2), and MFA on the AWS root user (1;
+  whether it is on wasn't recorded). Not recorded, so check them: the password policy
+  (5), "prevent user existence errors" on both clients (8), and the pool holding no
+  client but those two (10).
+- **Runbook 1, Railway — done:** the `production` environment (step 2), its database
+  `postgres prod` (3), the API service `bali prod` with its variables, `TZ`
+  `America/Chicago` (5–6), and `/healthz` answering ok (8). Not recorded, so check:
+  Railway's 2FA (1) and that the database has no public TCP proxy (3).
+- **Runbook 1 — still open:** the sweep cron in production (7), and daily backups (4),
+  which need a paid Railway plan (Hobby or above).
+- **Runbook 3, the Vercel flip — not started.** The `bali-web` client's URLs assume the
+  project is `bali-portal`; another name means changing them (runbook 2, step 8).
+
 How to read them:
 
 - Each step says where to click, then **Check:** how to know it worked.
