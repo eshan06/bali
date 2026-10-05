@@ -308,6 +308,9 @@ public actor SyncEngine {
     private var landed: [CheckedContinuation<Void, Never>] = []
     /// The last deletion sent that no answer settled: tried again under the same event id (rule 4).
     private var deletionId: String?
+    /// The account deletion under way, whose answer a second press shares: never two at once, one
+    /// of which would let the loops go while the other's `DELETE /v1/me` is on its way.
+    private var deletion: Task<AccountDeletion, Never>?
 
     /// `refresh` is B4's: refresh the token the API rejected, true once a fresh one is ready. It
     /// must return at once — false when only the student can give a token, whose sign-in then calls
@@ -599,8 +602,9 @@ public actor SyncEngine {
         reread()
     }
 
-    /// Me's Delete account (C4): the one call the screen makes, one at a time, answered with where
-    /// the deletion stands. Each step only once the last is done:
+    /// Me's Delete account (C4): the one call the screen makes, answered with where the deletion
+    /// stands — a press while one is under way shares its answer. Each step only once the last is
+    /// done:
     /// - `signIn` can delete itself — its token carries the scope Cognito's DeleteUser needs — or a
     ///   fresh sign-in comes first, before anything is sent: no one is deleted here but left in Cognito;
     /// - the loops hold, what they have on its way lands, and the outbox goes (`sendAll`), every
@@ -612,7 +616,19 @@ public actor SyncEngine {
     ///   one sent now would land under a fresh account;
     /// - Cognito's DeleteUser, which the next call tries again, alone, until it is done; done, the
     ///   sign-in is forgotten, as Sign out forgets it.
+    ///
+    /// What the student does while it runs, or while DeleteUser waits — a tap, Back to focus, a
+    /// join, a rename — is C4b's to keep from happening: none reaches an account the server keeps,
+    /// and an Emergency Unlock made under such a tap would wait for the next sign-in.
     public func deleteAccount(_ signIn: SignIn) async -> AccountDeletion {
+        if let deletion { return await deletion.value }
+        let task = Task { await self.delete(signIn) }
+        deletion = task
+        defer { deletion = nil }
+        return await task.value
+    }
+
+    private func delete(_ signIn: SignIn) async -> AccountDeletion {
         if await !signIn.deletionPending() {
             guard await signIn.mayDelete() else { return .signInFirst }
             deleting = true

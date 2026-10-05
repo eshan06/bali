@@ -53,7 +53,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   tap the server refused does not, being one it will never record for this account. **The loops
   hold** while it runs, and what they had on its way lands first: a boot read, a check-in or a
   record reaching the API after the deletion makes a fresh account under the same sign-in, which
-  nothing would delete. **The deletion:** under one event id while no answer settled it (rule 4),
+  nothing would delete. A second press while one runs shares its answer: two at once, the one
+  ending first would let the loops go while the other's `DELETE /v1/me` was on its way. **The deletion:** under one event id while no answer settled it (rule 4),
   once more under a fresh one on `409 event_id_conflict` (C3: a boot call racing the deletion makes
   the reborn account look older than it), and `teacher_has_classes` its own state. **After it:**
   the sign-in gives the API no token (`Tokens.deleted`, saved in the Keychain and carried through
@@ -68,9 +69,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   call tries DeleteUser alone; `NotAuthorizedException` renews the token once and tries again, a
   renewal refused for good meaning the sign-in is gone already (a try whose answer was lost);
   `UserNotFoundException` is done. Done, the tokens are forgotten as Sign out forgets them. **Not
-  covered, for C4b:** Sign out pressed while DeleteUser waits forgets the token and leaves the
-  person in Cognito, and a tap made in that wait is never sent and waits for the next sign-in: the
-  Me screen should offer only the retry there. **Tests:** `DeleteUserTests` (BaliCore),
+  covered, for C4b:** what the student does from the press until the sign-in is deleted. A join or
+  a rename landing after the deletion makes a fresh account; a tap or Back to focus made while it
+  runs, or a tap while DeleteUser waits, is let go with the account, but an Emergency Unlock made
+  under it is kept, and goes with the next sign-in; and Sign out while DeleteUser waits forgets the
+  token, leaves the person in Cognito and keeps such a tap for the next sign-in too. So from the
+  press to the end the app offers nothing but the deletion and its retry (`SignIn.deletionPending`
+  says, across a relaunch, that one waits for DeleteUser). **Tests:** `DeleteUserTests` (BaliCore),
   `DeleteAccountTests` and `DeletionOrderTests` (BaliOutbox), the main rules each proven by a
   mutation that fails its test.
 

@@ -47,14 +47,19 @@ func deletesSent(_ endpoint: TransportDouble) async throws -> [String] {
 @Suite("The sign-in deleting itself (C4)", .timeLimit(.minutes(3)))
 struct DeleteUserTests {
     @Test(
-        "a token carrying the scope DeleteUser needs, from a Cognito pool, may delete itself; one from a sign-in before the phone asked for it, one naming another issuer, and none at all may not — a fresh sign-in first"
+        "a token carrying the scope DeleteUser needs, from a Cognito pool, may delete itself; one from a sign-in before the phone asked for it, one naming another issuer — another host under amazonaws.com too — and none at all may not — a fresh sign-in first"
     )
     func mayDelete() async throws {
         let endpoint = TransportDouble(status: 500)
         #expect(await signIn(try .holding(admin("a1")), endpoint, told: Told()).mayDelete())
         #expect(await !signIn(try .holding(jwt("a1")), endpoint, told: Told()).mayDelete())
-        let elsewhere = admin("a1", issuer: "https://cognito-idp.us-east-1.example.com/us-east-1_x")
-        #expect(await !signIn(try .holding(elsewhere), endpoint, told: Told()).mayDelete())
+        for issuer in [
+            "https://cognito-idp.us-east-1.example.com/us-east-1_x",
+            "https://cognito-idp.bucket.s3.amazonaws.com/us-east-1_x",
+        ] {
+            let phone = await signIn(try .holding(admin("a1", issuer: issuer)), endpoint, told: Told())
+            #expect(await !phone.mayDelete(), "\(issuer)")
+        }
         #expect(await !signIn(MemoryStore(), endpoint, told: Told()).mayDelete())
         #expect(await endpoint.sent.isEmpty)
     }

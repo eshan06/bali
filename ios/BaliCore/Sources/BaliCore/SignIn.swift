@@ -158,15 +158,17 @@ struct Tokens: Codable, Sendable {
     }
 
     /// Where the sign-in that gave access token `token` deletes itself (C4): Cognito's own endpoint
-    /// in its pool's region, read unverified from its issuer and taken only when that is one — so the
-    /// token is sent nowhere else — while its scopes hold the one DeleteUser needs. Nil otherwise: a
-    /// sign-in made before the phone asked for that scope, whose renewals keep the scopes it got.
+    /// in its pool's region, read unverified from its issuer and taken only when that is one,
+    /// `cognito-idp.<region>.amazonaws.com` — so the token is sent nowhere else — while its scopes
+    /// hold the one DeleteUser needs. Nil otherwise: a sign-in made before the phone asked for that
+    /// scope, whose renewals keep the scopes it got.
     static func deleteEndpoint(of token: String) -> URL? {
         struct Claims: Decodable { let scope, iss: String }
         guard let claims = claims(Claims.self, of: token),
             claims.scope.split(separator: " ").contains(where: { $0 == SignIn.deleteScope }),
             let host = URLComponents(string: claims.iss)?.host,
-            host.hasPrefix("cognito-idp."), host.hasSuffix(".amazonaws.com")
+            host.split(separator: ".").count == 4, host.hasPrefix("cognito-idp."),
+            host.hasSuffix(".amazonaws.com")
         else { return nil }
         return URL(string: "https://\(host)/")
     }

@@ -258,6 +258,26 @@ struct DeleteAccountTests {
         #expect(await deletion.value == .deleted)
         await rig.stop()
     }
+
+    @Test(
+        "Pressed again while a deletion is under way, the press shares its answer: one DELETE /v1/me and one DeleteUser — never a second deletion beside the first, whose end would let the loops go while the other's is on its way"
+    )
+    func pressedTwice() async throws {
+        let rig = try await SignedRig()
+        try await rig.signIn()
+        let (first, second) = (rig.deleting(), rig.deleting())
+        let delete = try await rig.server.next(deleteMeRoute)
+        try await Task.sleep(for: .milliseconds(200))
+        // No second deletion on its way — it would have sent its own by now, and waited for an
+        // answer no one gives: required, so the test ends there rather than waits on it.
+        try #require(await rig.server.waiting.isEmpty)
+        delete.reply(200, deletedAnswer)
+        try await rig.server.next(deleteUserRoute).reply(200, "{}")
+        #expect(await first.value == .deleted)
+        #expect(await second.value == .deleted)
+        #expect(await rig.server.waiting.isEmpty)
+        await rig.stop()
+    }
 }
 
 @Suite("The outbox before an account deletion (C4)")
