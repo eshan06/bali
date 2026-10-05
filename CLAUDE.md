@@ -95,10 +95,12 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   it changed a real design decision, update ARCHITECTURE.md itself.
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,
-  `apps/web/src/components`), `ios/Bali/UI`, the shield (`ios/BaliShield`), a
-  demo site, and user-facing strings wherever they live (DESIGN.md lists
-  where). Read `docs/DESIGN.md` first, then design and build with the
-  `design-taste-frontend` skill, and write every new or changed user-facing
+  `apps/web/src/components`), `ios/Bali/UI`, the shield (`ios/BaliShield`),
+  the Cognito sign-in page (D2d), a demo site, and user-facing strings
+  wherever they live (DESIGN.md lists where). Read `docs/DESIGN.md` first,
+  then design and build with the `design-taste-frontend` and
+  `high-end-visual-design` skills (Bali's style, Soft premium), and write
+  every new or changed user-facing
   string with the `no-ai-slop` skill; `/santa-loop` runs
   `web-design-guidelines` on the portal's UI and `no-ai-slop` on changed
   strings (WARNs only). The design skills never apply to the API,

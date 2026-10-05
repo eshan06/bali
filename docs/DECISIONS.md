@@ -37,9 +37,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its CSS; the grid's density and Present; the theme paragraph; "Where it stands today" pointing
   at D2c; the tooling table; and the list of where user-facing strings live, verified by grep:
   BaliOutbox's `Focus`, `Unlocked`, `ProtectionOff`, `History`, `Me` and `SyncEngine` words were
-  missing, and in `apps/web/src/lib` `api-client`, `recap` and `blocks` (D2a's audit also named
-  `reports` and `invite`: by grep they hold none, their words being in the reports page,
-  `invite-code.tsx` and `errors.ts`). The two style skills not picked are deleted
+  missing, and in `apps/web/src/lib` `api-client` and `recap` (D2a's audit also named `blocks`,
+  `reports` and `invite`: by grep they hold none, their words being in `blocks.tsx`, the reports
+  page, `invite-code.tsx` and `errors.ts`); #226's late review added `ios/Bali/BlockReader.swift`
+  (the NFC sheet), `BaliApp.swift`'s `problem` and `Info.plist`'s NFC usage description. The two
+  style skills not picked are deleted
   (`.claude/skills/`, `.prettierignore`), and `high-end-visual-design`'s Bali block and
   `description` now say it is Bali's style, applied under DESIGN.md alongside
   `design-taste-frontend`, DESIGN.md winning and its fonts and palette never overriding the
