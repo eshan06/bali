@@ -1,4 +1,12 @@
-import { type Database, endSession, enrollments, startSession, tapIn, users } from '@bali/db';
+import {
+  type Database,
+  endSession,
+  enrollments,
+  newUuidV7,
+  startSession,
+  tapIn,
+  users,
+} from '@bali/db';
 import {
   API_ERROR_REASONS,
   type ApiErrorBody,
@@ -813,9 +821,10 @@ async function captureAll() {
     as,
     method: 'PUT',
     path: pushPath,
-    body: { token: pushToken, environment: 'production', eventId: randomUUID(), ...body },
+    // UUIDv7, as a phone mints them: a register applies only after the row's (N4).
+    body: { token: pushToken, environment: 'production', eventId: newUuidV7(), ...body },
   });
-  const unregister = (as: string, eventId = randomUUID()): Call => ({
+  const unregister = (as: string, eventId = newUuidV7()): Call => ({
     as,
     method: 'DELETE',
     path: pushPath,

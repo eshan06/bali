@@ -4,6 +4,7 @@ import { validate as isUuid } from 'uuid';
 import {
   armedTaps,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -36,13 +37,12 @@ export const STUDENT_RECORD_COVERAGE = {
     'events.user_id': 'events',
     'armed_taps.student_id': 'armedTaps',
     'teacher_invites.redeemed_by': 'invitesRedeemed',
+    'device_tokens.user_id': 'deviceTokens',
   },
   notTheirs: {
     'classes.teacher_id': "a teacher's classes: the school's records, with other students in them",
     'blocks.teacher_id': "a teacher's blocks: the school's equipment",
     'armed_taps.teacher_id': "the taps other students made on a teacher's block",
-    // Theirs, and listed here only until N4 exports it (PLAN, "Push: class started").
-    'device_tokens.user_id': 'NOT YET: theirs; N4 adds their device tokens to the export',
   },
 } as const;
 
@@ -99,6 +99,13 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         })
         .from(teacherInvites)
         .where(eq(teacherInvites.redeemedBy, id));
+      // Their phones' APNs tokens (N4), whole: a row keyed to them, the device
+      // address included — it opens nothing without Bali's own APNs key.
+      const tokens = await tx
+        .select()
+        .from(deviceTokens)
+        .where(eq(deviceTokens.userId, id))
+        .orderBy(asc(deviceTokens.createdAt), asc(deviceTokens.token));
 
       // What those rows point at, named: never another student, only the
       // class, its teacher's display name, its school, a session's window.
@@ -181,6 +188,7 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         events: happened,
         armedTaps: armed,
         invitesRedeemed,
+        deviceTokens: tokens,
         classes: classRows,
         sessions: sessionRows,
         sessionEvents,

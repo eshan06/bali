@@ -4212,4 +4212,33 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
       expect(rows).toHaveLength(1);
     }
   }, 30_000);
+
+  it('an older and a newer register of one token at once: the newer always holds it (N4)', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const [a, b] = [await student(`old-${round}`), await student(`new-${round}`)];
+      const shared = token();
+      const olderId = newUuidV7();
+      const newerId = newUuidV7();
+      const [older, newer] = await Promise.all([
+        registerPushToken(db, {
+          userId: a.id,
+          token: shared,
+          environment: 'sandbox',
+          eventId: olderId,
+        }),
+        registerPushToken(db, {
+          userId: b.id,
+          token: shared,
+          environment: 'production',
+          eventId: newerId,
+        }),
+      ]);
+      // Whichever lands first, the newer register writes; the older one either
+      // wrote before it or is answered as a replay of the newer's truth.
+      expect(newer, `round ${round}`).toEqual({ outcome: 'registered', environment: 'production' });
+      expect(['registered', 'replay'], `round ${round}`).toContain(older.outcome);
+      const row = one(await db.select().from(deviceTokens).where(eq(deviceTokens.token, shared)));
+      expect(row, `round ${round}`).toMatchObject({ userId: b.id, eventId: newerId });
+    }
+  }, 30_000);
 });

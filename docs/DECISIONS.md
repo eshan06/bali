@@ -8,6 +8,26 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **Device tokens are personal data, and a newer register wins (N4).**
+  `deleteAccount` (C3), a school's disposal (C6a) and the retention run (C6b) delete the
+  tokens of the people they de-identify, in their own transaction, beside the pre-bell taps
+  they already delete: a token is no record of anything, so nothing is kept under a row that
+  names no one. A continuing account in a retention run keeps its tokens, and a token is not a
+  record that keeps an account named. No count in `school_disposed` or `retention_applied`:
+  the payloads stay as they were. C5's export carries them whole as `deviceTokens` (additive to
+  `bali.student-record/1`): the rule is every row keyed to the person, every column, and the
+  token opens nothing without Bali's own APNs key, unlike an invite's hash, which is left out
+  because it is a credential's trace and no fact about the person. Rode along (N3's open note):
+  a register now rewrites a token's row only when its `eventId` sorts after the row's, by
+  Postgres's uuid order (a UUIDv7's leading timestamp — the phone's own order, as a quiz answer
+  replaces an earlier one), so an old retry landing after a newer register no longer moves the
+  token back; it answers `replay` with the token's environment now. Not closed, on purpose: a
+  removal deletes the row and keeps no `eventId`, so a stale register arriving after a removal
+  cannot be told from a new one and registers the token again. A tombstone would fix it; not
+  built — the harm is one "class started" nudge to a phone whose student removed it, and the
+  next register or removal settles it. A client that sends a v4 `eventId` gets a random order;
+  the contract asks for UUIDv7 already.
+
 - **2026-10-06** — **Device tokens: `PUT`/`DELETE /v1/me/push-token`, a row that really goes
   (N3).** The token travels in the body, never the URL, so no request log holds it (Fastify
   logs no body; a database error's values are scrubbed, S2). The table is keyed by the

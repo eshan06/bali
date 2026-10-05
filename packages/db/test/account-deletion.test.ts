@@ -2,6 +2,7 @@ import { sessionReport } from '@bali/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import { mintTeacherInvite, recordAgreement, redeemTeacherInvite } from '../src/schools.js';
@@ -10,6 +11,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -285,6 +287,44 @@ describe('deleteAccount (C3)', () => {
       .from(participations)
       .where(eq(participations.sessionId, session.id));
     expect(joined).toEqual([{ studentId: ben.id }]);
+  });
+
+  it('deletes the device tokens of its phones, and leaves a classmate’s (N4)', async () => {
+    const { ana, ben } = await seed('c3-tokens');
+    const token = () => newUuidV7().replace(/-/g, '').repeat(2);
+    const held = { ana: [token(), token()], ben: [token()] };
+    for (const [student, tokens] of [
+      [ana, held.ana],
+      [ben, held.ben],
+    ] as const) {
+      for (const t of tokens) {
+        await registerPushToken(db, {
+          userId: student.id,
+          token: t,
+          environment: 'sandbox',
+          eventId: newUuidV7(),
+        });
+      }
+    }
+    const tokensOf = async (userId: string) =>
+      (await db.select().from(deviceTokens).where(eq(deviceTokens.userId, userId))).map(
+        (r) => r.token,
+      );
+    expect(await tokensOf(ana.id)).toHaveLength(2);
+
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+
+    expect(await tokensOf(ana.id)).toEqual([]);
+    expect(await tokensOf(ben.id)).toEqual(held.ben);
+    // A register that reaches the deleted account writes none back.
+    const late = await registerPushToken(db, {
+      userId: ana.id,
+      token: token(),
+      environment: 'sandbox',
+      eventId: newUuidV7(),
+    });
+    expect(late).toEqual({ outcome: 'account_deleted' });
+    expect(await tokensOf(ana.id)).toEqual([]);
   });
 
   it('refuses a teacher with a class or a block, and deletes one with neither', async () => {
