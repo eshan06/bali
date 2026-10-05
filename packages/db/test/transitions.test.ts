@@ -148,7 +148,11 @@ describe('startSession', () => {
 
     // A second before the bell, a Start still answers with the class running.
     const early = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:24:59Z') });
-    expect(early).toMatchObject({ outcome: 'existing', session: { id: old.id } });
+    expect(early).toMatchObject({
+      outcome: 'existing',
+      session: { id: old.id },
+      convertedStudentIds: [],
+    });
 
     const gap = new Date('2026-01-01T09:25:10Z');
     await armTap(db, {
@@ -160,7 +164,11 @@ describe('startSession', () => {
       now: gap,
     });
     const next = await startSession(db, { classId: klass.id, ...window('2026-01-01T09:25:30Z') });
-    expect(next).toMatchObject({ outcome: 'created', armedConverted: 1 });
+    expect(next).toMatchObject({
+      outcome: 'created',
+      armedConverted: 1,
+      convertedStudentIds: [student.id],
+    });
     expect(next.session.id).not.toBe(old.id);
 
     const over = one(await db.select().from(sessions).where(eq(sessions.id, old.id)));
@@ -3895,6 +3903,8 @@ describe('armed taps', () => {
       ...window('2026-01-01T10:00:00Z'),
     });
     expect(next.armedConverted).toBe(0);
+    // A declined tap is no join: no "class started" push for it (N5).
+    expect(next.convertedStudentIds).toEqual([]);
     const skipped = one(
       (await eventsFor(next.session.id)).filter((e) => e.type === 'armed_tap_skipped'),
     );
