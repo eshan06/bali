@@ -9,8 +9,8 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-05** — **Phase 7, Live lesson, planned** (L0; ARCHITECTURE's "Live lesson (Phase
-  7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended with the owner's
-  approval, who asked for the phase to be written into it before building). During a running
+  7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended because the owner
+  asked for the phase to be written into it before building; the PR awaits the owner's approval). During a running
   session the teacher asks a question (Slice 1, single choice) and presents PDF slides (Slice
   2); students see both on Bali's own screen, which works shielded, unlocked or with no Screen
   Time access, and never covers or delays Emergency Unlock. **The owner's rulings:** results
@@ -36,10 +36,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `session_presentations` row, not columns on the hot `sessions` row; decks in a private
   bucket per environment behind a storage interface with a fake (S3 recommended, the API's
   first AWS credential, scoped to the bucket), ≤ 25 MB and ≤ 200 pages, PDF.js ≥ 4.2.67 with
-  eval off on the portal and PDFKit on the phone. **Privacy:** responses are education
+  eval off on the portal and PDFKit on the phone; no presigned URL in the polled body (it would
+  change every poll and no `304` would ever match), a download route minting it instead. **Privacy:** responses are education
   records (kept de-identified by C3, C6a, C6b; in the student's C5 export); question texts
   emptied by the disposal; decks are the teacher's content, their stored objects deleted with
-  their rows' removal. Open for the owner: the threshold, reveal on or off, the storage
+  their rows' removal. Open for the owner: the threshold, reveal on or off, the live breakdown, the storage
   provider, the size cap.
 
 - **2026-10-05** — **Production as it stands; no prod backups for the Vanderbilt pilot; live

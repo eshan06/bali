@@ -854,11 +854,15 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   sweep, a question already counts as closed (A17's rule: the server's clock decides).
 - **The small-group guard.** The per-option breakdown is shown only once at least **3**
   students have answered; before that a teacher sees "N answered" only, open or closed. The
-  teacher sees "N of M answered", M the students enrolled in the class now, and never which
-  students answered or didn't. No answer's time is exposed.
+  teacher sees "N of M answered" — M the students enrolled in the class now, N those of them
+  with an answer, so N never exceeds M — and never which students answered or didn't. No
+  answer's time is exposed.
 - **No leaderboards, no grading, no per-student participation** in any report, recap or
-  export a teacher reads. Totals-only governs what Bali shows; it cannot stop a teacher
-  watching a student's screen in the room, and the guard removes the trivial cases.
+  export a teacher reads. Totals-only governs what Bali shows. **Its known limit:** a teacher
+  watching the live counts change while watching one student answer in the room can
+  attribute that one step, and 3 answers all on one option tell everyone's. The guard removes
+  the trivial cases; showing the breakdown only once the question closes would remove the
+  live one too, and is the owner's option (PLAN's Open owner items).
 
 **4. The data model (additive).** Four tables, each row's id a UUIDv7 (data-model decision 2):
 - `questions` — one row per question: `id`, `session_id`, `prompt`, `options` (jsonb, an
@@ -871,14 +875,18 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   `student_id`, `option` (an index into the question's options), `event_id` (unique),
   `answered_at` (the server's clock, when it received the answer); unique (`question_id`,
   `student_id`). While the question is open a student's later answer replaces their
-  earlier one — only when its `event_id` sorts after the stored one: the phone mints
-  UUIDv7s in the order it acts, so a slow first answer landing after the second never
-  undoes it (the phone's own order, as A12's counter orders an unlock). An older or equal
-  id changes nothing and is answered with the answer now. A clock turned back reorders only
-  the student's own answers, and the answer now is always what the phone is told.
+  earlier one — only when its `event_id` sorts after the stored one: a UUIDv7 begins with
+  the minting phone's time, so a slow first answer landing after the second never undoes it.
+  An older or equal id changes nothing and is answered with the answer now. This is weaker
+  than A12's counter, on purpose: a phone whose clock was turned back, or a second device,
+  can mint an id that sorts first, and that answer is then not taken. It harms only the
+  student's own answer, and never silently: the card shows the answer the server holds, and
+  answer now carries its own `event_id`, so the phone's retry mints one after it. A replaced answer's id is no longer kept, so
+  only a stored id is checked against another student's.
 - `decks` (Slice 2) — one row per uploaded PDF: `id`, `teacher_id`, `school_id`, `title`,
   `storage_key`, `sha256`, `bytes`, `page_count`, `status` (`pending` / `ready` /
-  `rejected`), `created_at`, `removed_at` (decision 3's soft removal).
+  `rejected`), `created_at`, `removed_at` (decision 3's soft removal), `object_deleted_at`
+  (when its stored object was confirmed deleted; decision 8).
 - `session_presentations` (Slice 2) — at most one row per session, keyed by `session_id`:
   `deck_id` (nullable: nothing shown), `page`, `updated_at`, and the `event_id` of the
   slide change that set it. **A row of its own, not columns on `sessions`:** `sessions` is
@@ -900,17 +908,28 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   questions of a teacher it de-identifies. In a student's export only as the question one of
   their responses answers.
 - **Decks are the teacher's content, not a student's record.** Not in a student's export.
-  A teacher removing a deck sets `removed_at` and deletes its stored object; the disposal,
-  and the retention run for a teacher it de-identifies, do the same to every such deck, so
-  no stored object outlives its row's removal. A presentation row is kept, pointing at a
-  removed deck, as the history of what was shown.
+  A teacher removing a deck sets `removed_at`; so do the disposal, the retention run for a
+  teacher it de-identifies, and the account deletion of a teacher with decks but no class or
+  block (C3), each emptying the deck's `title` too, since a title can name a person. A
+  presentation row is kept, pointing at a removed deck, as the history of what was shown.
+  **The stored object goes after the commit, never inside the transaction:** the engine marks
+  the row, and once it commits the API deletes the object and stamps `object_deleted_at`; the
+  sweep deletes any removed or rejected deck's object still unstamped, so a crash between the
+  two leaves no object behind for long. A disposal or retention preview, rolled back, never
+  touches storage.
 
 **5. Writers.** Questions, responses and presentation state are written only by the
 transition engine (`packages/db/src/transitions.ts`), each mutation in one transaction with
 a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
-current truth. Locks are taken session row first, then question row, in every transition,
-so an answer racing a close or the session's end either commits before it and counts, or
-sees it and is refused.
+current truth. Locks are taken session row first, then question row, then deck row, in
+every transition: an open takes the session row FOR UPDATE, so two opens run one at a time
+(the partial unique index stays a backstop, and its violation is never a `500`: it is
+retried as a replay); an answer takes the session and the question FOR SHARE; a close and a
+session's end take the question FOR UPDATE. So an answer racing a close or the session's end
+either commits before it and counts, or sees it and is refused. A question the session's end
+closes is closed at the session's end — the bell when the sweep or a Start past it ends it
+(A17, A18) — never at the sweep's own time. A slide change reads its deck FOR SHARE and a
+deck's removal takes it FOR UPDATE, so a deck is never removed under a session showing it.
 - **Answers never write to `events`.** The events feed streams to the teacher's browser
   (Live updates), so a per-student answer event would put who answered what on the
   teacher's screen and break totals-only. The `responses` row is the record; its own
@@ -943,7 +962,8 @@ Teacher (the class's own teacher only; another teacher and a student `403`):
   same transaction.
 - `POST /v1/questions/{id}/close` — `{ eventId, reveal? }`: closes it, revealing the correct
   option when asked and one exists. A replay, or a close of a question already closed,
-  answers the question now and changes nothing.
+  answers the question now and changes nothing, recording nothing (its `eventId` is kept only
+  when its `question_closed` event is written).
 - `GET /v1/questions/{id}/results` — the aggregate: `answered` (N), `enrolled` (M), whether
   it is open, the correct option and whether it is revealed, and `counts` per option — null
   until at least 3 have answered (the guard is the server's, never only the portal's).
@@ -956,9 +976,15 @@ Student (enrolled in the session's class now; anyone else `403`, an unknown id `
   running (false tells the phone to stop polling); the current question — the open one, or
   the last closed one until another opens — with its prompt and options, the correct option
   only once revealed, and never anyone's counts; the caller's own answer, if any; and in
-  Slice 2 the slide (deck id, `sha256`, `page`, `page_count`, and a short-lived download
-  URL). A read that writes nothing. A strong ETag over the body; `If-None-Match` answers
-  `304`.
+  Slice 2 the slide (deck id, `sha256`, `page`, `page_count`), **never a URL**. A read that
+  writes nothing. A strong ETag over the body; `If-None-Match` answers `304`. The body holds
+  nothing minted per request, so an unchanged lesson is `304` on every poll.
+- `GET /v1/decks/{id}/download` (Slice 2) — a short-lived presigned GET, for the deck's own
+  teacher (the presenter), or for a student while a running session of their class shows
+  that deck (anyone else `403`, a removed deck `404 deck_not_found`): what the phone calls only
+  when the slide names a deck it has not cached, and again if the URL has expired. The phone
+  checks the bytes against the slide's `sha256` before rendering them, and refuses a
+  mismatch honestly with a retry.
 - `POST /v1/questions/{id}/answers` — `{ eventId, option }`, answered with the caller's
   answer now. `400 invalid_option` for an index the question lacks; `409 question_closed`
   past its close or the bell; a replay (or an older answer, decision 4) answers the answer
@@ -971,7 +997,12 @@ Slice 2, teacher:
 - `POST /v1/decks/{id}/complete` — `{ eventId }`: the API reads the object and checks it —
   the `%PDF-` magic bytes, its size ≤ 25 MB and equal to the declared, the `sha256`, ≤ 200
   pages, not encrypted — then marks it `ready` with its page count, or `rejected` with the
-  reason and its object deleted. A deck left `pending` 24 hours is rejected by the sweep.
+  reason and its object deleted. One-way: a deck `ready` or `rejected` is never checked
+  again, and its replay answers the verdict. The PUT expires in 5 minutes; a PUT over a
+  `ready` deck's object before then changes bytes no client takes, since every client checks
+  the `sha256` the server verified. The checks are bounded: the size cap first, the parse
+  under a time limit, a PDF that exceeds either `rejected`. A deck left `pending` 24 hours is
+  rejected by the sweep.
 - `GET /v1/decks` — the caller's own decks, never a removed one; `DELETE /v1/decks/{id}` —
   remove one (`409 deck_in_use` while a running session shows it).
 - `POST /v1/sessions/{id}/slide` — `{ eventId, deckId | null, page }`: show a page of one of
@@ -983,7 +1014,9 @@ Authorization: every new route gets its rows in S1's matrix
 another student, a teacher who isn't the owner, the owner — and its request schema in
 `contracts/openapi.json`; the student routes get fixtures in `contracts/fixtures/` that
 BaliCore decodes. **Rate limits** (ISSUES #1): the 2 s poll is 30 requests a minute per
-account, inside the 120-a-minute budget beside the check-in's two; the portal polls results
+account, inside the 120-a-minute budget beside the check-in's two, and the poller stops at a
+`429` until its `Retry-After`, so the poll never spends the headroom an Emergency Unlock
+needs (an unlock refused `429` is still kept and resent, never lost); the portal polls results
 from its one visible tab. L4 measures a class of polling phones in the load gate and adds a
 dedicated budget only if it must.
 
@@ -996,7 +1029,7 @@ and no count below the guard ever enters the stream.
 **8. Storage (Slice 2).** A private bucket per environment, made by the owner (AWS S3 in the
 Cognito account recommended; M0), with no public access and CORS for the portal's origins
 only. Uploads go by presigned PUT; clients read by short-lived presigned GET (minutes),
-minted per request for a caller allowed to see the deck. It sits behind a storage interface
+minted by the download route for a caller allowed to see the deck, never in the polled body. It sits behind a storage interface
 in the API with an in-memory fake, so CI and `npm run demo` need no AWS. This is the API's
 first AWS credential (C3's "the API holds no AWS credential" was about Cognito): an IAM
 identity allowed only to put, get and delete objects in that one bucket, its keys Railway
