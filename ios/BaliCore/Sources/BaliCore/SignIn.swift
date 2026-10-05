@@ -29,13 +29,16 @@ public struct Cognito: Sendable, Hashable {
         (self.domain, self.clientId, self.redirectURI) = (domain, clientId, redirectURI)
     }
 
-    /// The hosted UI's sign-in page for `attempt`: its challenge and state, never its verifier.
+    /// The hosted UI's sign-in page for `attempt`: its challenge and state, never its verifier. Its
+    /// scopes are OpenID's and the one Cognito's DeleteUser needs (C4), which the phone's app client
+    /// must allow, or the sign-in is refused.
     func authorizeURL(_ attempt: Attempt) -> URL? {
         URL(
             string: endpoint("oauth2/authorize") + "?"
                 + form([
                     ("response_type", "code"), ("client_id", clientId),
-                    ("redirect_uri", redirectURI.absoluteString), ("scope", "openid email profile"),
+                    ("redirect_uri", redirectURI.absoluteString),
+                    ("scope", "openid email profile \(SignIn.deleteScope)"),
                     ("state", attempt.state), ("code_challenge", attempt.challenge),
                     ("code_challenge_method", "S256"),
                 ]))
@@ -125,6 +128,10 @@ struct Tokens: Codable, Sendable {
     /// the clock). One it cannot read is no expiry the phone knows: the API refusing the token
     /// renews it (`SignIn.refresh`).
     var until: Date
+    /// The API has deleted the account and its Cognito sign-in waits to be (C4): no token goes to the
+    /// API from then on — a request there makes a fresh account under the same sign-in — and only
+    /// Cognito's DeleteUser takes one. Kept through a renewal; nil in tokens kept before it.
+    var deleted: Bool?
 
     init(access: String, refresh: String, email: String?, at now: Date) {
         (self.access, self.refresh, self.email) = (access, refresh, email)
@@ -150,6 +157,21 @@ struct Tokens: Codable, Sendable {
         return claims(Claims.self, of: token)?.email
     }
 
+    /// Where the sign-in that gave access token `token` deletes itself (C4): Cognito's own endpoint
+    /// in its pool's region, read unverified from its issuer and taken only when that is one,
+    /// `cognito-idp.<region>.amazonaws.com` — so the token is sent nowhere else — while its scopes
+    /// hold the one DeleteUser needs. Nil otherwise: a sign-in made before the phone asked for that
+    /// scope, whose renewals keep the scopes it got.
+    static func deleteEndpoint(of token: String) -> URL? {
+        struct Claims: Decodable { let scope, iss: String }
+        guard let claims = claims(Claims.self, of: token),
+            claims.scope.split(separator: " ").contains(where: { $0 == SignIn.deleteScope }),
+            let host = URLComponents(string: claims.iss)?.host,
+            host.wholeMatch(of: /cognito-idp\.[a-z]{2}(-[a-z]+)+-[0-9]+\.amazonaws\.com/) != nil
+        else { return nil }
+        return URL(string: "https://\(host)/")
+    }
+
     /// The token's payload read as `T`, unverified; nil when it cannot be.
     private static func claims<T: Decodable>(_ type: T.Type, of token: String) -> T? {
         let parts = token.split(separator: ".", omittingEmptySubsequences: false)
@@ -167,6 +189,8 @@ struct Tokens: Codable, Sendable {
 public actor SignIn: TokenProvider {
     /// How long before its expiry an access token stops being given, so one sent arrives in time.
     static let margin: TimeInterval = 60
+    /// The scope Cognito's DeleteUser needs in the access token it is given (C4).
+    static let deleteScope = "aws.cognito.signin.user.admin"
 
     /// Nonisolated, so the app reads it without a hop: an actor's `let` is isolated outside its
     /// module.
@@ -204,10 +228,10 @@ public actor SignIn: TokenProvider {
     }
 
     /// The access token to send now. Nil when nobody is signed in, when the Keychain cannot be read
-    /// right now (the phone locked), or when an expired one could not be renewed — never a
-    /// sign-out, and never a token it knows has expired.
+    /// right now (the phone locked), when an expired one could not be renewed — never a sign-out,
+    /// and never a token it knows has expired — and once the API has deleted the account (C4).
     public func accessToken() async -> String? {
-        guard let tokens = current() else { return nil }
+        guard let tokens = current(), tokens.deleted != true else { return nil }
         if now() < tokens.until { return tokens.access }
         return await renew(telling: true) ? self.tokens?.access : nil
     }
@@ -254,6 +278,72 @@ public actor SignIn: TokenProvider {
     public func signOut() throws {
         try store.clear()
         adopt(nil)
+    }
+
+    /// Whether this sign-in can delete its own account (C4): its access token carries the scope
+    /// Cognito's DeleteUser needs, and names its pool (`Tokens.deleteEndpoint`). False when nobody
+    /// is signed in, the Keychain cannot be read now, or the sign-in was made before the phone asked
+    /// for that scope: a fresh sign-in first.
+    public func mayDelete() -> Bool {
+        current().flatMap { Tokens.deleteEndpoint(of: $0.access) } != nil
+    }
+
+    /// The API has deleted this sign-in's account (C4): from now on no token goes to the API — a
+    /// request there would make a fresh account under the same sign-in — until DeleteUser deletes
+    /// the sign-in, or a sign-out forgets it. Kept with the tokens, so a relaunch sends nothing
+    /// either; a Keychain that cannot take it right now takes it at the next ask.
+    public func accountDeleted() {
+        guard current() != nil else { return }
+        tokens?.deleted = true
+        unsaved = !keep(tokens)
+    }
+
+    /// Whether the API has deleted this sign-in's account and its Cognito sign-in waits to be (C4).
+    public func deletionPending() -> Bool { current()?.deleted == true }
+
+    /// Cognito's DeleteUser (C4): the sign-in deletes itself with its own access token at its pool's
+    /// endpoint — no AWS credential, as the API holds none. Deleted, the tokens are forgotten as a
+    /// sign-out forgets them, and the answer is nil; else what Cognito answered, the tokens kept to
+    /// try again. An expired token is renewed first, as `accessToken` renews one, and so, once, is
+    /// one Cognito says it no longer takes: a sign-in it then refuses for good — deleted by a try
+    /// whose answer never came — is forgotten by that renewal, and gone too.
+    public func deleteUser() async -> SendResult? {
+        var renewing = false
+        while true {
+            guard let held = current() else { return loaded ? nil : .networkError }
+            if renewing || now() >= held.until {
+                guard await renew(telling: false) else { return tokens == nil ? nil : .networkError }
+            }
+            guard let access = tokens?.access, let endpoint = Tokens.deleteEndpoint(of: access) else {
+                return .networkError
+            }
+            switch await deleteUser(access, at: endpoint) {
+            case (.status(200..<300), _), (_, "UserNotFoundException"?):
+                adopt(nil, saved: keep(nil))
+                return nil
+            case (_, "NotAuthorizedException"?) where !renewing: renewing = true
+            case (let result, _): return result
+            }
+        }
+    }
+
+    /// One DeleteUser call with `access` at `endpoint`, in Cognito's JSON protocol: the status, or no
+    /// answer, and the error's type — its `__type`, past any namespace.
+    private func deleteUser(_ access: String, at endpoint: URL) async -> (SendResult, String?) {
+        struct Failure: Decodable {
+            let type: String
+            enum CodingKeys: String, CodingKey { case type = "__type" }
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = APIClient.requestTimeout
+        request.setValue("application/x-amz-json-1.1", forHTTPHeaderField: "Content-Type")
+        request.setValue(
+            "AWSCognitoIdentityProviderService.DeleteUser", forHTTPHeaderField: "X-Amz-Target")
+        request.httpBody = try? JSONEncoder().encode(["AccessToken": access])
+        guard let exchanged = try? await transport.send(request) else { return (.networkError, nil) }
+        let type = (try? JSONDecoder().decode(Failure.self, from: exchanged.0))?.type
+        return (.status(exchanged.1.statusCode), type?.split(separator: "#").last.map(String.init))
     }
 
     /// Whether someone is signed in on this phone: now — once the Keychain could be read — then at
@@ -338,10 +428,12 @@ public actor SignIn: TokenProvider {
         case .success(let grant):
             // A refresh token Cognito rotates replaces the one kept, which then stops working — so
             // tokens the Keychain cannot take right now are saved again at the next ask. The email
-            // is the same account's: an answer naming none keeps it, as it keeps the refresh token.
-            let fresh = Tokens(
+            // is the same account's: an answer naming none keeps it, as it keeps the refresh token,
+            // and an account the API deleted stays deleted (C4).
+            var fresh = Tokens(
                 access: grant.access, refresh: grant.refresh ?? refresh,
                 email: grant.email ?? tokens?.email, at: now())
+            fresh.deleted = tokens?.deleted
             adopt(fresh, saved: keep(fresh))
             if telling { await tokenArrived?() }
             return true

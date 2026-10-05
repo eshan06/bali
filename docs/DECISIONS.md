@@ -37,6 +37,51 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ("Push: a doorbell for students") and PLAN (steps N1–N6); the app half is the Mac
   session's.
 
+- **2026-10-05** — **C4a: the phone's Delete account engine — the scope first, the outbox before
+  the deletion, nothing to the API after it.** One engine call, `SyncEngine.deleteAccount(signIn)`,
+  answered in `AccountDeletion` states that C4b words. **The scope:** the sign-in asks for
+  `aws.cognito.signin.user.admin` beside `openid email profile`, since DeleteUser refuses a token
+  without it, and a sign-in's renewals keep the scopes it was given: one made before this build can
+  never delete, so it is `signInFirst`, read from the access token's `scope` before anything is
+  sent, and no one is deleted from the API but left in Cognito. Both phone clients allow it (prod
+  2026-10-04, dev 2026-10-05); a client without it refuses every sign-in. **The outbox first, each
+  record once:** every unlock first, since the server places an unlock against the phone's other
+  records by its order (A12) — except one under a tap still queued, which goes after that tap: sent
+  first it is answered `unknown_tap` and refiled into the old session (B6d), an unlock counted in a
+  class the student had tapped out of. Then the rest in the drain's order, a record left pending
+  holding those behind it. An unlock still unrecorded holds the deletion back (`unlockUnsent`); a
+  tap the server refused does not, being one it will never record for this account. **The loops
+  hold** while it runs, and what they had on its way lands first: a boot read, a check-in or a
+  record reaching the API after the deletion makes a fresh account under the same sign-in, which
+  nothing would delete. A second press while one runs shares its answer: two at once, the one
+  ending first would let the loops go while the other's `DELETE /v1/me` was on its way. **The
+  deletion:** under one event id while no answer settled it (rule 4), once more under a fresh one
+  on `409 event_id_conflict` (C3: a boot call racing the deletion makes the reborn account look
+  older than it), and `teacher_has_classes` its own state. **After it:**
+  the sign-in gives the API no token (`Tokens.deleted`, saved in the Keychain and carried through
+  renewals), so neither the engine, a screen nor a relaunch makes a boot read before DeleteUser.
+  The deleted account's queued records are let go, all but an unlock — a judgment call: a refused
+  tap would otherwise be retried under whoever signs in next; an unlock never is, and none is left
+  by then. The phone stands out, its shields off and a wait ended, with no Emergency Unlock
+  recorded (the owner's ruling: one sent now would land under a fresh account). **DeleteUser:** at
+  the pool's own endpoint, read from the token's issuer and taken only when that is
+  `cognito-idp.<region>.amazonaws.com`, so any hosted-UI domain works and the token goes nowhere
+  else; no AWS credential. A failure keeps the token and is said (`signInNotDeleted`), and the next
+  call tries DeleteUser alone; `NotAuthorizedException` renews the token once and tries again, a
+  renewal refused for good meaning the sign-in is gone already (a try whose answer was lost) — its
+  known limit: a refresh token expired or revoked between the two calls is refused alike, and then
+  the Cognito sign-in stays; `UserNotFoundException` is done. Done, the tokens are forgotten as
+  Sign out forgets them, and what the account queued meanwhile goes with it. **Not
+  covered, for C4b:** what the student does from the press until the sign-in is deleted. A join or
+  a rename landing after the deletion makes a fresh account; a tap or Back to focus made while it
+  runs, or a tap while DeleteUser waits, is let go with the account, but an Emergency Unlock made
+  under it is kept, and goes with the next sign-in; and Sign out while DeleteUser waits forgets the
+  token, leaves the person in Cognito and keeps such a tap for the next sign-in too. So from the
+  press to the end the app offers nothing but the deletion and its retry (`SignIn.deletionPending`
+  says, across a relaunch, that one waits for DeleteUser). **Tests:** `DeleteUserTests` (BaliCore),
+  `DeleteAccountTests` and `DeletionOrderTests` (BaliOutbox), the main rules each proven by a
+  mutation that fails its test.
+
 - **2026-10-05** — **C2a: the policy pages ship as a marked draft outline, placeholder text
   included.** P4 (2026-10-04, below) kept `/support`'s policy line at "coming soon" and ruled out
   placeholder text until C2 brought the lawyer's words. The owner's pick for C2a changes that:

@@ -215,7 +215,7 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
   `retention_applied` event of counts naming no one (`docs/RUNBOOKS.md`, runbook 1, step 12).
 
 **Done when:** the owner's policy is written, and C3–C6 have landed (C3, C5 and C6 have;
-C4, the phone's Delete account, is next).
+C4a, the phone's Delete account engine, has too; its Me screen button, C4b, is next).
 
 ---
 

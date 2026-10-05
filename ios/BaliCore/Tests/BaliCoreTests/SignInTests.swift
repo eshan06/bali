@@ -162,14 +162,17 @@ struct SignInTests {
         #expect(one.state.count == 22)
     }
 
-    @Test("the hosted UI's sign-in page carries the challenge and the state, never the verifier")
+    @Test(
+        "the hosted UI's sign-in page carries the challenge and the state, never the verifier — and asks for the scope Cognito's DeleteUser needs (C4)"
+    )
     func authorize() throws {
         let url = try #require(cognito.authorizeURL(Attempt(verifier: rfcVerifier, state: "st")))
         #expect(
             url.absoluteString
                 == "https://bali-dev.auth.us-east-1.amazoncognito.com/oauth2/authorize"
                 + "?response_type=code&client_id=phone-client"
-                + "&redirect_uri=bali%3A%2F%2Fauth%2Fcallback&scope=openid%20email%20profile"
+                + "&redirect_uri=bali%3A%2F%2Fauth%2Fcallback"
+                + "&scope=openid%20email%20profile%20aws%2Ecognito%2Esignin%2Euser%2Eadmin"
                 + "&state=st&code_challenge=\(rfcChallenge)&code_challenge_method=S256")
         #expect(!url.absoluteString.contains(rfcVerifier))
         // A domain set with a trailing slash names the same endpoints.

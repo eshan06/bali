@@ -90,7 +90,7 @@ checked with a public authorize request (`bali://auth/callback`, scope
 `openid email profile`, PKCE S256 → the hosted sign-in page):
 
 - **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
-- **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check)
+- **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check). It allows `aws.cognito.signin.user.admin` too (the owner, 2026-10-05, for C4's `DeleteUser`; an authorize request asking for it reaches the login page)
 - **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`). Dev's `AUTH_AUDIENCE` is the phone's id plus this one: `7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v`
 - **Dev's API:** `https://bali-production-09a2.up.railway.app` — dev's, despite
   the name: Railway named the service before the environment was renamed dev.
@@ -131,9 +131,9 @@ own pool (hosting decision 2). None of these is secret:
 - **`AUTH_AUDIENCE`:** `36meb9r9h0cdrt2a1schcv9abs,5dr74i0iqnth9p4c4k594r27aj`.
 - **In the build:** the TestFlight workflow's `prod` choice (below) sets the API,
   the domain and the phone's client id; `ios/project.yml` keeps dev's for every
-  other build. The app asks for `openid email profile` only
-  (`ios/BaliCore/Sources/BaliCore/SignIn.swift`); asking for the admin scope too is
-  C4's change, which the client already allows.
+  other build. The app asks for `openid email profile aws.cognito.signin.user.admin`
+  (`ios/BaliCore/Sources/BaliCore/SignIn.swift`, since C4a), which both
+  environments' phone clients allow.
 
 How a pool's phone client is made (as production's was; for a rebuild). In the AWS
 console → Cognito → that user pool:
@@ -150,9 +150,11 @@ console → Cognito → that user pool:
    - **Allowed callback URLs:** `bali://auth/callback`, exactly.
    - **Identity providers:** Cognito user pool.
    - **OAuth grant types:** **Authorization code grant** only.
-   - **OpenID Connect scopes:** `openid`, `email`, `profile`. Tick **Profile**
-     by hand: a new Mobile-app client allows only `openid`, `email` and
-     `phone`.
+   - **OpenID Connect scopes:** `openid`, `email`, `profile` and
+     `aws.cognito.signin.user.admin`. Tick **Profile** by hand: a new Mobile-app
+     client allows only `openid`, `email` and `phone`. The app asks for all four
+     (C4a: Cognito's `DeleteUser` needs the last), so a client without one
+     refuses every sign-in from the phone.
 3. **Refresh-token expiration.** On the client's **App client information →
    Edit**, raise **Refresh token expiration** above Cognito's 30-day default —
    365 days, say. Cognito refusing the refresh token is the app's one
