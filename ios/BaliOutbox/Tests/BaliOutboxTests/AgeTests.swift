@@ -51,6 +51,40 @@ struct AgeTests {
     }
 
     @Test(
+        "The rule and the menus count in the Gregorian calendar whatever calendar the phone shows its dates in (santa's round 1): a phone on the Islamic calendar, whose year is eleven days short of a solar one, would otherwise pass a 12-year-old after thirteen of them, and one on the Japanese calendar would offer era years; only the phone's time zone and language are its own, so the month names come in its language"
+    )
+    func gregorianWhateverThePhoneShows() {
+        let today = day(2026, 10, 5)
+        for identifier in [Calendar.Identifier.islamicUmmAlQura, .islamic, .japanese, .buddhist, .chinese] {
+            var phone = Calendar(identifier: identifier)
+            phone.timeZone = TimeZone(identifier: "UTC")!
+            // Born in January 2014: 12 years and 9 months old, thirteen lunar years on.
+            #expect(!AgeCheck.passes(month: 1, year: 2014, today: today, calendar: phone), "\(identifier)")
+            #expect(
+                !AgeCheck.passes(month: 10, year: 2013, today: day(2026, 10, 31), calendar: phone),
+                "\(identifier)")
+            #expect(
+                AgeCheck.passes(month: 10, year: 2013, today: day(2026, 11, 1), calendar: phone),
+                "\(identifier)")
+            #expect(Birth().months(at: today, calendar: phone) == Array(1...12), "\(identifier)")
+            let years = Birth().years(at: today, calendar: phone)
+            #expect(years.first == 2026 && years.last == 1926, "\(identifier)")
+            #expect(Birth(year: 2026).months(at: today, calendar: phone) == Array(1...10), "\(identifier)")
+            #expect(Birth(month: 12).years(at: today, calendar: phone).first == 2025, "\(identifier)")
+            #expect(
+                Birth.monthName(3, calendar: phone) == Birth.monthName(3, calendar: gregorian),
+                "\(identifier)")
+        }
+        var french = Calendar(identifier: .japanese)
+        french.locale = Locale(identifier: "fr_FR")
+        #expect(Birth.monthName(3, calendar: french) == "mars")
+        var english = Calendar(identifier: .islamicUmmAlQura)
+        english.locale = Locale(identifier: "en_US")
+        #expect(Birth.monthName(1, calendar: english) == "January")
+        #expect(Birth.monthName(12, calendar: english) == "December")
+    }
+
+    @Test(
         "13 or older keeps one flag, that the check passed, in the defaults given — never the month or the year — and a fresh check reads it back as passed; under 13 keeps nothing at all: no key of any kind is written, the next launch reads not answered, and the answer stands in memory alone; a check given no defaults, a frozen fixture's, writes nowhere either"
     )
     func keeps() throws {

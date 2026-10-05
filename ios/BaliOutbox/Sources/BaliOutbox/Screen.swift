@@ -24,8 +24,9 @@ public enum Screen: Sendable, Hashable {
     /// `deleting`, whether Me's Delete account has its own screen to show (C4b, `Deleting.shows`),
     /// before everything but a start that failed — nothing else is offered from the press to the
     /// end; `age`, the 13+ check's answer (C7) — the question first on a first launch, before the
-    /// intro, and on an install from before it at the next launch where no session runs, the stop
-    /// screen in its place once answered under 13; `introSeen`, the phone's own flag (C1);
+    /// intro, and on an install from before it once no session stands for the phone (never over
+    /// a session's screens, Session over included), the stop screen in its place once answered
+    /// under 13; `introSeen`, the phone's own flag (C1);
     /// `signedIn`, nil until the Keychain could be read;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
@@ -66,7 +67,9 @@ public enum Screen: Sendable, Hashable {
         // Where the phone stood not read, the last run's shields kept on (B6b): home, which holds
         // Emergency Unlock there, before the intro and the sign-in too.
         if sync?.standing == .unread, protection?.shielded == true { return (.home, false) }
-        if let gate = ageGate(age, introSeen: introSeen, sync: sync, now: now) {
+        if let gate = ageGate(
+            age, introSeen: introSeen, sync: sync, sessionOverClosed: sessionOverClosed, now: now)
+        {
             return (gate, false)
         }
         if !introSeen { return (.intro, false) }
@@ -96,18 +99,23 @@ public enum Screen: Sendable, Hashable {
     /// The 13+ check's screen (C7), while it has not passed: the question — or the stop screen,
     /// once answered under 13 this run. First on a first launch, before the intro, with nothing
     /// known yet; on an install from before the check, the intro seen, only once the engine says
-    /// where the phone stands, and never over a running session — Focus, Unlocked and Protection
-    /// off keep their screens, and so does the home a standing not read keeps, since each holds
-    /// Emergency Unlock: the check waits for the next launch where no session runs. Nil once
-    /// passed, or while a session runs.
+    /// where the phone stands, and never over a session's screens — Focus, Unlocked and
+    /// Protection off keep theirs, and so does the home a standing not read keeps, since each
+    /// holds Emergency Unlock, and Session over keeps its own past the bell until the student
+    /// closes it (santa's round 1): the check shows once no session stands for the phone, at the
+    /// next launch, after the bell once Session over is closed, or once a read says out. Nil once
+    /// passed, or while a session's screen holds.
     private static func ageGate(
-        _ age: AgeCheck.Answer, introSeen: Bool, sync: SyncState?, now: Date
+        _ age: AgeCheck.Answer, introSeen: Bool, sync: SyncState?,
+        sessionOverClosed: SessionView?, now: Date
     ) -> Screen? {
         guard age != .passed else { return nil }
         let screen: Screen = age == .tooYoung ? .tooYoung : .age
         guard let sync else { return introSeen ? .starting : screen }
         switch sync.standing {
-        case .inSession(let session, _) where session.endsAt > now: return nil
+        case .inSession(let session, _)
+        where session.endsAt > now || !session.rings(as: sessionOverClosed):
+            return nil
         case .unread: return nil
         case .inSession, .waiting, .out: return screen
         }

@@ -34,13 +34,26 @@ public struct AgeCheck: Sendable, Hashable {
     /// only once the month after their birth month has begun, 13 years on, when whoever was born
     /// in that month — on its last day too — has had their 13th birthday. In the birth month
     /// itself, 13 years on, a student born on its last day is still 12 until that day, so no one
-    /// passes: a 12-year-old never does. By the phone's own calendar.
+    /// passes: a 12-year-old never does. In the Gregorian calendar, in the phone's time zone
+    /// (`calendar`, the phone's own, lends only that: `gregorian(like:)`).
     public static func passes(month: Int, year: Int, today: Date, calendar: Calendar = .current)
         -> Bool
     {
-        let now = calendar.dateComponents([.year, .month], from: today)
+        let now = gregorian(like: calendar).dateComponents([.year, .month], from: today)
         guard let thisYear = now.year, let thisMonth = now.month else { return false }
         return thisYear * 12 + thisMonth > (year + 13) * 12 + month
+    }
+
+    /// The Gregorian calendar in the time zone and the language of `phone`, the calendar the
+    /// phone shows its dates in: the rule and the menus count in it whatever that is (santa's
+    /// round 1). An Islamic year is eleven days short of a solar one, so thirteen of them would
+    /// pass a 12-year-old; a Japanese year is its era's, so the year menu would offer era years.
+    /// Only the time zone and the language are the phone's own.
+    static func gregorian(like phone: Calendar) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = phone.timeZone
+        calendar.locale = phone.locale ?? .current
+        return calendar
     }
 
     /// The question answered with `month` and `year`, judged at `today`: passed, the one flag is
@@ -59,11 +72,12 @@ public struct AgeCheck: Sendable, Hashable {
     }
 }
 
-/// The age screen's picks (C7): the birth month and year as the student picks them, and what each
-/// menu offers — every month and a hundred years, so the list hints at no cutoff — short of the
-/// future: with this year picked, the months to this one; with a month past this one picked, the
-/// years to last year. So no pick can be a month that has not come, and the question needs no
-/// error of its own.
+/// The age screen's picks (C7): the birth month and year as the student picks them, Gregorian,
+/// and what each menu offers — every month and a hundred years, so the list hints at no cutoff —
+/// short of the future: with this year picked, the months to this one; with a month past this one
+/// picked, the years to last year. So no pick can be a month that has not come, and the question
+/// needs no error of its own. Counted in the Gregorian calendar in the phone's time zone, whatever
+/// calendar the phone shows (`AgeCheck.gregorian(like:)`); the names in its language.
 public struct Birth: Sendable, Hashable {
     public var month: Int?
     public var year: Int?
@@ -76,7 +90,7 @@ public struct Birth: Sendable, Hashable {
     /// The months the month menu offers at `today`: all twelve, or, with this year picked, those
     /// up to this one.
     public func months(at today: Date, calendar: Calendar = .current) -> [Int] {
-        let now = calendar.dateComponents([.year, .month], from: today)
+        let now = AgeCheck.gregorian(like: calendar).dateComponents([.year, .month], from: today)
         guard let thisYear = now.year, let thisMonth = now.month else { return Array(1...12) }
         return Array(1...(year == thisYear ? thisMonth : 12))
     }
@@ -84,9 +98,14 @@ public struct Birth: Sendable, Hashable {
     /// The years the year menu offers at `today`, this year first and a hundred back — or, with a
     /// month past this one picked, last year first.
     public func years(at today: Date, calendar: Calendar = .current) -> [Int] {
-        let now = calendar.dateComponents([.year, .month], from: today)
+        let now = AgeCheck.gregorian(like: calendar).dateComponents([.year, .month], from: today)
         guard let thisYear = now.year, let thisMonth = now.month else { return [] }
         let newest = month.map { $0 > thisMonth } == true ? thisYear - 1 : thisYear
         return Array(((newest - 100)...newest).reversed())
+    }
+
+    /// Gregorian month `month`'s name in the phone's language, whatever calendar it shows.
+    public static func monthName(_ month: Int, calendar: Calendar = .current) -> String {
+        AgeCheck.gregorian(like: calendar).monthSymbols[month - 1]
     }
 }

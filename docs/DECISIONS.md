@@ -67,12 +67,18 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "Choose", offer the twelve months and this year with a hundred before it (a span that hints at
   no cutoff), and leave out the future — this year picked, the months to this one; a month past
   this one picked, the years to last year — so no pick can be invalid and the screen needs no
-  error of its own. **Never over a running session:** the router shows the check only once the
-  engine says where the phone stands and no session runs; Focus, Unlocked, Protection off and
-  the home a standing not read keeps hold Emergency Unlock and keep their screens, so an install
-  from before the check sees it at the next launch with no session running, and a tap waiting
-  for a Start still locks the phone through it (Focus takes over, the check after the bell). The
-  rule and the keeping live in BaliOutbox (`AgeCheck`, `Birth`), tested on Linux too.
+  error of its own. **Gregorian, whatever calendar the phone shows** (santa's round 1, both
+  reviewers): the rule and the menus count in the Gregorian calendar, in the phone's time zone
+  and with month names in its language. On a phone set to the Islamic calendar `Calendar.current`
+  would have counted thirteen lunar years, each eleven days short of a solar one, and passed a
+  student of 12 years and 9 months; on the Japanese calendar the year menu would have offered
+  era years. **Never over a session's screens:** the router shows the check only once the engine
+  says where the phone stands and no session stands for the phone; Focus, Unlocked, Protection
+  off and the home a standing not read keeps hold Emergency Unlock and keep their screens, and
+  Session over holds past the bell until the student closes it, so an install from before the
+  check sees it at the next launch, or after the bell once Session over is closed, and a tap
+  waiting for a Start still locks the phone through it (Focus takes over). The rule and the
+  keeping live in BaliOutbox (`AgeCheck`, `Birth`), tested on Linux too.
 
 - **2026-10-06** — **Device tokens are personal data, and a newer register wins (N4).**
   `deleteAccount` (C3), a school's disposal (C6a) and the retention run (C6b) delete the

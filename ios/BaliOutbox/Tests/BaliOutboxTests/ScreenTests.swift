@@ -94,7 +94,7 @@ struct ScreenTests {
     }
 
     @Test(
-        "The 13+ check (C7) comes first: on a first launch, nothing known yet, the question before the intro — and the stop screen in its place once answered under 13 this run; passed, the intro as before. On an install from before the check, the intro seen, it waits for the engine to say where the phone stands, then shows out of any running session — out, waiting, past the bell, whatever the classes — before the sign-in and the permission; and never over a running session: Focus, Unlocked, Protection off and the home a standing not read keeps hold Emergency Unlock, so they stay, signed in or not, whatever the permission reads, and the shields on are Focus before it too. No tab bar on either screen"
+        "The 13+ check (C7) comes first: on a first launch, nothing known yet, the question before the intro — and the stop screen in its place once answered under 13 this run; passed, the intro as before. On an install from before the check, the intro seen, it waits for the engine to say where the phone stands, then shows once no session stands for the phone — out, waiting, past the bell once Session over is closed, whatever the classes — before the sign-in and the permission; and never over a session's screens: Focus, Unlocked, Protection off and the home a standing not read keeps hold Emergency Unlock, so they stay, signed in or not, whatever the permission reads, the shields on are Focus before it too, and Session over holds past the bell until the student closes it (santa's round 1). No tab bar on either screen"
     )
     func ageFirst() throws {
         let (outbox, _) = try makeOutbox()
@@ -115,12 +115,23 @@ struct ScreenTests {
             #expect(screen(age: age, hasClasses: false) == gate, "\(age)")
             #expect(screen(age: age, everInClass: true, hasClasses: false) == gate, "\(age)")
             #expect(screen(age: age, standing: .waiting) == gate, "\(age)")
+            // Past the bell, Session over holds until Done or See history closes it; then the check.
+            for state in [ParticipationState.focused, .unlocked, .protectionOff] {
+                let rung = Standing.inSession(session(), state)
+                #expect(screen(age: age, standing: rung, now: at(3000)) == .sessionOver, "\(age)")
+                #expect(
+                    screen(age: age, standing: rung, sessionOverClosed: session(), now: at(3000))
+                        == gate, "\(age) \(state)")
+                #expect(
+                    screen(
+                        age: age, standing: rung, sessionOverClosed: session(), opened: [.join],
+                        tab: .history, now: at(3000)) == gate, "\(age) \(state)")
+            }
+            // Another session's Session over, or the same one with its bell moved, holds (C5b).
             #expect(
-                screen(age: age, standing: .inSession(session(), .focused), now: at(3000)) == gate,
-                "\(age)")
-            #expect(
-                screen(age: age, standing: .inSession(session(), .unlocked), now: at(3000)) == gate,
-                "\(age)")
+                screen(
+                    age: age, standing: .inSession(session("t"), .focused),
+                    sessionOverClosed: session(), now: at(3000)) == .sessionOver, "\(age)")
             // A running session keeps its screens, each with Emergency Unlock on it or behind it.
             #expect(screen(age: age, standing: .inSession(session(), .focused)) == .focus, "\(age)")
             #expect(
