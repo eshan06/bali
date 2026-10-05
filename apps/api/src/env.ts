@@ -1,3 +1,4 @@
+import { createPrivateKey } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +29,19 @@ if (loaded.error) {
 /** An optional variable set to the empty string reads as unset, never as a boot failure. */
 function blankIsUnset<T extends z.ZodType>(schema: T) {
   return z.preprocess((value) => (value === '' ? undefined : value), schema);
+}
+
+/** An Apple key id or team id: ten capitals or numerals. */
+const APPLE_ID = /^[A-Z0-9]{10}$/;
+
+/** Whether `pem` is an EC P-256 private key, the kind APNs signs with (ES256). */
+function isP256PrivateKey(pem: string): boolean {
+  try {
+    const key = createPrivateKey(pem);
+    return key.asymmetricKeyType === 'ec' && key.asymmetricKeyDetails?.namedCurve === 'prime256v1';
+  } catch {
+    return false;
+  }
 }
 
 const envSchema = z.object({
@@ -91,6 +105,32 @@ const envSchema = z.object({
   SENTRY_ENVIRONMENT: blankIsUnset(z.string().optional()),
   /** Set by Railway on a deploy from git: the commit, used as the Sentry release. */
   RAILWAY_GIT_COMMIT_SHA: blankIsUnset(z.string().optional()),
+  /*
+   * The "class started" push (N5, push/apns.ts): Apple's `.p8` signing key, its
+   * key id and the team's id — all three or none. Unset — the default, and
+   * always in tests and dev — means push is off and nothing is sent. The key is
+   * the file's contents, its line breaks as they are or written `\n`.
+   */
+  APNS_KEY_P8: blankIsUnset(
+    z
+      .string()
+      .transform((key) => key.replace(/\\n/g, '\n'))
+      .refine(isP256PrivateKey, 'is not a P-256 private key (the .p8 file’s contents)')
+      .optional(),
+  ),
+  APNS_KEY_ID: blankIsUnset(z.string().regex(APPLE_ID, 'is 10 capitals or numerals').optional()),
+  APNS_TEAM_ID: blankIsUnset(z.string().regex(APPLE_ID, 'is 10 capitals or numerals').optional()),
+  /** The app's bundle id, the push's `apns-topic`; unset, `com.bali.Bali`. */
+  APNS_TOPIC: blankIsUnset(z.string().min(1).optional()),
+}).superRefine((env, ctx) => {
+  const set = [env.APNS_KEY_P8, env.APNS_KEY_ID, env.APNS_TEAM_ID].filter((v) => v !== undefined);
+  if (set.length !== 0 && set.length !== 3) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['APNS_KEY_P8'],
+      message: 'APNS_KEY_P8, APNS_KEY_ID and APNS_TEAM_ID are set together or not at all',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

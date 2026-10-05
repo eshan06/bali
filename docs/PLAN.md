@@ -4,7 +4,9 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N4: device tokens are personal data (deleted by C3, C6a and C6b,
+_Last updated: 2026-10-06 — N5a: the APNs client (`apps/api/src/push/apns.ts`, off unless
+`APNS_KEY_P8`/`APNS_KEY_ID`/`APNS_TEAM_ID` are set; nothing calls it yet — N5b, wiring it to the
+Start, is next). Before it, N4: device tokens are personal data (deleted by C3, C6a and C6b,
 in C5's export), and a register applies only after the row's eventId (N5, the APNs sender, is
 next). Before it, N3: device tokens, `PUT`/`DELETE /v1/me/push-token` (the interface is
 on N3's line). Before it, C4a, the phone's Delete account engine, landed (C4b, its Me screen
@@ -250,7 +252,22 @@ words — is the Mac session's**, in parallel.
 - **N5** The APNs sender, after the Start's transaction commits: one alert per converted
   student's tokens (HTTP/2, `.p8` token auth, time-sensitive, collapse id per session, short
   expiration); never on a replay; a failure logged without the token and never failing the
-  Start; a gone token (`410`, `BadDeviceToken`) deleted; off when unconfigured — ⬜
+  Start; a gone token (`410`, `BadDeviceToken`) deleted; off when unconfigured. Split in two:
+  - **N5a** The APNs client — ✅ `apps/api/src/push/apns.ts`, Node's own `http2` and `crypto`, no
+    dependency: an ES256 provider token (key id, team, issue time) reused for 50 minutes and
+    signed afresh after `ExpiredProviderToken`; one alert to one token on its environment's host
+    (`api.sandbox.push.apple.com` / `api.push.apple.com`) with `apns-topic`, `apns-push-type:
+    alert`, priority 10, `apns-expiration` and `apns-collapse-id`; the answer read as delivered or
+    refused, `gone` for `410`, `BadDeviceToken` or `Unregistered`. One HTTP/2 connection per
+    host, a 5 s timeout a request. The transport is a seam (`ApnsTransport`), so tests send to a
+    fake or a local server. Config: `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` (all three or
+    none, the key checked as P-256 at boot), `APNS_TOPIC` (unset, `com.bali.Bali`); in `.env.example`
+    and DEPLOY's table. Nothing calls it yet
+  - **N5b** Wiring it to the Start — ⬜ `startSession` reports the students it converted
+    (additive; empty on a replay); after the commit the route fires one alert per their tokens
+    without awaiting it, a shutdown drains the sends; failures logged with the student id and
+    APNs's reason, never the token; a gone token's row deleted only as read (still the student's,
+    same `eventId`); off with one boot log line when the key is unset
 - **N6** 🔧 `docs/RUNBOOKS.md`: the owner's console steps (the APNs key, the App ID's Push
   Notifications capability, Railway's variables); `docs/APP-STORE.md`'s privacy answers for
   the device token — ⬜
