@@ -21,9 +21,15 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and
 badges); `api-client.ts` (`NetworkError`'s and `UnauthorizedError`'s words);
 `recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
-9:30 AM"); and `blocks.ts` ("Couldn't load your blocks."). `reports.ts` and
-`invite.ts` hold none: their words are in the reports page, `invite-code.tsx`
-and `errors.ts`. Their voice follows this file; their logic does not. It never
+9:30 AM"). `blocks.ts`, `reports.ts` and `invite.ts` hold none: their words
+are in `blocks.tsx`, the reports page, `invite-code.tsx` and `errors.ts`. In
+`ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
+("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
+Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
+start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start");
+and `Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. The
+Debug readout's words are not user-facing. Their voice follows this file;
+their logic does not. It never
 covers the API, `packages/`, or `apps/web/src/lib` and the iOS engine and
 outbox beyond those strings.
 
@@ -78,9 +84,10 @@ In this file's terms:
 
 - **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
   at `radius-lg`; each card inside is `surface-card` at `radius-md` with
-  `shadow-1`, so the two corners read as one concentric pair (§4, Card and
-  tray). In dark the shadow goes and a `border-default` hairline carries the
-  edge.
+  `shadow-1`, the outer and inner corners one nested pair (§4, Card and tray;
+  the canvas drew the inset at 6 px, exactly 20 − 14, and `space-2` is the
+  nearest token: the owner's call, `docs/DECISIONS.md`, 2026-10-05). In dark
+  the shadow goes and a `border-default` hairline carries the edge.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
 - **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
@@ -135,7 +142,7 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | `unlocked` | emergency_unlocked | `state-emergency-*` | lock-open / lock.open | "Unlocked" |
 | `protection_off` | revoked | `state-revoked-*` | shield-off / shield.slash | grid "Protection off"; app "Screen Time off" |
 | `ended` | ended | `state-ended-*` | flag / flag | grid "Left" |
-| `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent · 2 min": how long since the last check-in, in the label |
+| `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent" today; from D2f "Silent · 2 min", how long since the last check-in, in the label |
 | grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
 | grid `left_unprotected` | none | `state-emergency-*` (Q2 A) | flag, then lock-open | "Left · unlocked" |
 | grid `left_protection_off` | none | `state-revoked-*` (Q2 A) | flag, then shield-off | "Left · protection off" |
@@ -332,13 +339,18 @@ reduced motion. The student's own Unlocked chip never pulses: the pulse is
 the teacher's cue.
 
 ```css
+:root { --bali-softpulse-glow: rgba(219, 147, 71, 0.35); } /* orange-400 */
+@media (prefers-color-scheme: dark) { :root { --bali-softpulse-glow: rgba(229, 175, 111, 0.35); } } /* orange-300 */
 @keyframes bali-softpulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(219, 147, 71, 0); }
-  50% { box-shadow: 0 0 0 6px rgba(219, 147, 71, 0.35); }
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 6px var(--bali-softpulse-glow); }
 }
 .chip-emergency.just-unlocked { animation: bali-softpulse 1.2s cubic-bezier(0.2, 0, 0, 1) 2; }
 @media (prefers-reduced-motion: reduce) { .chip-emergency.just-unlocked { animation: none; } }
 ```
+
+(D2c's theme variables carry the two glow values; the snippet names them so it
+stands alone.)
 
 ## 8. Responsive behaviour
 
