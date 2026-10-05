@@ -4,7 +4,10 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N5b: a Start sends the "class started" alert to the students whose
+_Last updated: 2026-10-06 — N6: the push's backend half is done; runbook 7 (`docs/RUNBOOKS.md`)
+has the owner's console steps (the APNs key, the App ID's Push Notifications, Railway's
+variables), and `docs/APP-STORE.md` declares the device token under Device ID. Left: the app
+half (the Mac session) and the owner's runbook 7. Before it, N5b: a Start sends the "class started" alert to the students whose
 waiting tap it converted, after its commit and in the background (off until `APNS_KEY_P8`/
 `APNS_KEY_ID`/`APNS_TEAM_ID` are set — N6, the owner's console steps, is next). Before it, D2d's
 files have landed (`infra/cognito/hosted-ui/`: the sign-in page's CSS, its
@@ -53,8 +56,9 @@ why, Open owner items the owner's queue.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
-  token endpoints; the app half's interface is on N3's line) ✅; next the backend steps N4–N6
-  (cloud sessions) and the app half (the Mac session), in parallel. Not on
+  token endpoints; the app half's interface is on N3's line) ✅; **the backend half is done**
+  (N4–N6 ✅, 2026-10-06). Left: the app half (the Mac session) and the owner's console steps
+  (`docs/RUNBOOKS.md`, runbook 7); until then push is off on both deploys. Not on
   the pilot's critical path: it never delays C2 or the external TestFlight steps.
 
 - **CI reliability (2026-10-06):** ✅ main's post-merge runs are never cancelled any more
@@ -289,7 +293,19 @@ words — is the Mac session's**, in parallel.
     moved-token guard, off, no token in a log line); the engine's PGlite tests pin the ids
 - **N6** 🔧 `docs/RUNBOOKS.md`: the owner's console steps (the APNs key, the App ID's Push
   Notifications capability, Railway's variables); `docs/APP-STORE.md`'s privacy answers for
-  the device token — ⬜
+  the device token — ✅ runbook 7, "Push: the APNs key": the `.p8` key (Sandbox & Production,
+  downloaded once), Push Notifications on `com.bali.Bali` (automatic signing picks it up on
+  the next build), `APNS_KEY_P8`/`APNS_KEY_ID`/`APNS_TEAM_ID` on dev's `bali` and prod's
+  `bali prod` (the boot log says `push is on`), the end-to-end check, and rotating a leaked
+  key. App Privacy: the token rides the declared **Device ID** row (App Functionality,
+  linked, not tracking), so no new type; **for the Mac session:** `PrivacyInfo.xcprivacy`
+  needs no change for it (it already declares `NSPrivacyCollectedDataTypeDeviceID`, linked,
+  App Functionality; CI's `privacy-manifests.py` matches it to APP-STORE's table). **Known
+  gap (N5b):** APNs answers `BadDeviceToken` for a token sent to the wrong host too, so a
+  phone that registered under the wrong environment loses its token after the first push,
+  until its next register restores it. **The backend half is done;** left: the app half (the
+  Mac session's: registering the token, the entitlement, Time Sensitive, the words) and 🔧
+  the owner's runbook 7
 
 ### Phase 3 steps (one PR each; 📱 = needs the owner's iPhone)
 
@@ -457,6 +473,9 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - 🔧 P8: `railway config migrate` before 2026-12-01.
 - Phase 7 (live lesson): planned; build on hold by the owner (2026-10-05) — nothing starts until the owner says so; when resumed, backend only first (no UI/app/portal changes). Say when to resume. Defaults to confirm or change (ARCHITECTURE, "Live lesson", decisions 3 and 8): the small-group guard's threshold (3 answers before the breakdown shows); whether a teacher may reveal the correct option on close (on); whether the live breakdown shows while a question is open (on) or only once it closes, the guard's known limit; the storage provider (AWS S3 in the Cognito account, the API's first AWS credential); the deck size cap (25 MB, 200 pages).
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's session length and Extend are built (P10); New code is parked on the API's CORS allowing `PATCH` (P11, a cloud session's PR), and until then `docs/PILOT.md` says how to work around it.
+- 🔧 Push: runbook 7 (`docs/RUNBOOKS.md`) — the APNs key, Push Notifications on the App ID,
+  the three `APNS_*` variables on dev and prod; its end-to-end check once the app half ships
+  (N6).
 - 🔧 Delete dev's unused phone clients `bali-ios` and `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool.
 - ✅ Before C4: the phone's Cognito app client allows the `aws.cognito.signin.user.admin` scope (Cognito's `DeleteUser` needs it) — prod (2026-10-04) and dev's `bali-ios-dev-public` (2026-10-05).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
