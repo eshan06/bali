@@ -142,7 +142,8 @@ jobs:
       # Release guard on what was built: the sign-in's settings are there, over HTTPS; the build
       # number is the run's; an icon exists (App Store Connect refuses a build without one); and
       # no binary holds text that only `#if DEBUG` code has — the readout's title and the
-      # monitor's lost-bell check; and each bundle carries its privacy manifest.
+      # monitor's lost-bell check; each bundle carries its privacy manifest; the signed NFC
+      # formats entitlement is TAG alone; and each extension has a display name.
       - name: 'Release guard: the archived app'
         run: |
           app="$ARCHIVE/Products/Applications/Bali.app"
@@ -169,8 +170,10 @@ jobs:
           done
           [ "$(plist CFBundleVersion)" = "$GITHUB_RUN_NUMBER" ] \
             || { echo "::error::The build number is not the run's ($GITHUB_RUN_NUMBER)."; fail=1; }
-          [ -n "$(plist CFBundleIconName)" ] \
-            || { echo "::error::The app has no icon (CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
+          # On iOS, actool writes the icon's name under CFBundleIcons, not at the top level
+          # (macOS's place): ios.yml checks the same key on every iOS PR.
+          [ -n "$(plist CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] \
+            || { echo "::error::The app has no icon (CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName): App Store Connect refuses the upload. Add an AppIcon asset catalog to the Bali target."; fail=1; }
           # binary | the source that has the text | the text. A text no longer in its source
           # fails too, so a rename can't leave this check finding nothing.
           for marker in "Bali|ios/Bali/BaliApp.swift|Debug readout" \
@@ -192,6 +195,20 @@ jobs:
           for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
             plutil -lint "$bundle/PrivacyInfo.xcprivacy" \
               || { echo "::error::No sound privacy manifest in $bundle."; fail=1; }
+          done
+          # App Store Connect refused run 37273876331's upload on both (ITMS-90778, ITMS-90360):
+          # the signed NFC formats entitlement is TAG alone, and each extension has a display name.
+          codesign -d --entitlements - --xml "$app" > "$RUNNER_TEMP/entitlements.plist" 2>/dev/null || true
+          formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" \
+            "$RUNNER_TEMP/entitlements.plist" 2>/dev/null || true)
+          echo "NFC formats = $formats"
+          if ! grep -qw TAG <<< "$formats" || grep -qw NDEF <<< "$formats"; then
+            echo "::error::The signed app's NFC formats must be TAG alone (App Store Connect refuses NDEF)."
+            fail=1
+          fi
+          for appex in BaliMonitor BaliShield; do
+            [ -n "$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$app/PlugIns/$appex.appex/Info.plist" 2>/dev/null)" ] \
+              || { echo "::error::$appex.appex has no CFBundleDisplayName: App Store Connect refuses the upload."; fail=1; }
           done
           exit "$fail"
 

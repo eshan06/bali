@@ -100,7 +100,7 @@ jobs:
 
       # Phase 6, C1: the manifests ci.yml checks reached the bundles — the app's and each
       # extension's, where App Store Connect reads them.
-      - name: Each bundle carries its privacy manifest
+      - name: Each bundle carries its privacy manifest, the app its icon and NFC format, each extension its name
         working-directory: ios
         run: |
           dir=$(xcodebuild -showBuildSettings -project Bali.xcodeproj -scheme Bali -destination "$SIMULATOR" 2>/dev/null \
@@ -108,6 +108,26 @@ jobs:
           app="$dir/Bali.app"
           for bundle in "$app" "$app/PlugIns/BaliMonitor.appex" "$app/PlugIns/BaliShield.appex"; do
             plutil -lint "$bundle/PrivacyInfo.xcprivacy" || { echo "::error::no privacy manifest in $bundle"; exit 1; }
+          done
+          # The home-screen icon (#215): the asset catalog compiled, and its name where iOS reads
+          # it (CFBundleIcons, not macOS's top-level key): testflight.yml's guard, on every PR.
+          icon=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName" "$app/Info.plist" 2>/dev/null || true)
+          if [ "$icon" != AppIcon ] || [ ! -f "$app/Assets.car" ]; then
+            echo "::error::Bali.app has no AppIcon (icon name \"$icon\", or no Assets.car)."
+            plutil -p "$app/Info.plist"
+            exit 1
+          fi
+          # App Store Connect refused run 37273876331's upload on both (ITMS-90778, ITMS-90360):
+          # the NFC formats entitlement may hold TAG only (an NDEF reader session runs under it),
+          # and each extension needs a display name. testflight.yml checks the signed archive.
+          formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" Bali/Bali.entitlements 2>/dev/null || true)
+          if ! grep -qw TAG <<< "$formats" || grep -qw NDEF <<< "$formats"; then
+            echo "::error::Bali.entitlements' NFC formats must be TAG alone (App Store Connect refuses NDEF): $formats"
+            exit 1
+          fi
+          for appex in BaliMonitor BaliShield; do
+            name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$app/PlugIns/$appex.appex/Info.plist" 2>/dev/null || true)
+            [ -n "$name" ] || { echo "::error::$appex.appex has no CFBundleDisplayName: App Store Connect refuses the upload."; exit 1; }
           done
 
       # The app target's own tests (BaliTests), hosted in the app.

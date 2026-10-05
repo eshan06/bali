@@ -8,6 +8,16 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **The app's NFC entitlement is `TAG` alone; each extension names itself.**
+  App Store Connect refused prod TestFlight run 37273876331 (ITMS-90778: "NDEF is disallowed"
+  for `com.apple.developer.nfc.readersession.formats`; ITMS-90360: no `CFBundleDisplayName` in
+  `BaliMonitor.appex` or `BaliShield.appex`). B6's note (5) predicted the first one. Apple's
+  entitlement page lists `TAG` as the only value, and Apple's NFC tag-reader sample reads NDEF
+  through `NFCNDEFReaderSession` under that capability, so `BlockReader` is unchanged. The
+  extensions are "Bali Monitor" and "Bali Shield", names no screen shows. `ios.yml` checks
+  both on every iOS PR, and testflight.yml's release guard checks the signed archive before
+  upload.
+
 - **2026-10-05** — **Phase 7, Live lesson, planned** (L0; ARCHITECTURE's "Live lesson (Phase
   7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended because the owner
   asked for the phase to be written into it before building. The PR awaits the owner's

@@ -3008,10 +3008,11 @@ async function behindHolder<P, R>(
  * once — the staging must be real.
  *
  * Held-transaction tests that gate on the 5 s default carry an explicit 20 s
- * budget, and must: this package has no vitest config, so the test budget is
- * vitest's own 5 s, and a round that never staged died as "Test timed out" —
- * naming nothing — before the gate could throw the error that says what went
- * wrong. Measured, with the gate forced to miss.
+ * budget, and must: under vitest's own 5 s test budget a round that never
+ * staged died as "Test timed out" — naming nothing — before the gate could
+ * throw the error that says what went wrong (measured, with the gate forced to
+ * miss). The package's vitest.config.ts now allows 60 s; the explicit 20 s
+ * overrides it, so a stuck round still fails in 20 s.
  */
 async function waitForBlockedBackend(timeoutMs = 5_000, waiters = 1): Promise<void> {
   const deadline = Date.now() + timeoutMs;
