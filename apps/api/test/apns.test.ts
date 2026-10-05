@@ -174,7 +174,12 @@ describe('apnsConfig', () => {
   });
 
   it('reads the key, ids and topic, the topic com.bali.Bali when unset', () => {
-    const env = { ...testEnv, APNS_KEY_P8: pem, APNS_KEY_ID: 'ABC123DEFG', APNS_TEAM_ID: 'H535678UF8' };
+    const env = {
+      ...testEnv,
+      APNS_KEY_P8: pem,
+      APNS_KEY_ID: 'ABC123DEFG',
+      APNS_TEAM_ID: 'H535678UF8',
+    };
     expect(apnsConfig(env)).toMatchObject({
       keyId: 'ABC123DEFG',
       teamId: 'H535678UF8',
