@@ -232,8 +232,9 @@
   --color-focus-ring: var(--bali-focus-ring-color);
 
   /* A bridge for the screens D2e to D2g redraw: their `text-slate-500` helper lines sit on the
-     stone page now, below AA; text-tertiary is the pre-solved ink for them. Goes with the last
-     `slate-` class. */
+     stone page now, below AA; text-tertiary is the pre-solved ink for them. It recolours every
+     slate-500 utility, the Unknown chip's `border-slate-500` dashed edge included (the state still
+     reads from its label and edge). Goes with the last `slate-` class. */
   --color-slate-500: var(--bali-text-tertiary);
 }
 

@@ -59,18 +59,19 @@ export default function LoginPage() {
             {error}
           </p>
         ) : null}
-        <nav aria-label="Help and policies" className="mt-6">
-          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body">
-            {PUBLIC_PAGES.map((page) => (
-              <li key={page.href}>
-                <Link href={page.href} className={PUBLIC_LINK}>
-                  {page.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
       </div>
+      {/* The public pages, under the card and in line with its text: the card keeps to signing in. */}
+      <nav aria-label="Help and policies" className="mt-6 px-6">
+        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body">
+          {PUBLIC_PAGES.map((page) => (
+            <li key={page.href}>
+              <Link href={page.href} className={PUBLIC_LINK}>
+                {page.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </main>
   );
 }

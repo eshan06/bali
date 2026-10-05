@@ -171,6 +171,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       expect(theme.get(`--${token.name}`)).toBe(token.value);
   });
 
+  it('a transition is DESIGN.md §7’s `fast` 150 ms on the `standard` easing unless a class says otherwise', () => {
+    // The tokens carry no motion group, so the two values are §7's own words.
+    expect(theme.get('--default-transition-duration')).toBe('150ms');
+    expect(theme.get('--default-transition-timing-function')).toBe('cubic-bezier(0.2,0,0,1)');
+  });
+
   it('the spacing unit is space-1, so p-N is space-N', () => {
     const unit = parseInt(theme.get('--spacing') ?? '', 10);
     expect(`${unit}px`).toBe(tokens.spacing.tokens[0]?.value);

@@ -65,8 +65,8 @@ and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
 (`lucide-react`) as the icon set; the buttons (`components/button.tsx`) and
 the mark (`components/mark.tsx`); the focus ring on every control and all
 animation off under reduced motion, both global rules. The bar and `/login`
-are in the picked style (D2c-1); the callback, `/support` and the invite-code
-screen follow (D2c-2); the classes home, the grid, the recap and reports keep
+are in the picked style (D2c-1); the callback, `/support`, the two policy
+pages and the invite-code screen follow (D2c-2); the classes home, the grid, the recap and reports keep
 their Tailwind classes on the new base (the page colour, the font, the ring,
 and the radii: their `rounded-lg` is now 20 px) until D2e–D2g, which also
 retire Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
