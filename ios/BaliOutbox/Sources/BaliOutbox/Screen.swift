@@ -103,8 +103,11 @@ public enum Screen: Sendable, Hashable {
     /// Protection off keep theirs, and so does the home a standing not read keeps, since each
     /// holds Emergency Unlock, and Session over keeps its own past the bell until the student
     /// closes it (santa's round 1): the check shows once no session stands for the phone, at the
-    /// next launch, after the bell once Session over is closed, or once a read says out. Nil once
-    /// passed, or while a session's screen holds.
+    /// next launch, after the bell once Session over is closed, or once a read says out. Where
+    /// the sign-in or Screen Time would come before Session over — signed out, or the permission
+    /// off — they come before the check too, which waits behind the session's screens (santa's
+    /// round 2). Nil once passed, or while the phone stands in a session whose Session over is
+    /// not closed.
     private static func ageGate(
         _ age: AgeCheck.Answer, introSeen: Bool, sync: SyncState?,
         sessionOverClosed: SessionView?, now: Date

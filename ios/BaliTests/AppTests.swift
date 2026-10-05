@@ -1516,7 +1516,8 @@ struct AppTests {
         #expect(defaults.object(forKey: AgeCheck.key) as? Bool == true)
         defaults.removeObject(forKey: AgeCheck.key)
         let young = Phone()
-        let now = Calendar.current.dateComponents([.year, .month], from: Date())
+        // This month, Gregorian: the rule counts in it whatever calendar the phone shows.
+        let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
         young.answerAge()
         #expect(young.age.answer == .tooYoung && young.birth == Birth())

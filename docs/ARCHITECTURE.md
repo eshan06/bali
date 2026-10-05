@@ -800,9 +800,9 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   router shows the age screen, and the stop screen under 13 gets, only once no session stands
   for the phone: Focus, Unlocked, Protection off and the home a standing not read keeps hold
   the exit, so they keep their screens, Session over keeps its own past the bell until the
-  student closes it, and an install from before the check sees it at the next launch, or after
-  the bell once Session over is closed. The check counts in the Gregorian calendar whatever
-  calendar the phone shows its dates in.
+  student closes it, and an install from before the check sees it once no session stands for
+  the phone: at the next launch out of one, or after the bell once Session over is closed. The
+  check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own
