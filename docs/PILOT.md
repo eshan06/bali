@@ -55,8 +55,8 @@ class (2026-10-05); for another professor, start at step 3.
    `<your block's 10-character code>`. Make it up (letters and digits only) and keep it
    off shared channels and the repo: anyone enrolled who knows it can send a tap with it.
    Write the code onto a blank NFC tag (NTAG213 or
-   similar) as an NDEF **Text** record with any NFC-writing app; a link ending in
-   `/t/<code>` works too. The professor registers the code on the portal by typing it in;
+   similar) as an NDEF **Text** record with any NFC-writing app; a link `https://<host>/t/<code>` or
+   `bali://t/<code>` works too (never `http://`: the phone refuses it as not a block). The professor registers the code on the portal by typing it in;
    one block serves all of a teacher's classes, and a block registered to one teacher is
    refused to another. **Check:** a student's app, scanning the block before any session,
    waits for the teacher rather than saying it isn't a Bali block.
@@ -71,7 +71,8 @@ class (2026-10-05); for another professor, start at step 3.
    the group's public link); each student installs TestFlight, accepts, and installs Bali.
    Apple's rules, not this repo's: a TestFlight build expires 90 days after upload (the
    one dispatched 2026-10-05 lasts to about 2027-01-03, past the term's end), and the first
-   build offered to an external group waits for Apple's Beta App Review. A fix is a new
+   build offered to an external group waits for Apple's Beta App Review (what to send it:
+   `docs/APP-STORE.md`, section 5). A fix is a new
    prod dispatch (`docs/DEPLOY.md`, "TestFlight").
 8. **Each student, once:** opens Bali, reads the privacy pages, signs up with their
    `@vanderbilt.edu` address, gives Bali Screen Time permission, enters the class's join
@@ -113,8 +114,9 @@ During:
 
 At the end:
 
-- At the bell every phone lets go by its own clock, even with Bali closed. End early from
-  the portal if the class ends early.
+- At the bell every phone lets go by its own clock, even with Bali closed, unless its tap
+  never reached the server: then it holds until 50 minutes after the tap (Emergency Unlock
+  still works). End early from the portal if the class ends early.
 - The class page shows the session's recap: who joined, focus and silent minutes, every
   unlock. The reports page keeps every session. Totals, never rankings.
 

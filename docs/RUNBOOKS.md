@@ -433,7 +433,8 @@ it governs a project whose root is the repo root (the existing one, if that is i
 setting), and not the new project rooted at `apps/web`. The doc's author can't see
 your Vercel projects; step 1 tells you which case you're in.
 
-1. **Look at the existing project, change nothing.** Vercel → the existing project →
+1. **Look at the existing project, change nothing** *(only if a demo project is connected
+   to the repo; not needed 2026-10-05)*. Vercel → the existing project →
    **Settings → General:** note its **Root Directory**. **Settings → Git:** note its
    **Production Branch** (expected `v2-archive`).
 2. **Protect the demo before anything changes** *(only if a demo project is connected to
