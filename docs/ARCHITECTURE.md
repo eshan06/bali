@@ -818,7 +818,9 @@ the same `/v1` API, under the rules of "Live lesson (Phase 7)" below.
 During a running session the teacher can ask the class a question (Slice 1) and present
 slides (Slice 2); each student follows on their own phone, on Bali's own screen. Planned
 2026-10-05 from the research in `docs/ROADMAP-RESEARCH.md` (B); the build is Phase 7 in
-`docs/PLAN.md`, and its decision entry is `docs/DECISIONS.md`, 2026-10-05.
+`docs/PLAN.md`, and its decision entry is `docs/DECISIONS.md`, 2026-10-05. **The build is on
+hold by the owner (2026-10-05):** nothing starts until the owner says so; when resumed,
+backend only first (no UI, app or portal changes).
 
 ### The decisions (2026-10-05)
 
@@ -861,7 +863,8 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   removed mid-session, as A9 keeps such a student on the grid, so the bars always total N and
   a breakdown once shown never vanishes because of a removal. M is the union of the students
   enrolled in the class now, the session's participants (a removed one included) and everyone
-  counted in N, so N never exceeds M. No answer's time is exposed.
+  counted in N, so N never exceeds M. No answer's time is exposed to a teacher (the
+  student's own export, C5, has each of theirs whole, `answered_at` included).
 - **No leaderboards, no grading, no per-student participation** in any report, recap or
   export a teacher reads. Totals-only governs what Bali shows. **Its known limit:** a teacher
   watching the live counts change while watching one student answer in the room can
@@ -907,6 +910,13 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   de-identified user, so the counts stay and name no one; the student's export (C5) includes
   every response of theirs with its question's prompt, options and session; a school's
   disposal (C6a) and the retention run (C6b) keep them under the person they de-identify.
+  **A response answered after the school's year end is a record after the year:** as
+  `RETENTION_COVERAGE` already says of `armed_taps.teacher_id` ("one made after the year
+  keeps them named") and `teacher_invites.redeemed_by`, the retention run keeps that student
+  named and continuing (their enrollment not ended). An enrolled student who answers but
+  never taps in has no other record after the year, so without this the run would end the
+  enrollment and de-identify a student still in class. `responses.student_id`'s coverage
+  entry says so.
 - **Questions are the teacher's words.** Kept with their session. The disposal empties each
   question's prompt and option texts, as it empties class names, since a prompt can name a
   person (the counts by option index stay); the retention run does the same for the
@@ -931,14 +941,23 @@ leftover (decision 4) — it records a fact about storage, never a state change,
 field of `decks` is written outside the engine. Each mutation runs in one transaction with
 a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
 current truth. Locks are taken session row first, then question row, then deck row, in
-every transition: an open takes the session row FOR UPDATE, so two opens run one at a time
-(the partial unique index stays a backstop, and its violation is never a `500`: it is
-retried as a replay); an answer takes the session and the question FOR SHARE; a close and a
+every transition: an open takes the session row FOR UPDATE, so two opens run one at a time.
+Its two unique constraints are backstops with different outcomes, and neither is ever a
+`500`: a violation of `questions.event_id` is a replay, answered with the question that
+`eventId` opened (the caller's own; another teacher's is `409 event_id_conflict`); a
+violation of the partial unique index on the open question means another question opened
+under another `eventId` meanwhile, so the transaction is retried, and the retry closes that
+question and opens this one, as a later open always does. An answer takes the session and the question FOR SHARE; a close and a
 session's end take the question FOR UPDATE. So an answer racing a close or the session's end
 either commits before it and counts, or sees it and is refused. A question the session's end
 closes is closed at the session's end — the bell when the sweep or a Start past it ends it
 (A17, A18) — never at the sweep's own time. A slide change reads its deck FOR SHARE and a
 deck's removal takes it FOR UPDATE, so a deck is never removed under a session showing it.
+**A deck's removal is the one transition whose only lock is the deck row:** it takes no
+session row (it can't know which session shows the deck before it looks), takes the deck
+FOR UPDATE first, then reads the presentation rows without locking them to answer `409
+deck_in_use`. That keeps the order: a slide change's FOR SHARE on the same deck row is the
+single place the two meet, so they serialise there and never deadlock.
 - **Answers never write to `events`.** The events feed streams to the teacher's browser
   (Live updates), so a per-student answer event would put who answered what on the
   teacher's screen and break totals-only. The `responses` row is the record; its own
@@ -999,9 +1018,13 @@ Student (enrolled in the session's class now; anyone else `403`, an unknown id `
   answer now. `400 invalid_option` for an index the question lacks; `409 question_closed`
   past its close or the bell; a replay (or an older answer, decision 4) answers the answer
   now. An `eventId` already spent elsewhere is `409 event_id_conflict`, nothing recorded,
-  as for every other mutation (tap step 9): one another student's response holds, or one
-  already in `events` under anyone, the caller included (their own tap or unlock) — the
-  answers route checks `events` too, though an answer writes none.
+  as for every other mutation (tap step 9). The check matches on the `eventId` alone: any
+  `responses` row holding it except the caller's own answer to this question (the replay
+  above), so another student's response and the caller's own answer to another question
+  both conflict; and any row in `events` holding it, under anyone, the caller included
+  (their own tap or unlock), since the answers route checks `events` too though an answer
+  writes none. A concurrent insert that trips the `responses.event_id` unique index instead
+  is re-read and answered the same way: a replay or `409 event_id_conflict`, never a `500`.
 
 Slice 2, teacher:
 - `POST /v1/decks` — `{ eventId, title, bytes, sha256 }`: a `pending` deck and a presigned

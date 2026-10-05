@@ -20,9 +20,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-05** — **Phase 7, Live lesson, planned** (L0; ARCHITECTURE's "Live lesson (Phase
   7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended because the owner
-  asked for the phase to be written into it before building. The PR awaits the owner's
-  approval: the owner's explicit one-off request for this phase plan, 2026-10-05, not a change to
-  CLAUDE.md's loop, whose plans still run without an approval gate). During a running
+  asked for the phase to be written into it before building). **Status: planned; build on hold by the owner (2026-10-05) — nothing starts until the owner says so; when resumed, backend only first (no UI/app/portal changes).** The plan
+  merged as the record; no step of it is built until the owner resumes it. During a running
   session the teacher asks a question (Slice 1, single choice) and presents PDF slides (Slice
   2); students see both on Bali's own screen, which works shielded, unlocked or with no Screen
   Time access, and never covers or delays Emergency Unlock. **The owner's rulings:** results
