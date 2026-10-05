@@ -264,6 +264,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   question's results are **totals only**: no teacher or projector ever sees one student's
   answer, so the feature never becomes a per-student record of what someone got wrong.
 
+- **2026-10-05** — **D2d: the Cognito sign-in page, as far as classic Hosted UI allows.** One CSS
+  file for both pools, so they can't drift; a pool's version is its logo plus that file, and
+  dev's logo carries a Dev tag so a tester knows which pool they are on. Bali's tokens on
+  Cognito's class names (`infra/cognito/hosted-ui/`, beside the Pre sign-up Lambda); a property
+  outside AWS's per-class list (the card's and fields' corners, the pill button and its border,
+  the focus ring, 16 px field text, the gap under a field) is in the file marked "if kept", the
+  page designed to hold without it, and the dev upload shows which ones Cognito keeps. The logo
+  is the design system's lockup, the bare mark from `apps/web/public/icon.svg` beside "Bali" in
+  Instrument Sans 600, as the B artboards draw it. Calls made on the conductor's defaults
+  (2026-10-05), the owner free to overrule: 44 px fields and button, for thumbs on the phone
+  (the portal's buttons are 40); labels regular weight in `text-primary` (Arial's bold is too
+  heavy, and the app's 13 px semibold has no Arial); a password rule not yet met in stone
+  (`text-tertiary`), never red (red is reserved); the links' bootstrap blue and the placeholders'
+  grey stay, since no allowed class reaches them. Shipped into `main`: the owner put D2 back on
+  and reversed the `ui`-branch rule (2026-10-05), so D2's PRs go into `main`.
+
 - **2026-10-05** — **D2b: DESIGN.md takes the owner's D2 picks, made 2026-10-04 on D2a's canvas
   ([Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)); the Cognito
   sign-in page joins D2's scope.** The canvas drew three styles on the same four screens inside
