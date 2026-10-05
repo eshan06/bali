@@ -709,7 +709,7 @@ export async function startSession(
           .for('no key update'),
       );
       // Disposed of with its school (C6a) while this Start waited on it: no lesson in it.
-      if (cls?.removedAt) throw new TransitionError('CLASS_NOT_FOUND', 'no such class');
+      if (!cls || cls.removedAt) throw new TransitionError('CLASS_NOT_FOUND', 'no such class');
 
       // The taps this Start converts, and their students' locks, first (A14's
       // order; `lockWaitingTaps`) — then the class's session not yet marked
@@ -3887,7 +3887,8 @@ export async function disposeSchool(
 }
 
 async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<DisposeSchoolResult> {
-  // The school first, so two disposals and an invite's minting serialise on it.
+  // The school first, so two disposals, an invite's minting and its redeem
+  // (which holds the school FOR SHARE before the account) serialise on it.
   const row = firstOrUndefined(
     await tx.select().from(schools).where(eq(schools.id, input.schoolId)).for('update'),
   );
@@ -3981,6 +3982,7 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
   if (liveIds.length) {
     await tx
       .update(users)
+      // `deletedCognitoId`'s format, set-based: a change to one changes both.
       .set({ cognitoId: sql`'deleted:' || ${users.id}`, displayName: null, removedAt: input.at })
       .where(inArray(users.id, liveIds));
     // After the rows are marked removed: the trigger allows this rewrite only then.

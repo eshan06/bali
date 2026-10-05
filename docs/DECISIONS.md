@@ -40,7 +40,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hold** stays a runbook step (C5). **Idempotent** on the
   school row: a second run is `already_disposed`. **Locks:** the school, then its people's
   rows, then its classes, then its lessons — a join, rename and deletion take a person before
-  a class, so none waits in a cycle with it; a Start behind it finds its class removed
+  a class, so none waits in a cycle with it; an invite's mint and its redeem hold the school
+  FOR SHARE (#220's review: a redeem held nothing of the school, so one landing mid-disposal
+  left a named teacher on a disposed school, past any re-run), the redeem before the caller's
+  row, in the disposal's order — so a redeem lands before it (its teacher is read as one of
+  the school's people) or after it (`invite_not_found`); a Start behind it finds its class removed
   (`startSession` now refuses a removed class, `CLASS_NOT_FOUND`); an arm or rename finds the
   account deleted; an unlock is recorded whichever lands first (the old account's in its
   lesson, or a reborn account's as `not_enrolled`). The Cognito sign-ins and backups are the

@@ -449,6 +449,24 @@ describe('disposeSchool (C6a)', () => {
 });
 
 describe('after a disposal', () => {
+  it('a redeem that reaches an open invite of a removed school is refused, and changes nothing', async () => {
+    // The disposal deletes its open invites, so this is the redeem's own guard:
+    // it holds the code's school only while that school is live.
+    const s = await seed('c6a-redeem');
+    const open = await mintTeacherInvite(db, { schoolId: s.school.id });
+    if (open.outcome !== 'minted') throw new Error('mint');
+    await db.update(schools).set({ removedAt: new Date() }).where(eq(schools.id, s.school.id));
+    const newcomer = await findOrCreateStudent(db, newUuidV7(), 'Newcomer');
+
+    expect(
+      await redeemTeacherInvite(db, { userId: newcomer.id, code: open.code, eventId: newUuidV7() }),
+    ).toEqual({ outcome: 'invite_not_found' });
+    expect(one(await db.select().from(users).where(eq(users.id, newcomer.id)))).toEqual(newcomer);
+    expect(
+      one(await db.select().from(teacherInvites).where(eq(teacherInvites.id, open.invite.id))),
+    ).toMatchObject({ redeemedAt: null, redeemedBy: null });
+  });
+
   it('an emergency unlock still on its way is recorded, by the old account or a new one', async () => {
     const s = await seed('c6a-unlock');
     await pastBell(s.lesson.id);
