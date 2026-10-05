@@ -1,7 +1,7 @@
 # Owner runbooks — production
 
-Five runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
-Vercel and GitHub. Phase 5's P6. Do them in this order the first time — each one
+Six runbooks for the consoles only the owner can reach: Railway, AWS (Cognito),
+Vercel, GitHub and Sentry. Phase 5's P6. Do them in this order the first time — each one
 uses values the one before it produced:
 
 1. [Cognito for production](#2-cognito-for-production) (the API needs its pool's values),
@@ -9,6 +9,8 @@ uses values the one before it produced:
 3. [The Vercel flip](#3-the-vercel-flip),
 4. [The backup-restore drill](#4-the-backup-restore-drill), once prod holds data,
 5. [GitHub hardening](#5-github-hardening), any time.
+6. [Alerts: Sentry and an uptime check](#6-alerts-sentry-and-an-uptime-check), once prod
+   runs with `SENTRY_DSN` set.
 
 **Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
@@ -41,6 +43,7 @@ uses values the one before it produced:
 - **Runbook 4, the restore drill — on hold** while prod has no backups. Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
 - **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
+- **Runbook 6, alerts:** open.
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
@@ -623,3 +626,47 @@ All on `github.com/eshan06/bali` → **Settings**, as the owner.
    counts as passed, so docs PRs never wait on it.
    **Check:** the next docs-only PR shows the check as skipped and still merges;
    the next API PR shows it running and required.
+
+---
+
+## 6. Alerts: Sentry and an uptime check
+
+Sentry already receives prod's failures (a 5xx, a crash, a failed sweep; runbook 1's
+`SENTRY_DSN`), but nobody hears about them until an alert rule sends them somewhere. Three
+alerts, each to your email:
+
+- **A new or returning error** in the API or the portal.
+- **The sweep stopped or keeps failing.** Each minute's sweep checks in to a Sentry Cron
+  monitor, `api-sweep` (`apps/api/src/monitoring.ts`). A stopped API sends nothing, and
+  Sentry calls it missed after 3 minutes (a minute's schedule plus a 2-minute margin); a
+  hung run holds its check-in open and the API skips the next ticks, so Sentry calls it
+  timed out after 5 minutes; 2 failed runs in a row also open an issue. Sessions then stop
+  ending at their bell, so this one matters.
+- **The API is down.** An outside check on `<prod API URL>/healthz`. `/healthz` answers
+  `{"status":"ok","version":…}` whenever the process is up; it doesn't touch Postgres. A
+  database outage shows up as the sweep's failed check-ins and as 5xx errors instead.
+
+1. **Errors.** Sentry → the API's project → **Alerts → Create Alert → Issues**
+   *(wording unsure)*. When: **A new issue is created**, or **The issue changes state from
+   resolved to unresolved**. If: the event's environment is `production`. Then: **Send a
+   notification to** you (email). Name it `bali prod: API errors`. Do the same on the
+   portal's project, if it has one (runbook 3's `NEXT_PUBLIC_SENTRY_DSN`).
+   **Check:** **Alerts** lists both rules, active.
+2. **The sweep's monitor.** It makes itself on prod's first sweep after this change deploys:
+   Sentry → **Crons** (or **Insights → Crons**) → `api-sweep`, environment `production`.
+   Open it → **Edit** *(wording unsure)* → **Notify** you. Leave its schedule alone (each
+   check-in sends it, so an edit is overwritten on the next sweep). dev's API checks in to
+   the same monitor under environment `dev`; notify on `production` only, if the page lets
+   you choose.
+   **Check:** the monitor shows a green check-in each minute in `production`.
+3. **The uptime check.** Sentry → **Alerts → Create Alert → Uptime Monitor**
+   *(wording unsure; if your plan doesn't offer it, a free outside monitor such as
+   UptimeRobot does the same)*: URL `<prod API URL>/healthz`, method `GET`, every 1 to 5
+   minutes, environment `production`, alert you when it fails. An outside monitor: expect
+   status `200` and the keyword `"ok"` in the body.
+   **Check:** the monitor shows up; then, from a terminal, `curl -sS
+   <prod API URL>/healthz` answers as above.
+4. **Prove one alert reaches you.** Change the uptime monitor's URL to
+   `<prod API URL>/healthz-test` (it answers `404`), wait for the email, then set it back.
+   Don't stop prod to test.
+   **Check:** the email came, and the monitor reads up again after the fix.

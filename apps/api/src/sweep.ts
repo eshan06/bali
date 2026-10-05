@@ -1,7 +1,7 @@
 import { type Database, expireDueSessions, markSilentParticipations } from '@bali/db';
 import type { FastifyInstance } from 'fastify';
 
-import { captureFailure } from './monitoring.js';
+import { captureFailure, withSweepMonitor } from './monitoring.js';
 
 /** How often the API sweeps by itself: every minute (hosting decision 3). */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -36,7 +36,8 @@ export async function sweep(
  * its cause and never thrown (rule 5): the process stays up and the next tick
  * runs as usual. `app.close()` — the shutdown's — stops the ticks and waits
  * out a run in flight, so the process never exits under one and none starts
- * after. Unref'd, so the ticker never holds a finished process open.
+ * after. Unref'd, so the ticker never holds a finished process open. Each run
+ * checks in to Sentry's cron monitor when monitoring is on (`monitoring.ts`).
  */
 export function startSweeping(app: FastifyInstance, run: () => Promise<unknown>): void {
   let inFlight: Promise<void> | undefined;
@@ -48,7 +49,7 @@ export function startSweeping(app: FastifyInstance, run: () => Promise<unknown>)
     // Through a resolved promise, so even a throw before `run` returns one is
     // a rejection handled here, never an exception out of the timer.
     inFlight = Promise.resolve()
-      .then(run)
+      .then(() => withSweepMonitor(run))
       .then(
         () => undefined,
         (err: unknown) => {
