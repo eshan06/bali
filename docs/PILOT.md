@@ -90,10 +90,10 @@ Before class:
 
 At the start:
 
-- Press Start for the class on the portal. **A session is 25 minutes today:** the
-  portal's one Start button has no length to choose. Students tap their phone to the
-  block, before or after Start: a tap before Start waits and joins at Start, so nobody
-  taps twice.
+- Pick the session's length on the portal (25, 50 or 75 minutes, or any number under
+  Other…; the class page remembers the last pick on that computer) and press Start.
+  Students tap their phone to the block, before or after Start: a tap before Start waits
+  and joins at Start, so nobody taps twice.
 - Each phone locks into focus at the tap, even with no signal. Calls, FaceTime, Messages
   and Emergency SOS keep working; every other app is shielded.
 - The live grid shows who is focused. A phone not heard from for 90 seconds shows as
@@ -106,11 +106,12 @@ During:
   unlocks at once, with or without a connection, and the unlock is recorded, with an
   optional reason (bathroom, nurse, other). It shows on the grid. A student who unlocked
   can go back into focus from the app, or by tapping the block again.
-- **For a class longer than 25 minutes:** when the session's bell comes, every phone
-  lets go. Press Start again for a new 25-minute session, and the students tap the block
-  again (a tap made before that Start waits for it). The portal has no "add time" yet
-  (the API's extend isn't on any screen), and a session can't be extended after its bell
-  anyway.
+- **Running long:** press **+5 min** or **+10 min** beside End session before the bell;
+  the new end time shows at once. A phone takes the new bell at its next check-in (Bali
+  open on it), so a phone with Bali closed the whole time lets go at the old bell. A
+  session can't be extended after its bell: by then every phone has let go. Press End,
+  then Start a new session, and the students tap the block again (a tap made before that
+  Start waits for it).
 
 At the end:
 
