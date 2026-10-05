@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 
 import { endSession } from '@/lib/auth';
 
-/** The pages read without signing in (sign-in itself, and the public help page): no Sign out there. */
-const SIGNED_OUT_PATHS = /^\/(login|auth|support)(\/|$)/;
+/** The pages read without signing in (sign-in itself, the help page and the policy pages): no Sign out there. */
+const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
 
 /**
  * The bar across every signed-in page (S4a), the invite-code screen's included: the name, and

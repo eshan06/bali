@@ -1,0 +1,61 @@
+import type { Metadata } from 'next';
+
+import { PolicyDraft, TextLink } from '@/components/policy-draft';
+
+/*
+ * The privacy policy's draft outline (Phase 6, C2a): the sections the lawyer's text will have,
+ * each marked as a placeholder. It states no fact of its own; what the help page already says in
+ * plain words (what Bali keeps, what a teacher sees) is linked, not restated.
+ */
+
+export const metadata: Metadata = {
+  title: 'Bali privacy policy (draft)',
+  description:
+    "A draft outline of Bali's privacy policy. The final text is coming from Bali's lawyer.",
+};
+
+export default function PrivacyPage() {
+  return (
+    <PolicyDraft
+      title="Privacy policy"
+      notice={{
+        lead: "This isn't the privacy policy yet.",
+        body: "Bali's lawyer is writing it. Until the final text arrives, this page shows the sections it will have, each marked as a placeholder. Nothing here is a promise.",
+      }}
+      sections={[
+        {
+          id: 'collects',
+          title: 'What Bali collects',
+          placeholder: (
+            <>
+              The final text will list what Bali collects and why. Until then, the help page says{' '}
+              <TextLink href="/support#privacy">what Bali keeps</TextLink>.
+            </>
+          ),
+        },
+        {
+          id: 'teacher-sees',
+          title: 'What your teacher sees',
+          placeholder: (
+            <>
+              The final text will cover what a teacher sees. Until then, the help page lists{' '}
+              <TextLink href="/support#teacher-sees">what your teacher sees</TextLink> and what they
+              never see.
+            </>
+          ),
+        },
+        {
+          id: 'retention',
+          title: 'How long records are kept',
+          placeholder: 'The final text will say how long Bali keeps records.',
+        },
+        {
+          id: 'deletion',
+          title: 'Deleting your account',
+          placeholder: 'The final text will say how to delete your account and what that removes.',
+        },
+      ]}
+      related={{ href: '/terms', label: 'Terms' }}
+    />
+  );
+}
