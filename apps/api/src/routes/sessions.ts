@@ -32,6 +32,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/plugin.js';
 import { requireOwnClass, requireSessionOwner, requireTeacher } from '../auth/teacher.js';
 import { parseRequest } from '../errors.js';
+import type { NotifyClassStarted } from '../push/class-started.js';
 import { mapTransitionError } from './errors.js';
 import { DeviceTime, Order } from './schemas.js';
 
@@ -85,7 +86,12 @@ function toUnlockResponse(result: UnlockResult): UnlockResponse {
  * wrappers over the transition engine — the engine owns the writes, these just authorize and
  * shape the response.
  */
-export function registerSessionsRoute(app: FastifyInstance, db: Database, clock: () => Date): void {
+export function registerSessionsRoute(
+  app: FastifyInstance,
+  db: Database,
+  clock: () => Date,
+  notifyClassStarted: NotifyClassStarted,
+): void {
   // POST /v1/classes/:id/sessions — start (or return the already-running) session.
   app.post(
     '/v1/classes/:id/sessions',
@@ -98,11 +104,20 @@ export function registerSessionsRoute(app: FastifyInstance, db: Database, clock:
       const { id: classId } = parseRequest(request, 'params', ClassParams);
       const { durationMinutes } = parseRequest(request, 'body', DurationBody);
 
-      await requireOwnClass(db, teacher, classId);
+      const klass = await requireOwnClass(db, teacher, classId);
 
       const startedAt = clock();
       const endsAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
       const result = await startSession(db, { classId, startedAt, endsAt });
+      // Committed: the doorbell for the students this Start joined (N5), in the
+      // background — never awaited, never failing the Start. A replay
+      // ('existing') converted no one, so it sends nothing.
+      notifyClassStarted({
+        sessionId: result.session.id,
+        className: klass.name,
+        startedAt: result.session.startedAt,
+        studentIds: result.convertedStudentIds,
+      });
 
       return {
         outcome: result.outcome,

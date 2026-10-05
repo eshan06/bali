@@ -9,6 +9,8 @@ import type { Env } from './env.js';
 import { registerErrors, routerRefusal } from './errors.js';
 import { registerSecurityHeaders } from './headers.js';
 import { createLimiter, type LimitOptions } from './limits.js';
+import { apnsConfig, type ApnsTransport, createApnsClient, http2Transport } from './push/apns.js';
+import { classStartedNotifier } from './push/class-started.js';
 import { LOG_REDACT, serializeError } from './redact.js';
 import { registerBlocksRoutes } from './routes/blocks.js';
 import { registerClassesRoutes } from './routes/classes.js';
@@ -56,6 +58,11 @@ export interface AppDeps {
    * tests shrink a budget and drive the clock.
    */
   limits?: LimitOptions;
+  /**
+   * Where APNs requests go when push is configured (N5). Unset, Apple's hosts
+   * over HTTP/2; tests send to a fake.
+   */
+  apnsTransport?: ApnsTransport;
 }
 
 /**
@@ -119,7 +126,13 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerPushTokenRoutes(app, deps.db);
   registerHistoryRoute(app, deps.db);
   registerTapsRoute(app, deps.db, clock);
-  registerSessionsRoute(app, deps.db, clock);
+  const apns = apnsConfig(env);
+  const notifyClassStarted = classStartedNotifier(
+    app,
+    deps.db,
+    apns && createApnsClient(apns, deps.apnsTransport ?? http2Transport()),
+  );
+  registerSessionsRoute(app, deps.db, clock, notifyClassStarted);
   registerEnrollmentsRoutes(app, deps.db, clock, limits);
   registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);
