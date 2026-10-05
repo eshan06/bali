@@ -14,13 +14,18 @@ permissions:
   contents: read
 
 concurrency:
-  # One group per event + branch: a newer push to the same PR cancels the
-  # outdated run, and a push to main can never share a group with (and
-  # cancel) a PR whose head branch happens to be named "main". On push
-  # head_ref is empty, so ref_name is used; on a PR head_ref is the source
-  # branch.
-  group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  # PR runs: one group per PR branch, and a newer push cancels the outdated
+  # run. On a PR head_ref is the source branch; the event prefix keeps a PR
+  # whose head branch is named "main" out of main's groups.
+  #
+  # Pushes to main: never cancelled. Each merge keeps its own post-merge run —
+  # a newer merge cancelling it left a cancelled ✗ on a commit nothing was
+  # wrong with (#229). The group is the commit (head_ref is empty on push),
+  # not the branch, because cancel-in-progress: false alone is not enough:
+  # GitHub still cancels a PENDING run in a group when a newer one queues,
+  # so three quick merges would cancel the middle one's run.
+  group: ci-${{ github.event_name }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

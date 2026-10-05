@@ -23,6 +23,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   store that keeps one line). `APNS_TOPIC` defaults to `com.bali.Bali`. A request times out at 5 s, inside the
   8 s shutdown deadline N5b's drain will sit under.
 
+- **2026-10-06** — **Post-merge CI runs on main are never cancelled; race tests stage, never aim.**
+  `ci.yml` cancels only outdated PR runs; a push to main gets a per-commit concurrency group,
+  because `cancel-in-progress: false` alone still lets GitHub cancel a queued run when a newer
+  one queues behind it. The conversion-gap race test (`races.test.ts`) aimed its refresh by
+  polling `pg_stat_activity` for a brief armed-tap statement, which can miss on a loaded
+  runner (main, run 37350621890); it now parks the Start behind a held running-session row,
+  after its taps are locked and before any is consumed, and fires the refresh only then. A
+  race test parks one side on a held lock it can observe; it never fires on a guessed moment.
+
 - **2026-10-06** — **Device tokens are personal data, and a newer register wins (N4).**
   `deleteAccount` (C3), a school's disposal (C6a) and the retention run (C6b) delete the
   tokens of the people they de-identify, in their own transaction, beside the pre-bell taps

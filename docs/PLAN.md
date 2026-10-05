@@ -52,6 +52,11 @@ why, Open owner items the owner's queue.
   (cloud sessions) and the app half (the Mac session), in parallel. Not on
   the pilot's critical path: it never delays C2 or the external TestFlight steps.
 
+- **CI reliability (2026-10-06):** ✅ main's post-merge runs are never cancelled any more
+  (`ci.yml` concurrency: per-commit group on push, cancel only PR runs), and the race test
+  "a refresh landing inside a conversion" is staged by a held session row instead of aimed by
+  polling, so it can no longer miss its window (it failed main's run for #244).
+
 **The pilot's critical path.** The prod TestFlight build (✅ uploaded) → the owner's phone
 test on prod, a block tap included → the privacy page (C2, the lawyer's words) → the external
 TestFlight group `Vanderbilt pilot` and Beta App Review (`docs/APP-STORE.md`, section 5) →
