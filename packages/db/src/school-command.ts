@@ -232,6 +232,9 @@ async function exportStudent({ db, print }: SchoolCommandIO, who: string): Promi
   print(JSON.stringify(record, null, 2));
 }
 
+/** `text` as one shell word, safe to paste: single-quoted, each `'` as `'\''`. */
+export const shellQuote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`;
+
 const tally = (c: DisposalCounts) =>
   `teachers ${c.teachers}, students ${c.students}, classes ${c.classes}, ` +
   `sessions ${c.sessions}, blocks ${c.blocks}, open invites ${c.openInvites}, ` +
@@ -261,7 +264,7 @@ async function dispose(
     case 'name_mismatch':
       throw new Error(
         `school ${schoolId} is named "${result.school.name}"; nothing was written. ` +
-          `To confirm: dispose ${schoolId} --confirm "${result.school.name}"`,
+          `To confirm: dispose ${schoolId} --confirm ${shellQuote(result.school.name)}`,
       );
     case 'in_session':
       throw new Error(
@@ -287,7 +290,9 @@ async function dispose(
         "First check no parent's inspection request is open for one of its students " +
           '(docs/RUNBOOKS.md, runbook 1, step 10).',
       );
-      print(`To go ahead: npm run school -- dispose ${schoolId} --confirm "${result.school.name}"`);
+      print(
+        `To go ahead: npm run school -- dispose ${schoolId} --confirm ${shellQuote(result.school.name)}`,
+      );
       return;
     case 'disposed':
       print(`disposed of school ${schoolId} on ${at.toISOString()}: ${tally(result.counts)}`);

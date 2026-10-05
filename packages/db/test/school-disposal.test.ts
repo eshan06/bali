@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -5,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { findOrCreateStudent } from '../src/queries.js';
-import { parseSchoolCommand } from '../src/school-command.js';
+import { parseSchoolCommand, shellQuote } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
   armedTaps,
@@ -549,7 +551,7 @@ describe('npm run school -- dispose', () => {
     expect(preview[0]).toContain(`"${s.school.name}"`);
     expect(preview.join('\n')).toContain('Nothing was written');
     expect(preview.at(-1)).toBe(
-      `To go ahead: npm run school -- dispose ${s.school.id} --confirm "${s.school.name}"`,
+      `To go ahead: npm run school -- dispose ${s.school.id} --confirm '${s.school.name}'`,
     );
     expect(one(await db.select().from(schools).where(eq(schools.id, s.school.id))).removedAt).toBe(
       null,
@@ -566,6 +568,16 @@ describe('npm run school -- dispose', () => {
     expect(await run(['dispose', s.school.id])).toEqual([
       expect.stringMatching(/^school \S+ was disposed of already, on \S+: nothing more to do$/),
     ]);
+  });
+
+  it('quotes the name it suggests as one shell word, whatever it holds', () => {
+    expect(shellQuote('School')).toBe("'School'");
+    expect(shellQuote(`St. Mary's "Upper" $HOME \\`)).toBe(`'St. Mary'\\''s "Upper" $HOME \\'`);
+    // What a POSIX shell makes of it is the name, exactly.
+    const name = `O'Brien's "Prep" $(echo x) \`back\``;
+    expect(execFileSync('sh', ['-c', `printf %s ${shellQuote(name)}`], { encoding: 'utf8' })).toBe(
+      name,
+    );
   });
 
   it('says why it refuses, and checks its arguments before connecting', async () => {

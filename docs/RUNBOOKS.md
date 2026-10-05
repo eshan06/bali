@@ -174,8 +174,9 @@ project for the API (its DSN).
       nothing. "lesson(s) running" means a class is in session: run it again after the bell.
       "records at another school too" lists accounts by id: nothing was written, and this
       command can't split one; stop and raise it.
-    - **Dispose of it**, with the name exactly as the preview printed it:
-      `npm run school -- dispose <school-id> --confirm "<name>"`.
+    - **Dispose of it**, with the name exactly as the preview printed it: paste the
+      preview's last line, `npm run school -- dispose <school-id> --confirm '<name>'` (the
+      name single-quoted, so an apostrophe or `$` in it reaches the command as typed).
       It prints one line, `disposed of school <id> on <time>: teachers …`, with no name: keep
       it with the school's request. Running it again says it was disposed of already.
     - **Delete the school's sign-ins in Cognito.** The disposal can't reach them (the API
