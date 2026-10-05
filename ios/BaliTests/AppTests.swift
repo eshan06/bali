@@ -1473,7 +1473,7 @@ struct AppTests {
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
             ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
-            ("green-200", Theme.markTrack),
+            ("green-200", Theme.markTrack), ("focus-ring-color", Theme.focusRing),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
