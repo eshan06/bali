@@ -114,10 +114,13 @@ a checkout after `npm ci`:
 npm run school -- add "Lincoln High"                 # prints the school's id
 npm run school -- agreement <school-id> 2026-10-01   # its data agreement, signed that day
 npm run school -- invite <school-id>                 # one teacher's code, shown this once
-npm run school -- list                               # every school, its agreement, open invites
+npm run school -- list                               # every school, its agreement, year end, open invites
 npm run --silent school -- export-student <id> > record.json   # one student's whole record (C5)
 npm run school -- dispose <school-id>                # what disposing of its data would take (C6a)
 npm run school -- dispose <school-id> --confirm "<name>"   # dispose of it, on its written request
+npm run school -- year-end <school-id> 2026-12-18    # the last day of its year or term (C6b)
+npm run school -- retention <school-id>              # who its retention run would de-identify
+npm run school -- retention <school-id> --confirm "<name>"   # run it, once the year is over
 ```
 
 - **The data agreement comes first.** No invite is minted for a school without one on
@@ -162,6 +165,25 @@ npm run school -- dispose <school-id> --confirm "<name>"   # dispose of it, on i
   it was disposed of already. `SCHOOL_DISPOSAL_COVERAGE` says what it does with each foreign
   key to `users` or `schools`, and a test fails on one it doesn't name. The Cognito sign-ins
   and the backups are the owner's to clear: `docs/RUNBOOKS.md`, runbook 1, step 11.
+- **A school year's retention run (C6b).** `year-end <school-id> <day>` records the last
+  day of the school's year or term (any day, past or future; again to correct it). After
+  it — from the midnight after that day by the server's clock — `retention <school-id>`
+  previews the run (the whole run, rolled back: exact counts) and, with `--confirm` and the
+  school's name, runs it in one transaction (`applyRetention`,
+  `packages/db/src/transitions.ts`): each person of the school whose records all lie on or
+  before that day is de-identified as an account deletion leaves one (C3); their live
+  enrollments end as a removal ends them (`enrollment_removed`, so a grid hears it); their
+  pre-bell taps are deleted; a de-identified teacher's removed classes lose their names.
+  Kept named, and listed by id in the preview: anyone with a record after the day (an
+  event, a lesson, a pre-bell tap, an invite redeemed, a class joined, a class or block
+  made, the account itself), with
+  records at another school, or a teacher with a live class or block. Lessons,
+  participations and events stay, so reports add up. Logged as one `retention_applied`
+  event: the school's id, the day and counts, no name. Refused, writing nothing: no year
+  end on record (it never guesses) or the year not over. A second run for the same day
+  answers with the first one's counts; a new `year-end` starts the next year's.
+  `RETENTION_COVERAGE` places every foreign key to `users`. When and how to run it on
+  prod: `docs/RUNBOOKS.md`, runbook 1, step 12.
 
 **Redeeming it, on the portal (T2).** The teacher signs in to the portal with the
 account they will teach from. An account that isn't a teacher yet, as `GET /v1/me` says,

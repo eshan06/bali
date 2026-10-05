@@ -509,9 +509,11 @@ describe('npm run school: running it', () => {
     const unsigned = await createSchool(db, { name: 'Unlisted Agreement High' });
 
     const lines = await run('list');
-    expect(lines[0]).toBe(`${'id'.padEnd(36)}  agreement   open invites  name`);
-    expect(lines).toContain(`${signed.id}  2026-09-30  1             Listed High`);
-    expect(lines).toContain(`${unsigned.id}  none        0             Unlisted Agreement High`);
+    expect(lines[0]).toBe(`${'id'.padEnd(36)}  agreement   year ends   open invites  name`);
+    expect(lines).toContain(`${signed.id}  2026-09-30  none        1             Listed High`);
+    expect(lines).toContain(
+      `${unsigned.id}  none        none        0             Unlisted Agreement High`,
+    );
     const printed = lines.join('\n');
     for (const { code, invite } of [open, used, lapsed]) {
       expect(printed).not.toContain(code);

@@ -209,7 +209,13 @@ deleted (data-model decision 3), and ISSUES #2 says an unlock record is never lo
   open invites and pre-bell taps removed, logged as a `school_disposed` event of counts
   (`docs/RUNBOOKS.md`, runbook 1, step 11).
 
-**Done when:** the owner's policy is written, and C3–C6 have landed (C3, C5 and C6a have).
+- The retention schedule (C6b, landed 2026-10-05): the owner records each school's year
+  end (`npm run school -- year-end`); after it, `npm run school -- retention` de-identifies
+  everyone whose records all lie in that year, kept counts and all, logged as a
+  `retention_applied` event of counts naming no one (`docs/RUNBOOKS.md`, runbook 1, step 12).
+
+**Done when:** the owner's policy is written, and C3–C6 have landed (C3, C5 and C6 have;
+C4, the phone's Delete account, is next).
 
 ---
 
