@@ -149,7 +149,9 @@ The words for a state are decided per surface, and several are owner rulings
 off"). `silent` is a real display state, derived from the last check-in and
 never stored (data-model decision 7), so it is never green, and neither is
 `unknown`; staleness short of silence ("last seen 4m ago") is a `caption` in
-`text-tertiary` beside any chip, never a colour change. The two Left chips
+`text-tertiary` beside any chip, never a colour change. Unknown's dashed edge
+is `border-strong` on purpose, the pick's (Q3 A), where the borrowed
+`state-nodevice-bg` token's own note says `border-default`. The two Left chips
 each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
 ISSUES #2's reason still stands: a phone that left the roster while unshielded
 must never read as the quiet "Left", so the icon and the label carry it, the
@@ -269,7 +271,9 @@ not-joined pair.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
-  used everywhere.
+  used everywhere. These roles are this file's (the pick): the tokens win on
+  values, and their usage notes still name `radius-sm` for buttons and
+  `radius-md` for chips until the owner next exports the design system.
 
 ## 6. Depth and elevation
 
@@ -289,8 +293,9 @@ not-joined pair.
 
 - Show every state as colour + icon + label.
 - Keep motion inside its budget: `fast` 150 ms (a chip's crossfade), `base`
-  200 ms (toasts, sheets), `slow` 300 ms (the ceiling for everything else),
-  `arc` 600 ms (the one theatrical moment: the countdown arc drawing in).
+  200 ms (toasts, sheets), `slow` 300 ms (the ceiling for everything else,
+  `bali-softpulse` excepted, below), `arc` 600 ms (the one theatrical moment:
+  the countdown arc drawing in).
   Easing `standard` `cubic-bezier(0.2, 0, 0, 1)`; `spring`
   `cubic-bezier(0.34, 1.3, 0.64, 1)` for Emergency Unlock's spring-back.
 - Turn all animation off under `prefers-reduced-motion` (on iOS, Reduce
