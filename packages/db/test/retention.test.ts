@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { getSessionEvents } from '../src/queries.js';
@@ -12,6 +13,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   schools,
@@ -79,6 +81,7 @@ const LATER = () => fromNow(3 * DAY);
  * that is over, unlocked in it, and has a tap waiting; Ben is in a lesson
  * running past the year's end; Cara is in a class at another school too; Eve's
  * account was made after the year ended. Another school's Dan is untouched.
+ * Ana's, Ben's and Dan's phones are registered for pushes.
  */
 async function seed(tag: string) {
   const [school, other] = await db
@@ -184,10 +187,20 @@ async function seed(tag: string) {
     deviceTime: new Date(),
     expiresAt: fromNow(60 * MIN),
   });
+  for (const student of [ana, ben, dan]) {
+    await registerPushToken(db, {
+      userId: student.id,
+      token: newUuidV7().replace(/-/g, '').repeat(2),
+      environment: 'production',
+      eventId: newUuidV7(),
+    });
+  }
   return { school, other, rivera, old, ana, ben, cara, dan, eve, bio, art, past: past.session };
 }
 
 const userRow = async (id: string) => one(await db.select().from(users).where(eq(users.id, id)));
+const tokensOf = (userId: string) =>
+  db.select().from(deviceTokens).where(eq(deviceTokens.userId, userId));
 
 describe('the retention run’s coverage of the schema', () => {
   it('handles every foreign key to users', () => {
@@ -261,6 +274,10 @@ describe('applyRetention (C6b)', () => {
     expect(await db.select().from(armedTaps).where(eq(armedTaps.studentId, s.ana.id))).toHaveLength(
       0,
     );
+    // Her phone's token goes too (N4); Ben, kept named, and Dan, elsewhere, keep theirs.
+    expect(await tokensOf(s.ana.id)).toEqual([]);
+    expect(await tokensOf(s.ben.id)).toHaveLength(1);
+    expect(await tokensOf(s.dan.id)).toHaveLength(1);
     // Mr Old's removed class loses its name; Biology, still taught, keeps its.
     expect(one(await db.select().from(classes).where(eq(classes.id, s.art.id))).name).toBe('');
     expect(one(await db.select().from(classes).where(eq(classes.id, s.bio.id))).name).toBe(
@@ -323,6 +340,7 @@ describe('applyRetention (C6b)', () => {
       users: await db.select().from(users).where(inArray(users.id, people)),
       events: await db.$count(events),
       armed: await db.$count(armedTaps),
+      tokens: await db.$count(deviceTokens),
       classes: await db.select().from(classes).where(eq(classes.schoolId, s.school.id)),
     });
     const before = await snapshot();

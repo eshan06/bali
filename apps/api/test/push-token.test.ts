@@ -1,4 +1,4 @@
-import { type Database, deviceTokens, registerPushToken, users } from '@bali/db';
+import { type Database, deviceTokens, newUuidV7, registerPushToken, users } from '@bali/db';
 import type {
   ApiErrorBody,
   RegisterPushTokenResponse,
@@ -67,7 +67,7 @@ describe('PUT /v1/me/push-token', () => {
   it('registers the token as the caller’s, lower-cased, with its environment', async () => {
     const sub = fresh('ana');
     const token = newToken();
-    const eventId = randomUUID();
+    const eventId = newUuidV7();
     const res = await register(sub, {
       token: token.toUpperCase(),
       environment: 'sandbox',
@@ -81,7 +81,7 @@ describe('PUT /v1/me/push-token', () => {
   it('answers a replay with the token now, and writes nothing again', async () => {
     const sub = fresh('ben');
     const token = newToken();
-    const sent = { token, environment: 'production', eventId: randomUUID() };
+    const sent = { token, environment: 'production', eventId: newUuidV7() };
     await register(sub, sent);
     const before = await rowOf(token);
     const again = await register(sub, sent);
@@ -95,8 +95,8 @@ describe('PUT /v1/me/push-token', () => {
   it('re-registers the caller’s own token under a new eventId, in its new environment', async () => {
     const sub = fresh('cara');
     const token = newToken();
-    await register(sub, { token, environment: 'sandbox', eventId: randomUUID() });
-    const eventId = randomUUID();
+    await register(sub, { token, environment: 'sandbox', eventId: newUuidV7() });
+    const eventId = newUuidV7();
     const res = await register(sub, { token, environment: 'production', eventId });
     expect(res.body).toEqual({ outcome: 'registered', environment: 'production' });
     expect(await rowOf(token)).toMatchObject({ environment: 'production', eventId });
@@ -105,20 +105,46 @@ describe('PUT /v1/me/push-token', () => {
     );
   });
 
+  it('applies only a register newer than the row’s: an older retry is a replay of the truth now', async () => {
+    const first = fresh('ola');
+    const second = fresh('pia');
+    const token = newToken();
+    // Minted in this order: the first account's register is the older, but the
+    // newer one lands first, and the older one's retry after it.
+    const older = { token, environment: 'sandbox', eventId: newUuidV7() };
+    const newer = { token, environment: 'production', eventId: newUuidV7() };
+    expect((await register(second, newer)).body.outcome).toBe('registered');
+    const before = await rowOf(token);
+    const late = await register(first, older);
+    expect(late).toEqual({ status: 200, body: { outcome: 'replay', environment: 'production' } });
+    // Nothing written: the token stays the newer register's, the second account's.
+    expect(await rowOf(token)).toEqual(before);
+    expect(before?.userId).toBe((await userOf(second)).id);
+
+    // The same account, too: an older register never takes back the newer environment.
+    const own = fresh('quin');
+    const mine = newToken();
+    const stale = newUuidV7();
+    await register(own, { token: mine, environment: 'production', eventId: newUuidV7() });
+    const res = await register(own, { token: mine, environment: 'sandbox', eventId: stale });
+    expect(res.body).toEqual({ outcome: 'replay', environment: 'production' });
+    expect((await rowOf(mine))?.environment).toBe('production');
+  });
+
   it('moves a token another account registered to the caller: one phone, one owner', async () => {
     const first = fresh('dan');
     const second = fresh('eve');
     const token = newToken();
-    await register(first, { token, environment: 'production', eventId: randomUUID() });
+    await register(first, { token, environment: 'production', eventId: newUuidV7() });
     const res = await register(second, {
       token,
       environment: 'production',
-      eventId: randomUUID(),
+      eventId: newUuidV7(),
     });
     expect(res.body.outcome).toBe('registered');
     expect((await rowOf(token))?.userId).toBe((await userOf(second)).id);
     // The first account no longer holds it: its removal touches nothing.
-    const gone = await remove(first, { token, eventId: randomUUID() });
+    const gone = await remove(first, { token, eventId: newUuidV7() });
     expect(gone.body).toEqual({ outcome: 'not_registered' });
     expect((await rowOf(token))?.userId).toBe((await userOf(second)).id);
   });
@@ -126,7 +152,7 @@ describe('PUT /v1/me/push-token', () => {
   it('refuses an eventId another token’s or another account’s register holds: 409, nothing written', async () => {
     const sub = fresh('fay');
     const token = newToken();
-    const eventId = randomUUID();
+    const eventId = newUuidV7();
     await register(sub, { token, environment: 'sandbox', eventId });
 
     const other = newToken();
@@ -144,7 +170,7 @@ describe('PUT /v1/me/push-token', () => {
     const sub = fresh('teacher');
     await db.insert(users).values({ cognitoId: sub, role: 'teacher' });
     const token = newToken();
-    const res = await register(sub, { token, environment: 'sandbox', eventId: randomUUID() });
+    const res = await register(sub, { token, environment: 'sandbox', eventId: newUuidV7() });
     expect(res.status).toBe(403);
     expect(res.body.error?.code).toBe('forbidden');
     expect(await rowOf(token)).toBeUndefined();
@@ -154,7 +180,7 @@ describe('PUT /v1/me/push-token', () => {
     const res = await register(null, {
       token: newToken(),
       environment: 'sandbox',
-      eventId: randomUUID(),
+      eventId: newUuidV7(),
     });
     expect(res.status).toBe(401);
   });
@@ -171,7 +197,7 @@ describe('PUT /v1/me/push-token', () => {
     const res = await register(fresh('val'), {
       token,
       environment: 'sandbox',
-      eventId: randomUUID(),
+      eventId: newUuidV7(),
       ...change,
     });
     expect(res.status).toBe(400);
@@ -184,14 +210,14 @@ describe('PUT /v1/me/push-token', () => {
 
   it('answers a register that reached an account deleted on its way: 409 account_deleted', async () => {
     const sub = fresh('hal');
-    await register(sub, { token: newToken(), environment: 'sandbox', eventId: randomUUID() });
+    await register(sub, { token: newToken(), environment: 'sandbox', eventId: newUuidV7() });
     const user = await userOf(sub);
     await db.update(users).set({ removedAt: new Date() }).where(eq(users.id, user.id));
     const result = await registerPushToken(db, {
       userId: user.id,
       token: newToken(),
       environment: 'sandbox',
-      eventId: randomUUID(),
+      eventId: newUuidV7(),
     });
     expect(result).toEqual({ outcome: 'account_deleted' });
   });
@@ -201,8 +227,8 @@ describe('DELETE /v1/me/push-token', () => {
   it('removes the caller’s token for good, and its retry answers not_registered', async () => {
     const sub = fresh('ida');
     const token = newToken();
-    await register(sub, { token, environment: 'sandbox', eventId: randomUUID() });
-    const removal = { token: token.toUpperCase(), eventId: randomUUID() };
+    await register(sub, { token, environment: 'sandbox', eventId: newUuidV7() });
+    const removal = { token: token.toUpperCase(), eventId: newUuidV7() };
     expect((await remove(sub, removal)).body).toEqual({ outcome: 'removed' });
     expect(await rowOf(token)).toBeUndefined();
     expect(await remove(sub, removal)).toEqual({
@@ -214,15 +240,15 @@ describe('DELETE /v1/me/push-token', () => {
   it('never removes another account’s token', async () => {
     const owner = fresh('jo');
     const token = newToken();
-    await register(owner, { token, environment: 'sandbox', eventId: randomUUID() });
-    const res = await remove(fresh('kim'), { token, eventId: randomUUID() });
+    await register(owner, { token, environment: 'sandbox', eventId: newUuidV7() });
+    const res = await remove(fresh('kim'), { token, eventId: newUuidV7() });
     expect(res.body).toEqual({ outcome: 'not_registered' });
     expect((await rowOf(token))?.userId).toBe((await userOf(owner)).id);
   });
 
   it('answers a caller the server has no account for: not_registered, and makes none', async () => {
     const sub = fresh('new');
-    const res = await remove(sub, { token: newToken(), eventId: randomUUID() });
+    const res = await remove(sub, { token: newToken(), eventId: newUuidV7() });
     expect(res.body).toEqual({ outcome: 'not_registered' });
     expect(await db.select().from(users).where(eq(users.cognitoId, sub))).toEqual([]);
   });
@@ -230,7 +256,7 @@ describe('DELETE /v1/me/push-token', () => {
   it('refuses an eventId a register holds: 409, nothing removed', async () => {
     const sub = fresh('lee');
     const token = newToken();
-    const eventId = randomUUID();
+    const eventId = newUuidV7();
     await register(sub, { token, environment: 'sandbox', eventId });
     const res = await remove(sub, { token, eventId });
     expect(res.status).toBe(409);
@@ -241,7 +267,7 @@ describe('DELETE /v1/me/push-token', () => {
   it('refuses a teacher: 403', async () => {
     const sub = fresh('teacher');
     await db.insert(users).values({ cognitoId: sub, role: 'teacher' });
-    const res = await remove(sub, { token: newToken(), eventId: randomUUID() });
+    const res = await remove(sub, { token: newToken(), eventId: newUuidV7() });
     expect(res.status).toBe(403);
   });
 
@@ -251,7 +277,7 @@ describe('DELETE /v1/me/push-token', () => {
     ['no body', undefined],
   ])('refuses %s: 400', async (_, change) => {
     const payload =
-      change === undefined ? undefined : { token: newToken(), eventId: randomUUID(), ...change };
+      change === undefined ? undefined : { token: newToken(), eventId: newUuidV7(), ...change };
     const res = await remove(fresh('mo'), payload as object);
     expect(res.status).toBe(400);
   });

@@ -41,6 +41,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -3678,8 +3679,8 @@ export interface DeleteAccountResult {
  * session too, since a deletion never waits for a lesson; the row loses its
  * name and its Cognito subject and is marked removed; each rename it made
  * loses the names it carried (the one rewrite of `events` the database allows,
- * migration 0015); and `account_deleted` is recorded under `eventId`, with no
- * payload. Its other events stay, so each class's reports count as before,
+ * migration 0015); its phones' device tokens are deleted (N4); and
+ * `account_deleted` is recorded under `eventId`, with no payload. Its other events stay, so each class's reports count as before,
  * under a row that names no one.
  *
  * A teacher with a live class or block is refused `TEACHER_HAS_CLASSES`:
@@ -3763,6 +3764,9 @@ export async function deleteAccount(
         .update(armedTaps)
         .set({ consumedAt: input.at })
         .where(and(eq(armedTaps.studentId, me.id), isNull(armedTaps.consumedAt)));
+      // Its phones' device tokens (N4): personal data, and no record of anything, so
+      // deleted, not kept. A register behind this finds the account deleted.
+      await tx.delete(deviceTokens).where(eq(deviceTokens.userId, me.id));
 
       await tx
         .update(users)
@@ -3809,8 +3813,7 @@ export const SCHOOL_DISPOSAL_COVERAGE = {
   'armed_taps.teacher_id': "deleted: the taps on its teachers' blocks",
   'teacher_invites.school_id': 'an open invite deleted; a redeemed one kept, naming no one',
   'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
-  // Not handled yet: N4 deletes them (PLAN, "Push: class started").
-  'device_tokens.user_id': 'NOT YET: kept; N4 deletes the device tokens of its people',
+  'device_tokens.user_id': 'deleted: the device tokens of its people (N4)',
 } as const;
 
 export interface DisposeSchoolInput {
@@ -3878,7 +3881,8 @@ class RetentionPreview extends Error {
  * de-identified as an account deletion leaves one (C3: no name, no Cognito
  * subject, removed; a rename's names emptied); its enrollments end; its classes
  * are removed and lose their names; its teachers' blocks are removed; the taps
- * waiting on them and its people's are deleted, as are its open invites; the
+ * waiting on them and its people's are deleted, as are its people's device
+ * tokens (N4) and its open invites; the
  * school is marked removed; and `school_disposed` records it with the school's
  * id and counts. What stays names no one: the lessons, their participations and
  * events, under rows that name no one, so counts still add up.
@@ -4008,6 +4012,9 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
         .where(or(inArray(armedTaps.studentId, peopleIds), inArray(armedTaps.teacherId, peopleIds)))
         .returning({ id: armedTaps.id })
     : [];
+  if (peopleIds.length) {
+    await tx.delete(deviceTokens).where(inArray(deviceTokens.userId, peopleIds));
+  }
   const removedBlocks = peopleIds.length
     ? await tx
         .update(blocks)
@@ -4195,9 +4202,8 @@ export const RETENTION_COVERAGE = {
     'deleted: the taps on a teacher it de-identifies; one made after the year keeps them named',
   'teacher_invites.redeemed_by':
     'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
-  // Not handled yet: N4 deletes them (PLAN, "Push: class started").
   'device_tokens.user_id':
-    'NOT YET: kept; N4 deletes the device tokens of a person it de-identifies',
+    'deleted: the device tokens of a person it de-identifies (N4); a continuing one keeps theirs',
 } as const;
 
 export interface ApplyRetentionInput {
@@ -4262,8 +4268,8 @@ export function yearOverAt(day: string): Date {
  * stay). Once the school's recorded year is over, each person of the school
  * whose records all lie in it is de-identified as an account deletion leaves
  * one (C3): no name, no Cognito subject, removed, a rename's names emptied;
- * each live enrollment ended as a removal ends it; their pre-bell taps
- * deleted; a de-identified teacher's removed classes lose their names. Their
+ * each live enrollment ended as a removal ends it; their pre-bell taps and
+ * their phones' device tokens (N4) deleted; a de-identified teacher's removed classes lose their names. Their
  * lessons, participations and events stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
@@ -4373,6 +4379,9 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
         .where(or(inArray(armedTaps.studentId, goneIds), inArray(armedTaps.teacherId, goneIds)))
         .returning({ id: armedTaps.id })
     : [];
+  if (goneIds.length) {
+    await tx.delete(deviceTokens).where(inArray(deviceTokens.userId, goneIds));
+  }
   // A class name can name its teacher; theirs are all removed (a live one keeps them named).
   // `isNotNull(classes.removedAt)` is a belt, not the live-class rule: activeSince keeps
   // any live class's teacher named, so none of theirs is live here.

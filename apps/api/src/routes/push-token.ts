@@ -40,7 +40,10 @@ const notAStudent = () => ApiError.forbidden('only a student registers a device 
  * PUT /v1/me/push-token — a student registers its phone's APNs token, with the
  * environment it was issued for (N3; ARCHITECTURE, "Push: a doorbell for
  * students"). One phone, one current owner: a token another account holds
- * moves to the caller. Idempotent on `eventId` (`registerPushToken`).
+ * moves to the caller. Idempotent on `eventId` (`registerPushToken`), and
+ * later wins by its UUIDv7 order: a register older than the row's answers
+ * `replay` with the token's environment now, which can mean another account's
+ * newer register holds the token (N4).
  *
  * DELETE /v1/me/push-token — the student removes it: `removed`, or
  * `not_registered` when the caller holds no such token (a retry, or it moved

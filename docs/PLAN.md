@@ -4,7 +4,9 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N3: device tokens, `PUT`/`DELETE /v1/me/push-token` (the interface is
+_Last updated: 2026-10-06 — N4: device tokens are personal data (deleted by C3, C6a and C6b,
+in C5's export), and a register applies only after the row's eventId (N5, the APNs sender, is
+next). Before it, N3: device tokens, `PUT`/`DELETE /v1/me/push-token` (the interface is
 on N3's line). Before it, C4a, the phone's Delete account engine, landed (C4b, its Me screen
 button and confirm step, is next). Before it, P10, the class page's session length and Extend,
 landed; P11, New join code, parked on the API's CORS (Phase 5 steps). Before it, N2:
@@ -234,11 +236,17 @@ words — is the Mac session's**, in parallel.
   another account's. BaliCore: `APIClient.registerPushToken(_: RegisterPushTokenRequest)` and
   `APIClient.removePushToken(_: RemovePushTokenRequest)`, with `PushEnvironment` (`.sandbox`,
   `.production`), `RegisterPushTokenResponse`, `RemovePushTokenResponse`. Fixtures:
-  `contracts/fixtures/push-token/`. Until N4, the foreign-key coverage maps list
-  `device_tokens.user_id` as "NOT YET". Why: `docs/DECISIONS.md` (N3)
+  `contracts/fixtures/push-token/`. Why: `docs/DECISIONS.md` (N3)
 - **N4** Tokens as personal data: deleted by `deleteAccount` (C3), the disposal (C6a) and the
   retention run (C6b); in C5's export and the foreign-key coverage tests; redacted from logs —
-  ⬜
+  ✅ each deletes the rows in its own transaction (C3 its account's, C6a all its people's, C6b
+  those it de-identifies; a continuing account keeps its); C5's export carries them whole as
+  `deviceTokens` (additive to `bali.student-record/1`); the three coverage maps say so. Logs:
+  N3's log-redaction test already holds no token in a log line. Rode along: `PUT
+  /v1/me/push-token` applies only when its `eventId` sorts after the row's (UUIDv7 order); an
+  older one answers `replay` with the token's environment now. **For the Mac session:** mint
+  the register's `eventId` as a UUIDv7 — a v4 id sorts at random. Known limit: a stale register
+  arriving after a removal registers the token again. Why: `docs/DECISIONS.md` (N4)
 - **N5** The APNs sender, after the Start's transaction commits: one alert per converted
   student's tokens (HTTP/2, `.p8` token auth, time-sensitive, collapse id per session, short
   expiration); never on a replay; a failure logged without the token and never failing the

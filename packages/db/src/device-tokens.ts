@@ -12,8 +12,8 @@ import type { Database } from './types.js';
  * `participations` or `events`, and the token's row is its own record.
  *
  * Each takes the caller's row FOR SHARE first, so a role change (a redeem, T1b)
- * or a deletion (C3, which N4 makes delete the account's tokens) runs wholly
- * before or after it, and is judged in the same transaction as the write.
+ * or a deletion (C3, which deletes the account's tokens) runs wholly before or
+ * after it, and is judged in the same transaction as the write.
  */
 
 type UserRow = typeof users.$inferSelect;
@@ -27,9 +27,15 @@ export type RegisterPushTokenResult =
  * phone, one current owner, so a token another account holds moves to this
  * one. Idempotent on `eventId`: the row that eventId wrote, still as it wrote
  * it, is a replay, written again by nothing; an eventId another token's or
- * another account's row holds is `event_id_conflict`. Only the latest register
- * of a token is remembered: once a later one rewrites the row, an older
- * eventId reads as new and registers again, the same token to the same owner.
+ * another account's row holds is `event_id_conflict`.
+ *
+ * Later wins, by the eventIds' UUIDv7 order (the phone's own, as a quiz answer
+ * replaces an earlier one): a register rewrites the token's row only when its
+ * eventId sorts after the one the row holds, so an old retry landing after a
+ * newer register — this account's or another's — writes nothing and is
+ * answered as a replay, with the token's environment now. A removal deletes
+ * the row and keeps no eventId, so a stale register after it registers again
+ * (DECISIONS, N4).
  */
 export async function registerPushToken(
   db: Database,
@@ -65,11 +71,24 @@ function registerOnce(
     if (user.role !== 'student') return { outcome: 'not_a_student' };
 
     const row = { userId: user.id, environment: input.environment, eventId: input.eventId };
-    await tx
+    const written = await tx
       .insert(deviceTokens)
       .values({ token: input.token, ...row })
-      .onConflictDoUpdate({ target: deviceTokens.token, set: { ...row, updatedAt: sql`now()` } });
-    return { outcome: 'registered', environment: input.environment };
+      .onConflictDoUpdate({
+        target: deviceTokens.token,
+        set: { ...row, updatedAt: sql`now()` },
+        // Postgres orders uuids by their bytes: a UUIDv7's leading timestamp first.
+        setWhere: sql`${deviceTokens.eventId} < excluded.event_id`,
+      })
+      .returning({ token: deviceTokens.token });
+    if (written.length > 0) return { outcome: 'registered', environment: input.environment };
+    // A newer register holds the row: this one is older, a replay of the truth now.
+    const [now] = await tx
+      .select({ environment: deviceTokens.environment })
+      .from(deviceTokens)
+      .where(eq(deviceTokens.token, input.token));
+    if (!now) throw new Error('registerPushToken: the newer row is gone');
+    return { outcome: 'replay', environment: now.environment };
   });
 }
 

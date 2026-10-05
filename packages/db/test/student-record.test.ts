@@ -1,6 +1,7 @@
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
@@ -57,7 +58,13 @@ function one<T>(rows: T[]): T {
   return row;
 }
 
-/** Ana in two classes, renamed, in a lesson she unlocked in, armed for the next; Ben beside her. */
+/** A device token no phone has registered yet: 64 hex digits. */
+const newToken = () => newUuidV7().replace(/-/g, '').repeat(2);
+
+/**
+ * Ana in two classes, renamed, in a lesson she unlocked in, armed for the next,
+ * her phone registered for pushes; Ben beside her, his registered too.
+ */
 async function seed(tag: string) {
   const school = one(
     await db
@@ -133,7 +140,19 @@ async function seed(tag: string) {
       expiresAt: fromNow(60 * MIN),
     });
   }
-  return { school, teacher, ana, ben, first, second, session };
+  const tokens = { ana: newToken(), ben: newToken() };
+  for (const [student, token] of [
+    [ana, tokens.ana],
+    [ben, tokens.ben],
+  ] as const) {
+    await registerPushToken(db, {
+      userId: student.id,
+      token,
+      environment: 'production',
+      eventId: newUuidV7(),
+    });
+  }
+  return { school, teacher, ana, ben, first, second, session, tokens };
 }
 
 async function exported(who: string, now = new Date()): Promise<StudentRecord> {
@@ -172,7 +191,7 @@ describe('the export’s coverage of the schema', () => {
 
 describe('exportStudentRecord (C5)', () => {
   it('holds the student’s whole record, and names the classes and lesson it points at', async () => {
-    const { ana, first, second, session, school } = await seed('c5-whole');
+    const { ana, first, second, session, school, tokens } = await seed('c5-whole');
     const record = await exported(ana.id);
 
     expect(record.format).toBe(STUDENT_RECORD_FORMAT);
@@ -190,6 +209,9 @@ describe('exportStudentRecord (C5)', () => {
     expect(record.armedTaps).toHaveLength(1);
     expect(record.armedTaps[0]).toMatchObject({ studentId: ana.id, consumedAt: null });
     expect(record.invitesRedeemed).toEqual([]);
+    expect(record.deviceTokens).toMatchObject([
+      { token: tokens.ana, userId: ana.id, environment: 'production' },
+    ]);
     expect(record.classes).toMatchObject([
       { id: first.id, name: 'Biology', teacherDisplayName: 'Ms Rivera' },
       { id: second.id, name: 'Chemistry', teacherDisplayName: 'Ms Rivera' },
@@ -202,8 +224,9 @@ describe('exportStudentRecord (C5)', () => {
   });
 
   it('carries nothing of another student’s', async () => {
-    const { ana, ben } = await seed('c5-others');
+    const { ana, ben, tokens } = await seed('c5-others');
     const text = JSON.stringify(await exported(ana.id));
+    expect(text).not.toContain(tokens.ben);
     expect(text).not.toContain(ben.id);
     expect(text).not.toContain(ben.cognitoId);
     expect(text).not.toContain('Ben c5-others');
@@ -242,6 +265,7 @@ describe('exportStudentRecord (C5)', () => {
       record.events,
       record.armedTaps,
       record.invitesRedeemed,
+      record.deviceTokens,
       record.classes,
       record.sessions,
       record.sessionEvents,
@@ -262,6 +286,8 @@ describe('exportStudentRecord (C5)', () => {
     expect(record.events.map((e) => e.type)).toContain('account_deleted');
     expect(record.events.find((e) => e.type === 'display_name_changed')?.payload).toBeNull();
     expect(record.enrollments.every((e) => e.removedAt !== null)).toBe(true);
+    // Its phone's token went with it (N4).
+    expect(record.deviceTokens).toEqual([]);
     expect(JSON.stringify(record)).not.toContain('Ana');
   });
 

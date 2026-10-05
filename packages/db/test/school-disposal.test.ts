@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { findOrCreateStudent } from '../src/queries.js';
@@ -13,6 +14,7 @@ import {
   armedTaps,
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -70,7 +72,8 @@ function one<T>(rows: T[]): T {
 /**
  * A school whose teacher came by an invite, with a block, a second invite still
  * open, two classes, Ana (renamed) and Ben in a lesson that is over, Ana's
- * unlock in it, and Ben's tap waiting for the teacher's next Start.
+ * unlock in it, and Ben's tap waiting for the teacher's next Start; both
+ * students' phones registered for pushes.
  */
 async function seed(tag: string) {
   const school = one(
@@ -147,6 +150,14 @@ async function seed(tag: string) {
     deviceTime: new Date(),
     reason: 'nurse',
   });
+  for (const student of [ana, ben]) {
+    await registerPushToken(db, {
+      userId: student.id,
+      token: newUuidV7().replace(/-/g, '').repeat(2),
+      environment: 'sandbox',
+      eventId: newUuidV7(),
+    });
+  }
   return { school, teacher, block, ana, ben, first, second, past: session, lesson: lesson.session };
 }
 
@@ -190,6 +201,7 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
     blocks: await db.select().from(blocks).where(eq(blocks.teacherId, s.teacher.id)),
     invites: await db.select().from(teacherInvites).where(eq(teacherInvites.schoolId, s.school.id)),
     armed: await db.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
+    tokens: await db.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
   };
 }
 
@@ -249,6 +261,9 @@ describe('disposeSchool (C6a)', () => {
     expect(after.enrollments.every((e) => e.removedAt !== null)).toBe(true);
     expect(after.blocks.every((b) => b.removedAt !== null)).toBe(true);
     expect(after.armed).toEqual([]);
+    // Its people's phones' tokens are gone (N4).
+    expect(before.tokens).toHaveLength(2);
+    expect(after.tokens).toEqual([]);
     // The redeemed invite stays, the record of who became a teacher; the open one goes.
     expect(after.invites).toHaveLength(1);
     expect(after.invites[0]?.redeemedBy).toBe(s.teacher.id);
