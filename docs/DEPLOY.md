@@ -61,6 +61,9 @@ check after each.
 2. **Railway project** — create a project with two environments (dev, prod). Add
    the **Postgres** plugin to each; it supplies `DATABASE_URL`. Enable daily
    backups + point-in-time recovery, same region as the service (decision 4).
+   Railway's backups need its **Pro** plan: on Hobby there are none, and prod runs
+   without them for the Vanderbilt pilot (the owner's ruling, 2026-10-05;
+   `docs/RUNBOOKS.md`, runbook 1, step 4).
 3. **Deploy the service** — connect this repo; Railway reads `railway.json` and
    builds from the `Dockerfile`. Set all environment variables above.
 4. **Sweep cron, the backup** — the API sweeps every minute by itself; add a
@@ -104,20 +107,23 @@ checked with a public authorize request (`bali://auth/callback`, scope
 own pool (hosting decision 2). None of these is secret:
 
 - **Production's API:** `https://bali-prod-production.up.railway.app` — Railway
-  environment `production`, services `bali prod` and `postgres prod`; `/healthz`
-  answers ok.
+  environment `production`, services `bali prod`, `postgres prod` (no public TCP
+  proxy) and the backup sweep cron `sweep-cron` (`*/5 * * * *`); `/healthz` answers ok.
+  No backups, by the owner's ruling for the pilot (`docs/RUNBOOKS.md`, runbook 1, step 4).
+- **The portal:** the Vercel project `bali-portal` (root `apps/web`, Node.js 22.x) at
+  `https://bali-portal.vercel.app`, built with prod's values (2026-10-05); prod's
+  `CORS_ORIGINS` is that origin.
 - **The pool:** `bali-production`, id `us-east-1_C55e0fhX8`; `AUTH_ISSUER`
   `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_C55e0fhX8`. Deletion
   protection on; MFA optional (TOTP); self sign-up gated by the Pre sign-up Lambda
   `bali-pre-signup` with `ALLOWED_EMAIL_DOMAINS=vanderbilt.edu` (checked: a gmail
   sign-up is refused). The API's `TZ` is `America/Chicago`.
 - **Hosted-UI domain:** `https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com`
-  (Hosted UI classic).
+  (Hosted UI classic). Password policy: minimum 12 characters.
 - **The portal's app client:** `bali-web`, id `36meb9r9h0cdrt2a1schcv9abs` — a
   public SPA client, PKCE, SRP and refresh only; callback
   `https://bali-portal.vercel.app/auth/callback`, sign-out
-  `https://bali-portal.vercel.app/login`. The Vercel project isn't made yet
-  (runbook 3): if it ends up under another name, both URLs change with it.
+  `https://bali-portal.vercel.app/login`, the Vercel project's own address.
 - **The phone's app client:** `bali-ios`, id `5dr74i0iqnth9p4c4k594r27aj` — public,
   callback `bali://auth/callback`, scopes `openid email profile` and
   `aws.cognito.signin.user.admin` (for C4's `DeleteUser`), refresh token 365 days,
