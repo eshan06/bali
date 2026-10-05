@@ -19,6 +19,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   finding isn't lost in it. Checked: `npm audit` reads 0, `npm run db:generate` reports no
   schema change (CI's drift check), core-utils' `transformSync` works on the new esbuild.
   Retire the override when drizzle-kit drops `@esbuild-kit`.
+
 - **2026-10-05** — **The app's NFC entitlement is `TAG` alone; each extension names itself.**
   App Store Connect refused prod TestFlight run 37273876331 (ITMS-90778: "NDEF is disallowed"
   for `com.apple.developer.nfc.readersession.formats`; ITMS-90360: no `CFBundleDisplayName` in

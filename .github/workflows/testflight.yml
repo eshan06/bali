@@ -198,13 +198,19 @@ jobs:
           done
           # App Store Connect refused run 37273876331's upload on both (ITMS-90778, ITMS-90360):
           # the signed NFC formats entitlement is TAG alone, and each extension has a display name.
-          codesign -d --entitlements - --xml "$app" > "$RUNNER_TEMP/entitlements.plist" 2>/dev/null || true
-          formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" \
-            "$RUNNER_TEMP/entitlements.plist" 2>/dev/null || true)
-          echo "NFC formats = $formats"
-          if ! grep -qw TAG <<< "$formats" || grep -qw NDEF <<< "$formats"; then
-            echo "::error::The signed app's NFC formats must be TAG alone (App Store Connect refuses NDEF)."
+          # codesign's own failure is said as itself, never as a wrong entitlement.
+          if ! codesign -d --entitlements - --xml "$app" > "$RUNNER_TEMP/entitlements.plist" \
+            2> "$RUNNER_TEMP/codesign.err"; then
+            echo "::error::codesign could not read the signed app's entitlements: $(cat "$RUNNER_TEMP/codesign.err")"
             fail=1
+          else
+            formats=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.nfc.readersession.formats" \
+              "$RUNNER_TEMP/entitlements.plist" 2>/dev/null || true)
+            echo "NFC formats = $formats"
+            if ! grep -qw TAG <<< "$formats" || grep -qw NDEF <<< "$formats"; then
+              echo "::error::The signed app's NFC formats must be TAG alone (App Store Connect refuses NDEF)."
+              fail=1
+            fi
           fi
           for appex in BaliMonitor BaliShield; do
             [ -n "$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$app/PlugIns/$appex.appex/Info.plist" 2>/dev/null)" ] \
