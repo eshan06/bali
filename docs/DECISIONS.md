@@ -44,7 +44,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`startSession` now refuses a removed class, `CLASS_NOT_FOUND`); an arm or rename finds the
   account deleted; an unlock is recorded whichever lands first (the old account's in its
   lesson, or a reborn account's as `not_enrolled`). The Cognito sign-ins and backups are the
-  owner's, in the command's runbook. **Rode along (#219's review):** C5's export carries the
+  owner's, in the command's runbook. **No event per enrollment:** a leave records
+  `enrollment_left` for the grid's sake, and a disposal has no grid left to tell; its
+  `school_disposed` is the why for every enrollment it ends, as `account_deleted` is for a
+  deletion's pre-bell tap. A person's pre-bell taps go whatever block they wait on (their
+  account goes). **Known, kept:** an outsider's tap racing the disposal on one of its
+  teachers' blocks can still arm after it (the arm path holds the student's row, not the
+  teacher's); the row names a de-identified teacher, no Start can take it (the classes are
+  gone), and it expires that day. **Rode along (#219's review):** C5's export carries the
   lessons' own events (start, extend, end, expiry: no one's id) as `sessionEvents`, so it says
   when the student's lesson ended; `deleteAccount` records no event for the pre-bell tap it
   consumes, on purpose: a Start's decline says why a student is not in the session that

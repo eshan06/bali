@@ -3816,7 +3816,10 @@ export interface DisposeSchoolInput {
   at: Date;
   /** The school's name, typed by the owner to confirm. Absent, nothing is written: a preview. */
   confirmName?: string;
-  /** The idempotency key for the school_disposed event (rule 4); one is minted when absent. */
+  /**
+   * The idempotency key for the school_disposed event (rule 4); one is minted when
+   * absent. A preview spends none, but meets an id already on record as a conflict.
+   */
   eventId?: string;
 }
 
@@ -4079,7 +4082,8 @@ async function lockPeople(tx: Database, ids: string[]) {
 
 /**
  * Those of `ids` with records at another school: a teacher there, or enrolled
- * in, teaching or recorded in one of its classes.
+ * in, teaching, present in or recorded in one of its classes — read as
+ * `peopleOf` reads this school's.
  */
 async function tiedElsewhere(tx: Database, schoolId: string, ids: string[]): Promise<string[]> {
   if (ids.length === 0) return [];
@@ -4087,6 +4091,10 @@ async function tiedElsewhere(tx: Database, schoolId: string, ids: string[]): Pro
     .select({ id: classes.id })
     .from(classes)
     .where(ne(classes.schoolId, schoolId));
+  const lessons = tx
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(inArray(sessions.classId, elsewhere));
   return idsOf([
     ...(await tx
       .select({ id: users.id })
@@ -4101,8 +4109,19 @@ async function tiedElsewhere(tx: Database, schoolId: string, ids: string[]): Pro
       .from(enrollments)
       .where(and(inArray(enrollments.studentId, ids), inArray(enrollments.classId, elsewhere)))),
     ...(await tx
+      .selectDistinct({ id: participations.studentId })
+      .from(participations)
+      .where(
+        and(inArray(participations.studentId, ids), inArray(participations.sessionId, lessons)),
+      )),
+    ...(await tx
       .selectDistinct({ id: events.userId })
       .from(events)
-      .where(and(inArray(events.userId, ids), inArray(events.classId, elsewhere)))),
+      .where(
+        and(
+          inArray(events.userId, ids),
+          or(inArray(events.classId, elsewhere), inArray(events.sessionId, lessons)),
+        ),
+      )),
   ]);
 }
