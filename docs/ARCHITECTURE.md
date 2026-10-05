@@ -647,7 +647,10 @@ minutes, as the backup. The sweep is idempotent, so two instances, or the API an
 sweeping at once is harmless.
 
 **4. Database safety from day one.** Automatic daily backups with point-in-time
-recovery, and the database in the same region as the API.
+recovery, and the database in the same region as the API. *Exception, the owner's ruling
+(2026-10-05):* prod runs without backups for the Vanderbilt pilot (Railway's need its Pro
+plan), an accepted risk for an informal pilot of adults; this decision holds again before
+any K-12 school (`docs/DECISIONS.md`, 2026-10-05).
 
 **5. The deploy sets `TZ` to the school's zone.** The server's local time is the
 school's: bell times render in it (carried over from v2) and an armed tap's
@@ -835,5 +838,5 @@ Each exists because v2 broke it and shipped a real bug
 - **Open:** one design question, Phase 6: ISSUES #3's fallback, should Apple's answer
   call for one (the issue ranks the fallback designs, best fit first). Next: the build plan (what gets coded
   first). Items deliberately parked live in each section's "decided later" list.
-- **Deploys:** the demo site builds from `v2-archive` (Vercel's production branch);
-  `main` is v3 only.
+- **Deploys:** the portal builds from `main` as the Vercel project `bali-portal`; the v2
+  demo site is the older project `bali-web`, not connected to the repo.

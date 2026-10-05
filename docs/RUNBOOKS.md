@@ -10,28 +10,42 @@ uses values the one before it produced:
 4. [The backup-restore drill](#4-the-backup-restore-drill), once prod holds data,
 5. [GitHub hardening](#5-github-hardening), any time.
 
-**Where production stands** (the owner, 2026-10-04; its values are in `docs/DEPLOY.md`,
+**Where production stands** (the owner, 2026-10-05; its values are in `docs/DEPLOY.md`,
 "The phone's sign-in", none secret):
 
-- **Runbook 2, Cognito — done:** the pool `bali-production` with deletion protection
-  (step 3); sign-up gated to `vanderbilt.edu` by `bali-pre-signup`, a gmail sign-up
-  checked refused (4); MFA optional, TOTP (6); both app clients, SRP and refresh only,
-  the phone's with the 365-day refresh token and the `aws.cognito.signin.user.admin`
-  scope C4 needs (8); the hosted-UI domain, classic (9); the values handed to Railway and
-  to the iOS build (12). Not needed: Sign in with Apple (11; no Google sign-in).
+- **Runbook 2, Cognito — done:** root MFA on the AWS account (step 1); the pool
+  `bali-production` with deletion protection (3); sign-up gated to `vanderbilt.edu` by
+  `bali-pre-signup` ([`infra/cognito/pre-signup.mjs`](../infra/cognito/pre-signup.mjs)),
+  a gmail sign-up checked refused (4); the password policy, minimum 12 (5); MFA optional,
+  TOTP (6); both app clients, SRP and refresh only, the phone's with the 365-day refresh
+  token and the `aws.cognito.signin.user.admin` scope C4 needs (8); the hosted-UI domain,
+  its branding set to Hosted UI (classic) (9); the values handed to Railway, Vercel and
+  the iOS build (12). Not needed: Sign in with Apple (11; no Google sign-in).
 - **Runbook 2 — skipped for the pilot, still to do:** threat protection (7; it needs
-  the Plus plan, billed per user), CloudTrail (2), and MFA on the AWS root user (1;
-  whether it is on wasn't recorded). Not recorded, so check them: the password policy
-  (5), "prevent user existence errors" on both clients (8), and the pool holding no
-  client but those two (10).
+  the Plus plan, billed per user) and CloudTrail (2). Not recorded, so check them:
+  "prevent user existence errors" on both clients (8), and the pool holding no client
+  but those two (10).
 - **Runbook 1, Railway — done:** the `production` environment (step 2), its database
-  `postgres prod` (3), the API service `bali prod` with its variables, `TZ`
-  `America/Chicago` (5–6), and `/healthz` answering ok (8). Not recorded, so check:
-  Railway's 2FA (1) and that the database has no public TCP proxy (3).
-- **Runbook 1 — still open:** the sweep cron in production (7), and daily backups (4),
-  which need a paid Railway plan (Hobby or above).
-- **Runbook 3, the Vercel flip — not started.** The `bali-web` client's URLs assume the
-  project is `bali-portal`; another name means changing them (runbook 2, step 8).
+  `postgres prod` with no public TCP proxy (3, checked 2026-10-05), the API service
+  `bali prod` with its variables, `TZ` `America/Chicago` and `CORS_ORIGINS`
+  `https://bali-portal.vercel.app` (5–6), the sweep cron `sweep-cron` (7; its first run
+  logged `expired 0`, `wentSilent 0`), and `/healthz` answering ok (8).
+- **Runbook 1 — not done, by the owner's ruling:** backups (4). Railway's backups need
+  its **Pro** plan; the account is on **Hobby** (upgraded 2026-10-05). For the Vanderbilt
+  pilot prod runs **without backups**, an accepted risk (step 4 says what that means);
+  revisit before any K-12 school. Railway's 2FA (1) is deferred by the owner.
+- **Runbook 3, the Vercel flip — done** (2026-10-05): the project `bali-portal`, rooted at
+  `apps/web`, at `https://bali-portal.vercel.app`, Node.js 22.x, prod's values; the API's
+  CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) isn't
+  connected to the repo, so step 2 wasn't needed. Still open: step 6, deleting `vercel.json`.
+- **Runbook 4, the restore drill — on hold** while prod has no backups. Its half A, a
+  `pg_dump` into a scratch database, works without them (skip its step 1).
+- **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
+
+**Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
+its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
+teacher there with the block `BALIBLOCK1` and a class. The first prod TestFlight build was
+dispatched 2026-10-05 (Actions run 37267876703).
 
 How to read them:
 
@@ -77,7 +91,13 @@ project for the API (its DSN).
      ending `.railway.internal`; `DATABASE_PUBLIC_URL` is gone or empty, and
      **Networking** lists no public domain or proxy.
 4. **Backups.** Postgres service → **Backups** tab → turn on a **daily** schedule (and
-   weekly, if offered). Backups need a paid Railway plan.
+   weekly, if offered). Backups need Railway's **Pro** plan ($20 a month); Hobby has
+   none.
+   - **The Vanderbilt pilot runs without them** (the owner's ruling, 2026-10-05; the
+     account is on Hobby). An accepted risk for an informal pilot of adults: if prod's
+     volume is lost, its sessions, reports and unlock records are gone, and the school,
+     its teachers and their classes are made again by hand. **Revisit before any K-12
+     school:** Pro and this step, or a nightly `pg_dump` to an encrypted S3 bucket.
    - **Point-in-time recovery:** hosting decision 4 asks for it. Railway's backups, as
      far as this doc's author knows, are scheduled volume snapshots, not
      point-in-time recovery. If you find no PITR setting, write that down and raise
@@ -142,11 +162,12 @@ project for the API (its DSN).
    - **Settings → Cron Schedule:** `*/5 * * * *`.
    - **Variables:** `INTERNAL_API_KEY=${{<api service name>.INTERNAL_API_KEY}}`
      (a reference, so the key lives in one place).
-   - **Start command:** one request that exits when done, for example with the image
-     `curlimages/curl`:
-     `curl -fsS -X POST -H "x-internal-key: $INTERNAL_API_KEY" <prod API URL>/internal/sweep`
-     *(if Railway doesn't expand `$INTERNAL_API_KEY` in a start command, wrap it:
-     `sh -c '…'`)*.
+   - **Start command:** one request that exits when done, with the image
+     `curlimages/curl:8.10.1`, wrapped in `sh -c` so a shell expands the key:
+     `sh -c 'curl -fsS -X POST -H "x-internal-key: $INTERNAL_API_KEY" <prod API URL>/internal/sweep'`.
+   - **As made** (2026-10-05): the service `sweep-cron`, that image, `*/5 * * * *`,
+     `INTERNAL_API_KEY` a reference to `bali prod`'s, the URL
+     `https://bali-prod-production.up.railway.app`.
    - **Check:** after the next run, the cron's log shows
      `{"expired":N,"wentSilent":M}`. A `401` means the key differs from the API's.
 8. **Verify the whole thing.**
@@ -208,7 +229,8 @@ project for the API (its DSN).
       left there only ever makes a new, empty account.
     - **Backups:** Railway's backups (step 4) still hold the school's data until they age
       out. Note the day the last backup from before the disposal expires (the Backups tab
-      lists each backup's time; its retention is the schedule's).
+      lists each backup's time; its retention is the schedule's). While prod has no backups
+      (the pilot), there is none to wait for: say so in the reply.
     - **Write back to the school,** by the agreement's channel, inside its days: the date of
       the disposal; what was removed (every name, Cognito subject and sign-in, class name,
       block, open invite and pre-bell tap of the school); what stays (lessons,
@@ -426,6 +448,9 @@ your Vercel projects; step 1 tells you which case you're in.
    - **Framework:** Next.js (detected). **Build command:** default (`next build`).
      **Install command:** default; Vercel installs the npm workspace from the
      repo's lockfile. Name it `bali-portal`.
+   - **Settings → Build and Deployment → Node.js Version: 22.x.** Vercel's default
+     (24.x on 2026-10-05) fails the install with npm's `EBADENGINE`: the repo's
+     `engines` asks for Node 22.
    - **Environment Variables**, scope **Production** only, before the first deploy:
 
      | Variable | Value |
@@ -478,6 +503,10 @@ your Vercel projects; step 1 tells you which case you're in.
 
 What it proves: prod's data can be brought back, how long it takes, and that it comes
 back whole. Run it after prod holds real sessions, then once a term.
+
+**On hold for the Vanderbilt pilot:** prod has no backups (runbook 1, step 4), so step 1
+below fails, and half B needs backups on dev, the same plan. Half A without step 1 proves a
+`pg_dump` of prod restores whole; it is worth a run before the pilot's first week ends.
 
 Railway's restore button, as far as this doc's author knows, restores a backup **over
 the same volume**. Never do that on prod for a drill. So the drill has two halves:

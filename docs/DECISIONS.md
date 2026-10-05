@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **Production as it stands; no prod backups for the Vanderbilt pilot; live
+  questions show totals only.** **Backups (the owner's ruling):** Railway's backups need its
+  **Pro** plan ($20 a month), not Hobby as the runbooks said; the account is on Hobby
+  (upgraded 2026-10-05). Prod runs the Vanderbilt pilot **without backups**: an informal
+  pilot of adults, where losing the volume costs the pilot's records and an afternoon
+  remaking the school, its teachers and classes. Hosting decision 4 keeps its exception
+  noted; it holds again before any K-12 school (Pro, or a nightly `pg_dump` to an encrypted
+  S3 bucket). The restore drill (runbook 4) waits on backups. **Done in the consoles
+  (the owner, 2026-10-04/05):** prod's sweep cron (`sweep-cron`, `curlimages/curl:8.10.1`,
+  `*/5 * * * *`, its key a reference to `bali prod`'s; the start command needs `sh -c` for the
+  key to expand); the Vercel flip (`bali-portal`, Node 22.x pinned because Vercel's default 24
+  fails `npm ci` on the repo's `engines`; the old `bali-web` project isn't connected to the repo,
+  so protecting the demo wasn't needed); root MFA, the prod pool's password minimum 12, the
+  hosted UI's branding classic, prod's Postgres with no public proxy; dev's phone client allows
+  the admin scope. Railway 2FA is deferred by the owner. **Railway's `railway.json`:** the CLI
+  warns config-as-code in `railway.json` is deprecated and works until 2026-12-01; P8 moves it
+  to `.railway/railway.ts` through `railway config migrate`, which the owner runs (it isn't run
+  unattended). **Two proposed phases, not scheduled** (`docs/ROADMAP-RESEARCH.md`): SIS/LMS
+  rosters, and presenting with live questions. For the latter the owner ruled that a live
+  question's results are **totals only**: no teacher or projector ever sees one student's
+  answer, so the feature never becomes a per-student record of what someone got wrong.
+
 - **2026-10-05** — **D2b: DESIGN.md takes the owner's D2 picks, made 2026-10-04 on D2a's canvas
   ([Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)); the Cognito
   sign-in page joins D2's scope.** The canvas drew three styles on the same four screens inside

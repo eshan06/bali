@@ -6,8 +6,9 @@ apps — read-through-the-events-feed, no direct database access — and authent
 with the same Cognito user pool over a **public PKCE** client (no client secret in
 the browser).
 
-This phase the portal runs **locally** against the Railway **dev** API; there is no
-Vercel deploy yet.
+Locally it runs against the Railway **dev** API. Production's portal is the Vercel
+project `bali-portal` at `https://bali-portal.vercel.app`, built from `main` with prod's
+values (`docs/RUNBOOKS.md`, runbook 3; since 2026-10-05).
 
 ## Run it locally
 
