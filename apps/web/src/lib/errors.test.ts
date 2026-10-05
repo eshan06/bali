@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, createApiClient, NetworkError } from './api-client';
-import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
+import {
+  CANT_ADD_TIME,
+  errText,
+  NOT_A_SESSION_LENGTH,
+  NOT_AN_INVITE_CODE,
+  TOO_MANY_TRIES,
+  TOO_MANY_TRIES_MINUTE,
+} from './errors';
 
 describe('errText', () => {
   it('says what to do over the budget, never the API’s own 429 message', () => {
@@ -48,7 +55,24 @@ describe('errText', () => {
     ).toBe("That didn't go through, so nothing changed. Try again.");
   });
 
+  it('says an extend past the bell in words, with the way on (P10)', () => {
+    expect(
+      errText(new ApiError(409, 'conflict', 'session is not running', 'session_not_running')),
+    ).toBe('This session is past its bell, so no time was added. End it, then start a new one.');
+  });
+
+  it('holds the class page’s words (P10): no em-dash, no exclamation mark, a way on', () => {
+    expect(NOT_A_SESSION_LENGTH).toBe(
+      'A session runs 1 to 480 minutes. Enter a whole number of minutes.',
+    );
+    expect(CANT_ADD_TIME).toBe("Bali couldn't add the time just now. Try again.");
+    for (const words of [NOT_A_SESSION_LENGTH, CANT_ADD_TIME]) {
+      expect(words).not.toMatch(/[—!]/);
+    }
+  });
+
   it('keeps every other error’s own words', () => {
+    // No reason: a newer server's, or none; the message is all there is.
     expect(errText(new ApiError(409, 'conflict', 'session is not running'))).toBe(
       'session is not running',
     );
