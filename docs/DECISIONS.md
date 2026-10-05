@@ -21,7 +21,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   account (the shared `deIdentify`: no name, `cognito_id` `deleted:<id>`, removed, a
   rename's names emptied by 0015's one rewrite). **Who stays named, reported by id:** anyone
   with a record after the day (the account made, an event, a participation in a lesson not
-  over by then, a pre-bell tap, a class or block made), anyone with records at another school
+  over by then, a pre-bell tap, an invite redeemed, a class joined, a class or block made), anyone with records at another school
   (C6a's `tiedElsewhere`), and a teacher with a live class or block (C3 refuses deleting one;
   their students' class would be left to no one). Splitting a continuing account's years
   would mean rewriting `events.user_id`; not built. A continuing person is judged again at the

@@ -4183,7 +4183,8 @@ export const RETENTION_COVERAGE = {
   'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
   'armed_taps.student_id': 'deleted: the taps of a person it de-identifies',
   'armed_taps.teacher_id': 'deleted: the taps on a teacher it de-identifies',
-  'teacher_invites.redeemed_by': 'kept, its teacher de-identified',
+  'teacher_invites.redeemed_by':
+    'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
 } as const;
 
 export interface ApplyRetentionInput {
@@ -4253,8 +4254,8 @@ export function yearOverAt(day: string): Date {
  * lessons, participations and events stay, so every count still adds up.
  *
  * Kept named, and reported by id (`continuing`): an account with a record
- * after the year's last day (an event, a lesson, a pre-bell tap, a class or
- * block made, the account itself made), with records at another school, or a
+ * after the year's last day (an event, a lesson, a pre-bell tap, an invite
+ * redeemed, a class joined, a class or block made, the account itself made), with records at another school, or a
  * teacher with a live class or block (as C3 refuses one). Splitting an
  * account's years would mean rewriting `events.user_id`; not built.
  *
@@ -4403,7 +4404,8 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
 
 /**
  * Those of `ids` with a record from `since` on: the account made, an event of
- * theirs, a participation in a lesson not over by then, a pre-bell tap, or, as
+ * theirs, a participation in a lesson not over by then, a pre-bell tap, an
+ * invite redeemed, a class joined, or, as
  * a teacher, a class or block still live or made since, or a lesson of a class
  * of theirs not over by then.
  */
@@ -4431,6 +4433,15 @@ async function activeSince(tx: Database, ids: string[], since: Date): Promise<st
       .selectDistinct({ id: armedTaps.studentId })
       .from(armedTaps)
       .where(and(inArray(armedTaps.studentId, ids), gte(armedTaps.createdAt, since)))),
+    // A redeem and a join are records too, whatever events they wrote.
+    ...(await tx
+      .selectDistinct({ id: teacherInvites.redeemedBy })
+      .from(teacherInvites)
+      .where(and(inArray(teacherInvites.redeemedBy, ids), gte(teacherInvites.redeemedAt, since)))),
+    ...(await tx
+      .selectDistinct({ id: enrollments.studentId })
+      .from(enrollments)
+      .where(and(inArray(enrollments.studentId, ids), gte(enrollments.createdAt, since)))),
     ...(await tx
       .selectDistinct({ id: classes.teacherId })
       .from(classes)

@@ -7,8 +7,16 @@ import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { getSessionEvents } from '../src/queries.js';
 import * as schema from '../src/schema.js';
-import { armedTaps, classes, enrollments, events, schools, users } from '../src/schema.js';
-import { recordYearEnd } from '../src/schools.js';
+import {
+  armedTaps,
+  classes,
+  enrollments,
+  events,
+  schools,
+  teacherInvites,
+  users,
+} from '../src/schema.js';
+import { hashInviteCode, recordYearEnd } from '../src/schools.js';
 import { makeTestDb } from '../src/testing.js';
 import {
   applyRetention,
@@ -373,8 +381,50 @@ describe('applyRetention (C6b)', () => {
     });
     expect(next).toMatchObject({ outcome: 'applied', yearEndsOn: localDay(5) });
     expect((await userRow(s.ben.id)).removedAt).not.toBeNull();
-    // Eve, made after the first year ended, is in the second; Rivera still teaches; Cara is shared.
+    // Eve, made after the first year ended, has nothing after the second: she goes now.
+    expect((await userRow(s.eve.id)).removedAt).not.toBeNull();
+    // Rivera still teaches; Cara is shared.
     for (const kept of [s.rivera, s.cara]) {
+      expect((await userRow(kept.id)).removedAt).toBeNull();
+    }
+  });
+
+  it('keeps a teacher who came in by an invite after the year, with no class yet, or a student who joined since', async () => {
+    const s = await seed('c6b-newcomer');
+    const [hire, joiner] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'hire-c6b', role: 'teacher', schoolId: s.school.id, displayName: 'New Hire' },
+        { cognitoId: 'joiner-c6b', role: 'student', displayName: 'Joiner' },
+      ])
+      .returning();
+    if (!hire || !joiner) throw new Error('seed');
+    // Their accounts are old; what is new is the redeem, and an enrollment with no event of its own.
+    await db
+      .update(users)
+      .set({ createdAt: fromNow(-30 * DAY) })
+      .where(inArray(users.id, [hire.id, joiner.id]));
+    const after = fromNow(2 * DAY + 12 * 60 * MIN);
+    await db.insert(teacherInvites).values({
+      schoolId: s.school.id,
+      codeHash: hashInviteCode(newUuidV7()),
+      expiresAt: fromNow(10 * DAY),
+      redeemedAt: after,
+      redeemedBy: hire.id,
+      redeemEventId: newUuidV7(),
+    });
+    await db
+      .insert(enrollments)
+      .values({ classId: s.bio.id, studentId: joiner.id, createdAt: after });
+
+    const result = await applyRetention(db, {
+      schoolId: s.school.id,
+      at: LATER(),
+      confirmName: s.school.name,
+    });
+    if (result.outcome !== 'applied') throw new Error(result.outcome);
+    expect(result.continuing).toEqual(expect.arrayContaining([hire.id, joiner.id]));
+    for (const kept of [hire, joiner]) {
       expect((await userRow(kept.id)).removedAt).toBeNull();
     }
   });
