@@ -40,6 +40,12 @@ export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} 
 /** A 5xx or a timeout on an extend (P10): Try again resends it under the same id. */
 export const CANT_ADD_TIME = "Bali couldn't add the time just now. Try again.";
 
+/** A 5xx or a timeout on a new join code (P11): Try again sends it again. */
+export const CANT_MAKE_CODE = "Bali couldn't make a new code just now. Try again.";
+
+/** The new join code is in place (P11), said beside it. */
+export const NEW_CODE_MADE = 'This is the new code. The old one has stopped working.';
+
 /**
  * A Start answered `existing` (P10): a session of the class was already running, started from
  * another tab or a phone, so the length picked here set nothing; the bell beside the grid is its.

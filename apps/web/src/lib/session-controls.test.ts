@@ -2,7 +2,7 @@ import { MAX_SESSION_MINUTES } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { createApiClient } from './api-client';
-import { CANT_ADD_TIME, CANT_REACH, TOO_MANY_TRIES } from './errors';
+import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   bellTime,
   DEFAULT_MINUTES,
@@ -14,6 +14,7 @@ import {
   LENGTH_PRESETS,
   parseMinutes,
   pickFor,
+  regenerateCode,
   rememberedMinutes,
   rememberMinutes,
 } from './session-controls';
@@ -220,6 +221,49 @@ describe('extendSession', () => {
     expect(await extendSession(slow.client, SESSION, attempt)).toEqual({
       kind: 'failed',
       message: CANT_ADD_TIME,
+    });
+  });
+});
+
+describe('regenerateCode', () => {
+  const klass = {
+    id: CLASS,
+    name: 'Period 1',
+    joinCode: 'NEWCDE',
+    createdAt: '2026-10-01T12:00:00.000Z',
+    liveSessionId: null,
+  };
+
+  it('asks for a new code and answers the class with it', async () => {
+    const { client, sent } = api(200, klass);
+    expect(await regenerateCode(client, CLASS)).toEqual({ kind: 'made', klass });
+    expect(sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
+    expect(sent[0]?.init?.method).toBe('PATCH');
+    expect(JSON.parse(sent[0]?.init?.body as string)).toEqual({ regenerateCode: true });
+  });
+
+  it('answers every failure in words, with Try again to send it again', async () => {
+    expect(await regenerateCode(unreachable, CLASS)).toEqual({
+      kind: 'failed',
+      message: CANT_REACH,
+    });
+    const busy = api(429, { error: { code: 'rate_limited', message: 'too many requests' } });
+    expect(await regenerateCode(busy.client, CLASS)).toEqual({
+      kind: 'failed',
+      message: TOO_MANY_TRIES,
+    });
+    const broken = api(500, { error: { code: 'internal', message: 'internal error' } });
+    expect(await regenerateCode(broken.client, CLASS)).toEqual({
+      kind: 'failed',
+      message: CANT_MAKE_CODE,
+    });
+    // A refusal the portal never expects (the class gone) still comes back with its message.
+    const gone = api(404, {
+      error: { code: 'not_found', reason: 'class_not_found', message: 'class not found' },
+    });
+    expect(await regenerateCode(gone.client, CLASS)).toEqual({
+      kind: 'failed',
+      message: 'class not found',
     });
   });
 });

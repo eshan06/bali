@@ -29,6 +29,7 @@ import {
   rememberMinutes,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
+import { JoinCode } from '@/components/join-code';
 import { LiveGrid } from '@/components/live-grid';
 import { RecapCard } from '@/components/recap-card';
 
@@ -203,13 +204,9 @@ export default function ClassDetailPage() {
         </Link>
       </nav>
 
-      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <h1 className="text-2xl font-semibold">{klass?.name ?? '…'}</h1>
-        {klass ? (
-          <p className="text-sm text-slate-500">
-            Join code: <span className="font-mono font-medium">{klass.joinCode}</span>
-          </p>
-        ) : null}
+        {klass ? <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} /> : null}
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}

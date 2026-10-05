@@ -1,11 +1,11 @@
-import { type ExtendSessionResponse, MAX_SESSION_MINUTES } from '@bali/shared';
+import { type ClassDetail, type ExtendSessionResponse, MAX_SESSION_MINUTES } from '@bali/shared';
 
 import { type ApiClient, ApiError, NetworkError } from './api-client';
-import { CANT_ADD_TIME, CANT_REACH, errText } from './errors';
+import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, errText } from './errors';
 import { newEventId } from './event-id';
 import type { RecapFormat } from './recap';
 
-/* The class page's controls (P10), tested: the session's length, and adding time to it. */
+/* The class page's controls, tested: the session's length and adding time (P10), a new code (P11). */
 
 /** The lengths offered as presets, in minutes, and the pick when this computer remembers none. */
 export const LENGTH_PRESETS = [25, 50, 75] as const;
@@ -130,6 +130,34 @@ export async function extendSession(
     }
     // A 5xx, a timeout or a body that isn't JSON: answered too, never thrown, so Try again shows.
     return { kind: 'failed', message: CANT_ADD_TIME };
+  }
+}
+
+/** A new join code's answer, as the control acts on it (P11). */
+export type NewCodeAnswer =
+  /** The class with its new code; the old one stopped working as the answer came. */
+  | { kind: 'made'; klass: ClassDetail }
+  /** No new code to show (no answer, or a refusal): Try again sends it again. */
+  | { kind: 'failed'; message: string };
+
+/**
+ * Mint the class a new join code (`PATCH /v1/classes/{id}`, `regenerateCode`). The route takes no
+ * `eventId`: a resend after a lost answer mints once more, and the code shown is the one the
+ * server holds, so any failure may be sent again as it was.
+ */
+export async function regenerateCode(
+  api: Pick<ApiClient, 'patch'>,
+  classId: string,
+): Promise<NewCodeAnswer> {
+  try {
+    const klass = await api.patch<ClassDetail>(`/v1/classes/${classId}`, { regenerateCode: true });
+    return { kind: 'made', klass };
+  } catch (e) {
+    if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
+    if (e instanceof ApiError && e.status < 500 && e.status !== 408) {
+      return { kind: 'failed', message: errText(e) };
+    }
+    return { kind: 'failed', message: CANT_MAKE_CODE };
   }
 }
 
