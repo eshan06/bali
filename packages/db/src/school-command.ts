@@ -399,7 +399,7 @@ async function retention(
     case 'year_not_over':
       throw new Error(
         `"${result.school.name}"'s year ends on ${result.yearEndsOn}, so it isn't over until ` +
-          `${result.overAt.toISOString()}; nothing was written. A wrong day: ${setYearEnd}`,
+          `${result.overAt.toLocaleString()} on this machine's clock; nothing was written. A wrong day: ${setYearEnd}`,
       );
     case 'name_mismatch':
       throw new Error(
