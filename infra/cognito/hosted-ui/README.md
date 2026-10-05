@@ -5,8 +5,9 @@ the phone alike. Cognito lets a pool set one logo and one CSS file, always toget
 list of class names (`docs/DESIGN.md`; D2d in `docs/PLAN.md`). These are Bali's:
 
 - `hosted-ui.css`: one file for both pools, so they can't drift. Bali's tokens on Cognito's
-  classes. A property outside AWS's per-class list is marked "if kept": the page looks right
-  without it, and the dev upload shows which ones Cognito keeps.
+  classes. A property outside AWS's per-class list is marked "if kept": the page holds without
+  it, and the dev upload shows which ones Cognito keeps. One exception to "holds": without the
+  focus ring's `box-shadow`, a focused field shows Bootstrap's own blue glow.
 - `logo-prod.png` and `logo-dev.png`: the lockup, the mark beside "Bali", dev's with a Dev tag so
   a tester knows which pool they are on. A transparent 140 × 32 px canvas drawn at 3x, under
   10 KB each. `make-logo.mjs` draws them (its header says how); the mark's one source is

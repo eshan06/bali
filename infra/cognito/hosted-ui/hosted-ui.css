@@ -10,7 +10,7 @@
 
 .banner-customizable {
   padding: 32px 0 0 0; /* space-8 above the logo */
-  background-color: #ffffff;
+  background-color: transparent; /* the card's own white, whatever its corners */
 }
 
 .logo-customizable {
@@ -46,7 +46,7 @@
   outline: 0;
   box-shadow:
     0 0 0 2px #f7f5f2,
-    0 0 0 4px #2c6f51; /* focus-ring, if kept */
+    0 0 0 4px #2c6f51; /* focus-ring, if kept; dropped, Bootstrap's own blue glow shows */
 }
 
 .submitButton-customizable {
