@@ -417,6 +417,12 @@ export interface StartSessionResult {
   session: SessionRow;
   /** How many waiting armed taps became participations at this start (decision 5). */
   armedConverted: number;
+  /**
+   * The students whose waiting armed tap this start converted — the ones the
+   * route's "class started" push goes to (N5). Empty on 'existing': a replay
+   * converts nobody, so nothing is sent again.
+   */
+  convertedStudentIds: string[];
 }
 
 /**
@@ -481,14 +487,14 @@ async function lockWaitingTaps(tx: Database, classId: string, at: Date): Promise
  * already this student's own `tap_in` the tap landed, so it is skipped and the
  * skip recorded as `armed_tap_skipped`; when any other event holds it, the tap
  * converts under a fresh id whose payload names the original. Returns the
- * count converted.
+ * students converted.
  */
 async function convertArmedTaps(
   tx: Database,
   session: SessionRow,
   waiting: ArmedTapRow[],
-): Promise<number> {
-  let converted = 0;
+): Promise<string[]> {
+  const converted: string[] = [];
   for (const tap of waiting) {
     const occurredAt = clampToWindow(tap.deviceTime, session.startedAt, session.endsAt);
     const order = knownOrder({ install: tap.orderInstall, seq: tap.orderSeq });
@@ -670,7 +676,7 @@ async function convertArmedTaps(
       .update(armedTaps)
       .set({ consumedAt: session.startedAt })
       .where(eq(armedTaps.id, tap.id));
-    converted += 1;
+    converted.push(tap.studentId);
   }
   return converted;
 }
@@ -732,7 +738,12 @@ export async function startSession(
       );
       if (existing) {
         if (sessionRunning(existing, input.startedAt)) {
-          return { outcome: 'existing', session: existing, armedConverted: 0 };
+          return {
+            outcome: 'existing',
+            session: existing,
+            armedConverted: 0,
+            convertedStudentIds: [],
+          };
         }
         await endHeldSession(tx, existing, { at: input.startedAt, reason: 'expired' });
       }
@@ -753,8 +764,13 @@ export async function startSession(
         occurredAt: session.startedAt,
       });
 
-      const armedConverted = await convertArmedTaps(tx, session, waiting);
-      return { outcome: 'created', session, armedConverted };
+      const convertedStudentIds = await convertArmedTaps(tx, session, waiting);
+      return {
+        outcome: 'created',
+        session,
+        armedConverted: convertedStudentIds.length,
+        convertedStudentIds,
+      };
     }),
   );
 }

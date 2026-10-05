@@ -1,5 +1,5 @@
 import type { PushEnvironment } from '@bali/shared';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { deviceTokens, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
@@ -122,6 +122,48 @@ export function removePushToken(
       .returning({ token: deviceTokens.token });
     return { outcome: removed.length > 0 ? 'removed' : 'not_registered' };
   });
+}
+
+export interface PushTarget {
+  token: string;
+  userId: string;
+  environment: PushEnvironment;
+  /** The register that wrote the row as read: a gone token's deletion names it (N5). */
+  eventId: string;
+}
+
+/** Every registered token of these students — the "class started" push's addressees (N5). */
+export function pushTargetsOf(db: Database, userIds: readonly string[]): Promise<PushTarget[]> {
+  if (userIds.length === 0) return Promise.resolve([]);
+  return db
+    .select({
+      token: deviceTokens.token,
+      userId: deviceTokens.userId,
+      environment: deviceTokens.environment,
+      eventId: deviceTokens.eventId,
+    })
+    .from(deviceTokens)
+    .where(inArray(deviceTokens.userId, [...userIds]));
+}
+
+/**
+ * Delete a token APNs reported gone (N5) — only the row as it was read: still
+ * this student's, still written by the same register. A token that moved to
+ * another account, or was registered again since, is left alone (N4's order).
+ * Returns whether a row went.
+ */
+export async function deleteGonePushToken(db: Database, target: PushTarget): Promise<boolean> {
+  const gone = await db
+    .delete(deviceTokens)
+    .where(
+      and(
+        eq(deviceTokens.token, target.token),
+        eq(deviceTokens.userId, target.userId),
+        eq(deviceTokens.eventId, target.eventId),
+      ),
+    )
+    .returning({ token: deviceTokens.token });
+  return gone.length > 0;
 }
 
 /** The caller's row, held FOR SHARE to the end of `tx`. */
