@@ -8,6 +8,48 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **C6b: the retention run — the owner's command, per school, per year.**
+  The engine's `applyRetention` lands first; the owner's commands (`year-end`, `retention`)
+  and the runbook land as C6b's second PR.
+  **The year's end is a day the owner records per school** (`schools.school_year_ends_on`,
+  migration 0017; `npm run school -- year-end <id> <day>`, beside the agreement's day), not a
+  fixed date: the Vanderbilt pilot is a semester and a K-12 school's year is its own. The
+  year is over at the midnight after that day by the server's clock (`TZ`, the school's;
+  `yearOverAt`). **Unset refuses** (`no_year_end`), and so does a year not over: the run never
+  de-identifies on a guess. **Who goes:** each live person of the school (`peopleOf`, C6a's
+  reading) whose records all lie on or before the day, de-identified exactly as C3 leaves an
+  account (the shared `deIdentify`: no name, `cognito_id` `deleted:<id>`, removed, a
+  rename's names emptied by 0015's one rewrite). **Who stays named, reported by id:** anyone
+  with a record after the day (the account made, an event, a participation in a lesson not
+  over by then, a pre-bell tap, a class or block made), anyone with records at another school
+  (C6a's `tiedElsewhere`), and a teacher with a live class or block (C3 refuses deleting one;
+  their students' class would be left to no one). Splitting a continuing account's years
+  would mean rewriting `events.user_id`; not built. A continuing person is judged again at the
+  next year's end. **Run it after the year, before the next begins**: a returning student not
+  yet active is de-identified, and their next sign-in starts a fresh account (a code to
+  rejoin) — the ruling's intent, since last year's records must stop naming them. **What
+  goes with them:** live enrollments end as a removal (`endLiveEnrollment`, its own
+  `enrollment_removed`, so a grid hears it; none is in a lesson, since a live participation
+  is a later record); their pre-bell taps deleted; a de-identified teacher's removed classes
+  emptied of names (a class name can name its teacher). **What stays:** lessons,
+  participations, events and unlocks, so reports add up (tested). **Logged** as one
+  `retention_applied` event (no session, class or user): the school's id, the day and five
+  counts; the ids of those kept are printed to the owner, never logged. **Not automatic:**
+  de-identification is irreversible, the day is the owner's entry, and the hold during a
+  parent's inspection request (C5) is a runbook step the owner checks before each run; a
+  cron would run past the hold. So it is a command with a preview and `--confirm "<name>"`,
+  like C6a, and a calendar entry in the runbook. **Idempotent per year:** a second run for
+  the same day finds its `retention_applied` and answers with its counts. **Locks:** the
+  school, then each person's tap lock and row in id order, as a deletion takes them, so a
+  tap, join, rename or arm behind it finds the account deleted and one ahead of it is read
+  as a record (a real-Postgres race; an unlock is recorded either way). **Rode along
+  (C6a's reviews, across C6b's two PRs):** `createClass` takes the school's KEY SHARE before the teacher's row, in
+  a disposal's order (the race proved the old order deadlocks); `already_disposed` reports
+  the counts from its `school_disposed` event; the dispose and retention switches end in a
+  never-check; runbook 1 step 11 no longer says only the interactive shell runs on the
+  server's clock; the Pre sign-up Lambda's messages lose their final period, as the owner's
+  deployed copy has (Cognito adds its own).
+
 - **2026-10-04** — **C6a: a school's data disposed of on its written request — de-identified,
   as C3 leaves an account, not destroyed.** The engine's `disposeSchool`, one transaction; the
   owner's command (`npm run school -- dispose`, a preview, then `--confirm "<name>"`) and its

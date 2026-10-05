@@ -201,6 +201,9 @@ export const EVENT_TYPES = [
   // A school's data disposed of on its written request (C6a): no session, no
   // class, no user. Its payload is the school's id and counts, never a name.
   'school_disposed',
+  // A school year's retention run (C6b): no session, no class, no user. Its
+  // payload is the school's id, the year's last day and counts, never a name.
+  'retention_applied',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

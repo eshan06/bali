@@ -42,6 +42,12 @@ export const schools = pgTable('schools', {
    * on record, and no teacher invite is minted for the school (T1a).
    */
   agreementSignedAt: date('agreement_signed_at', { mode: 'string' }),
+  /**
+   * The last day of the school's current school year (or term), as the owner records it (C6b).
+   * Past it, the retention run de-identifies the people whose records all lie on or before it.
+   * NULL = none on record, and the retention run refuses: it never guesses a year's end.
+   */
+  schoolYearEndsOn: date('school_year_ends_on', { mode: 'string' }),
   createdAt: createdAt(),
   removedAt: removedAt(),
 });

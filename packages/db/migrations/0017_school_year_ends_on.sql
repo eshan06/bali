@@ -1,0 +1,1 @@
+ALTER TABLE "schools" ADD COLUMN "school_year_ends_on" date;
