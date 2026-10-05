@@ -47,8 +47,10 @@ class (2026-10-05); for another professor, start at step 3.
    **Check:** `npm run school -- list` no longer lists that invite as open, and the
    portal shows the professor's classes page.
 5. **The class.** On the portal the professor creates the class. It gets a **join
-   code**: short, without `0`/`O` or `1`/`I`/`L`, for the students. The professor can
-   make a new one at any time, which stops the old one at once.
+   code**: short, without `0`/`O` or `1`/`I`/`L`, for the students. The portal can't
+   change the code yet (the API can, `PATCH /v1/classes/{id}`, but no screen calls it), so
+   share it with the class only. If it leaks, tell the owner; a new code means a session's
+   PR for the portal, or a new class.
 6. **The block.** A block is an NFC tag carrying a ten-letter-and-digit code,
    `<your block's 10-character code>`. Make it up (letters and digits only) and keep it
    off shared channels and the repo: anyone enrolled who knows it can send a tap with it.
@@ -58,13 +60,19 @@ class (2026-10-05); for another professor, start at step 3.
    one block serves all of a teacher's classes, and a block registered to one teacher is
    refused to another. **Check:** a student's app, scanning the block before any session,
    waits for the teacher rather than saying it isn't a Bali block.
+   🔧 **Before the first class, the owner's block needs a fresh code:** its first code
+   was committed to this repo (#228) and stays in its history. Write a new code onto the
+   tag and register it on the portal. The old code stays valid until its block row is
+   retired (`blocks.removed_at` set), and no screen or command does that yet: ask a
+   session for an owner command that retires a block, and run it on the old code.
 7. **The students' app**, through TestFlight's **external** group for the pilot, which
    gets prod builds only (`docs/DEPLOY.md`, "TestFlight"; dev builds go to an internal
    group, never this one). The owner adds each student's email to that group (or shares
    the group's public link); each student installs TestFlight, accepts, and installs Bali.
-   A prod build is good for 90 days in TestFlight: the one dispatched 2026-10-05 lasts
-   past the term's end, but a new build is a new dispatch (`docs/DEPLOY.md`). The first
-   external build waits for Apple's Beta App Review (`docs/APP-STORE.md`).
+   Apple's rules, not this repo's: a TestFlight build expires 90 days after upload (the
+   one dispatched 2026-10-05 lasts to about 2027-01-03, past the term's end), and the first
+   build offered to an external group waits for Apple's Beta App Review. A fix is a new
+   prod dispatch (`docs/DEPLOY.md`, "TestFlight").
 8. **Each student, once:** opens Bali, reads the privacy pages, signs up with their
    `@vanderbilt.edu` address, gives Bali Screen Time permission, enters the class's join
    code, sees what the professor will and won't see, and joins. A student can do this
@@ -81,9 +89,10 @@ Before class:
 
 At the start:
 
-- Press Start for the class on the portal, with the class's length. Students tap their
-  phone to the block, before or after Start: a tap before Start waits and joins at Start,
-  so nobody taps twice.
+- Press Start for the class on the portal. **A session is 25 minutes today:** the
+  portal's one Start button has no length to choose. Students tap their phone to the
+  block, before or after Start: a tap before Start waits and joins at Start, so nobody
+  taps twice.
 - Each phone locks into focus at the tap, even with no signal. Calls, FaceTime, Messages
   and Emergency SOS keep working; every other app is shielded.
 - The live grid shows who is focused. A phone not heard from for 90 seconds shows as
@@ -96,8 +105,11 @@ During:
   unlocks at once, with or without a connection, and the unlock is recorded, with an
   optional reason (bathroom, nurse, other). It shows on the grid. A student who unlocked
   can go back into focus from the app, or by tapping the block again.
-- If you need more time, extend the session before its bell. After the bell it can't be
-  extended: start a new session.
+- **For a class longer than 25 minutes:** when the session's bell comes, every phone
+  lets go. Press Start again for a new 25-minute session, and the students tap the block
+  again (a tap made before that Start waits for it). The portal has no "add time" yet
+  (the API's extend isn't on any screen), and a session can't be extended after its bell
+  anyway.
 
 At the end:
 
@@ -118,8 +130,9 @@ At the end:
   subdomain such as `mc.vanderbilt.edu` is refused unless added to the Pre sign-up
   Lambda's list, `docs/RUNBOOKS.md`, runbook 2, step 4), and they must enter the code
   Cognito emails them.
-- **A student can't join:** the join code may have been regenerated; read it again from
-  the class page.
+- **A student can't join:** check the code they typed against the class page (it has no
+  `0`, `O`, `1`, `I` or `L`), and that they're signed in with their `@vanderbilt.edu`
+  account. A join needs a connection.
 - **The scan says it isn't a Bali block:** the tag holds something else, or the code on
   it isn't the one registered; rewrite it (step 6).
 - **The API is down:** taps still lock phones at once and are kept on the phone, sent when

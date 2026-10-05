@@ -44,7 +44,7 @@ uses values the one before it produced:
 
 **Prod's data so far:** the school "Vanderbilt" (id `01a10a81-4ac0-7698-a1d4-fc0487865082`),
 its data agreement recorded 2026-10-05 and its year's end `2026-12-18`; the owner is a
-teacher there with the owner's block (registered 2026-10-05) and a class. The first prod TestFlight build was
+teacher there with a block and a class. 🔧 That block's first code reached the repo's history (#228): before the first class, write and register a fresh one (`docs/PILOT.md`, setup step 6). The first prod TestFlight build was
 dispatched 2026-10-05 (Actions run 37267876703).
 
 How to read them:
