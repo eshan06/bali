@@ -227,8 +227,13 @@ from `last_seen_at` (rule 2), never from the column.
 
 ### Decided later, on purpose
 
-- The retention schedule (ISSUES #5, Phase 6 C6b). A student's own deletion is decided
-  (decision 3's amendment), and so is a school's written request to dispose of its data
+- The retention schedule (ISSUES #5) is decided (C6b, 2026-10-05): each school's year end
+  is a day the owner records; after it, the owner's retention run de-identifies, as an
+  account deletion does, everyone whose records all lie on or before it (anyone with a later
+  record, at another school, or a teacher with a live class or block is kept named), logged
+  as a `retention_applied` event of counts; lessons and their history stay. A student's own
+  deletion is decided (decision 3's amendment), and so is a school's written request to
+  dispose of its data
   (C6a, 2026-10-04): every person of the school de-identified as an account deletion leaves
   one, its classes, blocks, open invites and pre-bell taps removed, the school marked
   removed, and a `school_disposed` event of counts naming no one; its lessons and their

@@ -193,6 +193,29 @@ project for the API (its DSN).
       as counts); and the day the last backup holding its data expires. If the agreement
       requires that de-identified records go too, stop before disposing and raise it: this
       command keeps them.
+12. **A school year's retention run (C6b).** The owner's ruling: named records are kept
+    through the school year, then de-identified; the counts stay. It never runs by itself:
+    you run it, so the hold of step 10 stays yours.
+    - **Record the year's end when the school is added,** and again each year: ask the
+      school for the last day of its year (for the Vanderbilt pilot, the semester's last
+      day), then in the API service's shell (step 9):
+      `npm run school -- year-end <school-id> YYYY-MM-DD`. `npm run school -- list` shows
+      it under "year ends". Put the run in your calendar for the week after that day.
+    - **On the calendar day, check no parent's inspection request is open** for a student
+      of the school (step 10).
+    - **Preview it** in the same shell: `npm run school -- retention <school-id>`. It prints
+      how many students, teachers, enrollments and pre-bell taps would go, and the ids of
+      the accounts it keeps named: anyone with a record after the year's last day, at
+      another school, or a teacher with a live class or block. "no year end on record" or
+      "isn't over until" means nothing was written: record the day, or wait.
+    - **Run it,** pasting the preview's last line,
+      `npm run school -- retention <school-id> --confirm '<name>'`. It prints one line of
+      counts with no name: keep it with the school's records. A second run says it ran
+      already, with the same counts.
+    - **Next year:** record the new last day with `year-end`; whoever was kept named this
+      time is judged again against it. The Cognito sign-ins stay (a de-identified student
+      who signs in again starts a fresh, empty account); Railway's backups age out on their
+      schedule (step 4).
 
 ---
 
