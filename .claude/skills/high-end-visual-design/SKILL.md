@@ -1,6 +1,6 @@
 ---
 name: high-end-visual-design
-description: 'Bali style option, for comparison on a design canvas only; user-facing UI. Teaches the AI to design like a high-end agency. Defines the exact fonts, spacing, shadows, card structures, and animations that make a website feel expensive. Blocks all the common defaults that make AI designs look cheap or generic.'
+description: 'Bali: the style, Soft premium (the owner pick, 2026-10-04); user-facing UI only, applied under docs/DESIGN.md alongside design-taste-frontend. DESIGN.md wins where they disagree, and its fonts and palette never override the tokens. Teaches the AI to design like a high-end agency. Defines the exact fonts, spacing, shadows, card structures, and animations that make a website feel expensive. Blocks all the common defaults that make AI designs look cheap or generic.'
 ---
 
 > **Bali, read this first.** Copied from Leonxlnx/taste-skill@ce26fc25c0e5e8cab638f883de62d9a86ee5e45b, `skills/soft-skill/SKILL.md` (MIT, `LICENSE` beside this file). Only this block and the `description` line differ from upstream.
@@ -9,7 +9,7 @@ description: 'Bali style option, for comparison on a design canvas only; user-fa
 > - **`docs/DESIGN.md` wins.** Bali's tokens, type, motion budget, state colours and voice hold wherever this skill says otherwise; changing DESIGN.md is the owner's call, made on a design canvas.
 > - **Never restyle an approved screen on this skill's say-so.** A redesign is a planned design step with the owner's sign-off (`docs/PLAN.md`).
 > - **CLAUDE.md still rules:** no new dependency (animation library, font, icon set, component kit) without a plan step that names it; every error path says something honest with a way to retry; tests and every CI gate as always.
-> - **A style option, for comparison only.** One of three styles kept so the owner can compare them on a design canvas and pick one (`docs/DESIGN.md`, Design tooling). Until the pick is written into DESIGN.md, use it only when a task asks to explore this style (a canvas or mock-up), never in a PR that ships product UI. The two not picked are deleted then.
+> - **Bali's style: Soft premium, the owner's pick (2026-10-04, on D2a's canvas; `docs/DESIGN.md` §1, The style).** Applied under DESIGN.md alongside `design-taste-frontend` whenever user-facing UI is designed or built, one PR per screen group (`docs/PLAN.md`, D2). Take its shape language: the tray, the pills, the soft shadow, the spacing rhythm, the care in states and motion. Where it and DESIGN.md disagree, DESIGN.md wins, and its fonts, palette, icons and archetypes never override the tokens: no Geist or Clash Display (Instrument Sans on the web, the system font on iOS), no banned-Lucide rule (lucide is the portal's icon set), no OLED black, glass, mesh gradients or grain, no Motion or GSAP, and motion inside DESIGN.md's budget. Of its archetypes only Soft Structuralism's spirit applies, in Bali's warm stone and evergreen.
 > - **Product UI shows real data.** Its advice on invented names, "organic" numbers, stock or picsum photos and placeholder imagery is for marketing mock-ups only; never in the portal or the app.
 
 # Agent Skill: Principal UI/UX Architect & Motion Choreographer (Awwwards-Tier)
