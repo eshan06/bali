@@ -37,7 +37,10 @@ outbox beyond those strings.
 [Bali Design System](https://claude.ai/artifact/UPEBLz6nAmGXrzYnQ75qVz)
 (`docs/DECISIONS.md`, 2026-09-20). Its token export sits in the repo, byte for
 byte, at `ios/Bali/UI/bali-tokens.json`. Where this file and the tokens
-disagree on a value, the tokens win: fix this file. The style is the owner's
+disagree on a value, the tokens win: fix this file. A usage note is not a
+value: the notes on `radius-sm` ("Buttons, inputs"), `radius-md` ("Cards,
+chips") and `space-5` ("Sheet padding") predate the pick and follow it at the
+owner's next export. The style is the owner's
 pick on the
 [Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
@@ -252,7 +255,10 @@ not-joined pair.
   mark's geometry ×10. One source, `apps/web/public/icon.svg`, opaque and unrounded
   (iOS rounds it); the app's `AppIcon` and the portal's PNGs are renders of it.
 - **Every error path** says what happened and offers a way to retry, right
-  where it happened (CLAUDE.md: no silent failures).
+  where it happened (CLAUDE.md: no silent failures). Error text is a sentence
+  in `text-primary` beside its retry, never red (red is protection off and
+  destructive actions, §2): the portal's shipped `text-red-600` lines change
+  in D2c and the screen-group steps, not before.
 
 ## 5. Layout principles
 
