@@ -293,9 +293,13 @@ an archived class never reserves its code forever; a teacher can regenerate it (
 - **Sign-in limits are sized for a school.** Sign-in happens before we know who's asking,
   so it's limited by internet address — with budgets sized for a whole school behind one
   address, slowing requests down before ever blocking them (ISSUES.md #1).
-- **Under-13 consent is a flagged policy decision.** Accounts for young students carry
-  legal requirements (parental consent). It's parked next to data deletion in "decided
-  later, on purpose" — to be settled deliberately, not mid-sprint.
+- **Under 13: not yet.** Accounts for young students carry legal requirements (parental
+  consent). *Decided 2026-10-04 (C7, the owner's ruling; built 2026-10-05):* 13+ is the
+  school's agreement plus a neutral in-app age screen — the first screen on a first launch,
+  asking the birth month and year by the FTC's COPPA guidance — that keeps one flag on the
+  phone when the answer is 13 or older (never the date) and nothing at all when it is not: the
+  student sees a stop screen, and the server never learns the question was asked. Under-13
+  consent itself stays a later decision, for the K-12 pilot.
 
 ## API surface
 
@@ -792,6 +796,11 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   (ruled 2026-09-29), quick, yet no pocket touch files one, and one step under VoiceOver. Not
   (b), a watchdog turning the shields off after a force-quit: iOS's coarse wake clock makes its
   honest promise "off within ~15 minutes", not instant.
+- **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05). The
+  router shows the age screen, and the stop screen under 13 gets, only out of a running
+  session: Focus, Unlocked, Protection off and the home a standing not read keeps hold the
+  exit, so they keep their screens, and an install from before the check sees it at the next
+  launch with no session running.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own

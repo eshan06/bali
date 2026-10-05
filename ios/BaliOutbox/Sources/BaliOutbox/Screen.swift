@@ -7,6 +7,8 @@ import Foundation
 public enum Screen: Sendable, Hashable {
     /// Nothing known yet: the sign-in, the engine or the enforcer has not spoken.
     case starting
+    /// The 13+ check (C7): the question, and the stop screen an answer under 13 gets.
+    case age, tooYoung
     case intro, signIn, screenTime, join, home, waiting, focus, unlocked, protectionOff, sessionOver
     /// Home's neighbours in D1's tab bar (C6): the student's own history, and Me.
     case history, me
@@ -21,7 +23,10 @@ public enum Screen: Sendable, Hashable {
     /// The screen for what the phone knows at `now`: `problem`, why the app could not start;
     /// `deleting`, whether Me's Delete account has its own screen to show (C4b, `Deleting.shows`),
     /// before everything but a start that failed — nothing else is offered from the press to the
-    /// end; `introSeen`, the phone's own flag (C1); `signedIn`, nil until the Keychain could be read;
+    /// end; `age`, the 13+ check's answer (C7) — the question first on a first launch, before the
+    /// intro, and on an install from before it at the next launch where no session runs, the stop
+    /// screen in its place once answered under 13; `introSeen`, the phone's own flag (C1);
+    /// `signedIn`, nil until the Keychain could be read;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
@@ -43,9 +48,9 @@ public enum Screen: Sendable, Hashable {
     /// honoured — in the same answer, at the same `now`, so the screen and its bar never disagree,
     /// at a bell either (C6a's review).
     public static func choose(
-        problem: String?, deleting: Bool, introSeen: Bool, signedIn: Bool?, protection: Protection?,
-        everApproved: Bool, everInClass: Bool, sync: SyncState?, hasClasses: Bool?,
-        sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
+        problem: String?, deleting: Bool, age: AgeCheck.Answer, introSeen: Bool, signedIn: Bool?,
+        protection: Protection?, everApproved: Bool, everInClass: Bool, sync: SyncState?,
+        hasClasses: Bool?, sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
     ) -> (screen: Screen, tabbed: Bool) {
         if let problem { return (.storage(problem), false) }
         // Delete account pressed (C4b): its screen and nothing else — not Focus either, whose
@@ -61,6 +66,9 @@ public enum Screen: Sendable, Hashable {
         // Where the phone stood not read, the last run's shields kept on (B6b): home, which holds
         // Emergency Unlock there, before the intro and the sign-in too.
         if sync?.standing == .unread, protection?.shielded == true { return (.home, false) }
+        if let gate = ageGate(age, introSeen: introSeen, sync: sync, now: now) {
+            return (gate, false)
+        }
         if !introSeen { return (.intro, false) }
         guard let signedIn, let protection, protection.checked, let sync else {
             return (.starting, false)
@@ -83,6 +91,26 @@ public enum Screen: Sendable, Hashable {
             }
         }
         return tabbed ? (tab == .history || tab == .me ? tab : .home, true) : (shown, false)
+    }
+
+    /// The 13+ check's screen (C7), while it has not passed: the question — or the stop screen,
+    /// once answered under 13 this run. First on a first launch, before the intro, with nothing
+    /// known yet; on an install from before the check, the intro seen, only once the engine says
+    /// where the phone stands, and never over a running session — Focus, Unlocked and Protection
+    /// off keep their screens, and so does the home a standing not read keeps, since each holds
+    /// Emergency Unlock: the check waits for the next launch where no session runs. Nil once
+    /// passed, or while a session runs.
+    private static func ageGate(
+        _ age: AgeCheck.Answer, introSeen: Bool, sync: SyncState?, now: Date
+    ) -> Screen? {
+        guard age != .passed else { return nil }
+        let screen: Screen = age == .tooYoung ? .tooYoung : .age
+        guard let sync else { return introSeen ? .starting : screen }
+        switch sync.standing {
+        case .inSession(let session, _) where session.endsAt > now: return nil
+        case .unread: return nil
+        case .inSession, .waiting, .out: return screen
+        }
     }
 
     /// The screen of where the phone stands, signed in and its permission checked: `joinFirst`,

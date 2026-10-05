@@ -8,7 +8,8 @@
     /// renders that fixture in place of the live phone (`BaliApp`), frozen — nothing signs in,
     /// syncs or shields, and its Try again does nothing. Debug builds only.
     enum PreviewFixtures {
-        /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
+        /// What `Phone` publishes, as a fixture has it: the 13+ check passed with nothing picked on
+        /// its screen (C7), signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
         /// edited, no sign-out failed, no class being left, no account being deleted, no reason
@@ -16,6 +17,8 @@
         /// (#143), unless said otherwise.
         struct State {
             var problem: String?
+            var age = AgeCheck.Answer.passed
+            var birth = Birth()
             var introSeen = true
             var signedIn: Bool? = true
             var protection: Protection? = permission(.approved)
@@ -38,6 +41,13 @@
         /// Each named for the screen it shows, then a state of it (`AppTests.fixtures` pins that).
         static let all: [String: State] = [
             "starting": State(signedIn: nil, protection: nil, sync: nil),
+            // The 13+ check (C7) at a first launch, nothing known yet: the question, nothing
+            // picked; both picked, Continue ready; and the stop screen an answer under 13 gets.
+            "age": State(age: .unanswered, introSeen: false, signedIn: nil, protection: nil, sync: nil),
+            "agePicked": State(
+                age: .unanswered, birth: Birth(month: 3, year: 2009), introSeen: false,
+                signedIn: nil, protection: nil, sync: nil),
+            "tooYoung": State(age: .tooYoung, introSeen: false, signedIn: nil, protection: nil, sync: nil),
             "intro": State(introSeen: false),
             "signIn": State(signedIn: false),
             "screenTime": State(protection: permission(.notDetermined)),
