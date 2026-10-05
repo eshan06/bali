@@ -8,6 +8,16 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **The push guard reads the exported build, not the archive (N2).** A
+  TestFlight or App Store build signed with `aps-environment` = `development` gets no pushes
+  and says nothing. The archive can't show it: automatic signing archives with the development
+  profile, and only the export re-signs with the distribution profile, which sets the value
+  (a `production` value in the file would not match the development profile at archive time).
+  So testflight.yml exports a copy with `destination: export`, the same options the upload
+  uses, and fails unless its signed `aps-environment` is `production`; an app without the key
+  passes. The cost is a second export (a re-sign, about a minute). The app keeps one
+  entitlements file with `development`, which ios.yml's NFC check already reads.
+
 - **2026-10-06** — **A "class started" push: a visible doorbell for waiting students.** The
   owner's decision with the Mac session. A student whose armed tap waits for the Start found
   it only at the phone's next 30 s read or return to the front (PLAN's open product decision
