@@ -10,10 +10,12 @@ import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
   armedTaps,
+  blocks,
   classes,
   enrollments,
   events,
   schools,
+  sessions,
   teacherInvites,
   users,
 } from '../src/schema.js';
@@ -388,6 +390,84 @@ describe('applyRetention (C6b)', () => {
     for (const kept of [s.rivera, s.cara]) {
       expect((await userRow(kept.id)).removedAt).toBeNull();
     }
+  });
+
+  it('keeps each person whose one record after the year is an event, a block, their class’s lesson or a tap on them', async () => {
+    const [school] = await db
+      .insert(schools)
+      .values({ name: 'Keeps High', schoolYearEndsOn: localDay(1) })
+      .returning();
+    if (!school) throw new Error('seed');
+    const old = fromNow(-30 * DAY);
+    const after = fromNow(2 * DAY + 12 * 60 * MIN);
+    const [teacher, blocker, lessoned, tapped, student] = await db
+      .insert(users)
+      .values([
+        { cognitoId: 'keeps-t', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-block', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-lesson', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-tapped', role: 'teacher', schoolId: school.id, createdAt: old },
+        { cognitoId: 'keeps-s', role: 'student', displayName: 'Keeps S', createdAt: old },
+      ])
+      .returning();
+    if (!teacher || !blocker || !lessoned || !tapped || !student) throw new Error('seed');
+    const [live, gone] = await db
+      .insert(classes)
+      .values([
+        { teacherId: teacher.id, schoolId: school.id, name: 'Live', joinCode: 'KEEP-1' },
+        {
+          teacherId: lessoned.id,
+          schoolId: school.id,
+          name: 'Gone',
+          joinCode: 'KEEP-2',
+          removedAt: after,
+          createdAt: old,
+        },
+      ])
+      .returning();
+    if (!live || !gone) throw new Error('seed');
+    await db
+      .insert(enrollments)
+      .values({ classId: live.id, studentId: student.id, createdAt: old });
+    // The student: an event after the year, nothing else.
+    await db.insert(events).values({
+      eventId: newUuidV7(),
+      type: 'enrollment_left',
+      userId: student.id,
+      classId: gone.id,
+      occurredAt: after,
+    });
+    // A block made after the year, removed since.
+    await db
+      .insert(blocks)
+      .values({ tagId: 'keeps-tag', teacherId: blocker.id, createdAt: after, removedAt: after });
+    // A lesson of the teacher's own (removed) class, ended after the year.
+    await db
+      .insert(sessions)
+      .values({ classId: gone.id, startedAt: old, endsAt: after, endedAt: after });
+    // A tap on a teacher with no block left, made after the year.
+    await db.insert(armedTaps).values({
+      studentId: student.id,
+      teacherId: tapped.id,
+      eventId: newUuidV7(),
+      deviceTime: after,
+      expiresAt: fromNow(3 * DAY),
+      createdAt: after,
+    });
+
+    const result = await applyRetention(db, {
+      schoolId: school.id,
+      at: LATER(),
+      confirmName: school.name,
+    });
+    if (result.outcome !== 'applied') throw new Error(result.outcome);
+    expect(result.continuing).toEqual(
+      [teacher.id, blocker.id, lessoned.id, tapped.id, student.id].sort(),
+    );
+    expect(result.counts).toMatchObject({ students: 0, teachers: 0, armedTaps: 0 });
+    expect(
+      await db.select().from(armedTaps).where(eq(armedTaps.teacherId, tapped.id)),
+    ).toHaveLength(1);
   });
 
   it('keeps a teacher who came in by an invite after the year, with no class yet, or a student who joined since', async () => {

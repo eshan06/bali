@@ -3855,9 +3855,16 @@ export type DisposeSchoolResult =
   | { outcome: 'shared_accounts'; school: NamedSchool; userIds: string[] }
   | { outcome: 'unknown_school' };
 
-/** A preview's answer, carried out of the transaction it rolls back. */
-class Preview<T> extends Error {
-  constructor(readonly result: T) {
+/** A disposal preview's answer, carried out of the transaction it rolls back. */
+class DisposalPreview extends Error {
+  constructor(readonly result: DisposeSchoolResult) {
+    super('preview');
+  }
+}
+
+/** A retention preview's answer, carried out as a disposal's is: its own class, never confused. */
+class RetentionPreview extends Error {
+  constructor(readonly result: ApplyRetentionResult) {
     super('preview');
   }
 }
@@ -3888,7 +3895,7 @@ export async function disposeSchool(
   try {
     return await withDeadlockRetry(() => db.transaction((tx) => disposeOnce(tx, input)));
   } catch (err) {
-    if (err instanceof Preview) return err.result as DisposeSchoolResult;
+    if (err instanceof DisposalPreview) return err.result;
     throw err;
   }
 }
@@ -4041,7 +4048,7 @@ async function disposeOnce(tx: Database, input: DisposeSchoolInput): Promise<Dis
     throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
   }
   if (input.confirmName === undefined) {
-    throw new Preview<DisposeSchoolResult>({ outcome: 'preview', school, counts });
+    throw new DisposalPreview({ outcome: 'preview', school, counts });
   }
   return { outcome: 'disposed', school, counts };
 }
@@ -4182,7 +4189,8 @@ export const RETENTION_COVERAGE = {
     'kept, under a person de-identified; a live one makes them continuing',
   'events.user_id': "kept, under a person de-identified; a rename's names emptied (migration 0015)",
   'armed_taps.student_id': 'deleted: the taps of a person it de-identifies',
-  'armed_taps.teacher_id': 'deleted: the taps on a teacher it de-identifies',
+  'armed_taps.teacher_id':
+    'deleted: the taps on a teacher it de-identifies; one made after the year keeps them named',
   'teacher_invites.redeemed_by':
     'kept, its teacher de-identified; one redeemed after the year keeps its teacher named',
 } as const;
@@ -4272,7 +4280,7 @@ export async function applyRetention(
   try {
     return await withDeadlockRetry(() => db.transaction((tx) => retainOnce(tx, input)));
   } catch (err) {
-    if (err instanceof Preview) return err.result as ApplyRetentionResult;
+    if (err instanceof RetentionPreview) return err.result;
     throw err;
   }
 }
@@ -4362,7 +4370,10 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
     : [];
   // A class name can name its teacher; theirs are all removed (a live one keeps them named).
   if (teacherIds.length) {
-    await tx.update(classes).set({ name: '' }).where(inArray(classes.teacherId, teacherIds));
+    await tx
+      .update(classes)
+      .set({ name: '' })
+      .where(and(inArray(classes.teacherId, teacherIds), isNotNull(classes.removedAt)));
   }
   await deIdentify(tx, goneIds, input.at);
 
@@ -4397,15 +4408,15 @@ async function retainOnce(tx: Database, input: ApplyRetentionInput): Promise<App
     continuing: [...kept].sort(),
   };
   if (input.confirmName === undefined) {
-    throw new Preview<ApplyRetentionResult>({ outcome: 'preview', ...result });
+    throw new RetentionPreview({ outcome: 'preview', ...result });
   }
   return { outcome: 'applied', ...result };
 }
 
 /**
  * Those of `ids` with a record from `since` on: the account made, an event of
- * theirs, a participation in a lesson not over by then, a pre-bell tap, an
- * invite redeemed, a class joined, or, as
+ * theirs, a participation in a lesson not over by then, a pre-bell tap (theirs,
+ * or on them), an invite redeemed, a class joined, or, as
  * a teacher, a class or block still live or made since, or a lesson of a class
  * of theirs not over by then.
  */
@@ -4433,6 +4444,11 @@ async function activeSince(tx: Database, ids: string[], since: Date): Promise<st
       .selectDistinct({ id: armedTaps.studentId })
       .from(armedTaps)
       .where(and(inArray(armedTaps.studentId, ids), gte(armedTaps.createdAt, since)))),
+    // A tap on a teacher since: a student still taps their block.
+    ...(await tx
+      .selectDistinct({ id: armedTaps.teacherId })
+      .from(armedTaps)
+      .where(and(inArray(armedTaps.teacherId, ids), gte(armedTaps.createdAt, since)))),
     // A redeem and a join are records too, whatever events they wrote.
     ...(await tx
       .selectDistinct({ id: teacherInvites.redeemedBy })

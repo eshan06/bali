@@ -21,7 +21,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   account (the shared `deIdentify`: no name, `cognito_id` `deleted:<id>`, removed, a
   rename's names emptied by 0015's one rewrite). **Who stays named, reported by id:** anyone
   with a record after the day (the account made, an event, a participation in a lesson not
-  over by then, a pre-bell tap, an invite redeemed, a class joined, a class or block made), anyone with records at another school
+  over by then, a pre-bell tap of theirs or on them, an invite redeemed, a class joined, a
+  class or block made), anyone with records at another school
   (C6a's `tiedElsewhere`), and a teacher with a live class or block (C3 refuses deleting one;
   their students' class would be left to no one). Splitting a continuing account's years
   would mean rewriting `events.user_id`; not built. A continuing person is judged again at the
@@ -48,7 +49,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the counts from its `school_disposed` event; the dispose and retention switches end in a
   never-check; runbook 1 step 11 no longer says only the interactive shell runs on the
   server's clock; the Pre sign-up Lambda's messages lose their final period, as the owner's
-  deployed copy has (Cognito adds its own).
+  deployed copy has (Cognito adds its own). **#222's review, in the second PR:** a tap made
+  on a teacher after the year keeps them named (so a continuing student's waiting tap is never
+  deleted with them); the name-emptying touches removed classes only; each preview has its own
+  error class.
 
 - **2026-10-04** — **C6a: a school's data disposed of on its written request — de-identified,
   as C3 leaves an account, not destroyed.** The engine's `disposeSchool`, one transaction; the
