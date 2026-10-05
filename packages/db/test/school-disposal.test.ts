@@ -316,7 +316,8 @@ describe('disposeSchool (C6a)', () => {
     const s = await seed('c6a-again');
     await pastBell(s.lesson.id);
     const at = new Date();
-    await disposeSchool(db, { schoolId: s.school.id, at, confirmName: s.school.name });
+    const first = await disposeSchool(db, { schoolId: s.school.id, at, confirmName: s.school.name });
+    if (first.outcome !== 'disposed') throw new Error(first.outcome);
     const before = await rowsOf(s);
     const disposals = () => db.$count(events, eq(events.type, 'school_disposed'));
     const logged = await disposals();
@@ -327,6 +328,8 @@ describe('disposeSchool (C6a)', () => {
       outcome: 'already_disposed',
       school: { id: s.school.id, name: s.school.name },
       disposedAt: at,
+      // Its counts, read back from its school_disposed event.
+      counts: first.counts,
     });
     expect(await rowsOf(s)).toEqual(before);
     expect(await disposals()).toBe(logged);
@@ -566,7 +569,12 @@ describe('npm run school -- dispose', () => {
       ),
     );
     expect(await run(['dispose', s.school.id])).toEqual([
-      expect.stringMatching(/^school \S+ was disposed of already, on \S+: nothing more to do$/),
+      expect.stringMatching(
+        new RegExp(
+          `^school \\S+ was disposed of already, on \\S+: teachers 1, students 2, classes 2, ` +
+            'sessions 2, blocks 1, open invites 1, pre-bell taps 0; nothing more to do$',
+        ),
+      ),
     ]);
   });
 

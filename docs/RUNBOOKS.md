@@ -167,7 +167,7 @@ project for the API (its DSN).
     - **Open a shell in the API service** (step 9): `railway ssh --service <api service
       name>`, and run the next two commands in that shell, never from your machine with
       `railway ssh … --`: there the school's name in quotes would reach the remote shell
-      unquoted, and the clock that judges whether a lesson runs is the server's only there.
+      unquoted. (Either way the command runs in the container, on the server's clock.)
     - **Preview it:** `npm run school -- dispose <school-id>` (`npm run school -- list`
       gives the id). It prints the school's name and what would go
       (teachers, students, classes, sessions, blocks, open invites, pre-bell taps) and writes
@@ -257,7 +257,8 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    like a sign-up, so a hidden Apple email is refused.
    **Check:** on the hosted page (step 9) → **Sign up**: a `@gmail.com` address is
    refused with "PreSignUp failed with error Use your @vanderbilt.edu email address
-   to sign up." (Cognito puts its own prefix before the Lambda's message); a
+   to sign up." (Cognito puts its own prefix before the Lambda's message and its own
+   period after it, so the Lambda's message ends without one); a
    `@vanderbilt.edu` one is sent a code.
 5. **Password policy.** Pool → **Authentication** → **Sign-in** → **Password policy**
    → **Custom**: minimum length 12 or more, temporary passwords valid 7 days or less.
