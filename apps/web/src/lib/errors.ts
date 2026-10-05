@@ -1,4 +1,4 @@
-import type { ApiErrorReason } from '@bali/shared';
+import { type ApiErrorReason, MAX_SESSION_MINUTES } from '@bali/shared';
 
 import { ApiError, NetworkError } from './api-client';
 
@@ -34,6 +34,19 @@ export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try 
 /** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
 export const CANT_REGISTER = "Bali couldn't register the block just now. Try again.";
 
+/** A session length typed under Other (P10): said before a Start is sent with it. */
+export const NOT_A_SESSION_LENGTH = `A session runs 1 to ${MAX_SESSION_MINUTES} minutes. Enter a whole number of minutes.`;
+
+/** A 5xx or a timeout on an extend (P10): Try again resends it under the same id. */
+export const CANT_ADD_TIME = "Bali couldn't add the time just now. Try again.";
+
+/**
+ * A Start answered `existing` (P10): a session of the class was already running, started from
+ * another tab or a phone, so the length picked here set nothing; the bell beside the grid is its.
+ */
+export const SESSION_ALREADY_RUNNING =
+  "A session was already running, so the length you picked wasn't used. It ends at the time shown.";
+
 /**
  * The refusals a person can act on, in their words (T2): keyed on the error's `reason`, never its
  * message, which is written for a log. Each says what happened and what to do next.
@@ -53,6 +66,10 @@ const REFUSALS = new Map<string | undefined, string>(
       'This account is a student in a class. Use a separate account for teaching, and enter your code there.',
     // Any mutation: its `event_id` already names another event (rule 4). Nothing was changed.
     event_id_conflict: "That didn't go through, so nothing changed. Try again.",
+    // POST /v1/sessions/{id}/extend (P10): past the bell, or ended, no time is added (decision
+    // 12). An End in that gap ends it at its bell and shows the recap, and a Start then works.
+    session_not_running:
+      'This session is past its bell, so no time was added. End it, then start a new one.',
   } satisfies Partial<Record<ApiErrorReason, string>>),
 );
 

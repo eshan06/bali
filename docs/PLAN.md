@@ -4,9 +4,11 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-06 — N2: testflight.yml guards the exported build's `aps-environment`. Before it, the "class started" push planned (N1, docs: ARCHITECTURE's
-"Push: a doorbell for students", steps N1–N6 below). Before it, 2026-10-05: the handoff
-rewritten; the prose this file carried until then is kept word for word in
+_Last updated: 2026-10-06 — P10, the class page's session length and Extend, landed; P11, New
+join code, parked on the API's CORS (Phase 5 steps). Before it, N2: testflight.yml guards the
+exported build's `aps-environment`, and the "class started" push planned (N1, docs:
+ARCHITECTURE's "Push: a doorbell for students", steps N1–N6 below). Before it, 2026-10-05: the
+handoff rewritten; the prose this file carried until then is kept word for word in
 `docs/DECISIONS.md`, "Archive: PLAN's old Now (to 2026-10-05)"._
 
 ## Now
@@ -27,9 +29,10 @@ why, Open owner items the owner's queue.
   consoles and their status), `docs/PILOT.md` (running the pilot).
 
 **In flight.**
-- **The owner's Mac session (all UI):** D2, the redesign, on the `ui` branch; and three
-  class-page controls the pilot needs, whose APIs already exist: the session length (Start is
-  hardcoded to 25 minutes), Extend, and New join code.
+- **The owner's Mac session (all UI):** D2, the redesign, on the `ui` branch (on hold while the
+  pilot's controls land). Of the three class-page controls the pilot needs, the session length
+  at Start and Extend are built (P10, Phase 5 steps); New join code is built and parked (P11):
+  the API's CORS must allow `PATCH` first, a cloud session's one-line PR with a test.
 - **The prod TestFlight build:** uploaded. Run 37279657642 (build 4, 2026-10-05) passed
   after #236. The runs before it: 1, the key's PEM refused (the owner re-pasted the secret);
   2, the icon guard's false alarm (#235); 3, uploaded and refused by App Store Connect (the
@@ -82,6 +85,8 @@ Nothing starts until the owner says so; when resumed, backend only first.
 - **P8** 🔧 Railway's config-as-code moves from `railway.json` to `.railway/railway.ts` before 2026-12-01, when the CLI says `railway.json` stops working (it warns it is deprecated). The owner runs `railway config migrate` on their computer (it isn't run unattended), then a session's PR commits the new file, removes `railway.json`, and updates `docs/DEPLOY.md`, `docs/RUNBOOKS.md` (runbooks 1 and 5) and CODEOWNERS' list; check a dev deploy still builds from the `Dockerfile` with `npm run migrate && npm start` and `/healthz`. ⬜
 
 - **P9** The sweep's Sentry Cron monitor and the owner's alerts — ✅ `withSweepMonitor` (`apps/api/src/monitoring.ts`) wraps each minute's run in `startSweeping` in a check-in to `api-sweep` (`in_progress`, then `ok` or `error`; the schedule, a 1-minute interval with a 2-minute margin, a 5-minute max runtime and 2 failures to an issue, rides along so Sentry makes the monitor); a plain call without `SENTRY_DSN`; tested with the fake transport (`apps/api/test/monitoring.test.ts`). A failed run is still reported as an error too. `/healthz` unchanged. [`docs/RUNBOOKS.md`](RUNBOOKS.md) runbook 6: Sentry alert rules for new or returning errors, the monitor's notification, an outside uptime check on `/healthz`, and a test alert. 🔧 The owner sets them up.
+- **P10** 👀 Portal: the class page's session length and Extend, on the APIs that already existed (the owner's picks, 2026-10-06; D2 on hold, so today's Tailwind look) — ✅ `apps/web/src/app/classes/[id]/page.tsx`, the logic in `src/lib/session-controls.ts`, tested. **Session length:** presets 25, 50 and 75 minutes and Other… (any whole number from 1 to `MAX_SESSION_MINUTES`, checked by the page before a Start is sent, `NOT_A_SESSION_LENGTH` said under the field; the form is `noValidate`, so the browser's own bubble never speaks for Bali), the Start button saying the length ("Start 50-minute session"); the class's last pick remembered on that computer (`localStorage`, keyed by class id, every read and write in try/catch, the page working without it), 50 when none is. **Extend:** "+5 min" and "+10 min" beside End while a session runs, each sent under a UUIDv7 `eventId` the portal mints (`newEventId`); an answer that never came is resent under the same id by Try again, or by the same button (`extendAttemptFor`), and a new amount gets a fresh one; the bell ("Ends at 9:30 AM") shows beside the grid from the Start's answer, an extend's, or the grid's snapshots (`LiveGrid`'s new `onSession`, so a reload has it), and only ever moves later (`laterBell`: a window never shrinks). Past the bell the API refuses it (`409 session_not_running`, decision 12), said in words keyed on the reason: End it, then start a new one (an End in that gap ends it at its bell and shows the recap). Every failure said where it happened, with Try again (`CANT_REACH`, a 429's wait, `CANT_ADD_TIME`). Tests: `apps/web/src/lib/session-controls.test.ts`, `errors.test.ts`. `docs/PILOT.md`'s day-of-class checklist says how to use them. 👀 Screenshots: `~/bali-notes/class-controls/{before,after}/`.
+- **P11** 👀 Portal: a new join code — ⏸ **parked** as a draft PR on `feat/class-page-new-code` (built, tested, not mergeable yet): a "New code" button by the code (`apps/web/src/components/join-code.tsx`), a confirm step ("Make a new code? ABCDE stops working right away.", Make new code / Cancel), then the new code in its place and said (`PATCH /v1/classes/{id}`, `regenerateCode` in `src/lib/session-controls.ts`). **Why parked:** the API's CORS answers every preflight with `GET,HEAD,POST` (`@fastify/cors` 11's default `methods`; `apps/api/src/app.ts` registers it with none), so a browser is refused the `PATCH` before it is sent, on prod too: the control fails honestly ("Couldn't reach Bali") every time. Found 2026-10-06 on the rig. **Needs first, a cloud session's PR:** `methods` naming `PATCH` (and `DELETE`, for the roster's removal when it gets a screen) in that registration, with a test of the preflight; then the draft is rebased and un-drafted. Until then `docs/PILOT.md`, setup step 5, still says the code can't be changed from the portal.
 
 Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect accounts and keys; Sign in with Apple (needed only if Google sign-in stays, guideline 4.8); writing the NFC tags; iPhone checks. The student-facing steps wait for Phase 6's gate items.
 
@@ -391,7 +396,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - 🔧 Production, still open: deleting `vercel.json` (runbook 3, step 6, a session's PR); Railway 2FA (deferred by the owner); and, skipped for the pilot, threat protection and CloudTrail (runbook 2, steps 7, 2). **No prod backups for the pilot** (owner, 2026-10-05: Railway's need the Pro plan; revisit before K-12, Pro or a nightly `pg_dump` to encrypted S3), so the restore drill (runbook 4) is on hold.
 - 🔧 P8: `railway config migrate` before 2026-12-01.
 - Phase 7 (live lesson): planned; build on hold by the owner (2026-10-05) — nothing starts until the owner says so; when resumed, backend only first (no UI/app/portal changes). Say when to resume. Defaults to confirm or change (ARCHITECTURE, "Live lesson", decisions 3 and 8): the small-group guard's threshold (3 answers before the breakdown shows); whether a teacher may reveal the correct option on close (on); whether the live breakdown shows while a question is open (on) or only once it closes, the guard's known limit; the storage provider (AWS S3 in the Cognito account, the API's first AWS credential); the deck size cap (25 MB, 200 pages).
-- 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). Also for the pilot: the portal starts only 25-minute sessions and has no extend or new-join-code control (the API has both); `docs/PILOT.md` says how to work around them.
+- 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's session length and Extend are built (P10); New code is parked on the API's CORS allowing `PATCH` (P11, a cloud session's PR), and until then `docs/PILOT.md` says how to work around it.
 - 🔧 Delete dev's unused phone clients `bali-ios` and `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`) in the dev pool.
 - ✅ Before C4: the phone's Cognito app client allows the `aws.cognito.signin.user.admin` scope (Cognito's `DeleteUser` needs it) — prod (2026-10-04) and dev's `bali-ios-dev-public` (2026-10-05).
 - 🔧 S4a's Sign out: check dev's web app client lists `http://localhost:3000/login` under Allowed sign-out URLs, and add it if not (`docs/WEB.md`).
