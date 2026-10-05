@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   title: 'Bali privacy policy (draft)',
   description:
     "A draft outline of Bali's privacy policy. The final text is coming from Bali's lawyer.",
+  // Kept out of search results while it is a placeholder; the lawyer's text removes this.
+  robots: { index: false },
 };
 
 export default function PrivacyPage() {

@@ -101,9 +101,16 @@ describe('the policy pages are a marked draft outline', () => {
   });
 
   it('shows no Sign out bar, like /login and /support', () => {
-    expect(bar).toMatch(
-      /const SIGNED_OUT_PATHS = \/\^\\\/\(login\|auth\|support\|privacy\|terms\)/,
-    );
+    // The pattern as PortalBar declares it, tested on paths rather than pinned as text.
+    const source = /const SIGNED_OUT_PATHS = \/(.+)\/;/.exec(bar)?.[1];
+    expect(source).toBeDefined();
+    const signedOut = new RegExp(source ?? '');
+    for (const path of ['/privacy', '/terms', '/privacy/', '/support', '/login']) {
+      expect(signedOut.test(path), path).toBe(true);
+    }
+    for (const path of ['/', '/classes/abc', '/privacy-notice']) {
+      expect(signedOut.test(path), path).toBe(false);
+    }
   });
 
   it('no new em dash in their words', () => {
