@@ -106,8 +106,9 @@ never stored here, no screen can ever show it.
   it, once (T1b) — after which the row is never changed or deleted.
 - `questions`, `responses`, `decks`, `session_presentations` — a live lesson's questions,
   each student's answer now, the teacher's PDF decks and the slide a session shows (Phase 7;
-  "Live lesson", decision 4). Written only by the transition engine; an answer never writes
-  to `events`.
+  "Live lesson", decision 4). Written only by the transition engine, except `decks.object_deleted_at`,
+  which the API stamps after the commit once it has deleted the object (or the sweep, for a
+  leftover); an answer never writes to `events`.
 
 ### The decisions (2026-09-15)
 
@@ -854,9 +855,13 @@ nothing of a live lesson sits in the outbox ahead of an unlock (decision 5).
   sweep, a question already counts as closed (A17's rule: the server's clock decides).
 - **The small-group guard.** The per-option breakdown is shown only once at least **3**
   students have answered; before that a teacher sees "N answered" only, open or closed. The
-  teacher sees "N of M answered" — M the students enrolled in the class now, N those of them
-  with an answer, so N never exceeds M — and never which students answered or didn't. No
-  answer's time is exposed.
+  teacher sees "N of M answered", and never which students answered or didn't. **One
+  population for N, the per-option counts and the guard:** everyone with a response to this
+  question, counted from `responses`. An answer stays counted when its student leaves or is
+  removed mid-session, as A9 keeps such a student on the grid, so the bars always total N and
+  a breakdown once shown never vanishes because of a removal. M is the union of the students
+  enrolled in the class now, the session's participants (a removed one included) and everyone
+  counted in N, so N never exceeds M. No answer's time is exposed.
 - **No leaderboards, no grading, no per-student participation** in any report, recap or
   export a teacher reads. Totals-only governs what Bali shows. **Its known limit:** a teacher
   watching the live counts change while watching one student answer in the room can
@@ -918,8 +923,12 @@ every new key to `users` or `schools` is placed, so the PR that adds a key place
   two leaves no object behind for long. A disposal or retention preview, rolled back, never
   touches storage.
 
-**5. Writers.** Questions, responses and presentation state are written only by the
-transition engine (`packages/db/src/transitions.ts`), each mutation in one transaction with
+**5. Writers.** Questions, responses, decks and presentation state are written only by the
+transition engine (`packages/db/src/transitions.ts`), with one named exception:
+`decks.object_deleted_at`, stamped outside any engine transaction by the API after the commit
+that removed or rejected the deck, once the stored object is deleted, or by the sweep for a
+leftover (decision 4) — it records a fact about storage, never a state change, and no other
+field of `decks` is written outside the engine. Each mutation runs in one transaction with
 a client-minted UUIDv7 `event_id`, idempotent on it: a replay writes nothing and answers the
 current truth. Locks are taken session row first, then question row, then deck row, in
 every transition: an open takes the session row FOR UPDATE, so two opens run one at a time
@@ -964,7 +973,8 @@ Teacher (the class's own teacher only; another teacher and a student `403`):
   option when asked and one exists. A replay, or a close of a question already closed,
   answers the question now and changes nothing, recording nothing (its `eventId` is kept only
   when its `question_closed` event is written).
-- `GET /v1/questions/{id}/results` — the aggregate: `answered` (N), `enrolled` (M), whether
+- `GET /v1/questions/{id}/results` — the aggregate over decision 3's one population:
+  `answered` (N), `eligible` (M), whether
   it is open, the correct option and whether it is revealed, and `counts` per option — null
   until at least 3 have answered (the guard is the server's, never only the portal's).
   ETag and `304`.
@@ -988,7 +998,10 @@ Student (enrolled in the session's class now; anyone else `403`, an unknown id `
 - `POST /v1/questions/{id}/answers` — `{ eventId, option }`, answered with the caller's
   answer now. `400 invalid_option` for an index the question lacks; `409 question_closed`
   past its close or the bell; a replay (or an older answer, decision 4) answers the answer
-  now. An `event_id` another student's response holds is `409 event_id_conflict`.
+  now. An `eventId` already spent elsewhere is `409 event_id_conflict`, nothing recorded,
+  as for every other mutation (tap step 9): one another student's response holds, or one
+  already in `events` under anyone, the caller included (their own tap or unlock) — the
+  answers route checks `events` too, though an answer writes none.
 
 Slice 2, teacher:
 - `POST /v1/decks` — `{ eventId, title, bytes, sha256 }`: a `pending` deck and a presigned

@@ -10,7 +10,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-10-05** — **Phase 7, Live lesson, planned** (L0; ARCHITECTURE's "Live lesson (Phase
   7)" is the design, PLAN's "Phase 7 steps" the build; ARCHITECTURE amended because the owner
-  asked for the phase to be written into it before building; the PR awaits the owner's approval). During a running
+  asked for the phase to be written into it before building. The PR awaits the owner's
+  approval: the owner's explicit one-off request for this phase plan, 2026-10-05, not a change to
+  CLAUDE.md's loop, whose plans still run without an approval gate). During a running
   session the teacher asks a question (Slice 1, single choice) and presents PDF slides (Slice
   2); students see both on Bali's own screen, which works shielded, unlocked or with no Screen
   Time access, and never covers or delays Emergency Unlock. **The owner's rulings:** results
@@ -27,7 +29,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   seconds, not a resync. **Defaults recorded (the owner may change them):** one open
   question per session, a new one closing the last and the session's end closing it; a
   **small-group guard** — the per-option breakdown only once 3 have answered, "N answered"
-  before, so a class of two can't be read off a bar chart; a correct option revealed on
+  before, so a class of two can't be read off a bar chart, over one population (everyone with a
+  response, still counted if removed mid-session, as A9 keeps them on the grid); a correct option revealed on
   close if the teacher asks; no leaderboards, grading or per-student participation; **no
   outbox for answers** — unlike an unlock an answer is not a must-never-lose record, and one
   landing after the close would be refused anyway, so it is one request with an honest retry
