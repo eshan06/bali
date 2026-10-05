@@ -29,17 +29,17 @@ struct DeletingView: View {
                     Spacer()
                     VStack(spacing: 4) {
                         switch deleting {
-                        case .stopped(_, retries: true), .pending:
+                        case .stopped(_, _, retries: true), .pending:
                             Button("Try again") { Task { await phone.deleteAccount() } }
                                 .buttonStyle(PrimaryButtonStyle())
-                        case .stopped(_, retries: false):
+                        case .stopped(_, _, retries: false):
                             Button("Back") { phone.deleting.close() }
                                 .buttonStyle(PrimaryButtonStyle())
                         case .done:
                             Button("OK") { phone.deleting.close() }.buttonStyle(PrimaryButtonStyle())
                         case .none, .asking, .busy: EmptyView()
                         }
-                        if case .stopped(_, retries: true) = deleting {
+                        if case .stopped(_, _, retries: true) = deleting {
                             Button("Back") { phone.deleting.close() }
                                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                                 .foregroundStyle(Theme.textSecondary)
@@ -47,6 +47,14 @@ struct DeletingView: View {
                         }
                     }
                 }
+            }
+        }
+        // The words change in place as the deletion stops or ends, with nothing to press until
+        // then: said to VoiceOver as they come, as Leave's and the name's failures are (rule 5;
+        // santa's round 1).
+        .onChange(of: deleting) { _, now in
+            if let said = now.said {
+                AccessibilityNotification.Announcement("\(said.title). \(said.body)").post()
             }
         }
     }

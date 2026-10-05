@@ -213,7 +213,7 @@ struct DeletingTests {
             var stopped = Deleting.busy
             stopped.answered(answer)
             #expect(stopped.shows, "\(answer)")
-            guard case .stopped(_, let again) = stopped else {
+            guard case .stopped(_, _, let again) = stopped else {
                 Issue.record("\(answer) did not stop")
                 continue
             }
@@ -264,6 +264,7 @@ struct DeletingTests {
             return deleting.said
         }
         let notDeleted = "Your account isn't deleted"
+        #expect(Deleting.notDeleted == notDeleted)
         #expect(said(.signInFirst)?.title == notDeleted)
         #expect(said(.signInFirst)?.body.hasPrefix("Your sign-in is from an older version of Bali") == true)
         #expect(
@@ -273,6 +274,13 @@ struct DeletingTests {
         #expect(said(.unlockUnsent)?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher yet.") == true)
         #expect(said(.unread)?.body.hasSuffix("Try again in a moment.") == true)
         #expect(said(.teacherHasClasses)?.body.contains("through your school") == true)
+        #expect(said(.unread)?.title == notDeleted && said(.teacherHasClasses)?.title == notDeleted)
+        // The deletion's own answer lost may have landed (C4a): its title claims neither way.
+        for result in [SendResult.networkError, .status(500), .status(429)] {
+            #expect(said(.notDeleted(result))?.title == Deleting.notFinished, "\(result)")
+            #expect(said(.notDeleted(result))?.title != notDeleted, "\(result)")
+        }
+        #expect(Deleting.notFinished == "Bali couldn't finish deleting your account")
         #expect(said(.notDeleted(.networkError))?.body == Joining.words(.networkError, nil))
         #expect(said(.notDeleted(.status(500)))?.body == Joining.words(.status(500), nil))
         #expect(said(.notDeleted(.status(429)))?.body == Joining.words(.status(429), nil))

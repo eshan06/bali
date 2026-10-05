@@ -39,9 +39,9 @@ public enum Deleting: Sendable, Hashable {
     case asking
     /// The deletion under way: its screen, with nothing to press until the answer comes.
     case busy
-    /// Stopped with nothing deleted: why, said on its screen, with Try again where another try can
-    /// help, and Back.
-    case stopped(String, retries: Bool)
+    /// Stopped with nothing deleted that the phone knows of: the title and why, said on its screen,
+    /// with Try again where another try can help, and Back.
+    case stopped(title: String, why: String, retries: Bool)
     /// The account deleted, its sign-in not yet (`signInNotDeleted`, or `SignIn.deletionPending`
     /// at a relaunch): its screen, with Try again alone, until the sign-in is deleted too.
     case pending
@@ -71,10 +71,10 @@ public enum Deleting: Sendable, Hashable {
     /// asked, one under way already.
     public mutating func start() -> Bool {
         switch self {
-        case .asking, .stopped(_, retries: true), .pending:
+        case .asking, .stopped(_, _, retries: true), .pending:
             self = .busy
             return true
-        case .none, .busy, .stopped(_, retries: false), .done: return false
+        case .none, .busy, .stopped(_, _, retries: false), .done: return false
         }
     }
 
@@ -84,11 +84,17 @@ public enum Deleting: Sendable, Hashable {
         switch answer {
         case .deleted: self = .done
         case .signInNotDeleted: self = .pending
-        case .signInFirst: self = .stopped(Self.signInFirst, retries: false)
-        case .teacherHasClasses: self = .stopped(Self.teacherHasClasses, retries: false)
-        case .unlockUnsent: self = .stopped(Self.unlockUnsent, retries: true)
-        case .unread: self = .stopped(Self.unread, retries: true)
-        case .notDeleted(let result): self = .stopped(Joining.words(result, nil), retries: true)
+        case .signInFirst:
+            self = .stopped(title: Self.notDeleted, why: Self.signInFirst, retries: false)
+        case .teacherHasClasses:
+            self = .stopped(title: Self.notDeleted, why: Self.teacherHasClasses, retries: false)
+        case .unlockUnsent:
+            self = .stopped(title: Self.notDeleted, why: Self.unlockUnsent, retries: true)
+        case .unread: self = .stopped(title: Self.notDeleted, why: Self.unread, retries: true)
+        // Nothing deleted that the phone knows of: a deletion whose answer was lost may have landed
+        // (C4a), so the title claims neither, and Try again settles it.
+        case .notDeleted(let result):
+            self = .stopped(title: Self.notFinished, why: Joining.words(result, nil), retries: true)
         }
     }
 
@@ -120,7 +126,7 @@ public enum Deleting: Sendable, Hashable {
                 "Deleting your account…",
                 "Bali deletes your account first, then your sign-in. This takes a moment."
             )
-        case .stopped(let why, _): ("Your account isn't deleted", why)
+        case .stopped(let title, let why, _): (title, why)
         case .pending:
             (
                 "Your account is deleted",
@@ -138,6 +144,12 @@ public enum Deleting: Sendable, Hashable {
     public static let question = "Delete your account?"
     public static let consequence =
         "Bali deletes your account, your name and your sign-in. This can't be undone. Lessons you were in still count in your teachers' reports, with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."
+
+    /// The title of a stop before anything was sent: nothing deleted, for certain.
+    public static let notDeleted = "Your account isn't deleted"
+    /// The title of a stop at the deletion's own answer, or none: a deletion whose answer was lost
+    /// may have landed (C4a), so this claims neither.
+    public static let notFinished = "Bali couldn't finish deleting your account"
 
     /// The sign-in was made before the phone asked for the scope Cognito's DeleteUser needs: a
     /// fresh one first. Nothing sent, nothing deleted.

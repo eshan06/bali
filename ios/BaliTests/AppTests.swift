@@ -330,7 +330,9 @@ struct AppTests {
         #expect(asking.deleting == .none && asking.shown == (.me, true))
         asking.deleting.ask()
         await asking.deleteAccount()
-        #expect(asking.deleting == .stopped(Joining.notStarted, retries: true))
+        #expect(
+            asking.deleting
+                == .stopped(title: Deleting.notDeleted, why: Joining.notStarted, retries: true))
         #expect(asking.shown == (.deleting, false) && !asking.offersSignOut)
         asking.deleting.close()
         #expect(asking.deleting == .none && asking.shown == (.me, true))
@@ -339,18 +341,21 @@ struct AppTests {
         let shieldedDeleting = Phone(fixture: try #require(PreviewFixtures.all["deletingShielded"]))
         #expect(shieldedDeleting.sync?.shieldedUntil(Date()) != nil)
         #expect(shieldedDeleting.shown == (.deleting, false))
-        for (name, retries) in [
-            ("deletingSignInFirst", false), ("deletingTeacher", false), ("deletingUnlockUnsent", true),
-            ("deletingUnread", true), ("deletingNotDeleted", true),
+        for (name, retries, title) in [
+            ("deletingSignInFirst", false, Deleting.notDeleted),
+            ("deletingTeacher", false, Deleting.notDeleted),
+            ("deletingUnlockUnsent", true, Deleting.notDeleted),
+            ("deletingUnread", true, Deleting.notDeleted),
+            ("deletingNotDeleted", true, Deleting.notFinished),
         ] {
             let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
             #expect(phone.shown == (.deleting, false), "\(name)")
-            guard case .stopped(let why, let again) = phone.deleting else {
+            guard case .stopped(let said, let why, let again) = phone.deleting else {
                 Issue.record("\(name) is not a stop")
                 continue
             }
-            #expect(again == retries && !why.isEmpty, "\(name)")
-            #expect(phone.deleting.said?.title == "Your account isn't deleted", "\(name)")
+            #expect(again == retries && !why.isEmpty && said == title, "\(name)")
+            #expect(phone.deleting.said?.title == title, "\(name)")
             phone.deleting.close()
             #expect(phone.deleting == .none && phone.shown.screen != .deleting, "\(name)")
         }
@@ -835,7 +840,7 @@ struct AppTests {
         "Delete account through the phone's own sign-in and engine (C4b): confirmed, the deletion's screen shows and nothing else until the answer; Cognito's DeleteUser answering nothing leaves the account deleted and the sign-in waiting, said with Try again alone — and a relaunch over the same Keychain lands on that screen at once, before any press; Try again finishes it, the sign-in gone, the done screen holding over Sign in until OK",
         .timeLimit(.minutes(3)))
     func deleteAccountWiring() async throws {
-        let server = Deleter(deleteUser: [nil, 200])
+        let server = Deleter(deleteUser: [nil, 200], holdsDeletion: true)
         let keychain = Keychain(account: "ana", scoped: true)
         let (phone, engine) = try standIn(server, keychain: keychain)
         let signIn = try #require(phone.signIn)
@@ -847,9 +852,12 @@ struct AppTests {
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
         phone.deleting.ask()
         #expect(phone.shown.screen != .deleting)
+        // The stand-in holds DELETE /v1/me until the test lets it go, so the deletion under way is
+        // seen for certain (santa's round 1: a deletion answered at once was busy for a millisecond).
         let deleting = Task { await phone.deleteAccount() }
-        try await until { phone.deleting == .busy }
-        #expect(phone.shown == (.deleting, false))
+        try await until { await server.holding }
+        #expect(phone.deleting == .busy && phone.shown == (.deleting, false))
+        await server.letGo()
         await deleting.value
         #expect(phone.deleting == .pending && phone.shown == (.deleting, false))
         #expect(await signIn.deletionPending() && !keychain.empty)
@@ -1965,14 +1973,28 @@ private actor Reasons: HTTPTransport {
 }
 
 /// The API and Cognito as a stand-in answers Delete account (C4b): `GET /v1/me` with a student in
-/// no class, `DELETE /v1/me` with `deleted`, and Cognito's DeleteUser from `deleteUser` in turn —
-/// a status, or nil for no answer at all — counting each; anything else gets no answer.
+/// no class, `DELETE /v1/me` with `deleted` — held, where `holdsDeletion`, until the test lets it go
+/// — and Cognito's DeleteUser from `deleteUser` in turn — a status, or nil for no answer at all —
+/// counting each; anything else gets no answer.
 private actor Deleter: HTTPTransport {
     private var deleteUser: [Int?]
+    private let holdsDeletion: Bool
+    private var held: CheckedContinuation<Void, Never>?
     private(set) var deletions = 0
     private(set) var deleteUsers = 0
 
-    init(deleteUser: [Int?]) { self.deleteUser = deleteUser }
+    init(deleteUser: [Int?], holdsDeletion: Bool = false) {
+        (self.deleteUser, self.holdsDeletion) = (deleteUser, holdsDeletion)
+    }
+
+    /// Whether a `DELETE /v1/me` waits for `letGo`.
+    var holding: Bool { held != nil }
+
+    /// The deletion held, answered now.
+    func letGo() {
+        held?.resume()
+        held = nil
+    }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw URLError(.badURL) }
@@ -1982,6 +2004,7 @@ private actor Deleter: HTTPTransport {
             body = #"{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":[],"session":null}"#
         case ("DELETE", _, "/v1/me"):
             deletions += 1
+            if holdsDeletion { await withCheckedContinuation { held = $0 } }
             body = #"{"outcome":"deleted"}"#
         case ("POST", "cognito-idp.us-east-1.amazonaws.com"?, "/"):
             deleteUsers += 1

@@ -393,7 +393,8 @@ final class Phone {
     func deleteAccount() async {
         guard deleting.start() else { return }
         guard let engine, let signIn else {
-            return deleting = .stopped(Joining.notStarted, retries: true)
+            return deleting = .stopped(
+                title: Deleting.notDeleted, why: Joining.notStarted, retries: true)
         }
         deleting.answered(await engine.deleteAccount(signIn))
     }
