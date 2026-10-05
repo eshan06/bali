@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock } from '../src/management.js';
 import { findOrCreateStudent } from '../src/queries.js';
+import { parseSchoolCommand } from '../src/school-command.js';
 import * as schema from '../src/schema.js';
 import {
   armedTaps,
@@ -52,6 +53,11 @@ afterAll(async () => {
 
 const MIN = 60_000;
 const fromNow = (ms: number) => new Date(Date.now() + ms);
+
+function must<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('missing');
+  return value;
+}
 
 function one<T>(rows: T[]): T {
   const row = rows[0];
@@ -526,5 +532,64 @@ describe('after a disposal', () => {
     const theirs = await seed('c6a-after-other');
     const again = await createBlock(db, { teacherId: theirs.teacher.id, tagId: 'tag-c6a-after' });
     expect(again).toMatchObject({ outcome: 'registered', block: { teacherId: theirs.teacher.id } });
+  });
+});
+
+describe('npm run school -- dispose', () => {
+  it('previews, then disposes once confirmed by name, and logs no name', async () => {
+    const s = await seed('c6a-command');
+    await pastBell(s.lesson.id);
+    const run = async (argv: string[]) => {
+      const lines: string[] = [];
+      await must(parseSchoolCommand(argv) ?? undefined)({ db, print: (l) => lines.push(l) });
+      return lines;
+    };
+
+    const preview = await run(['dispose', s.school.id]);
+    expect(preview[0]).toContain(`"${s.school.name}"`);
+    expect(preview.join('\n')).toContain('Nothing was written');
+    expect(preview.at(-1)).toBe(
+      `To go ahead: npm run school -- dispose ${s.school.id} --confirm "${s.school.name}"`,
+    );
+    expect(one(await db.select().from(schools).where(eq(schools.id, s.school.id))).removedAt).toBe(
+      null,
+    );
+
+    const done = await run(['dispose', s.school.id, '--confirm', s.school.name]);
+    expect(done).toHaveLength(1);
+    expect(done[0]).toMatch(
+      new RegExp(
+        `^disposed of school ${s.school.id} on \\S+: teachers 1, students 2, classes 2, ` +
+          'sessions 2, blocks 1, open invites 1, pre-bell taps 0$',
+      ),
+    );
+    expect(await run(['dispose', s.school.id])).toEqual([
+      expect.stringMatching(/^school \S+ was disposed of already, on \S+: nothing more to do$/),
+    ]);
+  });
+
+  it('says why it refuses, and checks its arguments before connecting', async () => {
+    const s = await seed('c6a-refuse');
+    const fail = (argv: string[]) =>
+      must(parseSchoolCommand(argv) ?? undefined)({ db, print: () => undefined });
+    await expect(fail(['dispose', s.school.id, '--confirm', 'Nope'])).rejects.toThrow(
+      `is named "${s.school.name}"; nothing was written`,
+    );
+    await expect(fail(['dispose', s.school.id, '--confirm', s.school.name])).rejects.toThrow(
+      '1 lesson(s) running; nothing was written',
+    );
+    const stranger = newUuidV7();
+    await expect(fail(['dispose', stranger])).rejects.toThrow(
+      `no school on record has the id ${stranger}`,
+    );
+    expect(() => parseSchoolCommand(['dispose'])).toThrow(/needs the school's id/);
+    expect(() => parseSchoolCommand(['dispose', 'nope'])).toThrow(/is not a school id/);
+    expect(() => parseSchoolCommand(['dispose', stranger, '--yes'])).toThrow(/--confirm "<name>"/);
+    expect(() => parseSchoolCommand(['dispose', stranger, '--confirm'])).toThrow(
+      /--confirm "<name>"/,
+    );
+    expect(() => parseSchoolCommand(['dispose', stranger, '--confirm', 'A', 'B'])).toThrow(
+      /unexpected/,
+    );
   });
 });
