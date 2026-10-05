@@ -41,6 +41,12 @@ otherwise" sharing of Family Controls data) and a FERPA / data-agreement review 
 
 ## B. Presenting and live questions (Top Hat-style)
 
+**Planned as Phase 7 (see ARCHITECTURE, Live lesson)** on 2026-10-05: the design is
+`docs/ARCHITECTURE.md`'s "Live lesson (Phase 7)" and the steps are `docs/PLAN.md`'s "Phase 7
+steps". Where this research and the architecture differ, the architecture wins; the open
+questions below were answered there (polling, any enrolled student, only within a running
+session) or recorded as defaults for the owner (storage, size cap, retention).
+
 **What Top Hat does:** PDF or PowerPoint slides presented with a projector view; students
 follow the current slide on their own device; about 11 embedded question types with a
 timer and a response count; attendance codes; participation grading; LMS sync through
