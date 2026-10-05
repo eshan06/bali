@@ -527,8 +527,8 @@ describe('after a disposal', () => {
         occurredAt: new Date(),
       }),
     ).rejects.toMatchObject({ code: 'CLASS_NOT_FOUND' });
-    expect(await mintTeacherInvite(db, { schoolId: s.school.id })).toEqual({
-      outcome: 'unknown_school',
+    expect(await mintTeacherInvite(db, { schoolId: s.school.id })).toMatchObject({
+      outcome: 'disposed',
     });
     expect(
       await redeemTeacherInvite(db, {

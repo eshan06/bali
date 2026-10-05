@@ -62,8 +62,6 @@ export async function createSchool(db: Database, input: { name: string }): Promi
   return row;
 }
 
-const liveSchool = (schoolId: string) => and(eq(schools.id, schoolId), isNull(schools.removedAt));
-
 /** The schools on record under `name`, its case set aside: what a second `add` of one says. */
 export async function schoolsNamed(db: Database, name: string): Promise<SchoolRow[]> {
   return db
@@ -128,8 +126,10 @@ export function recordAgreement(
 
 /**
  * Record the last day of the school's current year or term (C6b), as
- * `recordAgreement` records its agreement's: replaced by a second run, `before`
- * the day it replaced. The retention run reads it.
+ * `recordAgreement` records its agreement's. Its outcomes: `recorded` (a second
+ * run replaces the day, `before` the day it replaced), `unknown_school` when no
+ * school ever had the id, `disposed` (with when) for a school disposed of
+ * (C6a), which takes no day. The retention run reads it.
  */
 export function recordYearEnd(
   db: Database,
@@ -162,6 +162,7 @@ export type MintInviteResult =
   /** `code` is the only copy of the code there is: the invite holds its hash alone. */
   | { outcome: 'minted'; code: string; invite: InviteRow; school: SchoolRow }
   | { outcome: 'unknown_school' }
+  | { outcome: 'disposed'; disposedAt: Date }
   | { outcome: 'no_agreement'; school: SchoolRow };
 
 /**
@@ -174,7 +175,9 @@ export type MintInviteResult =
  *
  * The school's row is held (FOR SHARE) from the read of its agreement to the
  * invite's write, so nothing that takes an agreement back off the record or
- * removes the school — a disposal (C6a) — can come between the two.
+ * removes the school — a disposal (C6a) — can come between the two. A school
+ * disposed of mints nothing: `disposed`, with when; `unknown_school` when no
+ * school ever had the id.
  */
 export async function mintTeacherInvite(
   db: Database,
@@ -184,8 +187,13 @@ export async function mintTeacherInvite(
   gen: () => string = generateInviteCode,
 ): Promise<MintInviteResult> {
   return db.transaction(async (tx): Promise<MintInviteResult> => {
-    const [school] = await tx.select().from(schools).where(liveSchool(input.schoolId)).for('share');
+    const [school] = await tx
+      .select()
+      .from(schools)
+      .where(eq(schools.id, input.schoolId))
+      .for('share');
     if (!school) return { outcome: 'unknown_school' };
+    if (school.removedAt !== null) return { outcome: 'disposed', disposedAt: school.removedAt };
     if (school.agreementSignedAt === null) return { outcome: 'no_agreement', school };
     for (let attempt = 0; attempt < INVITE_MINT_ATTEMPTS; attempt += 1) {
       const code = gen();

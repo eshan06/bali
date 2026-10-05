@@ -187,12 +187,15 @@ describe('mintTeacherInvite', () => {
     expect(await invitesOf(school.id)).toHaveLength(0);
   });
 
-  it('refuses an unknown school, and a removed one', async () => {
+  it('refuses an unknown school, and says when a removed one was disposed of', async () => {
     expect((await mintTeacherInvite(db, { schoolId: newUuidV7() })).outcome).toBe('unknown_school');
-    // Staged by hand: nothing removes a school yet.
     const removed = await signedSchool('Closed High');
-    await db.update(schools).set({ removedAt: new Date() }).where(eq(schools.id, removed.id));
-    expect((await mintTeacherInvite(db, { schoolId: removed.id })).outcome).toBe('unknown_school');
+    const at = new Date('2026-10-04T15:00:00Z');
+    await db.update(schools).set({ removedAt: at }).where(eq(schools.id, removed.id));
+    expect(await mintTeacherInvite(db, { schoolId: removed.id })).toEqual({
+      outcome: 'disposed',
+      disposedAt: at,
+    });
     expect(await invitesOf(removed.id)).toHaveLength(0);
   });
 
@@ -473,7 +476,7 @@ describe('npm run school: running it', () => {
     );
   });
 
-  it('says a school disposed of takes no day, never that it is not on record', async () => {
+  it('says a school disposed of takes no day and no invite, never that it is not on record', async () => {
     const school = await createSchool(db, { name: 'Gone High' });
     const at = new Date('2026-10-04T15:00:00Z');
     const disposed = await disposeSchool(db, { schoolId: school.id, at, confirmName: 'Gone High' });
@@ -481,6 +484,10 @@ describe('npm run school: running it', () => {
     const said = `school ${school.id} was disposed of on ${at.toISOString()}, so it takes no day; nothing was written`;
     expect(await refusal(run('agreement', school.id, '2026-10-01'))).toBe(said);
     expect(await refusal(run('year-end', school.id, '2026-12-18'))).toBe(said);
+    expect(await refusal(run('invite', school.id))).toBe(
+      `school ${school.id} was disposed of on ${at.toISOString()}, so it takes no invite; nothing was written`,
+    );
+    expect(await invitesOf(school.id)).toHaveLength(0);
     const [row] = await db.select().from(schools).where(eq(schools.id, school.id));
     expect(row?.agreementSignedAt).toBeNull();
     expect(row?.schoolYearEndsOn).toBeNull();

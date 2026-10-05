@@ -203,15 +203,14 @@ function checkDay(day: string, now?: Date): void {
 
 const noSchool = (schoolId: string) => `no school on record has the id ${schoolId}`;
 
+const disposedOf = (schoolId: string, at: Date, takes: string) =>
+  `school ${schoolId} was disposed of on ${at.toISOString()}, so it takes ${takes}; nothing was written`;
+
 /** A day recorded, or the refusal that says why not: no such school, or one disposed of. */
 function dayRecorded(schoolId: string, result: RecordDayResult) {
   if (result.outcome === 'unknown_school') throw new Error(noSchool(schoolId));
-  if (result.outcome === 'disposed') {
-    throw new Error(
-      `school ${schoolId} was disposed of on ${result.disposedAt.toISOString()}, ` +
-        'so it takes no day; nothing was written',
-    );
-  }
+  if (result.outcome === 'disposed')
+    throw new Error(disposedOf(schoolId, result.disposedAt, 'no day'));
   return result;
 }
 
@@ -254,6 +253,9 @@ async function yearEnd({ db, print }: SchoolCommandIO, schoolId: string, day: st
 async function invite({ db, print }: SchoolCommandIO, schoolId: string): Promise<void> {
   const minted = await mintTeacherInvite(db, { schoolId });
   if (minted.outcome === 'unknown_school') throw new Error(noSchool(schoolId));
+  if (minted.outcome === 'disposed') {
+    throw new Error(disposedOf(schoolId, minted.disposedAt, 'no invite'));
+  }
   if (minted.outcome === 'no_agreement') {
     throw new Error(
       `"${minted.school.name}" has no data agreement on record, so no invite is minted for it. ` +
