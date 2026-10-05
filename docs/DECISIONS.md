@@ -8,6 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **drizzle-kit's old esbuild, overridden.** `npm audit` reported 4
+  moderate findings, one advisory (GHSA-67mh-4wv8-2f99, esbuild ≤0.24.2's dev server answering
+  any website), all down the dev-only chain drizzle-kit 0.31 → `@esbuild-kit/esm-loader` →
+  `@esbuild-kit/core-utils` → esbuild 0.18. `npm audit fix --force` would downgrade drizzle-kit
+  to 0.18, so instead the root `package.json`'s `overrides` gives `@esbuild-kit/core-utils`
+  `esbuild >=0.25.0`, which resolves to the copy already hoisted (0.28); its lockfile entries
+  for the nested 0.18 are gone. Nothing here starts esbuild's dev server and none of it ships
+  (`npm audit --omit=dev` was clean before too); the override clears the report so a real
+  finding isn't lost in it. Checked: `npm audit` reads 0, `npm run db:generate` reports no
+  schema change (CI's drift check), core-utils' `transformSync` works on the new esbuild.
+  Retire the override when drizzle-kit drops `@esbuild-kit`.
 - **2026-10-05** — **The app's NFC entitlement is `TAG` alone; each extension names itself.**
   App Store Connect refused prod TestFlight run 37273876331 (ITMS-90778: "NDEF is disallowed"
   for `com.apple.developer.nfc.readersession.formats`; ITMS-90360: no `CFBundleDisplayName` in
