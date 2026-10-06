@@ -57,9 +57,10 @@ PR.
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`) in the Soft premium shapes from D2h, pill buttons
-and chips, sunken inputs under the focus ring, and from D2i Home's hero card in
-a tray and the ring on Focus and Waiting on a raised disc; its screens take the
-style group by group, D2h–D2k. The portal draws from them too, from D2c on
+and chips, sunken inputs under the focus ring, from D2i Home's hero card in
+a tray and the ring on Focus and Waiting on a raised disc, and from D2j Me's
+name as its hero in a tray and its account in a card of its own; its screens
+take the style group by group, D2h–D2k. The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), light on `:root` and dark under the device's dark mode,
@@ -169,6 +170,7 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent · 2 min" (D2f): the whole minutes since the last check-in, in the label |
 | grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
 | app waiting (a tap before the Start, decision 5) | none | `state-notjoined-*` (D2i): no shield is on yet, so never green | clock / clock | Home's "Waiting" |
+| app Screen Time back on (#167, a moment, not a state) | none | `state-notjoined-*` (D2j): the student goes back to focus or to an unlock, so never green | shield-check / checkmark.shield | History's "Screen Time back on" |
 | grid `left_unprotected` | none | `state-emergency-*` (Q2 A) | flag, then lock-open | "Left · unlocked" |
 | grid `left_protection_off` | none | `state-revoked-*` (Q2 A) | flag, then shield-off | "Left · protection off" |
 | grid `unknown` | none | no fill (`state-nodevice-bg`), a 1 px dashed `border-strong` edge, `text-primary` ink (Q3 A) | circle-help / questionmark.circle | "Unknown · refresh": refresh is the action |
@@ -194,8 +196,13 @@ flag first and the state's icon after it. Two app chips the canvas did not
 draw get their look in their screen group's step: Home's Waiting has its own
 since D2i, the not-joined pair with a clock (a waiting phone is not in yet, so
 it takes not in's colour, and the clock and the word say the tap counted and
-the lock comes with the Start); History's "Screen Time back on" gets its look
-in D2j and stays as built, on the not-joined pair, until then.
+the lock comes with the Start); History's "Screen Time back on" has its own
+since D2j, the not-joined pair with Screen Time off's shield made whole and
+checked (`Chip.Kind.protectionOn`): it puts the student back where they stood,
+in focus or unlocked, so it is never focus's green. A sentence that tells the
+student what their teacher sees says it in its own words and quotes neither
+label (D2j): "your teacher sees that Screen Time is off", never "your teacher
+sees “Screen Time off”", which the grid never says.
 
 **Colour rules (law):**
 
@@ -272,7 +279,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
 - **Card and tray:** a card is `surface-card` with `shadow-1` at rest and, in
   dark, a `border-default` hairline instead. A group of cards sits in a tray:
   `surface-sunken` at `radius-lg` with a `space-2` inset, the cards inside at
-  `radius-md` with `space-4` padding (the grid's cells, Home's tap card). A
+  `radius-md` with `space-4` padding (the grid's cells, Home's tap card, Me's
+  name). A
   card standing alone (the recap, a sheet) is `radius-lg` with `space-6`
   padding (`space-5` on iOS), its stat tiles and wells `surface-sunken` at
   `radius-md`. Use a card only when elevation means hierarchy; otherwise group
