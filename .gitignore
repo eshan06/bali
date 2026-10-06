@@ -33,3 +33,6 @@ ios/Bali.xcodeproj/
 # graphify knowledge graph — regenerable (`graphify update .`), stays local
 graphify-out/
 __pycache__/
+
+# Railway: the old Config File paths `railway config migrate cutover` saves (runbook 8)
+.railway/.cac-migration.json
