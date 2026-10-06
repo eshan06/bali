@@ -1473,7 +1473,7 @@ struct AppTests {
             ("action-primary-bg", Theme.brand), ("action-primary-bg-hover", Theme.brandPressed),
             ("action-destructive-bg", Theme.destructive), ("red-700", Theme.destructivePressed),
             ("arc-fill", Theme.arc), ("arc-final2", Theme.arcFinal), ("arc-track", Theme.arcTrack),
-            ("green-200", Theme.markTrack), ("focus-ring-color", Theme.focusRing),
+            ("green-200", Theme.markTrack),
             ("state-focused-bg", Chip.Kind.focused.look.fill),
             ("state-focused-fg", Chip.Kind.focused.look.ink),
             ("state-emergency-bg", Chip.Kind.unlocked.look.fill),
@@ -1502,13 +1502,6 @@ struct AppTests {
         let resting = try #require((shadows["shadow-1"] as? [String: Any])?["light"] as? String)
         let rgba = shadow.bytes.map(String.init) + [String(format: "%g", shadow.opacity)]
         #expect(resting.hasSuffix("rgba(\(rgba.joined(separator: ",")))"), "\(resting): \(rgba)")
-        // shadow-2, a raised disc's (D2i): "0 2px 8px rgba(33,28,21,0.08), 0 1px 2px rgba(…,0.05)".
-        let raised = try #require((shadows["shadow-2"] as? [String: Any])?["light"] as? String)
-        for (layer, colour) in [("0 2px 8px", Theme.raised.wide), ("0 1px 2px", Theme.raised.close)] {
-            let found = drawn(colour)
-            let rgba = found.bytes.map(String.init) + [String(format: "%g", found.opacity)]
-            #expect(raised.contains("\(layer) rgba(\(rgba.joined(separator: ",")))"), "\(raised): \(rgba)")
-        }
     }
 
     @Test(
@@ -1882,10 +1875,10 @@ struct AppTests {
             .sizeThatFits(in: CGSize(width: 390, height: 1000))
         #expect(row.height >= 44, "\(row)")
         // The intro, drawn at the phone's size at its first and last pages: under Continue — the
-        // brand-filled pill, its flat bottom found from the bottom up past its round end (twice its
-        // 28-pt radius in from the gutter, D2h), clear of the centred links (santa's round 1: at
-        // the curve, the button's own last rows counted as ink) — a strip at least the row and its
-        // padding tall, with the links' ink in it on the last page alone.
+        // brand-filled button, its flat bottom found from the bottom up past its rounded corner,
+        // clear of the centred links (santa's round 1: at the corner, the button's own last rows
+        // counted as ink) — a strip at least the row and its padding tall, with the links' ink in
+        // it on the last page alone.
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         func brand(_ pixel: [Int]) -> Bool {
             zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
@@ -1903,7 +1896,7 @@ struct AppTests {
             let scale = Int(window.screen.scale)
             let width = Int(image.size.width)
             let bottom = Int(image.size.height) - Int(window.safeAreaInsets.bottom) * scale
-            let column = Int(Theme.gutter + 56) * scale
+            let column = Int(Theme.gutter + 2 * Theme.Radius.md) * scale
             var button = bottom - 1
             while button > 0, !brand(pixel(column, button)) { button -= 1 }
             let strip = (button + 1)..<bottom
@@ -1928,7 +1921,7 @@ struct AppTests {
     }
 
     @Test(
-        "Me's account (#165; D2j): whose sign-in this is, then Sign out, a button VoiceOver reads by its name and finds dimmed while an Emergency Unlock is unsent; under the policy links, which never sit beside the red Delete account (C2b); and Delete account last of all (C4b)"
+        "Me's account, in D1's look: Sign out, a button VoiceOver reads by its name and finds dimmed while an Emergency Unlock is unsent, then whose sign-in it ends (#147); under the policy links, which never sit beside the red Delete account (C2b); and Delete account last of all (C4b)"
     )
     func meAccount() throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -1944,7 +1937,7 @@ struct AppTests {
             let elements = try voiceOver(in: window)
             let labels = elements.map { $0.accessibilityLabel ?? "" }
             let order = [
-                "Terms", "You're signed in as ana.rodriguez@bali.test.", "Sign out", "Delete account",
+                "Terms", "Sign out", "You're signed in as ana.rodriguez@bali.test.", "Delete account",
             ].compactMap { labels.firstIndex(of: $0) }
             #expect(order.count == 4 && order == order.sorted(), "\(name): \(labels)")
             let signOut = try #require(elements.first { $0.accessibilityLabel == "Sign out" })

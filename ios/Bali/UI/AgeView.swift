@@ -9,7 +9,7 @@ import SwiftUI
 /// calendar the phone shows, the names in its language). Continue answers once both are picked
 /// (`Phone.answerAge(through:)`): 13 or older opens the sign-in page at once, and the check is
 /// never asked again; under 13 lands on `TooYoungView`. The rules are `AgeCheck`'s and `Birth`'s
-/// (BaliOutbox); the look is the Sign in screen's, in Soft premium (D2h).
+/// (BaliOutbox); the look is the Sign in screen's, in D1's light tokens.
 struct AgeView: View {
     let phone: Phone
     @Environment(\.webAuthenticationSession) private var browser
@@ -49,9 +49,8 @@ struct AgeView: View {
         }
     }
 
-    /// A menu drawn as DESIGN.md's input (D2h), Join's code field's sunken well at `radius-sm`:
-    /// `label` above, the pick or "Choose" inside, `items` in the menu; no focus ring, since nothing
-    /// is typed into it. VoiceOver reads the label and the pick.
+    /// A menu drawn as a field (D1's input look): `label` above, the pick or "Choose" inside,
+    /// `items` in the menu. VoiceOver reads the label and the pick.
     private func field<Items: View>(
         _ label: String, picked: String?, @ViewBuilder items: () -> Items
     ) -> some View {
@@ -68,7 +67,11 @@ struct AgeView: View {
                         .foregroundStyle(Theme.textTertiary)
                 }
                 .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 56)
-                .background(Theme.sunken, in: .rect(cornerRadius: Theme.Radius.sm))
+                .background(Theme.card, in: .rect(cornerRadius: Theme.Radius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong)
+                )
+                .shadow(color: Theme.shadow, radius: 1, y: 1)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)

@@ -48,7 +48,7 @@ struct JoinView: View {
                         .foregroundStyle(Theme.textSecondary).accessibilityHidden(true)
                     TextField("Class code", text: $text, prompt: Text(""))
                         .font(.system(.title, design: .monospaced, weight: .medium)).tracking(10)
-                        .multilineTextAlignment(.center).foregroundStyle(Theme.text).tint(Theme.brand)
+                        .multilineTextAlignment(.center).foregroundStyle(Theme.text)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
                         .keyboardType(.asciiCapable).submitLabel(.continue)
                         // Fixed while its look-up is under way; the keyboard back once it is over.
@@ -59,10 +59,13 @@ struct JoinView: View {
                             text = phone.joining.code
                         }
                         .onSubmit { if phone.joining.complete { run(phone.lookUp) } }
-                        // DESIGN.md's input (D2h): a sunken well, the focus ring while typing.
                         .frame(minHeight: 64)
-                        .background(Theme.sunken, in: .rect(cornerRadius: Theme.Radius.sm))
-                        .focusRing(typing, radius: Theme.Radius.sm)
+                        .background(Theme.card, in: .rect(cornerRadius: Theme.Radius.md))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                                .stroke(typing ? Theme.arc : Theme.borderStrong, lineWidth: 2)
+                        )
+                        .shadow(color: Theme.shadow, radius: 1, y: 1)
                     Text("Codes never use 0, O, 1, I or L, so there's nothing to mix up.")
                         .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                 }

@@ -157,8 +157,6 @@ private struct Ring: View {
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
         .padding(12).frame(width: 240, height: 240)
-        // On a raised disc (Soft premium: the B artboard's Focus, D2i), 6 pt clear of the ring.
-        .background(RaisedDisc())
         .accessibilityElement(children: .ignore)
         // Spoken as a length of time — "1 minute, 52 seconds" — never as a clock's "one fifty-two".
         .accessibilityLabel(
