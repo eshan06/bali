@@ -89,6 +89,41 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
     await app.close();
   });
 
+  // The portal's api-client sends GET, POST, PATCH and DELETE. @fastify/cors's
+  // default allows only GET,HEAD,POST, so a browser refused the PATCH behind
+  // New code (P11) before sending it. PUT (/v1/me/push-token) is iOS-only.
+  it.each(['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'])(
+    'allows a %s preflight from a listed origin (P11)',
+    async (method) => {
+      const app = buildWithCors('http://localhost:3000');
+      const res = await app.inject({
+        method: 'OPTIONS',
+        url: `/v1/classes/${randomUUID()}`,
+        headers: { origin: 'http://localhost:3000', 'access-control-request-method': method },
+      });
+      expect([200, 204]).toContain(res.statusCode);
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+      const allowed = String(res.headers['access-control-allow-methods'] ?? '')
+        .split(',')
+        .map((m) => m.trim());
+      expect(allowed).toContain(method);
+      expect(allowed).not.toContain('PUT');
+      await app.close();
+    },
+  );
+
+  it('gives a stranger origin no CORS allow headers on a PATCH preflight', async () => {
+    const app = buildWithCors('http://localhost:3000');
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: `/v1/classes/${randomUUID()}`,
+      headers: { origin: 'http://evil.example', 'access-control-request-method': 'PATCH' },
+    });
+    const acao = res.headers['access-control-allow-origin'];
+    expect(acao === undefined || acao === '').toBe(true);
+    await app.close();
+  });
+
   it('lets the portal read a 429’s Retry-After: exposed to its fetch, not only sent (L1)', async () => {
     const app = buildApp(
       { ...testEnv, CORS_ORIGINS: 'http://localhost:3000' },

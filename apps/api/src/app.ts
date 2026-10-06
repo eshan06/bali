@@ -111,8 +111,14 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
       .map((o) => o.trim())
       .filter(Boolean) ?? [];
   if (corsOrigins.length > 0) {
-    // A 429's Retry-After, readable by the portal's fetch, not only sent.
-    void app.register(cors, { origin: corsOrigins, exposedHeaders: ['retry-after'] });
+    // A 429's Retry-After, readable by the portal's fetch, not only sent. The
+    // methods are the portal's api-client's (the plugin's default, GET,HEAD,POST,
+    // refused its PATCH); PUT serves only the iOS app, which sends no Origin.
+    void app.register(cors, {
+      origin: corsOrigins,
+      methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'],
+      exposedHeaders: ['retry-after'],
+    });
   }
 
   // Every /v1 route's budget is spent in `authenticate`; /healthz and the

@@ -8,6 +8,13 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **CORS names its methods: the portal's, no more (P11).** `@fastify/cors` 11
+  defaults to `GET,HEAD,POST`, which refused the portal's `PATCH /v1/classes/{id}` at the
+  preflight. The registration in `apps/api/src/app.ts` now lists GET, HEAD, POST, PATCH,
+  DELETE: the methods `apps/web/src/lib/api-client.ts` sends. `PUT` (`/v1/me/push-token`) is
+  left out: only the iOS app calls it, and a native app sends no Origin. A portal call that
+  needs a new method adds it here with its preflight test.
+
 - **2026-10-06** — **The Start's push: fired after the commit, drained at shutdown, a gone token
   deleted only as read (N5b).** The engine only reports whom it converted
   (`convertedStudentIds`, empty on `existing`, so a replay can't send twice); the route sends,
