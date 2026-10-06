@@ -340,6 +340,9 @@ class page's minutes field types in it too, on the Field since D2f-2.
   drew it.
 - **Present never shows an unlock's reason**, because the class can see it:
   "Unlocked" alone where the teacher's view says "Unlocked · nurse" (2026-10-06).
+- **A session that ends in Present stays so** (D2g): the recap lists each unlock
+  by who and when with no reason, How it ended is the projector view, and the
+  toggle beside it leaves Present, the reasons back.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
