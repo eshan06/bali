@@ -102,7 +102,9 @@ At the start:
   readable from the back of the room; press it again to go back. It shows the same words as
   the grid but never an unlock's reason, which a student shares with you alone. If the
   session ends while you're presenting, the recap and How it ended leave the reasons out too;
-  press **Present** beside How it ended to see them.
+  press **Present** beside How it ended to see them. The page forgets Present when you reload
+  it or come back from Reports, and opens in your own view with the recap's reasons, so stop
+  projecting before either.
 
 During:
 
