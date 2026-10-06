@@ -783,7 +783,9 @@ Railway never reads `.railway/` on a deploy: nothing changes until you `apply`. 
 **deleted** or **renamed**, any variable deleted, any service but the one you're on, or a
 change to its `source`. Expected: `0 to add` and `0 to destroy`, and the changes, if any,
 only to that service's build and deploy settings. A session fixes the file in a PR; pull it
-and plan again.
+and plan again. The fix is always in the file, never in Railway: a variable the plan would
+delete gets added to `PRESERVED`, and a `source` change (its branch, or **Wait for CI**,
+`checkSuites`) gets the file matched to what the service has today.
 
 **Dev first:**
 
