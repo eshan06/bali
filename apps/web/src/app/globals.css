@@ -129,11 +129,15 @@
 
 /*
  * The tokens as Tailwind's theme, so a page writes `bg-surface-page`, `text-text-secondary`,
- * `rounded-md`, `p-4`, `text-h1`. Tailwind's own radii and shadows go: the tokens' five radii and
- * three shadows are the whole set. Its default colours and sizes stay until the screens still on
- * them are redrawn (D2f, D2g); the pages already redrawn use none of them.
+ * `rounded-md`, `p-4`, `text-h1`. Tailwind's own colours, type sizes, tracking, leading, radii and
+ * shadows go (D2g, once the last screen on them was redrawn): the tokens' are the whole set, so a
+ * default such as `text-slate-500` or `text-sm` draws nothing.
  */
 @theme {
+  --color-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+
   /* §5: the 4-point grid, px on the web: `p-4` is space-4, 16 px. */
   --spacing: 4px;
 
@@ -151,6 +155,7 @@
   --shadow-*: initial;
 
   /* §3: the type scale. `text-label` adds `uppercase`; `text-data-lg` takes `font-num`, `text-code` `font-mono`. */
+  --text-*: initial;
   --text-display: 56px;
   --text-display--line-height: 60px;
   --text-display--font-weight: 600;
@@ -249,11 +254,6 @@
   --color-arc-fill: var(--bali-arc-fill);
   --color-arc-final2: var(--bali-arc-final2);
   --color-focus-ring: var(--bali-focus-ring-color);
-
-  /* A bridge for the screens D2f and D2g redraw: their `text-slate-500` helper lines sit on the
-     stone page now, below AA; text-tertiary is the pre-solved ink for them. It recolours every
-     slate-500 utility. Goes with the last `slate-` class. */
-  --color-slate-500: var(--bali-text-tertiary);
 }
 
 /* §6: the three shadows, by name; shadow-1 is none in dark, so a card's edge is its hairline. */

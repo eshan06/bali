@@ -79,14 +79,14 @@ animation off under reduced motion, both global rules. The entry pages are in
 the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
 `/support`, the two policy pages and the invite-code screen (D2c-2); so are
 the classes home and its "Your block" (D2e), the live grid (D2f-1: its
-chips, states, `bali-softpulse`, badges and standard columns) and the class
-page with Present, its controls and its join code (D2f-2, D2f-3). All of them
-are held to the tokens' utilities by `tokens.test.ts`; the recap and reports
-keep their Tailwind classes on the new base (the page colour, the font, the
-ring, and the radii: their `rounded-lg` is now 20 px) until D2g, which also
-retires Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
-Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
-question for the owner.
+chips, states, `bali-softpulse`, badges and standard columns), the class
+page with Present, its controls and its join code (D2f-2, D2f-3), and the
+recap card and the reports page (D2g), which finished the portal. Every
+portal source file is held to the tokens' utilities by `tokens.test.ts`, and
+since D2g the theme holds none of Tailwind's own colours, type sizes,
+tracking or leading, so a default draws nothing. **A portal page uses the
+tokens' utilities and no Tailwind default** (no `slate-*`, no `text-sm`): a
+value the tokens lack is a question for the owner.
 
 ## 1. Visual theme and atmosphere
 
@@ -351,6 +351,9 @@ class page's minutes field types in it too, on the Field since D2f-2.
   drew it.
 - **Present never shows an unlock's reason**, because the class can see it:
   "Unlocked" alone where the teacher's view says "Unlocked · nurse" (2026-10-06).
+- **A session that ends in Present stays so** (D2g): the recap lists each unlock
+  by who and when with no reason, How it ended is the projector view, and the
+  toggle beside it leaves Present, the reasons back.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
@@ -440,7 +443,11 @@ a red chip.
 - **Web:** the portal is desktop-first (a teacher at a desk or on a projector)
   and must still work on a tablet. The grid reflows by column count, never by
   shrinking chips or text below the type scale. Mobile collapse is declared per
-  layout, not assumed.
+  layout, not assumed. The reports list (D2g) is a card per session in the
+  tray: one row under the column names where the session and its six figures
+  fit (the list 56 rem wide, a 1024 px window included); narrower, each figure
+  sits under its own name, three to a row and then two. Never a table that
+  scrolls sideways.
 
 ## 9. Agent prompt guide
 

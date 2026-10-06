@@ -5,6 +5,7 @@ import type {
   SessionReportSummary,
   UnlockReason,
 } from '@bali/shared';
+import { UNLOCK_REASONS } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
@@ -227,5 +228,30 @@ describe('recapView', () => {
         recapView({ ...REPORT, unlocks: [{ ...REPORT.unlocks[0], reason }] }, NY).unlocks[0].reason,
     );
     expect(reasons).toEqual(['Bathroom', 'Nurse', 'Other']);
+  });
+});
+
+describe('the recap in Present, the projector the class can see (D2g)', () => {
+  // A session that ends while the page is projected shows its recap on the projector: a reason
+  // is the student's to the teacher alone (#265), so it stays off, and nothing else changes.
+  it('lists every unlock by who and when, never its reason; the rest as the teacher sees it', () => {
+    const teacher = recapView(REPORT, NY);
+    const projected = recapView(REPORT, NY, true);
+    expect(projected.unlocks.map((u) => [u.key, u.name, plain(u.time), u.reason])).toEqual([
+      ['u1', 'Maya', '9:11 AM', undefined],
+      ['u2', 'Theo', '9:18 AM', undefined],
+      ['u3', 'Theo', '9:24 AM', undefined],
+    ]);
+    expect(projected.stats).toEqual(teacher.stats);
+    expect(projected.joined).toEqual(teacher.joined);
+    expect(projected.protectionOffs).toEqual(teacher.protectionOffs);
+  });
+
+  it('keeps every reason a student can pick off it', () => {
+    for (const reason of UNLOCK_REASONS) {
+      const report = { ...REPORT, unlocks: [{ ...REPORT.unlocks[0], reason }] };
+      expect(recapView(report, NY, true).unlocks[0].reason).toBeUndefined();
+      expect(recapView(report, NY).unlocks[0].reason).toBeDefined();
+    }
   });
 });

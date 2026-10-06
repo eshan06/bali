@@ -1,24 +1,38 @@
 'use client';
 
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { Button } from '@/components/button';
 import { RecapCard } from '@/components/recap-card';
+import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { getAccessToken } from '@/lib/auth';
 import { FIRST_READ, type ReadAt, readSessions, sessionRow, startRead } from '@/lib/reports';
 import { useApi } from '@/lib/use-api';
 
-/** The secondary button, as the recap card's Try again. */
-const BUTTON =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
-const COLUMNS = ['Joined', 'Focus time', 'Average', 'Silent', 'Unlocks', 'Protection off'];
-const CELL = 'py-2 pl-4 text-right tabular-nums';
-const LINE = 'border-b border-slate-200 dark:border-slate-800';
+/** The page's column, under the bar: room for a session and its six figures on one row (§5). */
+const PAGE = 'mx-auto max-w-6xl px-4 pt-10 pb-16 sm:px-10';
+
+/** Back to the class: brand ink and an arrow, as the class page's links across the portal. */
+const NAV_LINK =
+  'inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-brand underline-offset-2 hover:underline';
 
 /**
- * A class's reports (R5): R3's sessions, a page at a time, each row opening its recap (R4's card
- * fed by R2). Narrower than its columns, the table scrolls sideways (DESIGN.md: desktop-first).
+ * A session's row, from the list's width where the session and its six figures fit side by side
+ * (a 1024 px window included), under the column names; narrower, each figure sits under its own
+ * name, three to a row and then two, so no column is ever off the edge or smaller than the scale.
+ */
+const ROW = '@4xl:grid-cols-[minmax(0,1fr)_repeat(6,5.5rem)]';
+/** The figures' names, in the columns' order: the column names and each figure's own say these. */
+const COLUMNS = ['Joined', 'Focus time', 'Average', 'Silent', 'Unlocks', 'Protection off'] as const;
+const [JOINED, FOCUS, AVERAGE, SILENT, UNLOCKS, PROTECTION_OFFS] = COLUMNS;
+
+/**
+ * A class's reports (R5; in Soft premium, D2g): R3's sessions, a page at a time, each a card in the
+ * tray that opens its recap (R4's card fed by R2) inside it. A list, not a table, so it reflows by
+ * its own width (DESIGN.md §8): never a table that scrolls sideways.
  */
 export default function ReportsPage() {
   const api = useApi();
@@ -49,25 +63,26 @@ export default function ReportsPage() {
 
   const retry = (at: ReadAt, words: string) =>
     list.failure?.at === at ? (
-      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p role="alert" className="text-sm">
-          {words} <span className="text-slate-600 dark:text-slate-300">{list.failure.message}</span>
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <p role="alert" className="text-body">
+          {words} <span className="text-text-secondary">{list.failure.message}</span>
         </p>
-        <button type="button" onClick={() => void read(list, at)} className={BUTTON}>
+        <Button variant="secondary" onClick={() => void read(list, at)}>
           Try again
-        </button>
+        </Button>
       </div>
     ) : null;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link href={`/classes/${classId}`} className="text-sm text-slate-500 hover:underline">
-        ← {list.className ?? 'Back to the class'}
+    <main className={PAGE}>
+      <Link href={`/classes/${classId}`} className={NAV_LINK}>
+        <ArrowLeft size={16} aria-hidden="true" />
+        {list.className ?? 'Back to the class'}
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold">Reports</h1>
+      <h1 className="mt-6 text-h1">Reports</h1>
 
       {/* Mounted throughout, so a screen reader hears what it comes to say. */}
-      <p role="status" className="mt-6 text-sm text-slate-500 empty:mt-0 dark:text-slate-400">
+      <p role="status" className="mt-6 text-body text-text-secondary empty:mt-0">
         {list.reading === 'newest'
           ? 'Loading sessions…'
           : list.restarted
@@ -77,90 +92,104 @@ export default function ReportsPage() {
       {retry('newest', "Couldn't load the sessions.")}
 
       {list.loaded && list.sessions.length === 0 && list.nextBefore === null ? (
-        <p className="mt-6 text-sm">No reports yet. When a session ends, its report shows here.</p>
+        <p className={`mt-6 text-body ${EMPTY_TRAY}`}>
+          No reports yet. When a session ends, its report shows here.
+        </p>
       ) : null}
       {list.sessions.length > 0 ? (
-        <div className="mt-6 overflow-x-auto">
-          <table aria-label="Sessions, newest first" className="w-full text-sm whitespace-nowrap">
-            <thead>
-              <tr className={`${LINE} text-slate-500 dark:text-slate-400`}>
-                <th scope="col" className="py-2 pr-4 pl-5 text-left font-normal">
-                  Session
-                </th>
-                {COLUMNS.map((name) => (
-                  <th key={name} scope="col" className="py-2 pl-4 text-right font-normal">
-                    {name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.sessions.map((session) => {
-                const row = sessionRow(session);
-                const isOpen = open === session.id;
-                return (
-                  <Fragment key={session.id}>
-                    <tr className={isOpen ? '' : LINE}>
-                      <th scope="row" className="pr-4 text-left font-normal">
-                        <button
-                          type="button"
-                          aria-expanded={isOpen}
-                          aria-controls={isOpen ? `recap-${session.id}` : undefined}
-                          onClick={() => setOpen(isOpen ? null : session.id)}
-                          className="flex w-full cursor-pointer items-baseline gap-2 rounded py-2 text-left font-medium tabular-nums hover:underline"
-                        >
-                          <span aria-hidden="true" className="w-3 text-slate-500">
-                            {isOpen ? '▾' : '▸'}
-                          </span>
-                          {row.when}
-                        </button>
-                      </th>
+        <div className="mt-6 @container">
+          {/* The column names, once, for the eye; each figure carries its own for a screen reader. */}
+          <div
+            aria-hidden="true"
+            className={`hidden gap-x-3 px-6 pb-3 text-label text-text-tertiary uppercase @4xl:grid @4xl:items-end ${ROW}`}
+          >
+            <span>Session</span>
+            {COLUMNS.map((name) => (
+              <span key={name} className="text-right">
+                {name}
+              </span>
+            ))}
+          </div>
+          <ul aria-label="Sessions, newest first" className={TRAY}>
+            {list.sessions.map((session) => {
+              const row = sessionRow(session);
+              const isOpen = open === session.id;
+              return (
+                <li key={session.id} className={CARD}>
+                  <div className={`grid gap-3 @4xl:items-center ${ROW}`}>
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={isOpen ? `recap-${session.id}` : undefined}
+                      onClick={() => setOpen(isOpen ? null : session.id)}
+                      className="flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-sm text-left text-body font-semibold tabular-nums hover:underline"
+                    >
+                      <ChevronRight
+                        size={16}
+                        aria-hidden="true"
+                        className={`shrink-0 text-text-tertiary transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                      />
+                      {row.when}
+                    </button>
+                    <dl className="grid grid-cols-2 gap-3 @sm:grid-cols-3 @4xl:col-span-6 @4xl:grid-cols-subgrid @4xl:items-center">
                       {row.figures ? (
                         <>
-                          <td className={CELL}>{row.figures.joined}</td>
-                          <td className={CELL}>{row.figures.focus}</td>
-                          <td className={CELL}>{row.figures.average}</td>
-                          <td className={CELL}>{row.figures.silent}</td>
+                          <Figure label={JOINED} value={row.figures.joined} />
+                          <Figure label={FOCUS} value={row.figures.focus} />
+                          <Figure label={AVERAGE} value={row.figures.average} />
+                          <Figure label={SILENT} value={row.figures.silent} />
                         </>
                       ) : (
-                        <td colSpan={4} className="py-2 pl-4 text-slate-500 dark:text-slate-400">
-                          Nobody joined
-                        </td>
+                        // No zeros for a session nobody joined, as its recap says (R5).
+                        <div className="col-span-full @4xl:col-span-4">
+                          <dt className="sr-only">{JOINED}</dt>
+                          <dd className="text-body text-text-secondary">Nobody joined</dd>
+                        </div>
                       )}
-                      <td className={CELL}>{row.unlocks}</td>
-                      <td className={CELL}>{row.protectionOffs}</td>
-                    </tr>
-                    {isOpen ? (
-                      <tr className={LINE}>
-                        <td
-                          id={`recap-${session.id}`}
-                          colSpan={7}
-                          className="pb-4 whitespace-normal"
-                        >
-                          <RecapCard classId={classId} session={session} />
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                      <Figure label={UNLOCKS} value={row.unlocks} />
+                      <Figure label={PROTECTION_OFFS} value={row.protectionOffs} />
+                    </dl>
+                  </div>
+                  {isOpen ? (
+                    <div id={`recap-${session.id}`} className="mt-4 border-t border-border-default">
+                      <RecapCard classId={classId} session={session} />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       ) : null}
 
       {list.loaded && list.nextBefore !== null
         ? (retry('earlier', "Couldn't load earlier sessions.") ?? (
-            <button
-              type="button"
-              onClick={() => void read(list, 'earlier')}
-              disabled={list.reading !== null}
-              className={`mt-4 ${BUTTON}`}
+            // Held, not disabled, while it reads: focus stays on it.
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (list.reading === null) void read(list, 'earlier');
+              }}
+              aria-disabled={list.reading !== null}
+              className="mt-6"
             >
               {list.reading === 'earlier' ? 'Loading…' : 'Show earlier'}
-            </button>
+            </Button>
           ))
         : null}
     </main>
+  );
+}
+
+/**
+ * A session's figure in `data`: its name above it on a narrow row, and on a wide one only for a
+ * screen reader, the column names above the tray saying it for the eye.
+ */
+function Figure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="@4xl:text-right">
+      <dt className="text-label text-text-tertiary uppercase @4xl:sr-only">{label}</dt>
+      <dd className="mt-1 text-data tabular-nums @4xl:mt-0">{value}</dd>
+    </div>
   );
 }
