@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **P8: `.railway/railway.ts` by hand, one partial, every variable preserved.**
+  Railway's Config as Code (`railway.json`) is no longer read after 2026-12-01; its
+  replacement, Infrastructure as Code, is a TypeScript file the owner's CLI plans and applies
+  (never read on a deploy). The owner's `railway config migrate` dry run ran in an unlinked
+  clone, so it named the project, service and partial after the folder (`bali-railway`) and
+  left the `Dockerfile` builder as comments (the CLI's migrate doesn't translate `builder` or
+  `dockerfilePath`, `src/commands/config/migrate.rs`). So the file is hand-written. What it
+  rests on (Railway's IaC docs and reference, 2026-10-06, and the open-source CLI 5.63.4's
+  `src/iac/` where the docs are silent): **services match by their dashboard name**, so the
+  file declares `bali` in `dev` and `bali prod` in `production` (two services, one per
+  environment, `docs/DEPLOY.md`), chosen by `ctx.environment`; a name that doesn't exist
+  would be created, so any other environment throws. **A named partial (`bali-api`)**: the
+  first apply claims only what the file declares, and a partial deletes only resources it
+  owns, so the Postgres services and the sweep crons, never declared, are never touched;
+  without a partial the file would manage the whole environment and an apply would delete
+  them. **Every variable `preserve()`**: the CLI plans a destructive delete for each variable
+  of a declared service the file leaves out, and `preserve()` keeps Railway's value without
+  writing it here; a test keeps the list in step with `apps/api/src/env.ts`. **The source
+  declared** (`eshan06/bali`, `main`): an omitted source still diffs against the live one.
+  **Build and restart through the SDK's raw blocks** (`build: { builder, dockerfilePath }`,
+  `deploy: { restartPolicyType, restartPolicyMaxRetries }`), typed in `railway/iac`. The
+  project's name isn't diffed by the CLI, so it takes the linked one. Why
+  **`railway.json` stays** for now: a service whose Config File points at it blocks the plan
+  until `railway config migrate cutover` clears that setting, environment by environment;
+  deleting it before both are cut over would leave the other environment's deploys without
+  its settings. The follow-up PR deletes it once runbook 8 is verified on both. Considered:
+  `railway config pull` to generate the file (needs the owner's Railway access, and writes
+  over the file), and the GitHub Action that applies on merge (a Railway token in GitHub, one
+  per environment, and an apply no human reads first; not now). The `railway` npm package
+  becomes a root devDependency: the CLI imports `railway/iac` from the repo's
+  `node_modules`, so the owner's `npm ci` has to install it.
+
 - **2026-10-06** — **Present is kept for the browser tab.** D2f-2 left Present "per tab and not
   remembered", so a reload or a return from Reports opened the class page in the teacher's view,
   every unlock's reason on the projector, and `docs/PILOT.md` told teachers to stop projecting

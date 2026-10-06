@@ -29,7 +29,7 @@
     "load:gate": "npm run load:gate -w @bali/api --",
     "load:sweep": "npm run load:sweep -w @bali/api",
     "fixtures": "npm run fixtures -ws --if-present",
-    "typecheck": "npm run typecheck -ws --if-present",
+    "typecheck": "npm run typecheck -ws --if-present && tsc -p .railway",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -42,6 +42,7 @@
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.7",
+    "railway": "3.13.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.1"

@@ -14,6 +14,14 @@ also works on Render or plain Docker.
   migrator (no drizzle-kit in production); it records and skips already-applied
   migrations, so it is safe to re-run.
 - **Health check:** `GET /healthz`.
+- **Where Railway gets these:** `railway.json` (Config as Code) today; P8 moves them to
+  `.railway/railway.ts` (Infrastructure as Code), which also holds the restart policy (on
+  failure, 3 retries). Railway stops reading `railway.json` on 2026-12-01. The `.ts` file
+  manages only the API's services, dev's `bali` and production's `bali prod`, scoped by the
+  named partial `bali-api`; it lists every variable as `preserve()` (values stay in
+  Railway); Railway never reads it on a deploy: the owner applies it with
+  `railway config apply` (`docs/RUNBOOKS.md`, runbook 8). Until the follow-up PR deletes
+  `railway.json`, change a setting in both files.
 - **Sweep:** the API runs it itself every minute — the tick that expires ended
   sessions and opens silence episodes for phones gone quiet (hosting decision 3).
   A scheduled `POST /internal/sweep` with the `x-internal-key` header (step 4
@@ -67,7 +75,9 @@ check after each.
    without them for the Vanderbilt pilot (the owner's ruling, 2026-10-05;
    `docs/RUNBOOKS.md`, runbook 1, step 4).
 3. **Deploy the service** — connect this repo; Railway reads `railway.json` and
-   builds from the `Dockerfile`. Set all environment variables above.
+   builds from the `Dockerfile`. Set all environment variables above. Once P8 is applied
+   (runbook 8), a new service takes its settings from `.railway/railway.ts` instead: add
+   its environment and service name to `SERVICE_BY_ENVIRONMENT` there, plan, then apply.
 4. **Sweep cron, the backup** — the API sweeps every minute by itself; add a
    Railway cron that runs **every 5 minutes** (`*/5 * * * *`) and POSTs to
    `/internal/sweep` with `x-internal-key: $INTERNAL_API_KEY`, so sessions still

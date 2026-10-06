@@ -1,0 +1,5 @@
+{
+  // Type-checks .railway/railway.ts against the railway/iac SDK (root `npm run typecheck`).
+  "extends": "../tsconfig.base.json",
+  "include": ["railway.ts"]
+}
