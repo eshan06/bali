@@ -1,5 +1,6 @@
 // Run by the root `npm test` (node's own runner, no dependencies): the sign-in page's files stay
-// inside what Cognito's Hosted UI (classic) accepts, so an upload never fails on a rule we know.
+// inside what Cognito's Hosted UI (classic) accepts, so an upload never fails on a rule we know,
+// and a field's edge stays visible.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -48,6 +49,36 @@ test('every selector is one of the class names Cognito allows, on its own', () =
   assert.ok(selectors.length > 0, 'no rules found');
   for (const selector of selectors) {
     assert.ok(ALLOWED.has(selector), `not in Cognito's list, so refused or ignored: ${selector}`);
+  }
+});
+
+// WCAG 2's contrast ratio between two #rrggbb colours.
+const contrast = (one, two) => {
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((at) => {
+      const c = parseInt(hex.slice(at, at + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [light, dark] = [luminance(one), luminance(two)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+};
+
+// The #rrggbb a class's rule gives one property, e.g. colour('inputField-customizable', 'border').
+const colour = (name, property) =>
+  bare.match(new RegExp(`\\.${name}\\s*\\{[^}]*?\\b${property}:[^;}]*?(#[0-9a-f]{6})`, 'i'))?.[1];
+
+test("a field's edge stands 3:1 from the field's own fill and from the card (WCAG 1.4.11)", () => {
+  const edge = colour('inputField-customizable', 'border');
+  const grounds = [
+    colour('inputField-customizable', 'background-color'),
+    colour('background-customizable', 'background-color'),
+  ];
+  assert.ok(edge && grounds.every(Boolean), `a colour is missing: ${edge}, ${grounds}`);
+  for (const ground of grounds) {
+    const ratio = contrast(edge, ground);
+    assert.ok(ratio >= 3, `${edge} on ${ground}: ${ratio.toFixed(2)}:1`);
   }
 });
 
