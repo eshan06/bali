@@ -1,7 +1,7 @@
 import type { ClassDetail } from '@bali/shared';
 
 import { type ApiClient, ApiError, NetworkError } from './api-client';
-import { CANT_CREATE, CANT_REACH, errText } from './errors';
+import { CANT_CREATE, CANT_REACH, errText, NO_SCHOOL } from './errors';
 
 /* The classes home's create form (D2e), tested: the name's limit, and the create's answer. */
 
@@ -32,6 +32,10 @@ export async function createClass(
     return { kind: 'created', klass: await api.post<ClassDetail>('/v1/classes', { name }) };
   } catch (e) {
     if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
+    // The route's one 409 with no reason: the account has no school (the test pins the route).
+    if (e instanceof ApiError && e.status === 409 && e.reason === undefined) {
+      return { kind: 'failed', message: NO_SCHOOL };
+    }
     if (e instanceof ApiError && e.status < 500 && e.status !== 408) {
       return { kind: 'failed', message: errText(e) };
     }

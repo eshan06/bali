@@ -5,6 +5,7 @@ import { createApiClient } from './api-client';
 import { CANT_ADD_TIME, CANT_MAKE_CODE, CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   bellTime,
+  codeMoved,
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
   extendAttemptFor,
@@ -236,24 +237,24 @@ describe('regenerateCode', () => {
 
   it('asks for a new code and answers the class with it', async () => {
     const { client, sent } = api(200, klass);
-    expect(await regenerateCode(client, CLASS)).toEqual({ kind: 'made', klass });
+    expect(await regenerateCode(client, CLASS, 'OLDCDE')).toEqual({ kind: 'made', klass });
     expect(sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
     expect(sent[0]?.init?.method).toBe('PATCH');
     expect(JSON.parse(sent[0]?.init?.body as string)).toEqual({ regenerateCode: true });
   });
 
   it('answers every failure in words, with Try again to send it again', async () => {
-    expect(await regenerateCode(unreachable, CLASS)).toEqual({
+    expect(await regenerateCode(unreachable, CLASS, 'OLDCDE')).toEqual({
       kind: 'failed',
       message: CANT_REACH,
     });
     const busy = api(429, { error: { code: 'rate_limited', message: 'too many requests' } });
-    expect(await regenerateCode(busy.client, CLASS)).toEqual({
+    expect(await regenerateCode(busy.client, CLASS, 'OLDCDE')).toEqual({
       kind: 'failed',
       message: TOO_MANY_TRIES,
     });
     const broken = api(500, { error: { code: 'internal', message: 'internal error' } });
-    expect(await regenerateCode(broken.client, CLASS)).toEqual({
+    expect(await regenerateCode(broken.client, CLASS, 'OLDCDE')).toEqual({
       kind: 'failed',
       message: CANT_MAKE_CODE,
     });
@@ -261,10 +262,71 @@ describe('regenerateCode', () => {
     const gone = api(404, {
       error: { code: 'not_found', reason: 'class_not_found', message: 'class not found' },
     });
-    expect(await regenerateCode(gone.client, CLASS)).toEqual({
+    expect(await regenerateCode(gone.client, CLASS, 'OLDCDE')).toEqual({
       kind: 'failed',
       message: 'class not found',
     });
+  });
+
+  /** The mint answered `status` (its answer lost), the class read after it answered `read`. */
+  function lost(status: number, read: { status: number; body: unknown }) {
+    const sent: string[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (_url, init) => {
+        sent.push(init?.method ?? 'GET');
+        const [code, body] =
+          init?.method === 'PATCH'
+            ? [status, { error: { code: 'internal', message: 'bad gateway' } }]
+            : [read.status, read.body];
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: code,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      },
+    });
+    return { client, sent };
+  }
+
+  it('shows the code Bali holds after an answer that never came (#247’s review)', async () => {
+    // The mint landed and its answer was lost: the class read again has the new code.
+    const landed = lost(502, { status: 200, body: klass });
+    expect(await regenerateCode(landed.client, CLASS, 'OLDCDE')).toEqual({ kind: 'made', klass });
+    expect(landed.sent).toEqual(['PATCH', 'GET']);
+    // It never landed: the code is the one on screen, and the failure stands.
+    const missed = lost(502, { status: 200, body: { ...klass, joinCode: 'OLDCDE' } });
+    expect(await regenerateCode(missed.client, CLASS, 'OLDCDE')).toEqual({
+      kind: 'failed',
+      message: CANT_MAKE_CODE,
+    });
+    // Unread too: the failure stands, never thrown.
+    const dark = lost(502, { status: 503, body: { error: { code: 'unavailable', message: 'x' } } });
+    expect(await regenerateCode(dark.client, CLASS, 'OLDCDE')).toEqual({
+      kind: 'failed',
+      message: CANT_MAKE_CODE,
+    });
+  });
+
+  it('reads nothing again after a refusal, which minted nothing', async () => {
+    const { client, sent } = api(404, {
+      error: { code: 'not_found', reason: 'class_not_found', message: 'class not found' },
+    });
+    await regenerateCode(client, CLASS, 'OLDCDE');
+    expect(sent.map((s) => s.init?.method)).toEqual(['PATCH']);
+  });
+
+  it('reads the class once more on its own (a cancel after a failure): its code only if moved', async () => {
+    expect(await codeMoved(api(200, klass).client, CLASS, 'OLDCDE')).toEqual(klass);
+    const still = api(200, { ...klass, joinCode: 'OLDCDE' });
+    expect(await codeMoved(still.client, CLASS, 'OLDCDE')).toBeNull();
+    expect(still.sent[0]?.url).toBe(`http://api/v1/classes/${CLASS}`);
+    // Unread, never thrown: the code on screen stays as it was.
+    expect(await codeMoved(unreachable, CLASS, 'OLDCDE')).toBeNull();
+    const down = api(503, { error: { code: 'unavailable', message: 'unavailable' } });
+    expect(await codeMoved(down.client, CLASS, 'OLDCDE')).toBeNull();
   });
 });
 

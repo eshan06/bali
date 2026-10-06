@@ -316,6 +316,7 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     'components/blocks.tsx',
     'components/live-grid.tsx',
     'app/classes/[id]/page.tsx',
+    'components/join-code.tsx',
   ];
   const COLOUR =
     /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;

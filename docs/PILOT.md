@@ -98,6 +98,9 @@ At the start:
 - The live grid shows who is focused. A phone not heard from for 90 seconds shows as
   silent; it is not a sign that anyone did anything wrong (a phone off, out of battery or
   without signal looks the same).
+- To show the grid on a projector, press **Present** above it: four columns in larger type,
+  readable from the back of the room; press it again to go back. It shows the same words as
+  the grid, an unlock's reason included, so the whole room can read them.
 
 During:
 

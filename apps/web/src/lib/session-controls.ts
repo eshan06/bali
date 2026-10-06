@@ -141,23 +141,47 @@ export type NewCodeAnswer =
   | { kind: 'failed'; message: string };
 
 /**
- * Mint the class a new join code (`PATCH /v1/classes/{id}`, `regenerateCode`). The route takes no
- * `eventId`: a resend after a lost answer mints once more, and the code shown is the one the
- * server holds, so any failure may be sent again as it was.
+ * Mint the class a new join code (`PATCH /v1/classes/{id}`, `regenerateCode`); `shown` is the code
+ * on screen. The route takes no `eventId`, so a resend mints once more, and any failure may be sent
+ * again as it was. An answer that never came may still be a new code, minted before the answer was
+ * lost: the class is read again then (#247's review, `codeMoved`), and a code other than `shown` is
+ * the one Bali holds now, answered as made. A read that fails too, or reaches the server before the
+ * mint commits, leaves the failure said; the control reads once more if the teacher cancels then.
  */
 export async function regenerateCode(
-  api: Pick<ApiClient, 'patch'>,
+  api: Pick<ApiClient, 'patch' | 'get'>,
   classId: string,
+  shown: string,
 ): Promise<NewCodeAnswer> {
+  let message: string;
   try {
     const klass = await api.patch<ClassDetail>(`/v1/classes/${classId}`, { regenerateCode: true });
     return { kind: 'made', klass };
   } catch (e) {
-    if (e instanceof NetworkError) return { kind: 'failed', message: CANT_REACH };
+    // Refused (a 4xx, the budget's 429 included): nothing was minted, so nothing to read again.
     if (e instanceof ApiError && e.status < 500 && e.status !== 408) {
       return { kind: 'failed', message: errText(e) };
     }
-    return { kind: 'failed', message: CANT_MAKE_CODE };
+    message = e instanceof NetworkError ? CANT_REACH : CANT_MAKE_CODE;
+  }
+  const klass = await codeMoved(api, classId, shown);
+  return klass ? { kind: 'made', klass } : { kind: 'failed', message };
+}
+
+/**
+ * The class as Bali holds it, when its code is no longer `shown` (a mint landed, this tab's or
+ * another's); null while it still is, or when the read fails, which is never thrown.
+ */
+export async function codeMoved(
+  api: Pick<ApiClient, 'get'>,
+  classId: string,
+  shown: string,
+): Promise<ClassDetail | null> {
+  try {
+    const klass = await api.get<ClassDetail>(`/v1/classes/${classId}`);
+    return klass.joinCode === shown ? null : klass;
+  } catch {
+    return null;
   }
 }
 

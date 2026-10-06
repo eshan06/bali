@@ -76,12 +76,11 @@ the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
 `/support`, the two policy pages and the invite-code screen (D2c-2); so are
 the classes home and its "Your block" (D2e), the live grid (D2f-1: its
 chips, states, `bali-softpulse`, badges and standard columns) and the class
-page with Present and its controls (D2f-2). All of them are held to the
-tokens' utilities by `tokens.test.ts`; the join code, the recap and reports
+page with Present, its controls and its join code (D2f-2, D2f-3). All of them
+are held to the tokens' utilities by `tokens.test.ts`; the recap and reports
 keep their Tailwind classes on the new base (the page colour, the font, the
-ring, and the radii: their `rounded-lg` is now 20 px) until D2f-3 and D2g,
-which also retire Tailwind's default colours and sizes, kept in the theme only
-for them. **A portal page uses the tokens' utilities and no
+ring, and the radii: their `rounded-lg` is now 20 px) until D2g, which also
+retires Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
 Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
 question for the owner.
 
