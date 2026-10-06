@@ -47,20 +47,20 @@ struct ProtectionOffScreenTests {
         #expect(off.headline == "Screen Time is off" && off.way == .settings && off.refused == nil)
         #expect(
             off.body
-                == "Bali can't keep you focused without it, so your teacher sees 'Screen Time off'.")
+                == "Bali can't keep you focused without it, so your teacher sees “Screen Time off”.")
         let (outbox, _) = try makeOutbox()
         try record(outbox, .protectionOff(session: "s"))
         let sending = try synced(.inSession(bell1042, .protectionOff), queued: try outbox.records())
         #expect(
             words(sending)?.body
-                == "Bali can't keep you focused without it, so your teacher will see 'Screen Time off'.")
+                == "Bali can't keep you focused without it, so your teacher will see “Screen Time off”.")
         #expect(words(try synced(.inSession(bell1042, .unlocked)))?.body == words(sending)?.body)
         let back = try #require(
             words(try synced(.inSession(bell1042, .protectionOff)), checked(.approved)))
         #expect(back.headline == "Screen Time is back on" && back.way == .retap)
         #expect(
             back.body
-                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees 'Screen Time off'."
+                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees “Screen Time off”."
         )
         // The steps back (#167): Screen Time on again puts the phone back by itself — the re-tap is
         // the second step only where Screen Time reads on and that could not be done.
@@ -85,7 +85,7 @@ struct ProtectionOffScreenTests {
         let checking = try #require(words(off, checked(.notDetermined)))
         #expect(checking.way == .checking && checking.headline == "Checking Screen Time…")
         #expect(
-            checking.body == "Your teacher sees 'Screen Time off' until it's back on.")
+            checking.body == "Your teacher sees “Screen Time off” until it's back on.")
         #expect(checking.steps.last == "Bali puts you back in class by itself")
     }
 
@@ -109,14 +109,14 @@ struct ProtectionOffScreenTests {
         let off = try synced(.inSession(bell1042, .protectionOff))
         #expect(
             words(off, checked(.approved, unreported: true))?.body
-                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees 'Screen Time off'."
+                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees “Screen Time off”."
         )
         let (outbox, _) = try makeOutbox()
         try record(outbox, .protectionOff(session: "s"))
         let queued = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
         #expect(
             words(queued, checked(.notDetermined, unreported: true))?.body
-                == "Your teacher will see 'Screen Time off' until it's back on.")
+                == "Your teacher will see “Screen Time off” until it's back on.")
     }
 
     @Test(

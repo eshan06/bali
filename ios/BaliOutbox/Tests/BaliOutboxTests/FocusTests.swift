@@ -217,11 +217,11 @@ struct FocusTests {
         let words = focus(try synced(.inSession(bell1042, .focused), link: .unreachable))
         #expect(
             plain(words.offline)
-                == "Focus still ends at 10:42 AM — this phone keeps time without Wi-Fi, and Bali catches up when it's back online. Your teacher sees when this phone last checked in."
+                == "Focus still ends at 10:42 AM. This phone keeps time without Wi-Fi, and Bali catches up when it's back online. Your teacher sees when this phone last checked in."
         )
         #expect(
             words.caption
-                == "Works without Wi-Fi — an unlock is saved on this phone first. Letting go early does nothing."
+                == "Works without Wi-Fi. An unlock is saved on this phone first. Letting go early does nothing."
         )
         for link in [Link.signIn, .storageFailed, nil] {
             #expect(focus(try synced(.inSession(bell1042, .focused), link: link)).offline == nil)
