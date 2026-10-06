@@ -8,7 +8,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
-import { TOO_MANY_TRIES } from './errors';
+import { CANT_REACH, TOO_MANY_TRIES } from './errors';
 import { latestEnded, loadRecap, type RecapState, recapView, sessionTimes } from './recap';
 
 // A 25-minute lesson at 9:05 in New York, ended by the sweep at its bell.
@@ -130,7 +130,7 @@ describe('loadRecap', () => {
 
   it('says why either read failed, for the card’s Try again', async () => {
     const noList = fakeApi({ [LIST]: new NetworkError() });
-    expect(await states(noList)).toEqual([{ kind: 'error', message: new NetworkError().message }]);
+    expect(await states(noList)).toEqual([{ kind: 'error', message: CANT_REACH }]);
 
     const busy = new ApiError(429, 'rate_limited', 'too many requests from this account');
     const noReport = fakeApi({ [LIST]: page(SESSION), [ONE]: busy });
@@ -153,7 +153,7 @@ describe('loadRecap', () => {
     const failing = fakeApi({ [ONE]: new NetworkError() });
     const failed: RecapState[] = [];
     await loadRecap(failing, 'c1', SESSION, (s) => failed.push(s));
-    expect(failed.at(-1)).toEqual({ kind: 'error', message: new NetworkError().message });
+    expect(failed.at(-1)).toEqual({ kind: 'error', message: CANT_REACH });
   });
 
   it('puts the class id in the path as one segment', async () => {

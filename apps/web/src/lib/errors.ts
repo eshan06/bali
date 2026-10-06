@@ -28,7 +28,10 @@ export const NOT_A_BLOCK_ID =
 export const BLOCK_TAKEN =
   'That block is registered to another teacher. If the ID matches the one on your block, ask whoever sent your invite code to move it to you.';
 
-/** No answer from the API (P3): the connection, never the person. */
+/**
+ * No answer from the API (P3), and so every `NetworkError` a page shows (D2c-2): the connection,
+ * never the person, and never a sign-out (ARCHITECTURE, Web portal, decision 4).
+ */
 export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try again.";
 
 /** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
@@ -79,9 +82,9 @@ const REFUSALS = new Map<string | undefined, string>(
   } satisfies Partial<Record<ApiErrorReason, string>>),
 );
 
-/** A human-readable message for any thrown API/network error, safe to display. */
+/** A human-readable message for any thrown API/network error, safe to display beside a retry. */
 export function errText(e: unknown): string {
-  if (e instanceof NetworkError) return e.message;
+  if (e instanceof NetworkError) return CANT_REACH;
   if (e instanceof ApiError) {
     if (e.status === 429) {
       return (e.retryAfter ?? 0) > A_MOMENT ? TOO_MANY_TRIES_MINUTE : TOO_MANY_TRIES;
@@ -89,5 +92,5 @@ export function errText(e: unknown): string {
     return REFUSALS.get(e.reason) ?? e.message;
   }
   if (e instanceof Error) return e.message;
-  return 'Something went wrong.';
+  return 'Something went wrong. Try again.';
 }

@@ -2,7 +2,7 @@ import type { ClassDetail, SessionReportsPage, SessionReportSummary } from '@bal
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from './api-client';
-import { TOO_MANY_TRIES } from './errors';
+import { CANT_REACH, TOO_MANY_TRIES } from './errors';
 import { recapView } from './recap';
 import { FIRST_READ, readSessions, type SessionList, sessionRow, startRead } from './reports';
 
@@ -120,7 +120,7 @@ describe('readSessions', () => {
       expect(list).toMatchObject({
         loaded: false,
         reading: null,
-        failure: { at: 'newest', message: new NetworkError().message },
+        failure: { at: 'newest', message: CANT_REACH },
       });
     }
   });
@@ -173,7 +173,7 @@ describe('readSessions', () => {
       sessions: [MON, SUN],
       nextBefore: null,
       reading: null,
-      failure: { at: 'newest', message: new NetworkError().message },
+      failure: { at: 'newest', message: CANT_REACH },
       restarted: false,
     });
   });

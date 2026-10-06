@@ -26,9 +26,12 @@ export class ApiError extends Error {
   }
 }
 
-/** Couldn't reach the server. Retryable; must never sign the user out. */
+/**
+ * Couldn't reach the server. Retryable; must never sign the user out. Its message is for a log: a
+ * page says `errText`'s words for it, `CANT_REACH` (errors.ts).
+ */
 export class NetworkError extends Error {
-  constructor(message = "can't reach the server — retry") {
+  constructor(message = "couldn't reach the server") {
     super(message);
     this.name = 'NetworkError';
   }
