@@ -376,10 +376,12 @@ const REASON_TEXT: Record<UnlockReason, string> = {
  * on a chip that already says unlocked, and on a protection-off chip the
  * unlock itself — a detail beside the state, never the state, so protection
  * off is never relabelled an unlock nor shown green. Null when it adds nothing.
+ * In Present (`present`), the projector the class can see, never the reason: the
+ * consent card promises it to the teacher alone (A1).
  */
-export function unlockNote(s: Student, display: GridDisplay): string | null {
+export function unlockNote(s: Student, display: GridDisplay, present = false): string | null {
   if (s.unlock === null) return null;
-  const reason = s.unlock.reason === null ? null : REASON_TEXT[s.unlock.reason];
+  const reason = present || s.unlock.reason === null ? null : REASON_TEXT[s.unlock.reason];
   if (display === 'unlocked' || display === 'left_unprotected') return reason;
   if (display === 'protection_off' || display === 'left_protection_off') {
     return reason === null ? 'unlocked' : `unlocked · ${reason}`;

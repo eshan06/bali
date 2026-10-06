@@ -87,8 +87,9 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
 /**
  * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
  * style (DESIGN.md §4). What the chip carries rides after the label, never replacing it: an
- * unlock's reason, or how long a Silent phone has been quiet. `pulse` is `bali-softpulse` (§7),
- * and `onPulseEnd` hears it finish. In Present the label takes the projector's size (§5).
+ * unlock's reason (never in Present), or how long a Silent phone has been quiet. `pulse` is
+ * `bali-softpulse` (§7), and `onPulseEnd` hears it finish. In Present the label takes the
+ * projector's size (§5).
  */
 function Chip({
   display,
@@ -130,7 +131,8 @@ export function LiveGrid({
   onSession?: (session: SessionView) => void;
   /**
    * The projector view (DESIGN.md §5): four columns, names 20 px, chip labels 14 px, cells at
-   * least 88 px tall, readable from the back of a classroom; the same chips, the same words.
+   * least 88 px tall, readable from the back of a classroom; the same chips and words, but never
+   * an unlock's reason: the class can see it (`unlockNote`).
    */
   present?: boolean;
 }) {
@@ -333,7 +335,9 @@ export function LiveGrid({
                     <Chip
                       key={unlock ?? 'none'}
                       display={display}
-                      note={display === 'silent' ? silentNote(s, now) : unlockNote(s, display)}
+                      note={
+                        display === 'silent' ? silentNote(s, now) : unlockNote(s, display, present)
+                      }
                       pulse={softpulses(s, display, liveUnlocks)}
                       present={present}
                       onPulseEnd={() =>
