@@ -55,7 +55,9 @@ export default defineRailway((ctx) => {
   // The same settings railway.json holds: the Dockerfile build, migrations before the
   // server starts, the /healthz check, and three restarts after a crash.
   const api = service(name, {
-    source: github('eshan06/bali', { branch: 'main' }),
+    // checkSuites is the dashboard's "Wait for CI": a deploy waits for main's checks to
+    // pass. Left out, an apply turns it off (it did on production, 2026-10-06).
+    source: github('eshan06/bali', { branch: 'main', checkSuites: true }),
     build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' },
     start: 'npm run migrate && npm start',
     healthcheck: '/healthz',
