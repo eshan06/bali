@@ -19,7 +19,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   action-primary-bg and -fg) and the ring mark without its tile, and D2a's audit found it matching
   D1 within what iOS allows. Considered: the mark on a raised disc as the icon, as Focus's ring
   sits since D2i (a shadow baked into an image iOS sizes itself, and the app's own top-of-screen
-  marks, Sign in's, the age screen's, Session over's, stay plain); a label other than D1's "OK"
+  marks, Sign in's, the age screen's, the intro's, stay plain); a label other than D1's "OK"
   (B5c decided it, and nothing in DESIGN.md asks for another: no new words); a second button
   (B5c: none). **The audit's one shield finding**, "the subtitle runs three sentences; iOS may
   clip it on small phones", is a question only a phone answers: the line is the owner's ruling
