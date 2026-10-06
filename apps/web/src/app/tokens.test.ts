@@ -178,6 +178,12 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(users.map((file) => relative(src, file))).toEqual([join('components', 'live-grid.tsx')]);
   });
 
+  it('Tailwind’s own colours, type sizes, tracking, leading and shadows are gone (D2g)', () => {
+    for (const set of ['--color-*', '--text-*', '--tracking-*', '--leading-*', '--shadow-*']) {
+      expect(theme.get(set), set).toBe('initial');
+    }
+  });
+
   it('the radii are the tokens’ five and no other', () => {
     expect(theme.get('--radius-*')).toBe('initial');
     const radii = [...theme.keys()].filter((k) => k.startsWith('--radius-') && k !== '--radius-*');
@@ -219,7 +225,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     // (2026-10-05). Their line heights on the 4-pt grid; the design system gains them at the
     // owner's next export.
     const sizes = [...theme.keys()]
-      .filter((k) => k.startsWith('--text-') && !k.slice(2).includes('--'))
+      .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
     expect(sizes.sort()).toEqual([...styles, 'input', 'present-label', 'present-name'].sort());
@@ -295,29 +301,20 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
   });
 });
 
-describe('the pages in Soft premium use the tokens’ utilities, never a Tailwind default', () => {
-  // DESIGN.md: no `slate-*`, no `text-sm`. D2c's and D2e's pages and the pieces they share; D2f
-  // and D2g add theirs as they redraw them, until the theme's default colours and sizes can go.
-  const DRAWN = [
-    'app/login/page.tsx',
-    'app/auth/callback/page.tsx',
-    'app/support/page.tsx',
-    'app/privacy/page.tsx',
-    'app/terms/page.tsx',
-    'app/page.tsx',
-    'components/portal-bar.tsx',
-    'components/button.tsx',
-    'components/mark.tsx',
-    'components/text-link.tsx',
-    'components/field.tsx',
-    'components/tray.ts',
-    'components/policy-draft.tsx',
-    'components/invite-code.tsx',
-    'components/blocks.tsx',
-    'components/live-grid.tsx',
-    'app/classes/[id]/page.tsx',
-    'components/join-code.tsx',
-  ];
+describe('every page and piece uses the tokens’ utilities, never a Tailwind default', () => {
+  // DESIGN.md: no `slate-*`, no `text-sm`. Every screen is in Soft premium since D2g, and the theme
+  // holds no default colour or size, so one would draw nothing: each source file is held to it.
+  const src = fileURLToPath(new URL('../', import.meta.url));
+  const DRAWN = sources(src)
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => relative(src, file));
+
+  it('covers the redrawn screens, the recap and the reports page included', () => {
+    expect(DRAWN.length).toBeGreaterThan(30);
+    expect(DRAWN).toContain(join('components', 'recap-card.tsx'));
+    expect(DRAWN).toContain(join('app', 'classes', '[id]', 'reports', 'page.tsx'));
+  });
+
   const COLOUR =
     /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
   const SIZE = /\btext-(?:xs|sm|base|lg|\d?xl)\b/;
