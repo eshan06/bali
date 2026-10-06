@@ -669,7 +669,7 @@ final class Phone {
         guard engine == nil, !starting, !frozen else { return }
         starting = true
         defer { starting = false }
-        // The build's settings, the sign-in's and the portal's (C2b): ios/project.yml,
+        // The build's settings, the sign-in's and the portal's (C2-app): ios/project.yml,
         // docs/DEPLOY.md.
         guard let config = AppConfig(info: Bundle.main.infoDictionary ?? [:]) else {
             problem = "This copy of Bali isn't set up right. Ask your teacher."

@@ -30,10 +30,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   call): the 13+ age screen (C7) draws its month and year menus as Join's sunken well at
   `radius-sm`, with no focus ring since nothing is typed into them, and its stop screen's words sit
   on the gutter as Sign in's do, where they had been centred as a narrower block; the policy links
-  (C2b) are drawn as the portal's links (`TEXT_LINK`), medium and underlined in the brand's ink, so
+  (C2-app) are drawn as the portal's links (`TEXT_LINK`), medium and underlined in the brand's ink, so
   a link never rests on colour alone (DESIGN.md §4, Links); Delete account (C4b) takes the pills
   through the theme, its confirm a red one. The start failure for a build not set up says "This
-  copy of Bali isn't set up right.", not "isn't set up to sign in": since C2b a build missing the
+  copy of Bali isn't set up right.", not "isn't set up to sign in": since C2-app a build missing the
   portal's address fails there too. Shots in `~/bali-notes/d2/d2h-final/`.
 
 - **2026-10-05** — **D2e: the classes home and "Your block" in Soft premium, and the owner's two
