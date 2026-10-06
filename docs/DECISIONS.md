@@ -8,6 +8,38 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2k: Bali's shield in the redesign changes nothing you can see; its colours
+  are pinned to the tokens, and its OK joins `ShieldWords`.** The owner's rulings stand (the
+  recommended option on a taste call, said in the PR; the shield light-only, Q6 A). **Why nothing
+  to see:** `ShieldConfiguration` takes a background colour and blur style, an icon, a title, a
+  subtitle and two buttons' labels and colours, no layout and no font (DESIGN.md §3); D2a's canvas
+  says a style changes type, spacing, shape, density and composition and never the colours or the
+  mark, and iOS draws all five on a shield. The shield already wore the tokens' light values
+  (surface-page over `.systemThickMaterialLight`, text-primary, text-secondary,
+  action-primary-bg and -fg) and the ring mark without its tile, and D2a's audit found it matching
+  D1 within what iOS allows. Considered: the mark on a raised disc as the icon, as Focus's ring
+  sits since D2i (a shadow baked into an image iOS sizes itself, and the app's own top-of-screen
+  marks, Sign in's, the age screen's, Session over's, stay plain); a label other than D1's "OK"
+  (B5c decided it, and nothing in DESIGN.md asks for another: no new words); a second button
+  (B5c: none). **The audit's one shield finding**, "the subtitle runs three sentences; iOS may
+  clip it on small phones", is a question only a phone answers: the line is the owner's ruling
+  (B5c-2), passed in round 3 on the owner's iPhone 15 Pro (2026-10-01) with no note of it cut
+  short, so it stays, and the phone check looks for it whole at the default and a larger text
+  size (`ios/README.md`, round 3, step 1); cut short there, a shorter line is the owner's pick in
+  a follow-up. **The pin:** C1c
+  left the extension's hexes unpinned as another target's; its file is now compiled into
+  `BaliTests` too (`ios/project.yml`; an extension's code is no module to import), so
+  `AppTests.tokens` holds each colour the real configuration hands iOS, over an app and over a
+  website, to `bali-tokens.json`, and `AppTests.shield` its words (`ShieldWords`' own), the
+  light material and its one button. Alternatives: a Linux test reading the hexes out of the
+  extension's source (a regex over code, where the simulator test reads the real object); the
+  hexes moved into BaliOutbox beside the words (design values in the outbox package, which
+  DESIGN.md keeps to strings). **The words:** "OK" moves into `ShieldWords` (`button`), so every
+  word the shield shows lives where DESIGN.md lists them and is tested on Linux
+  (`ShieldWordsTests.words`); none changed, and none had an em-dash. Of four mutations (the
+  title's ink, the label, the material, the website's words), each turns a test red.
+  **📱 Still open:** the owner's phone check; the PR merges after it.
+
 - **2026-10-06** — **D2j: History and Me in Soft premium; History's "Screen Time back on" decided;
   Me's hierarchy (#165); no sentence quotes a label the teacher doesn't see.** The owner's rulings
   stand (D2's PRs into `main`, no sign-off wait, the recommended option on a taste call, said in

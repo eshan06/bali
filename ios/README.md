@@ -269,8 +269,10 @@ and layout are iOS's.
    the ring mark (a green arc open at the upper left, on a pale green track), the title
    `Focused with Bali` with no time, and under it "This app is paused for class. Calls, FaceTime,
    Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency Unlock is
-   always there." **OK**, white on dark green, closes the app. Then `npm run dev:teacher -- extend 10`:
-   a blocked app says the same — the new bell is Bali's to show.
+   always there.", the whole line, nothing cut short. **OK**, white on dark green, closes the app.
+   With a larger text size (Settings → Display & Brightness → Text Size, the slider to the right),
+   a blocked app shows the whole line still (D2a's audit asked whether iOS cuts it short; D2k). Then
+   `npm run dev:teacher -- extend 10`: a blocked app says the same — the new bell is Bali's to show.
 2. **After Emergency Unlock: no shield.** **Emergency Unlock**: every app opens, with no shield at
    all, Bali's or iOS's.
 3. **A tap not yet answered: the same words.** Turn on Airplane Mode and **Tap**: shielded at once,

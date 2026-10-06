@@ -60,7 +60,10 @@ pinned by `AppTests.tokens`) in the Soft premium shapes from D2h, pill buttons
 and chips, sunken inputs under the focus ring, from D2i Home's hero card in
 a tray and the ring on Focus and Waiting on a raised disc, and from D2j Me's
 name as its hero in a tray and its account in a card of its own; its screens
-take the style group by group, D2h–D2k. The portal draws from them too, from D2c on
+take the style group by group, D2h–D2k. The shield (D2k) takes the same light
+tokens and the mark, its colours pinned by `AppTests.tokens` too: iOS draws a
+shield's shapes, spacing and type, so the style reaches it only through its
+colours and words. The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), light on `:root` and dark under the device's dark mode,
