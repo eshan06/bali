@@ -20,7 +20,7 @@ struct HistoryView: View {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("History").textStyle(.h1).accessibilityAddTraits(.isHeader)
-                        Text("The same moments your teachers see — nothing more.").textStyle(.body)
+                        Text("The same moments your teachers see, and nothing more.").textStyle(.body)
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .padding(.bottom, 4)
@@ -152,14 +152,14 @@ private struct ClassCard: View {
 
     /// A moment's state, whose ink its icon takes (DESIGN.md's states), and D1's icon for it: in
     /// focus, unlocked, Screen Time off, not in — a declined tap — and an end, of the class or of
-    /// being in it. Screen Time back on (#167) has no artboard: Screen Time off's shield, whole, in
-    /// a neutral ink, since it returns the student to focus or to an unlock.
+    /// being in it. Screen Time back on (#167) has no artboard: its look is D2j's
+    /// (`Chip.Kind.protectionOn`), never green, since it returns the student to focus or to an unlock.
     private func look(_ type: HistoryEventType) -> (Chip.Kind, String) {
         switch type {
         case .tapIn, .refocus: (.focused, "checkmark.circle")
         case .unlock: (.unlocked, "lock.open")
         case .protectionOff: (.protectionOff, "shield.slash")
-        case .protectionOn: (.notIn, "shield")
+        case .protectionOn: (.protectionOn, "checkmark.shield")
         case .armedTapSkipped: (.notIn, "circle")
         case .sessionEnded, .sessionExpired, .leftForOtherSession, .enrollmentLeft,
             .enrollmentRemoved:

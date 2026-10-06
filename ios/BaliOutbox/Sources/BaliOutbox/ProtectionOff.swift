@@ -45,7 +45,8 @@ public struct ProtectionOffWords: Sendable, Hashable {
         let sent = state == .protectionOff && !queued
         let sees = sent ? "sees" : "will see"
         // Found and never saved, nothing yet makes it true that the teacher sees it, or will (rule
-        // 5) — whichever the way (C5b's review).
+        // 5) — whichever the way (C5b's review). What the teacher sees is said, never quoted: their
+        // grid's label is "Protection off", the phone's "Screen Time off" (D2j).
         let untold = protection?.unreported == true && !sent && !queued
         switch way {
         case .settings, .ask:
@@ -53,7 +54,7 @@ public struct ProtectionOffWords: Sendable, Hashable {
             body =
                 untold
                 ? "Bali can't keep you focused without it. It couldn't tell your teacher yet, and keeps trying."
-                : "Bali can't keep you focused without it, so your teacher \(sees) “Screen Time off”."
+                : "Bali can't keep you focused without it, so your teacher \(sees) that Screen Time is off."
         case .retap:
             headline = "Screen Time is back on"
             // On again, the check reports nothing more: no "keeps trying".
@@ -61,13 +62,13 @@ public struct ProtectionOffWords: Sendable, Hashable {
                 "Tap your teacher's block again to rejoin class. "
                 + (untold
                     ? "Bali couldn't tell your teacher that Screen Time was off."
-                    : "Until then, your teacher \(sees) “Screen Time off”.")
+                    : "Until then, your teacher \(sees) Screen Time as off.")
         case .checking:
             headline = "Checking Screen Time…"
             body =
                 untold
                 ? "Bali couldn't tell your teacher that Screen Time was off. It keeps trying."
-                : "Your teacher \(sees) “Screen Time off” until it's back on."
+                : "Until Screen Time is back on, your teacher \(sees) that it's off."
         }
         steps = [
             "Turn Screen Time back on for Bali",

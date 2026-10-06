@@ -1487,6 +1487,9 @@ struct AppTests {
             // Home's Waiting (D2i): not in's pair, never focus's green.
             ("state-notjoined-bg", Chip.Kind.waiting.look.fill),
             ("state-notjoined-fg", Chip.Kind.waiting.look.ink),
+            // History's Screen Time back on (D2j): not in's pair too, never focus's green.
+            ("state-notjoined-bg", Chip.Kind.protectionOn.look.fill),
+            ("state-notjoined-fg", Chip.Kind.protectionOn.look.ink),
         ]
         for (token, colour) in pinned {
             let found = drawn(colour)
@@ -1869,6 +1872,32 @@ struct AppTests {
                 let traits = link.accessibilityTraits
                 #expect(traits.contains(.link) && !traits.contains(.button), "\(traits)")
             }
+        }
+    }
+
+    @Test(
+        "Me's account (#165; D2j): whose sign-in this is, then Sign out, a button VoiceOver reads by its name and finds dimmed while an Emergency Unlock is unsent; under the policy links, which never sit beside the red Delete account (C2b); and Delete account last of all (C4b)"
+    )
+    func meAccount() throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        for (name, held) in [("me", false), ("meSignOutHeld", true)] {
+            let window = UIWindow(windowScene: scene)
+            // Tall enough for the whole of Me to lie on it, nothing scrolled away.
+            window.frame = CGRect(x: 0, y: 0, width: scene.screen.bounds.width, height: 3000)
+            window.rootViewController = UIHostingController(
+                rootView: MeView(phone: Phone(fixture: try #require(PreviewFixtures.all[name]))))
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            let elements = try voiceOver(in: window)
+            let labels = elements.map { $0.accessibilityLabel ?? "" }
+            let order = [
+                "Terms", "You're signed in as ana.rodriguez@bali.test.", "Sign out", "Delete account",
+            ].compactMap { labels.firstIndex(of: $0) }
+            #expect(order.count == 4 && order == order.sorted(), "\(name): \(labels)")
+            let signOut = try #require(elements.first { $0.accessibilityLabel == "Sign out" })
+            #expect(signOut.accessibilityTraits.contains(.button), "\(name)")
+            #expect(signOut.accessibilityTraits.contains(.notEnabled) == held, "\(name)")
         }
     }
 

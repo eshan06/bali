@@ -209,7 +209,7 @@ struct RaisedDisc: View {
 /// style in uppercase.
 struct Chip: View {
     enum Kind {
-        case focused, unlocked, protectionOff, ended, notIn, waiting
+        case focused, unlocked, protectionOff, protectionOn, ended, notIn, waiting
 
         /// The design system's fill and ink — red for protection off alone — and its SF Symbol.
         var look: (fill: Color, ink: Color, icon: String) {
@@ -217,6 +217,9 @@ struct Chip: View {
             case .focused: (Color(hex: 0xDCEDE3), Theme.brand, "checkmark.circle.fill")
             case .unlocked: (Color(hex: 0xF7E6D2), Color(hex: 0x6F3F1B), "lock.open")
             case .protectionOff: (Color(hex: 0xFAE3E0), Color(hex: 0x8C342B), "shield.slash")
+            // Screen Time back on (#167; D2j): the student goes back to focus, or to an unlock, so
+            // not in's pair and never focus's green; Screen Time off's shield, whole and checked.
+            case .protectionOn: (Theme.sunken, Color(hex: 0x524E47), "checkmark.shield")
             case .ended: (Theme.sunken, Theme.textTertiary, "flag")
             case .notIn: (Theme.sunken, Color(hex: 0x524E47), "circle")
             // Waiting for the Start (D2i): no shield on yet, so not in's pair, never focus's green;
