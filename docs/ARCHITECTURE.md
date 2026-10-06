@@ -853,7 +853,8 @@ types the API uses — on web, "one shared state function" is literally the same
 
 **4. The grid states its own health.** On a dropped stream it shows "reconnecting — last
 updated 40s ago" instead of freezing green, then catches up by event number. Only a real
-`401` signs a teacher out; a network blip shows "can't reach the server — retry."
+`401` signs a teacher out; a network blip shows "Couldn't reach Bali. Check your connection,
+then try again." with its retry (the words since D2c-2).
 
 **5. Deploys on Vercel when we ship.** A new project watching `main`; removing the
 `vercel.json` deploy block is the deliberate flip. Two open tabs are fine (each stream

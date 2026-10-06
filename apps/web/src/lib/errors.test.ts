@@ -4,6 +4,7 @@ import { ApiError, createApiClient, NetworkError } from './api-client';
 import {
   CANT_ADD_TIME,
   CANT_MAKE_CODE,
+  CANT_REACH,
   errText,
   NEW_CODE_MADE,
   NOT_A_SESSION_LENGTH,
@@ -85,14 +86,28 @@ describe('errText', () => {
     }
   });
 
-  it('keeps every other error’s own words', () => {
+  it('says no answer from the API as CANT_REACH, on every page, never the error’s log line (D2c-2)', async () => {
+    const unreachable = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.reject(new TypeError('Failed to fetch')),
+    });
+    const thrown = await unreachable.get('/v1/me').catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(NetworkError);
+    expect(errText(thrown)).toBe(CANT_REACH);
+    expect(errText(new NetworkError('anything at all'))).toBe(CANT_REACH);
+    expect(CANT_REACH).toBe("Couldn't reach Bali. Check your connection, then try again.");
+    // Its own message, now a log line, lost its em-dash too (DESIGN.md's em-dash cleanup).
+    expect(new NetworkError().message).not.toMatch(/[—–]/);
+  });
+
+  it('keeps every other error’s own words, and gives the unknown one a way on', () => {
     // No reason: a newer server's, or none; the message is all there is.
     expect(errText(new ApiError(409, 'conflict', 'session is not running'))).toBe(
       'session is not running',
     );
-    expect(errText(new NetworkError())).toBe(new NetworkError().message);
     expect(errText(new Error('boom'))).toBe('boom');
-    expect(errText('not an error')).toBe('Something went wrong.');
+    expect(errText('not an error')).toBe('Something went wrong. Try again.');
   });
 });
 

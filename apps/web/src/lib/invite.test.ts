@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiError, createApiClient, NetworkError } from './api-client';
-import { errText, NOT_AN_INVITE_CODE, TOO_MANY_TRIES, TOO_MANY_TRIES_MINUTE } from './errors';
+import { ApiError, createApiClient } from './api-client';
+import {
+  CANT_REACH,
+  errText,
+  NOT_AN_INVITE_CODE,
+  TOO_MANY_TRIES,
+  TOO_MANY_TRIES_MINUTE,
+} from './errors';
 import { attemptFor, CODE_REFUSALS, codeProblem, redeemInvite, typedCode } from './invite';
 
 // A code as the owner's command prints it (T1a), and its symbols as minted.
@@ -187,7 +193,7 @@ describe('redeemInvite', () => {
     });
     expect(await redeemInvite(unreachable, attempt)).toEqual({
       kind: 'failed',
-      message: new NetworkError().message,
+      message: CANT_REACH,
     });
     const busy = api(429, {
       error: { code: 'rate_limited', message: 'too many invite-code tries' },

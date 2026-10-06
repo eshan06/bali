@@ -244,3 +244,34 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 });
+
+describe('the pages in Soft premium use the tokens’ utilities, never a Tailwind default', () => {
+  // DESIGN.md: no `slate-*`, no `text-sm`. D2c's pages and the pieces they share; D2e to D2g add
+  // theirs as they redraw them, until the theme's default colours and sizes can go.
+  const DRAWN = [
+    'app/login/page.tsx',
+    'app/auth/callback/page.tsx',
+    'app/support/page.tsx',
+    'app/privacy/page.tsx',
+    'app/terms/page.tsx',
+    'components/portal-bar.tsx',
+    'components/button.tsx',
+    'components/mark.tsx',
+    'components/text-link.tsx',
+    'components/field.tsx',
+    'components/policy-draft.tsx',
+    'components/invite-code.tsx',
+  ];
+  const COLOUR =
+    /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
+  const SIZE = /\btext-(?:xs|sm|base|lg|\d?xl)\b/;
+  const TYPE =
+    /\b(?:tracking|leading)-(?:tighter|tight|snug|normal|relaxed|loose|wide|wider|widest)\b/;
+
+  it.each(DRAWN)('%s', (file) => {
+    const source = read(`../${file}`);
+    expect(source).not.toMatch(COLOUR);
+    expect(source).not.toMatch(SIZE);
+    expect(source).not.toMatch(TYPE);
+  });
+});

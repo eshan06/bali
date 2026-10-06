@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { PolicyDraft, TextLink } from '@/components/policy-draft';
+import { PolicyDraft } from '@/components/policy-draft';
+import { TextLink } from '@/components/text-link';
 
 /*
  * The terms' draft outline (Phase 6, C2a): the sections the lawyer's text will have, each marked

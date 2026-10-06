@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2c-2: the portal's other entry pages in Soft premium, and one sentence for
+  "no answer".** **A network failure is said one way everywhere:** `errText` answers every
+  `NetworkError` with `errors.ts`'s `CANT_REACH` ("Couldn't reach Bali. Check your connection,
+  then try again."), the words the block register and the class page's controls already used, so
+  the home, the class page, the grid, the recap and reports stop showing the error's own message
+  ("can't reach the server — retry", em-dash and all); that message is now a log line, and
+  ARCHITECTURE's Web portal decision 4 quotes the new words. The unknown thrown value gets a way on ("Something went wrong. Try again."). Only a
+  401 still signs anyone out (ARCHITECTURE, Web portal, decision 4). **The pages, within
+  DESIGN.md, nothing invented:** the callback is `/login`'s card, its failure a sentence in
+  `text-primary` and Back to sign in as the card's pill (a link drawn by `buttonClass`, since it
+  leads somewhere rather than acting); `/support` and the policy pages open with `/login`'s
+  lockup; the policy outline is a tray of section cards under the notice, drawn as §4's calm
+  banner (sunken, a hairline, `text-primary`, `radius-sm`), every word of C2a's draft kept; the
+  invite-code screen is a card on its own, as `/login`. **The field** (`components/field.tsx`,
+  PLAN's "labelled input piece", for D2e's block and class fields too): label above, the input a
+  sunken well with a `border-default` hairline at `radius-sm` (D2d's sign-in page's input), help
+  below in `caption`; a refused code draws its edge in `text-primary`, the shipped field's
+  slate-900 on the tokens, never red. **The invite code keeps its mono face, in the code style:**
+  a code checked symbol by symbol against the one sent, as a join code is; DESIGN.md §3 says "join
+  codes only", read here as codes rather than labels (the canvas's flag was Brutalist's mono
+  labels); the owner may rule otherwise. **A guard:** `tokens.test.ts` fails a D2c file that uses
+  a Tailwind default colour, size, tracking or leading; each later D2 step adds its files.
+
 - **2026-10-06** — **CORS names its methods: the portal's, no more (P11).** `@fastify/cors` 11
   defaults to `GET,HEAD,POST`, which refused the portal's `PATCH /v1/classes/{id}` at the
   preflight. The registration in `apps/api/src/app.ts` now lists GET, HEAD, POST, PATCH,

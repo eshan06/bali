@@ -20,7 +20,8 @@ question, its screen's titles and lines in `Deleting` (`Deletion.swift`); and th
 refusals `SyncEngine.swift` hands a screen ("Bali couldn't save your reason.
 Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and
-badges); `api-client.ts` (`NetworkError`'s and `UnauthorizedError`'s words);
+badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
+said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` ("No reason given", the reasons, and the session's "9:05 AM to
 9:30 AM"). `blocks.ts`, `reports.ts` and `invite.ts` hold none: their words
 are in `blocks.tsx`, the reports page, `invite-code.tsx` and `errors.ts`. In
@@ -63,11 +64,14 @@ reference), light on `:root` and dark under the device's dark mode,
 and as Tailwind's theme (`bg-surface-page`, `text-text-secondary`,
 `rounded-md`, `p-4` for `space-4`, `text-h1`, `shadow-1`); Instrument Sans
 and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
-(`lucide-react`) as the icon set; the buttons (`components/button.tsx`) and
-the mark (`components/mark.tsx`); the focus ring on every control and all
-animation off under reduced motion, both global rules. The bar and `/login`
-are in the picked style (D2c-1); the callback, `/support`, the two policy
-pages and the invite-code screen follow (D2c-2); the classes home, the grid, the recap and reports keep
+(`lucide-react`) as the icon set; the buttons (`components/button.tsx`), the
+mark and the lockup (`components/mark.tsx`), a link in running text
+(`components/text-link.tsx`) and the labelled text field
+(`components/field.tsx`); the focus ring on every control and all
+animation off under reduced motion, both global rules. The entry pages are in
+the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
+`/support`, the two policy pages and the invite-code screen (D2c-2), held to
+the tokens' utilities by `tokens.test.ts`; the classes home, the grid, the recap and reports keep
 their Tailwind classes on the new base (the page colour, the font, the ring,
 and the radii: their `rounded-lg` is now 20 px) until D2e–D2g, which also
 retire Tailwind's default colours and sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
