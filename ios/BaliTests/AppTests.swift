@@ -1827,9 +1827,12 @@ struct AppTests {
             }
             #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under Continue")
             // VoiceOver: the links there on the last page alone — never invisible ones before it
-            // — each a link, not a button, as the portal's are.
+            // — each a link, not a button, as the portal's are; Continue read on every page, so a
+            // walk that finds nothing can't pass for the links hidden.
+            let elements = try voiceOver(in: window)
+            #expect(elements.contains { $0.accessibilityLabel == "Continue" }, "page \(page)")
             let titles = PolicyLinks.Page.allCases.map(\.title)
-            let read = voiceOver(in: window).filter { titles.contains($0.accessibilityLabel ?? "") }
+            let read = elements.filter { titles.contains($0.accessibilityLabel ?? "") }
             #expect(read.map(\.accessibilityLabel) == (linked ? titles : []), "page \(page)")
             for link in read {
                 let traits = link.accessibilityTraits
@@ -1889,16 +1892,26 @@ struct AppTests {
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
 
-/// What VoiceOver reaches in `object`, in its order: the accessibility elements under it, those
-/// hidden from it left out — SwiftUI's own, through its hosting view's elements.
+/// What VoiceOver reaches in `window`, in its order: the accessibility elements under it, those
+/// hidden from it left out — SwiftUI's own, through its hosting view's elements. The app's
+/// accessibility is turned on first, as VoiceOver turns it on: SwiftUI builds no accessibility
+/// elements until it is, and a simulator that never had it on — CI's, made fresh for each run —
+/// has it off (santa's round 1, C2b). Through libAccessibility, as Cash App's
+/// AccessibilitySnapshot turns it on for its snapshots.
 @MainActor
-private func voiceOver(in object: NSObject) -> [NSObject] {
-    if object.accessibilityElementsHidden { return [] }
-    if object.isAccessibilityElement { return [object] }
-    if let elements = object.accessibilityElements as? [NSObject] {
-        return elements.flatMap(voiceOver(in:))
+private func voiceOver(in window: UIWindow) throws -> [NSObject] {
+    let library = try #require(dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW))
+    let enable = try #require(dlsym(library, "_AXSApplicationAccessibilitySetEnabled"))
+    unsafeBitCast(enable, to: (@convention(c) (Bool) -> Void).self)(true)
+    func walk(_ object: NSObject) -> [NSObject] {
+        if object.accessibilityElementsHidden { return [] }
+        if object.isAccessibilityElement { return [object] }
+        if let elements = object.accessibilityElements as? [NSObject] {
+            return elements.flatMap(walk)
+        }
+        return ((object as? UIView)?.subviews ?? []).flatMap(walk)
     }
-    return ((object as? UIView)?.subviews ?? []).flatMap(voiceOver(in:))
+    return walk(window)
 }
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
