@@ -5,6 +5,7 @@ import type {
   SessionSnapshot,
   SnapshotUnlock,
 } from '@bali/shared';
+import { UNLOCK_REASONS } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -69,11 +70,11 @@ function evt(
   return { seq, eventId: `ev-${seq}`, type, userId, occurredAt: at, payload };
 }
 
-/** The chip as a teacher reads it: the display, and what it adds for an unlock. */
-function chip(students: Students, id: string, now = new Date(T1)) {
+/** The chip as a teacher reads it, or the class in Present: the display, and its unlock's note. */
+function chip(students: Students, id: string, now = new Date(T1), present = false) {
   const s = students[id];
   const display = gridDisplay(s, now);
-  return { display, note: unlockNote(s, display) };
+  return { display, note: unlockNote(s, display, present) };
 }
 
 describe('grid-state', () => {
@@ -594,6 +595,29 @@ describe('a changed reason (A20)', () => {
       s = applyEvent(s, e);
     }
     expect(chip(s, 'ana')).toEqual(chip(fromSnapshot(boot), 'ana'));
+  });
+});
+
+describe('Present, the projector the class can see (D2f)', () => {
+  // The consent card promises an unlock's reason to the teacher (A1), never the class.
+  it('renders no unlock reason: the state alone, on every chip that carries one', () => {
+    for (const reason of UNLOCK_REASONS) {
+      let s = fromSnapshot(snapshot(5, [{ id: 'ana' }, { id: 'ben' }]));
+      s = applyEvent(s, evt(6, 'unlock', 'ana', T1, { reason }));
+      s = applyEvent(s, evt(7, 'protection_off', 'ben'));
+      s = applyEvent(s, evt(8, 'unlock', 'ben', T1, { recorded_as: 'protection_off', reason }));
+      const present = (id: string) => chip(s, id, new Date(T1), true);
+      expect(present('ana')).toEqual({ display: 'unlocked', note: null });
+      expect(present('ben')).toEqual({ display: 'protection_off', note: 'unlocked' });
+
+      s = applyEvent(s, evt(9, 'session_expired', null));
+      expect(present('ana')).toEqual({ display: 'left_unprotected', note: null });
+      expect(present('ben')).toEqual({ display: 'left_protection_off', note: 'unlocked' });
+
+      // The teacher's own view keeps it.
+      expect(chip(s, 'ana').note).not.toBeNull();
+      expect(chip(s, 'ben').note).toMatch(/^unlocked · ./);
+    }
   });
 });
 
