@@ -8,6 +8,22 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **Present never shows an unlock's reason.** D2f-2 gave Present the grid's own
+  words, so a projected grid read "Unlocked · nurse" beside a student's name, while the consent
+  card (`ConsentCard`, which `/support` lists word for word) promises the reason to the teacher:
+  "When you unlock, and the reason if you share one". Both santa reviewers raised it on #263; the
+  owner's standing instruction took the recommended option. In Present a chip shows the state
+  alone: "Unlocked", "Left · unlocked", and on a protection-off chip "unlocked" with no reason.
+  The teacher's standard view keeps the reason. One guard in `unlockNote` (`grid-state.ts`), where
+  every chip's note comes from, so a changed reason (A20) or a snapshot's reads the same; a test
+  pins it for every reason. The rest of Present stays as drawn. Each student's state, "Unlocked"
+  included, is what Present exists to show the room (the owner's pick, Q4), and whether a projector
+  shows states at all is the owner's call; Silent's minutes, "last seen" and Clock off are about the
+  phone (its contact, its clock). The reason is the one detail a student adds for the teacher alone.
+  **Not covered:** a session that ends while the page is projected leaves the recap card and How
+  it ended on the screen, both showing reasons as the teacher's view does; the recap is D2g's,
+  and what the page shows at the bell after Present is the owner's call.
+
 - **2026-10-06** — **D2f-3: the join code in Soft premium; a lost mint shows the code Bali holds;
   no school said in Bali's words.** Two review WARNs ridden along (#247's, #260's). **New code is a
   disclosure** (`aria-expanded`) that stays where it is while its confirm, a card, opens under it,

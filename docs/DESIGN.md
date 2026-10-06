@@ -327,7 +327,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
   grid's header (a secondary pill whose pressed state is shown, never by
   colour alone), switches into the **projector view**: four columns, names at
   20/28 semibold, chip labels at 14/20, cells at least 88 px tall, readable
-  from the back of a classroom; the same chips, the same words. Those two
+  from the back of a classroom; the same chips and words, but an unlock's
+  reason (below). Those two
   sizes are a Present-only style on the type scale (the owner's ruling,
   2026-10-05): names 20 px and labels 14 px, as drawn, with their line
   heights on the 4-pt grid (the canvas drew 26 and 18; D2f-2 took them up to
@@ -337,6 +338,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
   below the desktop width, never by shrinking type: by the grid's own width
   (container queries), the class page 1400 px wide at most, as the B artboard
   drew it.
+- **Present never shows an unlock's reason**, because the class can see it:
+  "Unlocked" alone where the teacher's view says "Unlocked · nurse" (2026-10-06).
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
