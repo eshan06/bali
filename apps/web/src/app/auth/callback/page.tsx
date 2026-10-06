@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { buttonClass } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
 import { Lockup } from '@/components/mark';
 import { completeLogin } from '@/lib/auth';
 
@@ -27,7 +28,7 @@ export default function CallbackPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
-      <div className="rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
+      <div className={CARD_ALONE}>
         <Lockup />
         {failed ? (
           <>

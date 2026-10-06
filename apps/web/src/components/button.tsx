@@ -2,17 +2,20 @@ import type { ComponentProps } from 'react';
 
 /**
  * The portal's buttons (DESIGN.md §4): a pill 40 px tall with space-4 side padding and a body
- * semibold label, the focus ring from globals.css. Primary is the brand's fill; secondary the
- * card colour with a strong stroke, sunken while hovered or pressed; destructive only for
- * removing a student or deleting a class (its tokens name no hover shade, so it has none). Dimmed
- * to 60 % while disabled, or while busy but kept focusable with `aria-disabled`.
+ * semibold label, the focus ring from globals.css, each with a 1 px edge, so a label is one width
+ * whatever the look. Primary is the brand's fill; secondary the card colour with a strong stroke,
+ * sunken while hovered or pressed, and pressed (`aria-pressed`, Present) or open
+ * (`aria-expanded`, New code) as a sunken fill with a `text-primary` edge, never by colour alone;
+ * destructive only for removing a student or deleting a class (its tokens name no hover shade, so
+ * it has none). Dimmed to 60 % while disabled, or while busy but kept focusable with
+ * `aria-disabled`.
  */
 const VARIANTS = {
   primary:
-    'bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover active:bg-action-primary-bg-hover',
+    'border border-transparent bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover active:bg-action-primary-bg-hover',
   secondary:
-    'border border-border-strong bg-surface-card text-text-primary hover:bg-surface-sunken active:bg-surface-sunken',
-  destructive: 'bg-action-destructive-bg text-action-destructive-fg',
+    'border border-border-strong bg-surface-card text-text-primary hover:bg-surface-sunken active:bg-surface-sunken aria-expanded:border-text-primary aria-expanded:bg-surface-sunken aria-pressed:border-text-primary aria-pressed:bg-surface-sunken',
+  destructive: 'border border-transparent bg-action-destructive-bg text-action-destructive-fg',
 };
 
 type Variant = keyof typeof VARIANTS;

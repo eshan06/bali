@@ -4,8 +4,8 @@ import type { BlockDetail, BlockListResponse } from '@bali/shared';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD } from '@/components/card';
 import { Field } from '@/components/field';
-import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { blockIdOf, loadProblem, type RegisterAnswer, registerBlock } from '@/lib/blocks';
 import { NOT_A_BLOCK_ID } from '@/lib/errors';
 import { useApi } from '@/lib/use-api';
@@ -18,7 +18,7 @@ const registeredOn = (iso: string) =>
 
 /**
  * The teacher's blocks on the classes home (P3; in Soft premium, D2e): the ones registered to
- * them as cards in a tray, each ID in the code style, and a field to register one by the ID
+ * them as cards, each ID in the code style, and a field to register one by the ID
  * written on it. The ID is checked as the phone reads a tag before a try is spent on it; each
  * refusal is said under the field, with the way on; an answer that never came is sent again as it
  * was by Try again, which is safe: one's own tag registers once.
@@ -106,9 +106,9 @@ export function Blocks() {
       ) : (
         <>
           {blocks.length === 0 ? (
-            <p className={`mt-6 text-body ${EMPTY_TRAY}`}>No block registered yet.</p>
+            <p className="mt-6 text-body text-text-secondary">No block registered yet.</p>
           ) : (
-            <ul className={`mt-6 ${TRAY}`}>
+            <ul className="mt-6 grid gap-2">
               {blocks.map((b) => (
                 <li
                   key={b.id}

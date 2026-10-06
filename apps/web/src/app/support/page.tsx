@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { buttonClass } from '@/components/button';
+import { CARD } from '@/components/card';
 import { Lockup } from '@/components/mark';
 import { TEXT_LINK, TextLink } from '@/components/text-link';
 
@@ -39,10 +40,6 @@ const SECTIONS = [
   { id: 'privacy', title: 'Privacy' },
   { id: 'help', title: 'Get help' },
 ];
-
-/** A card in a tray (DESIGN.md §4): `surface-card`, `radius-md`, `shadow-1`; its hairline in dark. */
-const CARD =
-  'rounded-md border border-transparent bg-surface-card p-4 shadow-1 dark:border-border-default';
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -132,11 +129,8 @@ export default function SupportPage() {
               Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
-          {/* The app's consent card's two lists (ConsentCard), as two cards in a tray. */}
-          <div
-            id="teacher-sees"
-            className="grid scroll-mt-6 gap-2 rounded-lg bg-surface-sunken p-2"
-          >
+          {/* The app's consent card's two lists (ConsentCard), as two cards. */}
+          <div id="teacher-sees" className="grid scroll-mt-6 gap-2">
             <div className={CARD}>
               <h3 className="flex items-center gap-2 text-h3">
                 <Eye size={20} aria-hidden="true" className="shrink-0 text-text-brand" />

@@ -3,6 +3,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
 import { Field } from '@/components/field';
 import {
   type Attempt,
@@ -84,7 +85,7 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
 
   return (
     // A card on its own (DESIGN.md §4), as /login's: one step, one card, centred under the bar.
-    <div className="mx-auto max-w-md rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
+    <div className={`mx-auto max-w-md ${CARD_ALONE}`}>
       <h1 className="text-h1 text-balance">Enter your invite code</h1>
       <p className="mt-2 text-body-lg text-pretty text-text-secondary">
         You need it once, to set up this account for teaching.

@@ -6,18 +6,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD } from '@/components/card';
 import { RecapCard } from '@/components/recap-card';
-import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
+import { NAV_LINK } from '@/components/text-link';
 import { getAccessToken } from '@/lib/auth';
 import { FIRST_READ, type ReadAt, readSessions, sessionRow, startRead } from '@/lib/reports';
 import { useApi } from '@/lib/use-api';
 
 /** The page's column, under the bar: room for a session and its six figures on one row (§5). */
 const PAGE = 'mx-auto max-w-6xl px-4 pt-10 pb-16 sm:px-10';
-
-/** Back to the class: brand ink and an arrow, as the class page's links across the portal. */
-const NAV_LINK =
-  'inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-brand underline-offset-2 hover:underline';
 
 /**
  * A session's row, from the list's width where the session and its six figures fit side by side
@@ -30,9 +27,9 @@ const COLUMNS = ['Joined', 'Focus time', 'Average', 'Silent', 'Unlocks', 'Protec
 const [JOINED, FOCUS, AVERAGE, SILENT, UNLOCKS, PROTECTION_OFFS] = COLUMNS;
 
 /**
- * A class's reports (R5; in Soft premium, D2g): R3's sessions, a page at a time, each a card in the
- * tray that opens its recap (R4's card fed by R2) inside it. A list, not a table, so it reflows by
- * its own width (DESIGN.md §8): never a table that scrolls sideways.
+ * A class's reports (R5; in Soft premium, D2g): R3's sessions, a page at a time, each a card that
+ * opens its recap (R4's card fed by R2) inside it. A list, not a table, so it reflows by its own
+ * width (DESIGN.md §8): never a table that scrolls sideways.
  */
 export default function ReportsPage() {
   const api = useApi();
@@ -92,16 +89,17 @@ export default function ReportsPage() {
       {retry('newest', "Couldn't load the sessions.")}
 
       {list.loaded && list.sessions.length === 0 && list.nextBefore === null ? (
-        <p className={`mt-6 text-body ${EMPTY_TRAY}`}>
+        <p className="mt-6 text-body text-text-secondary">
           No reports yet. When a session ends, its report shows here.
         </p>
       ) : null}
       {list.sessions.length > 0 ? (
         <div className="mt-6 @container">
-          {/* The column names, once, for the eye; each figure carries its own for a screen reader. */}
+          {/* The column names, once, for the eye, in line with the figures inside the cards' 1 px
+              edge and `space-4`; each figure carries its own for a screen reader. */}
           <div
             aria-hidden="true"
-            className={`hidden gap-x-3 px-6 pb-3 text-label text-text-tertiary uppercase @4xl:grid @4xl:items-end ${ROW}`}
+            className={`hidden gap-x-3 px-[17px] pb-3 text-label text-text-tertiary uppercase @4xl:grid @4xl:items-end ${ROW}`}
           >
             <span>Session</span>
             {COLUMNS.map((name) => (
@@ -110,7 +108,7 @@ export default function ReportsPage() {
               </span>
             ))}
           </div>
-          <ul aria-label="Sessions, newest first" className={TRAY}>
+          <ul aria-label="Sessions, newest first" className="grid gap-2">
             {list.sessions.map((session) => {
               const row = sessionRow(session);
               const isOpen = open === session.id;
@@ -183,7 +181,7 @@ export default function ReportsPage() {
 
 /**
  * A session's figure in `data`: its name above it on a narrow row, and on a wide one only for a
- * screen reader, the column names above the tray saying it for the eye.
+ * screen reader, the column names above the list saying it for the eye.
  */
 function Figure({ label, value }: { label: string; value: string }) {
   return (
