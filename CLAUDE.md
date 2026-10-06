@@ -61,7 +61,8 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    task with no plan is done by the session itself. Message the
    owner only for: parked steps, device checkpoints (anything needing a
    physical iPhone), genuine scope or architecture decisions the docs don't
-   answer, and destructive/irreversible actions.
+   answer, a screen with no approved design (Working rules), and
+   destructive/irreversible actions.
 3. **Execute** on a branch cut from the latest `origin/main`: code + tests
    together, fast checks locally as you go.
 4. **Verify:** first the deterministic checks (`npm run typecheck && npm run
@@ -93,13 +94,19 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 - **New feature?** Check `docs/PLAN.md` first. Design against ARCHITECTURE.md.
   When done, add the feature to PLAN.md with a one-line architecture note; if
   it changed a real design decision, update ARCHITECTURE.md itself.
+- **Every user-facing screen is designed in Claude Design and approved by the
+  owner before it is built.** Every state counts (loading, empty, error, large
+  text). A UI PR links the approved design it builds; a screen with no approved
+  design is a stop-and-ask. Restoring a previously shipped look on the owner's
+  order is the only exception.
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,
   `apps/web/src/components`), `ios/Bali/UI`, the shield (`ios/BaliShield`),
   the Cognito sign-in page (D2d), a demo site, and user-facing strings
   wherever they live (DESIGN.md lists where). Read `docs/DESIGN.md` first,
   then design and build with the `design-taste-frontend` and
-  `high-end-visual-design` skills (Bali's style, Soft premium), and write
+  `high-end-visual-design` skills (Bali's style, Soft premium, on the portal;
+  an app screen follows its approved design), and write
   every new or changed user-facing
   string with the `no-ai-slop` skill; `/santa-loop` runs
   `web-design-guidelines` on the portal's UI and `no-ai-slop` on changed

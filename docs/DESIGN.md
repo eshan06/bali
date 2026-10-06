@@ -50,17 +50,16 @@ pick on the
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
 to Q2–Q7 are the reference for what this file says about it. The approved
 screen designs (D1, the student app, `docs/PLAN.md`) win over both for the
-screens they draw, until a D2 step redraws a screen in the picked style
-(D2h–D2k): from then on that step's screen is the approved one. Changing any
-of it is the owner's call, made on a design canvas, never a side effect of a
-PR.
+screens they draw. Changing any of it is the owner's call, never a side effect
+of a PR: every user-facing screen is designed in Claude Design and approved by
+the owner before it is built (CLAUDE.md, Working rules).
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
-pinned by `AppTests.tokens`) in the Soft premium shapes from D2h, pill buttons
-and chips, sunken inputs under the focus ring, from D2i Home's hero card in
-a tray and the ring on Focus and Waiting on a raised disc, and from D2j Me's
-name as its hero in a tray and its account in a card of its own; its screens
-take the style group by group, D2h–D2k. The portal draws from them too, from D2c on
+pinned by `AppTests.tokens`) in D1's shapes. Its Soft premium redraw (D2h–D2j)
+was rolled back on 2026-10-06, the owner's call on seeing it
+(`docs/DECISIONS.md`): every app screen looks as it did before D2h, and a new
+look for any of them waits for a design the owner approves. The words and the
+fixes those steps made stayed (`docs/PLAN.md`, D2). The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), light on `:root` and dark under the device's dark mode,
@@ -104,7 +103,8 @@ honesty without harshness.
 
 **The style: Soft premium** (the owner's pick, 2026-10-04, Q1 B on D2a's
 canvas; the `high-end-visual-design` skill's language, inside Bali's tokens).
-In this file's terms:
+The portal is drawn in it (D2c–D2g). The app is not: its redraw (D2h–D2j) was
+rolled back on 2026-10-06, and it keeps D1's look. In this file's terms:
 
 - **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
   at `radius-lg`; each card inside is `surface-card` at `radius-md` with
@@ -114,8 +114,7 @@ In this file's terms:
   carries the edge.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
-- **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc (the
-  app's ring on Focus and Waiting, D2i) or
+- **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
   popover, `shadow-3` on sheets: warm black, never blue-grey, never a hard
   drop (§6).
 - **Tinted chips on plain cells** (Q5 A). The chip is filled with its state's
@@ -259,9 +258,9 @@ class page's minutes field types in it too, on the Field since D2f-2.
 - **Primary button:** `action-primary-bg`, `action-primary-fg` label, hover
   or pressed `action-primary-bg-hover`, no shadow; a pill (`radius-full`) in
   Soft premium. On iOS: full width, 56 pt tall, a 17 semibold label, dimmed
-  to 60% while disabled or busy (a pill on every iOS screen from D2h, through
-  `Theme.swift`). On the web: 40 px tall, `space-4` side padding, a `body`
-  semibold label.
+  to 60% while disabled or busy, at D1's `radius-md` (the app's pills were
+  rolled back with D2h, 2026-10-06). On the web: 40 px tall, `space-4` side
+  padding, a `body` semibold label.
 - **Secondary button:** the primary's shape, `surface-card` with a
   `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
 - **Destructive button:** `action-destructive-*`, only for removing a student
@@ -274,13 +273,13 @@ class page's minutes field types in it too, on the Field since D2f-2.
   between anyone and the exit. Warm orange, `radius-full`; the hold's progress
   is a ring, and the `spring` easing is its spring-back on an early release.
   Always reachable when the shields are on. Its words are D1's on two lines
-  (D2i): "Hold to unlock" in the button's label style, "Your teacher will see
+  (D2i, kept in the rollback): "Hold to unlock" in the button's label style, "Your teacher will see
   it" under it in `body`, each one line at the default text size.
 - **Card and tray:** a card is `surface-card` with `shadow-1` at rest and, in
   dark, a `border-default` hairline instead. A group of cards sits in a tray:
   `surface-sunken` at `radius-lg` with a `space-2` inset, the cards inside at
-  `radius-md` with `space-4` padding (the grid's cells, Home's tap card, Me's
-  name). A
+  `radius-md` with `space-4` padding (the grid's cells; the app draws no tray,
+  its cards stand alone as D1 drew them). A
   card standing alone (the recap, a sheet) is `radius-lg` with `space-6`
   padding (`space-5` on iOS), its stat tiles and wells `surface-sunken` at
   `radius-md`. Use a card only when elevation means hierarchy; otherwise group
@@ -289,7 +288,7 @@ class page's minutes field types in it too, on the Field since D2f-2.
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's
   ruling of 2026-10-05 over the canvas's 4 × 10 px), and D1's 6 × 12 pt on
-  iOS.
+  iOS, at D1's `radius-md` there.
   Silent and Unknown add a 1 px dashed `border-strong` edge (§2). A chip
   never pulses but as §7 allows.
 - **The grid's stale banner** ("Live feed has gone quiet…", drawn on D2a's
@@ -297,14 +296,17 @@ class page's minutes field types in it too, on the Field since D2f-2.
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
   alarmed.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
-  focus shows the focus ring (on iOS, `focusRing` in `Theme.swift`). What is
-  typed is the input size (§3), 16 px, so iPhone Safari never zooms in; a label
-  is always a real label, never a placeholder standing in for one. A menu drawn
-  as a field (the app's age screen) takes the well and no ring: nothing is typed
-  into it.
+  focus shows the focus ring. What is typed is the input size (§3), 16 px, so
+  iPhone Safari never zooms in; a label is always a real label, never a
+  placeholder standing in for one. The app keeps D1's fields (2026-10-06's
+  rollback): Join's code a white field whose border turns green while typing,
+  the age screen's menus drawn as that field, Me's name a sunken well with the
+  same green edge.
 - **Links:** `text-brand`, medium, underlined, so a link never rests on colour
-  alone: the portal's `TextLink` (`components/text-link.tsx`) and the app's
-  policy links (`PolicyLinks`, D2h).
+  alone: the portal's `TextLink` (`components/text-link.tsx`). The app's policy
+  links (`PolicyLinks`, C2-app) keep their look from before D2h, `caption` in
+  the brand's ink and no underline: on colour alone, a known gap until the
+  owner approves the app's next design.
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.
@@ -456,7 +458,8 @@ design if it has one. Then:
   teacher mid-lesson, calm and dense, in the Bali Design System."
 - **Build with both skills:** `design-taste-frontend` for the read, the
   discipline and the tells; `high-end-visual-design` for Soft premium's shape
-  language (the tray, the pills, the soft shadow, the spacing rhythm). Where
+  language (the tray, the pills, the soft shadow, the spacing rhythm) on the
+  portal; an app screen follows its approved design. Where
   either disagrees with this file, this file wins; neither's fonts, palette,
   icons or motion override the tokens.
 - **Use the dials for product UI:** `DESIGN_VARIANCE 3`, `MOTION_INTENSITY 2`,

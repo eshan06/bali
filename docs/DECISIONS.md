@@ -8,6 +8,29 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **The app's Soft premium redesign is rolled back, and every screen is now
+  designed and approved before it is built.** The owner, after seeing D2h, D2i and D2j (#233,
+  #262, #266) in the app: "I don't like the app redesign either. remove those PRs" (the shield's,
+  #268, was closed unmerged the same day). Those steps ran with no sign-off wait, each taste call
+  the recommended option, so the owner first saw the screens once they had shipped. **What went:**
+  the look, every app screen back as it was before D2h: D1's `radius-md` buttons and chips, Join's
+  white code field, the age screen's menus drawn as it, Home's cards with no tray, Focus's and
+  Waiting's rings with no raised disc, Unlocked's reasons at `radius-sm`, Me as D1 drew it (its
+  name card, Sign out with whose sign-in under it, Delete account's question in a caption), and
+  the policy links (C2-app) as a caption in the brand's ink. **What stayed**, since it was never
+  the style: the words (the em-dash cleanup and "Bali couldn't start" in the student's words,
+  #115's voice items; Protection off and the Screen Time screen saying what the teacher sees
+  without quoting a label the grid never shows); History's "Screen Time back on" and Home's
+  "Waiting" chips (the not-joined pair, never green, each with its own icon); Emergency Unlock's
+  words on two lines, where D1's one sentence wrapped mid-phrase; "Bali couldn't start" scrolling
+  once the text outgrows the screen; the age stop screen's words on the gutter. C7's flow (#272)
+  is untouched. The portal stays in Soft premium (D2c–D2g). Me's #165 changes went with the look,
+  so a better Me waits for its own approved design. **The rule** (CLAUDE.md, Working rules): every
+  user-facing screen is designed in Claude Design and approved by the owner before it is built,
+  every state included; a UI PR links its approved design, and a screen without one is a
+  stop-and-ask. Restoring a shipped look on the owner's order, as this rollback does, is the one
+  exception.
+
 - **2026-10-06** — **C7's age question moves to the Sign in tap.** The owner's decision, from
   testing the TestFlight build: being asked your age before you have even signed in felt wrong
   as the app's very first screen. So a first launch opens on the intro, and the question shows

@@ -4,14 +4,14 @@ import SwiftUI
 import UIKit
 
 /// Me (C6b; D1's Me), where the router sends the Me tab: the name the student's teachers see,
-/// edited in place (A8's `PATCH /v1/me`, `Naming`), the page's hero in DESIGN.md's tray (D2j);
-/// their classes with each teacher, and Join a class over it with a way back (`ClassesSection`);
-/// what Bali does in class, Screen Time's state and what a teacher sees (the intro's own page),
-/// the portal's privacy policy and terms under it (`PolicyLinks`, C2b); and the account (#165):
-/// whose sign-in this is (#147) and Sign out, which waits while an Emergency Unlock is unsent
-/// (`SignOutWords`), in a card of their own; D1's Leave on each class, asked first, never while
-/// the phone stands in that class's lesson (C6c, `Leaving`); and, at the very bottom, Delete
-/// account, asked first too (C4b, `Deleting`). Every failure is said with its way on (rule 5).
+/// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
+/// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
+/// and what a teacher sees (the intro's own page); the portal's privacy policy and terms
+/// (`PolicyLinks`, C2b); and Sign out, whose sign-in it ends said under it (#147), which waits
+/// while an Emergency Unlock is unsent (`SignOutWords`); D1's Leave on each class, asked first,
+/// never while the phone stands in that class's lesson (C6c, `Leaving`); and, at the very bottom,
+/// Delete account, asked first too (C4b, `Deleting`). Every failure is said with its way on
+/// (rule 5).
 struct MeView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
@@ -28,22 +28,23 @@ struct MeView: View {
     var body: some View {
         ScreenScaffold {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("Me").textStyle(.h1).accessibilityAddTraits(.isHeader)
-                    // Once a read has named the student: until then Classes says why not. The
-                    // page's hero, in DESIGN.md's tray as Home's is (D2j).
+                    // Once a read has named the student: until then Classes says why not.
                     if let me = phone.sync?.me {
-                        Tray {
-                            if phone.naming.editing { editing } else { name(me.user.displayName) }
+                        Card(padding: 0) {
+                            Group {
+                                if phone.naming.editing { editing } else { name(me.user.displayName) }
+                            }
+                            .padding(.vertical, 14).padding(.horizontal, 16)
                         }
                     }
                     ClassesSection(phone: phone, title: "Classes", leaves: true)
-                    VStack(alignment: .leading, spacing: 8) {
-                        about
-                        // Above Sign out, never beside the red Delete account (C2b).
-                        PolicyLinks(alignment: .leading)
-                    }
-                    account
+                    about
+                    // Above Sign out, never beside the red Delete account (C2b).
+                    PolicyLinks(alignment: .leading)
+                    SignOutButton(phone: phone, email: phone.email)
+                    DeleteAccountButton(phone: phone)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -52,18 +53,16 @@ struct MeView: View {
         .sheet(isPresented: $consent) { ConsentSheet() }
     }
 
-    /// A group's label, as Classes' is.
-    private func label(_ words: String) -> some View {
-        Text(words).textStyle(.label).textCase(.uppercase).foregroundStyle(Theme.textTertiary)
+    private var label: some View {
+        Text("Name").textStyle(.label).textCase(.uppercase).foregroundStyle(Theme.textTertiary)
     }
 
-    /// D1's name card, the page's hero (D2j): the name the student's teachers see, a card's title
-    /// on the type scale, and the button that edits it, round as every button in the app is.
+    /// D1's name card: the name the student's teachers see, and the button that edits it.
     private func name(_ name: String?) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                label("Name")
-                Text(name ?? "No name yet").textStyle(.h3)
+                label
+                Text(name ?? "No name yet").textStyle(TextStyle(size: 17, line: 26, weight: .semibold))
                     .foregroundStyle(name == nil ? Theme.textTertiary : Theme.text)
                 Text(
                     name == nil
@@ -77,18 +76,19 @@ struct MeView: View {
                 phone.naming.edit(name)
             } label: {
                 Image(systemName: "pencil").font(.system(size: 18, weight: .medium))
-                    .frame(width: 44, height: 44).overlay(Circle().stroke(Theme.borderStrong))
+                    .frame(width: 44, height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm).stroke(Theme.borderStrong))
             }
             .foregroundStyle(Theme.text).accessibilityLabel("Edit name")
         }
     }
 
-    /// The name as the student edits it (DESIGN.md's input: the label above a sunken well under the
-    /// focus ring, the helper and any error below), then Save — again, after a failure — or Cancel.
+    /// The name as the student edits it (DESIGN.md's input: the label above a sunken well, the
+    /// helper and any error below), then Save — again, after a failure — or Cancel.
     private var editing: some View {
         let naming = phone.naming
         return VStack(alignment: .leading, spacing: 8) {
-            label("Name").accessibilityHidden(true)
+            label.accessibilityHidden(true)
             TextField("Name", text: $text, prompt: Text(""))
                 .textStyle(.bodyLg).textContentType(.name).textInputAutocapitalization(.words)
                 .autocorrectionDisabled().submitLabel(.done).tint(Theme.brand)
@@ -101,7 +101,9 @@ struct MeView: View {
                 .onSubmit(save)
                 .padding(.horizontal, 12).padding(.vertical, 8).frame(minHeight: 48)
                 .background(Theme.sunken, in: .rect(cornerRadius: Theme.Radius.sm))
-                .focusRing(typing, radius: Theme.Radius.sm)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                        .stroke(typing ? Theme.arc : .clear, lineWidth: 2))
             Text("Your teachers see this name.").textStyle(.caption)
                 .foregroundStyle(Theme.textTertiary)
             if let failure = naming.failure { Text(failure).textStyle(.body) }
@@ -177,95 +179,58 @@ struct MeView: View {
         }
         .buttonStyle(.plain)
     }
-
-    /// The account (#165): whose sign-in this is (#147) and Sign out, in a card of their own — Sign
-    /// out a row with its icon, an action at a glance where a plain line under the cards read as a
-    /// heading (D2a's audit), held while an Emergency Unlock is unsent, said why above the card with
-    /// Try again — and under the card, Delete account, the screen's one red (C4b).
-    private var account: some View {
-        let held = phone.signOutHeld
-        return VStack(alignment: .leading, spacing: 8) {
-            label("Account")
-            if let held { Retry(words: held, phone: phone) }
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if let signedIn = SignOutWords.signedIn(phone.email) {
-                        Text(signedIn).textStyle(.body).foregroundStyle(Theme.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(16)
-                        Rectangle().fill(Theme.border).frame(height: 1)
-                    }
-                    Button {
-                        Task { await phone.signOut() }
-                    } label: {
-                        Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
-                            .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-                            .foregroundStyle(Theme.brand).padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain).disabled(held != nil).opacity(held == nil ? 1 : 0.6)
-                }
-            }
-            if let failed = phone.signOutFailure { Text(failed).textStyle(.body) }
-            DeleteAccountButton(phone: phone)
-        }
-    }
 }
 
-/// D1's Sign out on Join, where a student in no class reaches nothing else (`Phone.offersSignOut`):
-/// held while an Emergency Unlock is unsent, said why with Try again, and why the last did not
-/// finish (C6b). Me's is a row of its account card (D2j).
+/// D1's Sign out — held while an Emergency Unlock is unsent, said why with Try again — and why the
+/// last did not finish (C6b): Me's, and Join's where a student in no class reaches nothing else
+/// (`Phone.offersSignOut`). On Me, whose sign-in it ends, under it (#147).
 struct SignOutButton: View {
     let phone: Phone
+    /// The email of the sign-in Sign out ends, said under it as its helper (Me's, #147); nil says
+    /// nothing.
+    var email: String?
 
     var body: some View {
-        let held = phone.signOutHeld
+        let held = phone.sync.flatMap(SignOutWords.held)
         if let held { Retry(words: held, phone: phone) }
         VStack(alignment: .leading, spacing: 4) {
             Button("Sign out") { Task { await phone.signOut() } }
                 .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary).frame(minHeight: 44)
                 .disabled(held != nil).opacity(held == nil ? 1 : 0.6)
-            if let failed = phone.signOutFailure { Text(failed).textStyle(.body) }
+            if let signedIn = SignOutWords.signedIn(email) {
+                Text(signedIn).textStyle(.caption).foregroundStyle(Theme.textTertiary)
+            }
+            // Held, the hold is the one reason said: a failure from before it is not (C6b-1's
+            // review).
+            if held == nil, let failed = phone.signOutFailed { Text(failed).textStyle(.body) }
         }
     }
 }
 
-extension Phone {
-    /// Why Sign out waits, said by it with Try again: an Emergency Unlock this phone recorded that
-    /// the server has not (`SignOutWords.held`). Nil: nothing holds it.
-    var signOutHeld: String? { sync.flatMap(SignOutWords.held) }
-
-    /// Why the last Sign out did not finish, said under it: held, the hold is the one reason said,
-    /// never a failure from before it (C6b-1's review).
-    var signOutFailure: String? { signOutHeld == nil ? signOutFailed : nil }
-}
-
 /// Delete account (C4b; the owner's picks, 2026-10-05), at the very bottom of Me under Sign out and
 /// whose sign-in it is: a text button in DESIGN.md's destructive red, the one red on the screen.
-/// Pressed, it gives way to its question, asked as Leave asks its own (`LeaveQuestion`), on a card
-/// of its own (D2j): what goes and what stays, in `body` where a caption was small for an act that
-/// can't be undone, a red Delete account and Cancel. From there the deletion's own screen takes
-/// over (`DeletingView`), and says every stop with its way on (rule 5); an Emergency Unlock still
-/// unsent is one such stop, said there by the engine, which reads the file itself.
+/// Pressed, it gives way to its question, asked as Leave asks its own (`LeaveQuestion`): what goes
+/// and what stays, a red Delete account and Cancel. From there the deletion's own screen takes over
+/// (`DeletingView`), and says every stop with its way on (rule 5); an Emergency Unlock still unsent
+/// is one such stop, said there by the engine, which reads the file itself.
 struct DeleteAccountButton: View {
     let phone: Phone
 
     var body: some View {
         if phone.deleting == .asking {
-            Card {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(Deleting.question).textStyle(.h3)
-                    Text(Deleting.consequence).textStyle(.body).foregroundStyle(Theme.textSecondary)
-                    Button("Delete account") { Task { await phone.deleteAccount() } }
-                        .buttonStyle(PrimaryButtonStyle(destructive: true)).padding(.top, 8)
-                    Button("Cancel") { phone.deleting.cancel() }
-                        .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
-                        .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Deleting.question)
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                Text(Deleting.consequence).textStyle(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                Button("Delete account") { Task { await phone.deleteAccount() } }
+                    .buttonStyle(PrimaryButtonStyle(destructive: true)).padding(.top, 4)
+                Button("Cancel") { phone.deleting.cancel() }
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
             }
-            .padding(.top, 8)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
             // Said to VoiceOver as it appears, as Leave's question is.
             .onAppear { AccessibilityNotification.Announcement(Deleting.question).post() }
         } else {
