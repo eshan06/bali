@@ -111,7 +111,9 @@ describe('createClass', () => {
 
   it('holds the form’s words (D2e): no em-dash, no exclamation mark, a way on', () => {
     expect(NO_CLASS_NAME).toBe('Enter a name for the class.');
-    expect(CANT_CREATE).toBe("Bali couldn't create the class just now. Try again.");
+    expect(CANT_CREATE).toBe(
+      "Bali couldn't finish creating the class. If it isn't in your list above, try again.",
+    );
     for (const words of [NO_CLASS_NAME, CANT_CREATE]) expect(words).not.toMatch(/[—–!]/);
   });
 });

@@ -91,27 +91,12 @@ export default function HomePage() {
     const answer = await createClass(api, trimmed);
     sending.current = false;
     setBusy(false);
+    // The list as the server has it, whatever the answer: a class made before its answer was lost
+    // shows before Try again, and beside a second one after it (DECISIONS, 2026-09-20: visible).
+    load();
     if (answer.kind === 'failed') return setSaid(answer);
-    const { klass } = answer;
-    // The server's answer is the class: listed at once, as `/v1/me` lists a teacher's own.
-    setMe(
-      (m) =>
-        m && {
-          ...m,
-          classes: [
-            ...m.classes,
-            {
-              id: klass.id,
-              name: klass.name,
-              teacher: { displayName: m.user.displayName },
-              enrollmentId: null,
-              liveSession: null,
-            },
-          ],
-        },
-    );
     setName('');
-    setSaid({ kind: 'created', id: klass.id, name: klass.name });
+    setSaid({ kind: 'created', id: answer.klass.id, name: answer.klass.name });
   }
 
   if (me === null || me.user.role !== 'teacher') {
@@ -143,6 +128,19 @@ export default function HomePage() {
       <h1 ref={heading} tabIndex={-1} className="text-h1 text-balance">
         Your classes
       </h1>
+
+      {/* The list read again after a create, and that read failed: said, unless the create's own
+          failure under its field already says why. */}
+      {error && said?.kind !== 'failed' ? (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p role="alert" className="text-body">
+            Couldn&apos;t load your classes. <span className="text-text-secondary">{error}</span>
+          </p>
+          <Button variant="secondary" onClick={load}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
 
       {me.classes.length === 0 ? (
         <p className={`mt-6 text-body ${EMPTY_TRAY}`}>

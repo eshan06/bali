@@ -21,7 +21,8 @@ export type CreateAnswer =
 /**
  * Create a class named `name` (`POST /v1/classes`), its answer in words, never thrown, so the
  * form always comes back with something to say and Try again. The route takes no `eventId`: a
- * resend after a lost answer makes a second class, as a second press always has.
+ * resend after a lost answer makes a second class, as a second press always has, so the page
+ * reads the list again after every answer, and a class made either way is in it to see.
  */
 export async function createClass(
   api: Pick<ApiClient, 'post'>,

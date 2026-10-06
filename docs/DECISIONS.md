@@ -34,12 +34,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a 5xx or a timeout as `CANT_CREATE`, never the API's log line (`createClass`, `lib/classes.ts`,
   answered in words as `regenerateCode` is). The field holds a name to the API's 120 characters
   itself (`maxLength`; a test pins the number to the route's `CreateBody`), so the create's 400,
-  whose message is a log line, is never met. A created class is listed from the create's own
-  answer, as a registered block is, and said with a way on: "… is ready. Open it to see its join
-  code." The tray, its cards and the empty tray are shared (`components/tray.ts`) for D2f and D2g.
-  The em-dash cleanup found none in these strings. **Known, not changed here:** `POST /v1/classes`
-  takes no `eventId`, so Try again after a lost answer can make a second class of the same name,
-  as a second press always could; that is a backend step if it matters.
+  whose message is a log line, is never met. A made class is said with a way on: "… is ready.
+  Open it to see its join code." **The list is read again after every create's answer** (santa's
+  round 1, both reviewers): `POST /v1/classes` takes no `eventId` (2026-09-20, accepted because a
+  second class is visible and correctable), so a class made before its answer was lost must show
+  before Try again, and beside the second one after it; a first draft listed the class from the
+  create's answer alone, which hid such a class until a reload. So a 5xx says "Bali couldn't
+  finish creating the class. If it isn't in your list above, try again.", and a failed re-read is
+  said above the list with its own Try again, unless the create's failure already says why. The
+  tray, its cards and the empty tray are shared (`components/tray.ts`) for D2f and D2g. The em-dash
+  cleanup found none in these strings.
 
 - **2026-10-05** — **C2-app: the app's policy links open the production portal in an in-app Safari
   sheet, from one build setting.** The intro's last page, Sign in and Me each carry two quiet text
