@@ -49,10 +49,24 @@ pick on the
 [Bali style canvas (D2a)](https://claude.ai/artifact/MVBkdwGKFHKUtEEsEC94sd)
 (2026-10-04; `docs/DECISIONS.md`, 2026-10-05): its B artboards and its answers
 to Q2–Q7 are the reference for what this file says about it. The approved
-screen designs (D1, the student app, `docs/PLAN.md`) win over both for the
-screens they draw. Changing any of it is the owner's call, never a side effect
-of a PR: every user-facing screen is designed in Claude Design and approved by
-the owner before it is built (CLAUDE.md, Working rules).
+screen designs win over both for the screens they draw: D1 for the student app
+(`docs/PLAN.md`), and for the portal the four canvases below. Changing any of
+it is the owner's call, never a side effect of a PR: every user-facing screen
+is designed in Claude Design and approved by the owner before it is built
+(CLAUDE.md, Working rules).
+
+**The portal's approved designs** (the owner, 2026-10-06; `docs/DECISIONS.md`):
+[Entry & info](https://claude.ai/artifact/K7vJUJLDNpHgtZV9cYcXbF) (sign-in, the
+callback, the invite code, Cognito's pages, Help and the policy pages),
+[Classes home](https://claude.ai/artifact/Shc2dz4xn8Qc9iDHDuYT2N),
+[Class page & live grid](https://claude.ai/artifact/662Zkg7urbM64BXvNbq2GX) and
+[Recap & reports](https://claude.ai/artifact/BuiyWgXpVNkhPR8osDBcHZ). They
+replace D2's look of the portal, built on its code in B1–B5 (`docs/PLAN.md`).
+A design draws only what the backend does today, and only the screens Phases 2
+to 6 ask for: it never promises what the API lacks. The portal is designed
+desktop-first: no phone layout is drawn but where students arrive from the app
+(Cognito's pages, Help and the policy pages), and no page may break on a phone
+or a tablet (§8).
 
 **Where it stands today:** the iOS app draws from the tokens (`Theme.swift`,
 pinned by `AppTests.tokens`) in D1's shapes. Its Soft premium redraw (D2h–D2j)
@@ -69,7 +83,7 @@ and JetBrains Mono self-hosted through `next/font` (`fonts.ts`); lucide
 (`lucide-react`) as the icon set; the buttons (`components/button.tsx`), the
 mark and the lockup (`components/mark.tsx`), a link in running text
 (`components/text-link.tsx`), the labelled text field
-(`components/field.tsx`) and the tray and its cards (`components/tray.ts`);
+(`components/field.tsx`) and the cards (`components/card.ts`);
 the focus ring on every control and all
 animation off under reduced motion, both global rules. The entry pages are in
 the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
@@ -77,7 +91,10 @@ the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
 the classes home and its "Your block" (D2e), the live grid (D2f-1: its
 chips, states, `bali-softpulse`, badges and standard columns), the class
 page with Present, its controls and its join code (D2f-2, D2f-3), and the
-recap card and the reports page (D2g), which finished the portal. Every
+recap card and the reports page (D2g), which finished the portal. The owner
+judged that look poor and approved four new designs (above): B1 laid what they
+share (no grey tray, `border-input`, `code-lg`, the field, the buttons'
+pressed look, the nav link), and B2–B5 redraw the pages. Every
 portal source file is held to the tokens' utilities by `tokens.test.ts`, and
 since D2g the theme holds none of Tailwind's own colours, type sizes,
 tracking or leading, so a default draws nothing. **A portal page uses the
@@ -103,15 +120,15 @@ honesty without harshness.
 
 **The style: Soft premium** (the owner's pick, 2026-10-04, Q1 B on D2a's
 canvas; the `high-end-visual-design` skill's language, inside Bali's tokens).
-The portal is drawn in it (D2c–D2g). The app is not: its redraw (D2h–D2j) was
+The portal is drawn in it (D2c–D2g), and its approved designs of 2026-10-06
+keep it, without the tray. The app is not: its redraw (D2h–D2j) was
 rolled back on 2026-10-06, and it keeps D1's look. In this file's terms:
 
-- **Cards in a soft tray.** A group of cards sits in a `surface-sunken` tray
-  at `radius-lg`; each card inside is `surface-card` at `radius-md` with
-  `shadow-1`, the outer and inner corners one nested pair (§4, Card and tray;
-  the inset is `space-2`, the owner's ruling of 2026-10-05 over the canvas's
-  6 and 10 px). In dark the shadow goes and a `border-default` hairline
-  carries the edge.
+- **Cards straight on the page, no grey tray** (the owner's ruling,
+  2026-10-06, which retired D2's tray). A card is `surface-card` with its own
+  `border-default` hairline and `shadow-1`; in dark the shadow goes and the
+  hairline alone carries the edge (§4, Card). No grey frame takes the tray's
+  place.
 - **Pills.** State chips, buttons and Emergency Unlock are `radius-full`;
   inputs keep `radius-sm`. Three radii do the work: 20 / 14 / full (§5).
 - **A soft warm shadow.** `shadow-1` at rest, `shadow-2` on a raised disc or
@@ -143,6 +160,7 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 | Brand block | `surface-brand` | green-700 `#245A43` |
 | Hairlines, card edges | `border-default` | stone-200 `#E3DFD8` |
 | Emphasis borders | `border-strong` | stone-300 `#D2CCC2` |
+| Text field edges | `border-input` | stone-500 `#8A847A` (dark `#837D74`) |
 | Primary ink | `text-primary` | `#211F1B` |
 | Supporting ink | `text-secondary` | `#5B564E` |
 | Captions, labels | `text-tertiary` | stone-600 `#6B665D` |
@@ -152,6 +170,15 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 | Destructive button | `action-destructive-bg` / `-fg` | red-600 `#A93D31` / `#FFFFFF` |
 | Countdown arc | `arc-fill` / `arc-track` / `arc-final2` | green-600 / stone-200 / green-400 |
 | Focus ring | `focus-ring-color` | green-600 `#2C6F51` |
+
+**`border-input`** is the owner's ruling (2026-10-06), not in the tokens yet:
+every text field's edge, 3:1 against the card, the page and the field's own
+well (WCAG 1.4.11), where `border-default` is 1.3:1; in dark it is dark
+`text-tertiary`'s value. A refused field's edge stays `text-primary`. Cognito's
+sign-in fields take it too (`infra/cognito/hosted-ui/hosted-ui.css`, B2a).
+`globals.css` holds it, pinned by `tokens.test.ts`, until the design system's
+next export carries it (`bali-tokens.json` is that export, byte for byte, never
+edited by hand).
 
 **The states** are the heart of the product: every surface shows a student's
 state with a chip, always colour + icon + label, never colour alone. The design
@@ -241,6 +268,7 @@ sees “Screen Time off”", which the grid never says.
 | data | 14 / 20 | 500 | Tables and stats, tabular |
 | data-lg | 28 / 32, rounded | 600 | Medium countdowns, tabular |
 | code | 14 / 20, mono | 500 | Codes only: join codes, invite codes, block IDs |
+| code-lg | 24 / 32, mono | 500 | The join code in Present only, read from the back of the room |
 | input | 16 / 24 | 400 | Text typed in a field, on the web; a code typed in one is mono at 500 |
 
 **The input size** is the owner's ruling (2026-10-05): iPhone Safari zooms
@@ -250,7 +278,8 @@ the invite code, the block ID and the class name included; a code typed in one
 keeps the code style's face and weight. It is for inputs only, never for text
 around them, and it is not in the tokens yet: the next export of the design
 system should gain it (`bali-tokens.json` is that export, byte for byte, so it
-is never edited by hand), as it should the Present view's sizes (§5). The
+is never edited by hand), as it should the Present view's sizes (§5) and
+`code-lg` (the owner's ruling, 2026-10-06, with the approved designs). The
 class page's minutes field types in it too, on the Field since D2f-2.
 
 ## 4. Component stylings
@@ -262,7 +291,11 @@ class page's minutes field types in it too, on the Field since D2f-2.
   rolled back with D2h, 2026-10-06). On the web: 40 px tall, `space-4` side
   padding, a `body` semibold label.
 - **Secondary button:** the primary's shape, `surface-card` with a
-  `border-strong` stroke and `text-primary` ink; pressed, `surface-sunken`.
+  `border-strong` stroke and `text-primary` ink; hovered, `surface-sunken`;
+  pressed (Present, `aria-pressed`) or open (New code, `aria-expanded`),
+  `surface-sunken` with a `text-primary` edge, the Button's own, never by
+  colour alone. The class page's length picker draws each length as this pill
+  and its pick pressed the same way, with a check.
 - **Destructive button:** `action-destructive-*`, only for removing a student
   or deleting a class.
 - **Emergency Unlock control:** a one-second hold, always (the owner's ruling,
@@ -275,15 +308,20 @@ class page's minutes field types in it too, on the Field since D2f-2.
   Always reachable when the shields are on. Its words are D1's on two lines
   (D2i, kept in the rollback): "Hold to unlock" in the button's label style, "Your teacher will see
   it" under it in `body`, each one line at the default text size.
-- **Card and tray:** a card is `surface-card` with `shadow-1` at rest and, in
-  dark, a `border-default` hairline instead. A group of cards sits in a tray:
-  `surface-sunken` at `radius-lg` with a `space-2` inset, the cards inside at
-  `radius-md` with `space-4` padding (the grid's cells; the app draws no tray,
-  its cards stand alone as D1 drew them). A
-  card standing alone (the recap, a sheet) is `radius-lg` with `space-6`
-  padding (`space-5` on iOS), its stat tiles and wells `surface-sunken` at
-  `radius-md`. Use a card only when elevation means hierarchy; otherwise group
-  with spacing or a hairline.
+- **Card:** `surface-card` straight on the page, with its own
+  `border-default` hairline and `shadow-1` at rest; in dark the hairline alone
+  (`shadow-1` is none). **No grey tray** behind a card or a group of cards, and
+  no other grey frame in its place (the owner's ruling, 2026-10-06;
+  `components/card.ts`). Grey stays only where the approved designs keep it: a
+  text field's well, the state chips' fills, the grid's stale banner, a
+  button's hover and pressed states, and the policy draft's banner and badge.
+  Cards in a list (the grid's cells, the classes, the blocks, the reports) are
+  `radius-md` with `space-4` padding, `space-2` apart; a card standing alone
+  (sign-in, the invite code, the recap, a sheet) is `radius-lg` with `space-6`
+  padding (`space-5` on iOS). An empty list says so in a plain line in
+  `text-secondary`, never in a box. The app draws no tray either: its cards
+  stand alone as D1 drew them. Use a card only when elevation means hierarchy;
+  otherwise group with spacing or a hairline.
 - **State chip:** a pill (`radius-full`) filled with the state's tint, its
   icon and label in the state's ink, the `label` style in uppercase; padding
   `space-2` × `space-3` on the web (the tokens' values, kept by the owner's
@@ -295,15 +333,22 @@ class page's minutes field types in it too, on the Field since D2f-2.
   canvas): stone, not amber. `surface-sunken` with a `border-default`
   hairline and `text-primary` ink, at `radius-sm`: the grid is honest, not
   alarmed.
-- **Inputs:** `surface-sunken` well, label above, helper and error text below;
-  focus shows the focus ring. What is typed is the input size (§3), 16 px, so
+- **Inputs:** `surface-sunken` well with a `border-input` edge (§2), label
+  above, helper and error text below; focus shows the focus ring, and a
+  refusal draws the edge in `text-primary`, never red. What is typed is the
+  input size (§3), 16 px, so
   iPhone Safari never zooms in; a label is always a real label, never a
-  placeholder standing in for one. The app keeps D1's fields (2026-10-06's
+  placeholder standing in for one. A button that acts on one field (the
+  classes home's Create class) may sit on the input's row, wrapping under it
+  on a narrow form (the Field's `trailing`). The app keeps D1's fields (2026-10-06's
   rollback): Join's code a white field whose border turns green while typing,
   the age screen's menus drawn as that field, Me's name a sunken well with the
   same green edge.
 - **Links:** `text-brand`, medium, underlined, so a link never rests on colour
-  alone: the portal's `TextLink` (`components/text-link.tsx`). The app's policy
+  alone: the portal's `TextLink` (`components/text-link.tsx`). A link across
+  the portal (All classes, Reports, back to the class) is `text-brand`
+  semibold beside its 16 px arrow, which carries it at rest, underlined on
+  hover (`NAV_LINK`). The app's policy
   links (`PolicyLinks`, C2-app) keep their look from before D2h, `caption` in
   the brand's ink and no underline: on colour alone, a known gap until the
   owner approves the app's next design.
@@ -332,7 +377,7 @@ class page's minutes field types in it too, on the Field since D2f-2.
 - **Web:** 40 px page gutters on desktop; the live grid is the page's main
   object, laid out with CSS Grid.
 - **The grid's density** (the owner's pick, 2026-10-04, Q4): **standard** is
-  six columns at the desktop width, cells in the tray, the name in `body`
+  six columns at the desktop width, cells straight on the page, the name in `body`
   (15 px) over the chip in `label` (12 px). **Present**, a toggle in the
   grid's header (a secondary pill whose pressed state is shown, never by
   colour alone), switches into the **projector view**: four columns, names at
@@ -359,8 +404,8 @@ class page's minutes field types in it too, on the Field since D2f-2.
   back in it with no session running, the recap carries the toggle at the end
   of its header.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
-  `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
-  its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
+  `radius-md` 14 (cards in a list) · `radius-lg` 20 (sheets, a card on its
+  own) · `radius-full` (chips, buttons and Emergency Unlock). One system,
   used everywhere. These roles are this file's (the pick): the tokens win on
   values, and their usage notes still name `radius-sm` for buttons and
   `radius-md` for chips until the owner next exports the design system.
@@ -444,11 +489,13 @@ a red chip.
 - **iOS:** one column, Dynamic Type everywhere (the type scale scales with the
   phone's text size), screens scroll once the text outgrows them, and touch
   targets are at least 44 pt (buttons are 56).
-- **Web:** the portal is desktop-first (a teacher at a desk or on a projector)
-  and must still work on a tablet. The grid reflows by column count, never by
+- **Web:** the portal is designed desktop-first (a teacher at a desk or on a
+  projector; the owner's ruling, 2026-10-06: its approved designs draw no phone
+  layout but where students arrive from the app), and no page may break on a
+  phone or a tablet. The grid reflows by column count, never by
   shrinking chips or text below the type scale. Mobile collapse is declared per
-  layout, not assumed. The reports list (D2g) is a card per session in the
-  tray: one row under the column names where the session and its six figures
+  layout, not assumed. The reports list (D2g) is a card per session: one row
+  under the column names where the session and its six figures
   fit (the list 56 rem wide, a 1024 px window included); narrower, each figure
   sits under its own name, three to a row and then two. Never a table that
   scrolls sideways.
@@ -463,8 +510,9 @@ design if it has one. Then:
   teacher mid-lesson, calm and dense, in the Bali Design System."
 - **Build with both skills:** `design-taste-frontend` for the read, the
   discipline and the tells; `high-end-visual-design` for Soft premium's shape
-  language (the tray, the pills, the soft shadow, the spacing rhythm) on the
-  portal; an app screen follows its approved design. Where
+  language (the pills, the soft shadow, the spacing rhythm; never a tray, §4)
+  on the portal, under its approved designs; an app screen follows its
+  approved design. Where
   either disagrees with this file, this file wins; neither's fonts, palette,
   icons or motion override the tokens.
 - **Use the dials for product UI:** `DESIGN_VARIANCE 3`, `MOTION_INTENSITY 2`,
