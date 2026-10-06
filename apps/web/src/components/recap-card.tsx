@@ -24,9 +24,18 @@ const LABEL = 'text-label text-text-tertiary uppercase';
  * minutes. A card standing alone (DESIGN.md §4): `radius-lg`, `space-6` padding, its figures in
  * `data-lg` on sunken tiles, laid out by the card's own width. Given a `session` (R5's opened row),
  * it reads that one's report inside the row's card, so it draws no card of its own, and its
- * heading is for screen readers.
+ * heading is for screen readers. In `present` (the class page's Present, which the class can see)
+ * it lists each unlock by who and when, never with its reason.
  */
-export function RecapCard({ classId, session }: { classId: string; session?: Summary }) {
+export function RecapCard({
+  classId,
+  session,
+  present = false,
+}: {
+  classId: string;
+  session?: Summary;
+  present?: boolean;
+}) {
   const api = useApi();
   const headingId = useId();
   const [state, setState] = useState<RecapState>({ kind: 'finding' });
@@ -84,7 +93,7 @@ export function RecapCard({ classId, session }: { classId: string; session?: Sum
           </Button>
         </div>
       ) : (
-        <Recap view={recapView(state.report)} />
+        <Recap view={recapView(state.report, {}, present)} />
       )}
     </section>
   );

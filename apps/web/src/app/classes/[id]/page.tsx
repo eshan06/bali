@@ -57,8 +57,9 @@ const LENGTH =
 
 /**
  * A class's page (in Soft premium, D2f): its name and join code; while no session runs, the length
- * picker and Start, the last session's recap and how it ended; while one runs, the live grid with
- * its bell, Present, Extend and End; then the roster. Each failure is said where it happened.
+ * picker and Start, the last session's recap and how it ended, with Present; while one runs, the
+ * live grid with its bell, Present, Extend and End; then the roster. Each failure is said where it
+ * happened.
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -227,6 +228,25 @@ export default function ClassDetailPage() {
     });
   }
 
+  // Present, the projector the class can see (DESIGN.md §5), in the grid's header, live or ended:
+  // it reaches the recap too, so a session that ends while projected shows no unlock's reason, and
+  // pressing it again shows them. Pressed is its check and sunken fill, never colour alone.
+  const presentToggle = (
+    <Button
+      variant="secondary"
+      aria-pressed={present}
+      onClick={() => setPresent((on) => !on)}
+      className="aria-pressed:border-text-primary aria-pressed:bg-surface-sunken"
+    >
+      {present ? (
+        <Check size={16} aria-hidden="true" />
+      ) : (
+        <Presentation size={16} aria-hidden="true" />
+      )}
+      Present
+    </Button>
+  );
+
   return (
     <main className={PAGE}>
       <nav aria-label="Class" className="flex justify-between gap-4">
@@ -331,14 +351,17 @@ export default function ClassDetailPage() {
             </form>
             {/* The last session's recap (R4) until a new one starts; only once the class is read,
                 so a session already running never shows it. */}
-            {klass ? <RecapCard classId={classId} /> : null}
+            {klass ? <RecapCard classId={classId} present={present} /> : null}
             {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
             {grid ? (
               <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">
-                <h2 id={`${id}-ended`} className="text-h2">
-                  How it ended
-                </h2>
-                <LiveGrid sessionId={grid.id} />
+                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                  <h2 id={`${id}-ended`} className="text-h2">
+                    How it ended
+                  </h2>
+                  {presentToggle}
+                </div>
+                <LiveGrid sessionId={grid.id} present={present} />
               </section>
             ) : null}
           </div>
@@ -356,20 +379,7 @@ export default function ClassDetailPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                {/* Pressed is shown by its check and its sunken fill, never by colour alone. */}
-                <Button
-                  variant="secondary"
-                  aria-pressed={present}
-                  onClick={() => setPresent((on) => !on)}
-                  className="aria-pressed:border-text-primary aria-pressed:bg-surface-sunken"
-                >
-                  {present ? (
-                    <Check size={16} aria-hidden="true" />
-                  ) : (
-                    <Presentation size={16} aria-hidden="true" />
-                  )}
-                  Present
-                </Button>
+                {presentToggle}
                 {EXTEND_PRESETS.map((add) => (
                   <Button
                     key={add}
