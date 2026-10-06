@@ -35,12 +35,31 @@ jobs:
           echo "::error::Draft: the review runs when the PR is marked ready. Already ready? Re-running this run fails again: convert the PR to draft and back, or push a commit."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
+      # Phase 6, S6: the secret scanner the review is checked with, set aside
+      # before the reviewer runs. It is the base commit's, never the PR's (the
+      # PR could change it, the reviewer could write files); only a base that
+      # doesn't have it yet (S6's own PR) uses the tree's. Anything else fails.
+      - name: Set aside the secret scanner
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          scanner="$RUNNER_TEMP/review-secrets.py"
+          path=.github/scripts/review-secrets.py
+          if git cat-file -e "$BASE_SHA:$path" 2>/dev/null; then
+            git show "$BASE_SHA:$path" > "$scanner"
+          elif git cat-file -e "$BASE_SHA^{commit}"; then
+            cp "$path" "$scanner"
+          else
+            echo "::error::Can't read the base commit to get the secret scanner; the review won't be posted."
+            exit 1
+          fi
+
       - name: Claude reviews the diff
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1.0.243
         with:
           # Billed to the owner's Claude subscription, not API credits. If
           # reviews start failing with credential errors, re-run
@@ -88,6 +107,12 @@ jobs:
         run: |
           if [ ! -f claude-review.md ]; then
             echo "::error::Claude produced no claude-review.md — failing closed."
+            exit 1
+          fi
+          # Phase 6, S6: a review that looks like it holds a secret is never
+          # posted, and the check fails; the PR gets a note without its text.
+          if ! python3 -I "$RUNNER_TEMP/review-secrets.py" claude-review.md; then
+            gh pr comment "$PR" --body "Claude Review withheld its review: it may contain a secret. The reason is in the Claude Review run's log. Check this PR's diff for a leaked credential, then push or re-run." || true
             exit 1
           fi
           {

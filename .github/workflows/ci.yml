@@ -55,6 +55,9 @@ jobs:
       # what else). Every upload is checked against them, TestFlight included.
       - run: python3 .github/scripts/privacy-manifests.test.py
       - run: python3 .github/scripts/privacy-manifests.py
+      # Phase 6, S6: the scan claude-review.yml runs on a review before posting
+      # it, against made-up secrets and ordinary reviews.
+      - run: python3 .github/scripts/review-secrets.test.py
       # The contract fixtures are the API's real answers to a phone, which
       # BaliCore decodes, contracts/outbox/ the outbox tables' answers on
       # every input BaliCore's port must match, and contracts/openapi.json
