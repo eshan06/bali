@@ -1,15 +1,18 @@
+import AuthenticationServices
 import BaliOutbox
 import SwiftUI
 
-/// The 13+ check (C7), the first screen on a first launch, before the intro: the birth month and
-/// year, asked neutrally by the FTC's COPPA guidance — nothing here says 13, hints at the cutoff
-/// or preselects an answer, so each menu starts empty and offers every month and a hundred years
-/// (`Birth`, Gregorian whatever calendar the phone shows, the names in its language). Continue
-/// answers once both are picked (`Phone.answerAge()`): 13 or older goes on to the intro, and the
-/// check is never asked again; under 13 lands on `TooYoungView`. The rules are `AgeCheck`'s and
-/// `Birth`'s (BaliOutbox); the look is the Sign in screen's, in Soft premium (D2h).
+/// The 13+ check (C7), in Sign in's place once Sign in is pressed with the check not passed on this
+/// phone (the owner's decision, 2026-10-06): the birth month and year, asked neutrally by the
+/// FTC's COPPA guidance — nothing here says 13, hints at the cutoff or preselects an answer, so
+/// each menu starts empty and offers every month and a hundred years (`Birth`, Gregorian whatever
+/// calendar the phone shows, the names in its language). Continue answers once both are picked
+/// (`Phone.answerAge(through:)`): 13 or older opens the sign-in page at once, and the check is
+/// never asked again; under 13 lands on `TooYoungView`. The rules are `AgeCheck`'s and `Birth`'s
+/// (BaliOutbox); the look is the Sign in screen's, in Soft premium (D2h).
 struct AgeView: View {
     let phone: Phone
+    @Environment(\.webAuthenticationSession) private var browser
 
     var body: some View {
         let today = Date()
@@ -39,7 +42,7 @@ struct AgeView: View {
                         }
                     }
                     Spacer()
-                    Button("Continue") { phone.answerAge() }
+                    Button("Continue") { Task { await phone.answerAge(through: browser.hostedUI) } }
                         .buttonStyle(PrimaryButtonStyle()).disabled(!picks.complete)
                 }
             }
@@ -75,9 +78,9 @@ struct AgeView: View {
     }
 }
 
-/// The stop screen (C7) an answer under 13 gets: kind, and final for the run — no way back to the
-/// question until the app is reopened, and nothing kept of the answer anywhere (the owner's
-/// ruling, 2026-10-05).
+/// The stop screen (C7) an answer under 13 gets, in Sign in's place: kind, and final for the run —
+/// no way back to the question or to Sign in until the app is reopened, and nothing kept of the
+/// answer anywhere (the owner's ruling, 2026-10-05).
 struct TooYoungView: View {
     var body: some View {
         ScreenScaffold {

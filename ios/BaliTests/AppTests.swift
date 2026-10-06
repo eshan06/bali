@@ -847,9 +847,9 @@ struct AppTests {
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
-        // A phone of the test's own has seen no intro, passed no 13+ check and runs no enforcer: the
-        // router shows the 13+ question (C7), or Starting where the host's defaults hold the flags,
-        // so only the deletion's screen is asked after here, never Me.
+        // A phone of the test's own runs no enforcer: the router shows the intro, or Starting where
+        // the host's defaults hold its flag, so only the deletion's screen is asked after here,
+        // never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
         phone.deleting.ask()
         #expect(phone.shown.screen != .deleting)
@@ -1533,19 +1533,20 @@ struct AppTests {
     }
 
     @Test(
-        "The 13+ check (C7) as the phone keeps it: a fresh Phone reads the one flag from its own defaults — set once Continue answered 13 or older, kept across launches, never the month or the year — so the question is never asked again; an answer under 13 keeps nothing, so the next launch asks again while this run shows the stop screen; the picks go with the answer either way, and Continue with nothing picked changes nothing; a frozen fixture's answer writes nothing for another, and each fixture of the check shows its screen with no tab bar. The key as it was before is put back after"
+        "The 13+ check (C7) as the phone keeps it: a fresh Phone reads the one flag from its own defaults — set once Continue answered 13 or older, kept across launches, never the month or the year — so the question is never asked again; an answer under 13 keeps nothing, so the next launch asks again while this run shows the stop screen; the picks go with the answer either way, and Continue with nothing picked changes nothing; a frozen fixture's answer writes nothing for another, and each fixture of the check shows its screen with no tab bar — Sign in once one passes, a frozen phone opening no page. The key as it was before is put back after"
     )
-    func ageCheck() throws {
+    func ageCheck() async throws {
         let defaults = UserDefaults.standard
         let before = defaults.object(forKey: AgeCheck.key)
         defer { defaults.set(before, forKey: AgeCheck.key) }
         defaults.removeObject(forKey: AgeCheck.key)
+        let pages = Pages()
         let live = Phone()
         #expect(live.age.answer == .unanswered && !live.birth.complete)
-        live.answerAge()
+        await live.answerAge(through: pages.browser)
         #expect(live.age.answer == .unanswered && defaults.object(forKey: AgeCheck.key) == nil)
         live.birth = Birth(month: 1, year: 2000)
-        live.answerAge()
+        await live.answerAge(through: pages.browser)
         #expect(live.age.answer == .passed && live.birth == Birth())
         #expect(defaults.bool(forKey: AgeCheck.key) && Phone().age.answer == .passed)
         #expect(defaults.object(forKey: AgeCheck.key) as? Bool == true)
@@ -1554,20 +1555,77 @@ struct AppTests {
         // This month, Gregorian: the rule counts in it whatever calendar the phone shows.
         let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
         young.birth = Birth(month: now.month, year: now.year)
-        young.answerAge()
+        await young.answerAge(through: pages.browser)
         #expect(young.age.answer == .tooYoung && young.birth == Birth())
         #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
         // The fixtures: the question, nothing picked and both picked — whose pass, frozen, writes
-        // nothing — and the stop screen; the intro follows a pass.
+        // nothing — and the stop screen; Sign in follows a pass.
         let asked = Phone(fixture: try #require(PreviewFixtures.all["age"]))
         #expect(asked.shown == (.age, false) && !asked.birth.complete)
         let picked = Phone(fixture: try #require(PreviewFixtures.all["agePicked"]))
         #expect(picked.shown == (.age, false) && picked.birth == Birth(month: 3, year: 2009))
-        picked.answerAge()
-        #expect(picked.age.answer == .passed && picked.shown == (.intro, false))
+        await picked.answerAge(through: pages.browser)
+        #expect(picked.age.answer == .passed && picked.shown == (.signIn, false))
+        #expect(picked.signInFailed == .notOpened(Joining.notStarted))
         #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
         let stopped = Phone(fixture: try #require(PreviewFixtures.all["tooYoung"]))
         #expect(stopped.shown == (.tooYoung, false))
+        #expect(pages.opened.isEmpty)
+    }
+
+    @Test(
+        "The 13+ check (C7) is asked at Sign in (the owner's decision, 2026-10-06): a first launch opens on the intro, never the question; Sign in with no answer on the phone opens no sign-in page and shows the question in its place; through the phone's own sign-in, Continue at 13 or older opens the page at once — no second press — to come back to the sign-in's scheme, and Sign in opens it straight away from then on, after a relaunch too, never asking again; a page that did not open is said under the button, and gone at the next press; under 13 no page opens, then or at a later Sign in. The flags as they were before are put back after"
+    )
+    func ageAtSignIn() async throws {
+        let defaults = UserDefaults.standard
+        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
+        defer {
+            defaults.set(before.0, forKey: Phone.introSeenKey)
+            defaults.set(before.1, forKey: AgeCheck.key)
+        }
+        defaults.removeObject(forKey: Phone.introSeenKey)
+        defaults.removeObject(forKey: AgeCheck.key)
+        #expect(Phone().shown == (.intro, false))
+        // Routed as a first launch has it after the intro, signed out: Sign in, then the question.
+        let pages = Pages()
+        let routed = Phone(fixture: try #require(PreviewFixtures.all["signIn"]))
+        #expect(routed.shown == (.signIn, false))
+        await routed.signIn(through: pages.browser)
+        #expect(routed.shown == (.age, false) && pages.opened.isEmpty)
+        // The phone's own sign-in, nobody signed in.
+        let signedOut = { try standIn(StandIn(), keychain: Keychain(account: nil)).0 }
+        let live = try signedOut()
+        await live.signIn(through: pages.browser)
+        #expect(live.age.answer == .asked && pages.opened.isEmpty && live.signInFailed == nil)
+        live.birth = Birth(month: 1, year: 2000)
+        await live.answerAge(through: pages.browser)
+        let page = try #require(pages.opened.first)
+        #expect(pages.opened.count == 1 && live.age.answer == .passed)
+        #expect(page.url.absoluteString.hasPrefix("https://bali.auth.test/"))
+        #expect(page.scheme == "bali")
+        // Closed by the student: kept as the sign-in said it, for the readout; the screen says
+        // nothing.
+        #expect(live.signInFailed == .cancelled && live.signInFailed?.words == nil)
+        #expect(!live.signingIn)
+        pages.answer = .notOpened("no window")
+        await live.signIn(through: pages.browser)
+        #expect(pages.opened.count == 2 && live.signInFailed == .notOpened("no window"))
+        #expect(live.signInFailed?.words != nil)
+        pages.answer = .cancelled
+        let relaunched = try signedOut()
+        #expect(relaunched.age.answer == .passed)
+        await relaunched.signIn(through: pages.browser)
+        await live.signIn(through: pages.browser)
+        #expect(pages.opened.count == 4 && live.signInFailed?.words == nil)
+        defaults.removeObject(forKey: AgeCheck.key)
+        let young = try signedOut()
+        await young.signIn(through: pages.browser)
+        let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
+        young.birth = Birth(month: now.month, year: now.year)
+        await young.answerAge(through: pages.browser)
+        await young.signIn(through: pages.browser)
+        #expect(young.age.answer == .tooYoung && pages.opened.count == 4)
+        #expect(defaults.object(forKey: AgeCheck.key) == nil)
     }
 
     @Test(
@@ -1722,19 +1780,13 @@ struct AppTests {
     }
 
     @Test(
-        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a) — once the 13+ check has passed, which comes before it (C7); the flags as they were before are put back after"
+        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a); the flag as it was before is put back after"
     )
     func introSeen() {
         let defaults = UserDefaults.standard
-        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
-        defer {
-            defaults.set(before.0, forKey: Phone.introSeenKey)
-            defaults.set(before.1, forKey: AgeCheck.key)
-        }
+        let before = defaults.object(forKey: Phone.introSeenKey)
+        defer { defaults.set(before, forKey: Phone.introSeenKey) }
         defaults.removeObject(forKey: Phone.introSeenKey)
-        defaults.removeObject(forKey: AgeCheck.key)
-        #expect(Phone().shown.screen == .age)
-        defaults.set(true, forKey: AgeCheck.key)
         let phone = Phone()
         #expect(!phone.introSeen && phone.shown.screen == .intro)
         phone.sawIntro()
@@ -1821,7 +1873,7 @@ struct AppTests {
         let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
         for (name, screen) in [
             ("intro", String(reflecting: type(of: IntroView {}.body))),
-            ("signIn", String(reflecting: type(of: SignInView(signIn: nil).body))),
+            ("signIn", String(reflecting: type(of: SignInView(phone: me).body))),
             ("me", String(reflecting: type(of: MeView(phone: me).body))),
         ] {
             #expect(screen.contains("PolicyLinks"), "\(name)")
@@ -2011,6 +2063,21 @@ private func expectEdges(of scrolls: [UIScrollView], in window: UIWindow, _ name
         guard !scroll.isPagingEnabled else { continue }
         let inset = scroll.adjustedContentInset
         #expect(inset.left == Theme.gutter && inset.right == Theme.gutter, "\(name): \(inset)")
+    }
+}
+
+/// A browser of the test's own for `Phone.signIn(through:)`: each page it was asked to open, with
+/// the scheme it was to come back to, answered with `answer` — the student closing it, unless set.
+@MainActor
+private final class Pages {
+    private(set) var opened: [(url: URL, scheme: String)] = []
+    var answer = SignInError.cancelled
+
+    var browser: Phone.Browser {
+        { url, scheme throws(SignInError) in
+            self.opened.append((url, scheme))
+            throw self.answer
+        }
     }
 }
 

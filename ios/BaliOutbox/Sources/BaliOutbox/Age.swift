@@ -1,17 +1,20 @@
 import Foundation
 
-/// The 13+ check (C7; the owner's rulings, 2026-10-04 and 2026-10-05): the student app's first
-/// screen on a first launch, before the intro, asking the birth month and year neutrally, by the
-/// FTC's COPPA guidance — nothing on it says 13, hints at the cutoff or preselects an answer. 13 or
-/// older keeps one flag in the phone's own defaults, that the check passed, never the date, and is
-/// not asked again. Under 13 keeps nothing anywhere — no flag, no date, no counter, on the phone,
-/// in the app group, the Keychain or the server — and sees a kind stop screen, with no way back to
-/// the question until the app is reopened: held here, in memory, for the run. The rules, so they
-/// run on Linux; the app's `Phone` keeps one and the screens call it.
+/// The 13+ check (C7; the owner's rulings, 2026-10-04 and 2026-10-05): asked when the student taps
+/// Sign in with it not passed on the phone — after the intro, before the sign-in page opens (the
+/// owner's decision, 2026-10-06) — the birth month and year, neutrally, by the FTC's COPPA
+/// guidance: nothing on it says 13, hints at the cutoff or preselects an answer. 13 or older keeps
+/// one flag in the phone's own defaults, that the check passed, never the date, and is not asked
+/// again. Under 13 keeps nothing anywhere — no flag, no date, no counter, on the phone, in the app
+/// group, the Keychain or the server — and sees a kind stop screen, with no way back to the
+/// question until the app is reopened: held here, in memory, for the run. The rules, so they run
+/// on Linux; the app's `Phone` keeps one and the screens call it.
 public struct AgeCheck: Sendable, Hashable {
     public enum Answer: Sendable, Hashable {
-        /// Never passed on this phone and not answered this run: the question shows.
+        /// Never passed on this phone and not asked this run: Sign in shows.
         case unanswered
+        /// Sign in pressed, not answered yet: the question shows.
+        case asked
         /// 13 or older: kept, and never asked again.
         case passed
         /// Under 13, this run: the stop screen, until the app is reopened.
@@ -54,6 +57,13 @@ public struct AgeCheck: Sendable, Hashable {
         calendar.timeZone = phone.timeZone
         calendar.locale = phone.locale ?? .current
         return calendar
+    }
+
+    /// Sign in pressed: whether its sign-in page may open — the check passed on this phone. Else
+    /// the question shows, or the stop screen an answer under 13 got stays.
+    public mutating func ask() -> Bool {
+        if answer == .unanswered { answer = .asked }
+        return answer == .passed
     }
 
     /// The question answered with `month` and `year`, judged at `today`: passed, the one flag is
