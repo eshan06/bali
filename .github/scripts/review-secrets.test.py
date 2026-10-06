@@ -63,6 +63,7 @@ CLEAN = {
     "event 01890a5d-ac96-774b-bcce-b302099a8057.",
     "words that start like tokens": "The ghost_value and sk-ant-short and xoxb-1 are fine.",
     "a short JWT-like dotted name": "eyJhbGci.eyJzdWIi.abc",
+    "AWS's documented sample key id": "AK" + "IA" + "IOSFODNN7" + "EXAMPLE",
 }
 
 

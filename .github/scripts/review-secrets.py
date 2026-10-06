@@ -14,7 +14,8 @@ import sys
 
 # A few high-signal shapes; a false alarm costs a re-run, a miss costs a rotation.
 PATTERNS = [
-    ("an AWS access key id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    # AWS's documented sample ids end in EXAMPLE.
+    ("an AWS access key id", re.compile(r"\b(?:AKIA|ASIA)(?![0-9A-Z]{9}EXAMPLE\b)[0-9A-Z]{16}\b")),
     # The header alone is how docs show where a key goes; a body after it is a key.
     (
         "a private key block",

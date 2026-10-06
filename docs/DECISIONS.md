@@ -18,10 +18,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   with a body, GitHub, Anthropic and Slack tokens, JWTs) and this repository's own secret names
   written with a non-placeholder value. A key header alone passes, since `.env.example` and the
   docs show one. A hit posts nothing and fails the check; its log names the kind and line, never
-  the text, so the log doesn't leak what the comment would have. The posting step runs the
-  base branch's copy of the script, because the reviewer can write files and the PR can edit
-  the tree; only S6's own PR, whose base has none, uses the tree's. A false alarm costs a
-  re-run; a miss costs a rotation.
+  the text, so the log doesn't leak what the comment would have, and the PR gets a note saying
+  the review was withheld. The script is the PR's base commit's copy, set aside before the
+  reviewer runs, because the reviewer can write files and the PR can edit the tree; only S6's
+  own PR, whose base has none, uses the tree's, and an unreadable base fails closed. Known
+  limits: a value in prose rather than `NAME=value`, and shapes not on the list. A false alarm
+  costs a re-run; a miss costs a rotation.
 
 - **2026-10-06** — **D2g: the recap card and the reports page in Soft premium; the reports list
   reflows; a session that ends in Present keeps its reasons off.** The calls the picks left open,
