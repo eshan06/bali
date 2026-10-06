@@ -93,6 +93,11 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
 - **New feature?** Check `docs/PLAN.md` first. Design against ARCHITECTURE.md.
   When done, add the feature to PLAN.md with a one-line architecture note; if
   it changed a real design decision, update ARCHITECTURE.md itself.
+- **Every user-facing screen is designed in Claude Design and approved by the
+  owner before it is built.** Every state counts (loading, empty, error, large
+  text). A UI PR links the approved design it builds; a screen with no approved
+  design is a stop-and-ask. Restoring a previously shipped look on the owner's
+  order is the only exception.
 - **User-facing UI work, and only that, uses the design framework.** That
   covers the portal's pages and components (`apps/web/src/app`,
   `apps/web/src/components`), `ios/Bali/UI`, the shield (`ios/BaliShield`),
