@@ -74,13 +74,14 @@ the focus ring on every control and all
 animation off under reduced motion, both global rules. The entry pages are in
 the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
 `/support`, the two policy pages and the invite-code screen (D2c-2); so are
-the classes home and its "Your block" (D2e), and the live grid (D2f-1: its
-chips, states, `bali-softpulse`, badges and standard columns). All of them are
-held to the tokens' utilities by `tokens.test.ts`; the rest of the class page,
-the recap and reports keep their Tailwind classes on the new base (the page
-colour, the font, the ring, and the radii: their `rounded-lg` is now 20 px)
-until D2f-2, D2f-3 and D2g, which also retire Tailwind's default colours and
-sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
+the classes home and its "Your block" (D2e), the live grid (D2f-1: its
+chips, states, `bali-softpulse`, badges and standard columns) and the class
+page with Present and its controls (D2f-2). All of them are held to the
+tokens' utilities by `tokens.test.ts`; the join code, the recap and reports
+keep their Tailwind classes on the new base (the page colour, the font, the
+ring, and the radii: their `rounded-lg` is now 20 px) until D2f-3 and D2g,
+which also retire Tailwind's default colours and sizes, kept in the theme only
+for them. **A portal page uses the tokens' utilities and no
 Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
 question for the owner.
 
@@ -245,7 +246,7 @@ keeps the code style's face and weight. It is for inputs only, never for text
 around them, and it is not in the tokens yet: the next export of the design
 system should gain it (`bali-tokens.json` is that export, byte for byte, so it
 is never edited by hand), as it should the Present view's sizes (§5). The
-class page's minutes field takes it when D2f redraws that page.
+class page's minutes field types in it too, on the Field since D2f-2.
 
 ## 4. Component stylings
 
@@ -326,13 +327,17 @@ class page's minutes field takes it when D2f redraws that page.
   (15 px) over the chip in `label` (12 px). **Present**, a toggle in the
   grid's header (a secondary pill whose pressed state is shown, never by
   colour alone), switches into the **projector view**: four columns, names at
-  20/26 semibold, chip labels at 14/18, cells at least 88 px tall, readable
+  20/28 semibold, chip labels at 14/20, cells at least 88 px tall, readable
   from the back of a classroom; the same chips, the same words. Those two
   sizes are a Present-only style on the type scale (the owner's ruling,
   2026-10-05): names 20 px and labels 14 px, as drawn, with their line
-  heights on the 4-pt grid; D2f draws it, and the design system gains it when
-  the owner next exports it. The grid reflows by column count below the
-  desktop width, never by shrinking type.
+  heights on the 4-pt grid (the canvas drew 26 and 18; D2f-2 took them up to
+  28 and 20, never tighter than drawn, 14/20 being the scale's own pair for
+  14 px: `text-present-name`, `text-present-label`), and the design system
+  gains them when the owner next exports it. The grid reflows by column count
+  below the desktop width, never by shrinking type: by the grid's own width
+  (container queries), the class page 1400 px wide at most, as the B artboard
+  drew it.
 - **Radii:** `radius-xs` 6 (small badges) · `radius-sm` 10 (inputs) ·
   `radius-md` 14 (cards and tiles) · `radius-lg` 20 (trays, sheets, a card on
   its own) · `radius-full` (chips, buttons and Emergency Unlock). One system,

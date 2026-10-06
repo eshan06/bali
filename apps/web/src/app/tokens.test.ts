@@ -213,18 +213,39 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only the input size the owner ruled (DESIGN.md §3), and every field types in it', () => {
-    // 16 px, so iPhone Safari never zooms into a field when it is tapped (2026-10-05), its line
-    // height on the 4-pt grid; the design system gains it at the owner's next export.
+  it('beside them, only the sizes the owner ruled (DESIGN.md §3, §5), each where it belongs', () => {
+    // The input size: 16 px, so iPhone Safari never zooms into a field when it is tapped
+    // (2026-10-05). The Present view's names and chip labels, 20 px and 14 px as drawn
+    // (2026-10-05). Their line heights on the 4-pt grid; the design system gains them at the
+    // owner's next export.
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
-    expect(sizes.sort()).toEqual([...styles, 'input'].sort());
+    expect(sizes.sort()).toEqual([...styles, 'input', 'present-label', 'present-name'].sort());
     expect(theme.get('--text-input')).toBe('16px');
     expect(theme.get('--text-input--line-height')).toBe('24px');
     expect(theme.get('--text-input--font-weight')).toBe('400');
     expect(read('../components/field.tsx')).toMatch(/<input[^]*className=\{`[^`]*\btext-input\b/);
+    expect(theme.get('--text-present-name')).toBe('20px');
+    expect(theme.get('--text-present-name--line-height')).toBe('28px');
+    expect(theme.get('--text-present-name--font-weight')).toBe('600');
+    // The label style's weight and tracking at the projector's size.
+    const label = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'label');
+    expect(theme.get('--text-present-label')).toBe('14px');
+    expect(theme.get('--text-present-label--line-height')).toBe('20px');
+    expect(theme.get('--text-present-label--font-weight')).toBe(String(label?.fontWeight));
+    expect(theme.get('--text-present-label--letter-spacing')).toBe(label?.letterSpacing);
+    for (const size of ['present-name', 'present-label', 'input']) {
+      expect(parseInt(theme.get(`--text-${size}--line-height`) ?? '', 10) % 4, size).toBe(0);
+    }
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const present = sources(src).filter(
+      (file) => file.endsWith('.tsx') && /\btext-present-/.test(readFileSync(file, 'utf8')),
+    );
+    expect(present.map((file) => relative(src, file))).toEqual([
+      join('components', 'live-grid.tsx'),
+    ]);
   });
 
   it('the families are the tokens’ stacks: the self-hosted face first, then its fallbacks', () => {
@@ -294,6 +315,7 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     'components/invite-code.tsx',
     'components/blocks.tsx',
     'components/live-grid.tsx',
+    'app/classes/[id]/page.tsx',
   ];
   const COLOUR =
     /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
@@ -306,7 +328,10 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     expect(source).not.toMatch(COLOUR);
     expect(source).not.toMatch(SIZE);
     expect(source).not.toMatch(TYPE);
-    // A field is the Field, so what is typed in it is the input size (the owner's ruling).
-    if (file !== 'components/field.tsx') expect(source).not.toMatch(/<input\b/);
+    // A field is the Field, so what is typed in it is the input size (the owner's ruling); a radio
+    // types nothing (the class page's length picker).
+    if (file !== 'components/field.tsx') {
+      expect(source).not.toMatch(/<input\b(?![^>]*type="radio")/);
+    }
   });
 });

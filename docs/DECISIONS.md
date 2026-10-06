@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2f-2: the class page and Present in Soft premium.** The calls the picks left
+  open, taken on the conductor's "your recommended options": **The page is 1400 px wide at most**,
+  the B artboard's width, not the home's narrow column: the grid is the page's main object, and
+  six columns at 1440 need the room (a state's chip, "Protection off" the commonest, fits on one
+  line from there; a compound label wraps in its pill). **Present's line heights** go up onto the
+  4-pt grid, 20/28 and 14/20, where the canvas drew 26 and 18 and the owner ruled them onto the
+  grid: never tighter than drawn, and 14/20 is the type scale's own pair for 14 px. Present is
+  per tab and not remembered (a teacher presses it once on the projector). **Present shows the
+  same words** (§5), an unlock's reason included, so a projected grid shows each student's reason
+  to the room: as picked, said to the owner with the PR. **The length picker** is a segmented
+  tray, the pick raised out of the sunken tray as a card is and set semibold, never colour alone;
+  it was outlined pills. **Each failure is said where it happened:** a Start's under Start, which
+  sends it again; an End's beside the controls, End sending it again; only the page's own read
+  (the class, the roster) is said under the name, now with Try again, where all three shared one
+  red line with no retry. The controls hold with `aria-disabled` while a send is under way, so the
+  pressed button keeps focus (a disabled one drops it to the page), and one send at a time.
+
 - **2026-10-06** — **D2i: the in-class screens in Soft premium: Home, Waiting, Focus, Unlocked,
   Protection off and Session over.** The owner's rulings stand (D2's PRs into `main`, no sign-off
   wait, the recommended option on a taste call, said in the PR); D1's composition kept but where
