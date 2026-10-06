@@ -47,10 +47,9 @@ class (2026-10-05); for another professor, start at step 3.
    **Check:** `npm run school -- list` no longer lists that invite as open, and the
    portal shows the professor's classes page.
 5. **The class.** On the portal the professor creates the class. It gets a **join
-   code**: short, without `0`/`O` or `1`/`I`/`L`, for the students. The portal can't
-   change the code yet (the API can, `PATCH /v1/classes/{id}`, but no screen calls it), so
-   share it with the class only. If it leaks, tell the owner; a new code means a session's
-   PR for the portal, or a new class.
+   code**: short, without `0`/`O` or `1`/`I`/`L`, for the students. Share it with the class
+   only. If it leaks, press **New code** beside it on the class page and confirm: the old
+   code stops working at once, and students who have already joined stay joined.
 6. **The block.** A block is an NFC tag carrying a ten-letter-and-digit code,
    `<your block's 10-character code>`. Make it up (letters and digits only) and keep it
    off shared channels and the repo: anyone enrolled who knows it can send a tap with it.

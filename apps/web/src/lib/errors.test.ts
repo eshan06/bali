@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { ApiError, createApiClient, NetworkError } from './api-client';
 import {
   CANT_ADD_TIME,
+  CANT_MAKE_CODE,
   errText,
+  NEW_CODE_MADE,
   NOT_A_SESSION_LENGTH,
   NOT_AN_INVITE_CODE,
   SESSION_ALREADY_RUNNING,
@@ -70,7 +72,15 @@ describe('errText', () => {
     expect(SESSION_ALREADY_RUNNING).toBe(
       "A session was already running, so the length you picked wasn't used. It ends at the time shown.",
     );
-    for (const words of [NOT_A_SESSION_LENGTH, CANT_ADD_TIME, SESSION_ALREADY_RUNNING]) {
+    expect(CANT_MAKE_CODE).toBe("Bali couldn't make a new code just now. Try again.");
+    expect(NEW_CODE_MADE).toBe('This is the new code. The old one has stopped working.');
+    for (const words of [
+      NOT_A_SESSION_LENGTH,
+      CANT_ADD_TIME,
+      SESSION_ALREADY_RUNNING,
+      CANT_MAKE_CODE,
+      NEW_CODE_MADE,
+    ]) {
       expect(words).not.toMatch(/[—!]/);
     }
   });
