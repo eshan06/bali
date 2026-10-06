@@ -536,8 +536,8 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - Confirm the state of the later K-12 pilot (likely Los Angeles or New Jersey) and its school's phone policy (ISSUES #4). The first pilot is preliminary: adults at Vanderbilt, on their own phones.
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
 - #148 the sign-in page: D2d drew it (`infra/cognito/hosted-ui/`); 🔧 the owner uploads its logo and CSS to dev's pool, looks, then to prod's, by the README.
-- ✅ #165 the Me page: D2j (its hierarchy, the account in a card of its own).
-- ✅ #115 the older screens' design pass: the app's in D2h (#233), the portal's in D2c.
+- #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
+- ✅ #115 the older screens' design pass: the app's words in D2h (#233; its look rolled back 2026-10-06), the portal's in D2c.
 - #130 App Store readiness.
 - #175 Screen Time turned back on in Settings, noticed by Bali itself.
 - #176 reading and sending at once when the network comes back (filed 2026-10-03, not now).

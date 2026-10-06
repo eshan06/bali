@@ -458,7 +458,8 @@ design if it has one. Then:
   teacher mid-lesson, calm and dense, in the Bali Design System."
 - **Build with both skills:** `design-taste-frontend` for the read, the
   discipline and the tells; `high-end-visual-design` for Soft premium's shape
-  language (the tray, the pills, the soft shadow, the spacing rhythm). Where
+  language (the tray, the pills, the soft shadow, the spacing rhythm) on the
+  portal; an app screen follows its approved design. Where
   either disagrees with this file, this file wins; neither's fonts, palette,
   icons or motion override the tokens.
 - **Use the dials for product UI:** `DESIGN_VARIANCE 3`, `MOTION_INTENSITY 2`,

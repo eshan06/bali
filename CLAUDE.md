@@ -61,7 +61,8 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    task with no plan is done by the session itself. Message the
    owner only for: parked steps, device checkpoints (anything needing a
    physical iPhone), genuine scope or architecture decisions the docs don't
-   answer, and destructive/irreversible actions.
+   answer, a screen with no approved design (Working rules), and
+   destructive/irreversible actions.
 3. **Execute** on a branch cut from the latest `origin/main`: code + tests
    together, fast checks locally as you go.
 4. **Verify:** first the deterministic checks (`npm run typecheck && npm run
@@ -104,7 +105,8 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   the Cognito sign-in page (D2d), a demo site, and user-facing strings
   wherever they live (DESIGN.md lists where). Read `docs/DESIGN.md` first,
   then design and build with the `design-taste-frontend` and
-  `high-end-visual-design` skills (Bali's style, Soft premium), and write
+  `high-end-visual-design` skills (Bali's style, Soft premium, on the portal;
+  an app screen follows its approved design), and write
   every new or changed user-facing
   string with the `no-ai-slop` skill; `/santa-loop` runs
   `web-design-guidelines` on the portal's UI and `no-ai-slop` on changed
