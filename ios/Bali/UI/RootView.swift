@@ -51,6 +51,8 @@ struct RootView: View {
             ScreenScaffold {
                 BaliMark(size: 72).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        case .age: AgeView(phone: phone)
+        case .tooYoung: TooYoungView()
         case .intro: IntroView { phone.sawIntro() }
         case .signIn: SignInView(signIn: phone.signIn)
         case .screenTime: ScreenTimeView(phone: phone)

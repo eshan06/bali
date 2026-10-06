@@ -847,8 +847,9 @@ struct AppTests {
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
-        // A phone of the test's own has seen no intro and runs no enforcer: the router shows the
-        // intro, so only the deletion's screen is asked after here, never Me.
+        // A phone of the test's own has seen no intro, passed no 13+ check and runs no enforcer: the
+        // router shows the 13+ question (C7), or Starting where the host's defaults hold the flags,
+        // so only the deletion's screen is asked after here, never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
         phone.deleting.ask()
         #expect(phone.shown.screen != .deleting)
@@ -1498,6 +1499,44 @@ struct AppTests {
     }
 
     @Test(
+        "The 13+ check (C7) as the phone keeps it: a fresh Phone reads the one flag from its own defaults — set once Continue answered 13 or older, kept across launches, never the month or the year — so the question is never asked again; an answer under 13 keeps nothing, so the next launch asks again while this run shows the stop screen; the picks go with the answer either way, and Continue with nothing picked changes nothing; a frozen fixture's answer writes nothing for another, and each fixture of the check shows its screen with no tab bar. The key as it was before is put back after"
+    )
+    func ageCheck() throws {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: AgeCheck.key)
+        defer { defaults.set(before, forKey: AgeCheck.key) }
+        defaults.removeObject(forKey: AgeCheck.key)
+        let live = Phone()
+        #expect(live.age.answer == .unanswered && !live.birth.complete)
+        live.answerAge()
+        #expect(live.age.answer == .unanswered && defaults.object(forKey: AgeCheck.key) == nil)
+        live.birth = Birth(month: 1, year: 2000)
+        live.answerAge()
+        #expect(live.age.answer == .passed && live.birth == Birth())
+        #expect(defaults.bool(forKey: AgeCheck.key) && Phone().age.answer == .passed)
+        #expect(defaults.object(forKey: AgeCheck.key) as? Bool == true)
+        defaults.removeObject(forKey: AgeCheck.key)
+        let young = Phone()
+        // This month, Gregorian: the rule counts in it whatever calendar the phone shows.
+        let now = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
+        young.birth = Birth(month: now.month, year: now.year)
+        young.answerAge()
+        #expect(young.age.answer == .tooYoung && young.birth == Birth())
+        #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
+        // The fixtures: the question, nothing picked and both picked — whose pass, frozen, writes
+        // nothing — and the stop screen; the intro follows a pass.
+        let asked = Phone(fixture: try #require(PreviewFixtures.all["age"]))
+        #expect(asked.shown == (.age, false) && !asked.birth.complete)
+        let picked = Phone(fixture: try #require(PreviewFixtures.all["agePicked"]))
+        #expect(picked.shown == (.age, false) && picked.birth == Birth(month: 3, year: 2009))
+        picked.answerAge()
+        #expect(picked.age.answer == .passed && picked.shown == (.intro, false))
+        #expect(defaults.object(forKey: AgeCheck.key) == nil && Phone().age.answer == .unanswered)
+        let stopped = Phone(fixture: try #require(PreviewFixtures.all["tooYoung"]))
+        #expect(stopped.shown == (.tooYoung, false))
+    }
+
+    @Test(
         "The permission once read approved is kept in the phone's own defaults (C1b) — set at a read of approved, cleared once the check judges the permission off (denied, or not determined for the grace), left at a read not determined for a moment — and a fresh Phone reads it back; with it, not determined routes as approved. The flag as it was before is put back after"
     )
     func everApproved() throws {
@@ -1649,13 +1688,19 @@ struct AppTests {
     }
 
     @Test(
-        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a); the flag as it was before is put back after"
+        "The intro seen is kept in the phone's own defaults: a fresh Phone reads it back (C1a) — once the 13+ check has passed, which comes before it (C7); the flags as they were before are put back after"
     )
     func introSeen() {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: Phone.introSeenKey)
-        defer { defaults.set(before, forKey: Phone.introSeenKey) }
+        let before = (defaults.object(forKey: Phone.introSeenKey), defaults.object(forKey: AgeCheck.key))
+        defer {
+            defaults.set(before.0, forKey: Phone.introSeenKey)
+            defaults.set(before.1, forKey: AgeCheck.key)
+        }
         defaults.removeObject(forKey: Phone.introSeenKey)
+        defaults.removeObject(forKey: AgeCheck.key)
+        #expect(Phone().shown.screen == .age)
+        defaults.set(true, forKey: AgeCheck.key)
         let phone = Phone()
         #expect(!phone.introSeen && phone.shown.screen == .intro)
         phone.sawIntro()

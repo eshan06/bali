@@ -56,6 +56,12 @@ final class Phone {
     private var starting = false
     /// A fixture's, frozen as it was made (Debug): never started.
     private var frozen = false
+    /// The 13+ check (C7), as the phone's own defaults say — passed before, or not yet — and, this
+    /// run, what the student answered: under 13 is held here alone, never written anywhere
+    /// (`AgeCheck`). The question is the first screen on a first launch.
+    private(set) var age = AgeCheck(defaults: .standard)
+    /// The age screen's picks, the birth month and year, until Continue answers with them.
+    var birth = Birth()
     /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
     /// not the app group's, which the extensions read.
     private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
@@ -164,6 +170,7 @@ final class Phone {
     #if DEBUG
         init(fixture: PreviewFixtures.State) {
             (problem, introSeen, signedIn) = (fixture.problem, fixture.introSeen, fixture.signedIn)
+            (age, birth) = (AgeCheck(fixture.age), fixture.birth)
             (protection, sync, frozen) = (fixture.protection, fixture.sync, true)
             (everApproved, askFailed, joining) = (false, fixture.askFailed, fixture.joining)
             inClass = fixture.everInClass ? fixture.sync?.me?.user.id : nil
@@ -193,7 +200,8 @@ final class Phone {
     /// The router's answer over what the phone knows, with `opened` as the screens opened.
     private func choose(_ opened: [Screen]) -> (screen: Screen, tabbed: Bool) {
         Screen.choose(
-            problem: problem, deleting: deleting.shows, introSeen: introSeen, signedIn: signedIn,
+            problem: problem, deleting: deleting.shows, age: age.answer, introSeen: introSeen,
+            signedIn: signedIn,
             protection: protection, everApproved: everApproved, everInClass: everInClass, sync: sync,
             hasClasses: hasClasses, sessionOverClosed: sessionOverClosed, opened: opened, tab: tab,
             now: Date())
@@ -568,6 +576,16 @@ final class Phone {
     func joined(_ answer: APIResponse<EnrollmentJoinResponse>) {
         joining.busy = false
         if joining.joined(answer), opened.last == .join { opened.removeLast() }
+    }
+
+    /// The age screen's Continue (C7): the picks answer the check, judged by the phone's clock and
+    /// calendar today — passed, kept in the phone's own defaults (never on a frozen fixture, which
+    /// keeps nothing for another); under 13, kept nowhere, in memory until the app is reopened —
+    /// and the picks are let go either way. Nothing until both are picked.
+    func answerAge() {
+        guard let month = birth.month, let year = birth.year else { return }
+        age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
+        birth = Birth()
     }
 
     func sawIntro() {

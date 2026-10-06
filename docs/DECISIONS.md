@@ -54,6 +54,39 @@ a real decision? Add a dated entry at the top: what was decided and why.
   after its taps are locked and before any is consumed, and fires the refresh only then. A
   race test parks one side on a held lock it can observe; it never fires on a guessed moment.
 
+- **2026-10-05** — **C7, the 13+ age screen: neutral, first, month precision, and nothing kept
+  on "no".** The owner's picks (2026-10-05) on the 2026-10-04 ruling (c). The question asks the
+  birth month and year by the FTC's COPPA guidance: nothing on the screen says 13, hints at the
+  cutoff or preselects an answer (no default year, no "you must be 13"). It is the very first
+  screen on a first launch, before the intro. 13 or older keeps only that the check passed, on
+  the phone (`ageChecked` in the app's own defaults), never the date, and is not asked again.
+  Under 13 keeps nothing: no flag, date or counter, in the defaults, the app group, the Keychain
+  or on the server; the student sees a kind stop screen ("Bali isn't available for you yet. Ask
+  your teacher how to take part in class without the app.") with no way back to the question
+  until the app is reopened, the answer held in memory for the run. **Month precision:** the
+  phone knows a month, not a day, so it counts someone as 13 only once the month after their
+  birth month has begun, 13 years on — in the birth month itself a student born on its last day
+  is still 12, so the whole month says no, and no 12-year-old ever passes. The cost: a student
+  born on a month's last day is asked to wait that one day (a reopen asks again). Chosen over
+  passing on that last day itself, which for a birth on 29 February would pass on 28 February,
+  with 1 March the first day that is sure. **Menus, not wheels or typed fields:** a wheel rests on
+  a value, which reads as a preselection, and a typed month invites typos; two menus start on
+  "Choose", offer the twelve months and this year with a hundred before it (a span that hints at
+  no cutoff), and leave out the future — this year picked, the months to this one; a month past
+  this one picked, the years to last year — so no pick can be invalid and the screen needs no
+  error of its own. **Gregorian, whatever calendar the phone shows** (santa's round 1, both
+  reviewers): the rule and the menus count in the Gregorian calendar, in the phone's time zone
+  and with month names in its language. On a phone set to the Islamic calendar `Calendar.current`
+  would have counted thirteen lunar years, each eleven days short of a solar one, and passed a
+  student of 12 years and 9 months; on the Japanese calendar the year menu would have offered
+  era years. **Never over a session's screens:** the router shows the check only once the engine
+  says where the phone stands and no session stands for the phone; Focus, Unlocked, Protection
+  off and the home a standing not read keeps hold Emergency Unlock and keep their screens, and
+  Session over holds past the bell until the student closes it, so an install from before the
+  check sees it at the next launch, or after the bell once Session over is closed, and a tap
+  waiting for a Start still locks the phone through it (Focus takes over). The rule and the
+  keeping live in BaliOutbox (`AgeCheck`, `Birth`), tested on Linux too.
+
 - **2026-10-06** — **Device tokens are personal data, and a newer register wins (N4).**
   `deleteAccount` (C3), a school's disposal (C6a) and the retention run (C6b) delete the
   tokens of the people they de-identify, in their own transaction, beside the pre-bell taps
