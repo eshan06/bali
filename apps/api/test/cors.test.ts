@@ -112,7 +112,9 @@ describe('CORS (opt-in via CORS_ORIGINS)', () => {
     },
   );
 
-  it('gives a stranger origin no CORS allow headers on a PATCH preflight', async () => {
+  // The plugin sends its fixed allow-methods list to anyone; it is the missing
+  // allow-origin that makes the browser refuse a stranger's request.
+  it('gives a stranger origin no Access-Control-Allow-Origin on a PATCH preflight', async () => {
     const app = buildWithCors('http://localhost:3000');
     const res = await app.inject({
       method: 'OPTIONS',
