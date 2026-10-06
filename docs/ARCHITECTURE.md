@@ -856,8 +856,8 @@ updated 40s ago" instead of freezing green, then catches up by event number. Onl
 `401` signs a teacher out; a network blip shows "Couldn't reach Bali. Check your connection,
 then try again." with its retry (the words since D2c-2).
 
-**5. Deploys on Vercel when we ship.** A new project watching `main`; removing the
-`vercel.json` deploy block is the deliberate flip. Two open tabs are fine (each stream
+**5. Deploys on Vercel when we ship.** A new project watching `main` (`bali-portal`, rooted at
+`apps/web`); the root `vercel.json` that blocked `main` deploys was deleted 2026-10-06. Two open tabs are fine (each stream
 has its own cursor; capped at 5 per account), and a tab left open across a deploy gets a
 "new version — refresh" banner.
 

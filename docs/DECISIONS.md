@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-05** — **C2b: the app's policy links open the production portal in an in-app Safari
+- **2026-10-05** — **C2-app: the app's policy links open the production portal in an in-app Safari
   sheet, from one build setting.** The intro's last page, Sign in and Me each carry two quiet text
   links, "Privacy policy" and "Terms" (the portal's own labels on `/login`), that open `/privacy`
   and `/terms` in `SFSafariViewController`, so the student stays in Bali and Done brings them
@@ -37,7 +37,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `text-primary` and Back to sign in as the card's pill (a link drawn by `buttonClass`, since it
   leads somewhere rather than acting); `/support` and the policy pages open with `/login`'s
   lockup; the policy outline is a tray of section cards under the notice, drawn as §4's calm
-  banner (sunken, a hairline, `text-primary`, `radius-sm`), every word of C2a's draft kept; the
+  banner (sunken, a hairline, `text-primary`, `radius-sm`), every word of C2-web's draft kept; the
   invite-code screen is a card on its own, as `/login`. **The field** (`components/field.tsx`,
   PLAN's "labelled input piece", for D2e's block and class fields too): label above, the input a
   sunken well with a `border-default` hairline at `radius-sm` (D2d's sign-in page's input), help
@@ -278,11 +278,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `DeleteAccountTests` and `DeletionOrderTests` (BaliOutbox), the main rules each proven by a
   mutation that fails its test.
 
-- **2026-10-05** — **C2a: the policy pages ship as a marked draft outline, placeholder text
+- **2026-10-05** — **C2-web: the policy pages ship as a marked draft outline, placeholder text
   included.** P4 (2026-10-04, below) kept `/support`'s policy line at "coming soon" and ruled out
-  placeholder text until C2 brought the lawyer's words. The owner's pick for C2a changes that:
+  placeholder text until C2 brought the lawyer's words. The owner's pick for C2-web changes that:
   `/privacy` and `/terms` exist now, so the links the portal and the app need (`/login`,
-  `/support`, and C2b's intro, Sign in and Me screens) can ship ahead of the words, as a marked
+  `/support`, and C2-app's intro, Sign in and Me screens) can ship ahead of the words, as a marked
   draft outline, never as a policy. Each page says at the top that it isn't the policy yet, that
   the final text is coming from Bali's lawyer and that nothing on it is a promise; every section's
   line is marked "Placeholder." and names only what the final text will cover, linking to
@@ -696,7 +696,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   email, since the owner mints them. Left out on purpose until they are true: account deletion
   (C3, C4), the 13+ line (C7), retention (C6b) and any legal promise; the privacy policy is
   "coming soon" until C2 brings the lawyer's words, never placeholder text (superseded
-  2026-10-05, C2a: a marked draft outline; the entry of that date above). Support goes to
+  2026-10-05, C2-web: a marked draft outline; the entry of that date above). Support goes to
   eshan.shah@vanderbilt.edu (owner).
 
 - **2026-10-04** — **S3: API tightening, from the security investigation.** **Access tokens
