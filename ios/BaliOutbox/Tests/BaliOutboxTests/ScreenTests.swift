@@ -161,6 +161,10 @@ struct ScreenTests {
             #expect(screen(age: age, standing: .unread) == .home, "\(age)")
             #expect(screen(age: age, signedIn: false, shielded: true, standing: .unread) == .home)
             #expect(screen(age: age, introSeen: false, signedIn: false, queued: held) == .focus)
+            // Delete account pressed (C4b) has its own screen over everything but a failed start:
+            // the check waits behind it too.
+            #expect(screen(deleting: true, age: age, introSeen: false, signedIn: nil, permission: nil, standing: nil) == .deleting)
+            #expect(screen(deleting: true, age: age) == .deleting, "\(age)")
             // Unlocked's Home and a tab chosen stay the session's: never the check over them.
             #expect(
                 screen(age: age, standing: .inSession(session(), .unlocked), opened: [.home]) == .home,
