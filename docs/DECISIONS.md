@@ -23,7 +23,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sends it again; an End's beside the controls, End sending it again; only the page's own read
   (the class, the roster) is said under the name, now with Try again, where all three shared one
   red line with no retry. The controls hold with `aria-disabled` while a send is under way, so the
-  pressed button keeps focus (a disabled one drops it to the page), and one send at a time.
+  pressed button keeps focus (a disabled one drops it to the page), and one send at a time; only a
+  Start's own button says "Starting…", since an End's answer can come after the grid already says
+  the session ended (santa's round 1). An unread roster leaves its section empty under the failure
+  said by the name, never "Loading…".
 
 - **2026-10-06** — **D2i: the in-class screens in Soft premium: Home, Waiting, Focus, Unlocked,
   Protection off and Session over.** The owner's rulings stand (D2's PRs into `main`, no sign-off

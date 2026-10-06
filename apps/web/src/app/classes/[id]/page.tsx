@@ -76,8 +76,10 @@ export default function ClassDetailPage() {
   );
   // The class or its roster didn't load: said under the name, with Try again.
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // A Start, an End or an extend under way: a second press before the page redraws sends nothing.
+  // Which send is under way, if any: every control holds while one is, and only a Start's own
+  // button says "Starting…" (an End's answer can come after the grid already says it ended).
+  const [busy, setBusy] = useState<'start' | 'end' | 'extend' | null>(null);
+  // A send under way: a second press before the page redraws sends nothing.
   const sending = useRef(false);
   // The next session's length (P10): a preset, or Other with the minutes typed under it.
   const [pick, setPick] = useState<number | 'other'>(DEFAULT_MINUTES);
@@ -159,16 +161,16 @@ export default function ClassDetailPage() {
 
   const minutes = pick === 'other' ? parseMinutes(other) : pick;
 
-  /** Run `send` unless one is under way, the page busy until it settles. */
-  async function once(send: () => Promise<void>) {
+  /** Run `send` unless one is under way, the page busy with `kind` until it settles. */
+  async function once(kind: 'start' | 'end' | 'extend', send: () => Promise<void>) {
     if (sending.current) return;
     sending.current = true;
-    setBusy(true);
+    setBusy(kind);
     try {
       await send();
     } finally {
       sending.current = false;
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -179,7 +181,7 @@ export default function ClassDetailPage() {
       otherField.current?.focus();
       return;
     }
-    void once(async () => {
+    void once('start', async () => {
       rememberMinutes(classId, minutes);
       setStartSaid(null);
       try {
@@ -201,7 +203,7 @@ export default function ClassDetailPage() {
   function endSession() {
     if (!grid) return;
     const ending = grid.id;
-    void once(async () => {
+    void once('end', async () => {
       setSaid(null);
       try {
         await api.post(`/v1/sessions/${ending}/end`);
@@ -216,7 +218,7 @@ export default function ClassDetailPage() {
   function addTime(attempt: ExtendAttempt) {
     if (!grid) return;
     const session = grid.id;
-    void once(async () => {
+    void once('extend', async () => {
       setSaid(null);
       const answer = await extendSession(api, session, attempt);
       unanswered.current = keepUnanswered(attempt, answer);
@@ -262,7 +264,7 @@ export default function ClassDetailPage() {
             <form onSubmit={startSession} noValidate className="flex flex-col items-start gap-6">
               <fieldset>
                 <legend className="text-body font-medium">Session length</legend>
-                <div className="mt-3 inline-flex gap-1 rounded-full bg-surface-sunken p-1">
+                <div className="mt-3 inline-flex flex-wrap gap-1 rounded-full bg-surface-sunken p-1">
                   {[...LENGTH_PRESETS, 'other' as const].map((option) => (
                     <label key={option} className={LENGTH}>
                       <input
@@ -299,7 +301,7 @@ export default function ClassDetailPage() {
                         setOther(e.target.value);
                         setLengthSaid(false);
                       }}
-                      readOnly={busy}
+                      readOnly={busy === 'start'}
                       aria-invalid={lengthSaid}
                       aria-describedby={lengthSaid ? `${id}-said` : undefined}
                     />
@@ -313,8 +315,8 @@ export default function ClassDetailPage() {
               </fieldset>
               <div>
                 {/* One button throughout, so focus stays on it whatever it comes to say. */}
-                <Button type="submit" aria-disabled={busy} aria-busy={busy}>
-                  {busy
+                <Button type="submit" aria-disabled={busy !== null} aria-busy={busy === 'start'}>
+                  {busy === 'start'
                     ? 'Starting…'
                     : minutes === null
                       ? 'Start session'
@@ -373,13 +375,13 @@ export default function ClassDetailPage() {
                     key={add}
                     variant="secondary"
                     onClick={() => addTime(extendAttemptFor(unanswered.current, add))}
-                    aria-disabled={busy}
+                    aria-disabled={busy !== null}
                     className="tabular-nums"
                   >
                     +{add} min
                   </Button>
                 ))}
-                <Button variant="secondary" onClick={endSession} aria-disabled={busy}>
+                <Button variant="secondary" onClick={endSession} aria-disabled={busy !== null}>
                   End session
                 </Button>
               </div>
@@ -396,7 +398,7 @@ export default function ClassDetailPage() {
                       const again = unanswered.current;
                       if (again) addTime(again);
                     }}
-                    aria-disabled={busy}
+                    aria-disabled={busy !== null}
                   >
                     Try again
                   </Button>
@@ -420,10 +422,13 @@ export default function ClassDetailPage() {
         <h2 id={`${id}-roster`} className="text-h2">
           Roster
         </h2>
+        {/* Unread, it says so under the class's name with Try again, never "Loading…" here. */}
         {roster === null ? (
-          <p role="status" className="mt-4 text-body text-text-secondary">
-            Loading…
-          </p>
+          error ? null : (
+            <p role="status" className="mt-4 text-body text-text-secondary">
+              Loading…
+            </p>
+          )
         ) : roster.students.length === 0 ? (
           <p className={`mt-6 text-body ${EMPTY_TRAY}`}>No students have joined yet.</p>
         ) : (
