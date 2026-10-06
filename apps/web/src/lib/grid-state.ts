@@ -320,6 +320,51 @@ export function gridDisplay(s: Student, now: Date): GridDisplay {
   );
 }
 
+/** Whole minutes since the server last heard from the phone: its last check-in, or its tap. */
+export function minutesSinceContact(s: Student, now: Date): number {
+  const last = s.lastSeenAt ?? s.joinedAt;
+  return last === null ? 0 : Math.max(0, Math.floor((now.getTime() - last.getTime()) / 60_000));
+}
+
+/** What a Silent chip adds after its label (DESIGN.md §2): how long since the phone was heard. */
+export function silentNote(s: Student, now: Date): string {
+  return `${minutesSinceContact(s, now)} min`;
+}
+
+/**
+ * Staleness short of silence (DESIGN.md §2): beside a live chip whose phone hasn't been heard from
+ * for a minute or more, how long ago it was, as a caption, never a colour change. A focused phone
+ * reads Silent at 90 s, its label saying how long from then; an unlocked or protection-off phone
+ * never does, so for those this is the one place it shows.
+ */
+export function lastSeenNote(s: Student, display: GridDisplay, now: Date): string | null {
+  if (display !== 'focused' && display !== 'unlocked' && display !== 'protection_off') return null;
+  const minutes = minutesSinceContact(s, now);
+  return minutes < 1 ? null : `last seen ${minutes} min ago`;
+}
+
+/**
+ * `bali-softpulse`'s cue (DESIGN.md §7): an unlock the stream brings after the grid booted. The
+ * stream's first connect replays the events the boot snapshot already holds (`bootSeq` and
+ * below), and those never pulse.
+ */
+export function landsLive(e: Pick<FeedEvent, 'type' | 'seq'>, bootSeq: number): boolean {
+  return e.type === 'unlock' && e.seq > bootSeq;
+}
+
+/**
+ * Whether a chip pulses: the unlock it carries landed live (`landsLive`, by event id), and it
+ * shows it in emergency orange. An unlock left on a protection-off chip, or a late one the chip
+ * never took, stays still.
+ */
+export function softpulses(s: Student, display: GridDisplay, live: ReadonlySet<string>): boolean {
+  return (
+    s.unlock !== null &&
+    live.has(s.unlock.eventId) &&
+    (display === 'unlocked' || display === 'left_unprotected')
+  );
+}
+
 const REASON_TEXT: Record<UnlockReason, string> = {
   bathroom: 'bathroom',
   nurse: 'nurse',
@@ -405,4 +450,15 @@ export function staleness(input: {
   const quietFor = input.heartbeatMs * STALE_AFTER_MISSED_HEARTBEATS;
   const streamSilentMs = Math.max(0, input.now - input.lastStreamActivityAt);
   return streamSilentMs > quietFor ? { reason: 'stale', secondsAgo } : null;
+}
+
+/**
+ * The grid's health line (ARCHITECTURE, Web portal, decision 4) in words: why it may be out of
+ * date, and how old it is, in seconds for the first minute and in minutes from then on.
+ */
+export function staleWords({ reason, secondsAgo }: Staleness): string {
+  const ago = secondsAgo < 60 ? `${secondsAgo}s` : `${Math.floor(secondsAgo / 60)} min`;
+  return reason === 'reconnecting'
+    ? `Reconnecting… last updated ${ago} ago`
+    : `Live feed has gone quiet. Last updated ${ago} ago.`;
 }

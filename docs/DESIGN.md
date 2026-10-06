@@ -73,12 +73,13 @@ the focus ring on every control and all
 animation off under reduced motion, both global rules. The entry pages are in
 the picked style (D2c): the bar and `/login` (D2c-1), and the callback,
 `/support`, the two policy pages and the invite-code screen (D2c-2); so are
-the classes home and its "Your block" (D2e). All of them are held to the
-tokens' utilities by `tokens.test.ts`; the class page, the grid, the recap and
-reports keep their Tailwind classes on the new base (the page colour, the
-font, the ring, and the radii: their `rounded-lg` is now 20 px) until D2f and
-D2g, which also retire Tailwind's default colours and sizes, kept in the theme
-only for them. **A portal page uses the tokens' utilities and no
+the classes home and its "Your block" (D2e), and the live grid (D2f-1: its
+chips, states, `bali-softpulse`, badges and standard columns). All of them are
+held to the tokens' utilities by `tokens.test.ts`; the rest of the class page,
+the recap and reports keep their Tailwind classes on the new base (the page
+colour, the font, the ring, and the radii: their `rounded-lg` is now 20 px)
+until D2f-2, D2f-3 and D2g, which also retire Tailwind's default colours and
+sizes, kept in the theme only for them. **A portal page uses the tokens' utilities and no
 Tailwind default** (no `slate-*`, no `text-sm`): a value the tokens lack is a
 question for the owner.
 
@@ -163,7 +164,7 @@ portal's `GridDisplay` (`apps/web/src/lib/grid-state.ts`).
 | `unlocked` | emergency_unlocked | `state-emergency-*` | lock-open / lock.open | "Unlocked" |
 | `protection_off` | revoked | `state-revoked-*` | shield-off / shield.slash | grid "Protection off"; app "Screen Time off" |
 | `ended` | ended | `state-ended-*` | flag / flag | grid "Left" |
-| `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent" today; from D2f "Silent · 2 min", how long since the last check-in, in the label |
+| `silent` (derived, never stored) | none: the design system has staleness as a badge only | `state-ended-*` fill and ink, with a 1 px dashed `border-strong` edge (Q3 A) | wifi-off / wifi.slash | grid "Silent · 2 min" (D2f): the whole minutes since the last check-in, in the label |
 | grid `absent` / app "not in" | not_joined | `state-notjoined-*` | circle / circle | grid "Not here"; app "Not in" |
 | grid `left_unprotected` | none | `state-emergency-*` (Q2 A) | flag, then lock-open | "Left · unlocked" |
 | grid `left_protection_off` | none | `state-revoked-*` (Q2 A) | flag, then shield-off | "Left · protection off" |
@@ -176,8 +177,11 @@ The words for a state are decided per surface, and several are owner rulings
 "Screen Time off" (the owner's 2026-09-27 ruling replaced D1's "Permission
 off"). `silent` is a real display state, derived from the last check-in and
 never stored (data-model decision 7), so it is never green, and neither is
-`unknown`; staleness short of silence ("last seen 4m ago") is a `caption` in
-`text-tertiary` beside any chip, never a colour change. Unknown's dashed edge
+`unknown`; staleness short of silence ("last seen 4 min ago") is a `caption` in
+`text-tertiary` beside any chip, never a colour change: on the grid (D2f), beside
+a focused, unlocked or protection-off chip whose phone hasn't checked in for a
+whole minute, and a focused one reads Silent from 90 s, its label carrying the
+time from then (`lastSeenNote`, `grid-state.ts`). Unknown's dashed edge
 is `border-strong` on purpose, the pick's (Q3 A), where the borrowed
 `state-nodevice-bg` token's own note says `border-default`. The two Left chips
 each take their state's own colour (the owner's pick, 2026-10-04, Q2 A), and
@@ -193,9 +197,8 @@ not-joined pair.
 - **Red is reserved** for exactly two things: the revoked (protection off)
   state and destructive actions. No exception stands: "Left · protection off"
   is the revoked state, so it is red, and "Left · unlocked" is emergency
-  orange (the owner's pick, 2026-10-04, Q2 A). The shipped grid still paints
-  both red (`apps/web/src/components/live-grid.tsx`); D2f recolours them, and
-  no other PR does.
+  orange (the owner's pick, 2026-10-04, Q2 A). The grid painted both red until
+  D2f-1 recoloured them (`apps/web/src/components/live-grid.tsx`).
 - **Emergency is warm orange**, never red: the unlock is allowed, and the
   colour must say so.
 - **Blue belongs to passes** and nothing else.
@@ -398,7 +401,11 @@ the teacher's cue.
 ```
 
 (D2c's theme variables carry the two glow values; the snippet names them so it
-stands alone.)
+stands alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
+(`globals.css`, pinned by `tokens.test.ts`), on the chip of an unlock the stream
+brings while the grid is open, orange only (`softpulses`, `grid-state.ts`), once
+per unlock: never one the grid booted with or the stream's overlap replays, never
+a red chip.
 
 ## 8. Responsive behaviour
 

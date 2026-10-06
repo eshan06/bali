@@ -851,8 +851,9 @@ No second mini-backend inside Next.js. One brain, three thin clients.
 types the API uses — on web, "one shared state function" is literally the same file.
 (iOS mirrors it in `BaliCore` with contract tests, since Swift can't import TypeScript.)
 
-**4. The grid states its own health.** On a dropped stream it shows "reconnecting — last
-updated 40s ago" instead of freezing green, then catches up by event number. Only a real
+**4. The grid states its own health.** On a dropped stream it shows "Reconnecting… last
+updated 40s ago" (the words since D2f) instead of freezing green, then catches up by event
+number. Only a real
 `401` signs a teacher out; a network blip shows "Couldn't reach Bali. Check your connection,
 then try again." with its retry (the words since D2c-2).
 

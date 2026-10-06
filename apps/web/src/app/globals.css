@@ -241,8 +241,7 @@
 
   /* A bridge for the screens D2f and D2g redraw: their `text-slate-500` helper lines sit on the
      stone page now, below AA; text-tertiary is the pre-solved ink for them. It recolours every
-     slate-500 utility, the Unknown chip's `border-slate-500` dashed edge included (the state still
-     reads from its label and edge). Goes with the last `slate-` class. */
+     slate-500 utility. Goes with the last `slate-` class. */
   --color-slate-500: var(--bali-text-tertiary);
 }
 
@@ -255,6 +254,24 @@
 }
 @utility shadow-3 {
   box-shadow: var(--bali-shadow-3);
+}
+
+/*
+ * §7: bali-softpulse, the one pulse. When an Emergency Unlock lands on the live grid, its chip's
+ * glow ring swells to 6 px and fades, 1.2 s, twice, then is still; nothing moves. Under reduced
+ * motion, nothing at all (the base layer's rule below).
+ */
+@keyframes bali-softpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--bali-softpulse-glow);
+  }
+}
+@utility animate-softpulse {
+  animation: bali-softpulse 1.2s cubic-bezier(0.2, 0, 0, 1) 2;
 }
 
 @layer base {

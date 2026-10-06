@@ -12,9 +12,15 @@ import {
   endsSession,
   fromSnapshot,
   gridDisplay,
+  landsLive,
+  lastSeenNote,
   mergeSnapshot,
+  minutesSinceContact,
+  silentNote,
   snapshotIsFresh,
+  softpulses,
   staleness,
+  staleWords,
   type Students,
   unlockNote,
 } from './grid-state';
@@ -979,5 +985,114 @@ describe('the clock-off badge (S9)', () => {
       evt(6, 'tap_in', 'ana', T1, { clock_ahead_s: 'lots' }),
     );
     expect(s.ana.clockOff).toBe(false);
+  });
+});
+
+describe('how long a phone has been quiet (D2f)', () => {
+  /** `minutes` and `seconds` after T0, when every snapshot student was last heard. */
+  const at = (minutes: number, seconds = 0) =>
+    new Date(Date.parse(T0) + minutes * 60_000 + seconds * 1000);
+
+  it('a Silent chip says the whole minutes since the phone was last heard', () => {
+    const s = fromSnapshot(snapshot(1, [{ id: 'ana' }]));
+    expect(gridDisplay(s.ana, at(1, 31))).toBe('silent');
+    expect(silentNote(s.ana, at(1, 31))).toBe('1 min');
+    expect(silentNote(s.ana, at(12, 59))).toBe('12 min');
+    expect(minutesSinceContact(s.ana, at(-1))).toBe(0); // a clock behind never reads negative
+  });
+
+  it('a live chip says when it was last heard from its first whole minute; the others never do', () => {
+    let s = fromSnapshot(snapshot(1, [{ id: 'ana' }, { id: 'ben', state: null }, { id: 'cy' }]));
+    const seen = (id: string, now: Date) => lastSeenNote(s[id], gridDisplay(s[id], now), now);
+    expect(seen('ana', at(0, 59))).toBeNull();
+    expect(gridDisplay(s.ana, at(1))).toBe('focused');
+    expect(seen('ana', at(1))).toBe('last seen 1 min ago');
+    // Silent from 90 s: its label says how long, so the caption goes.
+    expect(seen('ana', at(2))).toBeNull();
+    // Unlocked and protection off never go silent, so the caption keeps counting.
+    s = applyEvent(s, evt(2, 'unlock', 'ana', T0, { reason: 'bathroom' }));
+    s = applyEvent(s, evt(3, 'protection_off', 'cy', T0));
+    expect(seen('ana', at(4))).toBe('last seen 4 min ago');
+    expect(seen('cy', at(4))).toBe('last seen 4 min ago');
+    // Never on a chip that isn't live: not here, or left.
+    expect(seen('ben', at(4))).toBeNull();
+    s = applyEvent(s, evt(4, 'enrollment_removed', 'ana', T0));
+    expect(gridDisplay(s.ana, at(4))).toBe('left_unprotected');
+    expect(seen('ana', at(4))).toBeNull();
+  });
+});
+
+describe('bali-softpulse (D2f)', () => {
+  const now = new Date(T1);
+
+  it('an unlock the stream brings after the boot lands live; the overlap’s replay never does', () => {
+    expect(landsLive(evt(11, 'unlock', 'ana'), 10)).toBe(true);
+    expect(landsLive(evt(10, 'unlock', 'ana'), 10)).toBe(false);
+    expect(landsLive(evt(11, 'refocus', 'ana'), 10)).toBe(false);
+  });
+
+  it('pulses the emergency chip of an unlock that landed live, and no other', () => {
+    let s = fromSnapshot(snapshot(10, [{ id: 'ana' }, { id: 'ben' }, { id: 'cy' }]));
+    const live = new Set<string>();
+    const land = (e: FeedEvent) => {
+      s = applyEvent(s, e);
+      if (landsLive(e, 10)) live.add(e.eventId);
+    };
+    const pulses = (id: string) => softpulses(s[id], gridDisplay(s[id], now), live);
+    land(evt(11, 'unlock', 'ana', T1, { reason: 'nurse' }));
+    expect(pulses('ana')).toBe(true);
+    // Recorded against protection off, the chip stays red, and still.
+    land(evt(12, 'protection_off', 'ben'));
+    land(evt(13, 'unlock', 'ben', T1, { recorded_as: 'protection_off' }));
+    expect(gridDisplay(s.ben, now)).toBe('protection_off');
+    expect(pulses('ben')).toBe(false);
+    // A late one the chip never took.
+    land(evt(14, 'unlock', 'cy', T1, { recorded_as: 'superseded' }));
+    expect(pulses('cy')).toBe(false);
+    // Back in focus: still. Unlocked again after leaving: Left · unlocked, orange, pulsing.
+    land(evt(15, 'refocus', 'ana'));
+    expect(pulses('ana')).toBe(false);
+    land(evt(16, 'enrollment_removed', 'ana'));
+    land(evt(17, 'unlock', 'ana'));
+    expect(gridDisplay(s.ana, now)).toBe('left_unprotected');
+    expect(pulses('ana')).toBe(true);
+  });
+
+  it('an unlock the grid booted with stays still, its replay included', () => {
+    const unlock: SnapshotUnlock = {
+      eventId: 'ev-9',
+      reason: 'bathroom',
+      recordedAs: null,
+      occurredAt: T1,
+    };
+    let s = fromSnapshot(snapshot(10, [{ id: 'ana', state: 'unlocked', unlock }]));
+    const replay = evt(9, 'unlock', 'ana', T1, { reason: 'bathroom' });
+    s = applyEvent(s, replay);
+    const live = new Set(landsLive(replay, 10) ? [replay.eventId] : []);
+    expect(gridDisplay(s.ana, now)).toBe('unlocked');
+    expect(softpulses(s.ana, 'unlocked', live)).toBe(false);
+  });
+});
+
+describe('the health line in words (D2f)', () => {
+  it('says why the grid may be out of date and how old it is, seconds then minutes', () => {
+    expect(staleWords({ reason: 'reconnecting', secondsAgo: 40 })).toBe(
+      'Reconnecting… last updated 40s ago',
+    );
+    expect(staleWords({ reason: 'stale', secondsAgo: 59 })).toBe(
+      'Live feed has gone quiet. Last updated 59s ago.',
+    );
+    expect(staleWords({ reason: 'stale', secondsAgo: 61 })).toBe(
+      'Live feed has gone quiet. Last updated 1 min ago.',
+    );
+    expect(staleWords({ reason: 'reconnecting', secondsAgo: 437 })).toBe(
+      'Reconnecting… last updated 7 min ago',
+    );
+  });
+
+  it('carries no em-dash (the owner’s cleanup, D2f)', () => {
+    for (const reason of ['reconnecting', 'stale'] as const) {
+      expect(staleWords({ reason, secondsAgo: 5 })).not.toMatch(/[—–]/);
+    }
   });
 });
