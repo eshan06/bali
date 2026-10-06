@@ -41,7 +41,7 @@ uses values the one before it produced:
 - **Runbook 3, the Vercel flip — done** (2026-10-05): the project `bali-portal`, rooted at
   `apps/web`, at `https://bali-portal.vercel.app`, Node.js 22.x, prod's values; the API's
   CORS preflight from it answers `204`. The old project `bali-web` (the v2 demo) isn't
-  connected to the repo, so step 2 wasn't needed. Still open: step 6, deleting `vercel.json`.
+  connected to the repo, so step 2 wasn't needed. Step 6 done (2026-10-06): `vercel.json` deleted. `bali-portal` hadn't been deploying `main` by itself (the owner deployed by hand); check the next push to `main` deploys it.
 - **Runbook 4, the restore drill — on hold** while prod has no backups. Its half A, a
   `pg_dump` into a scratch database, works without them (skip its step 1).
 - **Runbook 5, GitHub:** the load gate is a required check (7); the rest is open.
@@ -496,7 +496,7 @@ your Vercel projects; step 1 tells you which case you're in.
    - A preview can sign in only at a URL registered on dev's web client (Cognito
      takes no wildcards) and listed in dev's `CORS_ORIGINS`. Previews that can't sign
      in are fine; to sign in on one, register one fixed branch alias, never every URL.
-6. **Remove `vercel.json`'s deploy block.** Ask a session for a PR that deletes
+6. **Remove `vercel.json`'s deploy block.** ✅ Deleted 2026-10-06. Ask a session for a PR that deletes
    `vercel.json` (the block is the whole file). It governs only a project rooted at the
    repo root, and none is connected (step 2's note), so the portal already deploys `main`
    without it; the file is dead weight that misleads.
