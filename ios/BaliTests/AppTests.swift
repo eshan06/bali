@@ -1775,7 +1775,7 @@ struct AppTests {
     }
 
     @Test(
-        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under Continue on the last page alone, in a strip kept at least that row tall on the first page too, so Continue never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
+        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under Continue on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so Continue never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
     )
     func policyLinks() throws {
         let portal = try #require(PolicyLinks.portal)
@@ -1826,6 +1826,15 @@ struct AppTests {
                 count + (0..<width).filter { brand(pixel($0, y)) }.count
             }
             #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under Continue")
+            // VoiceOver: the links there on the last page alone — never invisible ones before it
+            // — each a link, not a button, as the portal's are.
+            let titles = PolicyLinks.Page.allCases.map(\.title)
+            let read = voiceOver(in: window).filter { titles.contains($0.accessibilityLabel ?? "") }
+            #expect(read.map(\.accessibilityLabel) == (linked ? titles : []), "page \(page)")
+            for link in read {
+                let traits = link.accessibilityTraits
+                #expect(traits.contains(.link) && !traits.contains(.button), "\(traits)")
+            }
         }
     }
 
@@ -1879,6 +1888,18 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// What VoiceOver reaches in `object`, in its order: the accessibility elements under it, those
+/// hidden from it left out — SwiftUI's own, through its hosting view's elements.
+@MainActor
+private func voiceOver(in object: NSObject) -> [NSObject] {
+    if object.accessibilityElementsHidden { return [] }
+    if object.isAccessibilityElement { return [object] }
+    if let elements = object.accessibilityElements as? [NSObject] {
+        return elements.flatMap(voiceOver(in:))
+    }
+    return ((object as? UIView)?.subviews ?? []).flatMap(voiceOver(in:))
+}
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
 /// one it shows: the others it lays out lie off screen.

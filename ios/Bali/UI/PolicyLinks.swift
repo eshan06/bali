@@ -45,7 +45,8 @@ struct PolicyLinks: View {
         }
     }
 
-    /// Each page's link: caption text in the brand's ink (DESIGN.md's links), in a 44-pt target.
+    /// Each page's link: caption text in the brand's ink (DESIGN.md's links), in a 44-pt target,
+    /// read by VoiceOver as the link it is, as the portal's own are.
     private var links: some View {
         ForEach(Page.allCases) { page in
             Button {
@@ -55,6 +56,7 @@ struct PolicyLinks: View {
                     .frame(minWidth: 44, minHeight: 44).contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .accessibilityRemoveTraits(.isButton).accessibilityAddTraits(.isLink)
         }
     }
 }

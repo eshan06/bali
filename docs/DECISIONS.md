@@ -8,6 +8,23 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-05** — **C2b: the app's policy links open the production portal in an in-app Safari
+  sheet, from one build setting.** The intro's last page, Sign in and Me each carry two quiet text
+  links, "Privacy policy" and "Terms" (the portal's own labels on `/login`), that open `/privacy`
+  and `/terms` in `SFSafariViewController`, so the student stays in Bali and Done brings them
+  back; Safari itself would drop them out of the app with the app switcher as the only way back.
+  The portal's address is one Info.plist key, `BaliPortalURL`, set by `BALI_PORTAL_URL` in
+  `ios/project.yml` to `https://bali-portal.vercel.app` for every configuration, since the policy
+  pages live only on the production portal (dev's has no words of its own to show). It is read by
+  `AppConfig` beside the sign-in's keys, so `AppConfigTests.agree` pins it to both files and a
+  build without it fails its start as a build without the sign-in's does; the TestFlight release
+  guard checks the sign-in's four keys and needs none for it. The links sit under Continue with
+  their room kept on the earlier pages, so Continue never moves as the pages turn; under Sign
+  in's "Trouble signing in?" line; and on Me above Sign out, never beside the red Delete account,
+  which stays last (C4b's pick). Caption size in the brand's ink, DESIGN.md's colour for links,
+  in a 44-pt target each, which VoiceOver reads as a link, as it reads the portal's. The words are
+  the lawyer's to come (C2); the links need not wait.
+
 - **2026-10-06** — **D2c-2: the portal's other entry pages in Soft premium, and one sentence for
   "no answer".** **A network failure is said one way everywhere:** `errText` answers every
   `NetworkError` with `errors.ts`'s `CANT_REACH` ("Couldn't reach Bali. Check your connection,
@@ -148,22 +165,6 @@ a real decision? Add a dated entry at the top: what was decided and why.
   only a token's latest register is remembered. A teacher is `403` with no reason, as `PATCH
   /v1/me`'s. No new refusal reason. Until N4, the three foreign-key coverage maps list
   `device_tokens.user_id` as "NOT YET": nothing deletes or exports a token yet.
-
-- **2026-10-05** — **C2b: the app's policy links open the production portal in an in-app Safari
-  sheet, from one build setting.** The intro's last page, Sign in and Me each carry two quiet text
-  links, "Privacy policy" and "Terms" (the portal's own labels on `/login`), that open `/privacy`
-  and `/terms` in `SFSafariViewController`, so the student stays in Bali and Done brings them
-  back; Safari itself would drop them out of the app with the app switcher as the only way back.
-  The portal's address is one Info.plist key, `BaliPortalURL`, set by `BALI_PORTAL_URL` in
-  `ios/project.yml` to `https://bali-portal.vercel.app` for every configuration, since the policy
-  pages live only on the production portal (dev's has no words of its own to show). It is read by
-  `AppConfig` beside the sign-in's keys, so `AppConfigTests.agree` pins it to both files and a
-  build without it fails its start as a build without the sign-in's does; the TestFlight release
-  guard checks the sign-in's four keys and needs none for it. The links sit under Continue with
-  their room kept on the earlier pages, so Continue never moves as the pages turn; under Sign
-  in's "Trouble signing in?" line; and on Me above Sign out, never beside the red Delete account,
-  which stays last (C4b's pick). Caption size in the brand's ink, DESIGN.md's colour for links,
-  in a 44-pt target each. The words are the lawyer's to come (C2); the links need not wait.
 
 - **2026-10-05** — **C4b: Delete account on Me, and the deletion's own screen over everything,
   Focus included.** The owner's picks (2026-10-05): a red "Delete account" text button at the very
