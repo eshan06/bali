@@ -130,10 +130,15 @@ export interface RecapView {
   protectionOffs: RecapMoment[];
 }
 
-/** The card's words and numbers, from R2's report. */
+/**
+ * The card's words and numbers, from R2's report. In Present (`present`), the projector the class
+ * can see, every unlock is still listed by who and when, but never with its reason: the student
+ * shares it with the teacher alone (#265's rule, `unlockNote`).
+ */
 export function recapView(
   report: SessionReportResponse,
   { locale, timeZone }: RecapFormat = {},
+  present = false,
 ): RecapView {
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
   const moment = (e: { eventId: string; student: ReportStudent; occurredAt: string }) => ({
@@ -147,7 +152,11 @@ export function recapView(
     unlocks: report.unlocks.map((u) => ({
       ...moment(u),
       // A reason this build doesn't know reads as none (API decision 4).
-      reason: isUnlockReason(u.reason) ? REASON_TEXT[u.reason] : 'No reason given',
+      reason: present
+        ? undefined
+        : isUnlockReason(u.reason)
+          ? REASON_TEXT[u.reason]
+          : 'No reason given',
     })),
     protectionOffs: report.protectionOffs.map(moment),
   };

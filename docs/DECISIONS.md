@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **D2g: the recap card and the reports page in Soft premium; the reports list
+  reflows; a session that ends in Present keeps its reasons off.** The calls the picks left open,
+  taken on the conductor's "your recommended options": **The reports page is a list, not a
+  table:** a card per session in the tray, its recap opening inside the card, never a card in a
+  card. A table that fits a desktop either scrolls sideways or shrinks its text on a tablet (at
+  ~600 px it ran 124 px off the edge), and restyling a table's cells into blocks can cost it its
+  table semantics in screen readers. So the list keeps one markup: where the session and its six
+  figures fit (the list 56 rem wide, which a 1024 px window gives) each card is one row under the
+  column names, and narrower each figure stands under its own name, three to a row and then two.
+  The column names above the tray are `aria-hidden`; each figure is a `dt`/`dd` pair, its `dt`
+  visually hidden on the wide row, so a screen reader hears every figure named once, at every
+  width. A session nobody joined keeps R5's words over its four figures, never zeros. **The recap
+  is the B artboard's** (`RecapB` on D2a's canvas): figures in `data-lg` on sunken tiles, names
+  and list headings in `label`, times in `caption`'s ink; laid out by its own width, so the class
+  page and an opened row share one card. On the class page it runs the page's width, as the grid
+  and the roster under it do. Its words are unchanged: no em-dash was in them, and the silent line
+  is already honest. **Show earlier** is held with `aria-disabled` while it reads, as D2f's
+  controls are, so focus stays on it. **Present at the end** (the case the entry below left open,
+  closed on the conductor's word): Present is the page's, not only the live grid's. A session that
+  ends while it is on switches the page to the recap and How it ended, as before, and both take
+  it: the recap lists each unlock by who and when, never its reason (`recapView`'s `present`, as
+  `unlockNote`'s), and How it ended is the projector view, the toggle beside it as beside the live
+  grid, so the teacher can leave Present there and see the reasons again. The toggle shows beside
+  How it ended whether or not Present was on, so an ended grid can be projected too. So
+  `docs/PILOT.md` drops its "stop projecting before then", keeping it only for a reload or a
+  return from Reports, which open the page in the teacher's view (Present is per tab and not
+  remembered, D2f-2's call; santa's round 2). **Tailwind's own colours, type sizes,
+  tracking and leading leave the theme** (`initial`), as DESIGN.md planned for D2g: with every
+  screen redrawn none is used, so `tokens.test.ts` now holds every source file to the tokens'
+  utilities, since a default would silently draw nothing. Found, not changed (a token is the
+  owner's): the tokens' dark `text-tertiary` on a dark card is 4.2:1, under AA's 4.5 for small
+  text.
+
 - **2026-10-06** — **D2j: History and Me in Soft premium; History's "Screen Time back on" decided;
   Me's hierarchy (#165); no sentence quotes a label the teacher doesn't see.** The owner's rulings
   stand (D2's PRs into `main`, no sign-off wait, the recommended option on a taste call, said in

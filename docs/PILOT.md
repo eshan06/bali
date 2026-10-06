@@ -100,9 +100,11 @@ At the start:
   without signal looks the same).
 - To show the grid on a projector, press **Present** above it: four columns in larger type,
   readable from the back of the room; press it again to go back. It shows the same words as
-  the grid but never an unlock's reason, which a student shares with you alone. When the
-  session ends, at the bell or at End session, the page shows its recap, reasons included,
-  so stop projecting before then.
+  the grid but never an unlock's reason, which a student shares with you alone. If the
+  session ends while you're presenting, the recap and How it ended leave the reasons out too;
+  press **Present** beside How it ended to see them. The page forgets Present when you reload
+  it or come back from Reports, and opens in your own view with the recap's reasons, so stop
+  projecting before either.
 
 During:
 
