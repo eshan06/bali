@@ -1509,22 +1509,24 @@ struct AppTests {
     }
 
     @Test(
-        "Emergency Unlock's words fit D1's 64-pt pill at the default text size on the narrowest iPhone, 390 pt less the gutters: the action and who sees it, a line each, where D1's one sentence wrapped mid-phrase (D2i; D2a's audit) — and once the text outgrows the pill, it grows, never cutting a line off"
+        "Emergency Unlock's words fit D1's 64-pt pill at the default text size on the narrowest iPhone the app runs on, 375 pt less the gutters: the action and who sees it, a line each, where D1's one sentence wrapped mid-phrase (D2i; D2a's audit). At the largest text size the pill grows with them, and its words, offered less height than they need, still keep every line whole — the first was cut short there before"
     )
     func unlockFits() {
-        let narrowest = 390 - 2 * Theme.gutter
-        /// The control at `type` as wide as its words want, every line whole; or in `width`.
-        func size(_ type: DynamicTypeSize, in width: CGFloat? = nil) -> CGSize {
-            let control = UnlockControl {}.environment(\.dynamicTypeSize, type)
-            let host =
-                width == nil
-                ? UIHostingController(rootView: AnyView(control.fixedSize()))
-                : UIHostingController(rootView: AnyView(control))
-            return host.sizeThatFits(in: CGSize(width: width ?? 10_000, height: 10_000))
-        }
-        let whole = size(.large)
+        let narrowest = 375 - 2 * Theme.gutter
+        let whole = UIHostingController(
+            rootView: UnlockControl {}.fixedSize().environment(\.dynamicTypeSize, .large)
+        ).sizeThatFits(in: CGSize(width: 10_000, height: 10_000))
         #expect(whole.width <= narrowest && abs(whole.height - 64) < 0.5, "\(whole)")
-        #expect(size(.accessibility5, in: narrowest).height > 100)
+        let grown = UIHostingController(
+            rootView: UnlockControl {}.environment(\.dynamicTypeSize, .accessibility5)
+        ).sizeThatFits(in: CGSize(width: narrowest, height: 10_000))
+        #expect(grown.height > 100, "\(grown)")
+        /// The words' height at the largest text size, 200 pt wide, offered `room`.
+        func words(_ room: CGFloat) -> CGFloat {
+            UIHostingController(rootView: UnlockWords().environment(\.dynamicTypeSize, .accessibility5))
+                .sizeThatFits(in: CGSize(width: 200, height: room)).height
+        }
+        #expect(abs(words(44) - words(10_000)) < 0.5, "\(words(44)) of \(words(10_000))")
     }
 
     @Test(

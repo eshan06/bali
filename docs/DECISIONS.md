@@ -8,7 +8,7 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-10-05** — **D2i: the in-class screens in Soft premium: Home, Waiting, Focus, Unlocked,
+- **2026-10-06** — **D2i: the in-class screens in Soft premium: Home, Waiting, Focus, Unlocked,
   Protection off and Session over.** The owner's rulings stand (D2's PRs into `main`, no sign-off
   wait, the recommended option on a taste call, said in the PR); D1's composition kept but where
   D2a's audit found a problem. **Home's hero card sits in a tray** (`Tray`, `Theme.swift`:
@@ -26,10 +26,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Emergency Unlock's words** (the audit: D1's one sentence wrapped mid-phrase at the default
   size; in the system font at D1's 16 pt it needs about 300 pt where the pill leaves 254 on a
   390-pt phone): D1's words on two lines, "Hold to unlock" in the button's style (17 semibold,
-  on the scale where 16 was not) and "Your teacher will see it" under it in `body`, each one
-  line at the default size (`AppTests.unlockFits`); each line holds its whole height, since
-  offered a share of the pill's the first cut off at the largest text size. The hold, the orange,
-  the pill, the ring and the spring are unchanged. Considered: "Hold to unlock" alone, its
+  on the scale where 16 was not) and "Your teacher will see it" under it in `body` (`UnlockWords`),
+  each one line at the default size down to a 375-pt phone (`AppTests.unlockFits`); each line
+  keeps its whole height, since offered a share of the pill's the first was cut short at the
+  largest text size. The hold, the orange, the pill, the ring and the spring are unchanged. Considered: "Hold to unlock" alone, its
   teacher line moved to the caption (three lines offline, and a failed press's words take the
   caption's place, which would hide it). **Unlocked's three reasons are pills**, as every button
   is since D2h. **The words:** the em-dash cleanup for these screens' strings — Waiting's

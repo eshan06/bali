@@ -43,7 +43,7 @@ export type TapDisposition =
    * Armed (decision 5), or `already_armed` — a waiting tap of this student's
    * for this teacher already stands and covers this one, which is also the
    * answer to the retry of a tap still waiting (A4): delete the record.
-   * The tap joined nothing, so it gives the phone no window: show "Ready —
+   * The tap joined nothing, so it gives the phone no window: show "Ready,
    * waiting for your teacher". A session the phone is already in is untouched
    * (arming ends nothing; only a join switches, decision 4). How the phone
    * learns of the Start is open decision 6.

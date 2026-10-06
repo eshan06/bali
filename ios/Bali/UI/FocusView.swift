@@ -178,9 +178,7 @@ private struct Ring: View {
 /// Held for a second it unlocks, a finger drifting up to a touch target's width; let go early,
 /// nothing happens and its progress springs back (the design system's spring) — under Reduce
 /// Motion a still pressed look instead, never a ring that looks done a second early. VoiceOver's
-/// own action unlocks in one step, and Voice Control knows it by the words on it too. D1's words
-/// on two lines (D2i): the action in a button's label, who sees it under it, each one line at the
-/// default text size, where the one sentence wrapped mid-phrase.
+/// own action unlocks in one step, and Voice Control knows it by the words on it too.
 struct UnlockControl: View {
     let unlock: () -> Void
     @State private var holding = false
@@ -196,13 +194,7 @@ struct UnlockControl: View {
                         .stroke(look.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-            // Each line its whole height: offered a share of the pill's, a long one would cut off.
-            VStack(spacing: 0) {
-                Text("Hold to unlock").textStyle(.button).fixedSize(horizontal: false, vertical: true)
-                Text("Your teacher will see it").textStyle(.body)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity).padding(.trailing, 12)
+            UnlockWords().frame(maxWidth: .infinity).padding(.trailing, 12)
         }
         .multilineTextAlignment(.center).foregroundStyle(look.ink)
         .padding(10).frame(minHeight: 64)
@@ -218,6 +210,20 @@ struct UnlockControl: View {
         .accessibilityInputLabels(["Hold to unlock", "Emergency Unlock"])
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { unlock() }
+    }
+}
+
+/// Emergency Unlock's words, D1's on two lines (D2i): the action in a button's label, who sees it
+/// under it, each one line at the default text size, where the one sentence wrapped mid-phrase.
+/// Each line keeps its whole height: offered a share of the pill's, the first was cut short at the
+/// largest text size.
+struct UnlockWords: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Hold to unlock").textStyle(.button).fixedSize(horizontal: false, vertical: true)
+            Text("Your teacher will see it").textStyle(.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
