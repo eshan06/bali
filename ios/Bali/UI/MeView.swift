@@ -7,9 +7,10 @@ import UIKit
 /// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
 /// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
 /// and what a teacher sees (the intro's own page); and Sign out, whose sign-in it ends said under
-/// it (#147), which waits while an Emergency Unlock is unsent (`SignOutWords`); and D1's Leave on
-/// each class, asked first, never while the phone stands in that class's lesson (C6c, `Leaving`).
-/// Every failure is said with its way on (rule 5).
+/// it (#147), which waits while an Emergency Unlock is unsent (`SignOutWords`); D1's Leave on
+/// each class, asked first, never while the phone stands in that class's lesson (C6c, `Leaving`);
+/// and, at the very bottom, Delete account, asked first too (C4b, `Deleting`). Every failure is
+/// said with its way on (rule 5).
 struct MeView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
@@ -40,6 +41,7 @@ struct MeView: View {
                     ClassesSection(phone: phone, title: "Classes", leaves: true)
                     about
                     SignOutButton(phone: phone, email: phone.email)
+                    DeleteAccountButton(phone: phone)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 16)
             }
@@ -203,6 +205,39 @@ struct SignOutButton: View {
     }
 }
 
+/// Delete account (C4b; the owner's picks, 2026-10-05), at the very bottom of Me under Sign out and
+/// whose sign-in it is: a text button in DESIGN.md's destructive red, the one red on the screen.
+/// Pressed, it gives way to its question, asked as Leave asks its own (`LeaveQuestion`): what goes
+/// and what stays, a red Delete account and Cancel. From there the deletion's own screen takes over
+/// (`DeletingView`), and says every stop with its way on (rule 5); an Emergency Unlock still unsent
+/// is one such stop, said there by the engine, which reads the file itself.
+struct DeleteAccountButton: View {
+    let phone: Phone
+
+    var body: some View {
+        if phone.deleting == .asking {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Deleting.question)
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                Text(Deleting.consequence).textStyle(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                Button("Delete account") { Task { await phone.deleteAccount() } }
+                    .buttonStyle(PrimaryButtonStyle(destructive: true)).padding(.top, 4)
+                Button("Cancel") { phone.deleting.cancel() }
+                    .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary).frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+            // Said to VoiceOver as it appears, as Leave's question is.
+            .onAppear { AccessibilityNotification.Announcement(Deleting.question).post() }
+        } else {
+            Button("Delete account") { phone.deleting.ask() }
+                .textStyle(TextStyle(size: 15, line: 22, weight: .semibold))
+                .foregroundStyle(Theme.destructive).frame(minHeight: 44).padding(.top, 8)
+        }
+    }
+}
+
 /// D1's Leave on a class of Me's (C6c): it asks its question under the class. Held, dimmed, while
 /// the phone stands in that class's lesson (`held`, `Leaving.held` as `ClassesSection` judges it,
 /// said under the class); none for a class named with no enrollment to leave by.
@@ -286,5 +321,8 @@ struct ConsentSheet: View {
     }
     #Preview("Me — leaving") {
         RootView(phone: Phone(fixture: PreviewFixtures.all["meLeaveAsk"]!))
+    }
+    #Preview("Me — Delete account asked") {
+        RootView(phone: Phone(fixture: PreviewFixtures.all["meDeleteAsk"]!))
     }
 #endif

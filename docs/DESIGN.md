@@ -15,7 +15,8 @@ grep, 2026-10-05; a new one joins this list). In
 `Screen.swift` and `Join.swift`, sign-in's included; `FocusWords` in
 `Focus.swift`; `UnlockedWords` in `Unlocked.swift`; `ProtectionOffWords` in
 `ProtectionOff.swift`; History's row labels and refusals in `History.swift`;
-Me's name, leave and `SignOutWords` sentences in `Me.swift`; and the two
+Me's name, leave and `SignOutWords` sentences in `Me.swift`; Delete account's
+question, its screen's titles and lines in `Deleting` (`Deletion.swift`); and the two
 refusals `SyncEngine.swift` hands a screen ("Bali couldn't save your reason.
 Try again.", "Bali couldn't lock your apps. Try again."). In
 `apps/web/src/lib`: `errors.ts`; `grid-state.ts` (the grid's notes and

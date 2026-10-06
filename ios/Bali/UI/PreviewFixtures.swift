@@ -11,9 +11,9 @@
         /// What `Phone` publishes, as a fixture has it: signed in, the permission approved, out of
         /// any session and in two classes, no ask for the permission failed, nothing typed to join,
         /// no screen opened over another, Home's tab chosen and no history read, no name being
-        /// edited, no sign-out failed, no class being left, no reason picked, no email named
-        /// (#147) and no class listed for the student on this phone before (#143), unless said
-        /// otherwise.
+        /// edited, no sign-out failed, no class being left, no account being deleted, no reason
+        /// picked, no email named (#147) and no class listed for the student on this phone before
+        /// (#143), unless said otherwise.
         struct State {
             var problem: String?
             var introSeen = true
@@ -28,6 +28,7 @@
             var naming = Naming()
             var signOutFailed: String?
             var leaving = Leaving()
+            var deleting = Deleting.none
             var picking: UnlockReason?
             var pickFailed: String?
             var email: String?
@@ -176,6 +177,33 @@
             "meLeaveInSession": State(
                 sync: standing(.inSession(period3, nil), me: anaRodriguez), tab: .me,
                 email: anaEmail),
+            // Delete account (C4b): its question asked under the button; then its own screen — the
+            // deletion under way, from Me and from Period 3's lesson, where the shields are on and
+            // Focus would otherwise show; each stop with nothing deleted, said with its way on; the
+            // account deleted and its sign-in not yet, as a relaunch finds it too; and done, over
+            // the Sign in that OK leaves to.
+            "meDeleteAsk": State(
+                sync: standing(.out, me: anaRodriguez), tab: .me, deleting: .asking, email: anaEmail),
+            "deleting": State(sync: standing(.out, me: anaRodriguez), tab: .me, deleting: .busy),
+            "deletingShielded": State(
+                protection: shielded(), sync: standing(.inSession(period3, .focused)),
+                deleting: .busy),
+            "deletingSignInFirst": State(
+                sync: standing(.out, me: anaRodriguez), deleting: stopped(.signInFirst)),
+            "deletingUnlockUnsent": State(
+                sync: queued(
+                    standing(.out, me: anaRodriguez), .unlock(session: "session", reason: nil)),
+                deleting: stopped(.unlockUnsent)),
+            "deletingUnread": State(
+                sync: standing(.out, me: anaRodriguez), deleting: stopped(.unread)),
+            "deletingTeacher": State(
+                sync: standing(.out, me: anaRodriguez), deleting: stopped(.teacherHasClasses)),
+            "deletingNotDeleted": State(
+                sync: offline(standing(.out, me: anaRodriguez)),
+                deleting: stopped(.notDeleted(.networkError))),
+            "deletingPending": State(
+                sync: waitingOnSignIn(standing(.out, me: nil)), deleting: .pending),
+            "deletingDone": State(signedIn: false, deleting: .done),
             "unlockedRefused": State(
                 sync: refused(standing(.inSession(period3, .unlocked)), .eventIdConflict)),
             "protectionOff": State(
@@ -257,6 +285,13 @@
             if sent { _ = leaving.send(at: Date()) }
             leaving.failure = failure
             return leaving
+        }
+
+        /// Delete account stopped as the engine answered `answer` (C4b): its screen's words and way on.
+        private static func stopped(_ answer: AccountDeletion) -> Deleting {
+            var deleting = Deleting.busy
+            deleting.answered(answer)
+            return deleting
         }
 
         /// Me's name card editing, `name` typed — and why its save failed: `failure`.

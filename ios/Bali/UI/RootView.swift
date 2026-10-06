@@ -34,7 +34,9 @@ struct RootView: View {
             .preferredColorScheme(.light)
             #if DEBUG
                 .overlay(alignment: .topTrailing) {
-                    if phone.engine != nil {
+                    // Not over the deletion's screen (C4b): its Sign out, Join and Tap are what
+                    // that screen keeps from happening.
+                    if phone.engine != nil, shown.screen != .deleting {
                         Button("Readout") { readout = true }
                             .textStyle(.caption).foregroundStyle(Theme.textTertiary).padding(8)
                     }
@@ -61,6 +63,7 @@ struct RootView: View {
         case .sessionOver: SessionOverView(phone: phone)
         case .history: HistoryView(phone: phone)
         case .me: MeView(phone: phone)
+        case .deleting: DeletingView(phone: phone)
         case .storage(let problem): StorageView(problem: problem) { await phone.start() }
         }
     }

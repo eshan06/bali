@@ -25,6 +25,149 @@ public enum AccountDeletion: Sendable, Hashable {
     case signInNotDeleted(SendResult)
 }
 
+/// Me's Delete account as the phone keeps it (C4b): the question asked under the button; the
+/// deletion under way; where one stopped, in words, with its way on (rule 5); and done. From the
+/// press to the end the app shows the deletion's own screen and nothing else (`Screen.deleting`,
+/// `shows`): a join or a rename landing after the deletion would make a fresh account, a tap or an
+/// Emergency Unlock made meanwhile would wait for the next sign-in, and Sign out while DeleteUser
+/// waits would leave the person in Cognito (`docs/DECISIONS.md`, C4a). Its rules and words, so
+/// they run on Linux; the app makes the call (`Phone.deleteAccount`).
+public enum Deleting: Sendable, Hashable {
+    /// Nothing under way: Me shows the button.
+    case none
+    /// Delete account pressed: Me asks under the button, with Delete account and Cancel.
+    case asking
+    /// The deletion under way: its screen, with nothing to press until the answer comes.
+    case busy
+    /// Stopped with nothing deleted that the phone knows of: the title and why, said on its screen,
+    /// with Try again where another try can help, and Back.
+    case stopped(title: String, why: String, retries: Bool)
+    /// The account deleted, its sign-in not yet (`signInNotDeleted`, or `SignIn.deletionPending`
+    /// at a relaunch): its screen, with Try again alone, until the sign-in is deleted too.
+    case pending
+    /// Deleted, the sign-in too: the done screen, until OK.
+    case done
+
+    /// Whether the deletion's own screen shows, over every other (`Screen.choose`).
+    public var shows: Bool {
+        switch self {
+        case .none, .asking: false
+        case .busy, .stopped, .pending, .done: true
+        }
+    }
+
+    /// Delete account pressed on Me: its question asked. Nothing once anything is under way.
+    public mutating func ask() {
+        if case .none = self { self = .asking }
+    }
+
+    /// Cancel under the question: no question.
+    public mutating func cancel() {
+        if case .asking = self { self = .none }
+    }
+
+    /// Delete account under the question, or Try again on the screen: true once the deletion may
+    /// begin, busy until its answer; false where nothing may — a try that cannot help, nothing
+    /// asked, one under way already.
+    public mutating func start() -> Bool {
+        switch self {
+        case .asking, .stopped(_, _, retries: true), .pending:
+            self = .busy
+            return true
+        case .none, .busy, .stopped(_, _, retries: false), .done: return false
+        }
+    }
+
+    /// The engine's answer to the deletion under way; one to no deletion is dropped.
+    public mutating func answered(_ answer: AccountDeletion) {
+        guard case .busy = self else { return }
+        switch answer {
+        case .deleted: self = .done
+        case .signInNotDeleted: self = .pending
+        case .signInFirst:
+            self = .stopped(title: Self.notDeleted, why: Self.signInFirst, retries: false)
+        case .teacherHasClasses:
+            self = .stopped(title: Self.notDeleted, why: Self.teacherHasClasses, retries: false)
+        // Nothing deleted that the phone knows of: a try before may have sent a deletion whose answer
+        // was lost, which landed (C4a; santa's round 2) — so the title claims neither, and Try
+        // again settles it.
+        case .unlockUnsent:
+            self = .stopped(title: Self.notFinished, why: Self.unlockUnsent, retries: true)
+        case .unread: self = .stopped(title: Self.notFinished, why: Self.unread, retries: true)
+        case .notDeleted(let result):
+            self = .stopped(title: Self.notFinished, why: Joining.words(result, nil), retries: true)
+        }
+    }
+
+    /// Back after a stop that deleted nothing, or OK once done: the screen goes. Nothing while the
+    /// deletion runs or its sign-in waits to be deleted, which offer no way out but Try again.
+    public mutating func close() {
+        switch self {
+        case .stopped, .done: self = .none
+        case .none, .asking, .busy, .pending: break
+        }
+    }
+
+    /// Who is signed in changed (`Phone.signed`): the question and a stop go with them — the words
+    /// were the last sign-in's. The deletion under way, a sign-in waiting to be deleted and the done
+    /// screen hold: the deletion's own end is such a change, and its answer is still to come.
+    public mutating func signInChanged() {
+        switch self {
+        case .asking, .stopped: self = .none
+        case .none, .busy, .pending, .done: break
+        }
+    }
+
+    /// What its screen says: the title and the line under it; nil while no screen shows.
+    public var said: (title: String, body: String)? {
+        switch self {
+        case .none, .asking: nil
+        case .busy:
+            (
+                "Deleting your account…",
+                "Bali deletes your account first, then your sign-in. This takes a moment."
+            )
+        case .stopped(let title, let why, _): (title, why)
+        case .pending:
+            (
+                "Your account is deleted",
+                "Bali's part is done, but your sign-in isn't deleted yet. Try again to finish."
+            )
+        case .done:
+            (
+                "Your account is deleted",
+                "Your sign-in is gone too. If you join Bali again, you start fresh."
+            )
+        }
+    }
+
+    /// The question asked under Me's button (the owner's words, 2026-10-05).
+    public static let question = "Delete your account?"
+    public static let consequence =
+        "Bali deletes your account, your name and your sign-in. This can't be undone. Lessons you were in still count in your teachers' reports, with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."
+
+    /// The title of a stop that refuses before anything could ever be sent — the sign-in, or the
+    /// account itself (a teacher's), or a phone not started: nothing deleted, for certain.
+    public static let notDeleted = "Your account isn't deleted"
+    /// The title of every other stop: a deletion sent by a try before, its answer lost, may have
+    /// landed (C4a), so this claims neither.
+    public static let notFinished = "Bali couldn't finish deleting your account"
+
+    /// The sign-in was made before the phone asked for the scope Cognito's DeleteUser needs: a
+    /// fresh one first. Nothing sent, nothing deleted.
+    static let signInFirst =
+        "Your sign-in is from an older version of Bali, so it can't delete your account. Sign out and sign in again, then delete your account."
+    /// An Emergency Unlock the server has not recorded: the next try sends it first.
+    static let unlockUnsent =
+        "Your Emergency Unlock hasn't reached your teacher yet. Check your connection and try again."
+    /// The outbox file could not be read, so whether an unlock waits is not known.
+    static let unread =
+        "Bali can't read what your phone saved right now, so it can't delete your account yet. Try again in a moment."
+    /// A teacher with a class or a block (`409 teacher_has_classes`): no try here can help.
+    static let teacherHasClasses =
+        "A teacher's account with classes or blocks is deleted through your school. Ask your school to arrange it."
+}
+
 extension OutboxRecord {
     /// A tap the server refused: kept and retried (tap step 10), but never one it recorded, so it
     /// holds no account deletion back (C4).

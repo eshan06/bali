@@ -186,6 +186,127 @@ struct MeTests {
     }
 }
 
+@Suite("Delete account on Me (C4b)")
+struct DeletingTests {
+    @Test(
+        "The question is asked from nothing and cancelled back to it, and asked again changes nothing under way; Delete account begins the deletion from the question, Try again from a stop another try can help and from a sign-in waiting to be deleted, and nothing else begins one; from the press to the end the deletion's own screen shows, and never before"
+    )
+    func steps() {
+        var deleting = Deleting.none
+        #expect(!deleting.shows && deleting.said == nil)
+        deleting.cancel()
+        #expect(deleting == .none && !deleting.start())
+        deleting.ask()
+        #expect(deleting == .asking && !deleting.shows && deleting.said == nil)
+        deleting.cancel()
+        #expect(deleting == .none)
+        deleting.ask()
+        #expect(deleting.start() && deleting == .busy && deleting.shows)
+        deleting.ask()
+        deleting.cancel()
+        deleting.close()
+        #expect(deleting == .busy && !deleting.start())
+        for (answer, retries) in [
+            (AccountDeletion.unlockUnsent, true), (.unread, true),
+            (.notDeleted(.networkError), true), (.signInFirst, false), (.teacherHasClasses, false),
+        ] {
+            var stopped = Deleting.busy
+            stopped.answered(answer)
+            #expect(stopped.shows, "\(answer)")
+            guard case .stopped(_, _, let again) = stopped else {
+                Issue.record("\(answer) did not stop")
+                continue
+            }
+            #expect(again == retries, "\(answer)")
+            var tried = stopped
+            #expect(tried.start() == retries && tried == (retries ? .busy : stopped), "\(answer)")
+            stopped.close()
+            #expect(stopped == .none, "\(answer)")
+        }
+        var pending = Deleting.busy
+        pending.answered(.signInNotDeleted(.networkError))
+        #expect(pending == .pending && pending.shows)
+        pending.close()
+        #expect(pending == .pending && pending.start() && pending == .busy)
+        pending.answered(.deleted)
+        #expect(pending == .done && pending.shows && !pending.start())
+        pending.close()
+        #expect(pending == .none)
+        // An answer to no deletion under way changes nothing.
+        var idle = Deleting.asking
+        idle.answered(.deleted)
+        #expect(idle == .asking)
+    }
+
+    @Test(
+        "A change of who is signed in takes the question and a stop with it, and holds the deletion under way, a sign-in waiting to be deleted and the done screen: the deletion's own end is such a change"
+    )
+    func signInChanged() {
+        var stopped = Deleting.busy
+        stopped.answered(.unread)
+        for (state, after) in [
+            (Deleting.none, Deleting.none), (.asking, .none), (stopped, .none), (.busy, .busy),
+            (.pending, .pending), (.done, .done),
+        ] {
+            var deleting = state
+            deleting.signInChanged()
+            #expect(deleting == after, "\(state)")
+        }
+    }
+
+    @Test(
+        "Each stop is said with its way on (rule 5): the sign-in from before the scope, a fresh one; an unsent Emergency Unlock and an unread file, another try; a teacher's account, the school; the deletion's own answer, in the Join screen's words for it; the account deleted and its sign-in not yet, Try again; done, a fresh start; and the deletion under way, a moment"
+    )
+    func words() {
+        func said(_ answer: AccountDeletion) -> (title: String, body: String)? {
+            var deleting = Deleting.busy
+            deleting.answered(answer)
+            return deleting.said
+        }
+        let notDeleted = "Your account isn't deleted"
+        #expect(Deleting.notDeleted == notDeleted)
+        #expect(said(.signInFirst)?.title == notDeleted)
+        #expect(said(.signInFirst)?.body.hasPrefix("Your sign-in is from an older version of Bali") == true)
+        #expect(
+            said(.signInFirst)?.body.hasSuffix("Sign out and sign in again, then delete your account.")
+                == true)
+        #expect(said(.unlockUnsent)?.body.hasPrefix("Your Emergency Unlock hasn't reached your teacher yet.") == true)
+        #expect(said(.unread)?.body.hasSuffix("Try again in a moment.") == true)
+        #expect(said(.teacherHasClasses)?.body.contains("through your school") == true)
+        #expect(said(.teacherHasClasses)?.title == notDeleted)
+        // A deletion sent by a try before, its answer lost, may have landed (C4a): every stop that
+        // can follow one claims neither way; only a refusal before anything could be sent says
+        // "isn't deleted".
+        #expect(said(.unlockUnsent)?.title == Deleting.notFinished)
+        #expect(said(.unread)?.title == Deleting.notFinished)
+        for result in [SendResult.networkError, .status(500), .status(429)] {
+            #expect(said(.notDeleted(result))?.title == Deleting.notFinished, "\(result)")
+            #expect(said(.notDeleted(result))?.title != notDeleted, "\(result)")
+        }
+        #expect(Deleting.notFinished == "Bali couldn't finish deleting your account")
+        #expect(said(.notDeleted(.networkError))?.body == Joining.words(.networkError, nil))
+        #expect(said(.notDeleted(.status(500)))?.body == Joining.words(.status(500), nil))
+        #expect(said(.notDeleted(.status(429)))?.body == Joining.words(.status(429), nil))
+        let deleted = "Your account is deleted"
+        #expect(said(.signInNotDeleted(.status(500)))?.title == deleted)
+        #expect(said(.signInNotDeleted(.networkError))?.body.hasSuffix("Try again to finish.") == true)
+        #expect(said(.deleted)?.title == deleted)
+        #expect(
+            said(.deleted)?.body
+                == "Your sign-in is gone too. If you join Bali again, you start fresh.")
+        #expect(Deleting.busy.said?.title == "Deleting your account…")
+        #expect(Deleting.question == "Delete your account?")
+        #expect(Deleting.consequence.hasSuffix("It isn't an Emergency Unlock."))
+        // Every string new here: no em-dash (DESIGN.md), no exclamation mark, each a way on.
+        let all = [Deleting.question, Deleting.consequence, Deleting.busy.said?.body ?? ""]
+            + [AccountDeletion.signInFirst, .unlockUnsent, .unread, .teacherHasClasses, .deleted, .signInNotDeleted(.networkError)]
+            .compactMap { said($0).map { $0.title + " " + $0.body } }
+        for words in all {
+            #expect(!words.contains("—") && !words.contains("!") && !words.isEmpty, "\(words)")
+        }
+    }
+}
+
 private let renameRoute = "PATCH /v1/me"
 
 /// `PATCH /v1/me`'s answer: the student named `name` now.
