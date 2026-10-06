@@ -88,27 +88,29 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
  * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
  * style (DESIGN.md §4). What the chip carries rides after the label, never replacing it: an
  * unlock's reason, or how long a Silent phone has been quiet. `pulse` is `bali-softpulse` (§7),
- * and `onPulseEnd` hears it finish.
+ * and `onPulseEnd` hears it finish. In Present the label takes the projector's size (§5).
  */
 function Chip({
   display,
   note,
   pulse,
   onPulseEnd,
+  present,
 }: {
   display: GridDisplay;
   note: string | null;
   pulse: boolean;
   onPulseEnd: () => void;
+  present: boolean;
 }) {
   const chip = CHIP[display];
   return (
     <span
       onAnimationEnd={pulse ? onPulseEnd : undefined}
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-label uppercase ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 uppercase ${present ? 'text-present-label' : 'text-label'} ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
     >
       {chip.icons.map((Icon, i) => (
-        <Icon key={i} size={14} aria-hidden="true" className="shrink-0" />
+        <Icon key={i} size={present ? 16 : 14} aria-hidden="true" className="shrink-0" />
       ))}
       <span className="min-w-0">{note === null ? chip.label : `${chip.label} · ${note}`}</span>
     </span>
@@ -119,12 +121,18 @@ export function LiveGrid({
   sessionId,
   onEnded,
   onSession,
+  present = false,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
   onEnded?: (sessionId: string) => void;
   /** Called with the session as each snapshot the grid keeps says it is: its bell (P10). */
   onSession?: (session: SessionView) => void;
+  /**
+   * The projector view (DESIGN.md §5): four columns, names 20 px, chip labels 14 px, cells at
+   * least 88 px tall, readable from the back of a classroom; the same chips, the same words.
+   */
+  present?: boolean;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
@@ -288,19 +296,25 @@ export function LiveGrid({
       {rows.length === 0 ? (
         <p className={`text-body ${EMPTY_TRAY}`}>No students enrolled yet.</p>
       ) : (
-        // Six columns at the desktop width, fewer as the grid narrows, never smaller type (§5).
+        // Six columns at the desktop width, four in Present, fewer as the grid narrows, never
+        // smaller type (§5).
         <div className="@container">
           <ul
-            className={`${TRAY} grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6`}
+            className={`${TRAY} ${present ? 'grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4' : 'grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5 @6xl:grid-cols-6'}`}
           >
             {rows.map((s) => {
               const display = gridDisplay(s, now);
               const seen = lastSeenNote(s, display, now);
               const unlock = s.unlock?.eventId;
               return (
-                <li key={s.studentId} className={`flex flex-col gap-3 ${CARD}`}>
+                <li
+                  key={s.studentId}
+                  className={`flex flex-col gap-3 ${present ? 'min-h-22' : ''} ${CARD}`}
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 text-body font-semibold break-words">
+                    <span
+                      className={`min-w-0 break-words ${present ? 'text-present-name' : 'text-body font-semibold'}`}
+                    >
                       {s.displayName ?? s.studentId.slice(0, 8)}
                     </span>
                     {/* S9: advice beside the name, never a colour of its own; it changes no state. */}
@@ -321,6 +335,7 @@ export function LiveGrid({
                       display={display}
                       note={display === 'silent' ? silentNote(s, now) : unlockNote(s, display)}
                       pulse={softpulses(s, display, liveUnlocks)}
+                      present={present}
                       onPulseEnd={() =>
                         setLiveUnlocks((prev) => {
                           const next = new Set(prev);

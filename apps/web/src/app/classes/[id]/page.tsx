@@ -7,10 +7,17 @@ import {
   type SessionView,
   type StartSessionResponse,
 } from '@bali/shared';
+import { ArrowLeft, ArrowRight, Check, Presentation } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { Button } from '@/components/button';
+import { Field } from '@/components/field';
+import { JoinCode } from '@/components/join-code';
+import { LiveGrid } from '@/components/live-grid';
+import { RecapCard } from '@/components/recap-card';
+import { EMPTY_TRAY } from '@/components/tray';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import {
@@ -29,20 +36,30 @@ import {
   rememberMinutes,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
-import { JoinCode } from '@/components/join-code';
-import { LiveGrid } from '@/components/live-grid';
-import { RecapCard } from '@/components/recap-card';
-
-const SECONDARY =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 disabled:opacity-50 motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900';
 
 /**
- * A length's pill: the radio inside it is read by screen readers, the label shows its state. The
- * radio is clipped away, so the focus ring (globals.css) is drawn on the label for it.
+ * The page's column: as wide as D2a's B artboard drew it (1400 px), since the live grid is its
+ * main object and six columns need the room; 40 px gutters from the desktop width (§5).
  */
-const PILL =
-  'cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm tabular-nums transition-colors select-none hover:bg-slate-100 has-checked:border-emerald-700 has-checked:bg-emerald-50 has-checked:font-semibold has-checked:text-emerald-900 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring motion-reduce:transition-none dark:border-slate-700 dark:hover:bg-slate-900 dark:has-checked:border-emerald-500 dark:has-checked:bg-emerald-950 dark:has-checked:text-emerald-100';
+const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10';
 
+/** A link across the portal (back to the classes, on to reports): brand ink and an arrow. */
+const NAV_LINK =
+  'inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-brand underline-offset-2 hover:underline';
+
+/**
+ * A length in the picker's tray, the radio inside it read by screen readers and clipped away, so
+ * the focus ring is drawn on the label for it. The pick is raised out of the sunken tray as a card
+ * is, its words semibold in the primary ink: never by colour alone.
+ */
+const LENGTH =
+  'inline-flex h-8 cursor-pointer items-center rounded-full border border-transparent px-4 text-body text-text-secondary tabular-nums transition-colors select-none hover:text-text-primary has-checked:bg-surface-card has-checked:font-semibold has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring dark:has-checked:border-border-default';
+
+/**
+ * A class's page (in Soft premium, D2f): its name and join code; while no session runs, the length
+ * picker and Start, the last session's recap and how it ended; while one runs, the live grid with
+ * its bell, Present, Extend and End; then the roster. Each failure is said where it happened.
+ */
 export default function ClassDetailPage() {
   const api = useApi();
   const router = useRouter();
@@ -57,15 +74,25 @@ export default function ClassDetailPage() {
   const [grid, setGrid] = useState<{ id: string; over: boolean; endsAt: string | null } | null>(
     null,
   );
+  // The class or its roster didn't load: said under the name, with Try again.
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Which send is under way, if any: every control holds while one is, and only a Start's own
+  // button says "Starting…" (an End's answer can come after the grid already says it ended).
+  const [busy, setBusy] = useState<'start' | 'end' | 'extend' | null>(null);
+  // A send under way: a second press before the page redraws sends nothing.
+  const sending = useRef(false);
   // The next session's length (P10): a preset, or Other with the minutes typed under it.
   const [pick, setPick] = useState<number | 'other'>(DEFAULT_MINUTES);
   const [other, setOther] = useState('');
   const [lengthSaid, setLengthSaid] = useState(false);
   const otherField = useRef<HTMLInputElement>(null);
+  // A Start that failed, said under its button; the button sends it again.
+  const [startSaid, setStartSaid] = useState<string | null>(null);
+  // The projector view (DESIGN.md §5), toggled in the grid's header.
+  const [present, setPresent] = useState(false);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
-  // beside the grid: a failure (with Try again), a refusal, or a note on the session shown.
+  // beside the grid: a failure (with Try again), a refusal or an End that failed (its button is
+  // the retry), or a note on the session shown.
   const unanswered = useRef<ExtendAttempt | null>(null);
   const [said, setSaid] = useState<{ kind: 'failed' | 'refused' | 'note'; message: string } | null>(
     null,
@@ -134,6 +161,19 @@ export default function ClassDetailPage() {
 
   const minutes = pick === 'other' ? parseMinutes(other) : pick;
 
+  /** Run `send` unless one is under way, the page busy with `kind` until it settles. */
+  async function once(kind: 'start' | 'end' | 'extend', send: () => Promise<void>) {
+    if (sending.current) return;
+    sending.current = true;
+    setBusy(kind);
+    try {
+      await send();
+    } finally {
+      sending.current = false;
+      setBusy(null);
+    }
+  }
+
   function startSession(e: React.FormEvent) {
     e.preventDefault();
     if (minutes === null) {
@@ -141,87 +181,92 @@ export default function ClassDetailPage() {
       otherField.current?.focus();
       return;
     }
-    rememberMinutes(classId, minutes);
-    setBusy(true);
-    api
-      .post<StartSessionResponse>(`/v1/classes/${classId}/sessions`, { durationMinutes: minutes })
-      .then(
-        (res) => {
-          setBusy(false);
-          setGrid({ id: res.session.id, over: false, endsAt: res.session.endsAt });
-          // `existing`: a session was running already (another tab's, a phone's), so the length
-          // picked here set nothing; said, since the bell shown is that session's.
-          setSaid(
-            res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
-          );
-        },
-        (e: unknown) => {
-          setBusy(false);
-          setError(errText(e));
-        },
-      );
+    void once('start', async () => {
+      rememberMinutes(classId, minutes);
+      setStartSaid(null);
+      try {
+        const res = await api.post<StartSessionResponse>(`/v1/classes/${classId}/sessions`, {
+          durationMinutes: minutes,
+        });
+        setGrid({ id: res.session.id, over: false, endsAt: res.session.endsAt });
+        // `existing`: a session was running already (another tab's, a phone's), so the length
+        // picked here set nothing; said, since the bell shown is that session's.
+        setSaid(
+          res.outcome === 'existing' ? { kind: 'note', message: SESSION_ALREADY_RUNNING } : null,
+        );
+      } catch (err) {
+        setStartSaid(errText(err));
+      }
+    });
   }
 
   function endSession() {
     if (!grid) return;
     const ending = grid.id;
-    setBusy(true);
-    api.post(`/v1/sessions/${ending}/end`).then(
-      () => {
-        setBusy(false);
+    void once('end', async () => {
+      setSaid(null);
+      try {
+        await api.post(`/v1/sessions/${ending}/end`);
         onEnded(ending);
-      },
-      (e: unknown) => {
-        setBusy(false);
-        setError(errText(e));
-      },
-    );
+      } catch (err) {
+        // Said beside the controls; End itself sends it again.
+        setSaid({ kind: 'refused', message: errText(err) });
+      }
+    });
   }
 
-  async function addTime(attempt: ExtendAttempt) {
+  function addTime(attempt: ExtendAttempt) {
     if (!grid) return;
     const session = grid.id;
-    setBusy(true);
-    setSaid(null);
-    const answer = await extendSession(api, session, attempt);
-    unanswered.current = keepUnanswered(attempt, answer);
-    setBusy(false);
-    if (answer.kind === 'extended') onSession({ id: session, classId, endsAt: answer.endsAt });
-    else setSaid(answer);
+    void once('extend', async () => {
+      setSaid(null);
+      const answer = await extendSession(api, session, attempt);
+      unanswered.current = keepUnanswered(attempt, answer);
+      if (answer.kind === 'extended') onSession({ id: session, classId, endsAt: answer.endsAt });
+      else setSaid(answer);
+    });
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <nav className="flex justify-between gap-4 text-sm">
-        <Link href="/" className="text-slate-500 hover:underline">
-          ← All classes
+    <main className={PAGE}>
+      <nav aria-label="Class" className="flex justify-between gap-4">
+        <Link href="/" className={NAV_LINK}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          All classes
         </Link>
-        <Link
-          href={`/classes/${classId}/reports`}
-          className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-        >
-          Reports →
+        <Link href={`/classes/${classId}/reports`} className={NAV_LINK}>
+          Reports
+          <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </nav>
 
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-        <h1 className="text-2xl font-semibold">{klass?.name ?? '…'}</h1>
+      <header className="mt-6 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+        <h1 className="min-w-0 text-h1 text-balance break-words">{klass?.name ?? '…'}</h1>
         {klass ? <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} /> : null}
-      </div>
+      </header>
 
-      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p role="alert" className="text-body">
+            Couldn&apos;t load this class. <span className="text-text-secondary">{error}</span>
+          </p>
+          <Button variant="secondary" onClick={load}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
 
-      <div className="mt-6">
+      <div className="mt-10">
         {grid === null || grid.over ? (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-10">
             {/* noValidate: the length is checked here and said in Bali's words under the field,
                 never by the browser's own bubble over the number input. */}
-            <form onSubmit={startSession} noValidate className="space-y-4">
+            <form onSubmit={startSession} noValidate className="flex flex-col items-start gap-6">
               <fieldset>
-                <legend className="text-sm font-medium">Session length</legend>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <legend className="text-body font-medium">Session length</legend>
+                <div className="mt-3 inline-flex flex-wrap gap-1 rounded-full bg-surface-sunken p-1">
                   {[...LENGTH_PRESETS, 'other' as const].map((option) => (
-                    <label key={option} className={PILL}>
+                    <label key={option} className={LENGTH}>
                       <input
                         type="radio"
                         name="session-length"
@@ -238,13 +283,12 @@ export default function ClassDetailPage() {
                   ))}
                 </div>
                 {pick === 'other' ? (
-                  <div className="mt-3">
-                    <label htmlFor={`${id}-minutes`} className="block text-sm font-medium">
-                      Minutes
-                    </label>
-                    <input
+                  <div className="mt-4 max-w-xs">
+                    <Field
                       ref={otherField}
                       id={`${id}-minutes`}
+                      label="Minutes"
+                      help={`A whole number from 1 to ${MAX_SESSION_MINUTES}.`}
                       name="minutes"
                       type="number"
                       inputMode="numeric"
@@ -257,107 +301,143 @@ export default function ClassDetailPage() {
                         setOther(e.target.value);
                         setLengthSaid(false);
                       }}
-                      readOnly={busy}
+                      readOnly={busy === 'start'}
                       aria-invalid={lengthSaid}
-                      aria-describedby={`${id}-help${lengthSaid ? ` ${id}-said` : ''}`}
-                      className="mt-2 w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
+                      aria-describedby={lengthSaid ? `${id}-said` : undefined}
                     />
-                    <p
-                      id={`${id}-help`}
-                      className="mt-2 text-sm text-slate-500 dark:text-slate-400"
-                    >
-                      A whole number from 1 to {MAX_SESSION_MINUTES}.
-                    </p>
                   </div>
                 ) : null}
                 {lengthSaid ? (
-                  <p id={`${id}-said`} role="alert" className="mt-3 text-sm font-medium">
+                  <p id={`${id}-said`} role="alert" className="mt-3 text-body">
                     {NOT_A_SESSION_LENGTH}
                   </p>
                 ) : null}
               </fieldset>
-              <button
-                type="submit"
-                disabled={busy}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {minutes === null ? 'Start session' : `Start ${minutes}-minute session`}
-              </button>
+              <div>
+                {/* One button throughout, so focus stays on it whatever it comes to say. */}
+                <Button type="submit" aria-disabled={busy !== null} aria-busy={busy === 'start'}>
+                  {busy === 'start'
+                    ? 'Starting…'
+                    : minutes === null
+                      ? 'Start session'
+                      : `Start ${minutes}-minute session`}
+                </Button>
+                {startSaid ? (
+                  <p role="alert" className="mt-3 text-body">
+                    {startSaid}
+                  </p>
+                ) : null}
+              </div>
             </form>
             {/* The last session's recap (R4) until a new one starts; only once the class is read,
                 so a session already running never shows it. */}
             {klass ? <RecapCard classId={classId} /> : null}
             {/* As it ended, until the next Start (R5): who was still unlocked stays in view. */}
             {grid ? (
-              <section className="space-y-4">
-                <h2 className="text-lg font-medium">How it ended</h2>
+              <section aria-labelledby={`${id}-ended`} className="flex flex-col gap-4">
+                <h2 id={`${id}-ended`} className="text-h2">
+                  How it ended
+                </h2>
                 <LiveGrid sessionId={grid.id} />
               </section>
             ) : null}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <section aria-labelledby={`${id}-live`} className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 className="text-lg font-medium">Live grid</h2>
+                <h2 id={`${id}-live`} className="text-h2">
+                  Live grid
+                </h2>
                 {grid.endsAt ? (
-                  <p className="text-sm text-slate-500 tabular-nums dark:text-slate-400">
+                  <p className="text-body text-text-secondary tabular-nums">
                     Ends at <time dateTime={grid.endsAt}>{bellTime(grid.endsAt)}</time>
                   </p>
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
+                {/* Pressed is shown by its check and its sunken fill, never by colour alone. */}
+                <Button
+                  variant="secondary"
+                  aria-pressed={present}
+                  onClick={() => setPresent((on) => !on)}
+                  className="aria-pressed:border-text-primary aria-pressed:bg-surface-sunken"
+                >
+                  {present ? (
+                    <Check size={16} aria-hidden="true" />
+                  ) : (
+                    <Presentation size={16} aria-hidden="true" />
+                  )}
+                  Present
+                </Button>
                 {EXTEND_PRESETS.map((add) => (
-                  <button
+                  <Button
                     key={add}
-                    type="button"
-                    onClick={() => void addTime(extendAttemptFor(unanswered.current, add))}
-                    disabled={busy}
-                    className={`${SECONDARY} tabular-nums`}
+                    variant="secondary"
+                    onClick={() => addTime(extendAttemptFor(unanswered.current, add))}
+                    aria-disabled={busy !== null}
+                    className="tabular-nums"
                   >
                     +{add} min
-                  </button>
+                  </Button>
                 ))}
-                <button type="button" onClick={endSession} disabled={busy} className={SECONDARY}>
+                <Button variant="secondary" onClick={endSession} aria-disabled={busy !== null}>
                   End session
-                </button>
+                </Button>
               </div>
             </div>
             {said ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-sm font-medium">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
                   {said.message}
                 </p>
                 {said.kind === 'failed' ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={() => {
                       const again = unanswered.current;
-                      if (again) void addTime(again);
+                      if (again) addTime(again);
                     }}
-                    disabled={busy}
-                    className={SECONDARY}
+                    aria-disabled={busy !== null}
                   >
                     Try again
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : null}
-            <LiveGrid sessionId={grid.id} onEnded={onEnded} onSession={onSession} />
-          </div>
+            <LiveGrid
+              sessionId={grid.id}
+              onEnded={onEnded}
+              onSession={onSession}
+              present={present}
+            />
+          </section>
         )}
       </div>
 
-      <section className="mt-10">
-        <h2 className="mb-2 text-lg font-medium">Roster</h2>
+      <section
+        aria-labelledby={`${id}-roster`}
+        className="mt-12 border-t border-border-default pt-10"
+      >
+        <h2 id={`${id}-roster`} className="text-h2">
+          Roster
+        </h2>
+        {/* Unread, it says so under the class's name with Try again, never "Loading…" here. */}
         {roster === null ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          error ? null : (
+            <p role="status" className="mt-4 text-body text-text-secondary">
+              Loading…
+            </p>
+          )
         ) : roster.students.length === 0 ? (
-          <p className="text-sm text-slate-500">No students have joined yet.</p>
+          <p className={`mt-6 text-body ${EMPTY_TRAY}`}>No students have joined yet.</p>
         ) : (
-          <ul className="divide-y divide-slate-200 text-sm dark:divide-slate-800">
+          <ul className="mt-4 columns-1 gap-x-10 sm:columns-2 lg:columns-3">
             {roster.students.map((s) => (
-              <li key={s.enrollmentId} className="py-2">
+              <li
+                key={s.enrollmentId}
+                className="break-inside-avoid border-b border-border-default py-2 text-body break-words"
+              >
                 {s.displayName ?? s.studentId.slice(0, 8)}
               </li>
             ))}

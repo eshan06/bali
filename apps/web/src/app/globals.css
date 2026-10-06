@@ -194,6 +194,17 @@
   --text-input: 16px;
   --text-input--line-height: 24px;
   --text-input--font-weight: 400;
+
+  /* The Present view's two sizes, the owner's ruling (2026-10-05): names 20 px and chip labels
+     14 px as D2a's canvas drew them, their line heights on the 4-pt grid (26 and 18 drawn, taken
+     up to 28 and 20). The live grid's only. Not in the tokens yet (DESIGN.md §5). */
+  --text-present-name: 20px;
+  --text-present-name--line-height: 28px;
+  --text-present-name--font-weight: 600;
+  --text-present-label: 14px;
+  --text-present-label--line-height: 20px;
+  --text-present-label--font-weight: 600;
+  --text-present-label--letter-spacing: 0.06em;
 }
 
 @theme inline {
