@@ -34,7 +34,7 @@ struct SignInView: View {
                             Task { await phone.signIn(through: browser.hostedUI) }
                         }
                         .buttonStyle(PrimaryButtonStyle()).disabled(phone.signingIn)
-                        if let failure = phone.signInFailed {
+                        if let failure = phone.signInFailed?.words {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }

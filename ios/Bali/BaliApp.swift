@@ -62,9 +62,10 @@ final class Phone {
     private(set) var age = AgeCheck(defaults: .standard)
     /// The age screen's picks, the birth month and year, until Continue answers with them.
     var birth = Birth()
-    /// Sign in's (C1a): a sign-in under way, and why the last did not finish (rule 5).
+    /// Sign in's (C1a): a sign-in under way, and why the last did not finish, as the sign-in said
+    /// it — the screen says its `words` (rule 5), the readout all of it.
     private(set) var signingIn = false
-    private(set) var signInFailed: String?
+    private(set) var signInFailed: SignInError?
     /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
     /// not the app group's, which the extensions read.
     private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
@@ -588,12 +589,11 @@ final class Phone {
     /// Sign in (C1a), the one way to the hosted UI — the screen's button, the age screen's
     /// Continue and the readout's alike: with the 13+ check not passed on this phone, no page
     /// opens and its question shows in Sign in's place (C7, the owner's decision, 2026-10-06);
-    /// else the hosted UI through `browser`, what did not finish said under the button, in
-    /// `SignInError.words` (rule 5). One at a time. A phone not started — a frozen one too — says
-    /// so.
+    /// else the hosted UI through `browser`, what did not finish kept (`signInFailed`). One at a
+    /// time. On a phone not started — a frozen one too — no page can open, which is said.
     func signIn(through browser: Browser) async {
         guard !signingIn, age.ask() else { return }
-        guard let signIn else { return signInFailed = Joining.notStarted }
+        guard let signIn else { return signInFailed = .notOpened(Joining.notStarted) }
         (signingIn, signInFailed) = (true, nil)
         defer { signingIn = false }
         let scheme = signIn.cognito.redirectURI.scheme ?? ""
@@ -602,7 +602,7 @@ final class Phone {
                 try await browser(url, scheme)
             }
         } catch {
-            signInFailed = error.words
+            signInFailed = error
         }
     }
 
@@ -981,10 +981,12 @@ final class Phone {
 
         /// Signs in as Sign in does (`Phone.signIn`), the 13+ check first: what happened.
         private func signingIn() async -> String {
+            guard !phone.signingIn else { return "A sign-in is under way already" }
             await phone.signIn(through: browser.hostedUI)
-            if let failed = phone.signInFailed { return "Sign-in failed: \(failed)" }
-            return phone.age.answer == .passed
-                ? "Sign-in finished or closed" : "Not opened: the 13+ check shows first"
+            if phone.age.answer != .passed {
+                return "Not opened: the 13+ check comes first, in Sign in's place"
+            }
+            return phone.signInFailed.map { "Sign-in didn't finish: \($0)" } ?? "Signed in"
         }
 
         /// Signs out of this phone: what happened.
