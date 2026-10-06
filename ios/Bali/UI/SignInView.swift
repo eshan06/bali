@@ -6,7 +6,8 @@ import SwiftUI
 /// Sign in (D1's Main artboard; C1a), shown until someone is signed in: Cognito's hosted UI in an
 /// ephemeral browser session — no cookie kept, so a sign-out asks the password again — through
 /// `SignIn`, as the readout did (B4c). A sign-in that did not finish is said under the button, in
-/// `SignInError.words` (rule 5); one the student closed changed nothing, and says nothing.
+/// `SignInError.words` (rule 5); one the student closed changed nothing, and says nothing. Under
+/// its caption, the portal's privacy policy and terms (`PolicyLinks`, C2b).
 struct SignInView: View {
     /// nil in a preview or a fixture, where nothing signs in.
     let signIn: SignIn?
@@ -40,6 +41,7 @@ struct SignInView: View {
                         Text("Trouble signing in? Ask your teacher.")
                             .textStyle(.caption).foregroundStyle(Theme.textTertiary)
                             .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                        PolicyLinks()
                     }
                 }
             }

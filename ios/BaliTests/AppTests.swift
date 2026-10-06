@@ -1775,6 +1775,73 @@ struct AppTests {
     }
 
     @Test(
+        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under Continue on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so Continue never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
+    )
+    func policyLinks() throws {
+        let portal = try #require(PolicyLinks.portal)
+        #expect(portal == AppConfig(info: Bundle.main.infoDictionary ?? [:])?.portal)
+        #expect(PolicyLinks.Page.allCases.map(\.title) == ["Privacy policy", "Terms"])
+        #expect(
+            PolicyLinks.Page.allCases.map { $0.url(on: portal).absoluteString }
+                == ["https://bali-portal.vercel.app/privacy", "https://bali-portal.vercel.app/terms"])
+        let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        for (name, screen) in [
+            ("intro", String(reflecting: type(of: IntroView {}.body))),
+            ("signIn", String(reflecting: type(of: SignInView(signIn: nil).body))),
+            ("me", String(reflecting: type(of: MeView(phone: me).body))),
+        ] {
+            #expect(screen.contains("PolicyLinks"), "\(name)")
+        }
+        let row = UIHostingController(rootView: PolicyLinks())
+            .sizeThatFits(in: CGSize(width: 390, height: 1000))
+        #expect(row.height >= 44, "\(row)")
+        // The intro, drawn at the phone's size at its first and last pages: under Continue — the
+        // brand-filled button, its flat bottom found from the bottom up past its rounded corner,
+        // clear of the centred links (santa's round 1: at the corner, the button's own last rows
+        // counted as ink) — a strip at least the row and its padding tall, with the links' ink in
+        // it on the last page alone.
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        func brand(_ pixel: [Int]) -> Bool {
+            zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
+        }
+        for (page, linked) in [(IntroView.pages.lowerBound, false), (IntroView.pages.upperBound, true)] {
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.screen.bounds
+            window.rootViewController = UIHostingController(rootView: IntroView(page: page) {})
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            let png = try #require(drawn(window))
+            let image = try #require(UIImage(data: png))
+            let pixel = try pixels(of: image)
+            let scale = Int(window.screen.scale)
+            let width = Int(image.size.width)
+            let bottom = Int(image.size.height) - Int(window.safeAreaInsets.bottom) * scale
+            let column = Int(Theme.gutter + 2 * Theme.Radius.md) * scale
+            var button = bottom - 1
+            while button > 0, !brand(pixel(column, button)) { button -= 1 }
+            let strip = (button + 1)..<bottom
+            #expect(strip.count >= 52 * scale, "page \(page): \(strip) at scale \(scale)")
+            let inked = strip.reduce(0) { count, y in
+                count + (0..<width).filter { brand(pixel($0, y)) }.count
+            }
+            #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under Continue")
+            // VoiceOver: the links there on the last page alone — never invisible ones before it
+            // — each a link, not a button, as the portal's are; Continue read on every page, so a
+            // walk that finds nothing can't pass for the links hidden.
+            let elements = try voiceOver(in: window)
+            #expect(elements.contains { $0.accessibilityLabel == "Continue" }, "page \(page)")
+            let titles = PolicyLinks.Page.allCases.map(\.title)
+            let read = elements.filter { titles.contains($0.accessibilityLabel ?? "") }
+            #expect(read.map(\.accessibilityLabel) == (linked ? titles : []), "page \(page)")
+            for link in read {
+                let traits = link.accessibilityTraits
+                #expect(traits.contains(.link) && !traits.contains(.button), "\(traits)")
+            }
+        }
+    }
+
+    @Test(
         "A card's shadow is D1's shadow-1 at its edge alone (#139): drawn once, on the card's shape — never on each line, chip or button inside it, which History redrew line by line as it scrolled — so inside, the card is its own white, and under it, its shadow"
     )
     func cardShadow() throws {
@@ -1824,6 +1891,28 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// What VoiceOver reaches in `window`, in its order: the accessibility elements under it, those
+/// hidden from it left out — SwiftUI's own, through its hosting view's elements. The app's
+/// accessibility is turned on first, as VoiceOver turns it on: SwiftUI builds no accessibility
+/// elements until it is, and a simulator that never had it on — CI's, made fresh for each run —
+/// has it off (santa's round 1, C2b). Through libAccessibility, as Cash App's
+/// AccessibilitySnapshot turns it on for its snapshots.
+@MainActor
+private func voiceOver(in window: UIWindow) throws -> [NSObject] {
+    let library = try #require(dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW))
+    let enable = try #require(dlsym(library, "_AXSApplicationAccessibilitySetEnabled"))
+    unsafeBitCast(enable, to: (@convention(c) (Bool) -> Void).self)(true)
+    func walk(_ object: NSObject) -> [NSObject] {
+        if object.accessibilityElementsHidden { return [] }
+        if object.isAccessibilityElement { return [object] }
+        if let elements = object.accessibilityElements as? [NSObject] {
+            return elements.flatMap(walk)
+        }
+        return ((object as? UIView)?.subviews ?? []).flatMap(walk)
+    }
+    return walk(window)
+}
 
 /// Every scroll view in `view`, itself among them, outermost first — of a pager's pages, only the
 /// one it shows: the others it lays out lie off screen.
