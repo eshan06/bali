@@ -8,6 +8,21 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **S6: the Claude workflows pinned, and the review scanned for secrets before
+  it posts.** **Pins:** `actions/checkout` at the commit the other workflows pin (v4.4.0), and
+  `anthropics/claude-code-action` at the commit its floating `v1` tag pointed at today, named by
+  its release (v1.0.243), so a moved tag can't change what runs with the OAuth token; a bump is
+  its own PR, and each one trips the action's tamper protection, so takes the owner's toggle
+  (GOTCHAS). **The scan:** a small script, not a scanner the repo would have to install
+  (nothing like gitleaks runs here): a few high-signal shapes (AWS key ids, a private key block
+  with a body, GitHub, Anthropic and Slack tokens, JWTs) and this repository's own secret names
+  written with a non-placeholder value. A key header alone passes, since `.env.example` and the
+  docs show one. A hit posts nothing and fails the check; its log names the kind and line, never
+  the text, so the log doesn't leak what the comment would have. The posting step runs the
+  base branch's copy of the script, because the reviewer can write files and the PR can edit
+  the tree; only S6's own PR, whose base has none, uses the tree's. A false alarm costs a
+  re-run; a miss costs a rotation.
+
 - **2026-10-06** — **D2g: the recap card and the reports page in Soft premium; the reports list
   reflows; a session that ends in Present keeps its reasons off.** The calls the picks left open,
   taken on the conductor's "your recommended options": **The reports page is a list, not a
