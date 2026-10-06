@@ -1775,6 +1775,59 @@ struct AppTests {
     }
 
     @Test(
+        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under Continue on the last page alone, in a strip kept at least that row tall on the first page too, so Continue never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
+    )
+    func policyLinks() throws {
+        let portal = try #require(PolicyLinks.portal)
+        #expect(portal == AppConfig(info: Bundle.main.infoDictionary ?? [:])?.portal)
+        #expect(PolicyLinks.Page.allCases.map(\.title) == ["Privacy policy", "Terms"])
+        #expect(
+            PolicyLinks.Page.allCases.map { $0.url(on: portal).absoluteString }
+                == ["https://bali-portal.vercel.app/privacy", "https://bali-portal.vercel.app/terms"])
+        let me = Phone(fixture: try #require(PreviewFixtures.all["me"]))
+        for (name, screen) in [
+            ("intro", String(reflecting: type(of: IntroView {}.body))),
+            ("signIn", String(reflecting: type(of: SignInView(signIn: nil).body))),
+            ("me", String(reflecting: type(of: MeView(phone: me).body))),
+        ] {
+            #expect(screen.contains("PolicyLinks"), "\(name)")
+        }
+        let row = UIHostingController(rootView: PolicyLinks())
+            .sizeThatFits(in: CGSize(width: 390, height: 1000))
+        #expect(row.height >= 44, "\(row)")
+        // The intro, drawn at the phone's size at its first and last pages: under Continue — the
+        // brand-filled button, found from the bottom up at its left end, clear of the centred
+        // links — a strip at least the row and its padding tall, with the links' ink in it on the
+        // last page alone.
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        func brand(_ pixel: [Int]) -> Bool {
+            zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
+        }
+        for (page, linked) in [(IntroView.pages.lowerBound, false), (IntroView.pages.upperBound, true)] {
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.screen.bounds
+            window.rootViewController = UIHostingController(rootView: IntroView(page: page) {})
+            window.isHidden = false
+            defer { window.isHidden = true }
+            window.layoutIfNeeded()
+            let png = try #require(drawn(window))
+            let image = try #require(UIImage(data: png))
+            let pixel = try pixels(of: image)
+            let scale = Int(window.screen.scale)
+            let width = Int(image.size.width)
+            let bottom = Int(image.size.height) - Int(window.safeAreaInsets.bottom) * scale
+            var button = bottom - 1
+            while button > 0, !brand(pixel(Int(Theme.gutter + 8) * scale, button)) { button -= 1 }
+            let strip = (button + 1)..<bottom
+            #expect(strip.count >= 52 * scale, "page \(page): \(strip) at scale \(scale)")
+            let inked = strip.reduce(0) { count, y in
+                count + (0..<width).filter { brand(pixel($0, y)) }.count
+            }
+            #expect((inked > 0) == linked, "page \(page): \(inked) brand pixels under Continue")
+        }
+    }
+
+    @Test(
         "A card's shadow is D1's shadow-1 at its edge alone (#139): drawn once, on the card's shape — never on each line, chip or button inside it, which History redrew line by line as it scrolled — so inside, the card is its own white, and under it, its shadow"
     )
     func cardShadow() throws {

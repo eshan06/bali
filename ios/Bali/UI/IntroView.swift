@@ -5,6 +5,7 @@ import SwiftUI
 /// last press is `done` (`Phone.sawIntro()`). D1's reference onboarding sheet in its light tokens;
 /// the words are v3's: every app pauses, no allow-list (ARCHITECTURE, "What Bali is"), and the
 /// list is the consent preview's own (`ConsentCard`, C2b), so the two never say different things.
+/// The last page links the portal's privacy policy and terms under Continue (`PolicyLinks`).
 struct IntroView: View {
     let done: () -> Void
     /// The pages' tags, first to last.
@@ -53,6 +54,11 @@ struct IntroView: View {
                 if page < Self.pages.upperBound { withAnimation { page += 1 } } else { done() }
             }
             .buttonStyle(PrimaryButtonStyle())
+            // The portal's policy pages, under Continue on the last page alone — their room kept
+            // on every page, so Continue never moves as the pages turn.
+            let last = page == Self.pages.upperBound
+            PolicyLinks().padding(.top, 8)
+                .opacity(last ? 1 : 0).accessibilityHidden(!last).allowsHitTesting(last)
         }
     }
 

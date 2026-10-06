@@ -8,12 +8,14 @@ struct AppConfigTests {
     static let values: [String: String] = [
         "BaliAPIURL": "https://api.bali.test", "BaliCognitoDomain": "https://bali.auth.test",
         "BaliCognitoClientID": "client", "BaliCognitoRedirectURI": "bali://auth/callback",
+        "BaliPortalURL": "https://portal.bali.test",
     ]
 
-    @Test("The four keys make the config; any one of them missing or empty, none: \"not set up\"")
+    @Test("The five keys make the config; any one of them missing or empty, none: \"not set up\"")
     func reads() throws {
         let config = try #require(AppConfig(info: Self.values))
         #expect(config.api == URL(string: "https://api.bali.test"))
+        #expect(config.portal == URL(string: "https://portal.bali.test"))
         #expect(
             config.cognito
                 == Cognito(
@@ -56,6 +58,7 @@ struct AppConfigTests {
         let config = try #require(AppConfig(info: built))
         #expect(config.cognito.redirectURI == URL(string: "bali://auth/callback"))
         #expect(config.api.scheme == "https" && config.cognito.domain.scheme == "https")
+        #expect(config.portal.scheme == "https")
     }
 
     @Test(

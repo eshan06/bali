@@ -6,11 +6,12 @@ import UIKit
 /// Me (C6b; D1's Me), where the router sends the Me tab: the name the student's teachers see,
 /// edited in place (A8's `PATCH /v1/me`, `Naming`); their classes with each teacher, and Join a
 /// class over it with a way back (`ClassesSection`); what Bali does in class, Screen Time's state
-/// and what a teacher sees (the intro's own page); and Sign out, whose sign-in it ends said under
-/// it (#147), which waits while an Emergency Unlock is unsent (`SignOutWords`); D1's Leave on
-/// each class, asked first, never while the phone stands in that class's lesson (C6c, `Leaving`);
-/// and, at the very bottom, Delete account, asked first too (C4b, `Deleting`). Every failure is
-/// said with its way on (rule 5).
+/// and what a teacher sees (the intro's own page); the portal's privacy policy and terms
+/// (`PolicyLinks`, C2b); and Sign out, whose sign-in it ends said under it (#147), which waits
+/// while an Emergency Unlock is unsent (`SignOutWords`); D1's Leave on each class, asked first,
+/// never while the phone stands in that class's lesson (C6c, `Leaving`); and, at the very bottom,
+/// Delete account, asked first too (C4b, `Deleting`). Every failure is said with its way on
+/// (rule 5).
 struct MeView: View {
     let phone: Phone
     /// The field's text, kept as `Naming.type` keeps a name, at every keystroke.
@@ -40,6 +41,8 @@ struct MeView: View {
                     }
                     ClassesSection(phone: phone, title: "Classes", leaves: true)
                     about
+                    // Above Sign out, never beside the red Delete account (C2b).
+                    PolicyLinks(alignment: .leading)
                     SignOutButton(phone: phone, email: phone.email)
                     DeleteAccountButton(phone: phone)
                 }

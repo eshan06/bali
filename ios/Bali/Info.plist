@@ -10,6 +10,8 @@
 	<string>$(BALI_COGNITO_DOMAIN)</string>
 	<key>BaliCognitoRedirectURI</key>
 	<string>$(BALI_COGNITO_REDIRECT_URI)</string>
+	<key>BaliPortalURL</key>
+	<string>$(BALI_PORTAL_URL)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NFCReaderUsageDescription</key>

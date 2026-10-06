@@ -64,6 +64,10 @@ targets:
         # Caught by the sign-in's own browser session, so it is no URL type of the app's: no other
         # app or page can open the app with an answer.
         BALI_COGNITO_REDIRECT_URI: bali://auth/callback
+        # The portal whose privacy policy and terms the app links (C2b): production's for every
+        # configuration, since the policy pages live only there — no Release override, and the
+        # TestFlight release guard, which checks the sign-in's keys, needs none for it.
+        BALI_PORTAL_URL: https://bali-portal.vercel.app
     dependencies:
       - package: BaliCore
       - package: BaliOutbox

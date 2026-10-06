@@ -1,9 +1,9 @@
 import Foundation
 
-/// Where the app signs in and syncs, as its build sets it (B4c): `ios/project.yml`'s settings,
-/// through the app's Info.plist — public values, no secret. Read here rather than in the app, so a
-/// test pins these keys to both files (#84's review): a key misspelt on either side would otherwise
-/// build green and only say "not set up" on a phone.
+/// Where the app signs in and syncs, as its build sets it (B4c), and the portal it links (C2b):
+/// `ios/project.yml`'s settings, through the app's Info.plist — public values, no secret. Read
+/// here rather than in the app, so a test pins these keys to both files (#84's review): a key
+/// misspelt on either side would otherwise build green and only say "not set up" on a phone.
 public struct AppConfig: Sendable, Hashable {
     /// The Info.plist keys, each set from a `project.yml` setting.
     public enum Key: String, CaseIterable, Sendable {
@@ -11,10 +11,13 @@ public struct AppConfig: Sendable, Hashable {
         case cognitoDomain = "BaliCognitoDomain"
         case cognitoClientId = "BaliCognitoClientID"
         case cognitoRedirectURI = "BaliCognitoRedirectURI"
+        /// The portal whose privacy policy and terms the app links (C2b).
+        case portal = "BaliPortalURL"
     }
 
     public let api: URL
     public let cognito: Cognito
+    public let portal: URL
 
     /// The build's, from its Info.plist (`info`); nil while one is not set — missing, empty, or
     /// not a URL where one is wanted.
@@ -25,9 +28,10 @@ public struct AppConfig: Sendable, Hashable {
         guard let api = value(.api).flatMap(URL.init(string:)),
             let domain = value(.cognitoDomain).flatMap(URL.init(string:)),
             let clientId = value(.cognitoClientId),
-            let redirect = value(.cognitoRedirectURI).flatMap(URL.init(string:))
+            let redirect = value(.cognitoRedirectURI).flatMap(URL.init(string:)),
+            let portal = value(.portal).flatMap(URL.init(string:))
         else { return nil }
-        self.api = api
+        (self.api, self.portal) = (api, portal)
         cognito = Cognito(domain: domain, clientId: clientId, redirectURI: redirect)
     }
 }
