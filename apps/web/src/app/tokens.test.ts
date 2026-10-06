@@ -395,8 +395,22 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
   const files = sources(src).filter((file) => /\.tsx?$/.test(file));
 
   it('surface-sunken fills nothing else', () => {
-    const bare = (file: string) =>
-      readFileSync(file, 'utf8').match(/(?<=[\s'"`])bg-surface-sunken\b/g)?.length ?? 0;
+    // Each fill with its variants: none at rest, or only a control's states.
+    const STATES = new Set(['hover', 'active', 'aria-pressed', 'aria-expanded', 'has-checked']);
+    const fills = (file: string) =>
+      [...readFileSync(file, 'utf8').matchAll(/((?:[\w-]+:)*)bg-surface-sunken\b/g)].map(
+        (m) => m[1] ?? '',
+      );
+    for (const file of files) {
+      for (const variants of fills(file).filter(Boolean)) {
+        const states = variants.split(':').filter(Boolean);
+        expect(
+          states.every((v) => STATES.has(v)),
+          `${relative(src, file)}: ${variants}`,
+        ).toBe(true);
+      }
+    }
+    const bare = (file: string) => fills(file).filter((v) => v === '').length;
     const filled = files.filter((file) => bare(file) > 0).map((file) => relative(src, file));
     expect(filled.sort()).toEqual(
       [

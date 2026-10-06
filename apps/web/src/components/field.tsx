@@ -31,28 +31,24 @@ export function Field({
 }: FieldProps) {
   const helpId = `${id}-help`;
   const describes = [help ? helpId : null, describedBy].filter(Boolean).join(' ');
-  const input = (
-    <input
-      id={id}
-      {...props}
-      aria-describedby={describes || undefined}
-      className={`block h-10 w-full rounded-sm border border-border-input bg-surface-sunken px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
-    />
-  );
   return (
     <div>
       <label htmlFor={id} className="block text-body font-medium">
         {label}
       </label>
-      {trailing ? (
-        // The input as wide as a name needs (280 to 440 px), its button beside it.
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <div className="max-w-110 min-w-0 grow basis-70">{input}</div>
-          {trailing}
+      {/* One shape with or without `trailing`, so a button coming or going never remounts the
+          input: with one, the input as wide as a name needs (280 to 440 px), the button beside. */}
+      <div className={trailing ? 'mt-2 flex flex-wrap items-center gap-3' : 'mt-2'}>
+        <div className={trailing ? 'max-w-110 min-w-0 grow basis-70' : undefined}>
+          <input
+            id={id}
+            {...props}
+            aria-describedby={describes || undefined}
+            className={`block h-10 w-full rounded-sm border border-border-input bg-surface-sunken px-3 text-input text-text-primary aria-[invalid=true]:border-text-primary ${mono ? 'font-mono font-medium' : ''}`}
+          />
         </div>
-      ) : (
-        <div className="mt-2">{input}</div>
-      )}
+        {trailing}
+      </div>
       {help ? (
         <p id={helpId} className="mt-2 text-caption text-text-tertiary">
           {help}
