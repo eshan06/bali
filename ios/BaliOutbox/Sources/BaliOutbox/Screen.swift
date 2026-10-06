@@ -68,7 +68,8 @@ public enum Screen: Sendable, Hashable {
         // Emergency Unlock there, before the intro and the sign-in too.
         if sync?.standing == .unread, protection?.shielded == true { return (.home, false) }
         if let gate = ageGate(
-            age, introSeen: introSeen, sync: sync, sessionOverClosed: sessionOverClosed, now: now)
+            age, introSeen: introSeen, signedIn: signedIn, sync: sync,
+            sessionOverClosed: sessionOverClosed, now: now)
         {
             return (gate, false)
         }
@@ -99,7 +100,9 @@ public enum Screen: Sendable, Hashable {
     /// The 13+ check's screen (C7), while it has not passed: the question — or the stop screen,
     /// once answered under 13 this run. First on a first launch, before the intro, with nothing
     /// known yet; on an install from before the check, the intro seen, only once the engine says
-    /// where the phone stands, and never over a session's screens — Focus, Unlocked and
+    /// where the phone stands and the Keychain has said who is signed in — a deletion left
+    /// pending is read with it (C4b), so its screen comes first with no flash of the question
+    /// (santa on the rebase) — and never over a session's screens — Focus, Unlocked and
     /// Protection off keep theirs, and so does the home a standing not read keeps, since each
     /// holds Emergency Unlock, and Session over keeps its own past the bell until the student
     /// closes it (santa's round 1): the check shows once no session stands for the phone, at the
@@ -109,12 +112,12 @@ public enum Screen: Sendable, Hashable {
     /// round 2). Nil once passed, or while the phone stands in a session whose Session over is
     /// not closed.
     private static func ageGate(
-        _ age: AgeCheck.Answer, introSeen: Bool, sync: SyncState?,
+        _ age: AgeCheck.Answer, introSeen: Bool, signedIn: Bool?, sync: SyncState?,
         sessionOverClosed: SessionView?, now: Date
     ) -> Screen? {
         guard age != .passed else { return nil }
         let screen: Screen = age == .tooYoung ? .tooYoung : .age
-        guard let sync else { return introSeen ? .starting : screen }
+        guard let sync, signedIn != nil else { return introSeen ? .starting : screen }
         switch sync.standing {
         case .inSession(let session, _)
         where session.endsAt > now || !session.rings(as: sessionOverClosed):

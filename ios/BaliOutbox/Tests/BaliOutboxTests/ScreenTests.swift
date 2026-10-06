@@ -109,6 +109,10 @@ struct ScreenTests {
             #expect(screen(age: age, introSeen: false, signedIn: false) == gate, "\(age)")
             #expect(screen(age: age, signedIn: nil, permission: nil, standing: nil) == .starting)
             #expect(screen(age: age, standing: nil) == .starting, "\(age)")
+            // The Keychain not read yet either: a deletion left pending is read with who is signed
+            // in (C4b), so the question never flashes before the deletion's screen (santa, rebase).
+            #expect(screen(age: age, signedIn: nil) == .starting, "\(age)")
+            #expect(screen(age: age, introSeen: false, signedIn: nil) == gate, "\(age)")
             #expect(screen(age: age) == gate, "\(age)")
             #expect(screen(age: age, signedIn: false) == gate, "\(age)")
             #expect(screen(age: age, permission: .denied) == gate, "\(age)")

@@ -847,8 +847,9 @@ struct AppTests {
         let following = Task { await phone.follow(signIn) }
         defer { following.cancel() }
         try await until { phone.signedIn == true }
-        // A phone of the test's own has seen no intro and runs no enforcer: the router shows the
-        // intro, so only the deletion's screen is asked after here, never Me.
+        // A phone of the test's own has seen no intro, passed no 13+ check and runs no enforcer: the
+        // router shows the 13+ question (C7), or Starting where the host's defaults hold the flags,
+        // so only the deletion's screen is asked after here, never Me.
         #expect(phone.deleting == .none && phone.shown.screen != .deleting)
         phone.deleting.ask()
         #expect(phone.shown.screen != .deleting)
