@@ -191,8 +191,7 @@ struct MeView: View {
                 VStack(spacing: 0) {
                     if let signedIn = SignOutWords.signedIn(phone.email) {
                         Text(signedIn).textStyle(.body).foregroundStyle(Theme.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 14).padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(16)
                         Rectangle().fill(Theme.border).frame(height: 1)
                     }
                     Button {

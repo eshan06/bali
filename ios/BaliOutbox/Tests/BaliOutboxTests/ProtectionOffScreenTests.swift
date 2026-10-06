@@ -125,14 +125,21 @@ struct ProtectionOffScreenTests {
     func noLabelQuoted() throws {
         let (outbox, _) = try makeOutbox()
         try record(outbox, .protectionOff(session: "s"))
+        // Recorded (sees), on its way (will see), and neither, where a protection off found but not
+        // saved has not been told (santa's round 1).
         let states = [
             try synced(.inSession(bell1042, .protectionOff)),
             try synced(.inSession(bell1042, .unlocked), queued: try outbox.records()),
+            try synced(.inSession(bell1042, .unlocked)),
         ]
-        let checks = [
-            checked(.denied), checked(.notDetermined, lasting: true), checked(.approved),
-            checked(.notDetermined), checked(.denied, unreported: true),
-        ]
+        let checks = [false, true].flatMap { unreported in
+            [
+                checked(.denied, unreported: unreported),
+                checked(.notDetermined, lasting: true, unreported: unreported),
+                checked(.approved, unreported: unreported),
+                checked(.notDetermined, unreported: unreported),
+            ]
+        }
         for (state, protection) in states.flatMap({ state in checks.map { (state, $0) } }) {
             let body = try #require(words(state, protection)).body
             for quoted in ["Screen Time off", "Protection off", "“", "\""] {
