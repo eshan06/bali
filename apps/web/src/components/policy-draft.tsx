@@ -1,5 +1,7 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+import { Lockup } from '@/components/mark';
+import { TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
  * The draft outline a policy page shows until the lawyer's words arrive (Phase 6, C2a): a notice
@@ -7,22 +9,11 @@ import type { ReactNode } from 'react';
  * then where to ask. Public like the help page (P4): no API call, no state, rendered per request
  * like every page (the root layout's `dynamic`), and no Sign out bar (`PortalBar` skips it). It
  * makes no legal claim of its own: where a fact is already public on the help page, a line links
- * there instead of restating it.
+ * there instead of restating it. Drawn in Soft premium (D2c-2): the notice as DESIGN.md §4's calm
+ * banner, and the outline as one card per section in a tray.
  */
 
 const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
-
-const LINK =
-  'font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300';
-
-/** A link in the page's words, styled as the help page styles its own. */
-export function TextLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className={LINK}>
-      {children}
-    </Link>
-  );
-}
 
 export interface PolicySection {
   id: string;
@@ -45,56 +36,47 @@ export function PolicyDraft({
   related: { href: string; label: string };
 }) {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12 leading-relaxed sm:px-10 sm:py-16">
-      <p className="text-sm font-semibold">Bali</p>
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">{title}</h1>
-      <div className="mt-6 max-w-[65ch] rounded-lg border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
-        <p>
-          <strong className="font-semibold">{notice.lead}</strong> {notice.body}
-        </p>
-      </div>
+    <main className="mx-auto max-w-2xl px-4 py-12 text-body sm:px-10 sm:py-16">
+      <Lockup />
+      <h1 className="mt-8 text-h1">{title}</h1>
+      <p className="mt-6 rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body-lg">
+        <strong className="font-semibold">{notice.lead}</strong> {notice.body}
+      </p>
 
-      <div className="mt-12 space-y-10">
+      <div className="mt-10 grid gap-2 rounded-lg bg-surface-sunken p-2">
         {sections.map((section) => (
           <section
             key={section.id}
             id={section.id}
             aria-labelledby={`${section.id}-title`}
-            className="scroll-mt-6 border-t border-slate-200 pt-8 dark:border-slate-800"
+            className="scroll-mt-6 rounded-md border border-transparent bg-surface-card p-4 shadow-1 dark:border-border-default"
           >
-            <h2 id={`${section.id}-title`} className="text-xl font-semibold">
+            <h2 id={`${section.id}-title`} className="text-h3">
               {section.title}
             </h2>
-            <p className="mt-4 max-w-[65ch] border-l-2 border-dashed border-slate-300 pl-4 text-slate-600 dark:border-slate-700 dark:text-slate-400">
-              <span className="font-semibold text-slate-900 dark:text-slate-100">Placeholder.</span>{' '}
+            <p className="mt-2 max-w-prose text-text-secondary">
+              <span className="font-semibold text-text-primary">Placeholder.</span>{' '}
               {section.placeholder}
             </p>
           </section>
         ))}
-
-        <section
-          id="contact"
-          aria-labelledby="contact-title"
-          className="scroll-mt-6 border-t border-slate-200 pt-8 dark:border-slate-800"
-        >
-          <h2 id="contact-title" className="text-xl font-semibold">
-            Contact
-          </h2>
-          <p className="mt-4 max-w-[65ch] text-slate-700 dark:text-slate-300">
-            Email{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`} className={`${LINK} break-all`}>
-              {SUPPORT_EMAIL}
-            </a>{' '}
-            with any question.
-          </p>
-        </section>
       </div>
 
-      <nav
-        aria-label="Help and policies"
-        className="mt-12 border-t border-slate-200 pt-8 text-sm dark:border-slate-800"
-      >
-        <ul className="flex flex-wrap gap-x-6 gap-y-2">
+      <section id="contact" aria-labelledby="contact-title" className="mt-10 scroll-mt-6">
+        <h2 id="contact-title" className="text-h3">
+          Contact
+        </h2>
+        <p className="mt-2 max-w-prose text-text-secondary">
+          Email{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
+            {SUPPORT_EMAIL}
+          </a>{' '}
+          with any question.
+        </p>
+      </section>
+
+      <nav aria-label="Help and policies" className="mt-12 border-t border-border-default pt-8">
+        <ul className="flex flex-wrap gap-x-5 gap-y-2">
           <li>
             <TextLink href="/support">Help and questions</TextLink>
           </li>

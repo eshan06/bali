@@ -2,6 +2,8 @@
 
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 
+import { Button } from '@/components/button';
+import { Field } from '@/components/field';
 import {
   type Attempt,
   attemptFor,
@@ -81,19 +83,20 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
   }
 
   return (
-    <>
-      <h1 className="text-2xl font-semibold">Enter your invite code</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+    // A card on its own (DESIGN.md §4), as /login's: one step, one card, centred under the bar.
+    <div className="mx-auto max-w-md rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
+      <h1 className="text-h1 text-balance">Enter your invite code</h1>
+      <p className="mt-2 text-body-lg text-pretty text-text-secondary">
         You need it once, to set up this account for teaching.
       </p>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="mt-8 max-w-md">
-        <label htmlFor={`${id}-code`} className="block text-sm font-medium">
-          Invite code
-        </label>
-        <input
+      <form onSubmit={(e) => void onSubmit(e)} className="mt-6">
+        <Field
           ref={field}
           id={`${id}-code`}
+          label="Invite code"
+          help="25 letters and digits. Paste it, or type it with or without dashes."
+          mono
           name="invite-code"
           value={code}
           onChange={onChange}
@@ -104,24 +107,20 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
           spellCheck={false}
           translate="no"
           aria-invalid={codeRefused}
-          aria-describedby={`${id}-help${said ? ` ${id}-said` : ''}`}
-          className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-base tracking-wide aria-[invalid=true]:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:aria-[invalid=true]:border-slate-100"
+          aria-describedby={said ? `${id}-said` : undefined}
         />
-        <p id={`${id}-help`} className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          25 letters and digits. Paste it, or type it with or without dashes.
-        </p>
         {said ? (
-          <p id={`${id}-said`} role="alert" className="mt-4 text-sm font-medium">
+          <p id={`${id}-said`} role="alert" className="mt-4 text-body">
             {said.message}
           </p>
         ) : null}
 
-        {/* One button throughout, so focus stays on it whatever it comes to say; the brand green. */}
-        <button
+        {/* One button throughout, so focus stays on it whatever it comes to say. */}
+        <Button
           type={teaches ? 'button' : 'submit'}
           onClick={teaches ? onTeacher : undefined}
           aria-disabled={busy}
-          className="mt-6 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-800 aria-disabled:opacity-60 motion-reduce:transition-none"
+          className="mt-6 w-full"
         >
           {busy
             ? 'Redeeming…'
@@ -130,8 +129,8 @@ export function InviteCode({ onTeacher }: { onTeacher: () => void }) {
               : said?.kind === 'failed'
                 ? 'Try again'
                 : 'Redeem code'}
-        </button>
+        </Button>
       </form>
-    </>
+    </div>
   );
 }

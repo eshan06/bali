@@ -1,6 +1,10 @@
+import { Eye, EyeOff } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+import { buttonClass } from '@/components/button';
+import { Lockup } from '@/components/mark';
+import { TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
  * The public help page (Phase 5, P4): read without signing in, so it calls no API and keeps no
@@ -36,17 +40,18 @@ const SECTIONS = [
   { id: 'help', title: 'Get help' },
 ];
 
-const LINK =
-  'font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300';
+/** A card in a tray (DESIGN.md §4): `surface-card`, `radius-md`, `shadow-1`; its hairline in dark. */
+const CARD =
+  'rounded-md border border-transparent bg-surface-card p-4 shadow-1 dark:border-border-default';
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-6 border-t border-slate-200 pt-10 dark:border-slate-800"
+      className="scroll-mt-6 border-t border-border-default pt-10"
     >
-      <h2 id={`${id}-title`} className="text-xl font-semibold">
+      <h2 id={`${id}-title`} className="text-h2">
         {title}
       </h2>
       <div className="mt-6 space-y-8">{children}</div>
@@ -54,33 +59,31 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function Question({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
+function Question({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div id={id} className="scroll-mt-6">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <div className="mt-2 max-w-[65ch] space-y-3 text-slate-700 dark:text-slate-300">
-        {children}
-      </div>
+    <div>
+      <h3 className="text-h3">{title}</h3>
+      <div className="mt-2 max-w-prose space-y-3 text-text-secondary">{children}</div>
     </div>
   );
 }
 
 export default function SupportPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12 leading-relaxed sm:px-10 sm:py-16">
-      <p className="text-sm font-semibold">Bali</p>
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">Help</h1>
-      <p className="mt-4 max-w-[65ch] text-lg text-slate-700 dark:text-slate-300">
+    <main className="mx-auto max-w-2xl px-4 py-12 text-body sm:px-10 sm:py-16">
+      <Lockup />
+      <h1 className="mt-8 text-h1">Help</h1>
+      <p className="mt-4 max-w-prose text-body-lg text-text-secondary">
         Bali keeps your iPhone out of the way during class. You tap your phone on your
         teacher&apos;s Bali block, your apps go quiet until the bell, and Emergency Unlock gets you
         out any time.
       </p>
 
       <nav aria-label="On this page" className="mt-8">
-        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <ul className="flex flex-wrap gap-2">
           {SECTIONS.map((s) => (
             <li key={s.id}>
-              <a href={`#${s.id}`} className={LINK}>
+              <a href={`#${s.id}`} className={buttonClass('secondary')}>
                 {s.title}
               </a>
             </li>
@@ -129,21 +132,34 @@ export default function SupportPage() {
               Settings any time. If you do during class, your teacher sees Screen Time off.
             </p>
           </Question>
-          <Question id="teacher-sees" title="What your teacher sees">
-            <ul className="list-disc space-y-2 pl-5">
-              {TEACHER_SEES.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <p className="pt-2 font-medium text-slate-900 dark:text-slate-100">
-              What your teacher never sees
-            </p>
-            <ul className="list-disc space-y-2 pl-5">
-              {TEACHER_NEVER_SEES.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </Question>
+          {/* The app's consent card's two lists (ConsentCard), as two cards in a tray. */}
+          <div
+            id="teacher-sees"
+            className="grid scroll-mt-6 gap-2 rounded-lg bg-surface-sunken p-2"
+          >
+            <div className={CARD}>
+              <h3 className="flex items-center gap-2 text-h3">
+                <Eye size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
+                What your teacher sees
+              </h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-text-secondary">
+                {TEACHER_SEES.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+            <div className={CARD}>
+              <h3 className="flex items-center gap-2 text-h3">
+                <EyeOff size={20} aria-hidden="true" className="shrink-0 text-text-brand" />
+                What your teacher never sees
+              </h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-text-secondary">
+                {TEACHER_NEVER_SEES.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </Section>
 
         <Section id="teachers" title="For teachers">
@@ -151,11 +167,8 @@ export default function SupportPage() {
             <p>
               A teacher account needs an invite code. Email us at the address under Get help and
               we&apos;ll send you one. Sign in to the{' '}
-              <Link href="/login" className={LINK}>
-                teacher portal
-              </Link>{' '}
-              and enter it once to set up your account for teaching. A code works once, and expires
-              14 days after we make it.
+              <TextLink href="/login">teacher portal</TextLink> and enter it once to set up your
+              account for teaching. A code works once, and expires 14 days after we make it.
             </p>
           </Question>
           <Question title="Register your block">
@@ -198,24 +211,17 @@ export default function SupportPage() {
           <Question title="Privacy policy and terms">
             <p>
               The full privacy policy and terms are coming from Bali&apos;s lawyer. Until they
-              arrive, the{' '}
-              <Link href="/privacy" className={LINK}>
-                privacy policy
-              </Link>{' '}
-              and{' '}
-              <Link href="/terms" className={LINK}>
-                terms
-              </Link>{' '}
-              pages show the sections each will have.
+              arrive, the <TextLink href="/privacy">privacy policy</TextLink> and{' '}
+              <TextLink href="/terms">terms</TextLink> pages show the sections each will have.
             </p>
           </Question>
         </Section>
 
         <Section id="help" title="Get help">
-          <div className="max-w-[65ch] text-slate-700 dark:text-slate-300">
+          <div className="max-w-prose text-text-secondary">
             <p>
               Email{' '}
-              <a href={`mailto:${SUPPORT_EMAIL}`} className={`${LINK} break-all`}>
+              <a href={`mailto:${SUPPORT_EMAIL}`} className={`${TEXT_LINK} break-all`}>
                 {SUPPORT_EMAIL}
               </a>
               . Tell us whether you&apos;re a student or a teacher, and what happened.
