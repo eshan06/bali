@@ -17,8 +17,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   a grid or the recap, so it comes back in Present until the teacher turns it off. **The tab's, not
   the computer's:** a new tab or window, the teacher's own view beside the projector's, opens
   without it, where `localStorage` would open every tab in Present; a duplicated tab copies its
-  storage and comes up in Present, its toggle pressed. Storage refused or switched off loses only
-  the memory: the page opens off, as before. **The recap carries the toggle when it stands alone**
+  storage and comes up in Present, its toggle pressed. **Class by class** (the brief's key):
+  another class's page opened in the projected tab opens in the teacher's view, its reasons shown,
+  as PILOT says; one key for the whole tab would carry Present there too (both santa reviewers'
+  note), left to the owner. Storage refused or switched off loses only the memory: the page opens
+  off, as before. **The recap carries the toggle when it stands alone**
   (the worker's call): back in Present with no session running, the page shows the recap and no
   grid, so no toggle, a mode with nothing on screen to say so or to leave it. So the recap's
   header takes the toggle then, and keeps it for the page's life once pressed off, so focus stays
