@@ -281,7 +281,12 @@ class page's minutes field takes it when D2f redraws that page.
 - **Inputs:** `surface-sunken` well, label above, helper and error text below;
   focus shows the focus ring (on iOS, `focusRing` in `Theme.swift`). What is
   typed is the input size (§3), 16 px, so iPhone Safari never zooms in; a label
-  is always a real label, never a placeholder standing in for one.
+  is always a real label, never a placeholder standing in for one. A menu drawn
+  as a field (the app's age screen) takes the well and no ring: nothing is typed
+  into it.
+- **Links:** `text-brand`, medium, underlined, so a link never rests on colour
+  alone: the portal's `TextLink` (`components/text-link.tsx`) and the app's
+  policy links (`PolicyLinks`, D2h).
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.

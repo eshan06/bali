@@ -4,12 +4,20 @@ The one file every session reads (after ARCHITECTURE.md) and updates when it
 finishes work. ARCHITECTURE.md says *how*; this file says *what* and *where we
 are*. Update rules are at the bottom.
 
-_Last updated: 2026-10-05 (Central) — D2e, the classes home and "Your block" in the redesign,
+_Last updated: 2026-10-05 (Central) — D2h, the student app's theme in Soft premium and its
+first-run screens, landed (#233): pill buttons and chips through `Theme.swift`, so every screen
+takes them; inputs as sunken wells (Join's code field under the focus ring, the age screen's two
+menus); the policy links as the portal's links, medium and underlined; Sign in, the age screen and
+its stop screen, the intro, the Screen Time grant, Join and RootView's states in the style, their
+words without em-dashes (screenshots in `~/bali-notes/d2/d2h-final/`). D2i, Home, Waiting, Focus,
+Unlocked, Protection off and Session over, is next for the app (Phase 3 steps, D2). Before it,
+D2e, the classes home and "Your block" in the redesign,
 landed: the classes as cards in the soft tray, the create form under them on a real label with
 every failure said under its field, the block's ID in the code style, and the owner's two rulings
 (codes in mono; a 16 px input size, so iPhone Safari never zooms into a field) in DESIGN.md
 (screenshots in `~/bali-notes/d2/d2e/`). D2f, the class page and the live grid with Present, is
-next (Phase 3 steps, D2). Before it, C2-app, the app's links to the privacy policy and terms, landed:
+next for the portal (Phase 3 steps, D2). Before it, C2-app, the app's links to the privacy policy and
+terms, landed:
 "Privacy policy" and "Terms" on the intro's last page, Sign in and Me, opening the production
 portal's `/privacy` and `/terms` in an in-app Safari sheet (screenshots in `~/bali-notes/c2b/`);
 C2 now waits on the lawyer's words alone. Before it, D2c-2, the portal's other entry pages in the redesign,
@@ -67,7 +75,9 @@ why, Open owner items the owner's queue.
 
 **In flight.**
 - **The owner's Mac session (all UI):** D2, the redesign, back on (the owner, 2026-10-05); its PRs go
-  into `main` now, not the `ui` branch; D2c ✅ (D2c-1 #232, D2c-2 #257), D2e ✅, D2f next (the class page and the live grid with Present; Phase 3 steps, D2). The three
+  into `main` now, not the `ui` branch; D2c ✅ (D2c-1 #232, D2c-2 #257), D2e ✅, D2f next for the portal
+  (the class page and the live grid with Present); D2h ✅ (#233), D2i next for the app (Phase 3 steps,
+  D2). The three
   class-page controls the pilot needs are built: the session length at Start, Extend (P10) and
   New join code (P11, Phase 5 steps; #247, once #255 made the API's CORS allow `PATCH`).
 - **The prod TestFlight build:** uploaded. Run 37279657642 (build 4, 2026-10-05) passed
@@ -364,7 +374,7 @@ plan backstop already treats it as source).
   - **D2e** ✅ the classes home and "Your block" in Soft premium, on D2c's pieces (`apps/web/src/app/page.tsx`, `components/blocks.tsx`): the classes as cards in the soft tray (`components/tray.ts`, shared for D2f and D2g), each a link to its class with a chevron, its edge firming on hover; the create form under the list on a real label ("New class name", the audit's placeholder-as-label) with a help line, its failures said under the field with the way on (an empty name before anything is sent; the connection, the budget's wait, and a 5xx as `CANT_CREATE`, which sends the teacher to the list first, `createClass` in `src/lib/classes.ts`, tested; the name held to the API's 120 characters by the field), the list read again after every create's answer so a class made before a lost answer shows before Try again, and a made class said with a link to open it; the block's ID in the code style on a card in a tray; an empty list as its tray with the words in it; Try again and Loading… for each read. The owner's two rulings (2026-10-05): codes in JetBrains Mono, invite codes and block IDs as well as join codes; and `input`, 16 / 24, a new input-only size on the type scale, so iPhone Safari never zooms into a field, applied through `components/field.tsx` to every portal field (the invite code, the block ID, the class name), not in `bali-tokens.json` (DESIGN.md asks the next export for it). `tokens.test.ts` holds the two files to the tokens' utilities, the theme to the tokens' sizes and the input size, and a redrawn page to the Field for its inputs. No em-dash was in these strings. Screenshots: `~/bali-notes/d2/d2e/{before,after}/`, light and dark at 1440 and 1024: the home with classes and blocks, the empty states, Create a class failing and done, a block ID refused and taken, each list's load failing, and the invite code typed at the new size (the rig's `home-states.mjs`). Still open from 2026-09-20 (`docs/DECISIONS.md`): `POST /v1/classes` takes no `eventId`, so Try again after a lost answer can make a second class, now always in the list to see.
   - **D2f** 👀 the live grid and the class page: the chips with their icons, the two Left chips recoloured, Silent and Unknown, the stale banner, the Present toggle, `bali-softpulse`.
   - **D2g** 👀 the recap card and the reports page.
-  - **D2h** ✅ the app's theme in Soft premium, plus Sign in, the intro, the Screen Time grant, Join and RootView's states (#115): `Theme.swift`'s buttons and chips are pills, shared, so every screen takes the shape at once; inputs are sunken wells at `radius-sm` under DESIGN.md's focus ring (`focusRing`: Join's code field now, Me's name field in D2j); the cards keep D1's shape, and no tray yet (D2i's Home is the first to group cards). The em-dash cleanup for these screens' strings, Screen Time's quotes typographic, and the two start-failure sentences in the student's words, the error kept in parentheses. Before and after shots on the iPhone 17 simulator in `~/bali-notes/d2/d2h/`, signed off by the owner on 2026-10-05 (the four calls confirmed: pills app-wide now, the sunken well, no tray, the error's clue kept).
+  - **D2h** ✅ the app's theme in Soft premium, plus Sign in, the intro, the Screen Time grant, Join and RootView's states (#115): `Theme.swift`'s buttons and chips are pills, shared, so every screen takes the shape at once; inputs are sunken wells at `radius-sm` under DESIGN.md's focus ring (`focusRing`: Join's code field now, Me's name field in D2j); the cards keep D1's shape, and no tray yet (D2i's Home is the first to group cards). The em-dash cleanup for these screens' strings, Screen Time's quotes typographic, and the two start-failure sentences in the student's words, the error kept in parentheses. Before and after shots on the iPhone 17 simulator in `~/bali-notes/d2/d2h/`, signed off by the owner on 2026-10-05 (the four calls confirmed: pills app-wide now, the sunken well, no tray, the error's clue kept). Finished on main's later screens (#233, into `main`): the 13+ age screen (C7) draws its month and year menus as Join's sunken well (no focus ring: nothing is typed into them) and its stop screen's words on the gutter; the policy links (C2b) as the portal's links, medium and underlined in the brand's ink (DESIGN.md §4, Links); Delete account (C4b) takes the pills, its confirm a red one; a build not set up says "This copy of Bali isn't set up right.", since a missing portal address (C2b) fails there too. Before (main) and after shots in `~/bali-notes/d2/d2h-final/`, light, at the default and the largest accessibility text size, the Safari sheet included.
   - **D2i** 📱 Home, Waiting (its chip's look), Focus, Unlocked, Protection off and Session over.
   - **D2j** 📱 History (its "Screen Time back on" chip's look) and Me (#165).
   - **D2k** 📱 the shield.
@@ -482,7 +492,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - A lawyer for the privacy policy, terms and the school's data agreement; the rest of Phase 6's owner list.
 - #148 the sign-in page: D2d drew it (`infra/cognito/hosted-ui/`); 🔧 the owner uploads its logo and CSS to dev's pool, looks, then to prod's, by the README.
 - #165 the Me page (D2j).
-- #115 the older screens' design pass (D2h).
+- ✅ #115 the older screens' design pass: the app's in D2h (#233), the portal's in D2c.
 - #130 App Store readiness.
 - #175 Screen Time turned back on in Settings, noticed by Bali itself.
 - #176 reading and sending at once when the network comes back (filed 2026-10-03, not now).

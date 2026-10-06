@@ -25,7 +25,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sentences in the student's words with the error kept in parentheses, since a support request
   needs it and the readout is not there before the engine starts. No token changed;
   `focus-ring-color` joins `AppTests.tokens`'s pins. Shots in `~/bali-notes/d2/d2h/`, on the
-  iPhone 17 simulator, the owner's device for D2's app steps.
+  iPhone 17 simulator, the owner's device for D2's app steps. **Finished on main's later screens**
+  (the owner's rulings: D2's PRs into `main`, no sign-off wait, the recommended option on a taste
+  call): the 13+ age screen (C7) draws its month and year menus as Join's sunken well at
+  `radius-sm`, with no focus ring since nothing is typed into them, and its stop screen's words sit
+  on the gutter as Sign in's do, where they had been centred as a narrower block; the policy links
+  (C2b) are drawn as the portal's links (`TEXT_LINK`), medium and underlined in the brand's ink, so
+  a link never rests on colour alone (DESIGN.md §4, Links); Delete account (C4b) takes the pills
+  through the theme, its confirm a red one. The start failure for a build not set up says "This
+  copy of Bali isn't set up right.", not "isn't set up to sign in": since C2b a build missing the
+  portal's address fails there too. Shots in `~/bali-notes/d2/d2h-final/`.
 
 - **2026-10-05** — **D2e: the classes home and "Your block" in Soft premium, and the owner's two
   rulings: codes in mono, and a 16 px size for what is typed in a field.** **The rulings (the
