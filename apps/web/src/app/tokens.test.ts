@@ -315,8 +315,9 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
     expect(DRAWN).toContain(join('app', 'classes', '[id]', 'reports', 'page.tsx'));
   });
 
+  // A side's border, a ring's offset and a shadow take a colour too (`border-t-slate-200`).
   const COLOUR =
-    /\b(?:bg|text|border|ring|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
+    /\b(?:bg|text|border(?:-[trblxyse])?|ring(?:-offset)?|outline|divide|decoration|placeholder|fill|stroke|from|via|to|accent|caret|(?:inset-|drop-)?shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)\b/;
   const SIZE = /\btext-(?:xs|sm|base|lg|\d?xl)\b/;
   const TYPE =
     /\b(?:tracking|leading)-(?:tighter|tight|snug|normal|relaxed|loose|wide|wider|widest)\b/;
