@@ -87,20 +87,24 @@ const CHIP: Record<GridDisplay, { label: string; icons: LucideIcon[]; tone: stri
 /**
  * A state chip: a pill in the state's tint, padded `space-2` × `space-3`, its label in the `label`
  * style (DESIGN.md §4). What the chip carries rides after the label, never replacing it: an
- * unlock's reason, or how long a Silent phone has been quiet. `pulse` is `bali-softpulse` (§7).
+ * unlock's reason, or how long a Silent phone has been quiet. `pulse` is `bali-softpulse` (§7),
+ * and `onPulseEnd` hears it finish.
  */
 function Chip({
   display,
   note,
   pulse,
+  onPulseEnd,
 }: {
   display: GridDisplay;
   note: string | null;
   pulse: boolean;
+  onPulseEnd: () => void;
 }) {
   const chip = CHIP[display];
   return (
     <span
+      onAnimationEnd={pulse ? onPulseEnd : undefined}
       className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-label uppercase ${chip.tone} ${pulse ? 'animate-softpulse' : ''}`}
     >
       {chip.icons.map((Icon, i) => (
@@ -292,6 +296,7 @@ export function LiveGrid({
             {rows.map((s) => {
               const display = gridDisplay(s, now);
               const seen = lastSeenNote(s, display, now);
+              const unlock = s.unlock?.eventId;
               return (
                 <li key={s.studentId} className={`flex flex-col gap-3 ${CARD}`}>
                   <div className="flex items-start justify-between gap-2">
@@ -309,10 +314,20 @@ export function LiveGrid({
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {/* Keyed by its unlock, so each new one pulses from the start; once it has
+                        pulsed it leaves the set, so a chip that turns red and back stays still. */}
                     <Chip
+                      key={unlock ?? 'none'}
                       display={display}
                       note={display === 'silent' ? silentNote(s, now) : unlockNote(s, display)}
                       pulse={softpulses(s, display, liveUnlocks)}
+                      onPulseEnd={() =>
+                        setLiveUnlocks((prev) => {
+                          const next = new Set(prev);
+                          if (unlock !== undefined) next.delete(unlock);
+                          return next;
+                        })
+                      }
                     />
                     {seen === null ? null : (
                       <span className="text-caption text-text-tertiary tabular-nums">{seen}</span>

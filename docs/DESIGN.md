@@ -403,8 +403,9 @@ the teacher's cue.
 (D2c's theme variables carry the two glow values; the snippet names them so it
 stands alone.) In the portal (D2f-1) it is the `animate-softpulse` utility
 (`globals.css`, pinned by `tokens.test.ts`), on the chip of an unlock the stream
-brings while the grid is open, orange only (`softpulses`, `grid-state.ts`): never
-one the grid booted with or the stream's overlap replays, never a red chip.
+brings while the grid is open, orange only (`softpulses`, `grid-state.ts`), once
+per unlock: never one the grid booted with or the stream's overlap replays, never
+a red chip.
 
 ## 8. Responsive behaviour
 

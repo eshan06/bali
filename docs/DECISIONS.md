@@ -27,7 +27,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the minutes from then. **Clock off** is a hairline badge at `radius-xs` (§5's small badges,
   over the canvas's pill), in `caption` and `text-tertiary`, never a colour of its own (S9). **The
   health line** loses its em-dash ("Reconnecting… last updated 40s ago"; "Live feed has gone
-  quiet. Last updated 61s ago."), and says minutes from the first minute, where it said "437s".
+  quiet. Last updated 50s ago."), and says minutes from the first minute ("7 min ago"), where it
+  said "437s ago". **The pulse plays once per unlock:** the chip is keyed by its unlock, so a new
+  one pulses from the start, and an unlock leaves the set once its pulse ends, so a chip that
+  turns red (protection off) and back never pulses an old unlock again (santa's round 1).
 
 - **2026-10-05** — **D2h: the app's theme in Soft premium, and the first-run screens (#115).**
   `Theme.swift`'s `PrimaryButtonStyle`, `SecondaryButtonStyle` and `Chip` are pills

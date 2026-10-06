@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -171,12 +171,11 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(css).toMatch(
       /@utility animate-softpulse\s*\{\s*animation: bali-softpulse 1\.2s cubic-bezier\(0\.2, 0, 0, 1\) 2;\s*\}/,
     );
-    const users = sources(fileURLToPath(new URL('../', import.meta.url))).filter(
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const users = sources(src).filter(
       (file) => file.endsWith('.tsx') && readFileSync(file, 'utf8').includes('animate-softpulse'),
     );
-    expect(users.map((file) => file.slice(file.indexOf('/src/') + 5))).toEqual([
-      'components/live-grid.tsx',
-    ]);
+    expect(users.map((file) => relative(src, file))).toEqual([join('components', 'live-grid.tsx')]);
   });
 
   it('the radii are the tokens’ five and no other', () => {
