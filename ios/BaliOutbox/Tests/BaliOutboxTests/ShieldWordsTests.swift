@@ -6,7 +6,7 @@ import Testing
 @Suite("What Bali's own shield says: the same words, whatever the phone stands in (B5c, B5c-2)")
 struct ShieldWordsTests {
     @Test(
-        "Over an app, and over a website: Bali's name, never a time, and D1's line beneath — what always works, and that Bali, where Emergency Unlock is, says when class ends"
+        "Over an app, and over a website: Bali's name, never a time, and D1's line beneath — what always works, and that Bali, where Emergency Unlock is, says when class ends — and D1's OK on the one button, every word the shield shows (D2k)"
     )
     func words() {
         let app = ShieldWords(over: .app)
@@ -15,9 +15,11 @@ struct ShieldWordsTests {
             app.subtitle
                 == "This app is paused for class. Calls, FaceTime, Messages and Emergency SOS always work. Open Bali to see when class ends. Emergency Unlock is always there."
         )
+        #expect(app.button == "OK")
         let website = ShieldWords(over: .website)
         #expect(website.title == "Focused with Bali")
         #expect(website.subtitle == app.subtitle.replacing("This app", with: "This website"))
+        #expect(website.button == "OK")
     }
 
     @Test(

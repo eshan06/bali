@@ -4,11 +4,13 @@ import ManagedSettingsUI
 import UIKit
 
 // Bali's own shield over a blocked app or website (ARCHITECTURE, "iOS app structure"; B5c), in
-// D1's approved look — light, the ring mark — as far as `ShieldConfiguration` carries it: a
-// background, an icon, a title and a subtitle, and a button. What it says is `ShieldWords`, tested
-// on Linux; this only carries it out, reading nothing: iOS's sandbox refuses it the outbox file
-// (B5c-2). The shield blocks every app and website a third party can (`.all()`), so iOS asks for
-// each of these four. Its principal class, named in its Info.plist.
+// the redesign (D2k) as far as `ShieldConfiguration` carries it: a background, an icon, a title
+// and a subtitle, and a button, each in the design system's light tokens. Soft premium's shapes,
+// spacing and type are iOS's to draw here. What it says is `ShieldWords`, tested on Linux; this
+// only carries it out, reading nothing: iOS's sandbox refuses it the outbox file (B5c-2). The
+// shield blocks every app and website a third party can (`.all()`), so iOS asks for each of these
+// four. Its principal class, named in its Info.plist; the app's tests compile it too, to hold what
+// it hands iOS to the words and the tokens (`AppTests.shield`, `AppTests.tokens`).
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         shield(over: .app)
@@ -32,9 +34,9 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     private func shield(over: ShieldWords.Over) -> ShieldConfiguration {
         let words = ShieldWords(over: over)
-        // D1's light tokens, whatever the phone's appearance: the page (stone-50) over a light
-        // material, so no dark default shows through; text-primary and text-secondary; and the
-        // primary action, green-700 and white. D1's font, sizes and layout are iOS's to choose.
+        // The light tokens, whatever the phone's appearance (DESIGN.md §1, light-only): the page
+        // (surface-page) over a light material, so no dark default shows through; text-primary
+        // and text-secondary; and the primary action, action-primary-bg and -fg. Never red.
         return ShieldConfiguration(
             backgroundBlurStyle: .systemThickMaterialLight,
             backgroundColor: .bali(0xF7F5F2),
@@ -44,7 +46,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             subtitle: .init(text: words.subtitle, color: .bali(0x5B564E)),
             // With no shield action extension, iOS's own action: the blocked app closes. The
             // shield cannot open Bali, where Emergency Unlock is (C5) — the subtitle says so.
-            primaryButtonLabel: .init(text: "OK", color: .white),
+            primaryButtonLabel: .init(text: words.button, color: .white),
             primaryButtonBackgroundColor: .bali(0x245A43))
     }
 }

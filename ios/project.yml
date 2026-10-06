@@ -89,6 +89,9 @@ targets:
       # the Simulator may not read the checkout in place (macOS keeps it out of ~/Downloads).
       - path: Bali/UI/bali-tokens.json
         buildPhase: resources
+      # The shield's configuration, compiled here too (an extension's code is no module to
+      # import): AppTests holds what it hands iOS to ShieldWords and to the tokens (D2k).
+      - BaliShield/ShieldConfigurationExtension.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bali.BaliTests
@@ -118,8 +121,8 @@ targets:
       # The outbox file, read where the app keeps it: in the app group.
       - package: BaliOutbox
 
-  # The shield a student sees over a blocked app or website: Bali's own, in D1's look, its words
-  # from where the phone stands (B5c).
+  # The shield a student sees over a blocked app or website: Bali's own, in the design system's
+  # light tokens, its words the same wherever the phone stands (B5c, B5c-2, D2k).
   BaliShield:
     type: app-extension
     platform: iOS

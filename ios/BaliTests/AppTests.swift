@@ -3,6 +3,8 @@ import BaliCore
 import BaliOutbox
 import FamilyControls
 import Foundation
+import ManagedSettings
+import ManagedSettingsUI
 import SwiftUI
 import Testing
 import UIKit
@@ -1430,7 +1432,7 @@ struct AppTests {
     }
 
     @Test(
-        "Every colour `Theme` draws, and each chip's, is D1's light value of its token in `bali-tokens.json` — the design system's own file, a token's reference to another followed — shadow-1's opacity too, so the two cannot drift apart unnoticed (#101's review)"
+        "Every colour `Theme` draws, and each chip's, is D1's light value of its token in `bali-tokens.json` — the design system's own file, a token's reference to another followed — shadow-1's opacity too, so the two cannot drift apart unnoticed (#101's review); and so is each colour the shield hands iOS, over an app and over a website (D2k)"
     )
     func tokens() throws {
         let url = try #require(
@@ -1491,7 +1493,17 @@ struct AppTests {
             ("state-notjoined-bg", Chip.Kind.protectionOn.look.fill),
             ("state-notjoined-fg", Chip.Kind.protectionOn.look.ink),
         ]
-        for (token, colour) in pinned {
+        // The shield's (D2k), as its extension hands them to iOS: the page, the two inks, and the
+        // primary action's fill and label. Never red.
+        let shieldColours: [(token: String, colour: Color)] = try shields().flatMap { shown, _ in
+            try [
+                ("surface-page", shown.backgroundColor), ("text-primary", shown.title?.color),
+                ("text-secondary", shown.subtitle?.color),
+                ("action-primary-bg", shown.primaryButtonBackgroundColor),
+                ("action-primary-fg", shown.primaryButtonLabel?.color),
+            ].map { (token: $0, colour: Color(uiColor: try #require($1, "\($0)"))) }
+        }
+        for (token, colour) in pinned + shieldColours {
             let found = drawn(colour)
             #expect(found.hex == light(token), "\(token): \(found.hex)")
             #expect(found.opacity == 1, "\(token)")
@@ -1772,6 +1784,20 @@ struct AppTests {
     }
 
     @Test(
+        "Bali's shield as its extension hands it to iOS (D2k), over an app and over a website: every word `ShieldWords`' own, the title, the line and the one button's label; a light material under the page, whatever the phone's appearance; no second button. Its colours are the tokens', in `tokens`; its mark the asset's, in `mark`"
+    )
+    func shield() {
+        for (shown, over) in shields() {
+            let words = ShieldWords(over: over)
+            #expect(shown.title?.text == words.title, "\(over)")
+            #expect(shown.subtitle?.text == words.subtitle, "\(over)")
+            #expect(shown.primaryButtonLabel?.text == words.button, "\(over)")
+            #expect(shown.secondaryButtonLabel == nil, "\(over)")
+            #expect(shown.backgroundBlurStyle == .systemThickMaterialLight, "\(over)")
+        }
+    }
+
+    @Test(
         "Every screen's scroll view reaches the phone's edges — its scroll bar at the screen's edge, never over the cards (the phone's check, 2026-09-30) — with its content inside D1's 24-pt gutters, as the rest of the screen is: each fixture's screen at the phone's own size, the intro opened at each of its pages and Me's What your teacher sees among them"
     )
     func scrollEdges() throws {
@@ -1951,6 +1977,17 @@ struct AppTests {
 
 /// A class of the tests' own, to find their bundle by: it carries D1's tokens (`ios/project.yml`).
 private final class TestsBundle {}
+
+/// Bali's shield as its extension, compiled into the tests too (`ios/project.yml`), hands it to
+/// iOS: over an app and over a website, each with what it is over. The two shields of a category
+/// take a token no test can make, and say the same.
+private func shields() -> [(ShieldConfiguration, ShieldWords.Over)] {
+    let shield = ShieldConfigurationExtension()
+    return [
+        (shield.configuration(shielding: Application(bundleIdentifier: "com.example.game")), .app),
+        (shield.configuration(shielding: WebDomain(domain: "example.com")), .website),
+    ]
+}
 
 /// What VoiceOver reaches in `window`, in its order: the accessibility elements under it, those
 /// hidden from it left out — SwiftUI's own, through its hosting view's elements. The app's
