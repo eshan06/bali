@@ -968,7 +968,7 @@ struct ScreenTests {
         let asked = Permission.notDetermined.screenTimeWords
         #expect(asked.ask == "Ask me" && asked.settings == nil)
         #expect(asked.body.hasPrefix("iOS asks once. Bali uses Screen Time only to pause apps"))
-        #expect(asked.body.hasSuffix("your teacher simply sees “Screen Time off”."))
+        #expect(asked.body.hasSuffix("your teacher simply sees that it's off."))
         #expect(Permission.approved.screenTimeWords == asked)
         let denied = Permission.denied.screenTimeWords
         #expect(denied.settings == "Open Settings" && denied.ask == "Ask again")
@@ -976,6 +976,11 @@ struct ScreenTests {
         #expect(denied.body.contains("Settings → Screen Time → Apps with Screen Time Access."))
         #expect(denied.body.hasSuffix("iOS may not ask again here."))
         #expect(!denied.body.contains("or ask again"))
+        // The teacher's grid says "Protection off", the phone "Screen Time off": neither is quoted
+        // as what the teacher sees (D2j).
+        for body in [asked.body, denied.body] {
+            #expect(!body.contains("“") && !body.contains("Screen Time off"), "\(body)")
+        }
         for permission in [Permission.approved, .denied, .notDetermined] {
             #expect(ScreenTimeAskError.cancelled.words(permission) == nil, "\(permission)")
         }

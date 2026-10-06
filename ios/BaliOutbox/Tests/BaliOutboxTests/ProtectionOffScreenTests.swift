@@ -47,20 +47,20 @@ struct ProtectionOffScreenTests {
         #expect(off.headline == "Screen Time is off" && off.way == .settings && off.refused == nil)
         #expect(
             off.body
-                == "Bali can't keep you focused without it, so your teacher sees “Screen Time off”.")
+                == "Bali can't keep you focused without it, so your teacher sees that Screen Time is off.")
         let (outbox, _) = try makeOutbox()
         try record(outbox, .protectionOff(session: "s"))
         let sending = try synced(.inSession(bell1042, .protectionOff), queued: try outbox.records())
         #expect(
             words(sending)?.body
-                == "Bali can't keep you focused without it, so your teacher will see “Screen Time off”.")
+                == "Bali can't keep you focused without it, so your teacher will see that Screen Time is off.")
         #expect(words(try synced(.inSession(bell1042, .unlocked)))?.body == words(sending)?.body)
         let back = try #require(
             words(try synced(.inSession(bell1042, .protectionOff)), checked(.approved)))
         #expect(back.headline == "Screen Time is back on" && back.way == .retap)
         #expect(
             back.body
-                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees “Screen Time off”."
+                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees Screen Time as off."
         )
         // The steps back (#167): Screen Time on again puts the phone back by itself — the re-tap is
         // the second step only where Screen Time reads on and that could not be done.
@@ -85,7 +85,7 @@ struct ProtectionOffScreenTests {
         let checking = try #require(words(off, checked(.notDetermined)))
         #expect(checking.way == .checking && checking.headline == "Checking Screen Time…")
         #expect(
-            checking.body == "Your teacher sees “Screen Time off” until it's back on.")
+            checking.body == "Until Screen Time is back on, your teacher sees that it's off.")
         #expect(checking.steps.last == "Bali puts you back in class by itself")
     }
 
@@ -109,14 +109,36 @@ struct ProtectionOffScreenTests {
         let off = try synced(.inSession(bell1042, .protectionOff))
         #expect(
             words(off, checked(.approved, unreported: true))?.body
-                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees “Screen Time off”."
+                == "Tap your teacher's block again to rejoin class. Until then, your teacher sees Screen Time as off."
         )
         let (outbox, _) = try makeOutbox()
         try record(outbox, .protectionOff(session: "s"))
         let queued = try synced(.inSession(bell1042, .unlocked), queued: try outbox.records())
         #expect(
             words(queued, checked(.notDetermined, unreported: true))?.body
-                == "Your teacher will see “Screen Time off” until it's back on.")
+                == "Until Screen Time is back on, your teacher will see that it's off.")
+    }
+
+    @Test(
+        "Protection off never quotes a label the teacher doesn't see (D2j): the teacher's grid says 'Protection off' where the phone says 'Screen Time off', both the owner's rulings, so whichever the way, and whether the teacher sees it, will see it or has not been told, the screen says what is true in its own words and quotes neither"
+    )
+    func noLabelQuoted() throws {
+        let (outbox, _) = try makeOutbox()
+        try record(outbox, .protectionOff(session: "s"))
+        let states = [
+            try synced(.inSession(bell1042, .protectionOff)),
+            try synced(.inSession(bell1042, .unlocked), queued: try outbox.records()),
+        ]
+        let checks = [
+            checked(.denied), checked(.notDetermined, lasting: true), checked(.approved),
+            checked(.notDetermined), checked(.denied, unreported: true),
+        ]
+        for (state, protection) in states.flatMap({ state in checks.map { (state, $0) } }) {
+            let body = try #require(words(state, protection)).body
+            for quoted in ["Screen Time off", "Protection off", "“", "\""] {
+                #expect(!body.contains(quoted), "\(body)")
+            }
+        }
     }
 
     @Test(
