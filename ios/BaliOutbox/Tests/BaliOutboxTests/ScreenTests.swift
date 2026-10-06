@@ -94,104 +94,49 @@ struct ScreenTests {
     }
 
     @Test(
-        "The 13+ check (C7) comes first: on a first launch, nothing known yet, the question before the intro — and the stop screen in its place once answered under 13 this run; passed, the intro as before. On an install from before the check, the intro seen, it waits for the engine to say where the phone stands, then shows once no session stands for the phone — out, waiting, past the bell once Session over is closed, whatever the classes — before the sign-in and the permission; and never over a session's screens: Focus, Unlocked, Protection off and the home a standing not read keeps hold Emergency Unlock, so they stay, signed in or not, whatever the permission reads, the shields on are Focus before it too, and Session over holds past the bell until the student closes it (santa's round 1) — the sign-in or Screen Time where they would come before Session over, signed out or the permission off, since the check waits behind the session's screens (santa's round 2). No tab bar on either screen"
+        "The 13+ check (C7) is asked at Sign in (the owner's decision, 2026-10-06): a first launch opens on the intro, never the question, whatever the answer; signed out, Sign in until it is pressed with the check not passed, then the question in its place, and the stop screen there once answered under 13 this run; a student signed in never sees either, whatever the answer; and never over a session's screens: the shields on are Focus, and the home a standing not read keeps holds Emergency Unlock, before either. No tab bar on either screen"
     )
-    func ageFirst() throws {
+    func ageAtSignIn() throws {
         let (outbox, _) = try makeOutbox()
         try record(outbox, .tap(tagId: "tag"))
         let held = try outbox.records()
-        for age in [AgeCheck.Answer.unanswered, .tooYoung] {
-            let gate: Screen = age == .tooYoung ? .tooYoung : .age
+        for age in [AgeCheck.Answer.unanswered, .asked, .passed, .tooYoung] {
+            #expect(screen(age: age, introSeen: false) == .intro, "\(age)")
             #expect(
                 screen(age: age, introSeen: false, signedIn: nil, permission: nil, standing: nil)
-                    == gate, "\(age)")
-            #expect(screen(age: age, introSeen: false) == gate, "\(age)")
-            #expect(screen(age: age, introSeen: false, signedIn: false) == gate, "\(age)")
-            #expect(screen(age: age, signedIn: nil, permission: nil, standing: nil) == .starting)
-            #expect(screen(age: age, standing: nil) == .starting, "\(age)")
-            // The Keychain not read yet either: a deletion left pending is read with who is signed
-            // in (C4b), so the question never flashes before the deletion's screen (santa, rebase).
+                    == .intro, "\(age)")
             #expect(screen(age: age, signedIn: nil) == .starting, "\(age)")
-            #expect(screen(age: age, introSeen: false, signedIn: nil) == gate, "\(age)")
-            #expect(screen(age: age) == gate, "\(age)")
+            #expect(screen(age: age) == .home, "\(age)")
+            #expect(screen(age: age, standing: .waiting) == .waiting, "\(age)")
+            #expect(screen(age: age, standing: .inSession(session(), .unlocked)) == .unlocked)
+            #expect(screen(age: age, permission: .denied) == .screenTime, "\(age)")
+            #expect(screen(age: age, hasClasses: false) == .join, "\(age)")
+        }
+        let gates: [(AgeCheck.Answer, Screen)] = [
+            (.unanswered, .signIn), (.passed, .signIn), (.asked, .age), (.tooYoung, .tooYoung),
+        ]
+        for (age, gate) in gates {
+            let focused = Standing.inSession(session(), .focused)
             #expect(screen(age: age, signedIn: false) == gate, "\(age)")
-            #expect(screen(age: age, permission: .denied) == gate, "\(age)")
-            #expect(screen(age: age, hasClasses: false) == gate, "\(age)")
-            #expect(screen(age: age, everInClass: true, hasClasses: false) == gate, "\(age)")
-            #expect(screen(age: age, standing: .waiting) == gate, "\(age)")
-            // Past the bell, Session over holds until Done or See history closes it; then the check.
-            for state in [ParticipationState.focused, .unlocked, .protectionOff] {
-                let rung = Standing.inSession(session(), state)
-                #expect(screen(age: age, standing: rung, now: at(3000)) == .sessionOver, "\(age)")
-                #expect(
-                    screen(age: age, standing: rung, sessionOverClosed: session(), now: at(3000))
-                        == gate, "\(age) \(state)")
-                #expect(
-                    screen(
-                        age: age, standing: rung, sessionOverClosed: session(), opened: [.join],
-                        tab: .history, now: at(3000)) == gate, "\(age) \(state)")
-            }
-            // Another session's Session over, or the same one with its bell moved, holds (C5b).
-            #expect(
-                screen(
-                    age: age, standing: .inSession(session("t"), .focused),
-                    sessionOverClosed: session(), now: at(3000)) == .sessionOver, "\(age)")
-            // Past the bell, signed out or the permission off, the sign-in or Screen Time comes
-            // before Session over — and so before the check, which waits behind the session's
-            // screens; closed, the check (santa's round 2).
-            let rung = Standing.inSession(session(), .focused)
-            #expect(screen(age: age, signedIn: false, standing: rung, now: at(3000)) == .signIn)
-            #expect(
-                screen(age: age, permission: .denied, standing: rung, now: at(3000)) == .screenTime,
-                "\(age)")
-            #expect(
-                screen(
-                    age: age, signedIn: false, standing: rung, sessionOverClosed: session(),
-                    now: at(3000)) == gate, "\(age)")
-            // A running session keeps its screens, each with Emergency Unlock on it or behind it.
-            #expect(screen(age: age, standing: .inSession(session(), .focused)) == .focus, "\(age)")
-            #expect(
-                screen(age: age, signedIn: false, standing: .inSession(session(), .focused)) == .focus,
-                "\(age)")
-            #expect(
-                screen(age: age, standing: .inSession(session(), .unlocked)) == .unlocked, "\(age)")
-            #expect(
-                screen(age: age, standing: .inSession(session(), .protectionOff)) == .protectionOff,
-                "\(age)")
-            #expect(
-                screen(age: age, permission: .denied, standing: .inSession(session(), .unlocked))
-                    == .protectionOff, "\(age)")
-            #expect(screen(age: age, standing: .inSession(session(), nil)) == .home, "\(age)")
-            #expect(screen(age: age, standing: .unread) == .home, "\(age)")
+            #expect(screen(age: age, signedIn: false, permission: .denied) == gate, "\(age)")
+            #expect(screen(age: age, signedIn: false, standing: .waiting) == gate, "\(age)")
+            #expect(screen(age: age, signedIn: false, standing: focused, now: at(3000)) == gate)
+            #expect(screen(age: age, signedIn: false, standing: focused) == .focus, "\(age)")
+            #expect(screen(age: age, signedIn: false, queued: held) == .focus, "\(age)")
             #expect(screen(age: age, signedIn: false, shielded: true, standing: .unread) == .home)
-            #expect(screen(age: age, introSeen: false, signedIn: false, queued: held) == .focus)
-            // Delete account pressed (C4b) has its own screen over everything but a failed start:
-            // the check waits behind it too.
-            #expect(screen(deleting: true, age: age, introSeen: false, signedIn: nil, permission: nil, standing: nil) == .deleting)
-            #expect(screen(deleting: true, age: age) == .deleting, "\(age)")
-            // Unlocked's Home and a tab chosen stay the session's: never the check over them.
-            #expect(
-                screen(age: age, standing: .inSession(session(), .unlocked), opened: [.home]) == .home,
-                "\(age)")
-            #expect(
-                screen(age: age, standing: .inSession(session(), .unlocked), opened: [.home], tab: .me)
-                    == .me, "\(age)")
+            #expect(screen(deleting: true, age: age, signedIn: false) == .deleting, "\(age)")
+            let why = "The outbox could not be opened"
+            #expect(screen(problem: why, age: age, signedIn: false) == .storage(why), "\(age)")
             var protection = Protection()
             (protection.checked, protection.permission) = (true, .approved)
             var out = SyncState()
             out.standing = .out
             let shown = Screen.choose(
-                problem: nil, deleting: false, age: age, introSeen: true, signedIn: true,
-                protection: protection,
-                everApproved: false, everInClass: false, sync: out, hasClasses: true,
-                sessionOverClosed: nil, opened: [], tab: .history, now: t0)
+                problem: nil, deleting: false, age: age, introSeen: true, signedIn: false,
+                protection: protection, everApproved: false, everInClass: true, sync: out,
+                hasClasses: true, sessionOverClosed: nil, opened: [], tab: .history, now: t0)
             #expect(shown.screen == gate && !shown.tabbed, "\(age)")
         }
-        #expect(screen(age: .passed, introSeen: false) == .intro)
-        #expect(screen(age: .passed, introSeen: false, signedIn: nil, permission: nil, standing: nil) == .intro)
-        #expect(screen(age: .passed) == .home)
-        let why = "The outbox could not be opened"
-        #expect(screen(problem: why, age: .unanswered, introSeen: false) == .storage(why))
     }
 
     @Test("The app could not start: storage, with why, over everything else")

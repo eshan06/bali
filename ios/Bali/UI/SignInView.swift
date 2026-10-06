@@ -5,15 +5,13 @@ import SwiftUI
 
 /// Sign in (D1's Main artboard; C1a), shown until someone is signed in: Cognito's hosted UI in an
 /// ephemeral browser session — no cookie kept, so a sign-out asks the password again — through
-/// `SignIn`, as the readout did (B4c). A sign-in that did not finish is said under the button, in
-/// `SignInError.words` (rule 5); one the student closed changed nothing, and says nothing. Under
-/// its caption, the portal's privacy policy and terms (`PolicyLinks`, C2b).
+/// `Phone.signIn`, which asks the 13+ check first where it has not passed (C7). A sign-in that did
+/// not finish is said under the button, in `SignInError.words` (rule 5); one the student closed
+/// changed nothing, and says nothing. Under its caption, the portal's privacy policy and terms
+/// (`PolicyLinks`, C2b).
 struct SignInView: View {
-    /// nil in a preview or a fixture, where nothing signs in.
-    let signIn: SignIn?
+    let phone: Phone
     @Environment(\.webAuthenticationSession) private var browser
-    @State private var busy = false
-    @State private var failure: String?
 
     var body: some View {
         ScreenScaffold {
@@ -32,9 +30,11 @@ struct SignInView: View {
                     }
                     Spacer()
                     VStack(spacing: 12) {
-                        Button(busy ? "Signing in…" : "Sign in") { Task { await go() } }
-                            .buttonStyle(PrimaryButtonStyle()).disabled(busy)
-                        if let failure {
+                        Button(phone.signingIn ? "Signing in…" : "Sign in") {
+                            Task { await phone.signIn(through: browser.hostedUI) }
+                        }
+                        .buttonStyle(PrimaryButtonStyle()).disabled(phone.signingIn)
+                        if let failure = phone.signInFailed {
                             Text(failure).textStyle(.body)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -48,24 +48,10 @@ struct SignInView: View {
         }
     }
 
-    /// One attempt: the hosted UI in the ephemeral session, and what did not finish said in place.
-    private func go() async {
-        guard let signIn, !busy else { return }
-        (busy, failure) = (true, nil)
-        defer { busy = false }
-        let (browser, scheme) = (browser, signIn.cognito.redirectURI.scheme ?? "")
-        do {
-            try await signIn.signIn { @MainActor url throws(SignInError) in
-                try await browser.hostedUI(url, scheme: scheme)
-            }
-        } catch {
-            failure = error.words
-        }
-    }
 }
 
 extension WebAuthenticationSession {
-    /// The hosted UI at `url`, in an ephemeral session, for `SignIn.signIn(through:)`: where it
+    /// The hosted UI at `url`, in an ephemeral session, for `Phone.signIn(through:)`: where it
     /// sent the student back, or why not, in the sign-in's words (C1b).
     func hostedUI(_ url: URL, scheme: String) async throws(SignInError) -> URL {
         do {

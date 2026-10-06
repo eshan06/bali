@@ -295,8 +295,10 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   address, slowing requests down before ever blocking them (ISSUES.md #1).
 - **Under 13: not yet.** Accounts for young students carry legal requirements (parental
   consent). *Decided 2026-10-04 (C7, the owner's ruling; built 2026-10-05):* 13+ is the
-  school's agreement plus a neutral in-app age screen — the first screen on a first launch,
-  asking the birth month and year by the FTC's COPPA guidance — that keeps one flag on the
+  school's agreement plus a neutral in-app age screen — shown when the student taps Sign in
+  with the check not passed on the phone, after the intro and before the sign-in page opens
+  (moved there 2026-10-06, the owner's decision), asking the birth month and year by the FTC's
+  COPPA guidance — that keeps one flag on the
   phone when the answer is 13 or older (never the date) and nothing at all when it is not: the
   student sees a stop screen, and the server never learns the question was asked. Under-13
   consent itself stays a later decision, for the K-12 pilot.
@@ -796,13 +798,14 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   (ruled 2026-09-29), quick, yet no pocket touch files one, and one step under VoiceOver. Not
   (b), a watchdog turning the shields off after a force-quit: iOS's coarse wake clock makes its
   honest promise "off within ~15 minutes", not instant.
-- **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05). The
-  router shows the age screen, and the stop screen under 13 gets, only once no session stands
-  for the phone: Focus, Unlocked, Protection off and the home a standing not read keeps hold
-  the exit, so they keep their screens, Session over keeps its own past the bell until the
-  student closes it, and an install from before the check sees it once no session stands for
-  the phone: at the next launch out of one, or after the bell once Session over is closed. The
-  check counts in the Gregorian calendar whatever calendar the phone shows its dates in.
+- **The 13+ check never stands between a student and Emergency Unlock** (C7, 2026-10-05; at
+  Sign in since 2026-10-06). The router shows the age screen, and the stop screen under 13
+  gets, only in Sign in's place: signed out, once Sign in was pressed with the check not
+  passed. So a student signed in never sees either, and the shields' Focus and the home a
+  standing not read keeps, which hold the exit, come before them. Every way to the hosted UI
+  goes through the one call that asks the check first (`Phone.signIn`), so no sign-in or
+  sign-up page opens around it. The check counts in the Gregorian calendar whatever calendar
+  the phone shows its dates in.
 - **A changed phone clock is detected, not prevented.** iOS scheduling follows wall-clock
   time, so a clock change is a real bypass family; the server compares against its own clock
   (rule 1) and surfaces it to the teacher rather than trusting it. Which of a student's own

@@ -119,6 +119,20 @@ struct AgeTests {
     }
 
     @Test(
+        "Sign in pressed asks the check (the owner's decision, 2026-10-06): not passed, the question shows and no sign-in page may open, however often it is pressed; answered 13 or older, the page may open; under 13, none may and the stop screen stays"
+    )
+    func asks() {
+        var check = AgeCheck(.unanswered)
+        #expect(!check.ask() && check.answer == .asked)
+        #expect(!check.ask() && check.answer == .asked)
+        check.answered(month: 10, year: 2000, today: day(2026, 10, 15), defaults: nil)
+        #expect(check.ask() && check.answer == .passed)
+        var young = AgeCheck(.asked)
+        young.answered(month: 10, year: 2014, today: day(2026, 10, 15), defaults: nil)
+        #expect(!young.ask() && young.answer == .tooYoung)
+    }
+
+    @Test(
         "What the menus offer at a day in October 2026: every month and this year with a hundred before it, newest first — with this year picked, only the months to October; with a month past October picked, the years from last year; a pick made, the other menu still offers what was picked; complete once both are picked"
     )
     func menus() {

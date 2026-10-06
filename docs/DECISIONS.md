@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-10-06** — **C7's age question moves to the Sign in tap.** The owner's decision, from
+  testing the TestFlight build: being asked your age before you have even signed in felt wrong
+  as the app's very first screen. So a first launch opens on the intro, and the question shows
+  when the student taps Sign in with the check not passed on the phone; Continue at 13 or older
+  opens the sign-in page at once, with no second press, and under 13 gets the same stop screen as
+  before, nothing kept, no way back until the app is reopened. It is still asked before Bali
+  collects any personal data: an account is made on Cognito's hosted page, which the app cannot
+  put a question into, so the last moment the app owns before that page is the tap that opens it.
+  **One gate, not one per button:** `Phone.signIn(through:)` is the only call that opens the
+  hosted UI (Sign in's button, the age screen's Continue, the Debug readout), and it asks the
+  check first, so a re-sign-in after an expired session or Delete account's "sign out and sign
+  in again" goes through it too. **A student signed in is never asked:** the router shows the
+  question only in Sign in's place. That drops the old rule for installs from before C7 (asked
+  at their next launch out of a session): such a student is asked at their next sign-in instead,
+  which still comes before any new account, the point of the check. Everything else about C7
+  stands: the neutral month and year, nothing on screen says 13, and only "passed" is kept on
+  the phone, never the date.
+
 - **2026-10-06** — **S6: the Claude workflows pinned, and the review scanned for secrets before
   it posts.** **Pins:** `actions/checkout` at the commit the other workflows pin (v4.4.0), and
   `anthropics/claude-code-action` at the commit its floating `v1` tag pointed at today, named by

@@ -57,11 +57,14 @@ final class Phone {
     /// A fixture's, frozen as it was made (Debug): never started.
     private var frozen = false
     /// The 13+ check (C7), as the phone's own defaults say — passed before, or not yet — and, this
-    /// run, what the student answered: under 13 is held here alone, never written anywhere
-    /// (`AgeCheck`). The question is the first screen on a first launch.
+    /// run, whether Sign in asked it and what the student answered: under 13 is held here alone,
+    /// never written anywhere (`AgeCheck`). Asked at Sign in (`signIn(through:)`).
     private(set) var age = AgeCheck(defaults: .standard)
     /// The age screen's picks, the birth month and year, until Continue answers with them.
     var birth = Birth()
+    /// Sign in's (C1a): a sign-in under way, and why the last did not finish (rule 5).
+    private(set) var signingIn = false
+    private(set) var signInFailed: String?
     /// Whether the student has seen the intro (C1): the phone's own flag, in its own defaults —
     /// not the app group's, which the extensions read.
     private(set) var introSeen = UserDefaults.standard.bool(forKey: Phone.introSeenKey)
@@ -578,14 +581,41 @@ final class Phone {
         if joining.joined(answer), opened.last == .join { opened.removeLast() }
     }
 
+    /// The browser a sign-in opens Cognito's hosted UI in (`WebAuthenticationSession.hostedUI`):
+    /// the page at a URL, and where it sent the student back to the scheme given.
+    typealias Browser = @MainActor @Sendable (URL, String) async throws(SignInError) -> URL
+
+    /// Sign in (C1a), the one way to the hosted UI — the screen's button, the age screen's
+    /// Continue and the readout's alike: with the 13+ check not passed on this phone, no page
+    /// opens and its question shows in Sign in's place (C7, the owner's decision, 2026-10-06);
+    /// else the hosted UI through `browser`, what did not finish said under the button, in
+    /// `SignInError.words` (rule 5). One at a time. A phone not started — a frozen one too — says
+    /// so.
+    func signIn(through browser: Browser) async {
+        guard !signingIn, age.ask() else { return }
+        guard let signIn else { return signInFailed = Joining.notStarted }
+        (signingIn, signInFailed) = (true, nil)
+        defer { signingIn = false }
+        let scheme = signIn.cognito.redirectURI.scheme ?? ""
+        do {
+            try await signIn.signIn { @MainActor url throws(SignInError) in
+                try await browser(url, scheme)
+            }
+        } catch {
+            signInFailed = error.words
+        }
+    }
+
     /// The age screen's Continue (C7): the picks answer the check, judged by the phone's clock and
     /// calendar today — passed, kept in the phone's own defaults (never on a frozen fixture, which
-    /// keeps nothing for another); under 13, kept nowhere, in memory until the app is reopened —
-    /// and the picks are let go either way. Nothing until both are picked.
-    func answerAge() {
+    /// keeps nothing for another), and the sign-in page opens at once through `browser`, with no
+    /// second press of Sign in; under 13, kept nowhere, in memory until the app is reopened — and
+    /// the picks are let go either way. Nothing until both are picked.
+    func answerAge(through browser: Browser) async {
         guard let month = birth.month, let year = birth.year else { return }
         age.answered(month: month, year: year, defaults: frozen ? nil : .standard)
         birth = Birth()
+        await signIn(through: browser)
     }
 
     func sawIntro() {
@@ -949,17 +979,12 @@ final class Phone {
                 ?? "not joined: \(joined.result) \(joined.error?.error.message ?? "")"
         }
 
-        /// Signs in through the hosted UI, in an ephemeral browser session: what happened.
+        /// Signs in as Sign in does (`Phone.signIn`), the 13+ check first: what happened.
         private func signingIn() async -> String {
-            let (browser, scheme) = (browser, signIn.cognito.redirectURI.scheme ?? "")
-            do {
-                try await signIn.signIn { @MainActor url throws(SignInError) in
-                    try await browser.hostedUI(url, scheme: scheme)
-                }
-                return "Signed in"
-            } catch {
-                return "Sign-in failed: \(error)"
-            }
+            await phone.signIn(through: browser.hostedUI)
+            if let failed = phone.signInFailed { return "Sign-in failed: \(failed)" }
+            return phone.age.answer == .passed
+                ? "Sign-in finished or closed" : "Not opened: the 13+ check shows first"
         }
 
         /// Signs out of this phone: what happened.
