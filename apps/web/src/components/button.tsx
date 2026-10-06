@@ -15,16 +15,15 @@ const VARIANTS = {
   destructive: 'bg-action-destructive-bg text-action-destructive-fg',
 };
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: keyof typeof VARIANTS;
-};
+type Variant = keyof typeof VARIANTS;
+
+/** A button's look, for a link that leads somewhere as a button would (the callback's way back). */
+export function buttonClass(variant: Variant = 'primary', className = ''): string {
+  return `inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-body font-semibold transition-colors disabled:cursor-default disabled:opacity-60 aria-disabled:cursor-default aria-disabled:opacity-60 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
+}
+
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
-  return (
-    <button
-      type="button"
-      {...props}
-      className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-body font-semibold transition-colors disabled:cursor-default disabled:opacity-60 aria-disabled:cursor-default aria-disabled:opacity-60 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`}
-    />
-  );
+  return <button type="button" {...props} className={buttonClass(variant, className)} />;
 }

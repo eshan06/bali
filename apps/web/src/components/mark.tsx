@@ -17,3 +17,13 @@ export function Mark({ size = 24 }: { size?: number }) {
     </svg>
   );
 }
+
+/** The lockup that opens a page with no bar (/login, the callback, the help and policy pages). */
+export function Lockup() {
+  return (
+    <p translate="no" className="inline-flex items-center gap-2 text-body font-semibold">
+      <Mark size={28} />
+      Bali
+    </p>
+  );
+}

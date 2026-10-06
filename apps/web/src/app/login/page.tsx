@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { Mark } from '@/components/mark';
+import { Lockup } from '@/components/mark';
+import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
 
 /** What a Sign out in this tab (S4a) left behind, said once on the way back here. */
@@ -20,9 +20,6 @@ const PUBLIC_PAGES = [
   { href: '/privacy', label: 'Privacy policy' },
   { href: '/terms', label: 'Terms' },
 ];
-
-const PUBLIC_LINK =
-  'rounded-xs font-medium text-text-brand underline underline-offset-2 hover:decoration-2';
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -40,10 +37,7 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
       {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding; in dark its hairline edge. */}
       <div className="rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
-        <p translate="no" className="inline-flex items-center gap-2 text-body font-semibold">
-          <Mark size={28} />
-          Bali
-        </p>
+        <Lockup />
         <h1 className="mt-6 text-h1 text-balance">Teacher portal</h1>
         <p className="mt-2 text-body-lg text-text-secondary">Sign in to see your classes.</p>
         {left ? (
@@ -65,9 +59,7 @@ export default function LoginPage() {
         <ul className="flex flex-wrap gap-x-5 gap-y-2 text-body">
           {PUBLIC_PAGES.map((page) => (
             <li key={page.href}>
-              <Link href={page.href} className={PUBLIC_LINK}>
-                {page.label}
-              </Link>
+              <TextLink href={page.href}>{page.label}</TextLink>
             </li>
           ))}
         </ul>
