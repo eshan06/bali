@@ -32,7 +32,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `unlockNote`'s), and How it ended is the projector view, the toggle beside it as beside the live
   grid, so the teacher can leave Present there and see the reasons again. The toggle shows beside
   How it ended whether or not Present was on, so an ended grid can be projected too. So
-  `docs/PILOT.md` drops its "stop projecting before then". **Tailwind's own colours, type sizes,
+  `docs/PILOT.md` drops its "stop projecting before then", keeping it only for a reload or a
+  return from Reports, which open the page in the teacher's view (Present is per tab and not
+  remembered, D2f-2's call; santa's round 2). **Tailwind's own colours, type sizes,
   tracking and leading leave the theme** (`initial`), as DESIGN.md planned for D2g: with every
   screen redrawn none is used, so `tokens.test.ts` now holds every source file to the tokens'
   utilities, since a default would silently draw nothing. Found, not changed (a token is the
