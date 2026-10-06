@@ -130,7 +130,7 @@ struct UnlockedView: View {
             }
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "checkmark.icloud").accessibilityHidden(true)
-                Text("Saved on your phone first — it reaches your teacher as soon as there's signal.")
+                Text("Saved on your phone first. It reaches your teacher as soon as there's signal.")
             }
             .textStyle(.caption).foregroundStyle(Theme.textTertiary).padding(.horizontal, 8)
             .multilineTextAlignment(.leading)
@@ -196,9 +196,9 @@ private struct ReasonLabel: View {
     }
 }
 
-/// D1's reason button: 48 pt tall, radius 10, the page's fill in a hairline — pressed, sunken. D1
-/// draws none chosen: the one chosen takes the brand's fill, the others dimmed while none can be
-/// picked.
+/// D1's reason button: 48 pt tall, the page's fill in a hairline — pressed, sunken — a pill as every
+/// button is (Soft premium, D2i). D1 draws none chosen: the one chosen takes the brand's fill, the
+/// others dimmed while none can be picked.
 private struct ReasonStyle: ButtonStyle {
     let chosen: Bool
     @Environment(\.isEnabled) private var enabled
@@ -209,9 +209,9 @@ private struct ReasonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(
                 chosen ? Theme.brand : configuration.isPressed ? Theme.sunken : Theme.page,
-                in: .rect(cornerRadius: Theme.Radius.sm)
+                in: .capsule
             )
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm).stroke(Theme.border))
+            .overlay(Capsule().stroke(Theme.border))
             .opacity(enabled || chosen ? 1 : 0.6)
     }
 }

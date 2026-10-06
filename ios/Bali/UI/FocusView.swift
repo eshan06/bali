@@ -157,6 +157,8 @@ private struct Ring: View {
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
         .padding(12).frame(width: 240, height: 240)
+        // On a raised disc (Soft premium: the B artboard's Focus, D2i), 6 pt clear of the ring.
+        .background(RaisedDisc())
         .accessibilityElement(children: .ignore)
         // Spoken as a length of time — "1 minute, 52 seconds" — never as a clock's "one fifty-two".
         .accessibilityLabel(
@@ -176,7 +178,9 @@ private struct Ring: View {
 /// Held for a second it unlocks, a finger drifting up to a touch target's width; let go early,
 /// nothing happens and its progress springs back (the design system's spring) — under Reduce
 /// Motion a still pressed look instead, never a ring that looks done a second early. VoiceOver's
-/// own action unlocks in one step, and Voice Control knows it by the words on it too.
+/// own action unlocks in one step, and Voice Control knows it by the words on it too. D1's words
+/// on two lines (D2i): the action in a button's label, who sees it under it, each one line at the
+/// default text size, where the one sentence wrapped mid-phrase.
 struct UnlockControl: View {
     let unlock: () -> Void
     @State private var holding = false
@@ -192,9 +196,13 @@ struct UnlockControl: View {
                         .stroke(look.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-            Text("Hold to unlock — your teacher will see it")
-                .textStyle(TextStyle(size: 16, line: 22, weight: .semibold))
-                .frame(maxWidth: .infinity).padding(.trailing, 12)
+            // Each line its whole height: offered a share of the pill's, a long one would cut off.
+            VStack(spacing: 0) {
+                Text("Hold to unlock").textStyle(.button).fixedSize(horizontal: false, vertical: true)
+                Text("Your teacher will see it").textStyle(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity).padding(.trailing, 12)
         }
         .multilineTextAlignment(.center).foregroundStyle(look.ink)
         .padding(10).frame(minHeight: 64)

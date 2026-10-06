@@ -4,7 +4,8 @@ import SwiftUI
 // 2026-09-26): its light tokens only — D1 is light, and `RootView` renders light in every
 // appearance (the owner's pick, 2026-10-04) — in the system font at D1's sizes, in the Soft premium
 // shapes from D2h (DESIGN.md §1: pill buttons and chips, inputs as sunken wells at `radius-sm` under
-// the focus ring, cards at `radius-lg` with shadow-1), and only the atoms the screens use.
+// the focus ring, cards at `radius-lg` with shadow-1) and D2i (a card in a tray, a ring on a raised
+// disc), and only the atoms the screens use.
 
 enum Theme {
     // Colours, D1's light values in `bali-tokens.json`, beside this file — `AppTests.tokens` pins
@@ -35,6 +36,8 @@ enum Theme {
     static let focusRing = arc
     /// shadow-1, a resting card's: 0 1px 2px, warm black at 6 %.
     static let shadow = Color(hex: 0x211C15).opacity(0.06)
+    /// shadow-2, a raised disc's (`RaisedDisc`): 0 2px 8px at 8 % over 0 1px 2px at 5 %, warm black.
+    static let raised = (wide: Color(hex: 0x211C15).opacity(0.08), close: Color(hex: 0x211C15).opacity(0.05))
 
     /// The 4-pt grid's steps the screens use, and the page's side gutter.
     static let gutter: CGFloat = 24
@@ -161,18 +164,43 @@ extension View {
     }
 }
 
-/// A card: white, radius 20, shadow-1, D1's 20-pt padding unless a screen packs rows into it. Its
-/// shadow is its shape's alone, drawn once at its edge: one over the whole card shadows every line,
-/// chip and button inside it too, each redrawn as a screen scrolls (#139).
+/// A card: white, radius 20 — a tray's, 14 — shadow-1, D1's 20-pt padding unless a screen packs rows
+/// into it. Its shadow is its shape's alone, drawn once at its edge: one over the whole card shadows
+/// every line, chip and button inside it too, each redrawn as a screen scrolls (#139).
 struct Card<Content: View>: View {
     var padding: CGFloat = 20
+    var radius = Theme.Radius.lg
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content().padding(padding).frame(maxWidth: .infinity)
             .background(
                 Theme.card.shadow(.drop(color: Theme.shadow, radius: 1, y: 1)),
-                in: .rect(cornerRadius: Theme.Radius.lg))
+                in: .rect(cornerRadius: radius))
+    }
+}
+
+/// DESIGN.md's tray (Soft premium, §4): a card in a `surface-sunken` well at `radius-lg`, inset 8,
+/// the card at `radius-md` with 16-pt padding, the two corners one nested pair. Home's hero card
+/// (D2i), the first a screen groups.
+struct Tray<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Card(padding: 16, radius: Theme.Radius.md, content: content).padding(8)
+            .background(Theme.sunken, in: .rect(cornerRadius: Theme.Radius.lg))
+    }
+}
+
+/// A raised disc (Soft premium, DESIGN.md §1): white under shadow-2, a ring's ground — Focus's and
+/// Waiting's (D2i). Drawn behind the ring, it takes no room of its own.
+struct RaisedDisc: View {
+    var body: some View {
+        Circle().fill(
+            Theme.card.shadow(.drop(color: Theme.raised.wide, radius: 4, y: 2))
+                .shadow(.drop(color: Theme.raised.close, radius: 1, y: 1))
+        )
+        .accessibilityHidden(true)
     }
 }
 
@@ -181,7 +209,7 @@ struct Card<Content: View>: View {
 /// style in uppercase.
 struct Chip: View {
     enum Kind {
-        case focused, unlocked, protectionOff, ended, notIn
+        case focused, unlocked, protectionOff, ended, notIn, waiting
 
         /// The design system's fill and ink — red for protection off alone — and its SF Symbol.
         var look: (fill: Color, ink: Color, icon: String) {
@@ -191,6 +219,9 @@ struct Chip: View {
             case .protectionOff: (Color(hex: 0xFAE3E0), Color(hex: 0x8C342B), "shield.slash")
             case .ended: (Theme.sunken, Theme.textTertiary, "flag")
             case .notIn: (Theme.sunken, Color(hex: 0x524E47), "circle")
+            // Waiting for the Start (D2i): no shield on yet, so not in's pair, never focus's green;
+            // the clock and the word say the tap counted and the lock comes with the Start.
+            case .waiting: (Theme.sunken, Color(hex: 0x524E47), "clock")
             }
         }
     }

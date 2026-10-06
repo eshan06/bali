@@ -19,13 +19,15 @@ struct WaitingView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     VStack(spacing: 32) {
+                        // D1's ring on Focus's raised disc (Soft premium, D2i), 6 pt clear of it.
                         Circle().inset(by: 8).stroke(Theme.arcTrack, lineWidth: 10)
                             .overlay(alignment: .top) {
                                 Circle().fill(Theme.arc).frame(width: 10, height: 10).offset(y: 3)
                             }
-                            .frame(width: 176, height: 176).accessibilityHidden(true)
+                            .frame(width: 176, height: 176)
+                            .background(RaisedDisc().padding(-3)).accessibilityHidden(true)
                         VStack(spacing: 12) {
-                            Text("Ready — waiting for your teacher").textStyle(.h1)
+                            Text("Ready, waiting for your teacher").textStyle(.h1)
                             Text(
                                 "You tapped your teacher's block before class started. Your phone locks when class starts, as long as Bali is open. No need to tap again."
                             )
