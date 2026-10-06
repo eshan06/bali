@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { CARD } from '@/components/card';
 import { Lockup } from '@/components/mark';
 import { TEXT_LINK, TextLink } from '@/components/text-link';
 
@@ -10,7 +11,7 @@ import { TEXT_LINK, TextLink } from '@/components/text-link';
  * like every page (the root layout's `dynamic`), and no Sign out bar (`PortalBar` skips it). It
  * makes no legal claim of its own: where a fact is already public on the help page, a line links
  * there instead of restating it. Drawn in Soft premium (D2c-2): the notice as DESIGN.md §4's calm
- * banner, and the outline as one card per section in a tray.
+ * banner, and the outline as one card per section.
  */
 
 const SUPPORT_EMAIL = 'eshan.shah@vanderbilt.edu';
@@ -43,13 +44,13 @@ export function PolicyDraft({
         <strong className="font-semibold">{notice.lead}</strong> {notice.body}
       </p>
 
-      <div className="mt-10 grid gap-2 rounded-lg bg-surface-sunken p-2">
+      <div className="mt-10 grid gap-2">
         {sections.map((section) => (
           <section
             key={section.id}
             id={section.id}
             aria-labelledby={`${section.id}-title`}
-            className="scroll-mt-6 rounded-md border border-transparent bg-surface-card p-4 shadow-1 dark:border-border-default"
+            className={`scroll-mt-6 ${CARD}`}
           >
             <h2 id={`${section.id}-title`} className="text-h3">
               {section.title}

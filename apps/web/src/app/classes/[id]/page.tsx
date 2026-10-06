@@ -17,7 +17,7 @@ import { Field } from '@/components/field';
 import { JoinCode } from '@/components/join-code';
 import { LiveGrid } from '@/components/live-grid';
 import { RecapCard } from '@/components/recap-card';
-import { EMPTY_TRAY } from '@/components/tray';
+import { NAV_LINK } from '@/components/text-link';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import {
@@ -45,17 +45,14 @@ import { useApi } from '@/lib/use-api';
  */
 const PAGE = 'mx-auto max-w-[1400px] px-4 pt-10 pb-16 sm:px-10';
 
-/** A link across the portal (back to the classes, on to reports): brand ink and an arrow. */
-const NAV_LINK =
-  'inline-flex items-center gap-2 rounded-xs text-body font-semibold text-text-brand underline-offset-2 hover:underline';
-
 /**
- * A length in the picker's tray, the radio inside it read by screen readers and clipped away, so
- * the focus ring is drawn on the label for it. The pick is raised out of the sunken tray as a card
- * is, its words semibold in the primary ink: never by colour alone.
+ * A length in the picker: a pill per length, no grey track behind them (the owner, 2026-10-06),
+ * the radio inside it read by screen readers and clipped away, so the focus ring is drawn on the
+ * label for it. The pick is pressed as Present is: sunken, a `text-primary` edge, semibold and a
+ * check, never colour alone.
  */
 const LENGTH =
-  'inline-flex h-8 cursor-pointer items-center rounded-full border border-transparent px-4 text-body text-text-secondary tabular-nums transition-colors select-none hover:text-text-primary has-checked:bg-surface-card has-checked:font-semibold has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring dark:has-checked:border-border-default';
+  'inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border-strong bg-surface-card px-4 text-body text-text-primary tabular-nums transition-colors select-none hover:bg-surface-sunken has-checked:border-text-primary has-checked:bg-surface-sunken has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
 
 /**
  * A class's page (in Soft premium, D2f): its name and join code; while no session runs, the length
@@ -240,7 +237,8 @@ export default function ClassDetailPage() {
 
   // Present, the projector the class can see (DESIGN.md §5), in the grid's header, live or ended:
   // it reaches the recap too, so a session that ends while projected shows no unlock's reason, and
-  // pressing it again shows them. Pressed is its check and sunken fill, never colour alone.
+  // pressing it again shows them. Pressed is its check, with the Button's sunken fill and
+  // `text-primary` edge, never colour alone.
   const presentToggle = (
     <Button
       variant="secondary"
@@ -249,7 +247,6 @@ export default function ClassDetailPage() {
         rememberPresent(classId, !present);
         setPresent(!present);
       }}
-      className="aria-pressed:border-text-primary aria-pressed:bg-surface-sunken"
     >
       {present ? (
         <Check size={16} aria-hidden="true" />
@@ -297,7 +294,7 @@ export default function ClassDetailPage() {
             <form onSubmit={startSession} noValidate className="flex flex-col items-start gap-6">
               <fieldset>
                 <legend className="text-body font-medium">Session length</legend>
-                <div className="mt-3 inline-flex flex-wrap gap-1 rounded-full bg-surface-sunken p-1">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {[...LENGTH_PRESETS, 'other' as const].map((option) => (
                     <label key={option} className={LENGTH}>
                       <input
@@ -311,6 +308,7 @@ export default function ClassDetailPage() {
                         }}
                         className="sr-only"
                       />
+                      {pick === option ? <Check size={16} aria-hidden="true" /> : null}
                       {option === 'other' ? 'Other…' : `${option} min`}
                     </label>
                   ))}
@@ -460,7 +458,7 @@ export default function ClassDetailPage() {
             </p>
           )
         ) : roster.students.length === 0 ? (
-          <p className={`mt-6 text-body ${EMPTY_TRAY}`}>No students have joined yet.</p>
+          <p className="mt-4 text-body text-text-secondary">No students have joined yet.</p>
         ) : (
           <ul className="mt-4 columns-1 gap-x-10 sm:columns-2 lg:columns-3">
             {roster.students.map((s) => (

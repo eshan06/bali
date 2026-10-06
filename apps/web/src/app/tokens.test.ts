@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { CARD, CARD_ALONE } from '../components/card';
+
 /*
  * The portal's tokens are the design system's own file, ios/Bali/UI/bali-tokens.json, as
  * AppTests.tokens pins Theme.swift to it: every `--bali-*` variable globals.css sets, light and
@@ -73,12 +75,36 @@ function side(token: Token, mode: 'light' | 'dark'): string {
 const semantic = (list: Token[]) => list.filter((t) => typeof t.value !== 'string');
 /** `#rrggbb` as its three bytes. */
 const bytes = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+/**
+ * The owner's colours beside the tokens', until the design system's next export carries them,
+ * each pinned by a test of its own: bali-softpulse's glow (DESIGN.md §7) and border-input (§2).
+ */
+const RULED = new Set(['--bali-softpulse-glow', '--bali-border-input']);
+/** A colour token's `#rrggbb` on one side, through its `{primitive}` if it names one. */
+function hexOf(name: string, mode: 'light' | 'dark'): string {
+  const token = colours.get(name) as Token;
+  const raw = typeof token.value === 'string' ? token.value : token.value[mode];
+  const primitive = /^\{([\w-]+)\}$/.exec(raw)?.[1];
+  return primitive ? hexOf(primitive, mode) : raw;
+}
+/** WCAG 2.2's contrast ratio of two `#rrggbb` colours. */
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r = 0, g = 0, bl = 0] = bytes(hex).map((v) => {
+      const c = v / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi = 0, lo = 0] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 describe('the portal’s tokens are bali-tokens.json’s', () => {
   it('every --bali- variable on :root is a token’s light value', () => {
     expect(light.size).toBeGreaterThan(60);
     for (const [name, value] of light) {
-      if (name === '--bali-softpulse-glow') continue;
+      if (RULED.has(name)) continue;
       const token = colours.get(name.slice('--bali-'.length)) ?? shadows.get(name.slice(7));
       expect(token, name).toBeDefined();
       expect(value, name).toBe(side(token as Token, 'light'));
@@ -97,7 +123,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
 
   it('the dark block holds each token’s dark value, every one whose dark differs included', () => {
     for (const [name, value] of dark) {
-      if (name === '--bali-softpulse-glow') continue;
+      if (RULED.has(name)) continue;
       const token = colours.get(name.slice(7)) ?? shadows.get(name.slice(7));
       expect(token, name).toBeDefined();
       expect(value, name).toBe(side(token as Token, 'dark'));
@@ -163,6 +189,25 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     glow('dark', 'orange-300');
   });
 
+  it('border-input, a text field’s edge, is the owner’s: 3:1 on the card, the page and the well', () => {
+    // The owner's ruling (2026-10-06): stone-500 in light, dark text-tertiary's value in dark,
+    // where border-default is 1.3:1, under WCAG 1.4.11's 3:1 for a control's edge.
+    expect(light.get('--bali-border-input')).toBe('var(--bali-stone-500)');
+    expect(dark.get('--bali-border-input')).toBe(hexOf('text-tertiary', 'dark').toLowerCase());
+    expect(inline.get('--color-border-input')).toBe('var(--bali-border-input)');
+    const edge = { light: hexOf('stone-500', 'light'), dark: hexOf('text-tertiary', 'dark') };
+    for (const mode of ['light', 'dark'] as const) {
+      for (const surface of ['surface-card', 'surface-page', 'surface-sunken']) {
+        const ratio = contrast(edge[mode], hexOf(surface, mode));
+        expect(ratio, `${surface}, ${mode}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+    // Every field's, through the one Field; a refused field's edge stays `text-primary`.
+    expect(read('../components/field.tsx')).toMatch(
+      /<input[^]*className=\{`[^`]*\bborder-border-input\b[^`]*\baria-\[invalid=true\]:border-text-primary\b/,
+    );
+  });
+
   it('bali-softpulse is a 6 px glow ring, 1.2 s twice on the standard easing, and only the grid’s', () => {
     expect(css).toMatch(
       /@keyframes bali-softpulse\s*\{\s*0%,\s*100%\s*\{\s*box-shadow: 0 0 0 0 transparent;\s*\}\s*50%\s*\{\s*box-shadow: 0 0 0 6px var\(--bali-softpulse-glow\);\s*\}\s*\}/,
@@ -222,13 +267,20 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
   it('beside them, only the sizes the owner ruled (DESIGN.md §3, §5), each where it belongs', () => {
     // The input size: 16 px, so iPhone Safari never zooms into a field when it is tapped
     // (2026-10-05). The Present view's names and chip labels, 20 px and 14 px as drawn
-    // (2026-10-05). Their line heights on the 4-pt grid; the design system gains them at the
+    // (2026-10-05). code-lg, the join code in Present, 24 px at the code style's weight
+    // (2026-10-06). Their line heights on the 4-pt grid; the design system gains them at the
     // owner's next export.
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
-    expect(sizes.sort()).toEqual([...styles, 'input', 'present-label', 'present-name'].sort());
+    expect(sizes.sort()).toEqual(
+      [...styles, 'code-lg', 'input', 'present-label', 'present-name'].sort(),
+    );
+    const code = tokens.type.groups.flatMap((g) => g.styles).find((s) => s.name === 'code');
+    expect(theme.get('--text-code-lg')).toBe('24px');
+    expect(theme.get('--text-code-lg--line-height')).toBe('32px');
+    expect(theme.get('--text-code-lg--font-weight')).toBe(String(code?.fontWeight));
     expect(theme.get('--text-input')).toBe('16px');
     expect(theme.get('--text-input--line-height')).toBe('24px');
     expect(theme.get('--text-input--font-weight')).toBe('400');
@@ -242,7 +294,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(theme.get('--text-present-label--line-height')).toBe('20px');
     expect(theme.get('--text-present-label--font-weight')).toBe(String(label?.fontWeight));
     expect(theme.get('--text-present-label--letter-spacing')).toBe(label?.letterSpacing);
-    for (const size of ['present-name', 'present-label', 'input']) {
+    for (const size of ['present-name', 'present-label', 'input', 'code-lg']) {
       expect(parseInt(theme.get(`--text-${size}--line-height`) ?? '', 10) % 4, size).toBe(0);
     }
     const src = fileURLToPath(new URL('../', import.meta.url));
@@ -331,6 +383,41 @@ describe('every page and piece uses the tokens’ utilities, never a Tailwind de
     // types nothing (the class page's length picker).
     if (file !== 'components/field.tsx') {
       expect(source).not.toMatch(/<input\b(?![^>]*type="radio")/);
+    }
+  });
+});
+
+describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
+  // Cards sit straight on the page with their own hairline (DESIGN.md §4). Grey stays only where
+  // the approved designs keep it: a field's well, the grid's stale banner, the policy draft's
+  // banner, and a control's hover, pressed or open state; a chip's fill is its state's own tint.
+  const src = fileURLToPath(new URL('../', import.meta.url));
+  const files = sources(src).filter((file) => /\.tsx?$/.test(file));
+
+  it('surface-sunken fills nothing else', () => {
+    const bare = (file: string) =>
+      readFileSync(file, 'utf8').match(/(?<=[\s'"`])bg-surface-sunken\b/g)?.length ?? 0;
+    const filled = files.filter((file) => bare(file) > 0).map((file) => relative(src, file));
+    expect(filled.sort()).toEqual(
+      [
+        join('components', 'field.tsx'),
+        join('components', 'live-grid.tsx'),
+        join('components', 'policy-draft.tsx'),
+      ].sort(),
+    );
+    for (const file of filled) expect(bare(join(src, file)), file).toBe(1);
+  });
+
+  it('a card keeps its own hairline in light and dark, never one for dark alone', () => {
+    for (const card of [CARD, CARD_ALONE]) {
+      expect(card).toMatch(/\bbg-surface-card\b/);
+      expect(card).toMatch(/\bborder border-border-default\b/);
+      expect(card).toMatch(/\bshadow-1\b/);
+    }
+    for (const file of files) {
+      expect(readFileSync(file, 'utf8'), relative(src, file)).not.toMatch(
+        /\bdark:(?:[\w-]+:)*border-border-default\b/,
+      );
     }
   });
 });

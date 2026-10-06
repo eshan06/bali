@@ -4,7 +4,7 @@ import type { ClassDetail } from '@bali/shared';
 import { useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD } from '@/components/tray';
+import { CARD } from '@/components/card';
 import { NEW_CODE_MADE } from '@/lib/errors';
 import { codeMoved, regenerateCode } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
@@ -98,7 +98,6 @@ export function JoinCode({
             setConfirming(true);
             setSaid(null);
           }}
-          className="aria-expanded:bg-surface-sunken"
         >
           New code
         </Button>

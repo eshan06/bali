@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
+import { CARD_ALONE } from '@/components/card';
 import { Lockup } from '@/components/mark';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
@@ -35,8 +36,8 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-10">
-      {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding; in dark its hairline edge. */}
-      <div className="rounded-lg border border-transparent bg-surface-card p-6 shadow-1 dark:border-border-default">
+      {/* A card on its own (DESIGN.md §4): radius-lg, space-6 padding, its own hairline edge. */}
+      <div className={CARD_ALONE}>
         <Lockup />
         <h1 className="mt-6 text-h1 text-balance">Teacher portal</h1>
         <p className="mt-2 text-body-lg text-text-secondary">Sign in to see your classes.</p>

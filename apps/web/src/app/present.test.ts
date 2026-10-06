@@ -42,7 +42,7 @@ describe('the class page in Present', () => {
   it('comes back in Present after a reload or a return from Reports, as this tab left it', () => {
     expect(opening()).toMatch(/const (\w+) = rememberedPresent\(classId\);[^]*setPresent\(\1\);/);
     const toggle = page.slice(page.indexOf('const presentToggle'));
-    const press = toggle.slice(toggle.indexOf('onClick'), toggle.indexOf('className'));
+    const press = toggle.slice(toggle.indexOf('onClick'), toggle.indexOf('</Button>'));
     expect(press).toMatch(/rememberPresent\(classId, !present\)/);
     expect(press).toMatch(/setPresent\(!present\)/);
   });

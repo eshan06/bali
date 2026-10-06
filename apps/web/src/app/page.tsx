@@ -8,10 +8,10 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Blocks } from '@/components/blocks';
 import { Button } from '@/components/button';
+import { CARD } from '@/components/card';
 import { Field } from '@/components/field';
 import { InviteCode } from '@/components/invite-code';
 import { TextLink } from '@/components/text-link';
-import { CARD, EMPTY_TRAY, TRAY } from '@/components/tray';
 import { getAccessToken } from '@/lib/auth';
 import { CLASS_NAME_MAX, createClass } from '@/lib/classes';
 import { errText, NO_CLASS_NAME } from '@/lib/errors';
@@ -29,7 +29,7 @@ type Said =
 const PAGE = 'mx-auto max-w-2xl px-4 pt-10 pb-16 sm:px-10';
 
 /**
- * The classes home (D2e, in Soft premium): the teacher's classes as cards in a tray, each opening
+ * The classes home (D2e, in Soft premium): the teacher's classes as cards, each opening
  * its class page; the create form under them, its name's refusals and failures said under the
  * field with the way on; then the teacher's block. An account that doesn't teach yet gets the
  * invite code in place of all of it.
@@ -143,17 +143,17 @@ export default function HomePage() {
       ) : null}
 
       {me.classes.length === 0 ? (
-        <p className={`mt-6 text-body ${EMPTY_TRAY}`}>
+        <p className="mt-6 text-body text-text-secondary">
           No classes yet. Create your first one below.
         </p>
       ) : (
-        <ul className={`mt-6 ${TRAY}`}>
+        <ul className="mt-6 grid gap-2">
           {me.classes.map((c) => (
             <li key={c.id}>
               {/* The whole card opens the class; its edge firms and the chevron moves on hover. */}
               <Link
                 href={`/classes/${c.id}`}
-                className={`group flex items-center justify-between gap-4 transition-colors hover:border-border-strong dark:hover:border-border-strong ${CARD}`}
+                className={`group flex items-center justify-between gap-4 transition-colors hover:border-border-strong ${CARD}`}
               >
                 <span className="min-w-0 text-h3 break-words">{c.name}</span>
                 <ChevronRight
