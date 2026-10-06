@@ -10,12 +10,18 @@ public enum Screen: Sendable, Hashable {
     case intro, signIn, screenTime, join, home, waiting, focus, unlocked, protectionOff, sessionOver
     /// Home's neighbours in D1's tab bar (C6): the student's own history, and Me.
     case history, me
+    /// Me's Delete account under way, stopped or done (C4b; `Deleting`): its own screen, over every
+    /// other from the press to the end, the shields' Focus included — the deletion ends the session
+    /// itself, and an unlock made meanwhile would wait for the next sign-in (DECISIONS, C4a).
+    case deleting
     /// The app could not start — its storage would not open, or its build is not set up — with why,
     /// shown with a way to try again (rule 5).
     case storage(String)
 
     /// The screen for what the phone knows at `now`: `problem`, why the app could not start;
-    /// `introSeen`, the phone's own flag (C1); `signedIn`, nil until the Keychain could be read;
+    /// `deleting`, whether Me's Delete account has its own screen to show (C4b, `Deleting.shows`),
+    /// before everything but a start that failed — nothing else is offered from the press to the
+    /// end; `introSeen`, the phone's own flag (C1); `signedIn`, nil until the Keychain could be read;
     /// `protection`, what rule 3's check found, nil until the enforcer runs and unchecked until its
     /// first pass; `everApproved`, whether a pass has ever read the permission approved (C1b) —
     /// Family Controls can read not determined for a moment after a launch (B5a-2), and with this
@@ -37,11 +43,15 @@ public enum Screen: Sendable, Hashable {
     /// honoured — in the same answer, at the same `now`, so the screen and its bar never disagree,
     /// at a bell either (C6a's review).
     public static func choose(
-        problem: String?, introSeen: Bool, signedIn: Bool?, protection: Protection?,
+        problem: String?, deleting: Bool, introSeen: Bool, signedIn: Bool?, protection: Protection?,
         everApproved: Bool, everInClass: Bool, sync: SyncState?, hasClasses: Bool?,
         sessionOverClosed: SessionView?, opened: [Screen], tab: Screen, now: Date
     ) -> (screen: Screen, tabbed: Bool) {
         if let problem { return (.storage(problem), false) }
+        // Delete account pressed (C4b): its screen and nothing else — not Focus either, whose
+        // Emergency Unlock would wait for the next sign-in; the deletion takes the shields off
+        // itself, as the question said.
+        if deleting { return (.deleting, false) }
         // The shields on — the enforcer's own rule, so the screen and the shields agree: focused in
         // a session the phone's own clock says still runs (decision 6), or a tap not yet answered
         // holding them (decision 7, to its cap; not after decision 11's unlock, nor refused) — is

@@ -11,7 +11,7 @@ import Testing
 /// engine that has not spoken. The permission is judged off as the enforcer judges it: denied at
 /// once, not determined only where `permissionOff` says it has lasted past B5a-2's grace.
 private func screen(
-    problem: String? = nil, introSeen: Bool = true, signedIn: Bool? = true,
+    problem: String? = nil, deleting: Bool = false, introSeen: Bool = true, signedIn: Bool? = true,
     permission: Permission? = .approved, permissionOff: Bool? = nil, checked: Bool = true,
     shielded: Bool = false, everApproved: Bool = false, everInClass: Bool = false,
     standing: Standing? = .out, queued: [OutboxRecord] = [], lastTap: String? = nil,
@@ -34,7 +34,8 @@ private func screen(
         sync?.lastTap = lastTap
     }
     return Screen.choose(
-        problem: problem, introSeen: introSeen, signedIn: signedIn, protection: protection,
+        problem: problem, deleting: deleting, introSeen: introSeen, signedIn: signedIn,
+        protection: protection,
         everApproved: everApproved, everInClass: everInClass, sync: sync, hasClasses: hasClasses,
         sessionOverClosed: sessionOverClosed, opened: opened, tab: tab, now: now
     ).screen
@@ -50,7 +51,7 @@ private func tabbed(
     var (protection, sync) = (Protection(), SyncState())
     (protection.checked, protection.permission, sync.standing) = (true, .approved, standing)
     return Screen.choose(
-        problem: nil, introSeen: true, signedIn: true, protection: protection, everApproved: false,
+        problem: nil, deleting: false, introSeen: true, signedIn: true, protection: protection, everApproved: false,
         everInClass: everInClass, sync: sync, hasClasses: hasClasses, sessionOverClosed: closed,
         opened: opened, tab: .history, now: now
     ).tabbed
@@ -98,6 +99,28 @@ struct ScreenTests {
             screen(problem: why, introSeen: false, signedIn: nil, permission: nil, standing: nil)
                 == .storage(why))
         #expect(screen(problem: why, standing: .inSession(session(), .focused)) == .storage(why))
+    }
+
+    @Test(
+        "Delete account pressed (C4b): the deletion's own screen over everything but a start that failed — the shields' Focus, the last run's shields' Home, the intro, the sign-in, a session's screens, a screen opened over another and a tab chosen — with no tab bar; nothing else is offered from the press to the end"
+    )
+    func deleting() {
+        #expect(screen(deleting: true) == .deleting)
+        #expect(screen(deleting: true, shielded: true, standing: .inSession(session(), .focused)) == .deleting)
+        #expect(screen(deleting: true, shielded: true, standing: .unread) == .deleting)
+        #expect(screen(deleting: true, introSeen: false, signedIn: nil, permission: nil, standing: nil) == .deleting)
+        #expect(screen(deleting: true, signedIn: false) == .deleting)
+        #expect(screen(deleting: true, standing: .inSession(session(), .unlocked)) == .deleting)
+        #expect(screen(deleting: true, opened: [.join], tab: .me) == .deleting)
+        var (protection, sync) = (Protection(), SyncState())
+        (protection.checked, protection.permission) = (true, .approved)
+        sync.standing = .out
+        let shown = Screen.choose(
+            problem: nil, deleting: true, introSeen: true, signedIn: true, protection: protection,
+            everApproved: false, everInClass: false, sync: sync, hasClasses: true,
+            sessionOverClosed: nil, opened: [], tab: .me, now: t0)
+        #expect(shown.screen == .deleting && !shown.tabbed)
+        #expect(screen(problem: "why", deleting: true) == .storage("why"))
     }
 
     @Test(
@@ -945,7 +968,7 @@ private func shown(_ state: SyncState, opened: [Screen], now: Date = t0) -> (Scr
     var protection = Protection()
     (protection.checked, protection.permission) = (true, .approved)
     let shown = Screen.choose(
-        problem: nil, introSeen: true, signedIn: true, protection: protection,
+        problem: nil, deleting: false, introSeen: true, signedIn: true, protection: protection,
         everApproved: false, everInClass: false, sync: state, hasClasses: state.hasClasses,
         sessionOverClosed: nil, opened: opened, tab: .home, now: now)
     return (shown.screen, shown.tabbed)
