@@ -13,8 +13,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `NetworkError` with `errors.ts`'s `CANT_REACH` ("Couldn't reach Bali. Check your connection,
   then try again."), the words the block register and the class page's controls already used, so
   the home, the class page, the grid, the recap and reports stop showing the error's own message
-  ("can't reach the server — retry", the portal's last em-dash in its words); that message is now
-  a log line. The unknown thrown value gets a way on ("Something went wrong. Try again."). Only a
+  ("can't reach the server — retry", em-dash and all); that message is now a log line, and
+  ARCHITECTURE's Web portal decision 4 quotes the new words. The unknown thrown value gets a way on ("Something went wrong. Try again."). Only a
   401 still signs anyone out (ARCHITECTURE, Web portal, decision 4). **The pages, within
   DESIGN.md, nothing invented:** the callback is `/login`'s card, its failure a sentence in
   `text-primary` and Back to sign in as the card's pill (a link drawn by `buttonClass`, since it
