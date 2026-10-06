@@ -336,3 +336,19 @@ describe('the pages in Soft premium use the tokens’ utilities, never a Tailwin
     }
   });
 });
+
+describe('the reports list reflows by its own width (D2g)', () => {
+  // At ~600 px the table ran off the right edge (DESIGN.md §8: a layout reflows by column count,
+  // never by smaller type). Each session is a card whose figures sit under their own names when
+  // the list is narrow, so no column is ever out of view in a box that scrolls sideways.
+  const page = read('./classes/[id]/reports/page.tsx');
+
+  it('is no table, and nothing in it scrolls sideways or refuses to wrap', () => {
+    expect(page).not.toMatch(/<table\b|overflow-x-(?:auto|scroll)|whitespace-nowrap/);
+  });
+
+  it('lays its rows out by the list’s own width, its figures named on a narrow row', () => {
+    expect(page).toMatch(/className="mt-6 @container"/);
+    expect(page).toMatch(/<dt className="[^"]*@4xl:sr-only[^"]*">/);
+  });
+});
